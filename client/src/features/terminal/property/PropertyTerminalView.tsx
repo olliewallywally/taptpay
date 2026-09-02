@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { motion } from "motion/react";
 import { inertWhen } from "../inert-when";
 import { WireframeLiquidButton } from "@/components/wireframe-liquid-button";
 import { setDockCollapse } from "@/features/navigation/dock-collapse-store";
@@ -18,6 +19,17 @@ const OFFW = '#F4F4F4';
 const GREEN = '#1BBF85';
 const RED   = '#FF3B4E';
 const AMBER = '#FFB02E';
+
+/* Only `.tp-home-stack` moves when the feed opens — it grows from its normal
+   row-3 slot to a full-screen overlay (position:absolute, inset:0) that sits
+   above the hero and gutter, which hold still. `layout` gives a real
+   FLIP-based resize (transform-driven) across that positioning-scheme change
+   instead of fighting CSS grid — a `transition: grid-template-rows` was
+   tried first and measured to not interpolate in Chromium at all (the tracks
+   held their old size for ~1-2 frames then snapped partway through the
+   duration). A touch faster than the first pass (0.75s) but still slower
+   than the app's usual 0.55s, per Oliver, 2026-08-31. */
+const FEED_LAYOUT_TRANSITION = { duration: 0.62, ease: [0.34, 1.56, 0.64, 1] } as const;
 
 /* Oliver asked for 20% more off-white hero on the tenants, amount (keypad)
    and send screens, and for the amount/send pair to land on the same bottom
@@ -195,10 +207,11 @@ function RequestsHome({ invoices, tenants, outstanding, outstandingExpenses = 0,
   const recent = feedOpen ? filtered : filtered.slice(0, 12);
 
   return (
-    <div className="tp-screen tp-home" data-feed-open={feedOpen || undefined}>
-      {/* Top — navy. Collapses to 0 and slides its content up when the feed expands. */}
-      <div className="stagger tp-feed-hero tp-home-hero" style={{ background: NAVY, padding: feedOpen ? '0 28px' : 'clamp(44px, 9.5svh, 86px) 28px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
-        <div className={`tp-feed-hero-inner${feedOpen ? ' off' : ''}`}>
+    <div className="tp-screen tp-home">
+      {/* Top — navy. Stays put; the list overlays it instead of it collapsing
+          (Oliver, 2026-08-31 — the grid-collapse version was too much). */}
+      <div className="stagger tp-feed-hero tp-home-hero" style={{ background: NAVY, padding: 'clamp(44px, 9.5svh, 86px) 28px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
+        <div className="tp-feed-hero-inner">
           <div className="tp-amount" style={amountStyle(fmt(outstanding), 82, { color: BLUE })}>{fmt(outstanding)}</div>
           <div style={{ marginTop: 10, color: BLUE, fontWeight: 500, fontSize: 16 }}>outstanding rent</div>
           {/* Expenses — smaller and lighter than the hero figure, faded */}
@@ -207,8 +220,15 @@ function RequestsHome({ invoices, tenants, outstanding, outstandingExpenses = 0,
         </div>
       </div>
       <div className="tp-home-chrome" aria-hidden="true" style={{ background: OFFW }} />
-      {/* Bottom — OFFW. Rises to the top of the page as the hero leaves. */}
-      <div className="stagger tp-feed-body tp-home-stack" style={{ background: OFFW, paddingInline: 22, ...(feedOpen ? { paddingTop: 12 } : null) }}>
+      {/* Bottom — OFFW. Everything else holds still; this is the only thing that
+          moves, growing via `layout` from its row-3 slot to a full-screen overlay
+          (position:absolute, inset:0) that sits above the static hero/gutter —
+          FLIP handles the transition between the two positioning schemes fine.
+          `gridRow` must be reset to auto here: an absolutely-positioned grid
+          item's containing block is its *grid area* (per spec), not the whole
+          grid container, as long as it still carries a `grid-row` placement —
+          so `inset: 0` was resolving against row 3's old box, not the screen. */}
+      <motion.div layout transition={FEED_LAYOUT_TRANSITION} className="stagger tp-feed-body tp-home-stack" style={{ background: OFFW, paddingInline: 22, ...(feedOpen ? { position: 'absolute', inset: 0, gridRow: 'auto', zIndex: 10, paddingTop: 'calc(env(safe-area-inset-top, 0px) + 24px)' } : null) }}>
         <div className="tp-home-stack-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 9 }}>
           <button className="tap-target" type="button" onClick={() => onToggleFeed?.()} aria-expanded={feedOpen}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'Outfit, system-ui', WebkitTapHighlightColor: 'transparent' }}>
@@ -231,7 +251,7 @@ function RequestsHome({ invoices, tenants, outstanding, outstandingExpenses = 0,
         <AnimatedScrollList
           className="tp-stack-scroll"
           style={{ flex: 1, overflow: 'auto', paddingRight: 2 }}
-          fadeColor="#fff"
+          fadeColor={OFFW}
         >
           <div className="tp-stack-card">
             {recent.length === 0 ? (
@@ -287,7 +307,7 @@ function RequestsHome({ invoices, tenants, outstanding, outstandingExpenses = 0,
             })}
           </div>
         </AnimatedScrollList>
-      </div>
+      </motion.div>
     </div>
   );
 }
@@ -340,7 +360,7 @@ function ChooseTenant({ tenants, invoices, go, onSelect, splitMode, onToggleSpli
 
   return (
     <div
-      className="tp-screen tp-feature"
+      className="tp-screen tp-feature tp-choose-tenant"
       style={{
         background: NAVY,
         '--hero-pref': HERO_PREF_XL,
@@ -358,19 +378,28 @@ function ChooseTenant({ tenants, invoices, go, onSelect, splitMode, onToggleSpli
       {/* Bottom — NAVY */}
       <div className="stagger tp-panel" style={{ background: NAVY }}>
         <div className="tp-panel-body" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-        {/* search */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,0.08)', borderRadius: 999, padding: '0 18px', height: 44, marginBottom: 14, flexShrink: 0 }}>
-          <Ic.Search sz={16} c="rgba(88,171,255,0.6)" />
-          <input
-            value={q} onChange={e => setQ(e.target.value)}
-            placeholder="search tenants or address"
-            style={{ flex: 1, border: 'none', background: 'transparent', color: BLUE, fontFamily: 'Outfit, system-ui', fontWeight: 500, fontSize: 'max(14px, var(--field-floor, 0px))', outline: 'none' }}
-          />
+        {/* search — sticky: stays put while the list scrolls under it, with a
+            fade strip at its own bottom edge so rows don't hard-clip as they
+            pass beneath (Oliver, 2026-08-31: "search bar to stay and not
+            scroll and it fades under the search bar"). */}
+        <div style={{ position: 'sticky', top: 0, zIndex: 2, background: NAVY, flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,0.08)', borderRadius: 999, padding: '0 18px', height: 44 }}>
+            <Ic.Search sz={16} c="rgba(88,171,255,0.6)" />
+            <input
+              value={q} onChange={e => setQ(e.target.value)}
+              placeholder="search tenants or address"
+              style={{ flex: 1, border: 'none', background: 'transparent', color: BLUE, fontFamily: 'Outfit, system-ui', fontWeight: 500, fontSize: 'max(14px, var(--field-floor, 0px))', outline: 'none' }}
+            />
+          </div>
+          <div aria-hidden="true" style={{ height: 20, background: `linear-gradient(${NAVY}, transparent)` }} />
         </div>
-        {/* list */}
+        {/* list — no bottom clearance: it's fine for rows to run under the
+            dock rather than stop short of it (same request). Scrollbar is
+            hidden via .tp-choose-tenant .tp-panel-body, the element that
+            actually scrolls here (terminal-tokens.css's DK1 rule). */}
         <AnimatedScrollList
           className="tp-thin-scroll"
-          style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 130 }}
+          style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, marginTop: -20, paddingBottom: 16 }}
           fadeColor={NAVY}
         >
           {filtered.length === 0 ? (

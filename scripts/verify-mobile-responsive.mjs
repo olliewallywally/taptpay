@@ -332,6 +332,7 @@ async function measure(page, allowlist) {
       ".tp-viewport .tp-home-hero",
       ".tp-viewport .tp-home-chrome",
       ".tp-viewport .tp-home-stack",
+      ".tp-viewport .tp-home-stack .dt-scroll-wrap",
       ".tp-viewport .tp-home-stack .tp-stack-scroll",
       ".tp-viewport .tp-home-stack .tp-stack-row",
       ".tp-viewport .tp-pfab.home",

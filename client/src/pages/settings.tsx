@@ -74,60 +74,98 @@ const BILLING_TYPE_LABELS: Record<string, string> = {
 
 const billingTypeLabel = (value: string) =>
   BILLING_TYPE_LABELS[value] ?? value.replace(/_/g, " ");
-import { 
-  Upload, CheckCircle, XCircle, LogOut, AlertCircle, Bell, BellOff, ChevronDown, Printer, ArrowRight, CreditCard, Building2, Wrench, BookOpen, RotateCcw
+import {
+  Upload, CheckCircle, XCircle, LogOut, AlertCircle, Bell, BellOff, Printer, ArrowRight, ArrowLeft, CreditCard, Building2, Wrench, BookOpen, RotateCcw, SlidersHorizontal, UserCircle
 } from "lucide-react";
 
-function SettingsSection({ title, isOpen, onToggle, children, delay = 0, anchor }: {
+type SectionKey = "business" | "prefs" | "billing" | "account" | "notifs" | "tutorial";
+
+/* Neutral grayscale for the redesigned list/detail chrome only (identity card,
+   grouped rows, sub-page header) — the reference image has no blue anywhere.
+   The app's brand navy/sky-blue (#040D6D/#58ABFF) stays exactly where it already
+   was: inside the untouched sub-page body content and the untouched bottom
+   cluster (payment button, mode buttons, log out). */
+const APPLE_INK = '#1C1C1E';
+const APPLE_MUTED = '#8E8E93';
+const APPLE_FILL = '#F2F2F7';
+
+/* iOS-style push/pop: the entering page slides in from the right over
+   SETTINGS_ENTER_MS (a plain mount animation, `both`-filled); the leaving page
+   slides back out over SETTINGS_LEAVE_MS before its state actually clears — see
+   `closeSection`. Curve matches the platform's own navigation transition. */
+const SETTINGS_ENTER_MS = 300;
+const SETTINGS_LEAVE_MS = 260;
+const SETTINGS_SLIDE_EASE = 'cubic-bezier(0.32, 0.72, 0, 1)';
+
+const SETTINGS_TRANSITION_CSS = `
+@keyframes settingsPushIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@keyframes settingsPushOut { from { transform: translateX(0); } to { transform: translateX(100%); } }
+.settings-detail-pane {
+  animation: settingsPushIn ${SETTINGS_ENTER_MS}ms ${SETTINGS_SLIDE_EASE} both;
+  box-shadow: -14px 0 32px rgba(0,0,0,0.10);
+  position: relative;
+  z-index: 1;
+}
+.settings-detail-pane.settings-detail-leaving {
+  animation: settingsPushOut ${SETTINGS_LEAVE_MS}ms ${SETTINGS_SLIDE_EASE} forwards;
+}
+`;
+
+const SECTION_META: Record<SectionKey, { title: string; icon: React.ReactNode }> = {
+  business: { title: "Business Details", icon: <Building2 className="w-5 h-5" style={{ color: APPLE_INK }} /> },
+  prefs: { title: "Dashboard Preferences", icon: <SlidersHorizontal className="w-5 h-5" style={{ color: APPLE_INK }} /> },
+  billing: { title: "Subscription & Billing", icon: <CreditCard className="w-5 h-5" style={{ color: APPLE_INK }} /> },
+  account: { title: "Account", icon: <UserCircle className="w-5 h-5" style={{ color: APPLE_INK }} /> },
+  notifs: { title: "Transaction Notifications", icon: <Bell className="w-5 h-5" style={{ color: APPLE_INK }} /> },
+  tutorial: { title: "Tutorial & Help", icon: <BookOpen className="w-5 h-5" style={{ color: APPLE_INK }} /> },
+};
+
+/* Apple-style grouped-list row: icon badge, label, optional trailing value,
+   chevron. Same anatomy the Payment Board Builder card already used, generalized
+   so it can also stack inside a group with a hairline between rows. */
+function SettingsItem({ icon, title, value, onClick, delay = 0, testId, tutorialId, settingsSection, last }: {
+  icon: React.ReactNode;
   title: string;
-  isOpen: boolean;
-  onToggle: () => void;
-  children: React.ReactNode;
+  value?: string;
+  onClick: () => void;
   delay?: number;
-  anchor?: string;
+  testId?: string;
+  tutorialId?: string;
+  settingsSection?: string;
+  last?: boolean;
 }) {
   return (
-    <div
-      data-tutorial-id={anchor}
-      className="pt-bounce bg-white mb-4 overflow-hidden transition-shadow"
-      style={{ '--pt-d': `${delay}ms`, borderRadius: 22, boxShadow: isOpen ? '0 10px 30px rgba(4,13,109,0.10)' : '0 4px 14px rgba(4,13,109,0.08)' } as any}
+    <button
+      type="button"
+      onClick={onClick}
+      data-testid={testId}
+      data-tutorial-id={tutorialId}
+      data-settings-section={settingsSection}
+      aria-label={title}
+      className="pt-bounce w-full flex items-center justify-between px-5 py-4 text-left"
+      style={{ '--pt-d': `${delay}ms`, borderBottom: last ? 'none' : '1px solid rgba(0,0,0,0.06)' } as any}
     >
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center justify-between px-5 sm:px-6 py-5 text-left"
-      >
-        <h2 style={{ fontWeight: 600, fontSize: 17, color: '#040D6D', letterSpacing: '-0.01em' }}>{title}</h2>
-        <div
-          style={{
-            width: 30, height: 30, borderRadius: 999, flexShrink: 0, marginLeft: 8,
-            background: isOpen ? '#040D6D' : 'rgba(4,13,109,0.07)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            transition: 'background 0.25s ease',
-          }}
-        >
-          <ChevronDown
-            size={17}
-            style={{
-              color: isOpen ? '#58ABFF' : '#040D6D',
-              transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-              transition: 'transform 0.3s ease, color 0.25s ease',
-            }}
-          />
-        </div>
-      </button>
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateRows: isOpen ? '1fr' : '0fr',
-          transition: 'grid-template-rows 0.3s ease',
-        }}
-      >
-        <div style={{ overflow: 'hidden' }}>
-          <div className="px-5 sm:px-6 pb-5 sm:pb-6">
-            {children}
-          </div>
-        </div>
-      </div>
+      <span className="flex items-center gap-4 min-w-0">
+        <span className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: APPLE_FILL }}>
+          {icon}
+        </span>
+        <span style={{ fontWeight: 600, fontSize: 16, color: APPLE_INK, lineHeight: 1.2 }}>{title}</span>
+      </span>
+      <span className="flex items-center gap-2 flex-shrink-0 ml-3">
+        {value && <span className="text-sm text-gray-400">{value}</span>}
+        <ArrowRight className="w-5 h-5" style={{ color: APPLE_MUTED }} />
+      </span>
+    </button>
+  );
+}
+
+function SettingsGroup({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
+  return (
+    <div
+      className="pt-bounce bg-white mb-4 overflow-hidden"
+      style={{ '--pt-d': `${delay}ms`, borderRadius: 22, boxShadow: '0 4px 14px rgba(4,13,109,0.08)' } as any}
+    >
+      {children}
     </div>
   );
 }
@@ -156,18 +194,26 @@ export default function Settings() {
     canRestart: tutorialReady,
   } = useTutorial();
 
-  const [openSections, setOpenSections] = useState<Set<string>>(new Set());
-  const toggle = (id: string) => setOpenSections(prev => {
-    const next = new Set(prev);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    return next;
-  });
-
-  useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("section") === "billing") {
-      setOpenSections(previous => new Set(previous).add("billing"));
-    }
-  }, []);
+  /* Apple-style list → detail: null shows the grouped row list, otherwise the
+     matching section renders as its own full-screen page (see render). The
+     Windcave hosted-card return still lands on /settings?section=billing&card=…
+     (server/routes.ts:7014, not changed here) — landing straight on the billing
+     page instead of an inline scroll target is the same behavior, new shape. */
+  const [activeSection, setActiveSection] = useState<SectionKey | null>(() =>
+    new URLSearchParams(window.location.search).get("section") === "billing" ? "billing" : null,
+  );
+  /* Slide-out is a real CSS animation, not an instant unmount — `leaving` keeps
+     the section rendered (with the exit class applied) for the animation's
+     duration, then the state actually clears. 260ms matches SETTINGS_LEAVE_MS
+     below and the animation's own duration. */
+  const [leaving, setLeaving] = useState(false);
+  const closeSection = () => {
+    setLeaving(true);
+    window.setTimeout(() => {
+      setActiveSection(null);
+      setLeaving(false);
+    }, SETTINGS_LEAVE_MS);
+  };
 
   const [businessDetails, setBusinessDetails] = useState<MerchantDetails>({
     businessName: '',
@@ -277,14 +323,6 @@ export default function Settings() {
     queryKey: ["/api/billing/card"],
     enabled: isOwner,
   });
-
-  useEffect(() => {
-    if (!isLoading && new URLSearchParams(window.location.search).get("section") === "billing") {
-      requestAnimationFrame(() => {
-        document.querySelector('[data-settings-section="billing"]')?.scrollIntoView({ behavior: "smooth", block: "start" });
-      });
-    }
-  }, [isLoading]);
 
   const updateMerchantMutation = useMutation({
     mutationFn: async (details: MerchantDetails & { windcaveApiKey?: string }) => {
@@ -614,7 +652,7 @@ export default function Settings() {
     if (!confirmed) return;
     try {
       await restartTutorials();
-      setOpenSections(previous => new Set(previous).add("tutorial"));
+      setActiveSection("tutorial");
       toast({
         title: "Tutorials restarted",
         description: "Open each page normally to see its tutorial again.",
@@ -713,51 +751,29 @@ export default function Settings() {
 
   return (
     <div style={{ background: '#FFFFFF', minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
-    <div className="pb-32" style={{ width: '100%', maxWidth: 'var(--phone-shell-max)', minHeight: '100svh', background: '#F4F4F4', fontFamily: "'Outfit', system-ui, sans-serif" }}>
+    <div className="pb-32" style={{ width: '100%', maxWidth: 'var(--phone-shell-max)', minHeight: '100svh', background: APPLE_FILL, fontFamily: "'Outfit', system-ui, sans-serif", overflowX: 'hidden' }}>
+      <style>{SETTINGS_TRANSITION_CSS}</style>
 
-      {/* Navy hero — full-bleed with the app's rounded-bottom sheet edge */}
-      <div style={{ background: '#040D6D', borderRadius: '0 0 28px 28px', padding: '64px 22px 28px' }}>
-        <div className="pt-bounce" style={{ '--pt-d': '0ms', display: 'flex', alignItems: 'center', gap: 16 } as any}>
-          <div style={{ width: 56, height: 56, borderRadius: 999, background: '#58ABFF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <span style={{ fontWeight: 700, fontSize: 20, color: '#040D6D' }}>{initials}</span>
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 700, fontSize: 18, color: '#FFFFFF', letterSpacing: '-0.2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {businessName}
-            </div>
-            <div style={{ fontWeight: 500, fontSize: 11, color: '#58ABFF', letterSpacing: '0.16em', textTransform: 'uppercase', marginTop: 3 }}>
-              settings
-            </div>
-          </div>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 11px', borderRadius: 10, background: statusActive ? 'rgba(19,194,154,0.18)' : 'rgba(255,176,46,0.20)', color: statusActive ? '#13C29A' : '#FFB02E', fontWeight: 600, fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase', flexShrink: 0 }}>
-            <span style={{ width: 6, height: 6, borderRadius: 999, background: statusActive ? '#13C29A' : '#FFB02E', flexShrink: 0 }} />
-            {statusActive ? 'active' : 'pending'}
-          </div>
-        </div>
-      </div>
-
-      {/* Content */}
       <div style={{ padding: '20px 18px 0' }}>
-        {/* Payment Board Builder Shortcut */}
-        <button
-          onClick={() => setLocation('/board-builder')}
-          className="pt-bounce w-full bg-white p-5 flex items-center justify-between mb-4 transition-all hover:shadow-lg text-left"
-          style={{ '--pt-d': '90ms', borderRadius: 22, boxShadow: '0 4px 14px rgba(4,13,109,0.08)' } as any}
-        >
-          <div className="flex items-center gap-4">
-            <div className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(4,13,109,0.08)' }}>
-              <Printer className="w-5 h-5" style={{ color: '#040D6D' }} />
-            </div>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 16, color: '#040D6D', lineHeight: 1.2 }}>Payment Board Builder</div>
-              <div className="text-gray-400 text-sm mt-0.5">Design & print your custom payment sign</div>
-            </div>
+        {activeSection && (
+          <div
+            className={`settings-detail-pane${leaving ? ' settings-detail-leaving' : ''}`}
+            style={{ background: APPLE_FILL }}
+          >
+          <div className="pt-bounce" style={{ '--pt-d': '0ms', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 } as any}>
+            <button
+              type="button"
+              onClick={closeSection}
+              aria-label="back to settings"
+              style={{ width: 36, height: 36, borderRadius: 999, background: '#FFFFFF', border: '1px solid rgba(0,0,0,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
+            >
+              <ArrowLeft size={17} style={{ color: APPLE_INK }} />
+            </button>
+            <h1 style={{ fontWeight: 700, fontSize: 19, color: APPLE_INK, letterSpacing: '-0.01em' }}>{SECTION_META[activeSection].title}</h1>
           </div>
-          <ArrowRight className="w-5 h-5 flex-shrink-0 ml-3" style={{ color: 'rgba(4,13,109,0.5)' }} />
-        </button>
 
-        {/* Business Details Section */}
-        <SettingsSection anchor="set-business" title="Business Details" delay={140} isOpen={openSections.has('business')} onToggle={() => toggle('business')}>
+        {activeSection === "business" && (
+        <div className="pt-bounce bg-white mb-4 px-5 sm:px-6 pt-5 pb-5 sm:pb-6" style={{ '--pt-d': '40ms', borderRadius: 22, boxShadow: '0 4px 14px rgba(4,13,109,0.08)' } as any}>
           {!isOwner && (
             <div className="mb-4 p-3 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-800">
               Business details are managed by the account owner.
@@ -898,10 +914,11 @@ export default function Settings() {
               {updateMerchantMutation.isPending ? "Saving..." : "Save Business Details"}
             </WireframeLiquidButton>
           )}
-        </SettingsSection>
+        </div>
+        )}
 
-        {/* Dashboard Preferences Section */}
-        <SettingsSection anchor="set-goal" title="Dashboard Preferences" delay={185} isOpen={openSections.has('preferences')} onToggle={() => toggle('preferences')}>
+        {activeSection === "prefs" && (
+        <div className="pt-bounce bg-white mb-4 px-5 sm:px-6 pt-5 pb-5 sm:pb-6" style={{ '--pt-d': '40ms', borderRadius: 22, boxShadow: '0 4px 14px rgba(4,13,109,0.08)' } as any}>
           <div className="space-y-4 mt-1">
             <div>
               <Label htmlFor="dailyGoal" className="text-gray-700 text-sm mb-1.5 block">
@@ -938,13 +955,14 @@ export default function Settings() {
               </div>
             </div>
           </div>
-        </SettingsSection>
+        </div>
+        )}
 
-        {/* Subscription & Billing Section */}
+        {activeSection === "billing" && (
+        <>
         {isNativeApp() ? (
-          <div className="pt-bounce bg-white mb-4 overflow-hidden" style={{ '--pt-d': '230ms', borderRadius: 22, boxShadow: '0 4px 14px rgba(4,13,109,0.08)' } as any}>
+          <div className="pt-bounce bg-white mb-4 overflow-hidden" style={{ '--pt-d': '40ms', borderRadius: 22, boxShadow: '0 4px 14px rgba(4,13,109,0.08)' } as any}>
             <div className="px-5 sm:px-6 py-5">
-              <h2 style={{ fontWeight: 600, fontSize: 17, color: '#040D6D', letterSpacing: '-0.01em' }} className="mb-4">Subscription &amp; Billing</h2>
               <div className="p-5 rounded-xl text-center space-y-3" style={{ background: 'rgba(4,13,109,0.05)' }}>
                 <p className="text-gray-700 text-sm leading-relaxed">
                   {isOwner
@@ -962,8 +980,7 @@ export default function Settings() {
             </div>
           </div>
         ) : (
-        <div data-settings-section="billing">
-        <SettingsSection title="Subscription & Billing" delay={230} isOpen={openSections.has('billing')} onToggle={() => toggle('billing')}>
+        <div className="pt-bounce bg-white mb-4 px-5 sm:px-6 pt-5 pb-5 sm:pb-6" style={{ '--pt-d': '40ms', borderRadius: 22, boxShadow: '0 4px 14px rgba(4,13,109,0.08)' } as any}>
           <div className="space-y-5 mt-1">
             {/* Current plan */}
             <div className="flex items-start justify-between p-4 bg-gradient-to-r from-[#040D6D]/10 to-[#58ABFF]/12 rounded-xl">
@@ -1369,12 +1386,13 @@ export default function Settings() {
             </>
             )}
           </div>
-        </SettingsSection>
         </div>
         )}
+        </>
+        )}
 
-        {/* Account Section */}
-        <SettingsSection title="Account" delay={275} isOpen={openSections.has('account')} onToggle={() => toggle('account')}>
+        {activeSection === "account" && (
+        <div className="pt-bounce bg-white mb-4 px-5 sm:px-6 pt-5 pb-5 sm:pb-6" style={{ '--pt-d': '40ms', borderRadius: 22, boxShadow: '0 4px 14px rgba(4,13,109,0.08)' } as any}>
           <div className="space-y-3 mt-1">
             <div className={`flex items-center justify-between p-4 rounded-xl ${merchant?.status === 'active' ? 'bg-green-50' : 'bg-amber-50 border border-amber-200'}`}>
               <div>
@@ -1394,10 +1412,11 @@ export default function Settings() {
               )}
             </div>
           </div>
-        </SettingsSection>
+        </div>
+        )}
 
-        {/* Push Notifications */}
-        <SettingsSection title="Transaction Notifications" delay={320} isOpen={openSections.has('notifications')} onToggle={() => toggle('notifications')}>
+        {activeSection === "notifs" && (
+        <div className="pt-bounce bg-white mb-4 px-5 sm:px-6 pt-5 pb-5 sm:pb-6" style={{ '--pt-d': '40ms', borderRadius: 22, boxShadow: '0 4px 14px rgba(4,13,109,0.08)' } as any}>
           <div className="mt-1">
             {pushSupported ? (
               !vapidAvailable ? (
@@ -1428,10 +1447,11 @@ export default function Settings() {
               <p className="text-sm text-gray-500">Push notifications are not supported in this browser.</p>
             )}
           </div>
-        </SettingsSection>
+        </div>
+        )}
 
-        <div data-tutorial-id="settings-tutorial-help">
-          <SettingsSection title="Tutorial & Help" delay={350} isOpen={openSections.has('tutorial')} onToggle={() => toggle('tutorial')}>
+        {activeSection === "tutorial" && (
+        <div className="pt-bounce bg-white mb-4 px-5 sm:px-6 pt-5 pb-5 sm:pb-6" style={{ '--pt-d': '40ms', borderRadius: 22, boxShadow: '0 4px 14px rgba(4,13,109,0.08)' } as any}>
             <div className="mt-1">
               <div className="flex items-start gap-3">
                 <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0" style={{ background: 'rgba(88,171,255,0.16)' }}>
@@ -1466,10 +1486,101 @@ export default function Settings() {
                 {tutorialRestarting ? "Restarting..." : tutorialVisitedPages ? "Restart Tutorials" : "Start Tutorials"}
               </Button>
             </div>
-          </SettingsSection>
         </div>
+        )}
+          </div>
+        )}
 
-        {/* Customer Payment Page Button */}
+        {!activeSection && (
+          <>
+            {/* Identity — tap through to Account, replacing the old static navy hero */}
+            <button
+              type="button"
+              onClick={() => setActiveSection('account')}
+              aria-label="Account"
+              data-testid="settings-row-account"
+              className="pt-bounce w-full bg-white p-5 flex items-center justify-between mb-4 text-left"
+              style={{ '--pt-d': '0ms', borderRadius: 22, boxShadow: '0 4px 14px rgba(4,13,109,0.08)' } as any}
+            >
+              <div className="flex items-center gap-4 min-w-0">
+                <div style={{ width: 52, height: 52, borderRadius: 999, background: APPLE_FILL, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <span style={{ fontWeight: 700, fontSize: 17, color: APPLE_INK }}>{initials}</span>
+                </div>
+                <div className="min-w-0">
+                  <div style={{ fontWeight: 700, fontSize: 16, color: APPLE_INK, letterSpacing: '-0.2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {businessName}
+                  </div>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 4, fontWeight: 600, fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase', color: statusActive ? '#13C29A' : '#FFB02E' }}>
+                    <span style={{ width: 6, height: 6, borderRadius: 999, background: statusActive ? '#13C29A' : '#FFB02E', flexShrink: 0 }} />
+                    {statusActive ? 'active' : 'pending'}
+                  </div>
+                </div>
+              </div>
+              <ArrowRight className="w-5 h-5 flex-shrink-0 ml-3" style={{ color: APPLE_MUTED }} />
+            </button>
+
+            <SettingsGroup delay={45}>
+              <SettingsItem
+                icon={SECTION_META.business.icon}
+                title={SECTION_META.business.title}
+                onClick={() => setActiveSection('business')}
+                tutorialId="set-business"
+                testId="settings-row-business"
+                last
+              />
+            </SettingsGroup>
+
+            <SettingsGroup delay={90}>
+              <SettingsItem
+                icon={SECTION_META.billing.icon}
+                title={SECTION_META.billing.title}
+                value={currentPlan.name}
+                onClick={() => setActiveSection('billing')}
+                settingsSection="billing"
+                testId="settings-row-billing"
+              />
+              <SettingsItem
+                icon={<Printer className="w-5 h-5" style={{ color: APPLE_INK }} />}
+                title="Payment Board Builder"
+                onClick={() => setLocation('/board-builder')}
+                testId="settings-row-board-builder"
+                last
+              />
+            </SettingsGroup>
+
+            <SettingsGroup delay={135}>
+              <SettingsItem
+                icon={SECTION_META.prefs.icon}
+                title={SECTION_META.prefs.title}
+                onClick={() => setActiveSection('prefs')}
+                tutorialId="set-goal"
+                testId="settings-row-prefs"
+              />
+              <SettingsItem
+                icon={SECTION_META.notifs.icon}
+                title={SECTION_META.notifs.title}
+                onClick={() => setActiveSection('notifs')}
+                testId="settings-row-notifications"
+                last
+              />
+            </SettingsGroup>
+
+            <SettingsGroup delay={180}>
+              <SettingsItem
+                icon={SECTION_META.tutorial.icon}
+                title={SECTION_META.tutorial.title}
+                onClick={() => setActiveSection('tutorial')}
+                tutorialId="settings-tutorial-help"
+                testId="settings-row-tutorial"
+                last
+              />
+            </SettingsGroup>
+          </>
+        )}
+
+        {/* Customer Payment Page Button — unchanged, per Oliver's instruction */}
+        {!activeSection && (
+        <>
         <div className="pt-bounce mb-5" style={{ '--pt-d': '365ms' } as any}>
           <Button
             onClick={() => setLocation(`/pay/${merchantId}`)}
@@ -1531,6 +1642,8 @@ export default function Settings() {
             Log Out
           </Button>
         </div>
+        </>
+        )}
       </div>
     </div>
     </div>

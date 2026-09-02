@@ -114,6 +114,22 @@
    and the value returns to ~26px (in the short-screen block). */
 .property-terminal-view.tp-viewport { --stack-hdr-h: 72px; }
 
+/* Property's active stack deliberately opts out of the §8 dock clearance:
+   Oliver wants it running the full remaining height of row 3, tucking under
+   the floating dock rather than stopping short of it (2026-08-30). Retail and
+   trades keep the reservation from the phase-8 amendment above — this is a
+   property-only reversal, not a retraction of that fix.
+
+   Its content also starts further from the floating action bar than the
+   shared --stack-gap gives it — Oliver asked for roughly 10% more clearance
+   above the "rent requests" header (2026-08-30). The seam itself (where the
+   off-white background begins, which the FAB straddles) is untouched; this
+   is empty space inside the off-white, not a shift of the row-3 boundary. */
+.property-terminal-view.tp-viewport .tp-home-stack {
+  padding-bottom: 0;
+  padding-top: calc(var(--stack-gap) + 10 * var(--u));
+}
+
 /* Amounts keep their authored size as a ceiling, then fit deterministically
    from the displayed character count. The observer fallback writes --fit only
    when the loaded font still overflows its actual parent. */
@@ -266,6 +282,16 @@
   padding-bottom: var(--dock-clear);
   padding-top: var(--stack-gap);
 }
+/* AnimatedScrollList renders its own `position:relative` wrapper
+   (`dt-scroll-wrap`, index.css) between this flex column and `.tp-stack-scroll`.
+   That wrapper is a plain block, so `.tp-stack-scroll`'s inline `flex: 1` had no
+   flex container to size against, grew to fit every row, and this element's
+   `overflow: hidden` clipped the remainder instead of scrolling it. Making the
+   wrapper itself a flex child (and a flex container in turn) restores the
+   chain — desktop's AnimatedScrollList usages (`.pc-list`, `.pt-rows`) don't
+   need this because they size the inner div with a fixed `max-height` instead
+   of `flex: 1`. */
+.tp-viewport .tp-home-stack .dt-scroll-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .tp-viewport .tp-home-stack .tp-stack-scroll { min-height: 0; overflow-y: auto; }
 .tp-viewport .tp-home-stack .tp-stack-row {
   min-height: var(--row-h);
@@ -277,10 +303,6 @@
    publishes the realised home-hero boundary on the viewport. */
 .tp-viewport .tp-pfab.home,
 .tp-viewport .tp-psubbar.home { top: var(--home-hero-h, var(--home-hero-pref)); }
-
-.tp-viewport .tp-screen.tp-home[data-feed-open="true"] {
-  grid-template-rows: 0 var(--chrome-gutter) minmax(calc(var(--stack-min) + var(--dock-clear) + var(--stack-gap)), 1fr);
-}
 
 @media (max-height: 700px) {
   .tp-viewport .tp-screen.tp-home {

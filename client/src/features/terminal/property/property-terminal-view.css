@@ -49,13 +49,22 @@
 .property-terminal-view .tp-fab:active { transform: scale(0.92); }
 .property-terminal-view .tp-stack-hdr { display: flex; justify-content: space-between; align-items: center; padding: 0 4px; margin-bottom: 12px; }
 .property-terminal-view .tp-stack-title { font-weight: 700; font-size: 14px; color: #040D6D; letter-spacing: -0.2px; }
-.property-terminal-view .tp-stack-card { border-radius: 14px; background: #fff; overflow: hidden; box-shadow: 0 2px 12px rgba(4,13,109,0.06); border: 1px solid rgba(4,13,109,0.04); }
-/* Feed expansion — hero collapses + slides its content up and off the page,
-   the request stack rises to the top. Same springy curve as the layer moves. */
-.property-terminal-view .tp-feed-hero { overflow: hidden; transition: height 0.55s cubic-bezier(0.34,1.56,0.64,1), padding 0.55s cubic-bezier(0.34,1.56,0.64,1); }
-.property-terminal-view .tp-feed-hero-inner { transition: transform 0.55s cubic-bezier(0.34,1.56,0.64,1), opacity 0.35s ease; }
-.property-terminal-view .tp-feed-hero-inner.off { transform: translateY(-120%); opacity: 0; }
-.property-terminal-view .tp-feed-body { transition: padding 0.55s cubic-bezier(0.34,1.56,0.64,1); }
+/* .tp-stack-card is now an unstyled grouping div — no card surface. Rows sit
+   directly on the off-white .tp-home-stack background (Oliver, 2026-08-30).
+   AnimatedScrollList's fadeColor prop was updated to match (OFFW, not #fff)
+   so the top/bottom scroll cues fade against the right colour.
+
+   Trailing space of one row's height, so the scroll range extends far enough
+   that the LAST row can be pulled up to where the second-to-last row's
+   resting position is now — otherwise the scrollable area's own bottom edge
+   (flush with the true viewport edge, since §property opted out of the dock
+   clearance) IS the last row's floor, and it can never clear the floating
+   dock the way every other row can (Oliver, 2026-08-30). */
+.property-terminal-view .tp-stack-card { padding-bottom: var(--row-h); }
+/* Feed expansion — the hero never moves; `.tp-home-stack` alone grows into a
+   full-screen overlay above it (see its `layout` animation and inline style
+   in PropertyTerminalView.tsx). */
+.property-terminal-view .tp-feed-hero { overflow: hidden; }
 /* No tp-stackIn here (trades/retail keep theirs): these rows are animated by
    Motion in AnimatedScrollList.tsx, and a CSS `animation: … both` beats an
    inline transform in the cascade — it would pin the row at the keyframe's
@@ -92,10 +101,17 @@
 .property-terminal-view .tp-thin-scroll { scrollbar-width: thin; scrollbar-color: rgba(88,171,255,0) transparent; transition: scrollbar-color 350ms; }
 .property-terminal-view .tp-thin-scroll::-webkit-scrollbar { width: 3px; }
 .property-terminal-view .tp-thin-scroll::-webkit-scrollbar-thumb { background-color: rgba(88,171,255,0); border-radius: 999px; }
-.property-terminal-view .tp-stack-scroll { scrollbar-width: thin; scrollbar-color: #040D6D transparent; }
-.property-terminal-view .tp-stack-scroll::-webkit-scrollbar { width: 4px; background: transparent; }
-.property-terminal-view .tp-stack-scroll::-webkit-scrollbar-track { background: transparent; }
-.property-terminal-view .tp-stack-scroll::-webkit-scrollbar-thumb { background: #040D6D; border-radius: 999px; }
+.property-terminal-view .tp-stack-scroll { scrollbar-width: none; }
+.property-terminal-view .tp-stack-scroll::-webkit-scrollbar { display: none; }
+/* ChooseTenant (PropertyTerminalView.tsx): .tp-panel-body is what actually
+   scrolls here (terminal-tokens.css's DK1 rule, not the AnimatedScrollList's
+   own inner div — .dt-scroll-wrap has no flex sizing of its own in this
+   screen, same root cause documented for .tp-home-stack .dt-scroll-wrap
+   above). Oliver, 2026-08-31: no visible scrollbar on this list. Scoped to
+   this one screen, not every .tp-panel-body — other feature screens weren't
+   asked for and weren't audited for the same fix. */
+.property-terminal-view .tp-choose-tenant .tp-panel-body { scrollbar-width: none; }
+.property-terminal-view .tp-choose-tenant .tp-panel-body::-webkit-scrollbar { display: none; }
 .property-terminal-view .tp-toast { position: absolute; left: 50%; transform: translateX(-50%); bottom: 110px; background: #040D6D; color: #F4F4F4; padding: 12px 22px; border-radius: 999px; font-size: 14px; font-weight: 500; opacity: 0; pointer-events: none; transition: opacity 200ms, transform 200ms; z-index: 60; }
 .property-terminal-view .tp-toast.show { opacity: 1; transform: translateX(-50%) translateY(-4px); }
 .property-terminal-view .tp-layer { position: absolute; inset: 0; display: flex; flex-direction: column; overflow: hidden; will-change: transform; z-index: 0; }

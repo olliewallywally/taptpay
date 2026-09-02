@@ -126,6 +126,39 @@ if (await stackRows.count()) {
 }
 const wrapCount = await page.locator(".dt-scroll-wrap").count();
 console.log("dt-scroll-wrap count on terminal:", wrapCount);
+if (await stackScroll.count()) {
+  const metrics = await stackScroll.first().evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    return {
+      clientHeight: el.clientHeight,
+      scrollHeight: el.scrollHeight,
+      scrollbarWidth: getComputedStyle(el).scrollbarWidth,
+      bottomEdge: r.bottom,
+      viewportH: window.innerHeight,
+    };
+  });
+  console.log("stack scroll metrics (bottomEdge should ~= viewportH; scrollbarWidth 'none'):", metrics);
+  await page.screenshot({ path: `${OUT}/3-terminal-active-stack-top.png` });
+  await stackScroll.first().evaluate((el) => { el.scrollTop = el.scrollHeight; });
+  await page.waitForTimeout(150);
+  const scrollTopAfter = await stackScroll.first().evaluate((el) => el.scrollTop);
+  console.log("scrollTop after scrolling to bottom (still swipe-scrollable):", scrollTopAfter);
+
+  const dockClearance = await page.evaluate(() => {
+    const rows = Array.from(document.querySelectorAll(".tp-stack-row"));
+    const last = rows[rows.length - 1];
+    const prev = rows[rows.length - 2];
+    const dock = document.querySelector('[class*="dock"], .tp-dock, nav');
+    return {
+      lastRowBottom: last?.getBoundingClientRect().bottom,
+      prevRowBottom: prev?.getBoundingClientRect().bottom,
+      dockTop: dock?.getBoundingClientRect().top,
+      rowCount: rows.length,
+    };
+  });
+  console.log("dock-clearance check (lastRowBottom should ~= prevRowBottom's old spot, i.e. clear of dockTop):", dockClearance);
+  await page.screenshot({ path: `${OUT}/4-terminal-stack-scrolled-bottom.png` });
+}
 const grad = page.locator(".dt-scroll-gradient-bottom").first();
 if (await grad.count()) {
   console.log("bottom gradient opacity:", await grad.evaluate((el) => getComputedStyle(el).opacity));
