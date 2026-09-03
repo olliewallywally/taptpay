@@ -396,10 +396,16 @@ function ChooseTenant({ tenants, invoices, go, onSelect, splitMode, onToggleSpli
         {/* list — no bottom clearance: it's fine for rows to run under the
             dock rather than stop short of it (same request). Scrollbar is
             hidden via .tp-choose-tenant .tp-panel-body, the element that
-            actually scrolls here (terminal-tokens.css's DK1 rule). */}
+            actually scrolls here (terminal-tokens.css's DK1 rule).
+
+            The trailing space is --tenant-scroll-tail rather than a literal:
+            that screen's .tp-panel gives up its dock padding so the scrollport
+            runs off the bottom of the page, and hands the clearance to this
+            padding instead — plus one row-step, so the last card lands where
+            the second-to-last one used to. See property-terminal-view.css. */}
         <AnimatedScrollList
           className="tp-thin-scroll"
-          style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, marginTop: -20, paddingBottom: 16 }}
+          style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, marginTop: -20, paddingBottom: 'var(--tenant-scroll-tail, 16px)' }}
           fadeColor={NAVY}
         >
           {filtered.length === 0 ? (

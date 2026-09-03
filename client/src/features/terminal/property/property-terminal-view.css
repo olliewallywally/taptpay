@@ -110,6 +110,31 @@
    above). Oliver, 2026-08-31: no visible scrollbar on this list. Scoped to
    this one screen, not every .tp-panel-body — other feature screens weren't
    asked for and weren't audited for the same fix. */
+/* ChooseTenant, Oliver 2026-09-02: "the scroll box isn't going off the page".
+   .tp-panel normally carries the dock reservation as padding-bottom
+   (terminal-tokens.css), which ends the scrollport ABOVE the dock — so the
+   list stopped short of the screen edge instead of running off it. On this
+   one screen that reservation moves off the scrollport and onto the list's
+   trailing padding (--tenant-scroll-tail, consumed by the AnimatedScrollList
+   in PropertyTerminalView.tsx): the scrollport now reaches the bottom of the
+   phone and rows scroll away under the dock, while every row can still be
+   scrolled clear of the dock band — which is the position
+   verify-terminal-dock.mjs §4.2 clause 2 actually measures.
+
+   The tail carries one extra row-step on top, so the last card finishes its
+   scroll where the second-to-last one used to land (same request).
+
+   --kb-h stays on the panel: the search field lives on this screen, and its
+   scrollport must still end above the keyboard on WebKit (A1 §4.1). */
+.property-terminal-view .tp-choose-tenant .tp-panel {
+  padding-bottom: var(--kb-h, 0px);
+  /* One row plus its gap: measured 73px + 8px at 390x844 (scripts' probe),
+     not derived — the row is sized by its own content, not a token. */
+  --tenant-row-step: 81px;
+  --tenant-scroll-tail: calc(
+    var(--dock-h, 0px) + var(--safe-bottom) + var(--sp-3) + 16px + var(--tenant-row-step)
+  );
+}
 .property-terminal-view .tp-choose-tenant .tp-panel-body { scrollbar-width: none; }
 .property-terminal-view .tp-choose-tenant .tp-panel-body::-webkit-scrollbar { display: none; }
 .property-terminal-view .tp-toast { position: absolute; left: 50%; transform: translateX(-50%); bottom: 110px; background: #040D6D; color: #F4F4F4; padding: 12px 22px; border-radius: 999px; font-size: 14px; font-weight: 500; opacity: 0; pointer-events: none; transition: opacity 200ms, transform 200ms; z-index: 60; }
