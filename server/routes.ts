@@ -17,7 +17,7 @@ import { uploadedFiles } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { TUTORIAL_PAGE_KEYS, isTutorialPageKey } from "@shared/tutorial";
 import { inviteTeamMemberSchema, acceptInviteSchema, retailTransactionCreateRequestSchema, updateMerchantDetailsSchema, updateThemeSchema, updateDailyGoalSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema, pushNotificationPreferencesSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createClientProfileSchema, updateClientProfileSchema, createQuoteSchema, acceptQuoteSchema, createJobInvoiceSchema, markJobPaidExternalSchema, createJobScheduleSchema, updateJobScheduleSchema, updateTradeReminderSettingsSchema, updateTradeGstSettingsSchema } from "@shared/schema";
-import { windcaveService, isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, simulateCreateSession, simulateQuerySession, simulateRentSession, getWindcaveEnv, submitGooglePayToken, createAttendedSession, submitTapToPayToken, simulateAttendedTapToPay, createCardStorageSession, queryStoredCardSession, chargeStoredCard } from "./windcave";
+import { windcaveService, isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, getWindcaveEnv, submitGooglePayToken, createAttendedSession, submitTapToPayToken, createCardStorageSession, queryStoredCardSession, chargeStoredCard } from "./windcave";
 import { authenticateUser, generateToken, authenticateToken, createUser, isAccountOwner, requestPasswordReset, resetPassword, validateResetToken, type AuthenticatedRequest, isAccountLocked, isIPRateLimited, recordFailedLogin, clearFailedAttempts, logSecurityEvent, syncVerifiedMerchants } from "./auth";
 import { generateReceiptPdf } from "./pdf-generator";
 import { generateQuotePdf } from "./trades-quote-pdf";
@@ -1444,9 +1444,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       return { kind: "pending" as const };
     }
 
-    const result = isWindcaveConfigured()
-      ? await queryWindcaveSession(attempt.processorSessionId)
-      : simulateQuerySession(attempt.processorSessionId);
+    if (!isWindcaveConfigured()) return { kind: "pending" as const };
+    const result = await queryWindcaveSession(attempt.processorSessionId);
     if (!result.success || (result.approved && !result.windcaveTransactionId)) {
       return { kind: "pending" as const };
     }
@@ -1598,9 +1597,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(404).json({ message: "Payment link not found" });
       }
 
-      let sessionResult;
-      if (isWindcaveConfigured()) {
-        sessionResult = await createWindcaveSession(
+      if (!isWindcaveConfigured()) {
+        return res.status(503).json({
+          code: "PAYMENT_PROVIDER_UNAVAILABLE",
+          message: "Payment gateway unavailable. Please try again.",
+        });
+      }
+      const sessionResult = await createWindcaveSession(
           xId,
           paymentAmount,
           merchantReference,
@@ -1613,10 +1616,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
             notificationUrl: `${baseUrl}/api/pay/notification/${returnState}`,
           },
         );
-      } else {
-        sessionResult = simulateCreateSession(merchantReference, baseUrl);
-        sessionResult.hppUrl = `${baseUrl}/api/pay/return/${returnState}?source=hpp&result=approved&sessionid=${sessionResult.sessionId}&sim=1`;
-      }
       if (!sessionResult.success || !sessionResult.sessionId) {
         return res.status(503).json({ message: "Payment gateway unavailable. Please try again." });
       }
@@ -1785,9 +1784,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.json(tokenAttemptOutcome(prepared.attempt));
       }
 
-      const queryResult = isWindcaveConfigured()
-        ? await queryWindcaveSession(validation.data.sessionId)
-        : simulateQuerySession(validation.data.sessionId);
+      if (!isWindcaveConfigured()) {
+        return res.status(503).json({ message: "Payment outcome is still being reconciled" });
+      }
+      const queryResult = await queryWindcaveSession(validation.data.sessionId);
       if (!queryResult.success) {
         return res.status(503).json({ message: "Payment outcome is still being reconciled" });
       }
@@ -1836,14 +1836,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.json(tokenAttemptOutcome(prepared.attempt));
       }
 
-      let queryResult: { success: boolean; approved?: boolean; windcaveTransactionId?: string; error?: string };
       if (!isWindcaveConfigured()) {
-        queryResult = {
-          success: true,
-          approved: true,
-          windcaveTransactionId: `SIMTXN_GPAY_${Date.now()}`,
-        };
-      } else {
+        return res.status(503).json({ message: "Payment outcome is still being reconciled" });
+      }
+      let queryResult: { success: boolean; approved?: boolean; windcaveTransactionId?: string; error?: string };
+      {
         const cached = tokenAttemptSessionCache.get(prepared.attempt.id);
         const ajaxUrl = prepared.firstFinalizer
           ? cached?.ajaxSubmitGooglePayUrl
@@ -1918,17 +1915,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       return { kind: "pending" as const, attempt };
     }
 
-    // Simulation is a server configuration, never a callback query flag. The
-    // raw return state is exposed to checkout, so trusting `?sim=1` here would
-    // let its holder forge an approved production payment.
-    const queryResult = !isWindcaveConfigured()
-      ? {
-          success: true,
-          approved: resultHint === "approved",
-          windcaveTransactionId:
-            resultHint === "approved" ? `SIMTXN_HPP_${Date.now()}` : undefined,
-        }
-      : await queryWindcaveSession(attempt.processorSessionId);
+    if (!isWindcaveConfigured()) return { kind: "pending" as const, attempt: claim.attempt };
+    const queryResult = await queryWindcaveSession(attempt.processorSessionId);
     if (!queryResult.success) {
       return { kind: "pending" as const, attempt: claim.attempt };
     }
@@ -2293,8 +2281,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           return res.status(502).json({ message: `Payment processor error: ${paymentResult.error}` });
         }
       } else {
-        // Dev/staging environment — no real credentials configured
-        paymentResult = simulateAttendedTapToPay(merchantRef);
+        return res.status(503).json({ code: "PAYMENT_PROVIDER_UNAVAILABLE", message: "Payment gateway unavailable" });
       }
 
       const finalStatus = paymentResult.approved ? "completed" : "failed";
@@ -2608,72 +2595,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  // Process NFC payment completion
-  app.post("/api/nfc-sessions/:sessionId/complete", async (req, res) => {
-    try {
-      const { sessionId } = req.params;
-      const { paymentMethod, paymentData, deviceFingerprint } = req.body;
-      
-      // Find transaction by NFC session ID
-      const transaction = await storage.getTransactionByNfcSession(sessionId);
-      if (!transaction) {
-        return res.status(404).json({ message: "NFC session not found" });
-      }
-      
-      // Update transaction status to processing
-      await storage.updateTransactionStatus(transaction.id, "processing");
-      
-      // Simulate contactless payment processing
-      // In production, this would integrate with actual NFC payment processors
-      const isSimulation = !windcaveService.isConfigured();
-      
-      if (isSimulation) {
-        // In a real NFC system, this endpoint would only be called when hardware detects a physical tap
-        // Process payment immediately since this represents a completed NFC tap
-        const finalStatus = "completed";
-        const windcaveTransactionId = `NFC_${Date.now()}`;
-        
-        const updatedTransaction = await storage.updateTransactionStatus(
-          transaction.id, 
-          finalStatus, 
-          windcaveTransactionId
-        );
-        
-        // Notify clients of completion
-        broadcastToStone(transaction.merchantId!, transaction.taptStoneId, { 
-          type: 'nfc_payment_completed', 
-          transaction: updatedTransaction,
-          paymentMethod: paymentMethod || 'contactless_card'
-        });
-
-        if (updatedTransaction) {
-          sendPushToMerchant(transaction.merchantId!, {
-            type: "payment_received",
-            itemName: transaction.itemName,
-            amount: transaction.price,
-            transactionId: transaction.id,
-          }).catch(() => {});
-        }
-        
-        res.json({ 
-          message: "NFC payment completed successfully", 
-          status: "completed",
-          transaction: updatedTransaction ? publicTransactionDto(updatedTransaction) : null,
-        });
-      } else {
-        // Real Windcave NFC processing would go here
-        res.json({ 
-          message: "NFC payment session created", 
-          status: "processing",
-          windcaveSession: "Real NFC processing not implemented yet" 
-        });
-      }
-    } catch (error) {
-      console.error("NFC payment completion error:", error);
-      res.status(500).json({ message: "Failed to complete NFC payment" });
-    }
-  });
-
   // Get NFC payment capabilities for a device
   app.get("/api/nfc/capabilities", (req, res) => {
     const userAgent = req.headers['user-agent'] || '';
@@ -2823,12 +2744,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const merchant = await storage.getMerchant(transaction.merchantId!);
       const customerEmail = merchant?.email || 'customer@taptpay.co.nz';
 
-      let sessionResult;
-      if (isWindcaveConfigured()) {
-        sessionResult = await createWindcaveSession(xId, paymentAmount, merchantReference, customerEmail, baseUrl, transactionId);
-      } else {
-        sessionResult = simulateCreateSession(merchantReference, baseUrl);
+      if (!isWindcaveConfigured()) {
+        return res.status(503).json({ code: "PAYMENT_PROVIDER_UNAVAILABLE", message: "Payment gateway unavailable. Please try again." });
       }
+      const sessionResult = await createWindcaveSession(xId, paymentAmount, merchantReference, customerEmail, baseUrl, transactionId);
 
       if (!sessionResult.success) {
         console.error('Windcave session creation failed:', sessionResult.error);
@@ -2992,9 +2911,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(403).json({ message: "Session ID mismatch" });
       }
 
-      const queryResult = isWindcaveConfigured()
-        ? await queryWindcaveSession(sessionId)
-        : simulateQuerySession(sessionId);
+      if (!isWindcaveConfigured()) {
+        return res.status(503).json({ code: "PAYMENT_PROVIDER_UNAVAILABLE", message: "Payment outcome is unavailable" });
+      }
+      const queryResult = await queryWindcaveSession(sessionId);
 
       const method = paymentMethod === "apple_pay" ? "apple_pay" : "card";
       const result = await finaliseHostedPayment(transactionId, queryResult.approved === true, queryResult.windcaveTransactionId, method);
@@ -3034,9 +2954,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       let windcaveTransactionId: string | undefined;
 
       if (!isWindcaveConfigured()) {
-        // Simulation mode — treat as approved
-        approved = true;
-        windcaveTransactionId = `SIMTXN_GPAY_${Date.now()}`;
+        return res.status(503).json({ code: "PAYMENT_PROVIDER_UNAVAILABLE", message: "Payment outcome is unavailable" });
       } else {
         // Look up the AJAX URL from server-side cache (set at session creation)
         const cachedUrls = sessionAjaxUrlCache.get(transactionId);
@@ -3074,17 +2992,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       console.error("googlepay-complete error:", error);
       res.status(500).json({ message: "Failed to finalise Google Pay payment" });
     }
-  });
-
-  // ── Windcave simulation submit endpoint (dev/test mode only) ────────────────
-  // Mimics the Windcave ajaxSubmitCard/ApplePay/GooglePay endpoints so that
-  // the Hosted Fields and ApplePay SDKs get a plausible success response when
-  // running without real Windcave credentials.
-  app.post("/api/windcave/sim-submit", (req, res) => {
-    const method = (req.query.method as string) || "card";
-    console.log(`[SIM_SUBMIT] method=${method} sessionId=${req.query.sessionId}`);
-    // Return a minimal JSON structure the Windcave SDKs treat as "done"
-    res.json({ status: "done", authorised: true, responseCode: "00" });
   });
 
   // Get single transaction details
@@ -3965,9 +3872,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // Mark as processing to prevent concurrent handling
       await storage.updateTransactionSessionState(transaction.id, 'processing');
 
-      const queryResult = isWindcaveConfigured()
-        ? await queryWindcaveSession(sessionId)
-        : simulateQuerySession(sessionId);
+      if (!isWindcaveConfigured()) {
+        await storage.updateTransactionSessionState(transaction.id, 'pending');
+        return;
+      }
+      const queryResult = await queryWindcaveSession(sessionId);
 
       if (!queryResult.success) {
         console.error(`[WINDCAVE_NOTIF] querySession failed for ${sessionId}:`, queryResult.error);
@@ -4044,7 +3953,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.get("/api/windcave/callback", async (req, res) => {
     try {
       const resultParam = req.query.result as string;
-      const isSim = req.query.sim === '1';
 
       // Primary lookup: by transactionId (new approach — avoids Windcave {id} template issues)
       const txnIdParam = req.query.transactionId as string;
@@ -4113,19 +4021,21 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.redirect(`/payment/result/${txnId}?status=declined`);
       }
 
-      // Notification hasn't arrived yet (or sim mode) — query Windcave ourselves
+      // Notification hasn't arrived yet — query the persisted processor session.
       const sessionToQuery = transaction.windcaveSessionId || sessionId;
 
-      if (!sessionToQuery && !isSim) {
+      if (!sessionToQuery) {
         console.warn(`[WINDCAVE_CALLBACK] No session ID available to query for transaction ${txnId}`);
         return res.redirect(`/payment/result/${txnId}?status=${resultParam || 'declined'}`);
       }
 
+      if (!isWindcaveConfigured()) {
+        return res.redirect(`/payment/result/${txnId}?status=pending`);
+      }
+
       await storage.updateTransactionSessionState(txnId, 'processing');
 
-      const queryResult = isWindcaveConfigured() && !isSim && sessionToQuery
-        ? await queryWindcaveSession(sessionToQuery)
-        : simulateQuerySession(sessionToQuery || 'sim');
+      const queryResult = await queryWindcaveSession(sessionToQuery);
 
       const newSessionState = queryResult.approved ? 'approved' : 'declined';
       await storage.updateTransactionSessionState(txnId, newSessionState);
@@ -5585,6 +5495,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (transaction.status !== "completed" && transaction.status !== "partially_refunded") {
         return res.status(400).json({ message: "Only completed transactions can be refunded" });
       }
+      if (!isWindcaveConfigured() || !transaction.windcaveTransactionId) {
+        return res.status(503).json({
+          code: "REFUND_PROVIDER_UNAVAILABLE",
+          message: "Refund processing is temporarily unavailable",
+        });
+      }
 
       // Check refund amount is valid
       const requestedAmount = parseFloat(refundAmount);
@@ -5617,10 +5533,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       });
 
       let windcaveRefundId: string;
-      const isLive = isWindcaveConfigured() && transaction.windcaveTransactionId;
-
-      if (isLive) {
-        // Real Windcave refund against the original transaction
+      {
+        // Windcave refund against the original transaction
         const merchantReference = `REFUND-${transaction.id}-${Date.now()}`;
         const refundResult = await createWindcaveRefund(
           transaction.windcaveTransactionId!,
@@ -5639,9 +5553,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         }
 
         windcaveRefundId = refundResult.refundTransactionId!;
-      } else {
-        // Simulation fallback (dev mode or no Windcave transaction ID on record)
-        windcaveRefundId = `REFUND_SIM_${Date.now()}`;
       }
 
       // Mark refund record as completed. Transaction totals were already updated
@@ -5667,7 +5578,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       res.json({ 
         success: true,
-        message: isLive ? "Refund processed with Windcave successfully" : "Refund processed successfully",
+        message: "Refund processed with Windcave successfully",
         refund: completedRefund,
         transaction: updatedTransaction
       });
@@ -6186,9 +6097,14 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   });
 
   // Digital Wallet Payment Processing Endpoints
+  const digitalWalletProcessingEnabled = () => false;
 
   // Apple Pay merchant validation endpoint
   app.post("/api/payments/apple-pay/validate", async (req, res) => {
+    if (!digitalWalletProcessingEnabled()) {
+      return res.status(404).json({ code: "NOT_FOUND", message: "Not found" });
+    }
+    /* istanbul ignore next -- retired implementation retained until provider integration */
     try {
       const { validationURL, displayName } = req.body;
 
@@ -6197,11 +6113,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
 
       // In production, this would validate with Apple's servers using merchant certificates
-      // For now, we'll simulate the validation response
-      const isSimulation = !windcaveService.isConfigured();
+      // Legacy non-provider validation response (unreachable behind the tombstone).
+      const providerMissing = !windcaveService.isConfigured();
       
-      if (isSimulation) {
-        // Simulated Apple Pay merchant session
+      if (providerMissing) {
+        // Legacy synthetic merchant session
         const merchantSession = {
           epochTimestamp: Date.now(),
           expiresAt: Date.now() + (5 * 60 * 1000), // 5 minutes
@@ -6227,7 +6143,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   });
 
   // Apple Pay payment processing endpoint
-  app.post("/api/payments/apple-pay/process", async (req, res) => {
+  app.post("/api/payments/apple-pay/process", authenticateToken, async (req, res) => {
+    if (!digitalWalletProcessingEnabled()) {
+      return res.status(503).json({ code: "DIGITAL_WALLET_DISABLED", message: "Digital wallet payments are unavailable" });
+    }
+    /* istanbul ignore next -- retired implementation retained until provider integration */
     try {
       const { payment, transactionId, amount, currency = "NZD" } = req.body;
 
@@ -6244,10 +6164,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // Update transaction status to processing
       await storage.updateTransactionStatus(transactionId, "processing");
 
-      const isSimulation = !windcaveService.isConfigured();
+      const providerMissing = !windcaveService.isConfigured();
 
-      if (isSimulation) {
-        // Simulate Apple Pay payment processing
+      if (providerMissing) {
+        // Legacy synthetic Apple Pay processing
         const paymentResult = {
           success: true,
           transactionId: `applepay_${Date.now()}`,
@@ -6290,7 +6210,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   });
 
   // Google Pay payment processing endpoint
-  app.post("/api/payments/google-pay/process", async (req, res) => {
+  app.post("/api/payments/google-pay/process", authenticateToken, async (req, res) => {
+    if (!digitalWalletProcessingEnabled()) {
+      return res.status(503).json({ code: "DIGITAL_WALLET_DISABLED", message: "Digital wallet payments are unavailable" });
+    }
+    /* istanbul ignore next -- retired implementation retained until provider integration */
     try {
       const { paymentMethodData, transactionId, amount, currency = "NZD" } = req.body;
 
@@ -6307,10 +6231,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // Update transaction status to processing
       await storage.updateTransactionStatus(transactionId, "processing");
 
-      const isSimulation = !windcaveService.isConfigured();
+      const providerMissing = !windcaveService.isConfigured();
 
-      if (isSimulation) {
-        // Simulate Google Pay payment processing
+      if (providerMissing) {
+        // Legacy synthetic Google Pay processing
         const paymentResult = {
           success: true,
           transactionId: `googlepay_${Date.now()}`,
@@ -7712,15 +7636,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const amountStr = (chargeCents / 100).toFixed(2);
       const merchantRef = (invoice.checkoutVertical === "trades" ? "JOB-" : "RENT-") + invoice.id.slice(0, 8).toUpperCase();
       const xId = crypto.randomBytes(16).toString("hex");
-      let sessionResult: any;
-      if (isWindcaveConfigured()) {
-        sessionResult = await createWindcaveSession(
+      if (!isWindcaveConfigured()) {
+        return res.status(503).json({ code: "PAYMENT_PROVIDER_UNAVAILABLE", message: "Payment gateway unavailable. Please try again." });
+      }
+      const sessionResult: any = await createWindcaveSession(
           xId, amountStr, merchantRef, party.email ?? "tenant@taptpay.co.nz", baseUrl, 0, 0,
           { callbackBase: `${baseUrl}/api/checkout/callback?token=${token}`, notificationUrl: `${baseUrl}/api/windcave/${invoice.checkoutVertical === "trades" ? "trades" : "rent"}-notification` },
         );
-      } else {
-        sessionResult = simulateRentSession(token, baseUrl);
-      }
       if (!sessionResult.success) return res.status(502).json({ message: "Payment gateway error. Please try again." });
       // Pin single-payment invoices to their one Windcave session so a stale or
       // foreign session can't finalize them. Split invoices legitimately create
@@ -7776,17 +7698,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const amountStr = (chargeCents / 100).toFixed(2);
       const merchantRef = (invoice.checkoutVertical === "trades" ? "JOB-" : "RENT-") + invoice.id.slice(0, 8).toUpperCase();
       const xId = crypto.randomBytes(16).toString("hex");
-      let sessionResult: any;
-      if (isWindcaveConfigured()) {
-        sessionResult = await createWindcaveSession(
+      if (!isWindcaveConfigured()) {
+        return res.status(503).json({ code: "PAYMENT_PROVIDER_UNAVAILABLE", message: "Payment gateway unavailable. Please try again." });
+      }
+      const sessionResult: any = await createWindcaveSession(
           xId, amountStr, merchantRef, party.email ?? "tenant@taptpay.co.nz", baseUrl, 0, 0,
           { callbackBase: `${baseUrl}/api/checkout/callback?token=${token}`, notificationUrl: `${baseUrl}/api/windcave/${invoice.checkoutVertical === "trades" ? "trades" : "rent"}-notification` },
         );
-      } else {
-        // Simulation: reuse the retail sim session so we get fake AJAX submit URLs
-        // for the in-page Hosted Fields flow (simulateRentSession only has an HPP url).
-        sessionResult = simulateCreateSession(merchantRef, baseUrl);
-      }
       if (!sessionResult.success) return res.status(502).json({ message: "Payment gateway error. Please try again." });
       // Pin single-payment invoices to their one Windcave session so a stale or
       // foreign session can't finalize them. Split invoices legitimately create
@@ -7835,7 +7753,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         console.error(`[checkout-complete] sessionId mismatch for invoice ${invoice.id}`);
         return res.status(403).json({ message: "Session ID mismatch" });
       }
-      const queryResult = isWindcaveConfigured() ? await queryWindcaveSession(sessionId) : simulateQuerySession(sessionId);
+      if (!isWindcaveConfigured()) {
+        return res.status(503).json({ code: "PAYMENT_PROVIDER_UNAVAILABLE", message: "Payment outcome is unavailable" });
+      }
+      const queryResult = await queryWindcaveSession(sessionId);
       invoiceAjaxUrlCache.delete(token);
       const updated = await finalizeCheckoutInvoice(invoice, queryResult.approved === true, queryResult.windcaveTransactionId, sessionId);
       return res.json({
@@ -7867,8 +7788,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       let approved = false;
       let windcaveTransactionId: string | undefined;
       if (!isWindcaveConfigured()) {
-        approved = true;
-        windcaveTransactionId = `SIMTXN_GPAY_${Date.now()}`;
+        return res.status(503).json({ code: "PAYMENT_PROVIDER_UNAVAILABLE", message: "Payment outcome is unavailable" });
       } else {
         const ajaxUrl = invoiceAjaxUrlCache.get(token)?.ajaxSubmitGooglePayUrl;
         if (ajaxUrl && googlePayToken) {
@@ -7907,7 +7827,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const token = req.query.token as string;
       const result = req.query.result as string;
-      const isSim = req.query.sim === "1";
       if (!token) return res.redirect("/");
       const invoice = await getCheckoutInvoiceByToken(token);
       if (!invoice) return res.redirect("/");
@@ -7919,12 +7838,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       const sessionId = invoice.windcaveSessionId;
       let queryResult: any;
-      if (isWindcaveConfigured() && !isSim && sessionId) {
-        queryResult = await queryWindcaveSession(sessionId);
-      } else {
-        // Simulation — honor the result embedded in the callback URL
-        queryResult = { success: true, approved: result === "approved", windcaveTransactionId: result === "approved" ? `SIMTXN_${Date.now()}` : undefined };
-      }
+      if (!isWindcaveConfigured() || !sessionId) return res.redirect(back);
+      queryResult = await queryWindcaveSession(sessionId);
       if (queryResult.success) {
         await finalizeCheckoutInvoice(invoice, !!queryResult.approved, queryResult.windcaveTransactionId, sessionId);
       }
@@ -7943,7 +7858,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const invoice = await storage.getInvoiceRentRequestByWindcaveSessionId(sessionId);
       if (!invoice) { console.warn(`[RENT_NOTIF] No invoice for session ${sessionId}`); return; }
       if (["paid", "paid_external", "voided"].includes(invoice.status)) return; // already settled
-      const queryResult = isWindcaveConfigured() ? await queryWindcaveSession(sessionId) : simulateQuerySession(sessionId);
+      if (!isWindcaveConfigured()) return;
+      const queryResult = await queryWindcaveSession(sessionId);
       if (!queryResult.success) { console.error(`[RENT_NOTIF] query failed for ${sessionId}:`, queryResult.error); return; }
       await finalizeRentInvoice(invoice.id, !!queryResult.approved, queryResult.windcaveTransactionId, sessionId);
       console.log(`[RENT_NOTIF] invoice ${invoice.id} → ${queryResult.approved ? "paid" : "declined"}`);
@@ -7959,7 +7875,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const stored = await storage.getJobInvoiceByWindcaveSessionId(sessionId);
       if (!stored) { console.warn(`[TRADES_NOTIF] No invoice for session ${sessionId}`); return; }
       if (["paid", "paid_external", "voided"].includes(stored.status)) return;
-      const queryResult = isWindcaveConfigured() ? await queryWindcaveSession(sessionId) : simulateQuerySession(sessionId);
+      if (!isWindcaveConfigured()) return;
+      const queryResult = await queryWindcaveSession(sessionId);
       if (!queryResult.success) { console.error(`[TRADES_NOTIF] query failed for ${sessionId}:`, queryResult.error); return; }
       const invoice = { ...stored, checkoutVertical: "trades" as const };
       await finalizeCheckoutInvoice(invoice, !!queryResult.approved, queryResult.windcaveTransactionId, sessionId);

@@ -791,46 +791,6 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// ── Simulation mode (used when credentials are not set) ──────────────────────
-
-export function simulateCreateSession(merchantReference: string, baseUrl: string): CreateSessionResult {
-  const sessionId = `sim_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  logAudit("SIMULATE_SESSION", { sessionId, merchantReference });
-  const hppUrl = `${baseUrl}/api/windcave/callback?result=approved&sessionid=${sessionId}&sim=1`;
-  return {
-    success: true,
-    sessionId,
-    hppUrl,
-    // Fake AJAX submit URLs — the checkout page will detect sim mode and handle accordingly
-    ajaxSubmitCardUrl: `${baseUrl}/api/windcave/sim-submit?sessionId=${sessionId}&method=card`,
-    ajaxSubmitApplePayUrl: `${baseUrl}/api/windcave/sim-submit?sessionId=${sessionId}&method=applepay`,
-    ajaxSubmitGooglePayUrl: `${baseUrl}/api/windcave/sim-submit?sessionId=${sessionId}&method=googlepay`,
-    alreadyComplete: false,
-  };
-}
-
-// Simulated session for the property rent checkout — points the HPP redirect at
-// the rent callback (/api/checkout/callback) instead of the retail one.
-export function simulateRentSession(token: string, baseUrl: string): CreateSessionResult {
-  const sessionId = `sim_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  logAudit("SIMULATE_RENT_SESSION", { sessionId, token });
-  return {
-    success: true,
-    sessionId,
-    hppUrl: `${baseUrl}/api/checkout/callback?token=${token}&result=approved&sim=1`,
-    alreadyComplete: false,
-  };
-}
-
-export function simulateQuerySession(sessionId: string): QuerySessionResult {
-  const approved = !sessionId.includes("decline");
-  return {
-    success: true,
-    approved,
-    windcaveTransactionId: approved ? `SIMTXN_${Date.now()}` : undefined,
-  };
-}
-
 // ── Attended (Tap to Pay on iPhone) ──────────────────────────────────────────
 
 export interface AttendedSessionResult {
@@ -975,20 +935,6 @@ export async function submitTapToPayToken(
   }
 
   return { success: false, error: `Windcave ${response.status}: ${text.slice(0, 200)}` };
-}
-
-/**
- * Simulation-only helper — only called when Windcave credentials are NOT configured.
- * Never used in production (isWindcaveConfigured() guards all real paths).
- */
-export function simulateAttendedTapToPay(merchantReference: string): AttendedPaymentResult {
-  const approved = !merchantReference.includes("decline");
-  logAudit("SIMULATE_TAP_TO_PAY", { merchantReference, approved });
-  return {
-    success: true,
-    approved,
-    windcaveTransactionId: approved ? `SIMTXN_TTP_${Date.now()}` : undefined,
-  };
 }
 
 // Legacy service wrapper kept for backward compatibility with NFC routes
