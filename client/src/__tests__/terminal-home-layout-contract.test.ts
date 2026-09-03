@@ -44,12 +44,17 @@ describe("terminal home layout phase-8 contract", () => {
        frame, and a grid track minimum that tracks it re-solves the home grid
        every frame (§9.F clause 7's 32ms budget, measured at 34-36ms). */
     expect(css).toMatch(/--dock-clear:\s*calc\([^;]*var\(--dock-h-max[^;]*var\(--safe-bottom\)[^;]*var\(--sp-3\)/s);
-    const stackRule = css.match(/\.tp-viewport\s+\.tp-home-stack\s*\{([^}]*)\}/)?.[1] ?? "";
+    const stackRule = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+      .find(match => match[1].trim() === ".tp-viewport .tp-home-stack")?.[2] ?? "";
     expect(stackRule).toMatch(/padding-bottom:\s*var\(--dock-clear\)/);
     /* The gap between the floating bar and the stack's header is reserved the
        same way: padding inside the off-white, and added to row 3's minimum so
        it does not come out of the three rows. */
     expect(stackRule).toMatch(/padding-top:\s*var\(--stack-gap\)/);
+    /* Property intentionally lets its active-stack rows travel beneath the
+       floating dock. Keep that scoped exception from being mistaken for the
+       shared rule merely because its selector ends in the same two classes. */
+    expect(css).toMatch(/\.property-terminal-view\.tp-viewport\s+\.tp-home-stack\s*\{[^}]*padding-bottom:\s*0/s);
     expect(css).toMatch(/--stack-min:\s*calc\(\s*3\s*\*\s*var\(--row-h\)\s*\+\s*var\(--stack-hdr-h\)\s*\+\s*2px\s*\)/);
 
     for (const match of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
