@@ -4,7 +4,7 @@ import fs from "fs";
 import path from "path";
 import helmet from "helmet";
 import compression from "compression";
-import { spawn, spawnSync } from "child_process";
+import { spawnSync } from "child_process";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { seedDatabase } from "./seed";
@@ -194,28 +194,6 @@ app.use(createRequestLogger(log));
     await syncVerifiedMerchants();
   } catch (error) {
     log(`⚠️ Failed to sync verified merchants: ${error}`);
-  }
-
-
-  // Dev-only automatic DB backups: snapshot both databases (workspace helium +
-  // production Neon) on every boot and then daily, via pg_dump into db-backups/.
-  // Runs in the workspace only — the deployed container has no pg_dump and its
-  // filesystem is ephemeral, so backups there would be pointless.
-  if (!config.isProduction) {
-    const backupScript = path.resolve(process.cwd(), 'scripts', 'db-backup.sh');
-    if (fs.existsSync(backupScript)) {
-      const runBackup = () => {
-        try {
-          const child = spawn('bash', [backupScript], { stdio: 'ignore', detached: true });
-          child.unref();
-        } catch (err) {
-          log(`⚠️ DB backup failed to start: ${err}`);
-        }
-      };
-      runBackup();
-      setInterval(runBackup, 24 * 60 * 60 * 1000).unref();
-      log("✅ DB backups: snapshot on boot + daily (db-backups/)");
-    }
   }
 
 

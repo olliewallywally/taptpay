@@ -8,7 +8,7 @@ packages = ["freetype", "gumbo", "harfbuzz", "jbig2dec", "libjpeg_turbo", "mupdf
 
 [deployment]
 deploymentTarget = "autoscale"
-build = ["bash", "-c", "npm run build && npm run db:migrate"]
+build = ["npm", "run", "build"]
 run = ["npm", "run", "start"]
 
 [[ports]]
