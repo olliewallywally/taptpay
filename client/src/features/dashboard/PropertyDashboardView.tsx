@@ -15,6 +15,11 @@ const SHEET = '#F4F4F4';
 
 const TIMEFRAMES: Timeframe[] = ['day', 'week', 'month', 'year'];
 
+/* Fixed slots in the navy hero — the amount row and the collection-rate line
+   below it — so the hero never changes height as the timeframe changes. */
+const HERO_ROW_H = 54;
+const HERO_RATE_H = 19;
+
 const fmtWhole = (c: number) => '$' + Math.round(c / 100).toLocaleString('en-NZ');
 const fmtCount = (n: number) => String(Math.round(n));
 
@@ -71,7 +76,7 @@ function PropertyDropdown({ options, value, onPick }: {
         <span style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', display: 'flex' }}><IcoChev /></span>
       </button>
       {open && (
-        <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, minWidth: 200, maxHeight: 260, overflowY: 'auto', background: NAVY, border: `1.5px solid rgba(88,171,255,0.4)`, borderRadius: 16, padding: 6, boxShadow: '0 16px 40px rgba(0,0,0,0.35)' }}>
+        <div className="pd-noscrollbar" style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, minWidth: 200, maxHeight: 260, overflowY: 'auto', background: NAVY, border: `1.5px solid rgba(88,171,255,0.4)`, borderRadius: 16, padding: 6, boxShadow: '0 16px 40px rgba(0,0,0,0.35)' }}>
           {[null, ...options].map(opt => (
             <button key={opt ?? '__all'} type="button"
               onClick={() => { onPick(opt); setOpen(false); }}
@@ -275,8 +280,14 @@ export function PropertyDashboardView({
           )}
 
           {/* Hero figure + growth pill — shimmer placeholders on first load so
-              the page never flashes $0 before the data lands */}
-          <div style={{ marginTop: 18, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+              the page never flashes $0 before the data lands.
+
+              The growth pill and the collection-rate line below are absent for
+              some timeframes (no previous baseline / nothing sent in the
+              window). Both keep their slot and only lose visibility, so the
+              navy hero is exactly the same height on day, week, month and
+              year — switching timeframe must never resize the box. */}
+          <div style={{ marginTop: 18, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', minHeight: HERO_ROW_H }}>
             {invLoading ? (
               <div className="pd-skel" style={{ width: 190, height: 54, borderRadius: 14, background: 'rgba(88,171,255,0.22)' }} />
             ) : (
@@ -284,20 +295,19 @@ export function PropertyDashboardView({
                 <RollingHeroNumber value={collected} format={fmtWhole} />
               </div>
             )}
-            {!invLoading && growth !== null && (
-              <div style={{ padding: '5px 12px', borderRadius: 999, border: `1.5px solid ${SKY}`, color: SKY, fontWeight: 600, fontSize: 12.5 }}>
-                {growth > 0 ? `+${growth}%` : `${growth}%`}
-              </div>
-            )}
+            <div aria-hidden={invLoading || growth === null}
+              style={{ padding: '5px 12px', borderRadius: 999, border: `1.5px solid ${SKY}`, color: SKY, fontWeight: 600, fontSize: 12.5, visibility: !invLoading && growth !== null ? 'visible' : 'hidden' }}>
+              {growth !== null ? (growth > 0 ? `+${growth}%` : `${growth}%`) : '+0%'}
+            </div>
           </div>
           <div style={{ marginTop: 10, color: SKY, fontWeight: 500, fontSize: 15 }}>rent collected</div>
-          {invLoading ? (
-            <div className="pd-skel" style={{ marginTop: 6, width: 118, height: 13, borderRadius: 7, background: 'rgba(88,171,255,0.18)' }} />
-          ) : (
-            rate !== null && (
-              <div style={{ marginTop: 4, color: 'rgba(88,171,255,0.6)', fontWeight: 400, fontSize: 13 }}>{rate}% collection rate</div>
-            )
-          )}
+          <div style={{ marginTop: 4, height: HERO_RATE_H, display: 'flex', alignItems: 'center' }}>
+            {invLoading ? (
+              <div className="pd-skel" style={{ width: 118, height: 13, borderRadius: 7, background: 'rgba(88,171,255,0.18)' }} />
+            ) : rate !== null ? (
+              <div style={{ color: 'rgba(88,171,255,0.6)', fontWeight: 400, fontSize: 13 }}>{rate}% collection rate</div>
+            ) : null}
+          </div>
 
           <RentBarChart buckets={buckets} selectedIdx={selectedIdx} onSelectBar={pickBar} animKey={`${tf}-${propFilter ?? 'all'}`} />
 
@@ -375,6 +385,9 @@ const PD_CSS = `
 .pd-card { box-shadow: 0 4px 14px rgba(4,13,109,0.08); transition: transform 0.18s ease, box-shadow 0.18s ease; -webkit-tap-highlight-color: transparent; }
 .pd-card:hover { transform: translateY(-1px); box-shadow: 0 8px 22px rgba(4,13,109,0.14); }
 .pd-card:active { transform: translateY(0) scale(0.985); }
+/* Still scrolls — the bar itself is hidden so the menu keeps its clean edge. */
+.pd-noscrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+.pd-noscrollbar::-webkit-scrollbar { width: 0; height: 0; display: none; }
 .pd-tap { position: relative; }
 .pd-tap::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; box-shadow: 0 0 0 0 rgba(88,171,255,0); }
 .pd-tap.pd-pulse::after { animation: pdRing 0.45s ease-out; }
