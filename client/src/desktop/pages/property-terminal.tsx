@@ -1603,7 +1603,7 @@ const PT_CSS = `
 /* Ported from property home's .ph-scope-* so the two screens' scope controls
    are the same object. The wrapper is the cascade step itself, as it is there. */
 .pt-scope-wrap { position:relative; align-self:flex-start; z-index:5; }
-.pt-scope-menu { position:absolute; top:calc(100% + 6px); left:0; z-index:6; min-width:220px; max-height:260px; overflow-y:auto; padding:6px; border-radius:14px; background:#0B1436; border:1px solid rgba(94,158,255,0.3); box-shadow:0 18px 40px rgba(0,4,24,0.5); display:flex; flex-direction:column; gap:2px; }
+.pt-scope-menu { position:absolute; top:calc(100% + 6px); left:0; z-index:6; min-width:220px; max-height:260px; overflow-y:auto; padding:6px; border-radius:14px; background:rgba(11,20,54,0.72); backdrop-filter:blur(20px) saturate(160%); -webkit-backdrop-filter:blur(20px) saturate(160%); border:1px solid rgba(255,255,255,0.14); box-shadow:0 18px 40px rgba(0,4,24,0.55), inset 0 1px 0 rgba(255,255,255,0.10); display:flex; flex-direction:column; gap:2px; }
 .pt-scope-opt { padding:11px 12px; border-radius:9px; background:transparent; font-weight:500; font-size:12.5px; color:${TEXT_SOFT}; text-align:left; cursor:pointer; transition:background .15s ease; text-transform:lowercase; }
 .pt-scope-opt:hover { background:rgba(94,158,255,0.14); }
 .pt-scope-opt[aria-selected="true"] { background:rgba(94,158,255,0.22); }
@@ -1634,7 +1634,7 @@ const PT_CSS = `
 /* Row actions. Reuses property home's .ph-scope-menu panel verbatim so the two
    screens' popovers are the same object; no position:fixed inside the scaled
    canvas, and no window.confirm over the simulated frame. */
-.pt-row-menu { position:absolute; left:0; z-index:6; width:246px; padding:6px; box-sizing:border-box; border-radius:14px; background:#0B1436; border:1px solid rgba(94,158,255,0.3); box-shadow:0 18px 40px rgba(0,4,24,0.5); display:flex; flex-direction:column; gap:2px; }
+.pt-row-menu { position:absolute; left:0; z-index:6; width:246px; padding:6px; box-sizing:border-box; border-radius:14px; background:rgba(11,20,54,0.72); backdrop-filter:blur(20px) saturate(160%); -webkit-backdrop-filter:blur(20px) saturate(160%); border:1px solid rgba(255,255,255,0.14); box-shadow:0 18px 40px rgba(0,4,24,0.55), inset 0 1px 0 rgba(255,255,255,0.10); display:flex; flex-direction:column; gap:2px; }
 .pt-row-menu-head { padding:9px 12px 7px; font-weight:700; font-size:11.5px; color:${TEXT_SOFT}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .pt-row-menu-note { padding:2px 12px 10px; font-weight:500; font-size:12px; color:rgba(244,246,255,0.5); }
 .pt-row-menu-warn { padding:2px 12px 10px; font-weight:600; font-size:12px; line-height:1.45; color:${RED}; }
@@ -1754,7 +1754,7 @@ const PT_CSS = `
 /* Opens upward and out of flow, like .pt-scope-menu: it sits low in a panel that
    already reaches ~790px of an 813px floor, so pushing layout would take the send
    button off-screen. One scroll area inside it, never two. */
-.pt-auto-panel { position:absolute; bottom:calc(100% + 8px); left:0; right:0; z-index:6; max-height:474px; overflow-y:auto; scrollbar-width:none; padding:14px 16px; box-sizing:border-box; border-radius:16px; background:#0B1436; border:1px solid rgba(94,158,255,0.3); box-shadow:0 18px 40px rgba(0,4,24,0.5); }
+.pt-auto-panel { position:absolute; bottom:calc(100% + 8px); left:0; right:0; z-index:6; max-height:474px; overflow-y:auto; scrollbar-width:none; padding:14px 16px; box-sizing:border-box; border-radius:16px; background:rgba(11,20,54,0.72); backdrop-filter:blur(20px) saturate(160%); -webkit-backdrop-filter:blur(20px) saturate(160%); border:1px solid rgba(255,255,255,0.14); box-shadow:0 18px 40px rgba(0,4,24,0.55), inset 0 1px 0 rgba(255,255,255,0.10); }
 .pt-auto-panel::-webkit-scrollbar { display:none; }
 .pt-auto-label-first { margin-top:0; }
 .pt-auto-block { margin-top:16px; padding:16px 18px; box-sizing:border-box; border-radius:16px; border:1px solid rgba(94,158,255,0.3); background:rgba(94,158,255,0.06); }

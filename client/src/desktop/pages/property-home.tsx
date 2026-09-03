@@ -607,7 +607,7 @@ const PH_CSS = `
 .ph-scope-wrap { position:relative; align-self:flex-start; z-index:5; }
 .ph-scope { display:inline-flex; align-items:center; gap:9px; padding:10px 20px; border-radius:9999px; border:1px solid rgba(94,158,255,0.55); background:transparent; font-weight:400; font-size:13.5px; color:${ACCENT_SOFT}; cursor:pointer; transition:background .18s ease; text-transform:lowercase; }
 .ph-scope:hover { background:rgba(94,158,255,0.08); }
-.ph-scope-menu { position:absolute; top:calc(100% + 6px); left:0; min-width:220px; max-height:260px; overflow-y:auto; padding:6px; border-radius:14px; background:#0B1436; border:1px solid rgba(94,158,255,0.3); box-shadow:0 18px 40px rgba(0,4,24,0.5); display:flex; flex-direction:column; gap:2px; }
+.ph-scope-menu { position:absolute; top:calc(100% + 6px); left:0; min-width:220px; max-height:260px; overflow-y:auto; padding:6px; border-radius:14px; background:rgba(11,20,54,0.72); backdrop-filter:blur(20px) saturate(160%); -webkit-backdrop-filter:blur(20px) saturate(160%); border:1px solid rgba(255,255,255,0.14); box-shadow:0 18px 40px rgba(0,4,24,0.55), inset 0 1px 0 rgba(255,255,255,0.10); display:flex; flex-direction:column; gap:2px; }
 .ph-scope-opt { padding:9px 12px; border-radius:9px; background:transparent; font-weight:500; font-size:12.5px; color:${TEXT_SOFT}; text-align:left; cursor:pointer; transition:background .15s ease; text-transform:lowercase; }
 .ph-scope-opt:hover { background:rgba(94,158,255,0.14); }
 .ph-scope-opt[aria-selected="true"] { background:rgba(94,158,255,0.22); }

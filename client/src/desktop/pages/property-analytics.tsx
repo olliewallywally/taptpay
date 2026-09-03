@@ -749,7 +749,7 @@ const PA_CSS = `
 .pa-scope-wrap { position:relative; }
 .pa-scope { display:inline-flex; align-items:center; gap:9px; padding:10px 20px; border-radius:9999px; border:1px solid rgba(94,158,255,0.55); background:transparent; font-weight:400; font-size:13.5px; color:#7FB2FF; cursor:pointer; transition:background .18s ease; }
 .pa-scope:hover { background:rgba(94,158,255,0.08); }
-.pa-scope-menu { position:absolute; left:0; top:48px; width:280px; box-sizing:border-box; padding:8px; border-radius:16px; border:1px solid rgba(94,158,255,0.3); background:#0F1747; box-shadow:0 18px 45px rgba(0,5,28,0.5); display:flex; flex-direction:column; gap:3px; }
+.pa-scope-menu { position:absolute; left:0; top:48px; width:280px; box-sizing:border-box; padding:8px; border-radius:16px; border:1px solid rgba(255,255,255,0.14); background:rgba(15,23,71,0.72); backdrop-filter:blur(20px) saturate(160%); -webkit-backdrop-filter:blur(20px) saturate(160%); box-shadow:0 18px 45px rgba(0,5,28,0.55), inset 0 1px 0 rgba(255,255,255,0.10); display:flex; flex-direction:column; gap:3px; }
 .pa-scope-option { width:100%; padding:10px 12px; border-radius:10px; background:transparent; color:#9DBCFF; text-align:left; font-weight:600; font-size:12.5px; cursor:pointer; }
 .pa-scope-option:hover, .pa-scope-option[aria-selected=true] { background:rgba(94,158,255,0.16); color:#FFFFFF; }
 .pa-hero-row { position:relative; z-index:1; margin-top:22px; display:flex; align-items:flex-start; justify-content:space-between; }
