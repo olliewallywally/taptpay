@@ -225,8 +225,6 @@ export default function Settings() {
     gstNumber: '',
   });
 
-  const [windcaveApi, setWindcaveApi] = useState('');
-  const [apiActive, setApiActive] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [dailyGoal, setDailyGoal] = useState('500');
@@ -296,8 +294,6 @@ export default function Settings() {
         email: data.email || '',
         gstNumber: data.gstNumber || '',
       });
-      setWindcaveApi('');
-      setApiActive(!!data.windcaveApiConfigured);
       setDailyGoal(data.dailyGoal || '500.00');
       if (data.customLogoUrl) {
         setLogoPreview(data.customLogoUrl);
@@ -325,7 +321,7 @@ export default function Settings() {
   });
 
   const updateMerchantMutation = useMutation({
-    mutationFn: async (details: MerchantDetails & { windcaveApiKey?: string }) => {
+    mutationFn: async (details: MerchantDetails) => {
       const token = localStorage.getItem("authToken");
       const response = await fetch(`/api/merchants/${merchantId}`, {
         method: "PUT",
@@ -618,15 +614,6 @@ export default function Settings() {
         setLogoPreview(reader.result as string);
       };
       reader.readAsDataURL(file);
-    }
-  };
-
-  const handleApiSave = () => {
-    if (windcaveApi.trim()) {
-      updateMerchantMutation.mutate({ ...businessDetails, windcaveApiKey: windcaveApi });
-      setApiActive(true);
-    } else {
-      toast({ title: "Please enter an API key", variant: "destructive" });
     }
   };
 

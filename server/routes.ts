@@ -2229,6 +2229,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!checkMerchantOwnership(req, mid)) {
         return res.status(403).json({ message: "Access denied" });
       }
+      if (!config.features.tapToPay) {
+        return res.status(503).json({ code: "TAP_TO_PAY_DISABLED", message: "Tap to Pay is temporarily unavailable" });
+      }
       if (!(await requireBillingCard(mid, res))) return;
 
       const requestedAmount = parseFloat(amount);
@@ -2528,6 +2531,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const merchantId = parseInt(req.params.merchantId);
       if (!checkMerchantOwnership(req, merchantId)) {
         return res.status(403).json({ message: "Access denied" });
+      }
+      if (!config.features.tapToPay) {
+        return res.status(503).json({ code: "TAP_TO_PAY_DISABLED", message: "Tap to Pay is temporarily unavailable" });
       }
       if (!(await requireBillingCard(merchantId, res))) return;
       const { amount, itemName, deviceId, nfcCapabilities } = req.body;
@@ -3641,7 +3647,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         nzbn: z.string().optional(),
         phone: z.string().optional(),
         gstNumber: z.string().optional(),
-        windcaveApiKey: z.string().optional(),
         contactEmail: z.string().email().optional(),
         contactPhone: z.string().optional(),
         businessAddress: z.string().optional(),
@@ -5553,6 +5558,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchantId) {
         return res.status(401).json({ message: "Merchant authentication required" });
       }
+      if (!config.features.refundInitiation) {
+        return res.status(503).json({ code: "REFUND_INITIATION_DISABLED", message: "Refund initiation is temporarily unavailable" });
+      }
 
       // Validate refund data — merge transactionId from URL param into body for schema validation
       const validation = createRefundSchema.safeParse({ ...req.body, transactionId });
@@ -5988,8 +5996,15 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   };
 
+  const requireEcommerceApi = (_req: any, res: any, next: any) => {
+    if (!config.features.ecommerceApi) {
+      return res.status(404).json({ code: "NOT_FOUND", message: "Not found" });
+    }
+    next();
+  };
+
   // Create transaction via API
-  app.post("/api/v1/transactions", authenticateApiKey, async (req: any, res) => {
+  app.post("/api/v1/transactions", requireEcommerceApi, authenticateApiKey, async (req: any, res) => {
     const startTime = Date.now();
     
     try {
@@ -6101,7 +6116,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   });
 
   // Get transaction status via API
-  app.get("/api/v1/transactions/:id", authenticateApiKey, async (req: any, res) => {
+  app.get("/api/v1/transactions/:id", requireEcommerceApi, authenticateApiKey, async (req: any, res) => {
     const startTime = Date.now();
     
     try {

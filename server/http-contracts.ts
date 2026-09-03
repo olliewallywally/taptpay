@@ -6,6 +6,7 @@ import {
   type SubscriptionBillingHistory,
 } from "@shared/schema";
 import { planForOrDefault } from "@shared/plans";
+import { config } from "./config";
 
 type MerchantInput = Merchant & Record<string, unknown>;
 type TransactionInput = Transaction & Record<string, unknown>;
@@ -135,7 +136,7 @@ export function ownerMerchantDto(merchant: MerchantInput) {
     billingCardLast4: merchant.billingCardLast4,
     billingCardBrand: merchant.billingCardBrand,
     billingCardExpiry: merchant.billingCardExpiry,
-    windcaveApiConfigured: Boolean(merchant.windcaveApiKey),
+    windcaveApiConfigured: config.features.liveWindcave,
     rentReminderEnabled: merchant.rentReminderEnabled,
     rentReminderDelayDays: merchant.rentReminderDelayDays,
     rentReminderIntervalDays: merchant.rentReminderIntervalDays,
@@ -209,7 +210,7 @@ export function adminMerchantDto(merchant: MerchantInput) {
     gstNumber: merchant.gstNumber,
     customLogoUrl: merchant.customLogoUrl,
     windcaveMerchantId: merchant.windcaveMerchantId,
-    windcaveApiConfigured: Boolean(merchant.windcaveApiKey),
+    windcaveApiConfigured: config.features.liveWindcave,
     emailVerified: merchant.emailVerified,
     onboardingCompleted: merchant.onboardingCompleted,
     gstRegistered: merchant.gstRegistered,
