@@ -90,8 +90,16 @@ const WLB_CSS = `
 /* While pending, hold the level below the rim so the wave keeps sloshing. */
 .wlb-busy .wlb-liquid { height: 80%; }
 /* Wave surface — twice the button width, slid sideways forever for the liquid feel.
-   Once the fill tops out it rises above the pill and the overflow clips it away. */
-.wlb-wave { position: absolute; bottom: 100%; left: 0; width: 200%; height: 9px; display: block; margin-bottom: -1px; animation: wlbSlosh 1.5s linear infinite; }
+   Once the fill tops out it rises above the pill and the overflow clips it away.
+
+   display:none until the press. The wave sits at 'bottom: 100%' of .wlb-liquid,
+   and at rest that box is 0px tall on the button's bottom edge — so the wave's
+   own 9px still landed inside the pill and showed as a sloshing strip along the
+   bottom of every resting wireframe button (Oliver, 2026-09-02: no effect at all
+   until it is clicked). Hiding it also stops the animation ticking on buttons
+   nobody has touched. */
+.wlb-wave { position: absolute; bottom: 100%; left: 0; width: 200%; height: 9px; display: none; margin-bottom: -1px; animation: wlbSlosh 1.5s linear infinite; }
+.wlb-on .wlb-wave, .wlb-busy .wlb-wave { display: block; }
 .wlb-label { position: relative; z-index: 1; }
 @keyframes wlbSlosh { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 `;
