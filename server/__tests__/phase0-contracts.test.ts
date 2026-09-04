@@ -13,6 +13,7 @@ import {
 import { redactSensitive } from "../request-log";
 import { SseBroker } from "../sse-broker";
 import { sanitizeWindcaveAuditDetails } from "../windcave";
+import { config } from "../config";
 
 const merchant = {
   id: 7,
@@ -157,8 +158,8 @@ describe("Phase 0 request and response contracts", () => {
       expect(owner).not.toHaveProperty(forbidden);
       expect(admin).not.toHaveProperty(forbidden);
     }
-    expect(owner.windcaveApiConfigured).toBe(true);
-    expect(admin.windcaveApiConfigured).toBe(true);
+    expect(owner.windcaveApiConfigured).toBe(config.features.liveWindcave);
+    expect(admin.windcaveApiConfigured).toBe(config.features.liveWindcave);
   });
 
   test("push preferences DTO is a strict boolean allowlist", () => {
