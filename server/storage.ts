@@ -2290,11 +2290,43 @@ export class MemStorage implements IStorage {
       .sort((a, b) => a.date.localeCompare(b.date));
   }
 
+  /**
+   * Full reset for test isolation between cases. Mirrors the constructor
+   * field-for-field — previously cleared only merchants/transactions while
+   * leaving users, subscriptions and every lock map live, so a merchant
+   * created after a reset could collide with a previous test's leftover
+   * team members or subscription state once currentMerchantId wrapped back
+   * to a reused id (found via R1-T3's role-gate tests: seat-limit errors on
+   * a supposedly fresh merchant).
+   */
   clearAllMerchants() {
     this.merchants.clear();
     this.transactions.clear();
+    this.refunds.clear();
+    this.splitPayments.clear();
+    this.paymentAttempts.clear();
+    this.merchantTransactionCounts.clear();
+    this.taptStones.clear();
+    this.stockItems.clear();
+    this.users.clear();
+    this.subscriptions.clear();
+    this.subscriptionHistory.clear();
+    this.pushSubs = [];
+    this.pushDeliveryClaims.clear();
+    this.tutorialProgress.clear();
     this.currentMerchantId = 1;
     this.currentTransactionId = 1;
+    this.currentRefundId = 1;
+    this.currentSplitPaymentId = 1;
+    this.currentTaptStoneId = 1;
+    this.currentStockItemId = 1;
+    this.currentUserId = 1;
+    this.currentSubscriptionId = 1;
+    this.currentSubscriptionHistoryId = 1;
+    this.taptStoneCreationLocks.clear();
+    this.paymentAttemptLocks.clear();
+    this.billSplitLocks.clear();
+    this.accountMutationLocks.clear();
     console.log("All merchants and transactions cleared from memory");
   }
 

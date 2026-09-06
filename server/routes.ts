@@ -3488,7 +3488,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.put("/api/merchants/:id/theme", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = parseInt(req.params.id);
-      if (!checkMerchantOwnership(req, merchantId)) {
+      // Owner-only by default (R1-T3 safe default) — a teammate can use the
+      // terminal but does not get to change the account's branding.
+      if (!checkAccountOwnership(req, merchantId)) {
         return res.status(403).json({ message: "Access denied" });
       }
       const validation = updateThemeSchema.safeParse(req.body);
@@ -3513,9 +3515,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.put("/api/merchants/:id/daily-goal", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = parseInt(req.params.id);
-      
-      // Verify user owns this merchant
-      if (!req.user || req.user.merchantId !== merchantId) {
+
+      // Owner-only by default (R1-T3 safe default) — a target for the whole
+      // account is a billing/reporting decision, not a terminal-operator one.
+      if (!checkAccountOwnership(req, merchantId)) {
         return res.status(403).json({ message: "Unauthorized" });
       }
 
@@ -3599,13 +3602,14 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.post("/api/merchants/:id/logo", authenticateToken, logoUpload.single('logo'), async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = parseInt(req.params.id);
-      
-      // Verify user owns this merchant
-      if (!req.user || req.user.merchantId !== merchantId) {
-        // Clean up uploaded file if unauthorized
-        if (req.file) {
-          fs.unlinkSync(req.file.path);
-        }
+
+      // Owner-only by default (R1-T3 safe default) — branding, like theme.
+      // logoUpload is multer.memoryStorage() (see its definition above): a
+      // rejected upload was never written to disk, so there is nothing to
+      // unlink — req.file.path is always undefined here and calling
+      // fs.unlinkSync on it threw, turning every rejection of this check
+      // into a 500 instead of the intended 403.
+      if (!checkAccountOwnership(req, merchantId)) {
         return res.status(403).json({ message: "Unauthorized" });
       }
 
@@ -3642,9 +3646,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.delete("/api/merchants/:id/logo", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = parseInt(req.params.id);
-      
-      // Verify user owns this merchant
-      if (!req.user || req.user.merchantId !== merchantId) {
+
+      // Owner-only by default (R1-T3 safe default) — branding, like theme.
+      if (!checkAccountOwnership(req, merchantId)) {
         return res.status(403).json({ message: "Unauthorized" });
       }
 
@@ -5468,12 +5472,19 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const transactionId = parseInt(req.params.transactionId);
       const merchantId = req.user?.merchantId;
-      
+
       if (!merchantId) {
         return res.status(401).json({ message: "Merchant authentication required" });
       }
       if (!config.features.refundInitiation) {
         return res.status(503).json({ code: "REFUND_INITIATION_DISABLED", message: "Refund initiation is temporarily unavailable" });
+      }
+      // Owner (or admin) only by default (R1-T3 safe default) — members do
+      // not initiate refunds. R4 adds an explicit, audited admin-override path.
+      // (Capability gate before role gate, matching this plan's documented
+      // middleware order: authenticate -> parse -> capability -> role/tenant.)
+      if (!isAccountOwner(req.user)) {
+        return res.status(403).json({ message: "Only the account owner can initiate a refund" });
       }
 
       // Validate refund data — merge transactionId from URL param into body for schema validation
