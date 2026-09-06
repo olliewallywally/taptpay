@@ -6655,13 +6655,14 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
   app.post("/api/team/:userId/resend", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
+      const userId = strictPositiveIntegerParam(req.params.userId);
+      if (userId === null) return res.status(400).json({ message: "Invalid userId" });
       const merchantId = req.user?.merchantId;
       if (!merchantId) return res.status(400).json({ message: "Merchant ID required" });
       if (!isAccountOwner(req.user)) {
         return res.status(403).json({ message: "Only the account owner can resend invites" });
       }
 
-      const userId = parseInt(req.params.userId, 10);
       if (!Number.isInteger(userId)) return res.status(400).json({ message: "Invalid invite" });
       if (!checkResendRateLimit(`team-invite:${merchantId}:${userId}`)) {
         return res.status(429).json({ message: "Too many resend attempts. Please try again later." });
@@ -6736,12 +6737,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
   app.delete("/api/team/:userId/invite", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
+      const userId = strictPositiveIntegerParam(req.params.userId);
+      if (userId === null) return res.status(400).json({ message: "Invalid userId" });
       const merchantId = req.user?.merchantId;
       if (!merchantId) return res.status(400).json({ message: "Merchant ID required" });
       if (!isAccountOwner(req.user)) {
         return res.status(403).json({ message: "Only the account owner can revoke invites" });
       }
-      const userId = parseInt(req.params.userId, 10);
       if (!Number.isInteger(userId)) return res.status(400).json({ message: "Invalid invite" });
 
       const revoked = await storage.revokeTeamInvite(merchantId, userId);
@@ -6755,13 +6757,14 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
   app.put("/api/team/:userId/status", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
+      const userId = strictPositiveIntegerParam(req.params.userId);
+      if (userId === null) return res.status(400).json({ message: "Invalid userId" });
       const merchantId = req.user?.merchantId;
       if (!merchantId) return res.status(400).json({ message: "Merchant ID required" });
       if (!isAccountOwner(req.user)) {
         return res.status(403).json({ message: "Only the account owner can change logins" });
       }
 
-      const userId = parseInt(req.params.userId, 10);
       const status = req.body?.status;
       if (!Number.isInteger(userId) || (status !== "active" && status !== "disabled")) {
         return res.status(400).json({ message: "Invalid request" });
@@ -6795,13 +6798,14 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
   app.delete("/api/team/:userId", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
+      const userId = strictPositiveIntegerParam(req.params.userId);
+      if (userId === null) return res.status(400).json({ message: "Invalid userId" });
       const merchantId = req.user?.merchantId;
       if (!merchantId) return res.status(400).json({ message: "Merchant ID required" });
       if (!isAccountOwner(req.user)) {
         return res.status(403).json({ message: "Only the account owner can remove logins" });
       }
 
-      const userId = parseInt(req.params.userId, 10);
       if (!Number.isInteger(userId)) return res.status(400).json({ message: "Invalid login" });
       const member = await storage.getUserById(userId);
       if (!member || member.merchantId !== merchantId || member.role === "owner") {
