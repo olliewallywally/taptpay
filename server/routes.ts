@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import express from "express";
 import { config } from "./config";
-import { strictPositiveIntegerParam } from "./http-params";
+import { strictPositiveIntegerParam, strictPositiveIntegerQueryParam } from "./http-params";
 import { createServer, type Server } from "http";
 import { installAsyncRouteGuard } from "./async-route-guard";
 import {
@@ -370,8 +370,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   }
 
   app.get("/nfc/:merchantId/stone/:stoneId", (req, res) => {
-    const merchantId = parseInt(req.params.merchantId);
-    const stoneId = parseInt(req.params.stoneId);
+    const merchantId = strictPositiveIntegerParam(req.params.merchantId);
+    if (merchantId === null) return res.status(400).json({ message: "Invalid merchantId" });
+    const stoneId = strictPositiveIntegerParam(req.params.stoneId);
+    if (stoneId === null) return res.status(400).json({ message: "Invalid stoneId" });
     const payUrl = generatePaymentUrl(merchantId, stoneId, req);
     const host = payUrl.replace(/^https?:\/\//, "");
     const intentUrl = `intent://${host}#Intent;scheme=https;package=com.android.chrome;end`;
@@ -380,7 +382,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   });
 
   app.get("/nfc/:merchantId", (req, res) => {
-    const merchantId = parseInt(req.params.merchantId);
+    const merchantId = strictPositiveIntegerParam(req.params.merchantId);
+    if (merchantId === null) return res.status(400).json({ message: "Invalid merchantId" });
     const payUrl = generatePaymentUrl(merchantId, undefined, req);
     const host = payUrl.replace(/^https?:\/\//, "");
     const intentUrl = `intent://${host}#Intent;scheme=https;package=com.android.chrome;end`;
@@ -2001,8 +2004,17 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.get("/api/merchants/:id/active-transaction", async (req, res) => {
     const merchantId = strictPositiveIntegerParam(req.params.id);
     if (merchantId === null) return res.status(400).json({ message: "Invalid id" });
-    const stoneId = req.query.stoneId ? parseInt(req.query.stoneId as string) : undefined;
-    
+    const stoneId = req.query.stoneId !== undefined
+      ? strictPositiveIntegerQueryParam(req.query.stoneId)
+      : undefined;
+    // stoneId is `null` only when the param was present and failed to parse
+    // (the ternary above yields `undefined`, never `null`, when it was
+    // absent) — so this check alone also lets TS narrow the type below to
+    // `number | undefined`, matching ActiveTransactionScope's stoneId.
+    if (stoneId === null) {
+      return res.status(400).json({ message: "Invalid stoneId" });
+    }
+
     // SECURITY: Rate limiting
     const clientIp = req.ip || 'unknown';
     if (!checkRateLimit(clientIp)) {
@@ -3136,7 +3148,15 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!checkMerchantOwnership(req, merchantId)) {
         return res.status(403).json({ message: "Access denied" });
       }
-      const days = parseInt(req.query.days as string) || 30;
+      // Unbounded before this fix: unlike every "size" query param in this file
+      // (all wrapped in Math.min against a pixel cap), this had no upper bound —
+      // a huge positive value (falsy-safe, so it survives the `|| 30` fallback)
+      // reaches getRevenueOverTime's `for (let i = 0; i <= days; i++)` loop,
+      // which is synchronous and builds one Map entry per day. That blocks
+      // Node's single event loop thread for every tenant, not just the caller.
+      // Clamped to a generous 1-year reporting window, same shape as the size
+      // clamps elsewhere in this file.
+      const days = Math.min(parseInt(req.query.days as string) || 30, 365);
       const revenueData = await storage.getRevenueOverTime(merchantId, days);
       res.json(revenueData);
     } catch (error) {
@@ -3850,7 +3870,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // Get specific tapt stone details
   app.get("/api/tapt-stones/:id", async (req, res) => {
     try {
-      const stoneId = parseInt(req.params.id);
+      const stoneId = strictPositiveIntegerParam(req.params.id);
+      if (stoneId === null) return res.status(400).json({ message: "Invalid id" });
       const stone = await storage.getTaptStone(stoneId);
       
       if (!stone || !stone.isActive) {
