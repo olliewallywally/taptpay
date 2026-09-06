@@ -2365,7 +2365,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // Create bill split
   app.post("/api/transactions/:id/split", async (req, res) => {
     try {
-      const transactionId = parseInt(req.params.id);
+      const transactionId = strictPositiveIntegerParam(req.params.id);
+      if (transactionId === null) return res.status(400).json({ message: "Invalid id" });
       const { totalSplits } = req.body;
 
       if (!totalSplits || totalSplits < 2 || totalSplits > 10) {
@@ -2412,7 +2413,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // Update splitEnabled on a pending transaction (merchant toggle)
   app.patch("/api/transactions/:id/split-enabled", authenticateToken, async (req, res) => {
     try {
-      const transactionId = parseInt(req.params.id);
+      const transactionId = strictPositiveIntegerParam(req.params.id);
+      if (transactionId === null) return res.status(400).json({ message: "Invalid id" });
       const { splitEnabled } = req.body;
 
       if (typeof splitEnabled !== 'boolean') {
@@ -2456,7 +2458,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // Get a single split payment by ID (public — needed for customer receipt page)
   app.get("/api/split-payments/:id", async (req, res) => {
     try {
-      const splitId = parseInt(req.params.id);
+      const splitId = strictPositiveIntegerParam(req.params.id);
+      if (splitId === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(splitId)) return res.status(400).json({ message: "Invalid split payment ID" });
       const split = await storage.getSplitPaymentById(splitId);
       if (!split) return res.status(404).json({ message: "Split payment not found" });
@@ -2474,7 +2477,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // Cancel transaction — merchant-initiated only (called from the terminal UI)
   app.post("/api/transactions/:id/cancel", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
-      const transactionId = parseInt(req.params.id);
+      const transactionId = strictPositiveIntegerParam(req.params.id);
+      if (transactionId === null) return res.status(400).json({ message: "Invalid id" });
       const transaction = await storage.getTransaction(transactionId);
 
       if (!transaction) {
@@ -2667,7 +2671,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         });
       }
       
-      const transactionId = parseInt(req.params.id);
+      const transactionId = strictPositiveIntegerParam(req.params.id);
+      if (transactionId === null) return res.status(400).json({ message: "Invalid id" });
       const { merchantId: requestMerchantId, stoneId: requestStoneId, amount: requestAmount } = validation.data;
       
       const transaction = await storage.getTransaction(transactionId);
@@ -2910,7 +2915,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // ── Hosted Fields completion — called by frontend after card/Apple Pay submit ─
   app.post("/api/transactions/:id/hosted-fields-complete", async (req, res) => {
     try {
-      const transactionId = parseInt(req.params.id);
+      const transactionId = strictPositiveIntegerParam(req.params.id);
+      if (transactionId === null) return res.status(400).json({ message: "Invalid id" });
       const { sessionId, paymentMethod } = req.body as { sessionId?: string; paymentMethod?: string };
 
       if (!sessionId) return res.status(400).json({ message: "sessionId required" });
@@ -2944,7 +2950,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // ── Google Pay completion — backend submits token using server-side cached URL ─
   app.post("/api/transactions/:id/googlepay-complete", async (req, res) => {
     try {
-      const transactionId = parseInt(req.params.id);
+      const transactionId = strictPositiveIntegerParam(req.params.id);
+      if (transactionId === null) return res.status(400).json({ message: "Invalid id" });
       // NOTE: Do NOT accept ajaxSubmitGooglePayUrl from the client — SSRF risk.
       // Only googlePayToken comes from the client (the opaque token from Google's SDK).
       const { sessionId, googlePayToken } = req.body as {
@@ -3013,7 +3020,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // Get single transaction details
   app.get("/api/transactions/:id", async (req, res) => {
     try {
-      const transactionId = parseInt(req.params.id);
+      const transactionId = strictPositiveIntegerParam(req.params.id);
+      if (transactionId === null) return res.status(400).json({ message: "Invalid id" });
       const transaction = await storage.getTransaction(transactionId);
       
       if (!transaction) {
@@ -3033,8 +3041,14 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // Generate PDF receipt
   app.post("/api/transactions/:id/receipt-pdf", async (req, res) => {
     try {
-      const transactionId = parseInt(req.params.id);
-      const splitIdParam = req.query.splitId ? parseInt(req.query.splitId as string) : null;
+      const transactionId = strictPositiveIntegerParam(req.params.id);
+      if (transactionId === null) return res.status(400).json({ message: "Invalid id" });
+      const splitIdParam = req.query.splitId
+        ? strictPositiveIntegerQueryParam(req.query.splitId as string)
+        : null;
+      if (req.query.splitId && splitIdParam === null) {
+        return res.status(400).json({ message: "Invalid splitId" });
+      }
       const transaction = await storage.getTransaction(transactionId);
       
       if (!transaction) {
@@ -3088,7 +3102,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // Generate QR code linking to receipt page (public — customer scans on their own device)
   app.get("/api/transactions/:id/receipt-qr", async (req, res) => {
     try {
-      const transactionId = parseInt(req.params.id);
+      const transactionId = strictPositiveIntegerParam(req.params.id);
+      if (transactionId === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(transactionId)) {
         return res.status(400).json({ message: "Invalid transaction ID" });
       }
@@ -5521,7 +5536,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // Create a refund for a transaction
   app.post("/api/transactions/:transactionId/refunds", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
-      const transactionId = parseInt(req.params.transactionId);
+      const transactionId = strictPositiveIntegerParam(req.params.transactionId);
+      if (transactionId === null) return res.status(400).json({ message: "Invalid transactionId" });
       const merchantId = req.user?.merchantId;
 
       if (!merchantId) {
@@ -5658,7 +5674,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // Get refunds for a specific transaction
   app.get("/api/transactions/:transactionId/refunds", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
-      const transactionId = parseInt(req.params.transactionId);
+      const transactionId = strictPositiveIntegerParam(req.params.transactionId);
+      if (transactionId === null) return res.status(400).json({ message: "Invalid transactionId" });
       const merchantId = req.user?.merchantId;
       
       if (!merchantId) {
@@ -5708,7 +5725,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // Get specific refund details
   app.get("/api/refunds/:refundId", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
-      const refundId = parseInt(req.params.refundId);
+      const refundId = strictPositiveIntegerParam(req.params.refundId);
+      if (refundId === null) return res.status(400).json({ message: "Invalid refundId" });
       const merchantId = req.user?.merchantId;
       
       if (!merchantId) {
@@ -6102,9 +6120,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // Get transaction status via API
   app.get("/api/v1/transactions/:id", requireEcommerceApi, authenticateApiKey, async (req: any, res) => {
     const startTime = Date.now();
-    
+
     try {
-      const transactionId = parseInt(req.params.id);
+      const transactionId = strictPositiveIntegerParam(req.params.id);
+      if (transactionId === null) return res.status(400).json({ error: "Invalid id" });
       
       // Check permissions
       if (!req.apiKey.permissions.includes('read_transactions')) {
