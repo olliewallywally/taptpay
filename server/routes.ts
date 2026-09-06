@@ -263,7 +263,9 @@ function checkRateLimit(ip: string): boolean {
   return true;
 }
 
-// Cleanup old rate limit records periodically
+// Cleanup old rate limit records periodically. unref() so this housekeeping
+// timer never keeps a short-lived process (a test run, a one-off script)
+// alive — the same reasoning as auth.ts's loginAttemptCleanupTimer.
 setInterval(() => {
   const now = Date.now();
   for (const [ip, record] of Array.from(rateLimitMap.entries())) {
@@ -272,7 +274,7 @@ setInterval(() => {
   for (const [key, record] of Array.from(resendRateLimitMap.entries())) {
     if (now > record.resetTime) resendRateLimitMap.delete(key);
   }
-}, RATE_LIMIT_WINDOW);
+}, RATE_LIMIT_WINDOW).unref();
 
 function broadcastToStone(merchantId: number, stoneId: number | null | undefined, data: any) {
   sseBroker.broadcast(merchantId, stoneId, data);
@@ -395,9 +397,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   });
 
   app.get("/.well-known/apple-developer-merchantid-domain-association", (_req, res) => {
+    // process.cwd(), not import.meta.dirname: this file loads under ts-jest's
+    // CommonJS transform (see server/migrate.ts's entrypoint-detection comment
+    // for the same constraint), and the app always runs from the repo root.
     const filePath = path.resolve(
-      import.meta.dirname,
-      "..",
+      process.cwd(),
       "client",
       "public",
       ".well-known",
@@ -7054,7 +7058,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     if (entry.count >= limit) return false;
     entry.count++; return true;
   }
-  setInterval(() => { const c = Date.now() - 120_000; tokenRateMap.forEach((v, k) => { if (v.windowStart < c) tokenRateMap.delete(k); }); }, 300_000);
+  setInterval(() => { const c = Date.now() - 120_000; tokenRateMap.forEach((v, k) => { if (v.windowStart < c) tokenRateMap.delete(k); }); }, 300_000).unref();
 
   function generateInvoiceToken(): string { return crypto.randomBytes(20).toString("base64url"); }
 

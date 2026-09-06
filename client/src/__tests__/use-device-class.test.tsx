@@ -18,7 +18,7 @@ describe("device class", () => {
     [900, 1200, false, "tablet"],
     [1024, 768, false, "desktop"],
     [1440, 900, false, "desktop"],
-    [1440, 650, false, "mobile"],
+    [1440, 650, false, "desktop"],
   ])(
     "classifies %ix%i with coarse pointer %s as %s",
     (width, height, coarsePointer, expected) => {

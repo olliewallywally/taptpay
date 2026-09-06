@@ -9,10 +9,15 @@ export function classifyDevice(
   height: number,
   hasCoarsePointer: boolean,
 ): DeviceClass {
-  if (
-    Math.min(width, height) < 700 ||
-    (hasCoarsePointer && width < 768)
-  ) {
+  if (hasCoarsePointer && width < 768) {
+    return "mobile";
+  }
+
+  // A fine (non-touch) pointer with desktop-class width is never phone UI,
+  // no matter how short the window — a wide short window is a resized
+  // desktop browser, not a phone (D10, docs/decisions/D10-device-gate.md).
+  const wideFinePointer = !hasCoarsePointer && width >= 1024;
+  if (!wideFinePointer && Math.min(width, height) < 700) {
     return "mobile";
   }
 
