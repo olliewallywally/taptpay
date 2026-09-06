@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/routes.ts @ 318fa4afad2c3c9bbcae50df752fe10ef50084c7 on 2026-09-06.
+ * scripts/generate-route-policy.ts from server/routes.ts @ f24dbfacab00dde067fe45be36988d67523ebf65 on 2026-09-06.
  *
  * 218 registrations (91 GET, 88 POST, 3 PATCH, 5 ALL, 22 PUT, 9 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -96,11 +96,11 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
   "PUT /api/merchants/:id/details": {"method":"PUT","path":"/api/merchants/:id/details","principal":"merchant-user","markers":["authenticateToken","checkAccountOwnership"]},
   "PUT /api/merchants/:id/change-password": {"method":"PUT","path":"/api/merchants/:id/change-password","principal":"merchant-user","markers":["authenticateToken"]},
   "PUT /api/merchants/:id/bank-account": {"method":"PUT","path":"/api/merchants/:id/bank-account","principal":"merchant-user","markers":["authenticateToken"]},
-  "PUT /api/merchants/:id/theme": {"method":"PUT","path":"/api/merchants/:id/theme","principal":"merchant-user","markers":["authenticateToken","checkMerchantOwnership"]},
-  "PUT /api/merchants/:id/daily-goal": {"method":"PUT","path":"/api/merchants/:id/daily-goal","principal":"merchant-user","markers":["authenticateToken"]},
+  "PUT /api/merchants/:id/theme": {"method":"PUT","path":"/api/merchants/:id/theme","principal":"merchant-user","markers":["authenticateToken","checkAccountOwnership"]},
+  "PUT /api/merchants/:id/daily-goal": {"method":"PUT","path":"/api/merchants/:id/daily-goal","principal":"merchant-user","markers":["authenticateToken","checkAccountOwnership"]},
   "PUT /api/merchants/:id": {"method":"PUT","path":"/api/merchants/:id","principal":"merchant-user","markers":["authenticateToken","checkAccountOwnership"]},
-  "POST /api/merchants/:id/logo": {"method":"POST","path":"/api/merchants/:id/logo","principal":"merchant-user","markers":["authenticateToken"]},
-  "DELETE /api/merchants/:id/logo": {"method":"DELETE","path":"/api/merchants/:id/logo","principal":"merchant-user","markers":["authenticateToken"]},
+  "POST /api/merchants/:id/logo": {"method":"POST","path":"/api/merchants/:id/logo","principal":"merchant-user","markers":["authenticateToken","checkAccountOwnership"]},
+  "DELETE /api/merchants/:id/logo": {"method":"DELETE","path":"/api/merchants/:id/logo","principal":"merchant-user","markers":["authenticateToken","checkAccountOwnership"]},
   "GET /api/merchants/:id/transactions": {"method":"GET","path":"/api/merchants/:id/transactions","principal":"merchant-user","markers":["authenticateToken","checkMerchantOwnership"]},
   "GET /api/merchants/:id/tapt-stones": {"method":"GET","path":"/api/merchants/:id/tapt-stones","principal":"merchant-user","markers":["authenticateToken","checkMerchantOwnership"]},
   "POST /api/merchants/:id/tapt-stones": {"method":"POST","path":"/api/merchants/:id/tapt-stones","principal":"merchant-user","markers":["authenticateToken","checkMerchantOwnership"]},
@@ -145,7 +145,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
   "GET /api/push/preferences": {"method":"GET","path":"/api/push/preferences","principal":"merchant-user","markers":["authenticateToken"]},
   "PUT /api/push/preferences": {"method":"PUT","path":"/api/push/preferences","principal":"merchant-user","markers":["authenticateToken"]},
   "POST /api/merchants/:id/clear-transactions": {"method":"POST","path":"/api/merchants/:id/clear-transactions","principal":"merchant-user","markers":["authenticateToken","checkAccountOwnership","req.user?.role === \"admin\""]},
-  "POST /api/transactions/:transactionId/refunds": {"method":"POST","path":"/api/transactions/:transactionId/refunds","principal":"merchant-user","markers":["authenticateToken"]},
+  "POST /api/transactions/:transactionId/refunds": {"method":"POST","path":"/api/transactions/:transactionId/refunds","principal":"merchant-user","markers":["authenticateToken","isAccountOwner"]},
   "GET /api/transactions/:transactionId/refunds": {"method":"GET","path":"/api/transactions/:transactionId/refunds","principal":"merchant-user","markers":["authenticateToken"]},
   "GET /api/merchants/:merchantId/refunds": {"method":"GET","path":"/api/merchants/:merchantId/refunds","principal":"merchant-user","markers":["authenticateToken"]},
   "GET /api/refunds/:refundId": {"method":"GET","path":"/api/refunds/:refundId","principal":"merchant-user","markers":["authenticateToken"]},
