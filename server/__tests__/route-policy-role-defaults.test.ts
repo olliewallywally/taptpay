@@ -62,7 +62,7 @@ describe("R1-T3 safe-default role gates — owner-only merchant configuration", 
     expect(ownerAttempt.status).toBe(200);
   });
 
-  it("a member cannot upload the merchant logo; the owner clears the role gate (this route writes uploadedFiles via `db` directly — one of the three known routes.ts exceptions the plan assigns to R1-T7, so it 500s with no live database here rather than the 200 it gives with one; the role gate is what T3 owns and is what this asserts)", async () => {
+  it("a member cannot upload the merchant logo; the owner can", async () => {
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
     const member = await createMemberPrincipal(owner.merchantId);
@@ -77,7 +77,7 @@ describe("R1-T3 safe-default role gates — owner-only merchant configuration", 
       .post(`/api/merchants/${owner.merchantId}/logo`)
       .set(bearer(owner))
       .attach("logo", PNG_MAGIC_ONLY, "logo.png");
-    expect(ownerAttempt.status).not.toBe(403);
+    expect(ownerAttempt.status).toBe(200);
   });
 
   it("a member cannot delete the merchant logo; the owner can", async () => {

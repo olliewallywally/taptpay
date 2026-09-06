@@ -1,4 +1,4 @@
-import { users, type User, type UserStatus, merchants, merchantTutorialProgress, transactions, merchantSettlements, refunds, splitPayments, paymentAttempts, PAYMENT_RETURN_STATE_MAX_AGE_MS, taptStones, stockItems, merchantSubscriptions, subscriptionBillingHistory, pushSubscriptions, pushNotificationDeliveries, normalizePushNotificationPreferences, DEFAULT_PUSH_NOTIFICATION_PREFERENCES, tenantProfiles, activeSchedules, invoicesRentRequests, transactionEvents, clientProfiles, quotes, jobInvoices, jobSchedules, jobEvents, type Merchant, type MerchantTutorialProgress, type Transaction, type SplitPayment, type PaymentAttempt, type InsertMerchant, type InsertTransaction, type CreateMerchant, type Refund, type InsertRefund, type TaptStone, type InsertTaptStone, type StockItem, type InsertStockItem, type MerchantSubscription, type SubscriptionBillingHistory, type PushSubscription, type PushNotificationPreferences, type PushNotificationEventType } from "@shared/schema";
+import { users, type User, type UserStatus, merchants, merchantTutorialProgress, transactions, uploadedFiles, merchantSettlements, refunds, splitPayments, paymentAttempts, PAYMENT_RETURN_STATE_MAX_AGE_MS, taptStones, stockItems, merchantSubscriptions, subscriptionBillingHistory, pushSubscriptions, pushNotificationDeliveries, normalizePushNotificationPreferences, DEFAULT_PUSH_NOTIFICATION_PREFERENCES, tenantProfiles, activeSchedules, invoicesRentRequests, transactionEvents, clientProfiles, quotes, jobInvoices, jobSchedules, jobEvents, type Merchant, type MerchantTutorialProgress, type Transaction, type SplitPayment, type PaymentAttempt, type InsertMerchant, type InsertTransaction, type CreateMerchant, type Refund, type InsertRefund, type TaptStone, type InsertTaptStone, type StockItem, type InsertStockItem, type MerchantSubscription, type SubscriptionBillingHistory, type PushSubscription, type PushNotificationPreferences, type PushNotificationEventType } from "@shared/schema";
 import { DEFAULT_PLAN_ID, isUpgrade, planFor, planForOrDefault, type PlanId } from "@shared/plans";
 import { decideBilling, failedPaymentUpdates, immediatePlanUpdates, MAX_PAYMENT_ATTEMPTS, nextBillingPeriodStart, nextPeriodUpdates, proratedUpgradeCents, queuedPlanUpdates, renewalPlan } from "./subscription-billing";
 import { getDb, isDatabaseConnected } from "./database";
@@ -822,6 +822,13 @@ export interface IStorage extends PaymentAttemptRepository {
 
   createJobEvent(data: any): Promise<any>;
   getJobEventsByClient(clientProfileId: string, limit?: number): Promise<any[]>;
+
+  // Uploaded file blobs (logos, invoice attachments), keyed by their public
+  // /uploads/<path> — R1-T7: routes.ts used to query the uploaded_files table
+  // directly via `db`, which is always null in MemStorage/no-database mode.
+  saveUploadedFile(relPath: string, mimeType: string, data: Buffer): Promise<void>;
+  getUploadedFile(relPath: string): Promise<{ mimeType: string; data: Buffer } | undefined>;
+  deleteUploadedFile(relPath: string): Promise<void>;
 }
 
 // Defaults for merchant columns the in-memory mocks don't set explicitly.
@@ -881,6 +888,7 @@ export class MemStorage implements IStorage {
     claimedAt: Date;
   }>;
   private tutorialProgress: Map<string, MerchantTutorialProgress>;
+  private uploadedFileBlobs: Map<string, { mimeType: string; data: Buffer }>;
 
   constructor() {
     this.merchants = new Map();
@@ -897,6 +905,7 @@ export class MemStorage implements IStorage {
     this.pushSubs = [];
     this.pushDeliveryClaims = new Map();
     this.tutorialProgress = new Map();
+    this.uploadedFileBlobs = new Map();
     this.currentMerchantId = 1;
     this.currentTransactionId = 1;
     this.currentRefundId = 1;
@@ -2327,7 +2336,20 @@ export class MemStorage implements IStorage {
     this.paymentAttemptLocks.clear();
     this.billSplitLocks.clear();
     this.accountMutationLocks.clear();
+    this.uploadedFileBlobs.clear();
     console.log("All merchants and transactions cleared from memory");
+  }
+
+  async saveUploadedFile(relPath: string, mimeType: string, data: Buffer): Promise<void> {
+    this.uploadedFileBlobs.set(relPath, { mimeType, data });
+  }
+
+  async getUploadedFile(relPath: string): Promise<{ mimeType: string; data: Buffer } | undefined> {
+    return this.uploadedFileBlobs.get(relPath);
+  }
+
+  async deleteUploadedFile(relPath: string): Promise<void> {
+    this.uploadedFileBlobs.delete(relPath);
   }
 
   private createSampleData() {
@@ -7697,6 +7719,28 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(jobEvents)
       .where(eq(jobEvents.clientProfileId, clientProfileId))
       .orderBy(desc(jobEvents.createdAt)).limit(limit);
+  }
+
+  // ───────── Uploaded file blobs ─────────
+  async saveUploadedFile(relPath: string, mimeType: string, data: Buffer): Promise<void> {
+    const db = getDb(); if (!db) throw new Error("Database not connected");
+    await db.insert(uploadedFiles)
+      .values({ path: relPath, mimeType, data })
+      .onConflictDoUpdate({
+        target: uploadedFiles.path,
+        set: { mimeType, data, createdAt: new Date() },
+      });
+  }
+
+  async getUploadedFile(relPath: string): Promise<{ mimeType: string; data: Buffer } | undefined> {
+    const db = getDb(); if (!db) return undefined;
+    const [file] = await db.select().from(uploadedFiles).where(eq(uploadedFiles.path, relPath));
+    return file ? { mimeType: file.mimeType, data: file.data } : undefined;
+  }
+
+  async deleteUploadedFile(relPath: string): Promise<void> {
+    const db = getDb(); if (!db) throw new Error("Database not connected");
+    await db.delete(uploadedFiles).where(eq(uploadedFiles.path, relPath));
   }
 
 }
