@@ -3310,7 +3310,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // Admin manual merchant verification (mark as verified directly)
   app.post("/api/admin/merchants/:id/verify", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
     try {
-      const merchantId = parseInt(req.params.id);
+      const merchantId = strictPositiveIntegerParam(req.params.id);
+      if (merchantId === null) return res.status(400).json({ message: "Invalid id" });
 
       const merchant = await storage.getMerchant(merchantId);
       if (!merchant) {
@@ -3354,7 +3355,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // Admin set merchant status to 'active' (Windcave onboarding complete)
   app.post("/api/admin/merchants/:id/set-active", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
     try {
-      const merchantId = parseInt(req.params.id);
+      const merchantId = strictPositiveIntegerParam(req.params.id);
+      if (merchantId === null) return res.status(400).json({ message: "Invalid id" });
       const merchant = await storage.getMerchant(merchantId);
       if (!merchant) return res.status(404).json({ message: "Merchant not found" });
       if (merchant.status === 'active') return res.status(400).json({ message: "Merchant is already active" });
@@ -3371,8 +3373,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
   app.get("/api/admin/merchants/:id/transactions", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
     try {
-      const merchantId = parseInt(req.params.id);
-      if (isNaN(merchantId)) return res.status(400).json({ message: "Invalid merchant ID" });
+      const merchantId = strictPositiveIntegerParam(req.params.id);
+      if (merchantId === null) return res.status(400).json({ message: "Invalid id" });
       const txList = await storage.getTransactionsByMerchant(merchantId);
       res.json(txList.map(adminTransactionDto));
     } catch (error) {
@@ -3384,9 +3386,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // Update Windcave Merchant ID (admin only)
   app.patch("/api/admin/merchants/:id/windcave-merchant-id", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
     try {
-      const merchantId = parseInt(req.params.id);
+      const merchantId = strictPositiveIntegerParam(req.params.id);
+      if (merchantId === null) return res.status(400).json({ message: "Invalid id" });
       const { windcaveMerchantId } = req.body;
-      if (isNaN(merchantId)) return res.status(400).json({ message: "Invalid merchant ID" });
       const merchant = await storage.getMerchant(merchantId);
       if (!merchant) return res.status(404).json({ message: "Merchant not found" });
       await storage.updateMerchant(merchantId, { windcaveMerchantId: windcaveMerchantId || null });
@@ -3400,7 +3402,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // Admin manual merchant activation with password (bypass email verification)
   app.post("/api/admin/merchants/:id/activate", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
     try {
-      const merchantId = parseInt(req.params.id);
+      const merchantId = strictPositiveIntegerParam(req.params.id);
+      if (merchantId === null) return res.status(400).json({ message: "Invalid id" });
       const { password } = req.body;
 
       if (!password) {
@@ -4496,7 +4499,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // Admin merchant management endpoints
   app.put("/api/admin/merchants/:id", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
     try {
-      const merchantId = parseInt(req.params.id);
+      const merchantId = strictPositiveIntegerParam(req.params.id);
+      if (merchantId === null) return res.status(400).json({ message: "Invalid id" });
       const updates = req.body;
 
       // Update different aspects of merchant data based on what's provided
@@ -4572,7 +4576,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
   app.get("/api/admin/merchants/:id", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
     try {
-      const merchantId = parseInt(req.params.id);
+      const merchantId = strictPositiveIntegerParam(req.params.id);
+      if (merchantId === null) return res.status(400).json({ message: "Invalid id" });
       const merchant = await storage.getMerchant(merchantId);
       if (!merchant) {
         return res.status(404).json({ message: "Merchant not found" });
@@ -4587,8 +4592,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // Delete merchant (admin only)
   app.delete("/api/admin/merchants/:id", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
     try {
-      const merchantId = parseInt(req.params.id);
-      
+      const merchantId = strictPositiveIntegerParam(req.params.id);
+      if (merchantId === null) return res.status(400).json({ message: "Invalid id" });
+
       // Check if merchant exists
       const merchant = await storage.getMerchant(merchantId);
       if (!merchant) {
@@ -5818,7 +5824,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // Revoke API key
   app.post("/api/admin/api-keys/:keyId/revoke", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
     try {
-      const keyId = parseInt(req.params.keyId);
+      const keyId = strictPositiveIntegerParam(req.params.keyId);
+      if (keyId === null) return res.status(400).json({ message: "Invalid keyId" });
       await storage.revokeApiKey(keyId);
       res.json({ success: true, message: "API key revoked successfully" });
     } catch (error) {
