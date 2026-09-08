@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 
 const read = (relativePath: string): string =>
   fs.readFileSync(path.join(process.cwd(), relativePath), "utf8");
@@ -23,11 +24,12 @@ describe("R0-T6 startup and build side-effect boundaries", () => {
 
   test("database dumps stay ignored and untracked", () => {
     expect(read(".gitignore")).toMatch(/^db-backups\/?$/m);
-    const tracked = fs.existsSync(path.join(process.cwd(), "db-backups"))
-      ? fs.readdirSync(path.join(process.cwd(), "db-backups"))
-      : [];
+    const tracked = execFileSync("git", ["ls-files", "-z", "--", "db-backups/"], {
+      cwd: process.cwd(), encoding: "utf8",
+    }).split("\0").filter(Boolean);
 
-    // An isolated worktree must not materialise repository-tracked dump files.
-    expect(tracked).toEqual([]);
+    // Ignored operator backups may exist and must not be deleted to satisfy
+    // this gate. Check the Git index, not directory contents; report count only.
+    expect(tracked.length).toBe(0);
   });
 });

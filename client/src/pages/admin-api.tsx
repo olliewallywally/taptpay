@@ -658,7 +658,7 @@ export default function AdminApi() {
                   <div className="bg-black/50 border border-white/20 rounded-lg p-4">
                     <pre className="text-green-400 text-sm overflow-x-auto">
 {`curl -X POST https://api.tapt.co.nz/v1/transactions \\
-  -H "Authorization: Bearer tapt_live_your_api_key" \\
+  -H "Authorization: Bearer $TAPTPAY_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
     "amount": "10.50",
