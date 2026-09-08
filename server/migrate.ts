@@ -58,13 +58,21 @@
  *    empty database would permanently skip the entire schema), and it refuses
  *    if the ledger already has rows unless `--force`.
  *
+ * 6. Every invocation must name its target: `--target`, `--expected-host` and
+ *    `--expected-database` are required, and the URI is checked against them
+ *    before `pg` is imported. A command that does not say which database it
+ *    means fails before it can connect to the wrong one. See
+ *    `docs/operations/migration-target.md`.
+ *
  * Usage
  * -----
- *   npm run db:migrate                          apply pending migrations
- *   npm run db:migrate:status                   report only, touches nothing
- *   npm run db:migrate -- --dry-run             list what would be applied
- *   npm run db:migrate:baseline                 print the baseline plan, refuse
- *   npm run db:migrate:baseline -- --confirm    record as applied, run nothing
+ *   TARGET="--target=local --expected-host=127.0.0.1 --expected-database=taptpay"
+ *
+ *   npm run db:migrate -- $TARGET                       apply pending migrations
+ *   npm run db:migrate:status -- $TARGET                report only, touches nothing
+ *   npm run db:migrate -- $TARGET --dry-run             list what would be applied
+ *   npm run db:migrate:baseline -- $TARGET              print the baseline plan, refuse
+ *   npm run db:migrate:baseline -- $TARGET --confirm    record as applied, run nothing
  */
 
 import crypto from "crypto";
@@ -492,6 +500,112 @@ export function executableStatements(sql: string): SqlChunk[] {
 }
 
 // ---------------------------------------------------------------------------
+// Safety gate: destructive and non-transactional statements
+// ---------------------------------------------------------------------------
+
+/**
+ * Two different hazards, deliberately not collapsed into one.
+ *
+ * `destructive` destroys rows. It is a decision, not a defect, so it is
+ * refused unless the operator says otherwise on the command line.
+ *
+ * `nontransactional` cannot honestly run inside the single transaction this
+ * runner wraps every file in. `CREATE INDEX CONCURRENTLY` in a transaction-
+ * wrapped file does not fail loudly on a good day and half-applies on a bad
+ * one, so it is refused outright: there is no reviewed non-transactional mode
+ * yet, and it must not be slipped into the current files.
+ */
+export type MigrationSafetyKind = "destructive" | "nontransactional";
+
+export interface MigrationSafetyFinding {
+  filename: string;
+  kind: MigrationSafetyKind;
+  /** Fixed rule name. Never statement text — a migration body carries values. */
+  rule: string;
+  /** 1-based position among the file's executable statements. */
+  statement: number;
+}
+
+export class MigrationSafetyError extends Error {
+  readonly findings: readonly MigrationSafetyFinding[];
+  constructor(findings: readonly MigrationSafetyFinding[]) {
+    const detail = findings
+      .map((f) => `${f.filename}: ${f.kind} — ${f.rule} (statement ${f.statement})`)
+      .join("; ");
+    super(
+      `Refusing to apply ${findings.length} unsafe statement(s). ${detail}. ` +
+        `A destructive migration needs --allow-destructive and a reviewed ` +
+        `decision; a non-transactional one needs a reviewed runner mode that ` +
+        `does not exist yet.`,
+    );
+    this.name = "MigrationSafetyError";
+    this.findings = findings;
+  }
+}
+
+/**
+ * Single-quoted literals only. Dollar-quoted bodies are deliberately left
+ * intact: a `DO $$ … $$` block executes real SQL with real effects and must
+ * never become a safe harbour the scanner waives.
+ */
+function maskStringLiterals(sql: string): string {
+  return sql.replace(/'(?:[^']|'')*'/g, "''");
+}
+
+interface SafetyRule {
+  kind: MigrationSafetyKind;
+  rule: string;
+  matches: (normalized: string) => boolean;
+}
+
+/**
+ * Non-transactional rules are tested first, and at most one finding is raised
+ * per statement, so a statement that is both reports the stricter hazard.
+ *
+ * Constraint, default and index reshapes are absent on purpose. `ALTER TABLE …
+ * DROP CONSTRAINT` / `ALTER COLUMN … DROP DEFAULT` destroy no rows, and the
+ * checked-in history already uses the drop-then-re-add pattern; flagging them
+ * would block every fresh database for no safety gain.
+ */
+const SAFETY_RULES: readonly SafetyRule[] = Object.freeze([
+  { kind: "nontransactional", rule: "CONCURRENTLY", matches: (s) => /\bCONCURRENTLY\b/.test(s) },
+  { kind: "nontransactional", rule: "VACUUM", matches: (s) => /\bVACUUM\b/.test(s) },
+  { kind: "nontransactional", rule: "REINDEX", matches: (s) => /\bREINDEX\b/.test(s) },
+  {
+    kind: "nontransactional",
+    rule: "ALTER TYPE … ADD VALUE",
+    matches: (s) => /\bALTER\s+TYPE\b/.test(s) && /\bADD\s+VALUE\b/.test(s),
+  },
+  { kind: "destructive", rule: "DROP TABLE", matches: (s) => /\bDROP\s+TABLE\b/.test(s) },
+  { kind: "destructive", rule: "DROP COLUMN", matches: (s) => /\bDROP\s+COLUMN\b/.test(s) },
+  { kind: "destructive", rule: "DROP SCHEMA", matches: (s) => /\bDROP\s+SCHEMA\b/.test(s) },
+  { kind: "destructive", rule: "DROP DATABASE", matches: (s) => /\bDROP\s+DATABASE\b/.test(s) },
+  { kind: "destructive", rule: "DROP TYPE", matches: (s) => /\bDROP\s+TYPE\b/.test(s) },
+  { kind: "destructive", rule: "TRUNCATE", matches: (s) => /\bTRUNCATE\b/.test(s) },
+  {
+    kind: "destructive",
+    rule: "DELETE without WHERE",
+    matches: (s) => /\bDELETE\s+FROM\b/.test(s) && !/\bWHERE\b/.test(s),
+  },
+]);
+
+/** Scan one migration's statements. Pure: reads nothing and connects to nothing. */
+export function inspectMigrationSafety(
+  filename: string,
+  sql: string,
+): MigrationSafetyFinding[] {
+  const findings: MigrationSafetyFinding[] = [];
+  executableStatements(sql).forEach((chunk, index) => {
+    const normalized = maskStringLiterals(chunk.normalized);
+    const rule = SAFETY_RULES.find((candidate) => candidate.matches(normalized));
+    if (rule) {
+      findings.push({ filename, kind: rule.kind, rule: rule.rule, statement: index + 1 });
+    }
+  });
+  return findings;
+}
+
+// ---------------------------------------------------------------------------
 // Planning: compare files on disk against the ledger
 // ---------------------------------------------------------------------------
 
@@ -651,16 +765,68 @@ export const ACQUIRE_MIGRATION_LOCK_SQL =
 export const RELEASE_MIGRATION_LOCK_SQL =
   "SELECT pg_advisory_unlock(hashtext('taptpay:migration-runner'))";
 
-/** Serialize deploys for the full plan/apply/baseline operation. */
+export const READ_MIGRATION_TIMEOUTS_SQL =
+  "SELECT current_setting('lock_timeout') AS lock_timeout, current_setting('statement_timeout') AS statement_timeout";
+export const SET_MIGRATION_SESSION_TIMEOUTS_SQL =
+  "SELECT set_config('lock_timeout', $1, false), set_config('statement_timeout', $2, false)";
+export const SET_MIGRATION_LOCAL_TIMEOUTS_SQL =
+  "SELECT set_config('lock_timeout', $1, true), set_config('statement_timeout', $2, true)";
+
+export interface MigrationTimeouts {
+  advisoryLockMs: number;
+  lockMs: number;
+  statementMs: number;
+}
+
+export const DEFAULT_MIGRATION_TIMEOUTS: Readonly<MigrationTimeouts> = Object.freeze({
+  advisoryLockMs: 10_000,
+  lockMs: 5_000,
+  statementMs: 60_000,
+});
+
+function migrationTimeouts(overrides: Partial<MigrationTimeouts>): MigrationTimeouts {
+  const budgets = { ...DEFAULT_MIGRATION_TIMEOUTS, ...overrides };
+  for (const value of Object.values(budgets)) {
+    if (!Number.isSafeInteger(value) || value <= 0 || value > 300_000) {
+      throw new MigrationHistoryError('Invalid migration timeout budget');
+    }
+  }
+  if (budgets.lockMs >= budgets.statementMs) {
+    throw new MigrationHistoryError('Migration lock budget must be below statement budget');
+  }
+  return budgets;
+}
+
+/**
+ * Serialize the full plan/apply/baseline operation on a dedicated connection.
+ * Restore caller settings on exit. A failed acquire/unlock/restore makes the
+ * connection unsafe to reuse; the CLI always closes it in its finally block.
+ */
 export async function withMigrationAdvisoryLock<T>(
   client: MigrationClient,
-  work: () => Promise<T>,
+  work: (timeouts: Readonly<MigrationTimeouts>) => Promise<T>,
+  timeoutOverrides: Partial<MigrationTimeouts> = {},
 ): Promise<T> {
-  await client.query(ACQUIRE_MIGRATION_LOCK_SQL);
+  const budgets = migrationTimeouts(timeoutOverrides);
+  const result = await client.query<{ lock_timeout: string; statement_timeout: string }>(READ_MIGRATION_TIMEOUTS_SQL);
+  const previous = result.rows[0];
+  if (!previous || typeof previous.lock_timeout !== 'string' || typeof previous.statement_timeout !== 'string') {
+    throw new MigrationHistoryError('Cannot inspect migration timeout settings');
+  }
+  let acquired = false;
   try {
-    return await work();
+    await client.query(SET_MIGRATION_SESSION_TIMEOUTS_SQL, [`${budgets.lockMs}ms`, `${budgets.advisoryLockMs}ms`]);
+    await client.query(ACQUIRE_MIGRATION_LOCK_SQL);
+    acquired = true;
+    // Ledger DDL and baseline writes also inherit bounded session settings.
+    await client.query(SET_MIGRATION_SESSION_TIMEOUTS_SQL, [`${budgets.lockMs}ms`, `${budgets.statementMs}ms`]);
+    return await work(Object.freeze(budgets));
   } finally {
-    await client.query(RELEASE_MIGRATION_LOCK_SQL).catch(() => undefined);
+    try {
+      if (acquired) await client.query(RELEASE_MIGRATION_LOCK_SQL);
+    } finally {
+      await client.query(SET_MIGRATION_SESSION_TIMEOUTS_SQL, [previous.lock_timeout, previous.statement_timeout]);
+    }
   }
 }
 
@@ -730,13 +896,16 @@ export async function applyMigration(
   client: MigrationClient,
   filename: string,
   source: string,
+  timeoutOverrides: Partial<MigrationTimeouts> = {},
 ): Promise<{ statements: number; durationMs: number }> {
+  const budgets = migrationTimeouts(timeoutOverrides);
   const checksum = checksumMigrationSource(source);
   const statements = executableStatements(source);
   const startedAt = Date.now();
 
   await client.query("BEGIN");
   try {
+    await client.query(SET_MIGRATION_LOCAL_TIMEOUTS_SQL, [`${budgets.lockMs}ms`, `${budgets.statementMs}ms`]);
     for (const statement of statements) {
       try {
         await client.query(statement.raw);
@@ -763,6 +932,9 @@ export interface RunOptions {
   dir?: string;
   dryRun?: boolean;
   log?: (message: string) => void;
+  timeouts?: Partial<MigrationTimeouts>;
+  /** Operator approval for row-destroying statements. Never defaults to true. */
+  allowDestructive?: boolean;
 }
 
 /** Apply every pending migration, in order, aborting on the first failure. */
@@ -770,6 +942,7 @@ export async function runPendingMigrations(
   client: MigrationClient,
   options: RunOptions = {},
 ): Promise<RunResult> {
+  const budgets = migrationTimeouts(options.timeouts ?? {});
   const dir = options.dir ?? defaultMigrationsDir();
   const log = options.log ?? ((message: string) => console.log(message));
 
@@ -804,12 +977,29 @@ export async function runPendingMigrations(
     return { plan, appliedNow: [] };
   }
 
+  const findings = plan.pending.flatMap((filename) =>
+    inspectMigrationSafety(filename, readMigrationSource(dir, filename)),
+  );
+
   if (options.dryRun) {
     log(`Would apply ${plan.pending.length} migration(s):`);
     for (const filename of plan.pending) log(`  • ${filename}`);
+    // A dry run is the preflight, so it reports rather than refuses. The real
+    // apply below is where the gate bites.
+    for (const finding of findings) {
+      log(
+        `  ⚠️  ${finding.filename}: ${finding.kind} — ${finding.rule} ` +
+          `(statement ${finding.statement})`,
+      );
+    }
     log("Dry run — nothing was executed.");
     return { plan, appliedNow: [] };
   }
+
+  const blocking = findings.filter(
+    (finding) => finding.kind === "nontransactional" || !options.allowDestructive,
+  );
+  if (blocking.length > 0) throw new MigrationSafetyError(blocking);
 
   await ensureMigrationLedger(client);
 
@@ -817,13 +1007,46 @@ export async function runPendingMigrations(
   for (const filename of plan.pending) {
     const source = readMigrationSource(dir, filename);
     log(`→ applying ${filename} ...`);
-    const { statements, durationMs } = await applyMigration(client, filename, source);
+    const { statements, durationMs } = await applyMigration(client, filename, source, budgets);
     appliedNow.push(filename);
     log(`  ✅ ${filename} (${statements} statement(s), ${durationMs}ms)`);
   }
 
   log(`✅ Applied ${appliedNow.length} migration(s).`);
   return { plan, appliedNow };
+}
+
+/**
+ * Re-plan against the ledger after applying, so a release proves its own end
+ * state instead of trusting that the apply loop finished. A release that
+ * cannot say "0 pending, 0 drifted" has not finished, whatever it printed.
+ */
+export async function verifyMigrationState(
+  client: MigrationClient,
+  dir: string = defaultMigrationsDir(),
+): Promise<MigrationPlan> {
+  const ordered = listMigrationFiles(dir);
+  const checksums = checksumAll(dir, ordered);
+  const ledger = await readMigrationLedgerIfPresent(client);
+  if (ledger === null) {
+    throw new MigrationHistoryError(
+      `Release verification failed: ledger ${LEDGER_QUALIFIED} is not initialised.`,
+    );
+  }
+  const plan = planMigrations(ordered, checksums, ledger);
+  if (
+    plan.pending.length > 0 ||
+    plan.drifted.length > 0 ||
+    plan.orphaned.length > 0 ||
+    plan.outOfOrder.length > 0
+  ) {
+    throw new MigrationHistoryError(
+      `Release verification failed: ${plan.pending.length} pending, ` +
+        `${plan.drifted.length} drifted, ${plan.orphaned.length} orphaned, ` +
+        `${plan.outOfOrder.length} out of order.`,
+    );
+  }
+  return plan;
 }
 
 // ---------------------------------------------------------------------------
@@ -1132,41 +1355,498 @@ export async function reportPendingMigrations(
 }
 
 // ---------------------------------------------------------------------------
+// Target identity boundary
+// ---------------------------------------------------------------------------
+
+/**
+ * The runner used to connect to whatever `DATABASE_URL` happened to be
+ * exported. That is how a release step migrates the wrong database: the
+ * operator's intent ("this is the isolated scratch target") was never written
+ * down, so nothing could contradict it, and `pg` quietly fills any piece the
+ * URI omits from `PGHOST`/`PGUSER`/`PGDATABASE`.
+ *
+ * Everything here is a pure boundary. The arguments and the URI are validated
+ * before `pg` is imported or a socket is opened; the server's own identity is
+ * compared before any ledger, status, apply or baseline work runs. Failures
+ * carry a fixed code and never the URI, the arguments, the credentials or a
+ * row value — the first thing an operator does with a failure is paste it into
+ * a chat window.
+ */
+
+export type MigrationTargetClass = "local" | "ci" | "staging" | "production";
+
+export const MIGRATION_TARGET_CLASSES: readonly MigrationTargetClass[] = Object.freeze([
+  "local",
+  "ci",
+  "staging",
+  "production",
+]);
+
+/**
+ * Explicit loopback literals only. A hostname that merely *resolves* to
+ * loopback today is not one, which is what stops the legacy non-loopback
+ * workspace database from being relabelled "local" to dodge the TLS rule.
+ */
+const LOOPBACK_HOSTS: ReadonlySet<string> = new Set(["127.0.0.1", "::1", "localhost"]);
+
+/** The only connection parameters allowed to survive into the driver. */
+const APPROVED_URL_PARAMETERS: ReadonlySet<string> = new Set(["sslmode", "connect_timeout"]);
+const APPROVED_SSL_MODES: ReadonlySet<string> = new Set([
+  "disable",
+  "require",
+  "verify-ca",
+  "verify-full",
+]);
+/** Modes that authenticate the server rather than merely encrypting the pipe. */
+const AUTHENTICATED_SSL_MODES: ReadonlySet<string> = new Set(["verify-full"]);
+
+export const DEFAULT_POSTGRES_PORT = 5432;
+const DEFAULT_CONNECT_TIMEOUT_MS = 5_000;
+const MIN_CONNECT_TIMEOUT_SECONDS = 1;
+const MAX_CONNECT_TIMEOUT_SECONDS = 60;
+
+/**
+ * Fixed operator-facing text per code. Deliberately free of hosts, database
+ * names and examples so no message can become an echo of its own input.
+ */
+export const MIGRATION_TARGET_ERRORS = {
+  MIGRATE_CLI_INVALID_ARGUMENTS:
+    "Unrecognised, repeated or conflicting arguments.",
+  MIGRATE_TARGET_EXPECTATION_MISSING:
+    "The target classification, expected host and expected database are all required.",
+  MIGRATE_TARGET_EXPECTATION_INVALID:
+    "The target classification or expected port is not a permitted value.",
+  MIGRATE_TARGET_URL_MISSING:
+    "No database URL was supplied to the runner.",
+  MIGRATE_TARGET_URL_MALFORMED:
+    "The database URL is not a parseable URI.",
+  MIGRATE_TARGET_URL_SCHEME:
+    "The database URL is not a PostgreSQL URI.",
+  MIGRATE_TARGET_URL_CREDENTIALS:
+    "The database URL must carry an explicit user and password.",
+  MIGRATE_TARGET_URL_DATABASE:
+    "The database URL must name exactly one database path component.",
+  MIGRATE_TARGET_URL_PORT:
+    "The database URL port is outside the permitted range.",
+  MIGRATE_TARGET_URL_HOST:
+    "The database URL host is empty or a socket path.",
+  MIGRATE_TARGET_URL_FRAGMENT:
+    "The database URL carries a fragment.",
+  MIGRATE_TARGET_URL_ENCODING:
+    "The database URL contains invalid percent-encoding.",
+  MIGRATE_TARGET_URL_PARAMETERS:
+    "The database URL carries a duplicate, unapproved or out-of-range connection parameter.",
+  MIGRATE_TARGET_CLASS_LOCAL_REQUIRES_LOOPBACK:
+    "A local target must use an explicit loopback host.",
+  MIGRATE_TARGET_CLASS_REMOTE_REQUIRES_REMOTE_HOST:
+    "A ci, staging or production target must not point at loopback.",
+  MIGRATE_TARGET_REMOTE_REQUIRES_TLS:
+    "A remote target requires authenticated TLS.",
+  MIGRATE_TARGET_EXPECTATION_MISMATCH:
+    "The database URL does not match the declared host, port and database.",
+  MIGRATE_TARGET_CONNECT_FAILED:
+    "The runner could not open a connection to the declared target.",
+  MIGRATE_TARGET_SERVER_IDENTITY_MISMATCH:
+    "The connected server reports a different database or login than declared.",
+} as const;
+
+export type MigrationTargetErrorCode = keyof typeof MIGRATION_TARGET_ERRORS;
+
+export class MigrationTargetError extends Error {
+  readonly code: MigrationTargetErrorCode;
+  constructor(code: MigrationTargetErrorCode) {
+    super(`${code}: ${MIGRATION_TARGET_ERRORS[code]}`);
+    this.name = "MigrationTargetError";
+    this.code = code;
+  }
+}
+
+/** What the operator asserted the target is, before anything is contacted. */
+export interface MigrationTargetExpectation {
+  classification: MigrationTargetClass;
+  host: string;
+  port: number;
+  database: string;
+}
+
+/** Explicit driver fields. Never a connection string — see the note above. */
+export interface ValidatedMigrationTarget {
+  classification: MigrationTargetClass;
+  host: string;
+  port: number;
+  database: string;
+  user: string;
+  password: string;
+  ssl: false | { rejectUnauthorized: true };
+  connectionTimeoutMs: number;
+}
+
+/** IPv6 arrives bracketed from the URL parser; the driver wants it bare. */
+function normalizeHost(host: string): string {
+  return host.replace(/^\[|\]$/g, "").toLowerCase();
+}
+
+function parsePortToken(token: string): number {
+  if (!/^\d{1,5}$/.test(token)) return Number.NaN;
+  const port = Number(token);
+  return port >= 1 && port <= 65_535 ? port : Number.NaN;
+}
+
+function decodeUrlComponent(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    throw new MigrationTargetError("MIGRATE_TARGET_URL_ENCODING");
+  }
+}
+
+/**
+ * Turn validated CLI arguments into the declared target. Throws before any
+ * connection object exists, so a bad invocation cannot reach a database.
+ */
+export function resolveMigrationTargetExpectation(
+  options: CliOptions,
+): MigrationTargetExpectation {
+  if (options.unknown.length > 0) {
+    throw new MigrationTargetError("MIGRATE_CLI_INVALID_ARGUMENTS");
+  }
+  const { target, expectedHost, expectedPort, expectedDatabase } = options;
+  if (!target || !expectedHost || !expectedDatabase) {
+    throw new MigrationTargetError("MIGRATE_TARGET_EXPECTATION_MISSING");
+  }
+  if (!MIGRATION_TARGET_CLASSES.includes(target as MigrationTargetClass)) {
+    throw new MigrationTargetError("MIGRATE_TARGET_EXPECTATION_INVALID");
+  }
+  let port = DEFAULT_POSTGRES_PORT;
+  if (expectedPort !== undefined) {
+    port = parsePortToken(expectedPort);
+    if (!Number.isFinite(port)) {
+      throw new MigrationTargetError("MIGRATE_TARGET_EXPECTATION_INVALID");
+    }
+  }
+  return {
+    classification: target as MigrationTargetClass,
+    host: normalizeHost(expectedHost),
+    port,
+    database: expectedDatabase,
+  };
+}
+
+/**
+ * Validate the URI's structure, then check it against what the operator
+ * declared, then check the classification's own rules. That order matters: a
+ * URI pointing somewhere unexpected must read as a mismatch, not as whatever
+ * rule the wrong host happens to trip first.
+ */
+export function validateMigrationTargetUrl(
+  raw: string | undefined,
+  expectation: MigrationTargetExpectation,
+): ValidatedMigrationTarget {
+  if (!raw) throw new MigrationTargetError("MIGRATE_TARGET_URL_MISSING");
+
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new MigrationTargetError("MIGRATE_TARGET_URL_MALFORMED");
+  }
+
+  if (url.protocol !== "postgres:" && url.protocol !== "postgresql:") {
+    throw new MigrationTargetError("MIGRATE_TARGET_URL_SCHEME");
+  }
+  if (url.hash !== "") {
+    throw new MigrationTargetError("MIGRATE_TARGET_URL_FRAGMENT");
+  }
+
+  const user = decodeUrlComponent(url.username);
+  const password = decodeUrlComponent(url.password);
+  if (user === "" || password === "") {
+    throw new MigrationTargetError("MIGRATE_TARGET_URL_CREDENTIALS");
+  }
+
+  // A percent-encoded socket directory arrives here as a hostname with a '%'.
+  const host = normalizeHost(url.hostname);
+  if (host === "" || host.includes("%")) {
+    throw new MigrationTargetError("MIGRATE_TARGET_URL_HOST");
+  }
+
+  let port = DEFAULT_POSTGRES_PORT;
+  if (url.port !== "") {
+    port = parsePortToken(url.port);
+    if (!Number.isFinite(port)) {
+      throw new MigrationTargetError("MIGRATE_TARGET_URL_PORT");
+    }
+  }
+
+  if (!/^\/[^/]+$/.test(url.pathname)) {
+    throw new MigrationTargetError("MIGRATE_TARGET_URL_DATABASE");
+  }
+  const database = decodeUrlComponent(url.pathname.slice(1));
+  if (database === "" || database.includes("/")) {
+    throw new MigrationTargetError("MIGRATE_TARGET_URL_DATABASE");
+  }
+
+  const parameters = new Map<string, string>();
+  for (const [key, value] of url.searchParams) {
+    const name = key.toLowerCase();
+    if (!APPROVED_URL_PARAMETERS.has(name) || parameters.has(name)) {
+      throw new MigrationTargetError("MIGRATE_TARGET_URL_PARAMETERS");
+    }
+    parameters.set(name, value);
+  }
+
+  const sslmode = parameters.get("sslmode");
+  if (sslmode !== undefined && !APPROVED_SSL_MODES.has(sslmode)) {
+    throw new MigrationTargetError("MIGRATE_TARGET_URL_PARAMETERS");
+  }
+
+  let connectionTimeoutMs = DEFAULT_CONNECT_TIMEOUT_MS;
+  const connectTimeout = parameters.get("connect_timeout");
+  if (connectTimeout !== undefined) {
+    const seconds = /^\d{1,3}$/.test(connectTimeout) ? Number(connectTimeout) : Number.NaN;
+    if (
+      !Number.isFinite(seconds) ||
+      seconds < MIN_CONNECT_TIMEOUT_SECONDS ||
+      seconds > MAX_CONNECT_TIMEOUT_SECONDS
+    ) {
+      throw new MigrationTargetError("MIGRATE_TARGET_URL_PARAMETERS");
+    }
+    connectionTimeoutMs = seconds * 1_000;
+  }
+
+  if (host !== expectation.host || port !== expectation.port || database !== expectation.database) {
+    throw new MigrationTargetError("MIGRATE_TARGET_EXPECTATION_MISMATCH");
+  }
+
+  const loopback = LOOPBACK_HOSTS.has(host);
+  if (expectation.classification === "local") {
+    if (!loopback) {
+      throw new MigrationTargetError("MIGRATE_TARGET_CLASS_LOCAL_REQUIRES_LOOPBACK");
+    }
+  } else {
+    if (loopback) {
+      throw new MigrationTargetError("MIGRATE_TARGET_CLASS_REMOTE_REQUIRES_REMOTE_HOST");
+    }
+    if (sslmode === undefined || !AUTHENTICATED_SSL_MODES.has(sslmode)) {
+      throw new MigrationTargetError("MIGRATE_TARGET_REMOTE_REQUIRES_TLS");
+    }
+  }
+
+  // Only an authenticating mode becomes real TLS. The weaker modes are
+  // reachable exclusively on loopback, where TLS is not the control in play.
+  const ssl =
+    sslmode !== undefined && AUTHENTICATED_SSL_MODES.has(sslmode)
+      ? ({ rejectUnauthorized: true } as const)
+      : false;
+
+  return {
+    classification: expectation.classification,
+    host,
+    port,
+    database,
+    user,
+    password,
+    ssl,
+    connectionTimeoutMs,
+  };
+}
+
+export interface MigrationTargetConnection {
+  client: MigrationClient;
+  end: () => Promise<void>;
+}
+
+export type MigrationTargetConnector = (
+  target: ValidatedMigrationTarget,
+) => Promise<MigrationTargetConnection>;
+
+/** Asked of the server itself, so a redirected DNS name cannot answer for it. */
+export const SELECT_TARGET_IDENTITY_SQL =
+  "SELECT current_database() AS database, current_user AS username";
+
+async function connectToMigrationTarget(
+  target: ValidatedMigrationTarget,
+): Promise<MigrationTargetConnection> {
+  // Imported lazily so the pure validation above runs without `pg` present.
+  const pg = await import("pg");
+  const ClientCtor = (pg as any).default?.Client ?? (pg as any).Client;
+  // Explicit fields, never `connectionString`: pg backfills anything a URI
+  // omits from the ambient PG* environment, which is the selection this
+  // boundary exists to remove.
+  const client = new ClientCtor({
+    host: target.host,
+    port: target.port,
+    user: target.user,
+    password: target.password,
+    database: target.database,
+    ssl: target.ssl,
+    application_name: "taptpay-migrate",
+    connectionTimeoutMillis: target.connectionTimeoutMs,
+    statement_timeout: DEFAULT_MIGRATION_TIMEOUTS.statementMs,
+    query_timeout: DEFAULT_MIGRATION_TIMEOUTS.statementMs + 5_000,
+  });
+  // A pg Client emits 'error' asynchronously; unhandled that ends the process,
+  // and the driver's own message carries the target. Absorb it.
+  client.on("error", () => undefined);
+  try {
+    await client.connect();
+  } catch {
+    await client.end().catch(() => undefined);
+    throw new MigrationTargetError("MIGRATE_TARGET_CONNECT_FAILED");
+  }
+  return { client: client as MigrationClient, end: () => client.end() };
+}
+
+export interface ValidatedMigrationTargetOptions {
+  cli: CliOptions;
+  connectionString?: string;
+  /** Injected by the tests so the boundary is provable without a database. */
+  connect?: MigrationTargetConnector;
+}
+
+/**
+ * Validate, connect, prove identity, then hand the caller a client. The
+ * connection is closed on every path, including an identity mismatch, where no
+ * ledger, status, apply or baseline work is allowed to have run.
+ */
+export async function withValidatedMigrationTarget<T>(
+  options: ValidatedMigrationTargetOptions,
+  work: (client: MigrationClient, target: ValidatedMigrationTarget) => Promise<T>,
+): Promise<T> {
+  const expectation = resolveMigrationTargetExpectation(options.cli);
+  const target = validateMigrationTargetUrl(options.connectionString, expectation);
+
+  const connect = options.connect ?? connectToMigrationTarget;
+  let connection: MigrationTargetConnection;
+  try {
+    connection = await connect(target);
+  } catch (error) {
+    if (error instanceof MigrationTargetError) throw error;
+    throw new MigrationTargetError("MIGRATE_TARGET_CONNECT_FAILED");
+  }
+
+  try {
+    const result = await connection.client.query<{ database: string; username: string }>(
+      SELECT_TARGET_IDENTITY_SQL,
+    );
+    const identity = result.rows[0];
+    if (
+      !identity ||
+      identity.database !== target.database ||
+      identity.username !== target.user
+    ) {
+      throw new MigrationTargetError("MIGRATE_TARGET_SERVER_IDENTITY_MISMATCH");
+    }
+    return await work(connection.client, target);
+  } finally {
+    await connection.end().catch(() => undefined);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // CLI
 // ---------------------------------------------------------------------------
 
+export const MIGRATION_CLI_USAGE = [
+  "Usage: tsx server/migrate.ts --target=<local|ci|staging|production>",
+  "         --expected-host=<host> [--expected-port=<port>] --expected-database=<name>",
+  "         [--status | --release | --dry-run | --baseline [--confirm] [--force]]",
+  "         [--allow-destructive]",
+  "See docs/operations/migration-target.md.",
+].join("\n");
+
 export interface CliOptions {
-  mode: "apply" | "status" | "baseline";
+  mode: "apply" | "status" | "baseline" | "release";
   dryRun: boolean;
   confirm: boolean;
   force: boolean;
+  allowDestructive: boolean;
+  target?: string;
+  expectedHost?: string;
+  expectedPort?: string;
+  expectedDatabase?: string;
   unknown: string[];
 }
 
+const VALUE_FLAGS: Readonly<Record<string, "target" | "expectedHost" | "expectedPort" | "expectedDatabase">> =
+  Object.freeze({
+    "--target": "target",
+    "--expected-host": "expectedHost",
+    "--expected-port": "expectedPort",
+    "--expected-database": "expectedDatabase",
+  });
+
+/**
+ * Rejects rather than merges. A repeated flag means two different intentions
+ * reached one command line and the later one would silently win; two modes in
+ * one invocation is a contradiction, not a preference. Only the flag *name* is
+ * ever recorded, so an argument's value cannot leak through a diagnostic.
+ */
 export function parseCliArgs(argv: readonly string[]): CliOptions {
   const options: CliOptions = {
     mode: "apply",
     dryRun: false,
     confirm: false,
     force: false,
+    allowDestructive: false,
     unknown: [],
   };
+  const seen = new Set<string>();
+  let modeSelected = false;
+
   for (const arg of argv) {
+    const separator = arg.indexOf("=");
+    const name = separator === -1 ? arg : arg.slice(0, separator);
+
+    if (seen.has(name)) {
+      options.unknown.push(name);
+      continue;
+    }
+
+    const field = VALUE_FLAGS[name];
+    if (field) {
+      if (separator === -1) {
+        options.unknown.push(name);
+        continue;
+      }
+      seen.add(name);
+      options[field] = arg.slice(separator + 1);
+      continue;
+    }
+
+    if (separator !== -1) {
+      options.unknown.push(name);
+      continue;
+    }
+
     switch (arg) {
       case "--baseline":
-        options.mode = "baseline";
-        break;
       case "--status":
-        options.mode = "status";
+      case "--release":
+        if (modeSelected) {
+          options.unknown.push(arg);
+          break;
+        }
+        modeSelected = true;
+        seen.add(arg);
+        options.mode =
+          arg === "--status" ? "status" : arg === "--release" ? "release" : "baseline";
         break;
       case "--dry-run":
+        seen.add(arg);
         options.dryRun = true;
         break;
       case "--confirm":
+        seen.add(arg);
         options.confirm = true;
         break;
       case "--force":
+        seen.add(arg);
         options.force = true;
+        break;
+      case "--allow-destructive":
+        seen.add(arg);
+        options.allowDestructive = true;
         break;
       default:
         options.unknown.push(arg);
@@ -1177,88 +1857,81 @@ export function parseCliArgs(argv: readonly string[]): CliOptions {
 
 async function main(): Promise<void> {
   const options = parseCliArgs(process.argv.slice(2));
-  if (options.unknown.length > 0) {
-    console.error(`Unknown argument(s): ${options.unknown.join(", ")}`);
-    console.error(
-      `Usage: tsx server/migrate.ts [--status | --dry-run | --baseline [--confirm] [--force]]`,
-    );
-    process.exit(2);
-  }
 
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) {
-    console.error("DATABASE_URL is not set — refusing to run migrations.");
-    process.exit(1);
-  }
+  await withValidatedMigrationTarget(
+    { cli: options, connectionString: process.env.DATABASE_URL },
+    async (client, target) => {
+      console.log(
+        `Migration runner → ${target.classification}: ` +
+          `${target.host}:${target.port}/${target.database}`,
+      );
 
-  const pg = await import("pg");
-  const ClientCtor = (pg as any).default?.Client ?? (pg as any).Client;
-  const client = new ClientCtor({
-    connectionString,
-    application_name: "taptpay-migrate",
-  });
-  client.on("error", (error: unknown) => {
-    console.error("Database connection error:", error);
-  });
-
-  const target = (() => {
-    try {
-      const parsed = new URL(connectionString);
-      return `${parsed.hostname}${parsed.port ? `:${parsed.port}` : ""}${parsed.pathname}`;
-    } catch {
-      return "(unparseable DATABASE_URL)";
-    }
-  })();
-  console.log(`Migration runner → ${target}`);
-
-  await client.connect();
-  try {
-    if (options.mode === "status") {
-      const dir = defaultMigrationsDir();
-      const ordered = listMigrationFiles(dir);
-      const checksums = checksumAll(dir, ordered);
-      const ledger = await readMigrationLedgerIfPresent(client as MigrationClient);
-      if (ledger === null) {
+      if (options.mode === "status") {
+        const dir = defaultMigrationsDir();
+        const ordered = listMigrationFiles(dir);
+        const checksums = checksumAll(dir, ordered);
+        const ledger = await readMigrationLedgerIfPresent(client);
+        if (ledger === null) {
+          console.log(
+            `Ledger ${LEDGER_QUALIFIED} does not exist — no migrations recorded.`,
+          );
+          console.log(`${ordered.length} migration file(s) on disk:`);
+          for (const filename of ordered) console.log(`  • ${filename} (unrecorded)`);
+          process.exitCode = 1;
+          return;
+        }
+        const plan = planMigrations(ordered, checksums, ledger);
         console.log(
-          `Ledger ${LEDGER_QUALIFIED} does not exist — no migrations recorded.`,
+          `${plan.applied.length} applied, ${plan.pending.length} pending, ` +
+            `${plan.drifted.length} drifted, ${plan.orphaned.length} orphaned.`,
         );
-        console.log(`${ordered.length} migration file(s) on disk:`);
-        for (const filename of ordered) console.log(`  • ${filename} (unrecorded)`);
-        process.exitCode = 1;
+        const lines = formatPendingReport(plan);
+        for (const line of lines) console.log(line);
+        if (
+          plan.drifted.length > 0 ||
+          plan.pending.length > 0 ||
+          plan.orphaned.length > 0 ||
+          plan.outOfOrder.length > 0
+        ) process.exitCode = 1;
         return;
       }
-      const plan = planMigrations(ordered, checksums, ledger);
-      console.log(
-        `${plan.applied.length} applied, ${plan.pending.length} pending, ` +
-          `${plan.drifted.length} drifted, ${plan.orphaned.length} orphaned.`,
-      );
-      const lines = formatPendingReport(plan);
-      for (const line of lines) console.log(line);
-      if (
-        plan.drifted.length > 0 ||
-        plan.pending.length > 0 ||
-        plan.orphaned.length > 0 ||
-        plan.outOfOrder.length > 0
-      ) process.exitCode = 1;
-      return;
-    }
 
-    if (options.mode === "baseline") {
-      await withMigrationAdvisoryLock(client as MigrationClient, () =>
-        baselineMigrations(client as MigrationClient, {
-          confirm: options.confirm,
-          force: options.force,
+      if (options.mode === "baseline") {
+        await withMigrationAdvisoryLock(client, () =>
+          baselineMigrations(client, {
+            confirm: options.confirm,
+            force: options.force,
+          }),
+        );
+        return;
+      }
+
+      if (options.mode === "release") {
+        // One command, migrate-first: apply, then prove the end state.
+        await withMigrationAdvisoryLock(client, async (timeouts) => {
+          await runPendingMigrations(client, {
+            dryRun: options.dryRun,
+            timeouts,
+            allowDestructive: options.allowDestructive,
+          });
+          if (options.dryRun) return;
+          const verified = await verifyMigrationState(client);
+          console.log(
+            `✅ Release verified: ${verified.applied.length} migration(s) recorded, 0 pending.`,
+          );
+        });
+        return;
+      }
+
+      await withMigrationAdvisoryLock(client, (timeouts) =>
+        runPendingMigrations(client, {
+          dryRun: options.dryRun,
+          timeouts,
+          allowDestructive: options.allowDestructive,
         }),
       );
-      return;
-    }
-
-    await withMigrationAdvisoryLock(client as MigrationClient, () =>
-      runPendingMigrations(client as MigrationClient, { dryRun: options.dryRun }),
-    );
-  } finally {
-    await client.end().catch(() => undefined);
-  }
+    },
+  );
 }
 
 /**
@@ -1274,6 +1947,8 @@ if (isDirectInvocation) {
   main().catch((error: unknown) => {
     console.error("");
     console.error(error instanceof Error ? error.message : String(error));
+    // A target/CLI rejection is an operator error, so show them the contract.
+    if (error instanceof MigrationTargetError) console.error(MIGRATION_CLI_USAGE);
     console.error("");
     process.exit(1);
   });

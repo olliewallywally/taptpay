@@ -6,13 +6,18 @@
 # CI: `verify:mobile`, `verify:mobile-keyboard` and `verify:terminal-dock` were
 # commands a human had to remember to type.
 #
-# WHY IT IS SPLIT IN TWO. §7.6: "Do not ship a permanently failing command." The
+# WHY IT IS SPLIT UP. §7.6: "Do not ship a permanently failing command." The
 # `static` job needs nothing but the repo and is green from the first run. The
 # browser gates need a live database — the app talks Neon over `@neondatabase/serverless`
 # (server/db.ts:1), so a stock `postgres:` service container cannot stand in for it
 # without a websocket proxy. Rather than fail red on every fork and every repo that
 # has no DATABASE_URL, `preflight` reports whether the secret exists and the gates
 # SKIP when it does not. A skipped job is honest; a red one teaches people to ignore CI.
+#
+# `migration-convergence` is the exception to that constraint, and R0-T6A's proof.
+# The migration runner talks plain `pg` rather than the app's Neon driver, so a
+# service container serves it perfectly well — no secret, green on forks, and it
+# never touches a database anyone owns.
 
 name: verify
 
@@ -39,10 +44,86 @@ jobs:
       - run: npm ci
       - name: tsc
         run: npm run check
+      - name: operator backup safety (synthetic subprocesses only)
+        run: npm run test:backup:safety
+      - name: schema fingerprint determinism (no database opened)
+        run: npm run test:fingerprint
       # test:client, not test — the server project needs a database, so it runs
       # in browser-gates below where one exists.
       - name: jest (client)
         run: npm run test:client
+
+  # R0-T6A's convergence proof, and the only migration gate that needs no
+  # secrets — so it is green on forks and on every PR. The runner talks plain
+  # `pg`, which a stock service container serves perfectly well; it is the app
+  # that needs Neon's WebSocket driver, and the app is not involved here.
+  migration-convergence:
+    name: migrations converge on an empty database
+    needs: static
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: migrator
+          POSTGRES_PASSWORD: migrator
+          POSTGRES_DB: convergence
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      # Loopback, disposable, and declared as such. The runner refuses to treat
+      # anything non-loopback as `local`, so this cannot drift onto a real host.
+      DATABASE_URL: postgres://migrator:migrator@127.0.0.1:5432/convergence?sslmode=disable
+      MIGRATION_ARGS: >-
+        --target=local
+        --expected-host=127.0.0.1
+        --expected-port=5432
+        --expected-database=convergence
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: migration safety preflight
+        run: npm run db:migrate -- $MIGRATION_ARGS --dry-run
+
+      # db:release, not db:migrate: it re-plans afterwards and fails unless the
+      # database reports 0 pending / 0 drifted / 0 orphaned.
+      - name: apply every migration to an empty database
+        run: npm run db:release -- $MIGRATION_ARGS
+
+      - name: the applied history is clean
+        run: npm run db:migrate:status -- $MIGRATION_ARGS
+
+      # The fingerprint covers only the `public` schema and carries no database
+      # name, user, OID, size, statistic or timestamp, so it is identical
+      # whatever the target is called. A diff here means the migrations no
+      # longer build the reviewed schema — regenerate deliberately, never to
+      # make the gate pass.
+      - name: the schema matches the recorded fingerprint
+        env:
+          FINGERPRINT_DATABASE_URL: ${{ env.DATABASE_URL }}
+          RECORDED: docs/evidence/remediation-v2-2/r0/R0-T6A-empty-fingerprint-2026-09-08.json
+        run: |
+          node scripts/schema-fingerprint.mjs > "$RUNNER_TEMP/fingerprint.json"
+          node -e "
+            const read = (p) => JSON.parse(require('fs').readFileSync(p, 'utf8')).digest;
+            const recorded = read(process.env.RECORDED);
+            const actual = read(process.env.RUNNER_TEMP + '/fingerprint.json');
+            console.log('recorded: ' + recorded);
+            console.log('actual:   ' + actual);
+            if (recorded !== actual) process.exitCode = 1;
+          "
+          git --no-pager diff --no-index --exit-code "$RECORDED" "$RUNNER_TEMP/fingerprint.json"
 
   preflight:
     name: can the browser gates run here?
@@ -87,8 +168,26 @@ jobs:
         run: |
           echo "PLAYWRIGHT_CHROMIUM_PATH=$(node -e "import('playwright').then(p => console.log(p.chromium.executablePath()))")" >> "$GITHUB_ENV"
 
+      # The runner now refuses to migrate a database the command did not name
+      # (R0-T6A, docs/operations/migration-target.md). Which database CI may
+      # migrate is an owner decision recorded in repository variables, not a
+      # default this step is allowed to invent.
       - name: apply migrations
-        run: npm run db:migrate
+        env:
+          MIGRATION_TARGET: ${{ vars.MIGRATION_TARGET }}
+          MIGRATION_EXPECTED_HOST: ${{ vars.MIGRATION_EXPECTED_HOST }}
+          MIGRATION_EXPECTED_PORT: ${{ vars.MIGRATION_EXPECTED_PORT }}
+          MIGRATION_EXPECTED_DATABASE: ${{ vars.MIGRATION_EXPECTED_DATABASE }}
+        run: |
+          if [ -z "$MIGRATION_TARGET" ] || [ -z "$MIGRATION_EXPECTED_HOST" ] || [ -z "$MIGRATION_EXPECTED_DATABASE" ]; then
+            echo "::error title=Migration target not declared::Set the MIGRATION_TARGET, MIGRATION_EXPECTED_HOST and MIGRATION_EXPECTED_DATABASE repository variables (MIGRATION_EXPECTED_PORT is optional) to declare which database CI may migrate. See docs/operations/migration-target.md."
+            exit 1
+          fi
+          npm run db:migrate -- \
+            --target="$MIGRATION_TARGET" \
+            --expected-host="$MIGRATION_EXPECTED_HOST" \
+            ${MIGRATION_EXPECTED_PORT:+--expected-port="$MIGRATION_EXPECTED_PORT"} \
+            --expected-database="$MIGRATION_EXPECTED_DATABASE"
 
       - name: start the dev server
         run: |

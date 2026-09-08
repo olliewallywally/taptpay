@@ -5,6 +5,8 @@ import path from "node:path";
 import {
   ACQUIRE_MIGRATION_LOCK_SQL,
   RELEASE_MIGRATION_LOCK_SQL,
+  READ_MIGRATION_TIMEOUTS_SQL,
+  SET_MIGRATION_SESSION_TIMEOUTS_SQL,
   MigrationHistoryError,
   checksumAll,
   reportPendingMigrations,
@@ -19,6 +21,7 @@ function fakeClient(ledger: LedgerRow[] = []) {
   const client = {
     async query(text: string) {
       calls.push(text);
+      if (text === READ_MIGRATION_TIMEOUTS_SQL) return { rows: [{ lock_timeout: '0', statement_timeout: '0' }] };
       if (text.startsWith("SELECT filename")) return { rows: ledger };
       return { rows: [] };
     },
@@ -72,8 +75,12 @@ describe("migration runner hardening", () => {
       withMigrationAdvisoryLock(success.client, async () => "ok"),
     ).resolves.toBe("ok");
     expect(success.calls).toEqual([
+      READ_MIGRATION_TIMEOUTS_SQL,
+      SET_MIGRATION_SESSION_TIMEOUTS_SQL,
       ACQUIRE_MIGRATION_LOCK_SQL,
+      SET_MIGRATION_SESSION_TIMEOUTS_SQL,
       RELEASE_MIGRATION_LOCK_SQL,
+      SET_MIGRATION_SESSION_TIMEOUTS_SQL,
     ]);
 
     const failure = fakeClient();
@@ -83,8 +90,12 @@ describe("migration runner hardening", () => {
       }),
     ).rejects.toThrow("apply failed");
     expect(failure.calls).toEqual([
+      READ_MIGRATION_TIMEOUTS_SQL,
+      SET_MIGRATION_SESSION_TIMEOUTS_SQL,
       ACQUIRE_MIGRATION_LOCK_SQL,
+      SET_MIGRATION_SESSION_TIMEOUTS_SQL,
       RELEASE_MIGRATION_LOCK_SQL,
+      SET_MIGRATION_SESSION_TIMEOUTS_SQL,
     ]);
   });
 
