@@ -1373,10 +1373,16 @@ export async function reportPendingMigrations(
  * a chat window.
  */
 
-export type MigrationTargetClass = "local" | "ci" | "staging" | "production";
+export type MigrationTargetClass =
+  | "local"
+  | "workspace"
+  | "ci"
+  | "staging"
+  | "production";
 
 export const MIGRATION_TARGET_CLASSES: readonly MigrationTargetClass[] = Object.freeze([
   "local",
+  "workspace",
   "ci",
   "staging",
   "production",
@@ -1388,6 +1394,18 @@ export const MIGRATION_TARGET_CLASSES: readonly MigrationTargetClass[] = Object.
  * workspace database from being relabelled "local" to dodge the TLS rule.
  */
 const LOOPBACK_HOSTS: ReadonlySet<string> = new Set(["127.0.0.1", "::1", "localhost"]);
+
+/**
+ * The reviewed exception to the TLS rule, and deliberately a closed list.
+ *
+ * The Replit-attached PostgreSQL answers to a private hostname over the
+ * workspace's own network and offers no TLS. It is not loopback, so it cannot
+ * be `local`, and it cannot meet the remote requirement either — which locked
+ * developers out of their own database entirely. `workspace` names that
+ * situation honestly instead of quietly weakening `local`, and it is pinned to
+ * these hostnames so it can never be pointed at anything else.
+ */
+const WORKSPACE_HOSTS: ReadonlySet<string> = new Set(["helium"]);
 
 /** The only connection parameters allowed to survive into the driver. */
 const APPROVED_URL_PARAMETERS: ReadonlySet<string> = new Set(["sslmode", "connect_timeout"]);
@@ -1438,6 +1456,8 @@ export const MIGRATION_TARGET_ERRORS = {
     "The database URL carries a duplicate, unapproved or out-of-range connection parameter.",
   MIGRATE_TARGET_CLASS_LOCAL_REQUIRES_LOOPBACK:
     "A local target must use an explicit loopback host.",
+  MIGRATE_TARGET_CLASS_WORKSPACE_HOST:
+    "A workspace target must use a recognised workspace hostname.",
   MIGRATE_TARGET_CLASS_REMOTE_REQUIRES_REMOTE_HOST:
     "A ci, staging or production target must not point at loopback.",
   MIGRATE_TARGET_REMOTE_REQUIRES_TLS:
@@ -1623,6 +1643,10 @@ export function validateMigrationTargetUrl(
     if (!loopback) {
       throw new MigrationTargetError("MIGRATE_TARGET_CLASS_LOCAL_REQUIRES_LOOPBACK");
     }
+  } else if (expectation.classification === "workspace") {
+    if (!WORKSPACE_HOSTS.has(host)) {
+      throw new MigrationTargetError("MIGRATE_TARGET_CLASS_WORKSPACE_HOST");
+    }
   } else {
     if (loopback) {
       throw new MigrationTargetError("MIGRATE_TARGET_CLASS_REMOTE_REQUIRES_REMOTE_HOST");
@@ -1748,7 +1772,7 @@ export async function withValidatedMigrationTarget<T>(
 // ---------------------------------------------------------------------------
 
 export const MIGRATION_CLI_USAGE = [
-  "Usage: tsx server/migrate.ts --target=<local|ci|staging|production>",
+  "Usage: tsx server/migrate.ts --target=<local|workspace|ci|staging|production>",
   "         --expected-host=<host> [--expected-port=<port>] --expected-database=<name>",
   "         [--status | --release | --dry-run | --baseline [--confirm] [--force]]",
   "         [--allow-destructive]",

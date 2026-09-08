@@ -1,6 +1,6 @@
 # What CI is allowed to migrate — decision requested
 
-Date: 2026-09-08 UTC. Status: **OPEN — awaiting owner decision.**
+Date: 2026-09-08 UTC. Status: **Option A chosen; awaiting the branch details and repository variables.**
 
 ## Why this needs deciding now
 
@@ -20,20 +20,41 @@ This is continuation gap 9 ("CI is not the final isolated release gate. The
 existing workflow still uses repository database/JWT secrets, migrates that
 target") reaching the surface, not a new problem introduced by the boundary.
 
-## First, an unanswered question
+## The environments, established 2026-09-08
 
-**What does `secrets.DATABASE_URL` currently point at?** If it is the
-development or production database, CI has been applying migrations to it on
-every push. That should be established before choosing an option below, because
-it also determines whether anything needs unwinding.
+| Environment | Host | Database | URI `sslmode` | Classification |
+| --- | --- | --- | --- | --- |
+| Development | `helium` | `heliumdb` | `disable` | `workspace` |
+| Production | `ep-mute-grass-af2foouy.c-2.us-west-2.aws.neon.tech` | `neondb` | `require` | `production` |
+
+Development and production are genuinely separate databases. Development was
+confirmed read-only on 2026-09-08 at **19 applied, 0 pending, 0 drifted, 0
+orphaned** — identical to the clean-database convergence, so it is current and
+already carries the `0010a`/`0013` foreign-key repairs.
+
+Two consequences worth recording:
+
+- The development database is neither loopback nor TLS-capable, so it needs the
+  pinned-hostname `workspace` classification. That is a reviewed exception, not
+  a general relaxation.
+- **Production's URI carries `sslmode=require`, which the runner refuses for a
+  remote target**, because it encrypts without authenticating the server. Any
+  future release against production must supply `sslmode=verify-full`. Neon
+  serves publicly-trusted certificates, so this is expected to work, but it has
+  not been tested — an agent must not connect to production. Verify it with a
+  read-only `--status` run before ever relying on it for a release.
+
+**Still unestablished: what `secrets.DATABASE_URL` points at.** If it is
+development or production, CI has been applying migrations to it on every push
+to `main` and `feat/**`. Option A replaces it regardless, but it is worth
+knowing whether anything needs unwinding.
 
 ## Options
 
-**A. A disposable Neon branch owned by CI (recommended).** Branch the
-development Neon project, name it `ci`, and point `secrets.DATABASE_URL` at it
-with `?sslmode=verify-full`. Declare it `--target=ci`. CI then migrates only its
-own throwaway database and can never reach dev or production. Roughly fifteen
-minutes of console work.
+**A. A disposable Neon branch owned by CI — CHOSEN.** The owner created a `ci`
+branch on 2026-09-08. Point `secrets.DATABASE_URL` at it with
+`?sslmode=verify-full` and declare it `--target=ci`. CI then migrates only its
+own throwaway database and can never reach development or production.
 
 Repository variables for this option:
 

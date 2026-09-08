@@ -427,3 +427,55 @@ test('no boundary error echoes the URI, credentials or row values', () => {
     expect(error!.message).not.toContain('taptpay');
   }
 });
+
+// ---------------------------------------------------------------------------
+// The workspace classification
+//
+// The Replit-attached database answers to a private hostname with no TLS. It is
+// not loopback, so it cannot be `local`, and it cannot meet the remote TLS rule
+// either — which locked developers out of their own database. `workspace` is the
+// reviewed exception: a pinned hostname allowlist, and nothing else.
+// ---------------------------------------------------------------------------
+
+function workspaceExpectation(host = 'helium', database = 'heliumdb') {
+  return resolveMigrationTargetExpectation(parseCliArgs([
+    '--target=workspace', `--expected-host=${host}`, `--expected-database=${database}`,
+  ]));
+}
+
+test('the workspace database can be declared and needs no TLS', () => {
+  const target = validateMigrationTargetUrl(
+    `postgres://postgres:${SECRET}@helium:5432/heliumdb?sslmode=disable`,
+    workspaceExpectation(),
+  );
+  expect(target.classification).toBe('workspace');
+  expect(target.host).toBe('helium');
+  expect(target.ssl).toBe(false);
+});
+
+test('workspace is pinned to the allowlist and cannot cover an arbitrary host', () => {
+  for (const host of ['db.example.net', 'helium.example.net', 'evil', '10.0.0.5']) {
+    expect(() => validateMigrationTargetUrl(
+      `postgres://postgres:${SECRET}@${host}:5432/heliumdb?sslmode=disable`,
+      workspaceExpectation(host),
+    )).toThrow(MigrationTargetError);
+  }
+});
+
+test('workspace still refuses connection overrides and undeclared databases', () => {
+  expect(() => validateMigrationTargetUrl(
+    `postgres://postgres:${SECRET}@helium:5432/heliumdb?options=-csearch_path%3Devil`,
+    workspaceExpectation(),
+  )).toThrow(MigrationTargetError);
+  expect(() => validateMigrationTargetUrl(
+    `postgres://postgres:${SECRET}@helium:5432/otherdb?sslmode=disable`,
+    workspaceExpectation(),
+  )).toThrow(MigrationTargetError);
+});
+
+test('a loopback host cannot be smuggled in as workspace', () => {
+  expect(() => validateMigrationTargetUrl(
+    `postgres://postgres:${SECRET}@127.0.0.1:5432/heliumdb?sslmode=disable`,
+    workspaceExpectation('127.0.0.1'),
+  )).toThrow(MigrationTargetError);
+});

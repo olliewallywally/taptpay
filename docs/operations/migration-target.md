@@ -17,7 +17,7 @@ rehearsal that does not exist yet.
 ## Command shape
 
 ```text
-npm run db:migrate -- --target=<local|ci|staging|production> \
+npm run db:migrate -- --target=<local|workspace|ci|staging|production> \
   --expected-host=<host> [--expected-port=<port>] --expected-database=<name>
 ```
 
@@ -60,11 +60,26 @@ mismatch rather than as whatever rule the wrong host happens to trip first.
 
 **The classification.** `local` accepts only the explicit loopback literals
 `127.0.0.1`, `::1` and `localhost`. A hostname that merely resolves to loopback
-is not one — that is what stops the legacy non-loopback workspace database from
-being relabelled `local` to dodge the next rule. `ci`, `staging` and
-`production` must not point at loopback and require `sslmode=verify-full`;
-encryption without server authentication is not accepted. Use `ci` for the
-disposable database a pipeline owns, so it is never confused with `staging`.
+is not one. `ci`, `staging` and `production` must not point at loopback and
+require `sslmode=verify-full`; encryption without server authentication is not
+accepted. Use `ci` for the disposable database a pipeline owns, so it is never
+confused with `staging`.
+
+`workspace` is the one reviewed exception, and it exists because the
+Replit-attached development database is neither. It answers to a private
+hostname over the workspace's own network and offers no TLS, so it can be
+neither `local` nor remote — which would have locked developers out of their own
+database. Rather than weaken `local` to fit it, `workspace` names the situation
+and is **pinned to a closed hostname allowlist in source** (`helium`). It can
+never be pointed at anything else, and a loopback or public host declared
+`workspace` is refused.
+
+The everyday development command is therefore:
+
+```text
+npm run db:migrate:status -- --target=workspace \
+  --expected-host=helium --expected-database=heliumdb
+```
 
 **The server's own identity, before any work.** The runner asks
 `current_database()` and `current_user` and compares both. On a mismatch it does
