@@ -95,6 +95,22 @@ the rule that refused; this document names the fix.
 A connection that cannot be opened reports `MIGRATE_TARGET_CONNECT_FAILED`
 without the driver's own message, which would carry the target.
 
+### Neon connection strings
+
+Neon issues URIs ending `?sslmode=require&channel_binding=require`. Both need
+attention before the runner will accept one:
+
+- `sslmode=require` is refused for any remote class. Change it to
+  `verify-full`. Neon serves publicly-trusted certificates, so this is a
+  correction, not a workaround.
+- `channel_binding` is refused as an unapproved parameter, and deliberately so.
+  `node-postgres` does not implement SCRAM channel binding, so accepting the
+  parameter would advertise a protection the runner cannot actually apply.
+  Remove it. Nothing is lost that was ever being enforced.
+
+Neither edit affects the application, which reaches Neon over WebSocket through
+`@neondatabase/serverless` and ignores libpq query parameters entirely.
+
 ## Callers
 
 Commands that predate this boundary now fail before connecting, which is the
