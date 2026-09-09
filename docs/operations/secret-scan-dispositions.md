@@ -85,6 +85,24 @@ carrying its `disposition` when one applies. The final row summarises:
 The command exits non-zero when `unresolved` is above zero — not when `findings`
 is. A repository with a long, fully-reviewed history passes.
 
+## The granularity, and its limit
+
+The scanner emits one row per *occurrence*, but a disposition keys on
+`(rule, file, commit)`. One triple can therefore cover many rows: the September
+2026 history scan produced 4839 rows from 276 distinct triples, because a rule
+that fires forty times in one transcript is forty rows and one decision.
+
+That is the finest granularity available, and it is a deliberate trade. The
+report template carries no line numbers — by design, since a line number plus a
+path is most of the way to quoting the secret — so a triple is the smallest thing
+a disposition can name.
+
+The limit follows directly: **reviewing a triple means reviewing every match
+inside it.** If one file at one commit contains both a placeholder and a real
+credential that fire the same rule, a single `false-positive` line clears both.
+When a triple is large or mixed, read the whole file at that commit before
+filing, and prefer `exposed-unresolved` if any occurrence in it is real.
+
 ## What this does not do
 
 It does not remove anything from history. Purging objects rewrites history and is

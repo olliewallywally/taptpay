@@ -101,6 +101,13 @@ backup, deployment or restore checks.
    Classifying that backlog then found **two public Google Cloud service-account
    private keys** — [GCP key exposure](r0/R0-T7-gcp-key-exposure-2026-09-09.md).
    Revocation is outstanding.
+   Continuing the classification found a third class: Claude Code's own OAuth
+   store, `.claude-home/.credentials.json`, in 50 commits — 20 public — whose
+   **Figma OAuth client secret is still the live value**
+   ([OAuth credential exposure](r0/R0-T7-oauth-credential-exposure-2026-09-09.md)).
+   The reviewed decisions now live in `.gitleaks-dispositions.jsonl` and the scan
+   gates on undispositioned findings
+   ([how to disposition](../../operations/secret-scan-dispositions.md)).
 
 ## Every named task and phase
 
