@@ -71,6 +71,7 @@ Decision requested: [what CI is allowed to migrate](../../../decisions/2026-09-0
 ```text
 7 migration jest suites — 210 passed
 node --test scripts/schema-fingerprint.test.mjs — 16 passed
+(28 as of 2026-09-09, when the tool was widened to views, triggers and permissions)
 node --test scripts/db-backup-safety.test.mjs — 17 passed
 npm run check — pass
 npm run build — pass

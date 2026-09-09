@@ -95,8 +95,11 @@ definitions, 2 index definitions and owned sequence name are **identical**.
 
 New recorded fingerprint
 `sha256:964f4251beea3ba52d1e23d973ae354d3bee9aac3539392c27aa04b7c59398b0`
-in [`R0-T6A-empty-fingerprint-2026-09-09.json`](R0-T6A-empty-fingerprint-2026-09-09.json);
-`verify.yml` gates against it. Rationale, the `db:push` hazard this creates, and
+in [`R0-T6A-empty-fingerprint-2026-09-09.json`](R0-T6A-empty-fingerprint-2026-09-09.json).
+(That artefact was superseded later the same day when the fingerprint was
+widened to cover views, triggers and permissions — `verify.yml` now gates on
+[`R0-T6A-empty-fingerprint-v2-2026-09-09.json`](R0-T6A-empty-fingerprint-v2-2026-09-09.json);
+see [the widening](R0-T6A-fingerprint-widening-2026-09-09.md).) Rationale, the `db:push` hazard this creates, and
 the retention question left open are recorded in
 [the decision](../../../decisions/2026-09-09-adopt-orphan-crypto-transactions.md).
 

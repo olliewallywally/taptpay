@@ -112,7 +112,7 @@ jobs:
       - name: the schema matches the recorded fingerprint
         env:
           FINGERPRINT_DATABASE_URL: ${{ env.DATABASE_URL }}
-          RECORDED: docs/evidence/remediation-v2-2/r0/R0-T6A-empty-fingerprint-2026-09-09.json
+          RECORDED: docs/evidence/remediation-v2-2/r0/R0-T6A-empty-fingerprint-v2-2026-09-09.json
         run: |
           node scripts/schema-fingerprint.mjs > "$RUNNER_TEMP/fingerprint.json"
           node -e "

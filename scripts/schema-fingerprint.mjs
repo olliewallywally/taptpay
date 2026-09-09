@@ -17,7 +17,8 @@ const fail = (code) => { throw new Error(code); };
 export const QUERIES = Object.freeze({
   tables: `
     SELECT c.relname AS "name", c.relkind AS "kind", c.relpersistence AS "persistence",
-           c.relrowsecurity AS "rowSecurity", c.relforcerowsecurity AS "forceRowSecurity"
+           c.relrowsecurity AS "rowSecurity", c.relforcerowsecurity AS "forceRowSecurity",
+           pg_catalog.pg_get_userbyid(c.relowner) AS "owner", c.relacl::text AS "acl"
       FROM pg_catalog.pg_class c
       JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
      WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p')`,
@@ -35,6 +36,7 @@ export const QUERIES = Object.freeze({
   // privilege-filtered view, so a null there never hides the real type.
   columns: `
     SELECT c.relname AS "table", a.attname AS "name", a.attnum AS "position",
+           a.attacl::text AS "acl",
            pg_catalog.format_type(a.atttypid, a.atttypmod) AS "type", t.typname AS "udtName",
            NOT a.attnotnull AS "nullable",
            pg_catalog.pg_get_expr(d.adbin, d.adrelid) AS "default",
@@ -51,7 +53,8 @@ export const QUERIES = Object.freeze({
       LEFT JOIN pg_catalog.pg_collation co ON co.oid = a.attcollation AND co.collname <> 'default'
       LEFT JOIN information_schema.columns ic
              ON ic.table_schema = n.nspname AND ic.table_name = c.relname AND ic.column_name = a.attname
-     WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p') AND a.attnum > 0 AND NOT a.attisdropped`,
+     WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p', 'v', 'm')
+       AND a.attnum > 0 AND NOT a.attisdropped`,
 
   // pg_get_constraintdef is the comparison text for primary key, unique and
   // check constraints; NOT VALID and DEFERRABLE clauses appear inside it.
@@ -96,7 +99,108 @@ export const QUERIES = Object.freeze({
       JOIN pg_catalog.pg_class cls ON cls.oid = idx.indexrelid
       JOIN pg_catalog.pg_class rel ON rel.oid = idx.indrelid
       JOIN pg_catalog.pg_namespace n ON n.oid = rel.relnamespace
-     WHERE n.nspname = 'public' AND rel.relkind IN ('r', 'p')`,
+     WHERE n.nspname = 'public' AND rel.relkind IN ('r', 'p', 'm')`,
+
+  // Views were invisible to version 1. A view is the classic way to expose a
+  // column the base table protects, so "which views exist and what do they
+  // select" is schema, not decoration. Definitions are recorded verbatim, the
+  // same treatment pg_get_constraintdef already gets.
+  views: `
+    SELECT c.relname AS "name", c.relkind AS "kind",
+           pg_catalog.pg_get_viewdef(c.oid, true) AS "definition",
+           c.relpersistence AS "persistence",
+           c.relrowsecurity AS "rowSecurity", c.relforcerowsecurity AS "forceRowSecurity",
+           pg_catalog.pg_get_userbyid(c.relowner) AS "owner", c.relacl::text AS "acl"
+      FROM pg_catalog.pg_class c
+      JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+     WHERE n.nspname = 'public' AND c.relkind IN ('v', 'm')`,
+
+  // tgisinternal excludes the triggers Postgres builds for foreign keys and
+  // deferred constraints; those are already recorded as constraints, and
+  // counting them twice would make every foreign key look like a trigger.
+  triggers: `
+    SELECT rel.relname AS "table", t.tgname AS "name",
+           pg_catalog.pg_get_triggerdef(t.oid, true) AS "definition",
+           t.tgenabled AS "enabled", t.tgdeferrable AS "deferrable", t.tginitdeferred AS "deferred"
+      FROM pg_catalog.pg_trigger t
+      JOIN pg_catalog.pg_class rel ON rel.oid = t.tgrelid
+      JOIN pg_catalog.pg_namespace n ON n.oid = rel.relnamespace
+     WHERE n.nspname = 'public' AND NOT t.tgisinternal`,
+
+  // A trigger is only as trustworthy as the function it calls, so routines are
+  // collected with it. The BODY IS DIGESTED, NOT COPIED: a function body is
+  // unbounded procedural code that can embed a literal secret, and this
+  // document is committed to a public repository. A digest still changes when
+  // the body changes, which is all drift detection needs. prosecdef is carried
+  // in the clear because SECURITY DEFINER is a privilege escalation surface and
+  // must be readable, not hashed.
+  routines: `
+    SELECT p.proname AS "name", p.prokind AS "kind",
+           pg_catalog.pg_get_function_identity_arguments(p.oid) AS "arguments",
+           pg_catalog.pg_get_function_result(p.oid) AS "returns",
+           l.lanname AS "language", p.provolatile AS "volatility",
+           p.proisstrict AS "strict", p.prosecdef AS "securityDefiner",
+           p.proconfig::text AS "config", p.proacl::text AS "acl",
+           pg_catalog.pg_get_userbyid(p.proowner) AS "owner",
+           encode(sha256(convert_to(p.prosrc, 'UTF8')), 'hex') AS "bodyDigest",
+           length(p.prosrc) AS "bodyLength"
+      FROM pg_catalog.pg_proc p
+      JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace
+      JOIN pg_catalog.pg_language l ON l.oid = p.prolang
+     WHERE n.nspname = 'public'`,
+
+  // Role oid 0 inside polroles means PUBLIC and has no pg_roles row, so a plain
+  // join would silently drop the single most important case: a policy that
+  // applies to everyone.
+  policies: `
+    SELECT rel.relname AS "table", pol.polname AS "name", pol.polcmd AS "command",
+           pol.polpermissive AS "permissive",
+           CASE WHEN 0 = ANY (pol.polroles) THEN ARRAY['PUBLIC']::text[]
+                ELSE ARRAY(SELECT r.rolname::text FROM pg_catalog.pg_roles r
+                            WHERE r.oid = ANY (pol.polroles) ORDER BY r.rolname) END AS "roles",
+           pg_catalog.pg_get_expr(pol.polqual, pol.polrelid) AS "using",
+           pg_catalog.pg_get_expr(pol.polwithcheck, pol.polrelid) AS "withCheck"
+      FROM pg_catalog.pg_policy pol
+      JOIN pg_catalog.pg_class rel ON rel.oid = pol.polrelid
+      JOIN pg_catalog.pg_namespace n ON n.oid = rel.relnamespace
+     WHERE n.nspname = 'public'`,
+
+  // Whether PUBLIC may still put objects in `public` is a schema-level fact no
+  // per-table query can see.
+  schemas: `
+    SELECT n.nspname AS "name", pg_catalog.pg_get_userbyid(n.nspowner) AS "owner",
+           n.nspacl::text AS "acl"
+      FROM pg_catalog.pg_namespace n
+     WHERE n.nspname = 'public'`,
+
+  // Default privileges apply to objects that do not exist yet, so they are
+  // invisible to every other query here and are exactly how a future table
+  // silently becomes readable.
+  defaultPrivileges: `
+    SELECT pg_catalog.pg_get_userbyid(d.defaclrole) AS "role",
+           d.defaclobjtype AS "objectType", n.nspname AS "schema", d.defaclacl::text AS "acl"
+      FROM pg_catalog.pg_default_acl d
+      LEFT JOIN pg_catalog.pg_namespace n ON n.oid = d.defaclnamespace`,
+
+  // Not schema-scoped, and deliberately so: a rebuild that lacks an extension
+  // the schema depends on fails at the first query, not at provisioning.
+  extensions: `
+    SELECT e.extname AS "name", e.extversion AS "version", n.nspname AS "schema"
+      FROM pg_catalog.pg_extension e
+      JOIN pg_catalog.pg_namespace n ON n.oid = e.extnamespace`,
+
+  // Enums and domains only. Composite types are excluded because Postgres mints
+  // one per table, which would restate the table list as noise.
+  types: `
+    SELECT t.typname AS "name", t.typtype AS "kind",
+           pg_catalog.format_type(t.typbasetype, t.typtypmod) AS "baseType",
+           t.typnotnull AS "notNull",
+           pg_catalog.pg_get_expr(t.typdefaultbin, 0) AS "default",
+           ARRAY(SELECT e.enumlabel::text FROM pg_catalog.pg_enum e
+                  WHERE e.enumtypid = t.oid ORDER BY e.enumsortorder) AS "labels"
+      FROM pg_catalog.pg_type t
+      JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
+     WHERE n.nspname = 'public' AND t.typtype IN ('e', 'd')`,
 });
 
 const RELKIND = Object.freeze({ r: 'table', p: 'partitioned table' });
@@ -106,6 +210,71 @@ const IDENTITY = Object.freeze({ a: 'always', d: 'by default' });
 const GENERATED = Object.freeze({ s: 'stored', v: 'virtual' });
 const FK_ACTION = Object.freeze({ a: 'NO ACTION', r: 'RESTRICT', c: 'CASCADE', n: 'SET NULL', d: 'SET DEFAULT' });
 const FK_MATCH = Object.freeze({ f: 'FULL', p: 'PARTIAL', s: 'SIMPLE' });
+const VIEW_RELKIND = Object.freeze({ v: 'view', m: 'materialized view' });
+const TRIGGER_ENABLED = Object.freeze({ O: 'enabled', D: 'disabled', R: 'replica', A: 'always' });
+const PROKIND = Object.freeze({ f: 'function', p: 'procedure', a: 'aggregate', w: 'window' });
+const VOLATILITY = Object.freeze({ i: 'immutable', s: 'stable', v: 'volatile' });
+const POLICY_CMD = Object.freeze({ '*': 'all', r: 'read', a: 'append', w: 'write', d: 'remove' });
+const DEFACL_OBJECT = Object.freeze({ r: 'table', S: 'sequence', f: 'function', T: 'type', n: 'schema' });
+const TYPTYPE = Object.freeze({ e: 'enum', d: 'domain' });
+
+// Privileges are the one thing here that is genuinely environment-specific: the
+// same schema provisioned twice carries different role NAMES, and recording
+// them raw would make every cross-environment comparison differ for a reason
+// that is not drift — destroying the digest's only job.
+//
+// So role names are normalised, not dropped. If every relation in `public` has
+// the same owner, that name becomes `@owner`; any other grantee keeps its
+// literal name, because a grant to somebody who is not the owner is precisely
+// the drift worth seeing. An empty grantee is PUBLIC, which is never
+// normalised away. When ownership is mixed, nothing is normalised and the
+// literal names stay visible — the mixture is itself the finding, and
+// `ownership.normalised` says which happened rather than leaving it to guess.
+export function ownerNormaliser(owners) {
+  const distinct = [...new Set(owners.filter((owner) => typeof owner === 'string' && owner !== ''))].sort(compare);
+  const normalised = distinct.length === 1;
+  const map = (name) => (name == null ? null : (normalised && name === distinct[0] ? '@owner' : name));
+  return { map, normalised, distinctOwners: distinct.length };
+}
+
+/** Splits an aclitem[] literal on top-level commas; a quoted role name may contain one. */
+function splitAclItems(text) {
+  const items = [];
+  let current = '';
+  let quoted = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+    if (character === '"' && text[index - 1] !== '\\') { quoted = !quoted; current += character; continue; }
+    if (character === ',' && !quoted) { items.push(current); current = ''; continue; }
+    current += character;
+  }
+  if (current !== '') items.push(current);
+  return items;
+}
+
+const unquote = (name) => (name.startsWith('"') && name.endsWith('"') && name.length > 1
+  ? name.slice(1, -1).replace(/\\"/g, '"').replace(/\\\\/g, '\\') : name);
+
+/**
+ * `null` means the catalogue holds no explicit grants at all — the object has
+ * default privileges and only its owner can reach it. That is a different fact
+ * from "an empty grant list" and is preserved as such.
+ */
+export function normaliseAcl(text, mapName) {
+  if (text == null || text === '') return null;
+  const inner = text.startsWith('{') && text.endsWith('}') ? text.slice(1, -1) : fail('FINGERPRINT_UNEXPECTED_ACL_SHAPE');
+  if (inner === '') return [];
+  return splitAclItems(inner).map((item) => {
+    const match = /^(.*)=([a-zA-Z*]*)\/(.*)$/.exec(item);
+    if (!match) fail('FINGERPRINT_UNEXPECTED_ACL_SHAPE');
+    const grantee = unquote(match[1]);
+    return {
+      grantee: grantee === '' ? 'PUBLIC' : mapName(grantee),
+      privileges: match[2],
+      grantor: mapName(unquote(match[3])),
+    };
+  }).sort((left, right) => compare(canonicalJson(left), canonicalJson(right)));
+}
 
 // An unrecognised catalogue code stays visible as unknown(x) rather than
 // aborting or silently collapsing to a default; a fingerprint that hides what
@@ -153,9 +322,19 @@ function sortRows(rows, keys) {
 
 /** Pure: raw catalogue rows in, deterministic comparison body out. */
 export function buildFingerprint(rows) {
+  // Derived before anything else: every ACL in the document is expressed
+  // relative to this, so it has to be decided from the whole relation set
+  // rather than per row.
+  const ownership = ownerNormaliser([
+    ...(rows.tables ?? []).map((row) => row.owner),
+    ...(rows.views ?? []).map((row) => row.owner),
+  ]);
+  const acl = (value) => normaliseAcl(value, ownership.map);
+
   const tables = sortRows((rows.tables ?? []).map((row) => ({
     name: row.name, kind: decode(RELKIND, row.kind), persistence: decode(PERSISTENCE, row.persistence),
     rowSecurity: row.rowSecurity ?? null, forceRowSecurity: row.forceRowSecurity ?? null,
+    owner: ownership.map(row.owner ?? null), acl: acl(row.acl),
   })), ['name']);
 
   const sequences = sortRows((rows.sequences ?? []).map((row) => ({ name: row.name })), ['name']);
@@ -166,7 +345,7 @@ export function buildFingerprint(rows) {
   // on a foreign-key column is precisely the drift this fingerprint exists to
   // expose, so smoothing defaults would defeat the tool.
   const columns = sortRows((rows.columns ?? []).map((row) => ({
-    table: row.table, name: row.name, position: row.position ?? null,
+    table: row.table, name: row.name, position: row.position ?? null, acl: acl(row.acl),
     type: row.type ?? null, udtName: row.udtName ?? null, nullable: row.nullable ?? null,
     default: row.default ?? null,
     identity: decode(IDENTITY, row.identity), generated: decode(GENERATED, row.generated),
@@ -194,6 +373,52 @@ export function buildFingerprint(rows) {
     unique: row.unique ?? null, primaryKey: row.primaryKey ?? null, valid: row.valid ?? null,
   })), ['table', 'name']);
 
+  const views = sortRows((rows.views ?? []).map((row) => ({
+    name: row.name, kind: decode(VIEW_RELKIND, row.kind), definition: row.definition ?? null,
+    persistence: decode(PERSISTENCE, row.persistence),
+    rowSecurity: row.rowSecurity ?? null, forceRowSecurity: row.forceRowSecurity ?? null,
+    owner: ownership.map(row.owner ?? null), acl: acl(row.acl),
+  })), ['name']);
+
+  const triggers = sortRows((rows.triggers ?? []).map((row) => ({
+    table: row.table, name: row.name, definition: row.definition ?? null,
+    enabled: decode(TRIGGER_ENABLED, row.enabled),
+    deferrable: row.deferrable ?? null, deferred: row.deferred ?? null,
+  })), ['table', 'name']);
+
+  const routines = sortRows((rows.routines ?? []).map((row) => ({
+    name: row.name, kind: decode(PROKIND, row.kind), arguments: row.arguments ?? null,
+    returns: row.returns ?? null, language: row.language ?? null,
+    volatility: decode(VOLATILITY, row.volatility), strict: row.strict ?? null,
+    securityDefiner: row.securityDefiner ?? null, config: row.config ?? null,
+    bodyDigest: row.bodyDigest ?? null, bodyLength: row.bodyLength ?? null,
+    owner: ownership.map(row.owner ?? null), acl: acl(row.acl),
+  })), ['name', 'arguments']);
+
+  const policies = sortRows((rows.policies ?? []).map((row) => ({
+    table: row.table, name: row.name, command: decode(POLICY_CMD, row.command),
+    permissive: row.permissive ?? null, roles: names(row.roles).map((role) => ownership.map(role)),
+    using: row.using ?? null, withCheck: row.withCheck ?? null,
+  })), ['table', 'name']);
+
+  const schemas = sortRows((rows.schemas ?? []).map((row) => ({
+    name: row.name, owner: ownership.map(row.owner ?? null), acl: acl(row.acl),
+  })), ['name']);
+
+  const defaultPrivileges = sortRows((rows.defaultPrivileges ?? []).map((row) => ({
+    role: ownership.map(row.role ?? null), objectType: decode(DEFACL_OBJECT, row.objectType),
+    schema: row.schema ?? null, acl: acl(row.acl),
+  })), ['schema', 'objectType', 'role']);
+
+  const extensions = sortRows((rows.extensions ?? []).map((row) => ({
+    name: row.name, version: row.version ?? null, schema: row.schema ?? null,
+  })), ['name']);
+
+  const types = sortRows((rows.types ?? []).map((row) => ({
+    name: row.name, kind: decode(TYPTYPE, row.kind), baseType: row.baseType ?? null,
+    notNull: row.notNull ?? null, default: row.default ?? null, labels: names(row.labels),
+  })), ['name']);
+
   // Derived, but recorded rather than left to the reader: the repository has a
   // known latent issue where foreign-key columns carry auto-increment defaults.
   // Listing the intersection makes it a one-line check in the evidence file.
@@ -206,17 +431,42 @@ export function buildFingerprint(rows) {
     }))), ['table', 'column', 'constraint']);
 
   const byType = (type) => constraints.filter((constraint) => constraint.type === type).length;
+  // An explicit grant to anyone but the object's OWN owner, anywhere in the
+  // schema. Derived for the same reason foreignKeyColumnDefaults is: it turns
+  // the question a reviewer actually asks into a single number instead of a
+  // manual scan.
+  //
+  // Compared against each object's own owner rather than the normalised
+  // `@owner`, because `public` is owned by the built-in `pg_database_owner`
+  // while the relations are owned by the provisioning role. Comparing to
+  // `@owner` counted the schema owner's own grant as an outside grant.
+  //
+  // A stock PostgreSQL 15+ database reads 1: `GRANT USAGE ON SCHEMA public TO
+  // PUBLIC`, which is the shipped default. Anything above 1 was granted by
+  // somebody.
+  const grantsBeyondOwner = [...tables, ...views, ...columns, ...routines, ...schemas]
+    .flatMap((object) => (object.acl ?? []).map((entry) => ({ entry, owner: object.owner ?? '@owner' })))
+    .filter(({ entry, owner }) => entry.grantee !== owner).length;
   return {
-    fingerprintVersion: 1,
+    // Version 2 adds views, triggers, routines, policies, privileges,
+    // default privileges, extensions and types. A version 1 document and a
+    // version 2 document of the same database are not comparable, and the
+    // field says so rather than letting a digest mismatch imply drift.
+    fingerprintVersion: 2,
     schema: 'public',
+    ownership: { normalised: ownership.normalised, distinctOwners: ownership.distinctOwners },
     counts: {
       tables: tables.length, sequences: sequences.length, columns: columns.length,
       constraints: constraints.length, primaryKeyConstraints: byType('primary key'),
       uniqueConstraints: byType('unique'), checkConstraints: byType('check'),
       foreignKeyConstraints: byType('foreign key'), foreignKeys: foreignKeys.length,
       indexes: indexes.length, foreignKeyColumnDefaults: foreignKeyColumnDefaults.length,
+      views: views.length, triggers: triggers.length, routines: routines.length,
+      policies: policies.length, extensions: extensions.length, types: types.length,
+      defaultPrivileges: defaultPrivileges.length, grantsBeyondOwner,
     },
     tables, sequences, columns, constraints, foreignKeys, indexes, foreignKeyColumnDefaults,
+    views, triggers, routines, policies, schemas, defaultPrivileges, extensions, types,
   };
 }
 

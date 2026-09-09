@@ -78,7 +78,10 @@ New recorded fingerprint:
 `sha256:964f4251beea3ba52d1e23d973ae354d3bee9aac3539392c27aa04b7c59398b0`
 (was `sha256:4b709a2c…`), regenerated twice to the same digest and stored as
 [R0-T6A-empty-fingerprint-2026-09-09.json](../evidence/remediation-v2-2/r0/R0-T6A-empty-fingerprint-2026-09-09.json).
-`.github/workflows/verify.yml` now gates against that file. The 2026-09-08
+`.github/workflows/verify.yml` gated against that file until later the same day,
+when the fingerprint was widened to cover views, triggers and permissions
+(`fingerprintVersion` 2) and the gate moved to
+[R0-T6A-empty-fingerprint-v2-2026-09-09.json](../evidence/remediation-v2-2/r0/R0-T6A-empty-fingerprint-v2-2026-09-09.json). The 2026-09-08
 artefact is kept unmodified as the record of that dated run.
 
 ## A correction to the record

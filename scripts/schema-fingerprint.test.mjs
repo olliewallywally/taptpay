@@ -9,8 +9,10 @@ import {
 // database is opened anywhere in this file.
 const CATALOGUE = Object.freeze({
   tables: [
-    { name: 'transactions', kind: 'r', persistence: 'p', rowSecurity: false, forceRowSecurity: false },
-    { name: 'merchants', kind: 'r', persistence: 'p', rowSecurity: false, forceRowSecurity: false },
+    { name: 'transactions', kind: 'r', persistence: 'p', rowSecurity: false, forceRowSecurity: false,
+      owner: 'app_owner', acl: null },
+    { name: 'merchants', kind: 'r', persistence: 'p', rowSecurity: true, forceRowSecurity: false,
+      owner: 'app_owner', acl: '{app_owner=arwdDxt/app_owner,reporting=r/app_owner}' },
   ],
   sequences: [{ name: 'merchants_id_seq' }, { name: 'transactions_merchant_id_seq' }],
   columns: [
@@ -53,6 +55,34 @@ const CATALOGUE = Object.freeze({
       unique: true, primaryKey: true, valid: true },
     { table: 'merchants', name: 'merchants_pkey', definition: 'CREATE UNIQUE INDEX merchants_pkey ON public.merchants USING btree (id)',
       unique: true, primaryKey: true, valid: true },
+  ],
+  views: [
+    // The classic exposure: a view handing a base-table column to everyone.
+    { name: 'merchant_summary', kind: 'v', definition: ' SELECT id, email FROM merchants;',
+      persistence: 'p', rowSecurity: false, forceRowSecurity: false,
+      owner: 'app_owner', acl: '{app_owner=arwdDxt/app_owner,=r/app_owner}' },
+  ],
+  triggers: [
+    { table: 'transactions', name: 'transactions_audit', enabled: 'O', deferrable: false, deferred: false,
+      definition: 'CREATE TRIGGER transactions_audit AFTER INSERT ON public.transactions FOR EACH ROW EXECUTE FUNCTION audit_transaction()' },
+  ],
+  routines: [
+    { name: 'audit_transaction', kind: 'f', arguments: '', returns: 'trigger', language: 'plpgsql',
+      volatility: 'v', strict: false, securityDefiner: true, config: null, acl: null, owner: 'app_owner',
+      bodyDigest: 'a3f1'.repeat(16), bodyLength: 214 },
+  ],
+  policies: [
+    { table: 'merchants', name: 'merchants_tenant_isolation', command: 'r', permissive: true,
+      roles: ['PUBLIC'], using: '(merchant_id = current_setting(\'app.merchant\'::text)::integer)', withCheck: null },
+  ],
+  schemas: [{ name: 'public', owner: 'app_owner', acl: '{app_owner=UC/app_owner,=U/app_owner}' }],
+  defaultPrivileges: [
+    { role: 'app_owner', objectType: 'r', schema: 'public', acl: '{=r/app_owner}' },
+  ],
+  extensions: [{ name: 'plpgsql', version: '1.0', schema: 'pg_catalog' }],
+  types: [
+    { name: 'merchant_status', kind: 'e', baseType: '-', notNull: false, default: null,
+      labels: ['pending', 'verified', 'active'] },
   ],
 });
 
@@ -114,7 +144,7 @@ test('shuffled catalogue rows produce byte-identical output and one digest', () 
 
 test('the digest is pinned so a shape change cannot silently invalidate recorded evidence', () => {
   assert.equal(fingerprintDocument(CATALOGUE).digest,
-    'sha256:1df762c48c44045fed8e63d720603bd19e8899b6999b07753206bd8a5e8fbd09');
+    'sha256:f1eb9e0610e764cc757214186f45ae4992b4f749e3f8a9634e2ed7adef409bb1');
 });
 
 test('a changed default, action or definition changes the digest', () => {
@@ -252,4 +282,135 @@ test('arguments are refused and driver errors never reach the caller', async () 
     (error) => error.message === 'FINGERPRINT_CONNECT_FAILED');
   await assert.rejects(runFingerprint([], { ...overrides, connect: async () => fakeClient(CATALOGUE, { failOn: 'pg_constraint' }) }),
     (error) => error.message === 'FINGERPRINT_QUERY_FAILED');
+});
+
+// ---------------------------------------------------------------------------
+// Version 2: views, triggers and permissions
+// ---------------------------------------------------------------------------
+
+test('the document declares version 2, so a version 1 record is not mistaken for drift', () => {
+  assert.equal(buildFingerprint(CATALOGUE).fingerprintVersion, 2);
+});
+
+test('views, triggers, routines and policies are collected and decoded', () => {
+  const { fingerprint } = fingerprintDocument(CATALOGUE);
+  assert.deepEqual(fingerprint.views.map((view) => [view.name, view.kind]), [['merchant_summary', 'view']]);
+  assert.deepEqual(fingerprint.triggers.map((trigger) => [trigger.table, trigger.name, trigger.enabled]),
+    [['transactions', 'transactions_audit', 'enabled']]);
+  assert.deepEqual(fingerprint.routines.map((routine) => [routine.name, routine.kind, routine.volatility]),
+    [['audit_transaction', 'function', 'volatile']]);
+  assert.deepEqual(fingerprint.policies.map((policy) => [policy.name, policy.command, policy.roles]),
+    [['merchants_tenant_isolation', 'read', ['PUBLIC']]]);
+  assert.deepEqual(fingerprint.types.map((type) => [type.name, type.kind, type.labels]),
+    [['merchant_status', 'enum', ['pending', 'verified', 'active']]]);
+  assert.deepEqual(fingerprint.extensions, [{ name: 'plpgsql', version: '1.0', schema: 'pg_catalog' }]);
+  assert.equal(fingerprint.counts.views, 1);
+  assert.equal(fingerprint.counts.triggers, 1);
+  assert.equal(fingerprint.counts.policies, 1);
+});
+
+test('a view definition is recorded so a widened view is drift, not a silent change', () => {
+  const baseline = fingerprintDocument(CATALOGUE).digest;
+  const widened = { views: CATALOGUE.views.map((view) => ({ ...view, definition: ' SELECT id, email, api_key FROM merchants;' })) };
+  assert.notEqual(fingerprintDocument({ ...CATALOGUE, ...widened }).digest, baseline);
+});
+
+test('a function body is digested, never copied into the document', () => {
+  const document = serialise(fingerprintDocument(CATALOGUE));
+  const [routine] = fingerprintDocument(CATALOGUE).fingerprint.routines;
+  // The body must be represented, but only by its digest and length.
+  assert.equal(routine.bodyDigest.length, 64);
+  assert.equal(routine.bodyLength, 214);
+  assert.ok(!Object.keys(routine).includes('body'), 'a routine body must never be carried verbatim');
+  assert.doesNotMatch(document, /prosrc/);
+  // SECURITY DEFINER is an escalation surface and stays readable rather than hashed.
+  assert.equal(routine.securityDefiner, true);
+});
+
+test('a changed function body changes the digest even though the body is not stored', () => {
+  const baseline = fingerprintDocument(CATALOGUE).digest;
+  const tampered = { routines: CATALOGUE.routines.map((routine) => ({ ...routine, bodyDigest: 'b4c2'.repeat(16) })) };
+  assert.notEqual(fingerprintDocument({ ...CATALOGUE, ...tampered }).digest, baseline);
+});
+
+test('role names normalise to @owner so two environments compare, while PUBLIC stays visible', () => {
+  const { fingerprint } = fingerprintDocument(CATALOGUE);
+  assert.deepEqual(fingerprint.ownership, { normalised: true, distinctOwners: 1 });
+  const merchants = fingerprint.tables.find((table) => table.name === 'merchants');
+  assert.deepEqual(merchants.acl, [
+    { grantee: '@owner', privileges: 'arwdDxt', grantor: '@owner' },
+    { grantee: 'reporting', privileges: 'r', grantor: '@owner' },
+  ]);
+  // The owner's literal name must not survive anywhere in the document.
+  assert.doesNotMatch(serialise(fingerprint), /app_owner/);
+  // An empty grantee is PUBLIC and is never normalised away.
+  const view = fingerprint.views[0];
+  assert.ok(view.acl.some((entry) => entry.grantee === 'PUBLIC'));
+});
+
+test('renaming the owning role leaves the digest unchanged; granting to anyone else does not', () => {
+  const renamed = (rows, owner) => Object.fromEntries(Object.entries(rows).map(([section, values]) => [
+    section, values.map((row) => JSON.parse(JSON.stringify(row).split('app_owner').join(owner))),
+  ]));
+  assert.equal(fingerprintDocument(renamed(CATALOGUE, 'postgres')).digest,
+    fingerprintDocument(CATALOGUE).digest);
+
+  const granted = { tables: CATALOGUE.tables.map((table) => (table.name === 'transactions'
+    ? { ...table, acl: '{app_owner=arwdDxt/app_owner,=r/app_owner}' } : table)) };
+  assert.notEqual(fingerprintDocument({ ...CATALOGUE, ...granted }).digest,
+    fingerprintDocument(CATALOGUE).digest);
+});
+
+test('grantsBeyondOwner counts every explicit grant that is not the owner', () => {
+  const { fingerprint } = fingerprintDocument(CATALOGUE);
+  // reporting on merchants, PUBLIC on the view, PUBLIC on the schema.
+  assert.equal(fingerprint.counts.grantsBeyondOwner, 3);
+  const none = fingerprintDocument({
+    ...CATALOGUE,
+    tables: CATALOGUE.tables.map((table) => ({ ...table, acl: null })),
+    views: CATALOGUE.views.map((view) => ({ ...view, acl: null })),
+    schemas: CATALOGUE.schemas.map((schema) => ({ ...schema, acl: null })),
+  });
+  assert.equal(none.fingerprint.counts.grantsBeyondOwner, 0);
+});
+
+test('mixed ownership stops normalisation and says so instead of hiding it', () => {
+  const mixed = { tables: CATALOGUE.tables.map((table) => (table.name === 'merchants'
+    ? { ...table, owner: 'someone_else' } : table)) };
+  const { fingerprint } = fingerprintDocument({ ...CATALOGUE, ...mixed });
+  assert.equal(fingerprint.ownership.normalised, false);
+  assert.equal(fingerprint.ownership.distinctOwners, 2);
+  assert.deepEqual(fingerprint.tables.map((table) => table.owner).sort(), ['app_owner', 'someone_else']);
+});
+
+test('an absent ACL means default privileges and is distinct from an empty grant list', () => {
+  const { fingerprint } = fingerprintDocument(CATALOGUE);
+  assert.equal(fingerprint.tables.find((table) => table.name === 'transactions').acl, null);
+  const emptied = { tables: CATALOGUE.tables.map((table) => ({ ...table, acl: '{}' })) };
+  const other = fingerprintDocument({ ...CATALOGUE, ...emptied }).fingerprint;
+  assert.deepEqual(other.tables.find((table) => table.name === 'transactions').acl, []);
+  assert.notEqual(fingerprintDocument({ ...CATALOGUE, ...emptied }).digest,
+    fingerprintDocument(CATALOGUE).digest);
+});
+
+test('a malformed ACL literal stops the run rather than being fingerprinted as prose', () => {
+  const broken = { tables: CATALOGUE.tables.map((table) => ({ ...table, acl: 'not-an-acl' })) };
+  assert.throws(() => fingerprintDocument({ ...CATALOGUE, ...broken }),
+    /FINGERPRINT_UNEXPECTED_ACL_SHAPE/);
+});
+
+test('adding a view, a trigger or a policy each changes the digest', () => {
+  const baseline = fingerprintDocument(CATALOGUE).digest;
+  const additions = [
+    { views: [...CATALOGUE.views, { name: 'extra', kind: 'v', definition: ' SELECT 1;', persistence: 'p',
+      rowSecurity: false, forceRowSecurity: false, owner: 'app_owner', acl: null }] },
+    { triggers: [...CATALOGUE.triggers, { table: 'merchants', name: 'extra', definition: 'CREATE TRIGGER extra',
+      enabled: 'D', deferrable: false, deferred: false }] },
+    { policies: [...CATALOGUE.policies, { table: 'transactions', name: 'extra', command: '*',
+      permissive: false, roles: ['PUBLIC'], using: 'true', withCheck: null }] },
+    { extensions: [...CATALOGUE.extensions, { name: 'pgcrypto', version: '1.3', schema: 'public' }] },
+  ];
+  for (const addition of additions) {
+    assert.notEqual(fingerprintDocument({ ...CATALOGUE, ...addition }).digest, baseline);
+  }
 });
