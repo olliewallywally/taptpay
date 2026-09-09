@@ -75,10 +75,21 @@ are non-null on **0 of 9** merchants, `crypto_enabled` is true for **0**, and
 secret and no retained payment record — which also settles the question the
 adoption decision left open, in that database.
 
-`invoices_rent_requests.scheduled_send_at` is unrelated and unexplained. The
-repository puts `scheduled_send_at` on a **different table** — `job_invoices`
-(`migrations/0007_trades_vertical.sql:93`, `shared/schema.ts:1306`). Which push
-created it on `invoices_rent_requests` could not be determined.
+`invoices_rent_requests.scheduled_send_at` is unrelated, and it is **traced**.
+Today the repository puts `scheduled_send_at` only on a *different* table,
+`job_invoices` (`migrations/0007_trades_vertical.sql:93`,
+`shared/schema.ts:1306`) — but it did once live on `invoices_rent_requests`:
+
+- `988b4744` (2026-06-15, *"feat(terminal): scheduled send date for rent
+  requests"*) declared `scheduledSendAt` on `invoicesRentRequests` in
+  `shared/schema.ts`.
+- By `d9143f2a` (2026-06-17) the declaration was gone again.
+
+A `drizzle-kit push` in that two-day window put the column in the database, the
+declaration was then withdrawn, and the column stayed. It is the same failure
+mode as the crypto residue and as `crypto_transactions` itself: **push writes
+schema that nothing later remembers.** Every orphan on this page traces back to
+it.
 
 ### 2. A missing index — genuine migration lag
 
