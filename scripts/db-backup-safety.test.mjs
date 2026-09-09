@@ -135,15 +135,33 @@ function fakePrograms(temporary, {
   expectedRootCert,
 } = {}) {
   const bin = path.join(temporary, 'bin');
+  const expectedUrl = new URL(expectedConnection);
+  const expectedDatabase = decodeURIComponent(expectedUrl.pathname.slice(1));
+  const expectedHost = expectedUrl.hostname.replace(/^\[|\]$/g, '');
+  const expectedPort = expectedUrl.port || '5432';
+  const expectedUser = decodeURIComponent(expectedUrl.username);
+  const expectedPassword = decodeURIComponent(expectedUrl.password);
+  const expectedSslmode = expectedUrl.searchParams.get('sslmode') ?? undefined;
+  const expectedConnectTimeout = expectedUrl.searchParams.get('connect_timeout') || '30';
   fs.mkdirSync(bin);
   // These executables are transport fakes, not cryptographic or database proof.
   // They assert secret separation and argument isolation without printing values.
   fs.writeFileSync(path.join(bin, 'pg_dump'), `#!${process.execPath}\n
- if (process.env.PGDATABASE !== ${JSON.stringify(expectedConnection)} || process.env.PGSSLROOTCERT !== ${JSON.stringify(expectedRootCert)} || process.argv.some(x => x.includes('synthetic-only')) || process.env.NEON_DATABASE_URL || process.env.WINDCAVE_API_KEY) process.exit(91);
+ if (process.env.PGDATABASE !== ${JSON.stringify(expectedDatabase)} ||
+     process.env.PGHOST !== ${JSON.stringify(expectedHost)} ||
+     process.env.PGPORT !== ${JSON.stringify(expectedPort)} ||
+     process.env.PGUSER !== ${JSON.stringify(expectedUser)} ||
+     process.env.PGPASSWORD !== ${JSON.stringify(expectedPassword)} ||
+     process.env.PGSSLMODE !== ${JSON.stringify(expectedSslmode)} ||
+     process.env.PGCONNECT_TIMEOUT !== ${JSON.stringify(expectedConnectTimeout)} ||
+     process.env.PGSSLROOTCERT !== ${JSON.stringify(expectedRootCert)} ||
+     process.argv.some(x => x.includes('synthetic-only')) ||
+     process.env.NEON_DATABASE_URL || process.env.WINDCAVE_API_KEY) process.exit(91);
 ${hangs ? 'setInterval(() => {}, 1000);' : `process.stdout.write('synthetic sql'); process.stderr.write('synthetic private error'); process.exitCode = ${dumpFails ? 2 : 0};`}
 `, { mode: 0o700 });
   fs.writeFileSync(path.join(bin, 'gpg'), `#!${process.execPath}\n
-if (process.env.PGDATABASE || process.env.BACKUP_DATABASE_URL || process.env.NEON_DATABASE_URL || process.env.WINDCAVE_API_KEY) process.exit(92);
+ if (process.env.PGDATABASE || process.env.PGHOST || process.env.PGUSER || process.env.PGPASSWORD ||
+     process.env.BACKUP_DATABASE_URL || process.env.NEON_DATABASE_URL || process.env.WINDCAVE_API_KEY) process.exit(92);
 if (!process.argv.includes('--encrypt') || !process.argv.includes('--batch') || !process.argv.includes(${JSON.stringify(recipient)})) process.exit(93);
 let data = ''; process.stdin.on('data', chunk => data += chunk);
 process.stdin.on('end', () => { if (data !== 'synthetic sql') process.exitCode = 94;

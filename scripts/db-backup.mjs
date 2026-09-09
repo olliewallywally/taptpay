@@ -84,14 +84,19 @@ export async function encryptedDump({ connection, recipient, output, env, signal
     signal?.throwIfAborted();
     // Exclusive creation rejects existing files and symlinks, including dangling ones.
     file = await fs.open(output, 'wx', 0o600);
+    const url = new URL(connection);
+    const sslmode = url.searchParams.get('sslmode');
     const childEnv = { PATH: env.PATH, LANG: 'C', LC_ALL: 'C' };
     const dumpEnv = {
       ...childEnv,
-      PGDATABASE: connection,
-      PGCONNECT_TIMEOUT: '30',
-      ...(new URL(connection).searchParams.get('sslmode') === 'verify-full'
-        ? { PGSSLROOTCERT: 'system' }
-        : {}),
+      PGHOST: url.hostname.replace(/^\[|\]$/g, ''),
+      PGPORT: url.port || '5432',
+      PGUSER: decodeURIComponent(url.username),
+      PGPASSWORD: decodeURIComponent(url.password),
+      PGDATABASE: decodeURIComponent(url.pathname.slice(1)),
+      PGCONNECT_TIMEOUT: url.searchParams.get('connect_timeout') || '30',
+      ...(sslmode ? { PGSSLMODE: sslmode } : {}),
+      ...(sslmode === 'verify-full' ? { PGSSLROOTCERT: 'system' } : {}),
     };
     dump = spawn('pg_dump', ['--no-owner', '--no-privileges', '--no-password'], {
       env: dumpEnv,
