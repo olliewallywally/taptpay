@@ -62,14 +62,26 @@ severity:
 | `ADMIN_EMAIL` | 36 chars | Exposed. |
 | `WINDCAVE_USERNAME` | two values, 9 and 12 chars | Exposed. |
 
-Deliberately checked and **not** found anywhere in `.claude-home` on `main`:
+Deliberately checked in `.claude-home` on `main`:
 
-- no `postgres://user:password@…` connection URI,
-- no `-----BEGIN … PRIVATE KEY-----` PEM block,
-- no `WINDCAVE_API_KEY` carrying a value.
+- no `-----BEGIN … PRIVATE KEY-----` PEM block — confirmed exhaustively across
+  all 2,950 origin-reachable `.claude-home` blobs;
+- no `WINDCAVE_API_KEY` carrying a value — only a six-character prefix followed
+  by a literal ellipsis, elided in the transcript itself.
 
-So neither database credentials nor the Windcave API key are in this exposure.
-That bounds it materially.
+> **Corrected 2026-09-09 — the database claim below was wrong.** This record
+> originally also stated that no `postgres://user:password@…` URI was present,
+> and called it specifically checked. It was checked with a malformed
+> expression: `postgres\(ql\)\?://…` passed to `grep -E`, where escaped
+> parentheses are literal, so it searched for the literal text
+> `postgres(ql)?://` and reported zero matches. The corrected pattern returns a
+> transcript blob **in `origin/main`'s tip tree carrying the production Neon URI
+> and its password**. See
+> [the production database credential](R0-T8-production-db-credential-2026-09-09.md).
+> The Windcave and PEM findings above are unaffected and were re-verified.
+
+So the Windcave API key is not in this exposure. The database credential is, and
+by a different path than this record looked for.
 
 Separately, `attached_assets/Pasted--type-service-account-project-id-swift-cursor-492707-t7_1775633514319.txt`
 is **tracked** and on `main`. It is a Google service-account document carrying a

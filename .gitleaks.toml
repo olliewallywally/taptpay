@@ -19,3 +19,30 @@ paths = [
 regexes = [
   '''^(?:06fdd007baadb74298ef3ae85382b8a5c0dc7e88|07879b33cd43cd1023f3fba39ba84da9010ce3e0|0861eab3bb8e08fbcfcab4226dc9f461ebd5de2e|0aede3b26d34bb8284f49d4fc91ab57bafb3d7f1|0c1e166936ac4591fa9aeb1a776dfcfd425986ff|0cc2ad7f3b923c3baae9a14d21374138c53a3cf3|0e6519780a7a1a775c3fb19096baea44c8e82846|0e8422aabcecaf86c8f5a8ce0e28e13a94d66fc1|13ce3e5c0e4ed26ce236f6d8d97bca21cac4abdb|1688067561cd48c064db2da7c172e2ba4b1ce2fa|17073878356bf95e91dc22a63706d7be5acfd243|188a660899dd42b1ce9c5940c824a661b70be66c|1ae6df6eacc1c4b8f06304ed46f98cc6ce27c158|1bb512b16bb8c83447a45f269d08488a61cc37a1|22d3944f830b5d00cba09b77cdadd25c79ec4fe8|243b9b7e523deda2371f0d588c422ab3a47ddf9c|2b55c0ecf9be36811c11e5708a24ed024af29160|337c822abe4c71ce9924ed0e4f133110a6c46967|3742d7166893027dfae049378a727e77718b45bc|3a813f181d2752f9ee15ea46b3bfc07b31295ad2|3b8609781d5ce630f8528f49989bd8e0c2475de3|3cdacde9f6e2934d7cd97a58919df91324317ced|4144440b75e1208e9b362dfd97058b768829574e|41af8386fe2483785eb66515bcd661df14bd5d79|428ee3953fe842d00876e4a0006ce087b5d0664c|42d5fa15470408dd705d4add02753e727672efbf|459ef5c90a6882ffce9b2f0b5a68b733a41e5279|49641513910b080b177e43e1247bdddcbe70b4e7|498894c9c6bd2633435e7a3d15deabcb72a026fc|57a09007eef9454e92fe03d5f0ffc2e72875da9c|5d384f50309c7a9bf03bdcd9c3df47ae282139a9|60fe208ad392f6873d61d93fd3aa513b8de0ea70|68419b5512c8fef28549726b4eac917b1fb5cdd8|6909b0b1fe8959e45b2dbc2b11db00cdcae8935c|6b7840bf7661bf8874edb5994e790c9f90326c72|6ccffecc2447699b161c91b843f47060aca07d7f|779721683691afdc0334c02bdf26465215ca0019|7be73552e0bd1198145396097055e3153354f27c|7d5cf6fe1da599241df016b09f3e91276a23bfaf|830141350d8ef6cf7f3008576d53a72a24acfcdd|8303da795b1bed0f33bfc716ebbf4ae83fb785e8|85c73d3ba851eb6c42af03dfbd644ece483b61fc|8a21448dbd51609e7c369a544b01075756e33e49|941d61901012fafeb17d72f9b668df6229c55263|952bfcf368d372b9cb29c4db0f8816d29f240282|98a66bc7dd03eb30cda9c9ea766e94d1b5a7ae3f|98de3baa596138ec43493706e8937b7675c5c8ed|a3423e0a28a3d29dbdc261a7aae1ec40cc12ab96|a4107684554cc84c28c1746933f1a36d5b316128|a4e8de50542818863c54819cb47ce1d0c0960ee5|ab0bf5efaf8402bb40a3c6c38f9f9f8e854e6346|b0c41a3fe3a4226951b31c059d85e1a84557f72f|b1a8ba62cc20256f15604a054b30ce54a38668f3|b1fe744b5be68156aa187b17ab4d21f264bd78bd|b4e362d12dbf813c3ac60bef6bda3597e38a19b1|b94707676040cc04359b34cd7c228b49b814a866|bca683181fb9dafa164fb03b7145a6ddd6b56675|c0ab26a2ef222dd20278a6b08d86f93a961ee640|c3c3dc63831b8ec5c5d3752f6c395157a54b1df9|c4a05c265d63060f299f549ba7517f7db715322a|d4478e96c7ab065a18d7bb688547cc69dc7fa5a4|d6e4bf534d5cb1d61ba4f6ac31eafd385e45aad3|dacd826ffcbed796ac52cd3caaec1eb312526cb1|e03b0687b5514b99e7e927ee9888da04ef0edb44|e3acf905fcad47ba7042ee9c3d7babbc18ad0c20|ec2072795fa3adc48b508e227884b3837685a3aa|eee3e570a1dad1de3bb2d794608691045db4743f|f0150cefe599cca57ae4384d50bffd9f1b8a2bab|f424a70130fa1e2272965b4f5d2d31a2235db875|f7398eee52c3e71b4e72b40839d38d497654e649|f8e00e6106b48e21d990116754bbd5acdb03b482|f91f2d3ccfe883215416f8c7fcd6e8d59cbfe4ee|fac3e691fa065ea5292cb39438dafec69ba12e4e|fb7ca64608730c21e3a4c5db140e74d8db05348a|ff49cab804bcc66b5fc13e257af53ea320771e6a)$'''
 ]
+
+# Added 2026-09-09. The default rule set has no detector for a connection URI
+# carrying an inline password, so the production database credential sat in
+# origin/main's tip tree unflagged by every scan. Deliberately NOT anchored with
+# \b: the transcript that carried it reads "...set in shell: YESpostgresql://",
+# with the scheme glued to preceding output, and a word boundary there matches
+# nothing. Over-matching a scheme is cheap; missing a live credential is not. See
+# docs/evidence/remediation-v2-2/r0/R0-T8-production-db-credential-2026-09-09.md.
+[[rules]]
+id = "connection-uri-password"
+description = "Database or broker connection URI carrying an inline password"
+regex = '''(?i)(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|rediss|amqps?)://[^\s:/@"'\\]{1,64}:([^\s@"'\\]{6,128})@[^\s/"'\\]{3,}'''
+secretGroup = 1
+keywords = ["postgres://", "postgresql://", "mysql://", "mongodb://", "mongodb+srv://", "redis://", "rediss://", "amqp://", "amqps://"]
+
+  # A redacted or templated password is not a leak. Anchored on the whole secret
+  # so a real password containing one of these substrings still fires.
+  [[rules.allowlists]]
+  description = "Redacted, templated or self-describing placeholder passwords"
+  condition = "OR"
+  regexTarget = "secret"
+  regexes = [
+    '''^\*+$''',
+    '''^(?i)(?:password|passwd|pass|secret|your[-_]?password|changeme|example|placeholder|redacted|xxx+)$''',
+    '''^[$][{(]?[A-Za-z_][A-Za-z0-9_]*[})]?$''',
+    '''^<[^>]+>$''',
+  ]
