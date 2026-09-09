@@ -102,6 +102,9 @@ export const BASELINE_EFFECT_REQUIREMENTS: readonly Requirement[] = [
   r("0017_schema_history_catchup.sql", "constraint", "api_keys", "api_keys_api_key_unique"),
   r("0017_schema_history_catchup.sql", "table", "api_requests"),
   r("0017_schema_history_catchup.sql", "table", "webhook_deliveries"),
+  r("0018_adopt_crypto_transactions.sql", "table", "crypto_transactions"),
+  r("0018_adopt_crypto_transactions.sql", "constraint", "crypto_transactions",
+    "crypto_transactions_coinbase_charge_id_unique"),
 ];
 
 export const FIND_MISSING_BASELINE_EFFECTS_SQL = `

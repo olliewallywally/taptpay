@@ -54,6 +54,16 @@ primary key, 8 unique, 21 check, 49 foreign key), 80 indexes, 20 sequences, and
 and produced by `scripts/schema-fingerprint.mjs`. It records object names and
 definitions only; no row data is read.
 
+> **Superseded for gating purposes on 2026-09-09, and left unmodified as the
+> record of this run.** The restore rehearsal found one table in production that
+> no migration created; `0018_adopt_crypto_transactions.sql` adopted it, so a
+> clean build is now **30 tables**, fingerprint
+> `sha256:964f4251beea3ba52d1e23d973ae354d3bee9aac3539392c27aa04b7c59398b0`,
+> recorded in [`R0-T6A-empty-fingerprint-2026-09-09.json`](R0-T6A-empty-fingerprint-2026-09-09.json)
+> — which is what `verify.yml` now gates against. The diff between the two is
+> exactly that one table: 30 objects added, 0 removed. Every count and claim
+> below remains true of the migration set as it stood on 2026-09-08.
+
 **The fingerprint was reproduced two independent ways and is byte-identical**:
 once applying the migrations with `psql -f` directly, and once applying them
 through the migration runner into a database with a different name and a

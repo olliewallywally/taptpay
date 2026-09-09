@@ -56,9 +56,11 @@ Everything else matches exactly.
 
 ### What `crypto_transactions` is
 
-An orphan. Verified in this workspace:
+An orphan. Verified in this workspace **as at discovery** — the migration gap is
+closed below, the rest still holds:
 
-- **No checked-in migration creates it** — nothing in `migrations/` mentions it.
+- **No checked-in migration created it** — nothing in `migrations/` mentioned it.
+  Closed 2026-09-09 by `0018_adopt_crypto_transactions.sql`.
 - **It is not in the current Drizzle schema** — no definition in `shared/`.
 - **No live source touches it.** The only hit anywhere in `server/`, `client/` or
   `scripts/` is `client/public/app/assets/schema-h7-17eaE.js`, a **built bundle**
@@ -66,26 +68,43 @@ An orphan. Verified in this workspace:
 - `FEATURE_CRYPTO` remains a false-only kill switch: `server/config.ts:267`
   throws `ConfigValidationError` if it is ever set true.
 
-So it predates migration `0000`, survived the crypto-payment removal that the
-2026-07-20 handoff records, and is now a table the application cannot recreate
-and does not read.
+So it predates migration `0000` and survived the crypto-payment removal that the
+2026-07-20 handoff records. At discovery it was a table the application could
+neither recreate nor read; it is now recreatable, and still unread.
 
-### Why this is recorded rather than fixed
+### Resolved 2026-09-09 — the owner chose option 2, and it is implemented
 
-It holds payment records. Deleting retained financial data is on the
-agent-never list, and D8's retention question is explicitly unresolved, so
-dropping it is not a cleanup an agent may perform — nor a decision to take
-casually. The options are the owner's:
+Three options were put to the owner: leave it recorded, adopt it with a forward
+migration, or archive and drop it. **The owner chose to adopt it.**
 
-1. **Leave it.** Costs nothing, and the drift is now named rather than unknown.
-2. **Add a forward migration that creates it**, so a rebuild-from-migrations
-   reproduces production exactly. This is the honest fix if the rows are being
-   kept: it makes the migration history true.
-3. **Archive and drop it**, under a dated retention decision. Requires
-   `--allow-destructive` and a reviewed change, by design.
+`migrations/0018_adopt_crypto_transactions.sql` now creates the table. It is a
+single `CREATE TABLE IF NOT EXISTS`, so it is a no-op against dev and
+production, which already have it; it reads no rows and deletes nothing. Its
+shape was copied from the live catalogue rather than the deleted Drizzle
+declaration, so a rebuild matches production exactly rather than approximately.
 
-Option 2 is the one that closes R0-T6A's convergence claim, because until then
-"rebuild from migrations equals production" is false by one table.
+**The convergence claim is now true.** Re-running CI's convergence job on a
+throwaway PostgreSQL 16 gives 20 applied / 0 pending / 0 drifted / 0 orphaned
+and **30 public tables**, and the fingerprint diff against the 2026-09-08 record
+is exactly this table — 30 objects added, **0 removed**, every one of them
+naming `crypto_transactions`. Foreign-key column defaults remain **0**.
+
+The built table was then compared against the live catalogue directly: its 20
+columns (position, name, type, nullability, default), 4 constraint names and
+definitions, 2 index definitions and owned sequence name are **identical**.
+
+New recorded fingerprint
+`sha256:964f4251beea3ba52d1e23d973ae354d3bee9aac3539392c27aa04b7c59398b0`
+in [`R0-T6A-empty-fingerprint-2026-09-09.json`](R0-T6A-empty-fingerprint-2026-09-09.json);
+`verify.yml` gates against it. Rationale, the `db:push` hazard this creates, and
+the retention question left open are recorded in
+[the decision](../../../decisions/2026-09-09-adopt-orphan-crypto-transactions.md).
+
+**One correction to what is written above:** this table was described as holding
+payment records. That was not verified and appears to be wrong — the development
+database (forked from production ~2026-06-30) holds **0 rows** in it.
+Production's count remains unverified here. D8's retention question is still
+open either way.
 
 **Worth knowing separately:** the stale bundle
 `client/public/app/assets/schema-h7-17eaE.js` still carries crypto schema
