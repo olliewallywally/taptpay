@@ -51,6 +51,15 @@ The fingerprint counts only `public`, so none of these was ever the difference.
 
 **The real drift is exactly one table: `public.crypto_transactions`.**
 
+> **Corrected 2026-09-09, later the same day.** True of *tables*, and only of
+> tables — this comparison was table-level, because a table listing is what it
+> had. A full object-level comparison against a database built from
+> `migrations/` alone found the crypto residue is one table **and six orphan
+> columns on `merchants`**, plus a seventh unrelated orphan column, a missing
+> index, and six foreign-key columns carrying rogue `nextval(...)` defaults. See
+> [the live drift analysis](R0-T6A-live-drift-2026-09-09.md). The root cause is
+> that migrations `0000`–`0013` were baselined on that database and never ran.
+
 30 application tables against the canonical 29, and the diff is that single name.
 Everything else matches exactly.
 

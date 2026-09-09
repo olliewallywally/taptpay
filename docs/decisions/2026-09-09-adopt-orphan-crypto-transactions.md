@@ -99,7 +99,16 @@ option 2 is what makes the migration history true, and it is the only option
 that closes the convergence gap whether the table holds rows or not.
 
 To settle it: `SELECT count(*) FROM crypto_transactions;` on the restored
-isolated copy.
+isolated copy. On the development database the answer is **0 rows**, and the two
+orphan Coinbase credential columns are non-null on **0 of 9** merchants.
+
+**Also corrected the same day:** the crypto residue is not only this table. Six
+orphan columns on `merchants` (`coinbase_commerce_api_key`,
+`coinbase_webhook_secret`, `crypto_enabled`, `enabled_cryptocurrencies`,
+`auto_convert_to_fiat`, `min_confirmations`) are in the live database and in
+neither `migrations/` nor `shared/schema.ts`. `0018` adopted the table but not
+these. Deciding them is open — see
+[the live drift analysis](../evidence/remediation-v2-2/r0/R0-T6A-live-drift-2026-09-09.md).
 
 ## The deliberate exception this creates
 

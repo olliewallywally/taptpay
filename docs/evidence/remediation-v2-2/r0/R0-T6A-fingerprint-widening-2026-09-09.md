@@ -170,8 +170,10 @@ document traced.
 
 These are differences in the **development** database, which was forked from
 production around 2026-06-30 and has diverged since; they do not establish
-production's state. Object-by-object causes are being traced separately; that analysis is
-recorded in its own file.
+production's state. Object-by-object causes are traced in
+[the live drift analysis](R0-T6A-live-drift-2026-09-09.md), which also
+establishes the root cause: migrations `0000`–`0013` were **baselined** on that
+database — recorded as applied without ever executing.
 
 **This is also the honest limit of the widening:** it did not find hidden drift
 in views, triggers or permissions — it found that the drift was in plain sight
