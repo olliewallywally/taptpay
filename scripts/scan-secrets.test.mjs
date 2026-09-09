@@ -117,3 +117,68 @@ test('evidence exception accepts only known Git hashes at reviewed paths', (t) =
   fs.writeFileSync(path.join(f.root, 'ordinary-source.txt'), `${keyword}: ${known}\n`);
   assert.equal(f.scan(), 1);
 });
+
+function committedLeak(t) {
+  const f = fixture(t);
+  fs.writeFileSync(path.join(f.root, 'source.txt'), `token = "${synthetic}"\n`);
+  f.git('add', '--', 'source.txt');
+  f.git('-c', 'user.name=Synthetic Fixture', '-c', 'user.email=fixture@example.invalid',
+    'commit', '--quiet', '-m', 'synthetic disposition fixture');
+  assert.equal(f.scan('history'), 1);
+  const finding = f.records.find((r) => r.rule);
+  f.records.length = 0;
+  return { f, finding };
+}
+const disposition = (finding, over = {}) => JSON.stringify({
+  rule: finding.rule, file: finding.file, commit: finding.commit,
+  disposition: 'false-positive', reason: 'synthetic fixture', reviewed: '2026-09-09', ...over });
+
+test('a reviewed disposition clears a finding and is scoped to one exact commit', (t) => {
+  const { f, finding } = committedLeak(t);
+  const file = path.join(f.root, '.gitleaks-dispositions.jsonl');
+  fs.writeFileSync(file, `${disposition(finding)}\n`);
+  assert.equal(f.scan('history'), 0);
+  assert.equal(f.records.find((r) => r.rule).status, 'dispositioned');
+  assert.equal(f.records.at(-1).dispositioned, 1);
+  assert.equal(JSON.stringify(f.records).includes(synthetic), false);
+
+  // The same review must not carry over to a different commit.
+  f.records.length = 0;
+  const other = createHash('sha1').update('some other commit').digest('hex');
+  fs.writeFileSync(file, `${disposition(finding, { commit: other })}\n`);
+  assert.equal(f.scan('history'), 1);
+  assert.equal(f.records.find((r) => r.rule).status, 'review-required');
+});
+
+test('a known but unrevoked exposure is recorded and still fails', (t) => {
+  const { f, finding } = committedLeak(t);
+  fs.writeFileSync(path.join(f.root, '.gitleaks-dispositions.jsonl'),
+    `${disposition(finding, { disposition: 'exposed-unresolved', reason: 'revocation outstanding' })}\n`);
+  assert.equal(f.scan('history'), 1);
+  const row = f.records.find((r) => r.rule);
+  assert.equal(row.status, 'review-required');
+  assert.equal(row.disposition, 'exposed-unresolved');
+});
+
+test('malformed, wildcarded or duplicated dispositions fail closed', (t) => {
+  const { f, finding } = committedLeak(t);
+  const file = path.join(f.root, '.gitleaks-dispositions.jsonl');
+  const rejected = [
+    disposition(finding, { file: '*' }),                      // no globs
+    disposition(finding, { commit: '' }),                     // no file-wide waiver
+    disposition(finding, { commit: 'not-a-sha' }),            // must be a full object id
+    disposition(finding, { disposition: 'looks-fine' }),      // closed vocabulary
+    disposition(finding, { reason: '  ' }),                   // a waiver needs a reason
+    disposition(finding, { reviewed: 'yesterday' }),          // dated review only
+    '{"rule":"x"}',                                           // incomplete record
+    'not json at all',
+    `${disposition(finding)}\n${disposition(finding)}`,        // duplicate hides which review applies
+  ];
+  for (const line of rejected) {
+    fs.writeFileSync(file, `${line}\n`);
+    assert.throws(() => f.scan('history'), (error) => error.message === 'SECRET_SCAN_FAILED', line);
+  }
+  // Comments and blank lines remain acceptable around real entries.
+  fs.writeFileSync(file, `# reviewed 2026-09-09\n\n${disposition(finding)}\n`);
+  assert.equal(f.scan('history'), 0);
+});

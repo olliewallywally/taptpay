@@ -11,6 +11,38 @@ const VERSION = '8.30.1';
 // reach output. The scanner writes only these fields, even to temporary storage.
 const TEMPLATE = '{{range .}}{{dict "rule" .RuleID "file" .File "commit" .Commit | toJson}}{{"\\n"}}{{end}}';
 
+// A finding is cleared only by an exact, reviewed (rule, file, commit) entry.
+// CLEARING dispositions assert the finding cannot be used against us: it was
+// never a credential, or the credential is dead. RECORDING dispositions state
+// a live exposure is known and unresolved — they keep the scan red on purpose,
+// because a known leak that nobody has revoked is not a passing state.
+const DISPOSITIONS_FILE = '.gitleaks-dispositions.jsonl';
+const CLEARING = new Set(['false-positive', 'third-party-fixture', 'rotated']);
+const RECORDING = new Set(['exposed-unresolved']);
+
+export function loadDispositions(root) {
+  const file = path.join(root, DISPOSITIONS_FILE);
+  if (!fs.existsSync(file)) return new Map();
+  const entries = new Map();
+  for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
+    if (!line.trim() || line.trimStart().startsWith('#')) continue;
+    const row = JSON.parse(line);
+    for (const field of ['rule', 'file', 'commit', 'disposition', 'reason', 'reviewed']) {
+      if (typeof row[field] !== 'string') throw new Error();
+    }
+    // No globs, no empty commit, no bare-file waivers: one entry, one object.
+    if (!row.rule || !row.file || !row.commit || !row.reason.trim()) throw new Error();
+    if (/[*?\[\]]/.test(row.rule + row.file + row.commit)) throw new Error();
+    if (!CLEARING.has(row.disposition) && !RECORDING.has(row.disposition)) throw new Error();
+    if (!/^[0-9a-f]{40}$/.test(row.commit)) throw new Error();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(row.reviewed)) throw new Error();
+    const key = `${row.rule}\u0000${row.file}\u0000${row.commit}`;
+    if (entries.has(key)) throw new Error(); // a duplicate hides which review applies
+    entries.set(key, row.disposition);
+  }
+  return entries;
+}
+
 export function scanSecrets({ root = ROOT, mode = 'tree', binary = 'gitleaks',
   emit = (record) => process.stdout.write(`${JSON.stringify(record)}\n`),
 } = {}) {
@@ -66,6 +98,9 @@ export function scanSecrets({ root = ROOT, mode = 'tree', binary = 'gitleaks',
     }
     const rows = fs.readFileSync(report, 'utf8').split('\n').filter(Boolean);
     if (findings !== (rows.length > 0)) throw new Error();
+    const dispositions = loadDispositions(root);
+    let unresolved = 0;
+    let cleared = 0;
     for (const row of rows) {
       const parsed = JSON.parse(row);
       if (typeof parsed.rule !== 'string' || typeof parsed.file !== 'string' ||
@@ -75,10 +110,15 @@ export function scanSecrets({ root = ROOT, mode = 'tree', binary = 'gitleaks',
         file = path.relative(file.startsWith(`${tree}${path.sep}`) ? tree : root, file);
       }
       if (path.isAbsolute(file) || file === '..' || file.startsWith(`..${path.sep}`)) throw new Error();
-      emit({ rule: parsed.rule, file, commit: parsed.commit, status: 'review-required' });
+      const disposition = dispositions.get(`${parsed.rule}\u0000${file}\u0000${parsed.commit}`);
+      if (disposition && CLEARING.has(disposition)) cleared += 1; else unresolved += 1;
+      emit({ rule: parsed.rule, file, commit: parsed.commit,
+        status: disposition && CLEARING.has(disposition) ? 'dispositioned' : 'review-required',
+        ...(disposition ? { disposition } : {}) });
     }
-    emit({ status: findings ? 'review-required' : 'clean', mode, findings: rows.length });
-    return findings ? 1 : 0;
+    emit({ status: unresolved ? 'review-required' : 'clean', mode,
+      findings: rows.length, dispositioned: cleared, unresolved });
+    return unresolved ? 1 : 0;
   } catch {
     // Even executable-not-found and malformed report errors must not echo argv,
     // stderr, file contents or exception objects.
