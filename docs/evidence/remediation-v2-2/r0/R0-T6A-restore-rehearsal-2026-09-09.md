@@ -34,48 +34,65 @@ The PostgreSQL major version matters and was correct: `pg_get_constraintdef` and
 `pg_get_indexdef` deparse text can shift between major versions, so a fingerprint
 comparison is only meaningful on 16.x, which is what was used.
 
-## Delta — the one thing left to reconcile
+## Delta — reconciled 2026-09-09
 
-**The restored production database has 33 public tables. The canonical
-migrated-from-zero schema has 29.**
+The owner supplied the table listing. The 33 resolve as **30 application tables
+in `public`, 2 migration-tracking tables in `drizzle`, and 1 Replit bookkeeping
+table in `_system`**. Three of the apparent four extras are bookkeeping outside
+`public` and are expected:
 
-The 29 are recorded in
-[`R0-T6A-empty-fingerprint-2026-09-08.json`](R0-T6A-empty-fingerprint-2026-09-08.json):
+| Table | Owner | Expected |
+| --- | --- | --- |
+| `drizzle.applied_migrations` | this runner's ledger | yes — deliberately outside `public` so `drizzle-kit push` ignores it |
+| `drizzle.__drizzle_migrations` | drizzle-kit's own ledger | yes — legacy, from the era before this runner |
+| `_system.replit_database_migrations_v1` | Replit platform | yes — not ours, not in `public` |
 
-```text
-active_schedules · api_keys · api_requests · client_profiles · info_pack_leads
-invoices_rent_requests · job_events · job_invoices · job_schedules
-merchant_settlements · merchant_subscriptions · merchant_tutorial_progress
-merchants · payment_attempts · platform_fees · push_notification_deliveries
-push_subscriptions · quotes · refunds · split_payments · stock_items
-subscription_billing_history · tapt_stones · tenant_profiles · transaction_events
-transactions · uploaded_files · users · webhook_deliveries
-```
+The fingerprint counts only `public`, so none of these was ever the difference.
 
-The migration ledger is **not** among them — it lives in the `drizzle` schema
-(`drizzle.applied_migrations`), deliberately outside `public` so `drizzle-kit
-push` ignores it. The schema fingerprint tool applies no exclusions: it takes
-every `public` table with `relkind IN ('r','p')`. So the four extra tables are
-genuinely extra, not an artefact of counting.
+**The real drift is exactly one table: `public.crypto_transactions`.**
 
-Four table names are needed to close this. The likely explanations, in order:
+30 application tables against the canonical 29, and the diff is that single name.
+Everything else matches exactly.
 
-1. **Pre-baseline legacy tables** — objects that existed before migration `0000`
-   and were therefore never created by any checked-in migration. D2 keeps
-   historical Stripe schema until dead-proof, and this is where it would show.
-2. **A `session` table** from `connect-pg-simple`, which R8 lists as a verified
-   unused dependency — the table can outlive the code.
-3. **Objects created by `drizzle-kit push`** during the period the startup push
-   was still running, which is the failure mode R0-T6A exists to close.
+### What `crypto_transactions` is
 
-Explanation 3 would be the significant one: it would mean production carries
-schema that no migration can reproduce, and a rebuild from migrations would not
-equal production. That is the exact claim restored-snapshot convergence is
-supposed to test, so the delta must be named rather than waived.
+An orphan. Verified in this workspace:
 
-**To close it:** the four table names, and for each, whether any checked-in
-migration in `migrations/` creates it. A single `\dt` listing from the isolated
-restore, diffed against the 29 above, is sufficient. No row data is needed.
+- **No checked-in migration creates it** — nothing in `migrations/` mentions it.
+- **It is not in the current Drizzle schema** — no definition in `shared/`.
+- **No live source touches it.** The only hit anywhere in `server/`, `client/` or
+  `scripts/` is `client/public/app/assets/schema-h7-17eaE.js`, a **built bundle**
+  — stale compiled output from before the crypto removal, not live code.
+- `FEATURE_CRYPTO` remains a false-only kill switch: `server/config.ts:267`
+  throws `ConfigValidationError` if it is ever set true.
+
+So it predates migration `0000`, survived the crypto-payment removal that the
+2026-07-20 handoff records, and is now a table the application cannot recreate
+and does not read.
+
+### Why this is recorded rather than fixed
+
+It holds payment records. Deleting retained financial data is on the
+agent-never list, and D8's retention question is explicitly unresolved, so
+dropping it is not a cleanup an agent may perform — nor a decision to take
+casually. The options are the owner's:
+
+1. **Leave it.** Costs nothing, and the drift is now named rather than unknown.
+2. **Add a forward migration that creates it**, so a rebuild-from-migrations
+   reproduces production exactly. This is the honest fix if the rows are being
+   kept: it makes the migration history true.
+3. **Archive and drop it**, under a dated retention decision. Requires
+   `--allow-destructive` and a reviewed change, by design.
+
+Option 2 is the one that closes R0-T6A's convergence claim, because until then
+"rebuild from migrations equals production" is false by one table.
+
+**Worth knowing separately:** the stale bundle
+`client/public/app/assets/schema-h7-17eaE.js` still carries crypto schema
+references. That is build output, not source, but it means a shipped asset
+mentions a removed feature.
+
+## What this still does not establish
 
 ## What this still does not establish
 
