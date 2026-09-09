@@ -872,15 +872,49 @@ export async function readMigrationLedgerIfPresent(
 // Applying
 // ---------------------------------------------------------------------------
 
+/**
+ * The only PostgreSQL error fields safe to print. Each is an identifier or a
+ * fixed code. `message`, `detail`, `hint` and `where` are deliberately absent:
+ * PostgreSQL puts offending row values into all four — "invalid input syntax
+ * for type integer: \"...\"" and "Key (email)=(...) already exists" are the
+ * common ones — and the first thing an operator does with a failure is paste it
+ * into a chat window.
+ */
+const SAFE_DATABASE_ERROR_FIELDS = [
+  "code",
+  "schema",
+  "table",
+  "column",
+  "constraint",
+  "routine",
+] as const;
+
+/** A printable summary of a driver error carrying no free text and no values. */
+export function describeDatabaseError(cause: unknown): string {
+  const source = cause as Record<string, unknown> | null | undefined;
+  const parts: string[] = [];
+  for (const field of SAFE_DATABASE_ERROR_FIELDS) {
+    const value = source?.[field];
+    // Bounded identifier shape: anything else is not an identifier and is not
+    // printed, however plausible the field name.
+    if (typeof value === "string" && /^[A-Za-z0-9_$.]{1,63}$/.test(value)) {
+      parts.push(`${field}=${value}`);
+    }
+  }
+  return parts.length > 0 ? parts.join(" ") : "no SQLSTATE reported";
+}
+
 export class MigrationExecutionError extends Error {
   readonly filename: string;
 
   constructor(filename: string, statementLine: number, cause: unknown) {
-    const detail = cause instanceof Error ? cause.message : String(cause);
     super(
-      `Migration ${filename} failed at the statement starting on line ` +
-        `${statementLine}: ${detail}. The transaction was rolled back — this ` +
-        `migration is NOT applied and NOT recorded.`,
+      `MIGRATE_APPLY_STATEMENT_FAILED: migration ${filename} failed at the ` +
+        `statement starting on line ${statementLine} ` +
+        `(${describeDatabaseError(cause)}). The transaction was rolled back — ` +
+        `this migration is NOT applied and NOT recorded. The driver's own ` +
+        `message is withheld because PostgreSQL puts row values in it; read it ` +
+        `from the error's cause in a private terminal.`,
     );
     this.name = "MigrationExecutionError";
     this.filename = filename;
@@ -1962,6 +1996,23 @@ async function main(): Promise<void> {
  * Run only when this file is the process entrypoint. Deliberately avoids
  * `import.meta` so the module still loads under ts-jest's CommonJS transform.
  */
+/**
+ * What the process is allowed to print on failure. Our own error classes build
+ * their text from fixed strings, so they pass through. Anything else — a driver
+ * error escaping a path that has not been wrapped yet, or a bug — is reduced to
+ * a code plus safe identifier fields, because its message is unreviewed.
+ */
+export function redactedFailureText(error: unknown): string {
+  if (error instanceof Error && /^Migration|^BaselineRefused/.test(error.name)) {
+    return error.message;
+  }
+  return (
+    `MIGRATE_UNEXPECTED_FAILURE: an unrecognised error reached the entrypoint ` +
+    `(${describeDatabaseError(error)}). Its message is withheld because it has ` +
+    `not been reviewed for row values or connection details.`
+  );
+}
+
 const entrypoint = process.argv[1] ?? "";
 const isDirectInvocation =
   /(^|[\\/])migrate\.(?:ts|js|mjs|cjs)$/.test(entrypoint) &&
@@ -1970,7 +2021,7 @@ const isDirectInvocation =
 if (isDirectInvocation) {
   main().catch((error: unknown) => {
     console.error("");
-    console.error(error instanceof Error ? error.message : String(error));
+    console.error(redactedFailureText(error));
     // A target/CLI rejection is an operator error, so show them the contract.
     if (error instanceof MigrationTargetError) console.error(MIGRATION_CLI_USAGE);
     console.error("");
