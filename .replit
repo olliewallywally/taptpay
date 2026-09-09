@@ -77,6 +77,7 @@ WINDCAVE_ENDPOINT = "https://uat.windcave.com/api/v1"
 VITE_GA4_MEASUREMENT_ID = "G-VBGBY5E8HW"
 WINDCAVE_GOOGLE_PAY_MERCHANT_ID = "c765be1e082b1c5b01ef55608fdd550c0290d779"
 GOOGLE_ANALYTICS_PROPERTY_ID = "531736578"
+BACKUP_AGE_RECIPIENT = "age1egyslupxmrxtrqvys2qszk0e9zwn0fedyjg3yuyuvn30naqmk5gqynqua5"
 
 [userenv.production]
 PRODUCTION_DOMAIN = "taptpay.co.nz"
