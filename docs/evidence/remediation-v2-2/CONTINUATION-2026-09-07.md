@@ -98,6 +98,9 @@ backup, deployment or restore checks.
    supersedes any reading of gap 3 as merely "partial", blocks pushing this
    branch, and reopens R0-H2. See
    [public repository exposure](r0/R0-T7-public-exposure-2026-09-09.md).
+   Classifying that backlog then found **two public Google Cloud service-account
+   private keys** — [GCP key exposure](r0/R0-T7-gcp-key-exposure-2026-09-09.md).
+   Revocation is outstanding.
 
 ## Every named task and phase
 

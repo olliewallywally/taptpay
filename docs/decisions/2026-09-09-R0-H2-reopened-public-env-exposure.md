@@ -57,3 +57,27 @@ The scanners worked. `R0-T7-history-scan-2026-09-08.jsonl` and
 left `review-required`, and the continuation tracker noted "Scanner findings
 remain unclassified" without treating that as blocking. A finding nobody reads is
 indistinguishable from a scan nobody ran.
+
+
+---
+
+## Owner disposition, 2026-09-09
+
+Oliver, after the repository was made private: **"nothing to rotate"**. Recorded
+as the owner's determination for the `.env`-snapshot credentials —
+`JWT_SECRET`, `ADMIN_PASSWORD_HASH`, `ADMIN_EMAIL`, `WINDCAVE_USERNAME`. The
+agent did not independently establish `JWT_SECRET`'s liveness and makes no
+claim that old credentials were rejected.
+
+**This disposition does not extend to two credentials found afterwards.**
+Classification of the scanner backlog turned up complete Google Cloud
+service-account private keys, publicly reachable from `origin` for roughly four
+months — a different class from the `.env` snapshots, and not in evidence when
+the disposition was given:
+
+- `taptpay-analytics@upbeat-nation-489422-u4`, key `7b85d31e7946…`
+- `taptpay-analytics@swift-cursor-492707-t7`, key `74e40c04f272…`
+
+Both require revocation in the Google Cloud console. See
+[two Google Cloud service-account private keys](../evidence/remediation-v2-2/r0/R0-T7-gcp-key-exposure-2026-09-09.md).
+R0-H2 stays **OPEN** on those two items alone.

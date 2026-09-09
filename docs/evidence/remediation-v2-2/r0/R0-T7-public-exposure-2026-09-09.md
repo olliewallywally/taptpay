@@ -73,9 +73,15 @@ That bounds it materially.
 
 Separately, `attached_assets/Pasted--type-service-account-project-id-swift-cursor-492707-t7_1775633514319.txt`
 is **tracked** and on `main`. It is a Google service-account document carrying a
-real `project_id`, `private_key_id` and `client_email`, but its `private_key`
-field is **empty** — no key material. Identifier disclosure, not a usable
-credential.
+real `project_id`, `private_key_id` and `client_email`. Its `private_key` field
+is empty **in the current tree**.
+
+> **Corrected 2026-09-09.** That "no key material" reading was drawn from the tip
+> blob alone and is wrong for the file's history: commits `dacd826ff` and
+> `6ccffecc2` carry the full PEM key, and a second service-account key was found
+> the same way. Both were public. See
+> [two Google Cloud service-account private keys](R0-T7-gcp-key-exposure-2026-09-09.md).
+> For this class of finding a clean tree proves nothing.
 
 ## Method
 
