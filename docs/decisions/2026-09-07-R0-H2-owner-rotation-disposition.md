@@ -17,3 +17,10 @@ Their historical exposure findings remain intact. It does not close R0-H4
 access/history review, R0-H5 backup disposition, R0-T6A migration rehearsal,
 R0-T7 secret-scan implementation, or the remaining R0 exit checks. R0-H3 checks
 that depend on an actual rotation are not represented as performed.
+
+---
+
+**Superseded 2026-09-09.** This disposition was made without knowledge that the
+repository was public and carried `.env` snapshots on `origin/main`. See
+[R0-H2 reopened by public `.env` exposure](2026-09-09-R0-H2-reopened-public-env-exposure.md).
+The historical record above is retained unchanged.

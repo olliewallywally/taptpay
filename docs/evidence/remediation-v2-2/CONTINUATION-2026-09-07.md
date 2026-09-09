@@ -5,9 +5,12 @@ with the first real-database evidence in [empty-database convergence](r0/R0-T6A-
 Follows [R0-T6A explicit migration target identity](r0/R0-T6A-target-handoff-2026-09-08.md),
 [R0-T6A migration budget hardening](r0/R0-T6A-budget-handoff-2026-09-08.md)
 and [R0-T7 reviewed source cleanup](r0/R0-T7-review-followup-2026-09-08.md).
-One owner decision is open and blocks CI: [what CI is allowed to migrate](../../decisions/2026-09-08-ci-migration-target.md).
-The current tree scan is clean; history disposition and database/release gates
-remain open. These records supersede the recovery snapshot only for their scope.
+**2026-09-09: the repository was found to be public with `.claude-home/` — including
+file-history snapshots of a real `.env` — in the current tree of `origin/main` and
+nine other remote branches. See [public repository exposure](r0/R0-T7-public-exposure-2026-09-09.md).
+R0-H2 is reopened; this branch was not pushed.**
+The CI target decision is configured but unexercised: [what CI is allowed to migrate](../../decisions/2026-09-08-ci-migration-target.md).
+History disposition and database/release gates remain open. These records supersede the recovery snapshot only for their scope.
 
 Follow-up: [September 8 R0-T7 repository safeguards](r0/R0-T7-handoff-2026-09-08.md)
 adds the env inventory, ignore boundaries, metadata-only CI scanning and response
@@ -41,10 +44,12 @@ remain binding, even where the row below summarizes its status.
 
 ## Owner direction recorded this turn
 
-R0-H2 is complete by Oliver's instruction: no secrets currently require rotation.
-See [dated decision](../../decisions/2026-09-07-R0-H2-owner-rotation-disposition.md).
-This supersedes the pending rotation action, not historical exposure evidence or
-unperformed access, backup, deployment and restore checks.
+R0-H2 was closed by Oliver's instruction on 2026-09-07 (no secrets currently
+require rotation) and **reopened on 2026-09-09** when the public `.env` exposure
+was found. See the [2026-09-07 disposition](../../decisions/2026-09-07-R0-H2-owner-rotation-disposition.md)
+and the [2026-09-09 reopening](../../decisions/2026-09-09-R0-H2-reopened-public-env-exposure.md).
+Neither record claims a performed rotation, and neither closes the access,
+backup, deployment or restore checks.
 
 ## Gaps that must not be silently skipped
 
@@ -85,6 +90,14 @@ unperformed access, backup, deployment and restore checks.
    server/browser jobs without them. R8 requires isolated approved targets,
    least privilege, no production secrets, mandatory source guards and sanitized
    artifacts. Adding the synthetic backup test does not close those gaps.
+10. **The repository is public and `origin/main` carries local agent state.**
+   Found 2026-09-09. `.claude-home/` sits in the current tree of `main` (1441
+   files) and nine other remote branches, including four file-history snapshots
+   of a real `.env`. The 2026-09-08 scanners recorded the hits; all 287 were left
+   `review-required`, so nobody established that they were publicly served. This
+   supersedes any reading of gap 3 as merely "partial", blocks pushing this
+   branch, and reopens R0-H2. See
+   [public repository exposure](r0/R0-T7-public-exposure-2026-09-09.md).
 
 ## Every named task and phase
 
@@ -102,9 +115,9 @@ may proceed where the plan allows it. Code lanes remain gated by their dependenc
 | R0-T5 | Remove fake-success and merchant credential surfaces | 473 | Engineering | Containment implemented; complete device, concurrency, no-side-effect and historical-credential count evidence not found. |
 | R0-T6 | Stop startup database dumps and the side-effectful build | 517 | Engineering | Startup/build fixed previously; manual backup safeguard implemented in this continuation. 17 synthetic and 3 existing R0-T6 tests pass; operational restore proof remains open. |
 | R0-T6A | Re-prove the migration contract and continuously gate complete history | 531 | Engineering | OPEN, substantially advanced in this continuation: bounded budgets, explicit target identity, the destructive/nontransactional safety gate and a migrate-first release command are implemented, and **empty-database convergence is now proven on a real isolated PostgreSQL 16** (19 applied, 29 tables, fingerprint `4b709a2c…`, CI-gated without secrets). The recorded FK `nextval` disagreement is resolved as migration lag, not a repository defect. Restored-snapshot convergence, N/N+1, lock timings on a production-sized clone, restore rehearsal and target approval remain absent. |
-| R0-T7 | Scrub the tracked configuration | 547 | Engineering | PARTIAL: tracked runtime block scrubbed; key-name-only env example, redacted secret-scan CI and rotation runbook not found. |
+| R0-T7 | Scrub the tracked configuration | 547 | Engineering | PARTIAL, and worse than recorded: tracked runtime block scrubbed, but 287 scanner findings remain `review-required` and the unread hits included a public `.env` exposure on `origin/main`. Classification of those findings is now blocking, not deferred. |
 | R0-H1 | Declare and inventory | 554 | Owner/professional/provider | Prior owner incident inventory exists; no incident-closure record found. |
-| R0-H2 | Generate and enter replacement secrets through an owner-controlled channel | 560 | Owner/professional/provider | COMPLETE by Oliver direction 2026-09-07: no secrets currently require rotation. No performed-rotation claim. |
+| R0-H2 | Generate and enter replacement secrets through an owner-controlled channel | 560 | Owner/professional/provider | **REOPENED 2026-09-09.** Closed 2026-09-07 by owner direction; reopened when `.env` snapshots were found in the public `origin/main` tree. `JWT_SECRET` liveness unconfirmed and `ADMIN_PASSWORD_HASH` exposed; `VAPID_PRIVATE_KEY` verified already rotated; no database URI or `WINDCAVE_API_KEY` present. No performed-rotation claim. |
 | R0-H3 | Deploy and verify the rotation took | 567 | Owner/professional/provider | OPEN: no deployment/credential acceptance record found; do not claim rotation-dependent checks ran. |
 | R0-H4 | Review access logs and scan history | 578 | Owner/professional/provider | OPEN: owner-reported no suspicious activity is recorded, but full redacted history/access review and disposition remain unverified. |
 | R0-H5 | Classify tracked uploads and local dumps | 585 | Owner/professional/provider | PARTIAL: tracked PNG classification recorded; prior inventory was 41; this workspace now has 38 ignored entries. Owner disposition remains open; no contents inspected. |

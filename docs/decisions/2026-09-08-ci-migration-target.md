@@ -1,6 +1,7 @@
-# What CI is allowed to migrate — decision requested
+# What CI is allowed to migrate
 
-Date: 2026-09-08 UTC. Status: **Option A chosen; awaiting the branch details and repository variables.**
+Date: 2026-09-08 UTC. Updated 2026-09-09.
+Status: **Option A configured on 2026-09-09; not yet exercised.**
 
 ## Why this needs deciding now
 
@@ -68,6 +69,45 @@ MIGRATION_EXPECTED_PORT     = (leave unset; defaults to 5432)
 Note that Neon connection strings are issued with `sslmode=require`. The runner
 refuses that for any remote class, because it encrypts without authenticating
 the server, so the secret must be stored with `verify-full`.
+
+### As configured, 2026-09-09
+
+The owner set the three required variables and replaced the secret on
+2026-09-09 at 01:23 UTC:
+
+```text
+MIGRATION_TARGET            = ci
+MIGRATION_EXPECTED_HOST     = ep-delicate-cake-artrmpc2.c-4.us-west-2.aws.neon.tech
+MIGRATION_EXPECTED_DATABASE = neondb
+MIGRATION_EXPECTED_PORT     = unset
+```
+
+That endpoint is a different Neon compute from production
+(`ep-mute-grass-af2foouy.c-2`), which is the property this option exists to
+establish: CI can reach neither development nor production. `secrets.DATABASE_URL`
+was updated one second before the variables, so it was replaced rather than left
+pointing at the previous target. Gap 9 is closed by construction.
+
+**It has not run.** The repository has no workflow runs at all, and
+`.github/workflows/verify.yml` does not exist on `origin/main` — the workflow and
+its `MIGRATION_*` wiring exist only on `remediation/r1-continuation-20260907`,
+which is unpushed and 265 commits ahead of `main`. Pushing it to exercise the
+wiring is blocked on
+[the public-repository exposure](../evidence/remediation-v2-2/r0/R0-T7-public-exposure-2026-09-09.md).
+
+Until then the cheapest proof is one read-only command from an operator terminal,
+with the `ci` URI supplied as `DATABASE_URL` through the secret channel:
+
+```text
+npm run db:migrate:status -- --target=ci \
+  --expected-host=ep-delicate-cake-artrmpc2.c-4.us-west-2.aws.neon.tech \
+  --expected-database=neondb
+```
+
+It exercises exactly what CI would: the `verify-full` correction, the removed
+`channel_binding`, and the target-identity boundary. A status table means the
+wiring is sound. **Still unestablished:** what `secrets.DATABASE_URL` pointed at
+before it was replaced, and therefore whether anything needs unwinding.
 
 **B. Declare the existing database honestly.** Point the variables at whatever
 the current secret is and set `MIGRATION_TARGET` accordingly. Restores CI to
