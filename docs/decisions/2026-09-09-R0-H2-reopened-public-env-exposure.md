@@ -78,6 +78,14 @@ the disposition was given:
 - `taptpay-analytics@upbeat-nation-489422-u4`, key `7b85d31e7946…`
 - `taptpay-analytics@swift-cursor-492707-t7`, key `74e40c04f272…`
 
+The same classification pass also established that **`JWT_SECRET` was not only in
+the `.env` snapshots**: the identical 128-character value sat in `.replit` across
+26 remote-reachable commits from 2026-02-15 until it was scrubbed on 2026-09-03.
+That is three independent exposure paths for one secret, across the whole period
+the repository was public. The disposition above was given when the `.env`
+snapshots were the only known path; the owner may wish to revisit it on this
+evidence, but it remains the owner's call and is recorded as given.
+
 Both require revocation in the Google Cloud console. See
 [two Google Cloud service-account private keys](../evidence/remediation-v2-2/r0/R0-T7-gcp-key-exposure-2026-09-09.md).
 R0-H2 stays **OPEN** on those two items alone.

@@ -56,7 +56,7 @@ severity:
 
 | Key | Shape | Disposition |
 | --- | --- | --- |
-| `JWT_SECRET` | 128 chars, high entropy | **Liveness unconfirmed — highest priority.** Not exposed to the agent's environment, so no comparison was possible. A second 35-char value also appears in a transcript. |
+| `JWT_SECRET` | 128 chars, high entropy | **Liveness unconfirmed — highest priority.** Not exposed to the agent's environment, so no comparison was possible. A second 35-char value also appears in a transcript. See the `.replit` finding below: the same value was separately public for seven months. |
 | `VAPID_PRIVATE_KEY` | 43 chars (P-256) | **Already rotated.** Differs from the current environment value. Consistent with R0-T3. |
 | `ADMIN_PASSWORD_HASH` | 60 chars, bcrypt-shaped | Exposed. A hash, but publicly crackable offline. |
 | `ADMIN_EMAIL` | 36 chars | Exposed. |
@@ -82,6 +82,30 @@ is empty **in the current tree**.
 > the same way. Both were public. See
 > [two Google Cloud service-account private keys](R0-T7-gcp-key-exposure-2026-09-09.md).
 > For this class of finding a clean tree proves nothing.
+
+## The same `JWT_SECRET` was also tracked in `.replit`
+
+Found 2026-09-09 while classifying the scanner backlog, and it is the more
+serious half of this finding.
+
+`.replit` — the workspace's own configuration file, not an incidental asset —
+carried a `JWT_SECRET` assignment in **26 commits**, dated **2026-02-15 through
+2026-09-03**. Every one of those 26 commits is reachable from a remote ref. The
+value is a single 128-character string that never changed across the whole range,
+and it is **the same value** as the one in the `.env` snapshots.
+
+`6d62b572` (2026-09-03) is the first commit whose `.replit` is clean — that is
+R0-T7's "tracked runtime block scrubbed" landing. It removed the secret going
+forward and, as always, left every prior blob intact.
+
+The practical reading: the session-signing secret was continuously present in the
+repository's main configuration file for the entire period the repository was
+public (2026-05-11 to 2026-09-09), in 26 separate commits, in addition to the
+four `.env` snapshots. Three independent exposure paths, one value.
+
+`VAPID_PRIVATE_KEY` in the same `.replit` history is a **third** distinct value —
+different from both the `.env` snapshot's and the current environment's. VAPID has
+been rotated at least twice; both exposed values are dead.
 
 ## Method
 
