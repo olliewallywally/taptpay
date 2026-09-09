@@ -76,3 +76,17 @@ mtime_ms = 1788919767376
 storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:3c12b37b-0b73-46ab-9533-ef32b681c563/b3cc0b12-95ff-4c1b-8593-1afc91d7b827/bbd2902f-9e0f-4062-85d4-d97401284795"
 storage_version_token = "1788919772059940"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "7780FhYO-J-0KZqOhgmnz"
+uri = "file://exports/taptpay-one-time-restore-transfer-public-key.asc"
+type = "unspecified"
+title = "One-time restore transfer public key"
+description = "Public-only GPG key for encrypting the decrypted SQL before uploading it for isolated restore verification. Expires in one day."
+logical_id = "44cf4a80-ae67-49a9-a545-f6dd632634f5"
+content_hash = "sha256:d90cc46a0b14c825b9a422d170507cc1ebc4e85c6c5586862381288980fff032"
+size = 1310
+mtime_ms = 1788921899612
+storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:3c12b37b-0b73-46ab-9533-ef32b681c563/44cf4a80-ae67-49a9-a545-f6dd632634f5/bc695dc8-571f-45e0-b644-c7ef31c9a45c"
+storage_version_token = "1788921906225899"
+content_type = "application/octet-stream"
