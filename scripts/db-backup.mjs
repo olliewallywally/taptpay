@@ -85,8 +85,16 @@ export async function encryptedDump({ connection, recipient, output, env, signal
     // Exclusive creation rejects existing files and symlinks, including dangling ones.
     file = await fs.open(output, 'wx', 0o600);
     const childEnv = { PATH: env.PATH, LANG: 'C', LC_ALL: 'C' };
+    const dumpEnv = {
+      ...childEnv,
+      PGDATABASE: connection,
+      PGCONNECT_TIMEOUT: '30',
+      ...(new URL(connection).searchParams.get('sslmode') === 'verify-full'
+        ? { PGSSLROOTCERT: 'system' }
+        : {}),
+    };
     dump = spawn('pg_dump', ['--no-owner', '--no-privileges', '--no-password'], {
-      env: { ...childEnv, PGDATABASE: connection, PGCONNECT_TIMEOUT: '30' },
+      env: dumpEnv,
       stdio: ['ignore', 'pipe', 'ignore'],
     });
     encrypt = spawn('gpg', ['--batch', '--no-tty', '--no-options', '--encrypt', '--recipient', recipient, '--output', '-'], {

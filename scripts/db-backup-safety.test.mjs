@@ -126,13 +126,20 @@ test('repository output and symlinked repository directories are rejected before
   }
 });
 
-function fakePrograms(temporary, { dumpFails = false, encryptionFails = false, hangs = false, empty = false } = {}) {
+function fakePrograms(temporary, {
+  dumpFails = false,
+  encryptionFails = false,
+  hangs = false,
+  empty = false,
+  expectedConnection = connection,
+  expectedRootCert,
+} = {}) {
   const bin = path.join(temporary, 'bin');
   fs.mkdirSync(bin);
   // These executables are transport fakes, not cryptographic or database proof.
   // They assert secret separation and argument isolation without printing values.
   fs.writeFileSync(path.join(bin, 'pg_dump'), `#!${process.execPath}\n
-if (process.env.PGDATABASE !== ${JSON.stringify(connection)} || process.argv.some(x => x.includes('synthetic-only')) || process.env.NEON_DATABASE_URL || process.env.WINDCAVE_API_KEY) process.exit(91);
+ if (process.env.PGDATABASE !== ${JSON.stringify(expectedConnection)} || process.env.PGSSLROOTCERT !== ${JSON.stringify(expectedRootCert)} || process.argv.some(x => x.includes('synthetic-only')) || process.env.NEON_DATABASE_URL || process.env.WINDCAVE_API_KEY) process.exit(91);
 ${hangs ? 'setInterval(() => {}, 1000);' : `process.stdout.write('synthetic sql'); process.stderr.write('synthetic private error'); process.exitCode = ${dumpFails ? 2 : 0};`}
 `, { mode: 0o700 });
   fs.writeFileSync(path.join(bin, 'gpg'), `#!${process.execPath}\n
@@ -153,6 +160,18 @@ test('successful stream writes only encryption output with private permissions',
   assert.equal(fs.readFileSync(destination, 'utf8'), 'fixture-encrypted-output');
   assert.equal(fs.statSync(destination).mode & 0o777, 0o600);
   assert.deepEqual(fs.readdirSync(temporary).sort(), ['backup.sql.gpg', 'bin']);
+});
+
+test('verify-full dumps use the system CA store without inheriting ambient TLS settings', { timeout: 5_000 }, async (t) => {
+  const { temporary, destination } = fixture(t);
+  const remoteConnection = 'postgresql://fixture:secret@example.invalid/backup_fixture?sslmode=verify-full';
+  const env = fakePrograms(temporary, {
+    expectedConnection: remoteConnection,
+    expectedRootCert: 'system',
+  });
+  env.PGSSLROOTCERT = '/untrusted/ambient/root.crt';
+  await encryptedDump({ connection: remoteConnection, recipient, output: destination, env });
+  assert.equal(fs.readFileSync(destination, 'utf8'), 'fixture-encrypted-output');
 });
 
 for (const [name, mode] of [
