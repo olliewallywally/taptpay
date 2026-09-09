@@ -5,3 +5,4 @@
 - [Schema push gating & drift](schema-push-and-drift.md) — auto schema push is opt-in via an env var, and `db:push` can hang on unrelated table prompts; use direct `CREATE INDEX` SQL for additive-only changes.
 
 - [Merchant onboarding, billing gate, crypto removal, and tutorials](merchant-onboarding-billing-tutorial-2026-07-20.md) — uncommitted 2026-07-20 implementation, migration, validation, and safe GitHub staging handoff
+- [Owner-controlled restore verification](owner-controlled-restore-verification.md) — verify encrypted backups without uploading the owner’s private key or plaintext production data.
