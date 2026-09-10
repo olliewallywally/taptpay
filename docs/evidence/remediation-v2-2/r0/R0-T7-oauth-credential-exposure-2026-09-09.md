@@ -1,7 +1,8 @@
 # R0-T7 — Claude Code's OAuth credential store was committed and public
 
 Date: 2026-09-09 UTC.
-Status: **OPEN — one live credential requires rotation.**
+Status: **OPEN — our copy is deleted; the credential is still live at Figma.**
+Updated 2026-09-10: see [the deletion](#2026-09-10--deleted-not-rotated) at the end.
 
 The third distinct credential class found while classifying the scanner backlog,
 after the [`.env` snapshots](R0-T7-public-exposure-2026-09-09.md) and the
@@ -47,9 +48,8 @@ approximately three months is the value in use today.
 
 ## Required owner action
 
-**Rotate the Figma OAuth client secret**, in the Figma app/connector settings
-that issued it, and reconnect the MCP connector afterwards. An agent must not
-rotate credentials.
+**Delete the Figma OAuth app** in Figma's developer settings — see the 2026-09-10
+update below, which supersedes the original "rotate and reconnect" advice.
 
 No action is required for the Claude.ai tokens: the exposed pair no longer
 authenticates. Revoking active Claude Code sessions is optional belt-and-braces,
@@ -68,3 +68,38 @@ hides.
 Dispositioned `exposed-unresolved` in `.gitleaks-dispositions.jsonl`, which keeps
 the history scan red until the Figma secret is rotated and the entry becomes
 `rotated`.
+
+
+## 2026-09-10 — deleted, not rotated
+
+The owner's decision: *"just straight up delete figma key its pointless and
+unused."* The evidence supports "unused" — the connector's `accessToken` was an
+**empty string**, so it had never completed an authorisation. Nothing in this
+repository uses the Figma connector.
+
+**Done:** the `mcpOAuth."plugin:figma:…"` entry was removed from
+`.claude-home/.credentials.json`. That object is now gone entirely — the file
+holds only `claudeAiOauth` — and the workspace retains no full copy of the
+value. The remaining `clientSecret` matches in `.claude-home/` are session
+transcripts holding this document's own text, unrelated `GOOGLE_CLIENT_SECRET`
+env-var *names* in source, and one deliberate `len=40 prefix='kKdd…'` redaction
+from the original investigation. A four-character prefix is not a credential.
+The file is untracked and `.claude-home/` is ignored (`.gitignore:14`), so no
+new commit can carry it.
+
+**Not done, and it is the part that matters:**
+
+> Deleting our copy does not revoke the secret. A Figma OAuth client secret is
+> issued by an app registered at **figma.com/developers/apps**. That app still
+> exists and still accepts that secret. The value sat in a public repository for
+> roughly three months, so it must be assumed taken — and it will keep
+> authenticating until the app itself is deleted.
+
+One owner action closes this: open figma.com/developers/apps, find the app whose
+client ID ends in the identifier recorded against `plugin:figma:figma|d39d3b62…`,
+and **delete the app**. No reconnect is needed, because nothing uses it.
+
+The disposition therefore stays `exposed-unresolved` on all 50 entries, per the
+runbook's own rule — `rotated` means the credential no longer authenticates, and
+this one still does. The reason field now records the deletion and what remains.
+Flip those entries to `rotated` once the Figma app is gone.
