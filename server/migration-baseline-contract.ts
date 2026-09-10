@@ -232,9 +232,10 @@ export const VERIFY_ONBOARDING_BACKFILL_SQL = `SELECT NOT EXISTS (
     AND onboarding_completed IS DISTINCT FROM true
 ) AS ok`;
 /**
- * `column_no_default` fails for two reasons — an absent column and a column that
- * kept its default — so its wording has to hold for both. The other kinds assert
- * plain existence and keep their original phrasing.
+ * `column_no_default` and `column_nullable` each fail for two reasons — an absent
+ * column, or a column that kept the property — so their wording has to hold for
+ * both, and "missing <kind> <name>" would be wrong half the time. The other kinds
+ * assert plain existence and keep their original phrasing.
  */
 function describeUnmetRequirement(item: Requirement): string {
   if (item.kind === "column_no_default") {
