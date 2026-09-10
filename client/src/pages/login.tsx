@@ -6,6 +6,7 @@ import { z } from "zod";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { trackEvent } from "@/lib/analytics";
 import { SEOHead } from "@/components/SEOHead";
 import { ChevronDown, ArrowLeft } from "lucide-react";
 import taptLogoPath from "@assets/IMG_6592_1755070818452.png";
@@ -31,6 +32,7 @@ export default function Login() {
     const newUser = params.get('newUser');
 
     if (token) {
+      trackEvent("login_succeeded", { auth_method: "google", login_type: "merchant", new_user: newUser === "true" });
       localStorage.setItem('authToken', token);
       if (merchantId) localStorage.setItem('merchantId', merchantId);
       window.history.replaceState({}, '', '/login');
@@ -46,6 +48,7 @@ export default function Login() {
       // fetch /api/auth/me with the fresh token instead of keeping stale state.
       window.location.href = '/dashboard';
     } else if (error) {
+      trackEvent("login_failed", { auth_method: "google", login_type: "merchant" });
       window.history.replaceState({}, '', '/login');
       toast({ title: 'Sign in failed', description: decodeURIComponent(error), variant: 'destructive' });
     }
@@ -70,6 +73,7 @@ export default function Login() {
       return response.json();
     },
     onSuccess: (result) => {
+      trackEvent("login_succeeded", { auth_method: "password", login_type: loginType });
       if (loginType === 'merchant') {
         localStorage.setItem("authToken", result.token);
         localStorage.setItem("user", JSON.stringify(result.user));
@@ -103,6 +107,7 @@ export default function Login() {
       }
     },
     onError: (error: any) => {
+      trackEvent("login_failed", { auth_method: "password", login_type: loginType });
       setErrors({ general: error.message || "Invalid credentials. Please try again." });
     },
   });
@@ -134,10 +139,12 @@ export default function Login() {
 
     if (!validateForm()) return;
 
+    trackEvent("login_attempted", { auth_method: "password", login_type: loginType });
     loginMutation.mutate(formData);
   };
 
   const handleGoogleLogin = () => {
+    trackEvent("login_attempted", { auth_method: "google", login_type: "merchant" });
     window.location.href = '/api/auth/google';
   };
 

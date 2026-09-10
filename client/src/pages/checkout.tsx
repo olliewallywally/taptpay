@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef, Component, type ReactNode } from 
 import { useParams, useLocation, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { trackEvent } from "@/lib/analytics";
 import { XCircle } from "lucide-react";
 import "@/styles/checkout.css";
 import { money } from "@/lib/checkout-theme";
@@ -278,11 +279,13 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
       });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || "Could not respond");
       const result = await res.json();
+      trackEvent("quote_responded", { outcome: accept ? "accepted" : "declined" });
       if (!accept) { setQuoteDeclined(true); return; }
       // Acceptance mints the deposit/full invoice → switch the page onto it. The
       // card shell stays mounted; the payment layout crossfades in once resolved.
       if (result.depositInvoice?.token) setAcceptedInvoiceToken(result.depositInvoice.token);
     } catch (err) {
+      trackEvent("quote_response_failed");
       setQuoteRespondError((err as Error).message);
     } finally {
       setQuoteResponding(false);
@@ -976,23 +979,28 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
       const result = await res.json();
       reconcileTokenAttempt(result, session);
       if (result.approved) {
+        trackEvent("payment_succeeded", { payment_method: "card", source: activeSource?.kind ?? "legacy" });
         setPayState("success");
         navigateAfterSuccess(result);
       } else {
+        trackEvent("payment_failed", { payment_method: "card", reason: "declined", source: activeSource?.kind ?? "legacy" });
         setPayState("error");
         setErrorMsg("Payment was declined. Please try another card.");
       }
     } catch {
+      trackEvent("payment_failed", { payment_method: "card", reason: "completion_error", source: activeSource?.kind ?? "legacy" });
       setPayState("error");
       setErrorMsg("Something went wrong. Please try again.");
     }
   }
 
   async function handleCardPay() {
+    trackEvent("payment_attempted", { payment_method: "card", source: activeSource?.kind ?? "legacy" });
     setPayState("processing");
     const session = await createSession();
     if (session?.__terminal) return;
     if (!session?.sessionId) {
+      trackEvent("payment_failed", { payment_method: "card", reason: "session_error", source: activeSource?.kind ?? "legacy" });
       setPayState("error");
       setErrorMsg("Unable to start payment. Please try again.");
       return;
@@ -1036,6 +1044,7 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
   }
 
   function handleApplePay() {
+    trackEvent("payment_attempted", { payment_method: "apple_pay", source: activeSource?.kind ?? "legacy" });
     // Signal that a payment is in progress — activates the beforeunload/pagehide
     // navigation blocker and gives the UI a processing state for Apple Pay too.
     setPayState("processing");
@@ -1088,15 +1097,18 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
             reconcileTokenAttempt(result, preSession);
             notify(result.approved === true);
             if (result.approved) {
+              trackEvent("payment_succeeded", { payment_method: "apple_pay", source: activeSource?.kind ?? "legacy" });
               setPayState("success");
               setPreSessionTrigger(t => t + 1); // queue a fresh session for any retry
               navigateAfterSuccess(result);
             } else {
+              trackEvent("payment_failed", { payment_method: "apple_pay", reason: "declined", source: activeSource?.kind ?? "legacy" });
               setPayState("error");
               setErrorMsg("Apple Pay payment was declined.");
               setPreSessionTrigger(t => t + 1);
             }
           } catch {
+            trackEvent("payment_failed", { payment_method: "apple_pay", reason: "completion_error", source: activeSource?.kind ?? "legacy" });
             notify(false);
             setPayState("error");
             setErrorMsg("Apple Pay failed.");
@@ -1135,6 +1147,7 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
   async function handleGooglePay() {
     const client = googleClient.current;
     if (!client) return;
+    trackEvent("payment_attempted", { payment_method: "google_pay", source: activeSource?.kind ?? "legacy" });
     setPayState("processing");
     try {
       const paymentData = await client.loadPaymentData({
@@ -1180,14 +1193,17 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
       reconcileTokenAttempt(result, session);
       if (isRetailToken) setGooglePreSessionTrigger(t => t + 1);
       if (result.approved) {
+        trackEvent("payment_succeeded", { payment_method: "google_pay", source: activeSource?.kind ?? "legacy" });
         setPayState("success");
         navigateAfterSuccess(result);
       } else {
+        trackEvent("payment_failed", { payment_method: "google_pay", reason: "declined", source: activeSource?.kind ?? "legacy" });
         setPayState("error");
         setErrorMsg("Google Pay payment was declined.");
       }
     } catch (e: any) {
       if (e?.statusCode === "CANCELED") { setPayState("idle"); return; }
+      trackEvent("payment_failed", { payment_method: "google_pay", reason: "completion_error", source: activeSource?.kind ?? "legacy" });
       setPayState("error");
       setErrorMsg("Google Pay payment failed.");
     }

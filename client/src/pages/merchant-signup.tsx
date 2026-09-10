@@ -10,6 +10,7 @@ import Stepper, { Step } from "@/components/Stepper";
 import { DEFAULT_PLAN_ID, PLAN_LIST, formatPlanPrice, type PlanId } from "@shared/plans";
 import { apiRequest } from "@/lib/queryClient";
 import { apiErrorMessage } from "@/lib/api-error";
+import { trackEvent } from "@/lib/analytics";
 import { useToast } from "@/hooks/use-toast";
 import logoImage from "@assets/IMG_6592_1755070818452.png";
 import "./merchant-signup.css";
@@ -189,6 +190,7 @@ export default function MerchantSignup() {
   const pickPlan = (planId: PlanId) => {
     setForm(previous => ({ ...previous, planId }));
     setErrors(previous => ({ ...previous, planId: undefined }));
+    trackEvent("signup_plan_selected", { plan: planId });
   };
 
   const signupMutation = useMutation({
@@ -197,9 +199,11 @@ export default function MerchantSignup() {
       return response.json();
     },
     onSuccess: data => {
+      trackEvent("signup_submitted", { plan: form.planId, outcome: "success" });
       setLocation(`/check-email?email=${encodeURIComponent(form.email)}&id=${data.merchant.id}`);
     },
     onError: (error: unknown) => {
+      trackEvent("signup_submitted", { plan: form.planId, outcome: "failed" });
       const description = apiErrorMessage(error, "We couldn't create the account. Please try again.");
       toast({ title: "Signup failed", description, variant: "destructive" });
     },
@@ -212,12 +216,14 @@ export default function MerchantSignup() {
     }
     const nextErrors = getErrors(form, currentStep);
     if (Object.keys(nextErrors).length) {
+      trackEvent("signup_validation_failed", { step: currentStep });
       setErrors(nextErrors);
       const firstField = STEP_FIELDS[currentStep].find(field => nextErrors[field]);
       requestAnimationFrame(() => document.querySelector<HTMLElement>(`[name="${firstField}"]`)?.focus());
       return false;
     }
     setErrors({});
+    if (currentStep < 5) trackEvent("signup_step_completed", { step: currentStep });
     if (currentStep === 5) {
       try {
         await signupMutation.mutateAsync();

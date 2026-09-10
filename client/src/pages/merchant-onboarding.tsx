@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { trackEvent } from "@/lib/analytics";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -67,10 +68,12 @@ export default function MerchantOnboarding() {
       return res.json();
     },
     onSuccess: () => {
+      trackEvent("onboarding_submitted", { outcome: "success" });
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       setShowSuccessDialog(true);
     },
     onError: (err: any) => {
+      trackEvent("onboarding_submitted", { outcome: "failed" });
       toast({
         title: "Submission Failed",
         description: err.message || "Please try again.",
@@ -82,9 +85,11 @@ export default function MerchantOnboarding() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.director.trim()) {
+      trackEvent("onboarding_validation_failed", { field: "director" });
       toast({ title: "Required", description: "Please enter the director's full legal name.", variant: "destructive" });
       return;
     }
+    trackEvent("onboarding_submission_started");
     submitMutation.mutate();
   };
 
