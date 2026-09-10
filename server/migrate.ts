@@ -1442,7 +1442,15 @@ const LOOPBACK_HOSTS: ReadonlySet<string> = new Set(["127.0.0.1", "::1", "localh
 const WORKSPACE_HOSTS: ReadonlySet<string> = new Set(["helium"]);
 
 /** The only connection parameters allowed to survive into the driver. */
-const APPROVED_URL_PARAMETERS: ReadonlySet<string> = new Set(["sslmode", "connect_timeout"]);
+// `channel_binding` hardens SCRAM against a MITM and can redirect nothing, so it
+// is approved rather than refused. Neon issues it by default; without this an
+// operator would have to STRIP a security parameter to migrate their own target.
+const APPROVED_URL_PARAMETERS: ReadonlySet<string> = new Set([
+  "sslmode",
+  "connect_timeout",
+  "channel_binding",
+]);
+const APPROVED_CHANNEL_BINDINGS: ReadonlySet<string> = new Set(["disable", "prefer", "require"]);
 const APPROVED_SSL_MODES: ReadonlySet<string> = new Set([
   "disable",
   "require",
@@ -1647,6 +1655,11 @@ export function validateMigrationTargetUrl(
       throw new MigrationTargetError("MIGRATE_TARGET_URL_PARAMETERS");
     }
     parameters.set(name, value);
+  }
+
+  const channelBinding = parameters.get("channel_binding");
+  if (channelBinding !== undefined && !APPROVED_CHANNEL_BINDINGS.has(channelBinding)) {
+    throw new MigrationTargetError("MIGRATE_TARGET_URL_PARAMETERS");
   }
 
   const sslmode = parameters.get("sslmode");

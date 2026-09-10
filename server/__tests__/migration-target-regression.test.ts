@@ -479,3 +479,26 @@ test('a loopback host cannot be smuggled in as workspace', () => {
     workspaceExpectation('127.0.0.1'),
   )).toThrow(MigrationTargetError);
 });
+
+// Neon issues channel_binding by default. It hardens SCRAM against a MITM and can
+// redirect nothing, so refusing it would have forced an operator to strip a
+// security parameter to migrate their own database.
+describe('channel_binding is an approved transport parameter', () => {
+  const withBinding = (value: string) =>
+    `postgres://migrator:${SECRET}@db.example.net:5432/taptpay?sslmode=verify-full&channel_binding=${value}`;
+
+  for (const value of ['require', 'prefer', 'disable']) {
+    test(`accepts channel_binding=${value}`, () => {
+      expect(() => validateMigrationTargetUrl(withBinding(value), remoteExpectation('production'))).not.toThrow();
+    });
+  }
+
+  test('refuses an invalid channel_binding value', () => {
+    expect(() => validateMigrationTargetUrl(withBinding('maybe'), remoteExpectation('production'))).toThrow(MigrationTargetError);
+  });
+
+  test('refuses a repeated channel_binding', () => {
+    expect(() => validateMigrationTargetUrl(
+      `${withBinding('require')}&channel_binding=disable`, remoteExpectation('production'))).toThrow(MigrationTargetError);
+  });
+});

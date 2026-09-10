@@ -166,6 +166,7 @@ export const BASELINE_EFFECT_REQUIREMENTS: readonly Requirement[] = [
   r("0020_adopt_orphan_columns.sql", "column", "merchants", "auto_convert_to_fiat"),
   r("0020_adopt_orphan_columns.sql", "column", "merchants", "min_confirmations"),
   r("0020_adopt_orphan_columns.sql", "column", "invoices_rent_requests", "scheduled_send_at"),
+  r("0021_create_missing_tapt_stones_index.sql", "index", "tapt_stones", "tapt_stones_merchant_id_idx"),
 ];
 
 export const FIND_MISSING_BASELINE_EFFECTS_SQL = `
