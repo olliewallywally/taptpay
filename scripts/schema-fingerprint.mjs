@@ -494,8 +494,17 @@ export function connectionSettings(env) {
   if (!database || database.includes('/')) fail('FINGERPRINT_INVALID_CONNECTION');
   // Query options can redirect host/dbname/user behind the URI's back. Accept
   // only bounded transport settings, once each.
+  // `channel_binding` is on this list because it cannot redirect anything - it
+  // only hardens SCRAM against a MITM - and Neon issues it by default. Rejecting
+  // it forced an operator to STRIP a security parameter to fingerprint their own
+  // restore target, which is exactly backwards.
   const keys = [...url.searchParams.keys()];
-  if (new Set(keys).size !== keys.length || keys.some((key) => !['sslmode', 'connect_timeout'].includes(key))) {
+  if (new Set(keys).size !== keys.length
+      || keys.some((key) => !['sslmode', 'connect_timeout', 'channel_binding'].includes(key))) {
+    fail('FINGERPRINT_INVALID_CONNECTION');
+  }
+  const binding = url.searchParams.get('channel_binding');
+  if (binding !== null && !['disable', 'prefer', 'require'].includes(binding)) {
     fail('FINGERPRINT_INVALID_CONNECTION');
   }
   const mode = url.searchParams.get('sslmode');

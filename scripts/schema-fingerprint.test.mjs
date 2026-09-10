@@ -234,6 +234,7 @@ test('malformed URIs and libpq redirects are refused before the driver is import
     `${base}?options=-csearch_path%3Devil`, `${base}?passfile=/etc/passwd`,
     `${base}?sslmode=disable&sslmode=verify-full`, `${base}?sslmode=maybe`,
     `${base}?connect_timeout=0`, `${base}?connect_timeout=999`, `${base}?connect_timeout=1abc`,
+    `${base}?channel_binding=maybe`, `${base}?channel_binding=require&channel_binding=disable`,
     'postgresql://fixture@%2Fvar%2Frun%2Fpostgresql/fingerprint_fixture',
     'postgresql://fixture@127.0.0.1:55432/']) {
     assert.throws(() => connectionSettings({ FINGERPRINT_DATABASE_URL: invalid }), /FINGERPRINT_INVALID_CONNECTION/, invalid);
@@ -244,6 +245,15 @@ test('malformed URIs and libpq redirects are refused before the driver is import
   });
   assert.deepEqual(connectionSettings({ FINGERPRINT_DATABASE_URL: `${base}?sslmode=verify-full` }).ssl,
     { rejectUnauthorized: true });
+
+  // Neon issues channel_binding by default. It hardens SCRAM and can redirect
+  // nothing, so it is accepted rather than forcing an operator to strip it.
+  for (const binding of ['require', 'prefer', 'disable']) {
+    assert.deepEqual(
+      connectionSettings({ FINGERPRINT_DATABASE_URL: `${base}?sslmode=require&channel_binding=${binding}` }),
+      { host: '127.0.0.1', port: 55432, user: 'fixture', password: undefined,
+        database: 'fingerprint_fixture', ssl: { rejectUnauthorized: false } });
+  }
 });
 
 test('collection runs inside one read-only snapshot before any catalogue statement', async () => {
