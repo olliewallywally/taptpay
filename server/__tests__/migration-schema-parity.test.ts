@@ -133,6 +133,53 @@ function columnsDeclaredByDrizzle(table: string): Set<string> {
   return names;
 }
 
+/**
+ * The empty-database fingerprint CI gates on. Read out of the workflow rather
+ * than hardcoded, so this test and CI can never end up checking different
+ * artefacts after a re-record.
+ */
+function recordedFingerprint(): { columns: any[] } {
+  const workflow = fs.readFileSync(
+    path.join(__dirname, "..", "..", ".github", "workflows", "verify.yml"), "utf8");
+  const recorded = workflow.match(/RECORDED:\s*(\S+)/);
+  if (!recorded) throw new Error("verify.yml no longer names a RECORDED fingerprint");
+  const file = path.join(__dirname, "..", "..", recorded[1]);
+  return JSON.parse(fs.readFileSync(file, "utf8")).fingerprint;
+}
+
+/** The pgTable block for `table`, brace-matched. */
+function ormTableBlock(table: string): string | null {
+  const source = fs.readFileSync(SCHEMA_FILE, "utf8");
+  const opening = new RegExp(`export const \\w+ = pgTable\\(\\s*"${table}"\\s*,\\s*\\{`).exec(source);
+  if (!opening) return null;
+
+  let index = opening.index + opening[0].length;
+  const start = index;
+  let depth = 1;
+  while (index < source.length && depth > 0) {
+    const character = source[index++];
+    if (character === "{") depth++;
+    else if (character === "}") depth--;
+  }
+  return source.slice(start, index);
+}
+
+/** One column's declaration: `field: type("col")…` to the first comma at paren depth 0. */
+function ormColumnDeclaration(block: string, column: string): string | null {
+  const opening = new RegExp(`\\w+\\s*:\\s*\\w+\\(\\s*"${column}"`).exec(block);
+  if (!opening) return null;
+
+  let depth = 0;
+  let index = opening.index;
+  for (; index < block.length; index++) {
+    const character = block[index];
+    if (character === "(") depth++;
+    else if (character === ")") depth--;
+    else if (character === "," && depth === 0) break;
+  }
+  return block.slice(opening.index, index);
+}
+
 describe("migrations and shared/schema.ts describe the same database", () => {
   test("every table Drizzle declares is created by a migration", () => {
     const declared = tablesDeclaredByDrizzle();
@@ -185,6 +232,55 @@ describe("migrations and shared/schema.ts describe the same database", () => {
       expect(columnsCreatedByMigrations(table).has(column)).toBe(true);
       expect(columnsDeclaredByDrizzle(table).has(column)).toBe(false);
     }
+  });
+
+  // R0-T6A requires every Drizzle column compared to a built database on
+  // nullability and default. merchant_subscriptions.tier was the one recorded
+  // disagreement: 0010a:96 makes it NOT NULL, the declaration omitted
+  // .notNull(), so Drizzle typed it string | null and would accept an explicit
+  // null the database rejects.
+  test("every declared column agrees with the built database on nullability and default", () => {
+    const fingerprint = recordedFingerprint();
+    const blocks = new Map<string, string | null>();
+    const mismatches: string[] = [];
+    const undeclared: string[] = [];
+    let checked = 0;
+
+    for (const column of fingerprint.columns) {
+      if (!blocks.has(column.table)) blocks.set(column.table, ormTableBlock(column.table));
+      const block = blocks.get(column.table);
+      if (block == null) continue; // table absent from the ORM by design
+
+      const declaration = ormColumnDeclaration(block, column.name);
+      if (declaration === null) { undeclared.push(`${column.table}.${column.name}`); continue; }
+      checked++;
+
+      // `serial` carries both properties implicitly - Postgres gives it NOT NULL
+      // and a nextval default, and Drizzle's serial() states neither - so it can
+      // only ever disagree spuriously.
+      if (/\b(?:small|big)?serial\(/.test(declaration)) continue;
+
+      // A primary key is NOT NULL implicitly; Drizzle does not restate it.
+      if (!/\.primaryKey\(\)/.test(declaration)) {
+        const ormNotNull = /\.notNull\(\)/.test(declaration);
+        if (ormNotNull !== (column.nullable === false)) {
+          mismatches.push(
+            `${column.table}.${column.name}: ORM ${ormNotNull ? "NOT NULL" : "nullable"}, database ${column.nullable === false ? "NOT NULL" : "nullable"}`);
+        }
+      }
+
+      const ormDefault = /\.\$?default\w*\(/.test(declaration);
+      const databaseDefault = column.default !== null && column.default !== undefined;
+      if (ormDefault !== databaseDefault) {
+        mismatches.push(
+          `${column.table}.${column.name}: ORM ${ormDefault ? "has" : "has no"} default, database ${databaseDefault ? "has" : "has no"} one`);
+      }
+    }
+
+    expect(checked).toBeGreaterThan(400);
+    expect(mismatches).toEqual([]);
+    // Anything undeclared must be a documented exception, never an oversight.
+    expect(undeclared.sort()).toEqual(Object.keys(COLUMNS_UNDECLARED_BY_DESIGN).sort());
   });
 
   test("every documented exception is still absent from the Drizzle schema", () => {

@@ -719,7 +719,11 @@ export const merchantSubscriptions = pgTable("merchant_subscriptions", {
   // Superseded columns, retained so historical rows stay readable. Nothing reads
   // them: `tier`/`billingFrequency` predate seat plans, the unbilled_* pair
   // accrued the old $0.10 transaction fee, and Stripe was never wired up.
-  tier: text("tier").default("free"),
+  // NOT NULL in every database measured (0010a:96 creates it so, and both the
+  // clean build and production agree). The declaration omitted .notNull(), which
+  // made Drizzle type it string | null and accept an explicit null the database
+  // rejects. R0-T6A named this disagreement; resolved toward the database.
+  tier: text("tier").notNull().default("free"),
   billingFrequency: text("billing_frequency").default("monthly"),
   unbilledTransactionCount: integer("unbilled_transaction_count").default(0),
   unbilledAmount: decimal("unbilled_amount", { precision: 10, scale: 2 }).default("0.00"),
