@@ -39,6 +39,47 @@ function droppedDefaultsByMigration(): Map<string, string[]> {
   return found;
 }
 
+/** Every `CREATE INDEX` in a migration, as `migration -> "table::index"`. */
+function indexesByMigration(): Map<string, string[]> {
+  const dir = defaultMigrationsDir();
+  const found = new Map<string, string[]>();
+  const pattern =
+    /CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:CONCURRENTLY\s+)?(?:IF\s+NOT\s+EXISTS\s+)?"?([A-Za-z_][\w$]*)"?\s+ON\s+(?:ONLY\s+)?(?:public\.)?"?([A-Za-z_][\w$]*)"?/gi;
+
+  for (const file of listMigrationFiles(dir)) {
+    const sql = fs.readFileSync(path.join(dir, file), "utf8").replace(/--[^\n]*/g, " ");
+    const names = [...sql.matchAll(pattern)].map((m) => `${m[2]}::${m[1]}`);
+    if (names.length > 0) found.set(file, [...new Set(names)].sort());
+  }
+  return found;
+}
+
+/** Every `ALTER COLUMN ... DROP NOT NULL`, as `migration -> "table.column"`. */
+function droppedNotNullsByMigration(): Map<string, string[]> {
+  const dir = defaultMigrationsDir();
+  const found = new Map<string, string[]>();
+
+  for (const file of listMigrationFiles(dir)) {
+    const sql = fs.readFileSync(path.join(dir, file), "utf8");
+    const columns: string[] = [];
+
+    for (const statement of sql.split(/\bALTER\s+TABLE\b/i).slice(1)) {
+      const body = statement.split(";")[0];
+      const table = body.match(/^\s*(?:IF\s+EXISTS\s+)?(?:"([^"]+)"|([A-Za-z_][\w$]*))/i);
+      const tableName = table?.[1] ?? table?.[2];
+      if (!tableName) continue;
+
+      const pattern = /\bALTER\s+(?:COLUMN\s+)?(?:"([^"]+)"|([A-Za-z_][\w$]*))\s+DROP\s+NOT\s+NULL\b/gi;
+      for (const match of body.matchAll(pattern)) {
+        columns.push(`${tableName}.${match[1] ?? match[2]}`);
+      }
+    }
+
+    if (columns.length > 0) found.set(file, [...new Set(columns)].sort());
+  }
+  return found;
+}
+
 describe("migration baseline effect contract", () => {
   test("every checked-in migration has an explicit observable contract", () => {
     const covered = new Set(BASELINE_EFFECT_REQUIREMENTS.map((item) => item.migration));
@@ -57,6 +98,45 @@ describe("migration baseline effect contract", () => {
     );
 
     const dropped = droppedDefaultsByMigration();
+    expect(dropped.size).toBeGreaterThan(0);
+
+    const unexpressed = [...dropped].flatMap(([migration, columns]) =>
+      columns
+        .filter((column) => !expressed.has(`${migration}::${column}`))
+        .map((column) => `${migration}: ${column}`),
+    );
+    expect(unexpressed).toEqual([]);
+  });
+
+  // `0010a` creates five indexes and the contract sampled none of them, which is
+  // how a baselined database ended up missing tapt_stones_merchant_id_idx. An
+  // index is cheap to check, so coverage is exhaustive rather than sampled.
+  test("every index a migration creates is an expressed requirement", () => {
+    const expressed = new Set(
+      BASELINE_EFFECT_REQUIREMENTS
+        .filter((item) => item.kind === "index")
+        .map((item) => `${item.migration}::${item.relationName}::${item.objectName}`),
+    );
+
+    const created = indexesByMigration();
+    expect(created.size).toBeGreaterThan(0);
+
+    const unexpressed = [...created].flatMap(([migration, names]) =>
+      names
+        .filter((name) => !expressed.has(`${migration}::${name}`))
+        .map((name) => `${migration}: ${name.replace("::", ".")}`),
+    );
+    expect(unexpressed).toEqual([]);
+  });
+
+  test("every dropped NOT NULL is an expressed requirement", () => {
+    const expressed = new Set(
+      BASELINE_EFFECT_REQUIREMENTS
+        .filter((item) => item.kind === "column_nullable")
+        .map((item) => `${item.migration}::${item.relationName}.${item.objectName}`),
+    );
+
+    const dropped = droppedNotNullsByMigration();
     expect(dropped.size).toBeGreaterThan(0);
 
     const unexpressed = [...dropped].flatMap(([migration, columns]) =>

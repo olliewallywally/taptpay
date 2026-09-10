@@ -15,6 +15,7 @@ type Requirement = {
     | "table"
     | "column"
     | "column_no_default"
+    | "column_nullable"
     | "index"
     | "constraint"
     | "verified_subscriptions_active"
@@ -42,6 +43,14 @@ export const BASELINE_EFFECT_REQUIREMENTS: readonly Requirement[] = [
   r("0003_property_management.sql", "table", "active_schedules"),
   r("0003_property_management.sql", "table", "invoices_rent_requests"),
   r("0003_property_management.sql", "table", "transaction_events"),
+  r("0003_property_management.sql", "index", "active_schedules", "active_schedules_next_run_date_idx"),
+  r("0003_property_management.sql", "index", "active_schedules", "active_schedules_merchant_status_idx"),
+  r("0003_property_management.sql", "index", "invoices_rent_requests", "invoices_schedule_billing_period_unique"),
+  r("0003_property_management.sql", "index", "invoices_rent_requests", "invoices_status_due_idx"),
+  r("0003_property_management.sql", "index", "invoices_rent_requests", "invoices_merchant_status_idx"),
+  r("0003_property_management.sql", "index", "invoices_rent_requests", "invoices_token_idx"),
+  r("0003_property_management.sql", "index", "transaction_events", "transaction_events_tenant_created_idx"),
+  r("0003_property_management.sql", "index", "transaction_events", "transaction_events_merchant_created_idx"),
   r("0004_rent_reminders.sql", "column", "merchants", "rent_reminder_enabled"),
   r("0004_rent_reminders.sql", "column", "invoices_rent_requests", "reminder_count"),
   r("0005_split_bill.sql", "column", "invoices_rent_requests", "split_enabled"),
@@ -54,6 +63,15 @@ export const BASELINE_EFFECT_REQUIREMENTS: readonly Requirement[] = [
   r("0007_trades_vertical.sql", "table", "job_schedules"),
   r("0007_trades_vertical.sql", "table", "job_invoices"),
   r("0007_trades_vertical.sql", "table", "job_events"),
+  r("0007_trades_vertical.sql", "index", "quotes", "quotes_merchant_status_idx"),
+  r("0007_trades_vertical.sql", "index", "quotes", "quotes_token_idx"),
+  r("0007_trades_vertical.sql", "index", "job_schedules", "job_schedules_next_run_date_idx"),
+  r("0007_trades_vertical.sql", "index", "job_schedules", "job_schedules_merchant_status_idx"),
+  r("0007_trades_vertical.sql", "index", "job_invoices", "job_invoices_status_due_idx"),
+  r("0007_trades_vertical.sql", "index", "job_invoices", "job_invoices_merchant_status_idx"),
+  r("0007_trades_vertical.sql", "index", "job_invoices", "job_invoices_token_idx"),
+  r("0007_trades_vertical.sql", "index", "job_events", "job_events_client_created_idx"),
+  r("0007_trades_vertical.sql", "index", "job_events", "job_events_merchant_created_idx"),
   r("0008_trades_phase3c_fixes.sql", "column", "merchants", "trade_reminders_enabled"),
   r("0008_trades_phase3c_fixes.sql", "index", "job_invoices", "job_invoices_schedule_due_uq"),
   r("0009_trades_gst_mode.sql", "column", "merchants", "trade_gst_mode"),
@@ -62,6 +80,7 @@ export const BASELINE_EFFECT_REQUIREMENTS: readonly Requirement[] = [
   r("0010_merchant_tutorial_progress.sql", "column", "merchants", "tutorial_auto_enabled"),
   r("0010_merchant_tutorial_progress.sql", "table", "merchant_tutorial_progress"),
   r("0010_merchant_tutorial_progress.sql", "index", "merchant_tutorial_progress", "merchant_tutorial_progress_run_page_idx"),
+  r("0010_merchant_tutorial_progress.sql", "index", "merchant_tutorial_progress", "merchant_tutorial_progress_merchant_generation_idx"),
   r("0010a_reconcile_retail_payment_baseline.sql", "table", "tapt_stones"),
   r("0010a_reconcile_retail_payment_baseline.sql", "table", "split_payments"),
   r("0010a_reconcile_retail_payment_baseline.sql", "table", "platform_fees"),
@@ -69,10 +88,20 @@ export const BASELINE_EFFECT_REQUIREMENTS: readonly Requirement[] = [
   r("0010a_reconcile_retail_payment_baseline.sql", "column", "transactions", "tapt_stone_id"),
   r("0010a_reconcile_retail_payment_baseline.sql", "index", "tapt_stones", "tapt_stones_merchant_id_idx"),
   r("0010a_reconcile_retail_payment_baseline.sql", "column_no_default", "transactions", "merchant_id"),
+  r("0010a_reconcile_retail_payment_baseline.sql", "column_nullable", "transactions", "merchant_id"),
+  r("0010a_reconcile_retail_payment_baseline.sql", "index", "transactions", "transactions_merchant_id_idx"),
+  r("0010a_reconcile_retail_payment_baseline.sql", "index", "transactions", "transactions_tapt_stone_id_idx"),
+  r("0010a_reconcile_retail_payment_baseline.sql", "index", "split_payments", "split_payments_transaction_id_idx"),
+  r("0010a_reconcile_retail_payment_baseline.sql", "index", "split_payments", "split_payments_merchant_id_idx"),
   r("0011_payment_links_and_board_numbers.sql", "column", "transactions", "payment_token_hash"),
   r("0011_payment_links_and_board_numbers.sql", "table", "payment_attempts"),
   r("0011_payment_links_and_board_numbers.sql", "index", "payment_attempts", "payment_attempts_return_state_hash_uq"),
   r("0011_payment_links_and_board_numbers.sql", "index", "tapt_stones", "tapt_stones_active_merchant_number_uq"),
+  r("0011_payment_links_and_board_numbers.sql", "index", "transactions", "transactions_payment_token_hash_uq"),
+  r("0011_payment_links_and_board_numbers.sql", "index", "payment_attempts", "payment_attempts_transaction_idx"),
+  r("0011_payment_links_and_board_numbers.sql", "index", "payment_attempts", "payment_attempts_transaction_share_key_uq"),
+  r("0011_payment_links_and_board_numbers.sql", "index", "payment_attempts", "payment_attempts_live_transaction_share_uq"),
+  r("0011_payment_links_and_board_numbers.sql", "index", "split_payments", "split_payments_transaction_split_uq"),
   r("0012_push_notification_preferences.sql", "table", "push_subscriptions"),
   r("0012_push_notification_preferences.sql", "column", "push_subscriptions", "preferences"),
   r("0012_push_notification_preferences.sql", "table", "push_notification_deliveries"),
@@ -83,11 +112,17 @@ export const BASELINE_EFFECT_REQUIREMENTS: readonly Requirement[] = [
   r("0013_subscription_plans.sql", "column", "merchant_subscriptions", "billing_claim_token"),
   r("0013_subscription_plans.sql", "table", "subscription_billing_history"),
   r("0013_subscription_plans.sql", "column_no_default", "users", "merchant_id"),
+  r("0013_subscription_plans.sql", "column_nullable", "users", "merchant_id"),
   r("0013_subscription_plans.sql", "column", "users", "invite_token_hash"),
   r("0013_subscription_plans.sql", "column", "users", "reset_token"),
   r("0013_subscription_plans.sql", "constraint", "merchant_subscriptions", "merchant_subscriptions_plan_id_check"),
   r("0013_subscription_plans.sql", "constraint", "users", "users_status_check"),
   r("0013_subscription_plans.sql", "index", "users", "users_email_lower_uq"),
+  r("0013_subscription_plans.sql", "index", "subscription_billing_history", "subscription_billing_history_merchant_created_idx"),
+  r("0013_subscription_plans.sql", "index", "subscription_billing_history", "subscription_billing_history_idempotency_key_uq"),
+  r("0013_subscription_plans.sql", "index", "users", "users_merchant_id_idx"),
+  r("0013_subscription_plans.sql", "index", "users", "users_invite_token_hash_uq"),
+  r("0013_subscription_plans.sql", "index", "users", "users_reset_token_hash_uq"),
   r("0014_reconcile_subscription_activation.sql", "verified_subscriptions_active", "merchant_subscriptions"),
   r("0015_startup_schema_cleanup.sql", "column", "merchants", "business_description"),
   r("0015_startup_schema_cleanup.sql", "column", "merchants", "estimated_annual_turnover"),
@@ -113,9 +148,24 @@ export const BASELINE_EFFECT_REQUIREMENTS: readonly Requirement[] = [
   r("0017_schema_history_catchup.sql", "constraint", "api_keys", "api_keys_api_key_unique"),
   r("0017_schema_history_catchup.sql", "table", "api_requests"),
   r("0017_schema_history_catchup.sql", "table", "webhook_deliveries"),
+  r("0017_schema_history_catchup.sql", "index", "refunds", "refunds_transaction_id_idx"),
   r("0018_adopt_crypto_transactions.sql", "table", "crypto_transactions"),
   r("0018_adopt_crypto_transactions.sql", "constraint", "crypto_transactions",
     "crypto_transactions_coinbase_charge_id_unique"),
+  r("0019_drop_rogue_fk_defaults.sql", "column_no_default", "transactions", "merchant_id"),
+  r("0019_drop_rogue_fk_defaults.sql", "column_no_default", "users", "merchant_id"),
+  r("0019_drop_rogue_fk_defaults.sql", "column_no_default", "refunds", "merchant_id"),
+  r("0019_drop_rogue_fk_defaults.sql", "column_no_default", "refunds", "transaction_id"),
+  r("0019_drop_rogue_fk_defaults.sql", "column_no_default", "platform_fees", "merchant_id"),
+  r("0019_drop_rogue_fk_defaults.sql", "column_no_default", "platform_fees", "transaction_id"),
+  r("0019_drop_rogue_fk_defaults.sql", "column_no_default", "merchant_settlements", "merchant_id"),
+  r("0020_adopt_orphan_columns.sql", "column", "merchants", "coinbase_commerce_api_key"),
+  r("0020_adopt_orphan_columns.sql", "column", "merchants", "coinbase_webhook_secret"),
+  r("0020_adopt_orphan_columns.sql", "column", "merchants", "crypto_enabled"),
+  r("0020_adopt_orphan_columns.sql", "column", "merchants", "enabled_cryptocurrencies"),
+  r("0020_adopt_orphan_columns.sql", "column", "merchants", "auto_convert_to_fiat"),
+  r("0020_adopt_orphan_columns.sql", "column", "merchants", "min_confirmations"),
+  r("0020_adopt_orphan_columns.sql", "column", "invoices_rent_requests", "scheduled_send_at"),
 ];
 
 export const FIND_MISSING_BASELINE_EFFECTS_SQL = `
@@ -145,6 +195,13 @@ WHERE requirement.kind NOT IN ('verified_subscriptions_active', 'verified_onboar
       AND column_info.table_name = requirement."relationName"
       AND column_info.column_name = requirement."objectName"
       AND column_info.column_default IS NULL
+  )
+  WHEN 'column_nullable' THEN EXISTS (
+    SELECT 1 FROM information_schema.columns AS column_info
+    WHERE column_info.table_schema = 'public'
+      AND column_info.table_name = requirement."relationName"
+      AND column_info.column_name = requirement."objectName"
+      AND column_info.is_nullable = 'YES'
   )
   WHEN 'index' THEN to_regclass('public.' || quote_ident(requirement."objectName")) IS NOT NULL
   WHEN 'constraint' THEN EXISTS (
@@ -182,6 +239,9 @@ export const VERIFY_ONBOARDING_BACKFILL_SQL = `SELECT NOT EXISTS (
 function describeUnmetRequirement(item: Requirement): string {
   if (item.kind === "column_no_default") {
     return `${item.migration}: ${item.relationName}.${item.objectName} must exist without a column default`;
+  }
+  if (item.kind === "column_nullable") {
+    return `${item.migration}: ${item.relationName}.${item.objectName} must exist and be nullable`;
   }
   const detail = item.objectName || item.relationName || item.kind;
   return `${item.migration}: missing ${item.kind} ${detail}`;
