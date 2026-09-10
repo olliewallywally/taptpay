@@ -112,3 +112,40 @@ finding proved it load-bearing; the general question is Oliver's.
 equally unexpressible. No live database was observed to differ on nullability,
 so no requirement was invented for an unproven defect. Recorded here as a known
 remaining blind spot.
+
+## Provenance — how this landed, and how it was put right
+
+Every prior commit on this branch is a single `security(r0):`/`docs(r0):` change
+with attribution. This work did not arrive that way, and the record should say
+so rather than look tidy.
+
+While it was in progress the Replit agent committed the working tree three times
+unprompted, interleaving it with unrelated changes it was making at the same
+time:
+
+| Original commit | Its own work | This work, swept in |
+| --- | --- | --- |
+| `1e268c7d` "Implement analytics tracking and update server migration contracts" | umami instrumentation across `checkout`, `login`, `merchant-signup`, `merchant-onboarding` | the `column_no_default` kind, the four requirements, the test |
+| `0e256a5d` "Implement new contract scratch files and update landing runtime logic" | `.replit`, `landingRuntime.ts` | the `0009` `quotes` correction |
+| `9cb8f872` "Update remediation documentation and add baseline contract analysis report" | — | this document, the tracker update |
+
+Nothing was lost and the resulting tree was the intended one, verified after the
+fact: the four requirements and the correction were present, 229 migration and
+runner tests passed, `tsc --noEmit` was clean. But three commit messages
+described payment-page analytics and migration-gate hardening as one change,
+none carried the branch's attribution trailers, and customer-facing
+instrumentation sat in a security remediation lineage. `1e268c7d` had also
+caught this file mid-edit — before the `0009` correction — so that commit
+contained a contract no correct database could satisfy.
+
+**Resolved 2026-09-10 on the owner's instruction.** Those three commits were
+split into four, each carrying one concern: the analytics instrumentation, the
+landing/`.replit` changes, the contract change *including* its `0009` correction
+so no intermediate commit holds an unsatisfiable gate, and this evidence. The
+rebuilt history reproduces the original tree byte for byte — verified by
+`git diff` against the pre-split tip, which is empty — and the pre-split branch
+is preserved at `backup/pre-split-20260910`. The two commits containing the
+agent's own work keep authorship attributed to it in their messages.
+
+The branch is unpushed and must stay so (R0-H2), so this rewrite touched no
+published history.
