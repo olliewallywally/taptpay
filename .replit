@@ -61,7 +61,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "ln -sfn /home/runner/workspace/.claude-home /home/runner/.claude 2>/dev/null; while true; do npm run dev; echo \"[supervisor] dev server exited (code $?) — restarting in 2s\"; sleep 2; done"
+args = "ln -sfn /home/runner/workspace/.claude-home /home/runner/.claude 2>/dev/null; env -u WINDCAVE_USERNAME -u WINDCAVE_API_KEY PAYMENT_MODE=disabled PUBLIC_ORIGIN=\"https://$REPLIT_DEV_DOMAIN\" npm run dev"
 waitForPort = 5000
 
 [workflows.workflow.metadata]

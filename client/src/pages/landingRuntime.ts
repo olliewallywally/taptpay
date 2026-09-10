@@ -1080,6 +1080,21 @@ export class LandingRuntime {
   }
 
   // ---------------- true-3d phone (webgl body + projection-matched screen) ----------------
+  createWebGLRenderer(canvas) {
+    const attributes = {
+      alpha: true,
+      antialias: (this._tier ?? 2) > 0,
+      powerPreference: 'high-performance',
+    };
+    try {
+      const context = canvas.getContext('webgl2', attributes) || canvas.getContext('webgl', attributes);
+      if (!context) return null;
+      return new THREE.WebGLRenderer({ canvas, context, ...attributes });
+    } catch {
+      return null;
+    }
+  }
+
   initPhone3D() {
     const canvas = document.getElementById('tp3-gl');
     const box = document.getElementById('tp3');
@@ -1089,7 +1104,11 @@ export class LandingRuntime {
     if (!canvas || !box || !spin || !face || !THREE) return;
     const P = 1100; // must equal #tp3-css perspective
 
-    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: (this._tier ?? 2) > 0, powerPreference: 'high-performance' });
+    const renderer = this.createWebGLRenderer(canvas);
+    if (!renderer) {
+      canvas.style.display = 'none';
+      return;
+    }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this._dprCap ?? 2));
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(30, 1, 40, 6000);
@@ -1205,7 +1224,11 @@ export class LandingRuntime {
     const density = this.props.coinDensity ?? 1.4;
     const isMobile = window.innerWidth < 768;
 
-    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: (this._tier ?? 2) > 0, powerPreference: 'high-performance' });
+    const renderer = this.createWebGLRenderer(canvas);
+    if (!renderer) {
+      canvas.style.display = 'none';
+      return;
+    }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this._dprCap ?? 2));
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
