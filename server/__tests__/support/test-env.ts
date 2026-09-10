@@ -22,6 +22,10 @@ delete process.env.DATABASE_TARGET;
 // Force explicit, deterministic values rather than relying on config.ts's
 // JEST_WORKER_ID fallbacks, so this harness behaves the same under `jest`
 // directly and under any future runner.
+// Ambient half-configured credential groups break config.ts at import; see
+// clear-ambient-credentials.ts. Imported for its side effect.
+import "./clear-ambient-credentials";
+
 process.env.APP_ENV = "test";
 process.env.ENV_VALIDATION_MODE = "audit";
 process.env.PAYMENT_MODE = "disabled";

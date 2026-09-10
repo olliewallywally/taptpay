@@ -1,3 +1,12 @@
+// `../push` reads the frozen config when it is imported below, so web-push has
+// to be configured HERE, above that import — not in beforeEach, which runs long
+// after. These tests previously passed only because the developer machine
+// happened to export real VAPID keys; with the ambient credential groups
+// cleared for determinism (support/clear-ambient-credentials.ts) the 404/410
+// deactivation path had no configured transport and never ran.
+process.env.VAPID_PUBLIC_KEY = "test-public-key";
+process.env.VAPID_PRIVATE_KEY = "test-private-key";
+
 const getPushSubscriptionsByMerchant = jest.fn();
 const deactivatePushSubscription = jest.fn();
 const deactivatePushSubscriptionByEndpoint = jest.fn();
@@ -42,8 +51,6 @@ function subscription(id: number, failedPaymentAlerts: boolean) {
 describe("push notification preference filtering", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    process.env.VAPID_PUBLIC_KEY = "test-public-key";
-    process.env.VAPID_PRIVATE_KEY = "test-private-key";
   });
 
   test("filters each subscription against the explicit event type", async () => {
