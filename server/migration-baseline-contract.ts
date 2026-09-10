@@ -11,7 +11,14 @@ export interface BaselineContractClient {
 
 type Requirement = {
   migration: string;
-  kind: "table" | "column" | "index" | "constraint" | "verified_subscriptions_active" | "verified_onboarding_complete";
+  kind:
+    | "table"
+    | "column"
+    | "column_no_default"
+    | "index"
+    | "constraint"
+    | "verified_subscriptions_active"
+    | "verified_onboarding_complete";
   relationName: string;
   objectName: string;
 };
@@ -50,7 +57,7 @@ export const BASELINE_EFFECT_REQUIREMENTS: readonly Requirement[] = [
   r("0008_trades_phase3c_fixes.sql", "column", "merchants", "trade_reminders_enabled"),
   r("0008_trades_phase3c_fixes.sql", "index", "job_invoices", "job_invoices_schedule_due_uq"),
   r("0009_trades_gst_mode.sql", "column", "merchants", "trade_gst_mode"),
-  r("0009_trades_gst_mode.sql", "column", "job_invoices", "gst_mode"),
+  r("0009_trades_gst_mode.sql", "column", "quotes", "gst_mode"),
   r("0010_merchant_tutorial_progress.sql", "column", "merchants", "tutorial_generation"),
   r("0010_merchant_tutorial_progress.sql", "column", "merchants", "tutorial_auto_enabled"),
   r("0010_merchant_tutorial_progress.sql", "table", "merchant_tutorial_progress"),
@@ -60,6 +67,8 @@ export const BASELINE_EFFECT_REQUIREMENTS: readonly Requirement[] = [
   r("0010a_reconcile_retail_payment_baseline.sql", "table", "platform_fees"),
   r("0010a_reconcile_retail_payment_baseline.sql", "table", "merchant_subscriptions"),
   r("0010a_reconcile_retail_payment_baseline.sql", "column", "transactions", "tapt_stone_id"),
+  r("0010a_reconcile_retail_payment_baseline.sql", "index", "tapt_stones", "tapt_stones_merchant_id_idx"),
+  r("0010a_reconcile_retail_payment_baseline.sql", "column_no_default", "transactions", "merchant_id"),
   r("0011_payment_links_and_board_numbers.sql", "column", "transactions", "payment_token_hash"),
   r("0011_payment_links_and_board_numbers.sql", "table", "payment_attempts"),
   r("0011_payment_links_and_board_numbers.sql", "index", "payment_attempts", "payment_attempts_return_state_hash_uq"),
@@ -70,8 +79,10 @@ export const BASELINE_EFFECT_REQUIREMENTS: readonly Requirement[] = [
   r("0012_push_notification_preferences.sql", "index", "push_notification_deliveries", "push_notification_deliveries_merchant_event_key_uq"),
   r("0013_subscription_plans.sql", "column", "merchant_subscriptions", "plan_id"),
   r("0013_subscription_plans.sql", "column", "merchant_subscriptions", "current_period_start"),
+  r("0013_subscription_plans.sql", "column_no_default", "merchant_subscriptions", "current_period_start"),
   r("0013_subscription_plans.sql", "column", "merchant_subscriptions", "billing_claim_token"),
   r("0013_subscription_plans.sql", "table", "subscription_billing_history"),
+  r("0013_subscription_plans.sql", "column_no_default", "users", "merchant_id"),
   r("0013_subscription_plans.sql", "column", "users", "invite_token_hash"),
   r("0013_subscription_plans.sql", "column", "users", "reset_token"),
   r("0013_subscription_plans.sql", "constraint", "merchant_subscriptions", "merchant_subscriptions_plan_id_check"),
@@ -128,6 +139,13 @@ WHERE requirement.kind NOT IN ('verified_subscriptions_active', 'verified_onboar
       AND column_info.table_name = requirement."relationName"
       AND column_info.column_name = requirement."objectName"
   )
+  WHEN 'column_no_default' THEN EXISTS (
+    SELECT 1 FROM information_schema.columns AS column_info
+    WHERE column_info.table_schema = 'public'
+      AND column_info.table_name = requirement."relationName"
+      AND column_info.column_name = requirement."objectName"
+      AND column_info.column_default IS NULL
+  )
   WHEN 'index' THEN to_regclass('public.' || quote_ident(requirement."objectName")) IS NOT NULL
   WHEN 'constraint' THEN EXISTS (
     SELECT 1
@@ -156,6 +174,19 @@ export const VERIFY_ONBOARDING_BACKFILL_SQL = `SELECT NOT EXISTS (
   WHERE status IN ('verified', 'active')
     AND onboarding_completed IS DISTINCT FROM true
 ) AS ok`;
+/**
+ * `column_no_default` fails for two reasons — an absent column and a column that
+ * kept its default — so its wording has to hold for both. The other kinds assert
+ * plain existence and keep their original phrasing.
+ */
+function describeUnmetRequirement(item: Requirement): string {
+  if (item.kind === "column_no_default") {
+    return `${item.migration}: ${item.relationName}.${item.objectName} must exist without a column default`;
+  }
+  const detail = item.objectName || item.relationName || item.kind;
+  return `${item.migration}: missing ${item.kind} ${detail}`;
+}
+
 export async function findMissingBaselineEffects(
   client: BaselineContractClient,
   migrations: readonly string[],
@@ -172,8 +203,7 @@ export async function findMissingBaselineEffects(
       JSON.stringify(schemaRequirements),
     ]);
     for (const item of result.rows) {
-      const detail = item.objectName || item.relationName || item.kind;
-      missing.push(`${item.migration}: missing ${item.kind} ${detail}`);
+      missing.push(describeUnmetRequirement(item));
     }
   }
 
