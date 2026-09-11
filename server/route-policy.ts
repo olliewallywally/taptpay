@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/routes.ts @ c658cac4e61a27b44da890925a333a1de14fcf04 on 2026-09-11.
+ * scripts/generate-route-policy.ts from server/routes.ts @ 5d30caf628c8d316aed012fc007eabf29a67aeb8 on 2026-09-11.
  *
  * 218 registrations (91 GET, 88 POST, 3 PATCH, 5 ALL, 22 PUT, 9 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -160,7 +160,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
   "DELETE /api/merchants/:merchantId/stock-items/:itemId": {"method":"DELETE","path":"/api/merchants/:merchantId/stock-items/:itemId","principal":"api-key","markers":["authenticateToken","authenticateApiKey","requireEcommerceApi"]},
   "POST /api/v1/transactions": {"method":"POST","path":"/api/v1/transactions","principal":"api-key","markers":["authenticateApiKey","requireEcommerceApi"]},
   "GET /api/v1/transactions/:id": {"method":"GET","path":"/api/v1/transactions/:id","principal":"api-key","markers":["authenticateApiKey","requireEcommerceApi"]},
-  "POST /api/payments/apple-pay/validate": {"method":"POST","path":"/api/payments/apple-pay/validate","principal":"unclassified","markers":[]},
+  "POST /api/payments/apple-pay/validate": {"method":"POST","path":"/api/payments/apple-pay/validate","principal":"merchant-user","markers":["authenticateToken"]},
   "POST /api/payments/apple-pay/process": {"method":"POST","path":"/api/payments/apple-pay/process","principal":"merchant-user","markers":["authenticateToken"]},
   "POST /api/payments/google-pay/process": {"method":"POST","path":"/api/payments/google-pay/process","principal":"merchant-user","markers":["authenticateToken"]},
   "GET /api/payments/digital-wallet/config": {"method":"GET","path":"/api/payments/digital-wallet/config","principal":"unclassified","markers":[]},
