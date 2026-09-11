@@ -6174,183 +6174,23 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   });
 
   // Digital Wallet Payment Processing Endpoints
-  const digitalWalletProcessingEnabled = () => false;
+  // Retired per R0-T5: no real Apple/Google Pay provider integration exists behind these
+  // routes. There is deliberately no capability flag here — a flag around fake-success
+  // code is not containment (plan rule 5). A real implementation is R2/R7 scope.
 
-  // Apple Pay merchant validation endpoint
-  app.post("/api/payments/apple-pay/validate", async (req, res) => {
-    if (!digitalWalletProcessingEnabled()) {
-      return res.status(404).json({ code: "NOT_FOUND", message: "Not found" });
-    }
-    /* istanbul ignore next -- retired implementation retained until provider integration */
-    try {
-      const { validationURL, displayName } = req.body;
-
-      if (!validationURL) {
-        return res.status(400).json({ error: "Validation URL is required" });
-      }
-
-      // In production, this would validate with Apple's servers using merchant certificates
-      // Legacy non-provider validation response (unreachable behind the tombstone).
-      const providerMissing = !windcaveService.isConfigured();
-      
-      if (providerMissing) {
-        // Legacy synthetic merchant session
-        const merchantSession = {
-          epochTimestamp: Date.now(),
-          expiresAt: Date.now() + (5 * 60 * 1000), // 5 minutes
-          merchantSessionIdentifier: `merchant_session_${Date.now()}`,
-          nonce: crypto.randomBytes(16).toString('hex'),
-          merchantIdentifier: "merchant.com.tapt.payment",
-          domainName: req.headers.host || "localhost:5000",
-          displayName: displayName || "Tapt Payment"
-        };
-
-        res.json(merchantSession);
-      } else {
-        // In production, implement actual Apple Pay merchant validation
-        // This requires Apple Pay merchant certificates and proper setup
-        return res.status(501).json({ 
-          error: "Apple Pay merchant validation not configured for production" 
-        });
-      }
-    } catch (error) {
-      console.error("Apple Pay validation error:", error);
-      res.status(500).json({ error: "Failed to validate Apple Pay merchant" });
-    }
+  // Apple Pay merchant validation endpoint — retired, no real Apple merchant validation exists
+  app.post("/api/payments/apple-pay/validate", authenticateToken, async (req, res) => {
+    return res.status(404).json({ code: "NOT_FOUND", message: "Not found" });
   });
 
-  // Apple Pay payment processing endpoint
+  // Apple Pay payment processing endpoint — retired, no success fallback under any condition
   app.post("/api/payments/apple-pay/process", authenticateToken, async (req, res) => {
-    if (!digitalWalletProcessingEnabled()) {
-      return res.status(503).json({ code: "DIGITAL_WALLET_DISABLED", message: "Digital wallet payments are unavailable" });
-    }
-    /* istanbul ignore next -- retired implementation retained until provider integration */
-    try {
-      const { payment, transactionId, amount, currency = "NZD" } = req.body;
-
-      if (!payment || !transactionId || !amount) {
-        return res.status(400).json({ error: "Payment data, transaction ID, and amount are required" });
-      }
-
-      // Get the transaction
-      const transaction = await storage.getTransaction(transactionId);
-      if (!transaction) {
-        return res.status(404).json({ error: "Transaction not found" });
-      }
-
-      // Update transaction status to processing
-      await storage.updateTransactionStatus(transactionId, "processing");
-
-      const providerMissing = !windcaveService.isConfigured();
-
-      if (providerMissing) {
-        // Legacy synthetic Apple Pay processing
-        const paymentResult = {
-          success: true,
-          transactionId: `applepay_${Date.now()}`,
-          paymentMethod: "apple_pay",
-          amount: amount,
-          currency: currency,
-          status: "completed"
-        };
-
-        // Update transaction to completed
-        const updatedTransaction = await storage.updateTransactionStatus(
-          transactionId, 
-          "completed", 
-          paymentResult.transactionId
-        );
-
-        // Track transaction for subscription billing
-        if (transaction.merchantId) {
-          await storage.incrementTransactionCount(transaction.merchantId);
-        }
-
-        // Notify connected clients
-        broadcastToStone(transaction.merchantId!, transaction.taptStoneId, { 
-          type: 'transaction_updated', 
-          transaction: updatedTransaction 
-        });
-
-        res.json(paymentResult);
-      } else {
-        // In production, process actual Apple Pay payment token with Windcave
-        // This would decrypt the payment token and submit to payment processor
-        return res.status(501).json({ 
-          error: "Apple Pay payment processing not configured for production" 
-        });
-      }
-    } catch (error) {
-      console.error("Apple Pay processing error:", error);
-      res.status(500).json({ error: "Failed to process Apple Pay payment" });
-    }
+    return res.status(503).json({ code: "DIGITAL_WALLET_DISABLED", message: "Digital wallet payments are unavailable" });
   });
 
-  // Google Pay payment processing endpoint
+  // Google Pay payment processing endpoint — retired, no success fallback under any condition
   app.post("/api/payments/google-pay/process", authenticateToken, async (req, res) => {
-    if (!digitalWalletProcessingEnabled()) {
-      return res.status(503).json({ code: "DIGITAL_WALLET_DISABLED", message: "Digital wallet payments are unavailable" });
-    }
-    /* istanbul ignore next -- retired implementation retained until provider integration */
-    try {
-      const { paymentMethodData, transactionId, amount, currency = "NZD" } = req.body;
-
-      if (!paymentMethodData || !transactionId || !amount) {
-        return res.status(400).json({ error: "Payment method data, transaction ID, and amount are required" });
-      }
-
-      // Get the transaction
-      const transaction = await storage.getTransaction(transactionId);
-      if (!transaction) {
-        return res.status(404).json({ error: "Transaction not found" });
-      }
-
-      // Update transaction status to processing
-      await storage.updateTransactionStatus(transactionId, "processing");
-
-      const providerMissing = !windcaveService.isConfigured();
-
-      if (providerMissing) {
-        // Legacy synthetic Google Pay processing
-        const paymentResult = {
-          success: true,
-          transactionId: `googlepay_${Date.now()}`,
-          paymentMethod: "google_pay",
-          amount: amount,
-          currency: currency,
-          status: "completed"
-        };
-
-        // Update transaction to completed
-        const updatedTransaction = await storage.updateTransactionStatus(
-          transactionId, 
-          "completed", 
-          paymentResult.transactionId
-        );
-
-        // Track transaction for subscription billing
-        if (transaction.merchantId) {
-          await storage.incrementTransactionCount(transaction.merchantId);
-        }
-
-        // Notify connected clients
-        broadcastToStone(transaction.merchantId!, transaction.taptStoneId, { 
-          type: 'transaction_updated', 
-          transaction: updatedTransaction 
-        });
-
-        res.json(paymentResult);
-      } else {
-        // In production, process actual Google Pay payment token with Windcave
-        // This would validate and process the payment token
-        return res.status(501).json({ 
-          error: "Google Pay payment processing not configured for production" 
-        });
-      }
-    } catch (error) {
-      console.error("Google Pay processing error:", error);
-      res.status(500).json({ error: "Failed to process Google Pay payment" });
-    }
+    return res.status(503).json({ code: "DIGITAL_WALLET_DISABLED", message: "Digital wallet payments are unavailable" });
   });
 
   // Digital wallet configuration endpoint

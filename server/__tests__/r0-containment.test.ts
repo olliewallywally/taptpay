@@ -52,6 +52,7 @@ describe("R0 containment — failing baseline evidence", () => {
 
   test("wallet processing routes reject unauthenticated requests", () => {
     for (const route of [
+      "/api/payments/apple-pay/validate",
       "/api/payments/apple-pay/process",
       "/api/payments/google-pay/process",
     ]) {
