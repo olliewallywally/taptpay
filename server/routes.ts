@@ -2923,9 +2923,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(404).json({ message: "Transaction not found" });
       }
 
-      // Validate the provided sessionId matches what we stored — prevents session swapping
-      if (transaction.windcaveSessionId && transaction.windcaveSessionId !== sessionId) {
-        console.error(`[hosted-fields-complete] sessionId mismatch for txn ${transactionId}`);
+      // Validate the provided sessionId matches what we stored — prevents session
+      // swapping. Unconditional: a transaction with no session bound yet (still
+      // null, its state from creation until /pay runs) must reject every
+      // sessionId, not skip the check — see r1-t7-windcave-session-binding.test.ts.
+      if (!transaction.windcaveSessionId || transaction.windcaveSessionId !== sessionId) {
+        console.error(`[hosted-fields-complete] sessionId mismatch or not yet bound for txn ${transactionId}`);
         return res.status(403).json({ message: "Session ID mismatch" });
       }
 
@@ -2963,9 +2966,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(404).json({ message: "Transaction not found" });
       }
 
-      // Validate sessionId belongs to this transaction
-      if (transaction.windcaveSessionId && transaction.windcaveSessionId !== sessionId) {
-        console.error(`[googlepay-complete] sessionId mismatch for txn ${transactionId}`);
+      // Validate sessionId belongs to this transaction. Unconditional: a
+      // transaction with no session bound yet (still null until /pay runs)
+      // must reject every sessionId, not skip the check — see
+      // r1-t7-windcave-session-binding.test.ts.
+      if (!transaction.windcaveSessionId || transaction.windcaveSessionId !== sessionId) {
+        console.error(`[googlepay-complete] sessionId mismatch or not yet bound for txn ${transactionId}`);
         return res.status(403).json({ message: "Session ID mismatch" });
       }
 
