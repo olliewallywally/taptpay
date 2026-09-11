@@ -366,8 +366,7 @@ describe("R1-T6 — /api/admin identifier batch", () => {
     });
 
     it(
-      "a well-formed keyId reaches storage.revokeApiKey and gets a 200 " +
-        "(MemStorage's revokeApiKey is an always-true stub — see evidence doc)",
+      "a well-formed keyId reaches the unavailable ecommerce tombstone",
       async () => {
         const { app } = await createTestApp();
         const admin = createAdminPrincipal();
@@ -375,8 +374,8 @@ describe("R1-T6 — /api/admin identifier batch", () => {
         const response = await request(app)
           .post("/api/admin/api-keys/1/revoke")
           .set(bearer(admin));
-        expect(response.status).toBe(200);
-        expect(response.body.success).toBe(true);
+        expect(response.status).toBe(404);
+        expect(response.body.success).not.toBe(true);
       },
     );
   });

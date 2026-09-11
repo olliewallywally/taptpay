@@ -3942,13 +3942,16 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return;
       }
 
+      // Without a configured provider there is nothing to reconcile against —
+      // do not even take the transient "processing" lock.
+      if (!isWindcaveConfigured()) {
+        console.log(`[WINDCAVE_NOTIF] Provider not configured, ignoring notification for ${sessionId}`);
+        return;
+      }
+
       // Mark as processing to prevent concurrent handling
       await storage.updateTransactionSessionState(transaction.id, 'processing');
 
-      if (!isWindcaveConfigured()) {
-        await storage.updateTransactionSessionState(transaction.id, 'pending');
-        return;
-      }
       const queryResult = await queryWindcaveSession(sessionId);
 
       if (!queryResult.success) {
@@ -4025,6 +4028,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // Windcave callback — customer browser redirected here after paying on HPP
   app.get("/api/windcave/callback", async (req, res) => {
     try {
+      // R0-T5: a browser-supplied "sim" parameter must never influence a real
+      // transaction's outcome — reject the whole request rather than merely
+      // ignoring the one parameter.
+      if (Object.keys(req.query).some((key) => key.toLowerCase() === "sim")) {
+        return res.status(400).json({ message: "Invalid request" });
+      }
+
       const resultParam = req.query.result as string;
 
       // Primary lookup: by transactionId (new approach — avoids Windcave {id} template issues)
@@ -4051,6 +4061,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
 
       const txnId = transaction.id;
+
+      // Without a real, configured provider there is nothing to reconcile
+      // against, so no browser-supplied signal — cancel, result or anything
+      // else — may finalize or otherwise mutate this transaction.
+      if (!isWindcaveConfigured()) {
+        return res.redirect(`/payment/result/${txnId}?status=pending`);
+      }
 
       // Handle cancelled — don't charge, just update status.
       // Guard: only trust the cancel signal if the sessionId in the URL matches what
@@ -4095,20 +4112,23 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
 
       // Notification hasn't arrived yet — query the persisted processor session.
-      const sessionToQuery = transaction.windcaveSessionId || sessionId;
+      // Never query a session the browser supplied but the server never persisted.
+      const sessionToQuery = transaction.windcaveSessionId;
 
       if (!sessionToQuery) {
-        console.warn(`[WINDCAVE_CALLBACK] No session ID available to query for transaction ${txnId}`);
-        return res.redirect(`/payment/result/${txnId}?status=${resultParam || 'declined'}`);
-      }
-
-      if (!isWindcaveConfigured()) {
+        console.warn(`[WINDCAVE_CALLBACK] No persisted session to query for transaction ${txnId}`);
         return res.redirect(`/payment/result/${txnId}?status=pending`);
       }
 
       await storage.updateTransactionSessionState(txnId, 'processing');
 
       const queryResult = await queryWindcaveSession(sessionToQuery);
+
+      if (!queryResult.success) {
+        console.error(`[WINDCAVE_CALLBACK] querySession failed for ${sessionToQuery}:`, queryResult.error);
+        await storage.updateTransactionSessionState(txnId, 'pending');
+        return res.redirect(`/payment/result/${txnId}?status=pending`);
+      }
 
       const newSessionState = queryResult.approved ? 'approved' : 'declined';
       await storage.updateTransactionSessionState(txnId, newSessionState);
@@ -4189,10 +4209,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     const configured = isWindcaveConfigured();
     res.json({
       configured,
-      mode: configured ? "live" : "simulation",
+      mode: configured ? "live" : "disabled",
       message: configured
-        ? "Windcave API is configured and ready (UAT)"
-        : "Running in simulation mode. Configure WINDCAVE_USERNAME and WINDCAVE_API_KEY to enable live payments.",
+        ? "Windcave API is configured (UAT)."
+        : "Payments are disabled. Configure WINDCAVE_USERNAME and WINDCAVE_API_KEY to enable live payments.",
       endpoint: config.windcave.endpoint || "",
     });
   });
@@ -5761,99 +5781,28 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // ADMIN API MANAGEMENT ROUTES
   // =============================================================================
 
-  // Get all API keys for admin
+  // Ecommerce administration is unavailable until its real implementation
+  // passes review. Never advertise fabricated keys, usage or revoke success.
   app.get("/api/admin/api-keys", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
-    try {
-      // For now, return mock data since we don't have API tables yet
-      const mockApiKeys = [
-        {
-          id: 1,
-          keyName: "Shopify Store API",
-          keyPrefix: "tapt_live_12ab",
-          environment: "live",
-          status: "active",
-          permissions: ["create_transactions", "read_transactions", "webhook_events"],
-          webhookUrl: "https://mystore.shopify.com/webhooks/tapt",
-          rateLimitPerHour: 1000,
-          lastUsedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
-          createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days ago
-        },
-        {
-          id: 2,
-          keyName: "WooCommerce Integration",
-          keyPrefix: "tapt_sandbox_34cd",
-          environment: "sandbox",
-          status: "active",
-          permissions: ["create_transactions", "read_transactions"],
-          webhookUrl: "",
-          rateLimitPerHour: 500,
-          lastUsedAt: null,
-          createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), // 3 days ago
-        }
-      ];
-      
-      res.json(mockApiKeys);
-    } catch (error) {
-      console.error("Error fetching API keys:", error);
-      res.status(500).json({ message: "Failed to fetch API keys" });
-    }
+    return res.status(404).json({ message: "Ecommerce API is unavailable" });
   });
 
-  // Create new API key
   app.post("/api/admin/api-keys", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
-    try {
-      const { keyName, environment, permissions, webhookUrl, rateLimitPerHour } = req.body;
-      
-      // Generate API key
-      const apiKey = await storage.createApiKey({
-        keyName,
-        environment,
-        permissions,
-        webhookUrl,
-        rateLimitPerHour,
-        merchantId: 1 // Admin creates for platform-wide use
-      });
-
-      res.json(apiKey);
-    } catch (error) {
-      console.error("Error creating API key:", error);
-      res.status(500).json({ message: "Failed to create API key" });
-    }
+    return res.status(404).json({ message: "Ecommerce API is unavailable" });
   });
 
-  // Revoke API key
   app.post("/api/admin/api-keys/:keyId/revoke", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
-    try {
-      const keyId = strictPositiveIntegerParam(req.params.keyId);
-      if (keyId === null) return res.status(400).json({ message: "Invalid keyId" });
-      await storage.revokeApiKey(keyId);
-      res.json({ success: true, message: "API key revoked successfully" });
-    } catch (error) {
-      console.error("Error revoking API key:", error);
-      res.status(500).json({ message: "Failed to revoke API key" });
-    }
+    const keyId = strictPositiveIntegerParam(req.params.keyId);
+    if (keyId === null) return res.status(400).json({ message: "Invalid keyId" });
+    return res.status(404).json({ message: "Ecommerce API is unavailable" });
   });
 
-  // Get API metrics for admin dashboard
   app.get("/api/admin/api-metrics", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
-    try {
-      const metrics = await storage.getApiMetrics();
-      res.json(metrics);
-    } catch (error) {
-      console.error("Error fetching API metrics:", error);
-      res.status(500).json({ message: "Failed to fetch API metrics" });
-    }
+    return res.status(404).json({ message: "Ecommerce API is unavailable" });
   });
 
-  // Get API usage data
   app.get("/api/admin/api-usage", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
-    try {
-      const usageData = await storage.getApiUsageData();
-      res.json(usageData);
-    } catch (error) {
-      console.error("Error fetching API usage:", error);  
-      res.status(500).json({ message: "Failed to fetch API usage" });
-    }
+    return res.status(404).json({ message: "Ecommerce API is unavailable" });
   });
 
   // =============================================================================

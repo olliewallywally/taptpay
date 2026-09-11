@@ -12,6 +12,9 @@ describe("R0-T6 startup and build side-effect boundaries", () => {
     expect(source).not.toMatch(/db-backup\.sh|pg_dump|runBackup/);
     expect(source).not.toMatch(/spawn\s*\(\s*["']bash["']/);
     expect(source).not.toMatch(/setInterval\s*\([^)]*backup/i);
+    // Starting development must never opt into the production backup target
+    // merely because an operator has configured it in the environment.
+    expect(source).not.toMatch(/NEON_DATABASE_URL/);
   });
 
   test("the deployment build performs compilation only", () => {

@@ -1117,7 +1117,8 @@ export class MemStorage implements IStorage {
       director: merchantData.director || null,
       nzbn: merchantData.nzbn || null,
       customLogoUrl: merchantData.customLogoUrl || null,
-      windcaveApiKey: merchantData.windcaveApiKey || null,
+      // R0-T5: never accept a merchant-supplied Windcave credential through this path.
+      windcaveApiKey: null,
       dailyGoal: merchantData.dailyGoal || "500.00",
       resetToken: null,
       resetTokenExpiry: null,
@@ -3796,8 +3797,10 @@ export class DatabaseStorage implements IStorage {
   async createMerchantWithPassword(merchantData: any, passwordHash: string): Promise<Merchant> {
     if (!this.db) throw new Error('Database not available');
     return await this.db.transaction(async (tx) => {
+      // R0-T5: never accept a merchant-supplied Windcave credential through this path.
+      const { windcaveApiKey: _rejectedWindcaveApiKey, ...safeMerchantData } = merchantData;
       const insertData = {
-        ...merchantData,
+        ...safeMerchantData,
         email: String(merchantData.email).trim().toLowerCase(),
         contactEmail: merchantData.contactEmail ?? String(merchantData.email).trim().toLowerCase(),
         contactPhone: merchantData.contactPhone ?? merchantData.phone ?? null,
