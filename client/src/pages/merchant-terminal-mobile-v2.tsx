@@ -473,7 +473,7 @@ export default function MerchantTerminalMobile() {
         liveStones={liveStones}
         livePayLink={livePayLink}
         qrElement={qrElement}
-        showPaywave={true}
+        showPaywave={false}
         successNotification={successNotif}
       />
 

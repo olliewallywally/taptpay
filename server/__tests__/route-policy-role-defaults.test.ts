@@ -147,40 +147,100 @@ describe("R1-T3 safe-default role gates — admin requires the validated princip
   });
 });
 
-describe("R1-T3 safe-default: password change never trusts the path merchant id", () => {
+/**
+ * R1-T3's safe default is explicit: "Password change: move to
+ * /api/account/password, or prove the path merchant equals the authenticated
+ * account. Never ignore a path ID."
+ *
+ * The superseded version of this block asserted the opposite contract — that a
+ * cross-tenant path id returns 200 because only the caller's own login changes.
+ * That is the behaviour the plan names as wrong, and its assertions are quoted
+ * verbatim in docs/evidence/remediation-v2-2/r1/R1-T3-password-path-contract-2026-09-11.md.
+ * The route is not moved: its only caller builds the URL from the caller's own
+ * JWT, so enforcing equality has an empty client blast radius.
+ */
+describe("R1-T3 safe-default: password change proves the path merchant is the caller's", () => {
   beforeEach(() => {
     resetTestStorage();
   });
 
-  it("changes the caller's own password regardless of the :id in the URL, and never the account the id actually names", async () => {
+  it("refuses a cross-tenant path id and changes nobody's password", async () => {
     const { app } = await createTestApp();
     const ownerA = await createOwnerPrincipal();
     const ownerB = await createOwnerPrincipal();
 
-    // ownerA calls the change-password route with ownerB's merchant id in the
-    // path — the path id must never be trusted for who gets changed.
     const response = await request(app)
       .put(`/api/merchants/${ownerB.merchantId}/change-password`)
       .set(bearer(ownerA))
       .send({ currentPassword: "Harness123", newPassword: "NewHarness456", confirmPassword: "NewHarness456" });
 
+    expect(response.status).toBe(403);
+
+    // Zero side effects: both accounts keep their original password, and the
+    // password the attacker tried to set works for neither.
+    for (const owner of [ownerA, ownerB]) {
+      const stillOld = await request(app)
+        .post(`/api/auth/login`)
+        .send({ email: owner.user.email, password: "Harness123" });
+      expect(stillOld.status).toBe(200);
+
+      const attemptedNew = await request(app)
+        .post(`/api/auth/login`)
+        .send({ email: owner.user.email, password: "NewHarness456" });
+      expect(attemptedNew.status).toBe(401);
+    }
+  });
+
+  it("still changes an owner's own password when the path id is their own", async () => {
+    const { app } = await createTestApp();
+    const owner = await createOwnerPrincipal();
+
+    const response = await request(app)
+      .put(`/api/merchants/${owner.merchantId}/change-password`)
+      .set(bearer(owner))
+      .send({ currentPassword: "Harness123", newPassword: "NewHarness456", confirmPassword: "NewHarness456" });
+
     expect(response.status).toBe(200);
 
-    // ownerB's password must be unchanged — the mismatched path id had zero effect.
-    const bStillOldPassword = await request(app)
-      .post(`/api/auth/login`)
-      .send({ email: ownerB.user.email, password: "Harness123" });
-    expect(bStillOldPassword.status).toBe(200);
+    const oldFails = await request(app)
+      .post(`/api/auth/login`).send({ email: owner.user.email, password: "Harness123" });
+    expect(oldFails.status).toBe(401);
+    const newWorks = await request(app)
+      .post(`/api/auth/login`).send({ email: owner.user.email, password: "NewHarness456" });
+    expect(newWorks.status).toBe(200);
+  });
 
-    // ownerA's password, meanwhile, really did change.
-    const aOldPasswordNowFails = await request(app)
-      .post(`/api/auth/login`)
-      .send({ email: ownerA.user.email, password: "Harness123" });
-    expect(aOldPasswordNowFails.status).toBe(401);
+  it("still lets a member change their own password on their own merchant", async () => {
+    const { app } = await createTestApp();
+    const owner = await createOwnerPrincipal();
+    const member = await createMemberPrincipal(owner.merchantId);
 
-    const aNewPasswordWorks = await request(app)
-      .post(`/api/auth/login`)
-      .send({ email: ownerA.user.email, password: "NewHarness456" });
-    expect(aNewPasswordWorks.status).toBe(200);
+    const response = await request(app)
+      .put(`/api/merchants/${owner.merchantId}/change-password`)
+      .set(bearer(member))
+      .send({ currentPassword: "Harness123", newPassword: "NewHarness456", confirmPassword: "NewHarness456" });
+
+    expect(response.status).toBe(200);
+
+    // The teammate's own login rotated; the owner's did not.
+    const memberNew = await request(app)
+      .post(`/api/auth/login`).send({ email: member.user.email, password: "NewHarness456" });
+    expect(memberNew.status).toBe(200);
+    const ownerUntouched = await request(app)
+      .post(`/api/auth/login`).send({ email: owner.user.email, password: "Harness123" });
+    expect(ownerUntouched.status).toBe(200);
+  });
+
+  it("rejects a malformed path id before anything else", async () => {
+    const { app } = await createTestApp();
+    const owner = await createOwnerPrincipal();
+
+    const response = await request(app)
+      .put(`/api/merchants/1abc/change-password`)
+      .set(bearer(owner))
+      .send({ currentPassword: "Harness123", newPassword: "NewHarness456", confirmPassword: "NewHarness456" });
+
+    expect(response.status).toBe(400);
+    expect(response.body.message).toBe("Invalid id");
   });
 });

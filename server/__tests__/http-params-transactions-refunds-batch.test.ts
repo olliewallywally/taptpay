@@ -335,7 +335,13 @@ describe("R1-T6 — transactions/refunds identifier batch", () => {
       expect(response.headers["content-type"]).toBe("image/png");
     });
 
-    it("size=-100 (reviewed, left unchanged: see evidence doc) still renders a valid PNG rather than crashing", async () => {
+    // SUPERSEDED 2026-09-11. This block previously asserted that size=-100
+    // "still renders a valid PNG rather than crashing" — the deliberate
+    // exemption batch 1 recorded for bounded tuning values. The tracker's gap 6
+    // reverses that exemption: a present-but-invalid value must be refused, not
+    // silently replaced by the default. The old assertions are quoted in
+    // docs/evidence/remediation-v2-2/r1/R1-T6-bounded-query-values-2026-09-11.md.
+    it("size=-100 is refused rather than silently falling back to the default", async () => {
       const { app } = await createTestApp();
       const owner = await createOwnerPrincipal();
       const txn = await completedTransaction(owner.merchantId);
@@ -343,8 +349,8 @@ describe("R1-T6 — transactions/refunds identifier batch", () => {
       const response = await request(app).get(
         `/api/transactions/${txn.id}/receipt-qr?size=-100`,
       );
-      expect(response.status).toBe(200);
-      expect(response.headers["content-type"]).toBe("image/png");
+      expect(response.status).toBe(400);
+      expect(response.body.message).toBe("Invalid size");
     });
   });
 

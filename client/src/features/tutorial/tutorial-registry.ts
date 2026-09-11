@@ -86,12 +86,15 @@ export const TUTORIAL_REGISTRY: Record<TutorialPageKey, TutorialPageDefinition> 
       { target: '[data-testid="input-search"]', fallbackTarget: '[data-testid^="card-product-"]', desktopTarget: '[data-tutorial-id="retail-stock-directory"]', tag: "Find & edit", title: "Keep stock organised", body: "Search the catalogue, then tap a product card whenever its details or price need changing.", desktopBody: "Search and sort the catalogue here, then open any product tile to update it." },
     ],
   },
+  // R0-T5: the contactless flow this taught was a simulator with no provider
+  // behind it, and has been retired. The page key stays registered so the
+  // tutorial page count and merchants' stored progress are unaffected — only
+  // the content changes, to stop teaching a capability that does not exist.
   "retail-nfc": {
     label: "NFC payment",
     steps: [
-      { target: '[data-tutorial-id="nfc-amount"]', fallbackTarget: "main", tag: "Amount", title: "Set the amount", body: "Enter what the customer owes before starting the contactless payment." },
-      { target: '[data-tutorial-id="nfc-item"]', fallbackTarget: "main", tag: "Item", title: "Describe the sale", body: "Add a short item name so the payment and receipt are easy to recognise." },
-      { target: '[data-tutorial-id="nfc-create"]', fallbackTarget: "main", tag: "Tap to pay", title: "Take the payment", body: "Start the terminal, then have the customer tap their card or wallet to pay." },
+      { target: '[data-tutorial-id="nfc-unavailable"]', fallbackTarget: "main", tag: "Tap to pay", title: "Not available yet", body: "This terminal cannot take contactless payments. We'll update this guide when tap to pay is ready." },
+      { target: '[data-tutorial-id="nfc-alternative"]', fallbackTarget: "main", tag: "Take payment", title: "Use a QR code instead", body: "Create the sale on your terminal and let the customer scan the QR code to pay." },
     ],
   },
   "payment-board-builder": {

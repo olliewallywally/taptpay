@@ -66,9 +66,19 @@ describe("RetailTerminalView safety boundary", () => {
     await waitFor(() => expect(onCreateSale).not.toHaveBeenCalled());
   });
 
+  // R0-T5 containment: Tap to Pay is disabled server-side and has no
+  // provider-authoritative implementation, so the control must not be offered
+  // unless a caller explicitly opts in. The delegation test below keeps the
+  // wiring covered for when the feature gate opens.
+  it("does not offer paywave by default, because the route behind it refuses", () => {
+    render(<RetailTerminalView liveState={existingState} onCreateSale={jest.fn()} />);
+
+    expect(screen.queryByRole("button", { name: "paywave" })).toBeNull();
+  });
+
   it("delegates paywave for an existing live transaction without recreating it locally", async () => {
     const onCreateSale = jest.fn().mockResolvedValue(undefined);
-    render(<RetailTerminalView liveState={existingState} onCreateSale={onCreateSale} />);
+    render(<RetailTerminalView liveState={existingState} onCreateSale={onCreateSale} showPaywave />);
 
     fireEvent.click(screen.getByRole("button", { name: "paywave" }));
     fireEvent.click(screen.getByRole("button", { name: "send" }));

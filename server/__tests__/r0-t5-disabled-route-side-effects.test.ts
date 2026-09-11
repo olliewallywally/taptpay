@@ -1,6 +1,7 @@
 import "./support/test-env";
 
 import request from "supertest";
+import * as database from "../database";
 import * as push from "../push";
 import { sseBroker } from "../sse-broker";
 import {
@@ -98,12 +99,21 @@ describe("R0-T5 — disabled surfaces refuse and change nothing", () => {
     jest.spyOn(push, "sendPushToMerchant").mockResolvedValue({
       eligibleSubscriptions: 0, attempted: 0, delivered: 0, failed: 0,
     });
+    // MemStorage's logTransactionEvent is a no-op, so an event write is
+    // invisible to storageSnapshot(). It needs its own spy or "zero event"
+    // is asserted by nothing at all.
+    jest.spyOn(storage, "logTransactionEvent");
+    // The disabled routes must not reach a database either. MemStorage is
+    // selected in tests, so this proves no DatabaseStorage path was taken.
+    jest.spyOn(database, "getDb");
   });
 
   afterEach(() => {
     expect(globalThis.fetch).not.toHaveBeenCalled();
     expect(sseBroker.broadcast).not.toHaveBeenCalled();
     expect(push.sendPushToMerchant).not.toHaveBeenCalled();
+    expect(storage.logTransactionEvent).not.toHaveBeenCalled();
+    expect(database.getDb).not.toHaveBeenCalled();
   });
 
   test.each(DISABLED_ROUTES.map((r) => [r.name, r] as const))(

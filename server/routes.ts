@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import express from "express";
 import { config } from "./config";
-import { strictPositiveIntegerParam, strictPositiveIntegerQueryParam } from "./http-params";
+import { strictBoundedIntegerQueryParam, strictPositiveIntegerParam, strictPositiveIntegerQueryParam } from "./http-params";
 import { createServer, type Server } from "http";
 import { installAsyncRouteGuard } from "./async-route-guard";
 import {
@@ -1062,7 +1062,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
 
       // Get size parameter (default to 400, allow up to 1000 for downloads)
-      const size = Math.min(parseInt(req.query.size as string) || 400, 1000);
+      const size = strictBoundedIntegerQueryParam(req.query.size, { fallback: 400, max: 1000 });
+      if (size === null) return res.status(400).json({ message: "Invalid size" });
       const isDownload = req.query.download === 'true';
 
       // Set response headers for PNG image - STATIC QR per merchant
@@ -1109,7 +1110,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
 
       // Get size parameter (default to 400, allow up to 1000 for downloads)
-      const size = Math.min(parseInt(req.query.size as string) || 400, 1000);
+      const size = strictBoundedIntegerQueryParam(req.query.size, { fallback: 400, max: 1000 });
+      if (size === null) return res.status(400).json({ message: "Invalid size" });
       const isDownload = req.query.download === 'true';
 
       // Set response headers for PNG image - STATIC QR per stone
@@ -1233,7 +1235,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!transaction) {
         return res.status(404).json({ message: "Payment link not found" });
       }
-      const size = Math.min(Math.max(parseInt(req.query.size as string) || 300, 100), 800);
+      const size = strictBoundedIntegerQueryParam(req.query.size, { fallback: 300, min: 100, max: 800 });
+      if (size === null) return res.status(400).json({ message: "Invalid size" });
       const tokenUrl = `${getBaseUrl(req)}/pay/t/${req.params.token}`;
       const qrBuffer = await QRCode.toBuffer(tokenUrl, {
         type: "png",
@@ -1398,7 +1401,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const result = await loadTokenReceipt(req.params.token, req.query.share);
       if (result.kind !== "ready") return sendTokenReceiptError(res, result);
-      const size = Math.min(Math.max(Number(req.query.size) || 300, 100), 800);
+      const size = strictBoundedIntegerQueryParam(req.query.size, { fallback: 300, min: 100, max: 800 });
+      if (size === null) return res.status(400).json({ message: "Invalid size" });
       const shareQuery = result.share ? `?share=${result.share.splitIndex}` : "";
       const receiptUrl = `${getBaseUrl(req)}/receipt/t/${req.params.token}${shareQuery}`;
       const qr = await QRCode.toBuffer(receiptUrl, {
@@ -2616,31 +2620,23 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   });
 
   // Get NFC payment capabilities for a device
+  // R0-T5: capability is what this platform will actually honour, not what the
+  // device could theoretically do. This previously derived every field from the
+  // User-Agent alone, so a phone was told NFC, Apple Pay and contactless were
+  // available while the routes behind them refuse — a fabricated capability.
+  // Tap to Pay follows its real feature gate; the wallet routes are tombstoned
+  // and have no gate to consult, so they report false until one exists.
   app.get("/api/nfc/capabilities", (req, res) => {
-    const userAgent = req.headers['user-agent'] || '';
-    const isIOS = /iPhone|iPad|iPod/.test(userAgent);
-    const isAndroid = /Android/.test(userAgent);
-    const isDesktop = !isIOS && !isAndroid;
-    
-    const capabilities = {
-      nfcSupported: !isDesktop,
-      applePay: isIOS,
-      googlePay: isAndroid,
-      samsungPay: isAndroid && /Samsung/.test(userAgent),
-      contactlessCard: true,
-      webNFC: 'NDEFReader' in global, // Web NFC API support
-      recommendations: []
-    };
-    
-    if (isIOS) {
-      (capabilities.recommendations as string[]).push("Use Apple Pay for fastest checkout");
-    } else if (isAndroid) {
-      (capabilities.recommendations as string[]).push("Use Google Pay or tap your card");
-    } else {
-      (capabilities.recommendations as string[]).push("Use QR code for payment on desktop");
-    }
-    
-    res.json(capabilities);
+    const tapToPayEnabled = config.features.tapToPay;
+    res.json({
+      nfcSupported: tapToPayEnabled,
+      applePay: false,
+      googlePay: false,
+      samsungPay: false,
+      contactlessCard: tapToPayEnabled,
+      webNFC: false,
+      recommendations: tapToPayEnabled ? [] : ["Use QR code for payment"],
+    });
   });
 
   // Process payment — creates Windcave HPP session and returns redirect URL
@@ -3116,7 +3112,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(404).json({ message: "Transaction not found" });
       }
 
-      const size = Math.min(parseInt(req.query.size as string) || 300, 800);
+      const size = strictBoundedIntegerQueryParam(req.query.size, { fallback: 300, max: 800 });
+      if (size === null) return res.status(400).json({ message: "Invalid size" });
       const receiptUrl = `${getBaseUrl(req)}/receipt/${transactionId}`;
 
       res.setHeader('Content-Type', 'image/png');
@@ -3171,7 +3168,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // Node's single event loop thread for every tenant, not just the caller.
       // Clamped to a generous 1-year reporting window, same shape as the size
       // clamps elsewhere in this file.
-      const days = Math.min(parseInt(req.query.days as string) || 30, 365);
+      const days = strictBoundedIntegerQueryParam(req.query.days, { fallback: 30, max: 365 });
+      if (days === null) return res.status(400).json({ message: "Invalid days" });
       const revenueData = await storage.getRevenueOverTime(merchantId, days);
       res.json(revenueData);
     } catch (error) {
@@ -3483,6 +3481,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const merchantId = strictPositiveIntegerParam(req.params.id);
       if (merchantId === null) return res.status(400).json({ message: "Invalid id" });
+      // R1-T3: the path id is a precondition, never a selector. Only the caller's
+      // own login is changed below, but a path id naming someone else must still
+      // be refused rather than ignored.
+      if (!checkMerchantOwnership(req, merchantId)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
       const validation = changePasswordSchema.safeParse(req.body);
       
       if (!validation.success) {
@@ -3952,10 +3956,21 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // Mark as processing to prevent concurrent handling
       await storage.updateTransactionSessionState(transaction.id, 'processing');
 
-      const queryResult = await queryWindcaveSession(sessionId);
+      let queryResult;
+      try {
+        queryResult = await queryWindcaveSession(sessionId);
+      } catch (error) {
+        // Leaving 'processing' behind would make this session permanently
+        // unreconcilable: the guard above refuses anything not 'pending'.
+        console.error(`[WINDCAVE_NOTIF] querySession threw for ${sessionId}:`, error);
+        await storage.updateTransactionSessionState(transaction.id, 'pending');
+        return;
+      }
 
-      if (!queryResult.success) {
-        console.error(`[WINDCAVE_NOTIF] querySession failed for ${sessionId}:`, queryResult.error);
+      // Same condition the token flows use: an approval with no processor
+      // transaction id is not a settlement we can record.
+      if (!queryResult.success || (queryResult.approved && !queryResult.windcaveTransactionId)) {
+        console.error(`[WINDCAVE_NOTIF] querySession unusable for ${sessionId}:`, queryResult.error);
         await storage.updateTransactionSessionState(transaction.id, 'pending');
         return;
       }
@@ -4062,6 +4077,17 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       const txnId = transaction.id;
 
+      // An outcome the provider already settled is persisted truth, so reading
+      // it back stays correct even while the provider is disabled. These run
+      // before the gate below so a customer who genuinely paid still reaches
+      // their receipt rather than a permanent "pending".
+      if (transaction.windcaveSessionState === 'approved') {
+        return res.redirect(`/receipt/${txnId}`);
+      }
+      if (transaction.windcaveSessionState === 'declined') {
+        return res.redirect(`/payment/result/${txnId}?status=declined`);
+      }
+
       // Without a real, configured provider there is nothing to reconcile
       // against, so no browser-supplied signal — cancel, result or anything
       // else — may finalize or otherwise mutate this transaction.
@@ -4103,14 +4129,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.redirect(`/payment/result/${txnId}?status=cancelled`);
       }
 
-      // If notification already processed this, redirect based on known state
-      if (transaction.windcaveSessionState === 'approved') {
-        return res.redirect(`/receipt/${txnId}`);
-      }
-      if (transaction.windcaveSessionState === 'declined') {
-        return res.redirect(`/payment/result/${txnId}?status=declined`);
-      }
-
       // Notification hasn't arrived yet — query the persisted processor session.
       // Never query a session the browser supplied but the server never persisted.
       const sessionToQuery = transaction.windcaveSessionId;
@@ -4122,10 +4140,21 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       await storage.updateTransactionSessionState(txnId, 'processing');
 
-      const queryResult = await queryWindcaveSession(sessionToQuery);
+      let queryResult;
+      try {
+        queryResult = await queryWindcaveSession(sessionToQuery);
+      } catch (error) {
+        // A throwing provider client must not strand the session in 'processing',
+        // where the notification handler refuses it forever as already-handled.
+        console.error(`[WINDCAVE_CALLBACK] querySession threw for ${sessionToQuery}:`, error);
+        await storage.updateTransactionSessionState(txnId, 'pending');
+        return res.redirect(`/payment/result/${txnId}?status=pending`);
+      }
 
-      if (!queryResult.success) {
-        console.error(`[WINDCAVE_CALLBACK] querySession failed for ${sessionToQuery}:`, queryResult.error);
+      // Same condition the token flows use: an approval with no processor
+      // transaction id is not a settlement we can record.
+      if (!queryResult.success || (queryResult.approved && !queryResult.windcaveTransactionId)) {
+        console.error(`[WINDCAVE_CALLBACK] querySession unusable for ${sessionToQuery}:`, queryResult.error);
         await storage.updateTransactionSessionState(txnId, 'pending');
         return res.redirect(`/payment/result/${txnId}?status=pending`);
       }
@@ -5289,10 +5318,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           principal: authenticatedRequest.user?.role === "admin" ? "admin" : "user",
         };
       } else if (req.query.stoneId !== undefined) {
-        if (typeof req.query.stoneId !== "string" || !/^\d+$/.test(req.query.stoneId)) {
+        const stoneId = strictPositiveIntegerQueryParam(req.query.stoneId);
+        if (stoneId === null) {
           return res.status(400).json({ message: "Invalid payment board" });
         }
-        const stoneId = Number(req.query.stoneId);
         const stone = await storage.getTaptStone(stoneId);
         if (!stone || !stone.isActive || stone.merchantId !== merchantId) {
           return res.status(404).json({ message: "Payment board not found" });
@@ -6820,8 +6849,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(403).json({ message: "Only the account owner can view billing history" });
       }
 
-      const requestedLimit = Number.parseInt(String(req.query.limit ?? ""), 10);
-      const limit = Number.isInteger(requestedLimit) ? Math.min(100, Math.max(1, requestedLimit)) : 50;
+      const limit = strictBoundedIntegerQueryParam(req.query.limit, { fallback: 50, min: 1, max: 100 });
+      if (limit === null) return res.status(400).json({ message: "Invalid limit" });
       const history = await storage.getBillingHistory(merchantId, limit);
       
       res.json({ history: history.map(billingHistoryDto) });
@@ -7346,7 +7375,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const tenant = await storage.getTenantProfile(req.params.id);
       if (!tenant) return res.status(404).json({ message: "Tenant not found" });
       if (!checkMerchantOwnership(req, tenant.merchantId)) return res.status(403).json({ message: "Access denied" });
-      const limit = Math.min(parseInt(String(req.query.limit ?? "50")), 200);
+      const limit = strictBoundedIntegerQueryParam(req.query.limit, { fallback: 50, max: 200 });
+      if (limit === null) return res.status(400).json({ message: "Invalid limit" });
       const events = await storage.getTransactionEventsByTenant(req.params.id, limit);
       res.json(events);
     } catch (err) { console.error("[PROP_EVENTS]", err); res.status(500).json({ message: "Failed to fetch events" }); }

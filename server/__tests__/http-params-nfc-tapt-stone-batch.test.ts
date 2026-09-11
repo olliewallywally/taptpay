@@ -170,14 +170,20 @@ describe("R1-T6 — /nfc, /api/tapt-stones, active-transaction stoneId", () => {
     });
   });
 
-  describe("GET /api/merchants/:id/qr — size (reviewed, left unchanged: see evidence doc)", () => {
-    it("a negative size does not crash the handler — the qrcode library silently ignores a non-positive width", async () => {
+  // SUPERSEDED 2026-09-11. This block previously asserted that a negative size
+  // "does not crash the handler — the qrcode library silently ignores a
+  // non-positive width", the deliberate exemption for bounded tuning values.
+  // The tracker's gap 6 reverses it: present-but-invalid is refused, not
+  // silently defaulted. Old assertions quoted in
+  // docs/evidence/remediation-v2-2/r1/R1-T6-bounded-query-values-2026-09-11.md.
+  describe("GET /api/merchants/:id/qr — size", () => {
+    it("a negative size is refused rather than relying on the qrcode library to ignore it", async () => {
       const { app } = await createTestApp();
       const owner = await createOwnerPrincipal();
 
       const response = await request(app).get(`/api/merchants/${owner.merchantId}/qr?size=-100`);
-      expect(response.status).toBe(200);
-      expect(response.headers["content-type"]).toBe("image/png");
+      expect(response.status).toBe(400);
+      expect(response.body.message).toBe("Invalid size");
     });
   });
 });

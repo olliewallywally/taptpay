@@ -2020,10 +2020,13 @@ export class MemStorage implements IStorage {
   async updateMerchant(id: number, updates: Partial<Merchant>): Promise<Merchant | undefined> {
     const merchant = this.merchants.get(id);
     if (!merchant) return undefined;
-    
+
+    // R0-T5: no general update path may write a Windcave credential. R5 owns
+    // historical values through its own reviewed path, not this one.
+    const { windcaveApiKey: _rejectedWindcaveApiKey, ...safeUpdates } = updates;
     const updatedMerchant = {
       ...merchant,
-      ...updates,
+      ...safeUpdates,
       updatedAt: new Date(),
     };
     this.merchants.set(id, updatedMerchant);
@@ -3831,9 +3834,12 @@ export class DatabaseStorage implements IStorage {
 
   async updateMerchant(id: number, updates: Partial<Merchant>): Promise<Merchant | undefined> {
     if (!this.db) throw new Error('Database not available');
+    // R0-T5: no general update path may write a Windcave credential. R5 owns
+    // historical values through its own reviewed path, not this one.
+    const { windcaveApiKey: _rejectedWindcaveApiKey, ...safeUpdates } = updates;
     const result = await this.db
       .update(merchants)
-      .set({ ...updates, updatedAt: new Date() })
+      .set({ ...safeUpdates, updatedAt: new Date() })
       .where(eq(merchants.id, id))
       .returning();
     return result[0];

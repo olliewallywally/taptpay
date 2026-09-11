@@ -219,7 +219,16 @@ export async function queryWindcaveSession(
   }
 
   if (response.status === 200) {
-    const data = await response.json();
+    // A 200 carrying a truncated or non-JSON body must be an unknown outcome,
+    // not a thrown exception: callers treat a throw as a crash and would strand
+    // the session mid-transition rather than leaving it reconcilable.
+    let data: any;
+    try {
+      data = await response.json();
+    } catch (err: any) {
+      logAudit("QUERY_SESSION_BODY_ERROR", { sessionId, error: err.message });
+      return { success: false, error: "Unreadable provider response body" };
+    }
     const tx = data.transactions?.[0];
     const approved = tx?.authorised === true;
     logAudit("QUERY_SESSION_RESULT", { sessionId, approved, txId: tx?.id });

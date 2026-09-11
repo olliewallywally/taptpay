@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/routes.ts @ f24dbfacab00dde067fe45be36988d67523ebf65 on 2026-09-06.
+ * scripts/generate-route-policy.ts from server/routes.ts @ c658cac4e61a27b44da890925a333a1de14fcf04 on 2026-09-11.
  *
  * 218 registrations (91 GET, 88 POST, 3 PATCH, 5 ALL, 22 PUT, 9 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -94,7 +94,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
   "POST /api/admin/merchants/:id/activate": {"method":"POST","path":"/api/admin/merchants/:id/activate","principal":"unclassified","markers":[]},
   "PUT /api/merchants/:id/rates": {"method":"PUT","path":"/api/merchants/:id/rates","principal":"merchant-user","markers":["authenticateToken"]},
   "PUT /api/merchants/:id/details": {"method":"PUT","path":"/api/merchants/:id/details","principal":"merchant-user","markers":["authenticateToken","checkAccountOwnership"]},
-  "PUT /api/merchants/:id/change-password": {"method":"PUT","path":"/api/merchants/:id/change-password","principal":"merchant-user","markers":["authenticateToken"]},
+  "PUT /api/merchants/:id/change-password": {"method":"PUT","path":"/api/merchants/:id/change-password","principal":"merchant-user","markers":["authenticateToken","checkMerchantOwnership"]},
   "PUT /api/merchants/:id/bank-account": {"method":"PUT","path":"/api/merchants/:id/bank-account","principal":"merchant-user","markers":["authenticateToken"]},
   "PUT /api/merchants/:id/theme": {"method":"PUT","path":"/api/merchants/:id/theme","principal":"merchant-user","markers":["authenticateToken","checkAccountOwnership"]},
   "PUT /api/merchants/:id/daily-goal": {"method":"PUT","path":"/api/merchants/:id/daily-goal","principal":"merchant-user","markers":["authenticateToken","checkAccountOwnership"]},

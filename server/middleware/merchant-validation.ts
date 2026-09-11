@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { storage } from '../storage';
+import { strictPositiveIntegerParam } from '../http-params';
 
 /**
  * Middleware to validate that a merchant exists and is active
@@ -7,9 +8,9 @@ import { storage } from '../storage';
  */
 export async function validateMerchant(req: Request, res: Response, next: NextFunction) {
   try {
-    const merchantId = parseInt(req.params.merchantId);
-    
-    if (!merchantId || isNaN(merchantId)) {
+    const merchantId = strictPositiveIntegerParam(req.params.merchantId);
+
+    if (merchantId === null) {
       return res.status(400).json({ 
         message: "Invalid merchant ID. Must be a valid number." 
       });
@@ -45,10 +46,10 @@ export async function validateMerchant(req: Request, res: Response, next: NextFu
  */
 export async function validateMerchantTransaction(req: Request, res: Response, next: NextFunction) {
   try {
-    const merchantId = parseInt(req.params.merchantId);
-    const transactionId = parseInt(req.params.transactionId);
-    
-    if (!merchantId || !transactionId || isNaN(merchantId) || isNaN(transactionId)) {
+    const merchantId = strictPositiveIntegerParam(req.params.merchantId);
+    const transactionId = strictPositiveIntegerParam(req.params.transactionId);
+
+    if (merchantId === null || transactionId === null) {
       return res.status(400).json({ 
         message: "Invalid merchant ID or transaction ID." 
       });

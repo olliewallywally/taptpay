@@ -921,7 +921,11 @@ export default function RetailTerminalViewCore({
   liveStones          = null,
   livePayLink         = null,
   qrElement           = null,
-  showPaywave         = true,
+  // R0-T5: Tap to Pay is disabled server-side (FEATURE_TAP_TO_PAY) and has no
+  // provider-authoritative implementation, so the control defaults off — the
+  // plan's rule is that until there is real proof, capability is false. The
+  // delegation below stays wired for when the gate opens.
+  showPaywave         = false,
   successNotification = null,
   publishDockState    = false,
 } = {}) {
