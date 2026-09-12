@@ -1,7 +1,10 @@
 # R0-T7 — two Google Cloud service-account private keys were publicly exposed
 
 Date: 2026-09-09 UTC.
-Status: **OPEN — revocation required. Supersedes the same-day "nothing to rotate" disposition for these two credentials only.**
+Status: **Owner reports both keys deleted, 2026-09-12.** See the
+[dated owner confirmation](../../../decisions/2026-09-12-google-analytics-key-revocation.md).
+Independent provider verification and IAM/audit-log review remain open. The
+original discovery and required-action record below is retained as history.
 
 Found while classifying the 287 `review-required` scanner findings
 ([public repository exposure](R0-T7-public-exposure-2026-09-09.md)). This is a
