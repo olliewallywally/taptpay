@@ -1,8 +1,9 @@
 import {
   BOOLEAN_ENV_KEYS,
-  ConfigValidationError,
   loadConfig,
   parseStrictBoolean,
+  PRODUCTION_WINDCAVE_ENDPOINT,
+  UAT_WINDCAVE_ENDPOINT,
 } from "../config";
 
 const BASE_ENV = {
@@ -51,25 +52,46 @@ describe("fail-closed runtime configuration", () => {
     expect(loadConfig({ ...BASE_ENV, [key]: undefined }).rawBooleans[key]).toBe(false);
   });
 
-  test.each([
-    ["test", "uat"],
-    ["test", "production"],
-    ["development", "production"],
-    ["staging", "simulation"],
-    ["staging", "production"],
-    ["production", "simulation"],
-    ["production", "uat"],
-  ])("rejects APP_ENV=%s with PAYMENT_MODE=%s", (appEnv, paymentMode) => {
+  const environments = ["test", "development", "staging", "production"] as const;
+  const paymentModes = ["disabled", "simulation", "uat", "production"] as const;
+  const allowedModes = {
+    test: ["disabled", "simulation"],
+    development: ["disabled", "simulation", "uat"],
+    staging: ["disabled", "uat"],
+    production: ["disabled", "production"],
+  };
+
+  test.each(environments.flatMap((appEnv) => paymentModes.map((paymentMode) => [appEnv, paymentMode] as const)))(
+    "enforces the full APP_ENV=%s / PAYMENT_MODE=%s matrix", (appEnv, paymentMode) => {
+    const source = {
+      ...BASE_ENV,
+      APP_ENV: appEnv,
+      DATABASE_TARGET: appEnv === "test" ? "ci" : appEnv === "development" ? "local" : appEnv,
+      PAYMENT_MODE: paymentMode,
+      WINDCAVE_ENDPOINT: paymentMode === "production" ? PRODUCTION_WINDCAVE_ENDPOINT : UAT_WINDCAVE_ENDPOINT,
+      WINDCAVE_USERNAME: "synthetic-user",
+      WINDCAVE_API_KEY: "synthetic-key",
+      FEATURE_LIVE_WINDCAVE: "true",
+      FEATURE_PROVIDER_RECONCILIATION: "true",
+    };
+    if (allowedModes[appEnv].includes(paymentMode)) {
+      expect(loadConfig(source).paymentMode).toBe(paymentMode);
+    } else {
+      expect(() => loadConfig(source)).toThrow(expect.objectContaining({
+        name: "ConfigValidationError", key: "PAYMENT_MODE",
+      }));
+    }
+  });
+
+  test.each(environments.flatMap((appEnv) => ["audit", "enforce"].map((mode) => [appEnv, mode] as const)))(
+    "rejects FEATURE_CRYPTO=true in %s with %s validation", (appEnv, envValidationMode) => {
     expect(() => loadConfig({
       ...BASE_ENV,
       APP_ENV: appEnv,
-      DATABASE_TARGET: appEnv,
-      PAYMENT_MODE: paymentMode,
-    })).toThrow(ConfigValidationError);
-  });
-
-  test("rejects FEATURE_CRYPTO=true in every environment", () => {
-    expect(() => loadConfig({ ...BASE_ENV, FEATURE_CRYPTO: "true" })).toThrow("FEATURE_CRYPTO");
+      DATABASE_TARGET: appEnv === "test" ? "ci" : appEnv === "development" ? "local" : appEnv,
+      ENV_VALIDATION_MODE: envValidationMode,
+      FEATURE_CRYPTO: "true",
+    })).toThrow(expect.objectContaining({ key: "FEATURE_CRYPTO" }));
   });
 
   test("rejects a partial Windcave credential pair even in audit mode", () => {

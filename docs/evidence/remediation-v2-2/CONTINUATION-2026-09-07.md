@@ -1,5 +1,15 @@
 # Full integration continuation audit — 2026-09-07
 
+Latest bounded continuation (2026-09-12, working diff on `3d9736cf`):
+**[R0-T2 source guard and configuration matrix](r0/R0-T2-source-guard-and-matrix-2026-09-12.md)**.
+The environment-read regex missed alternate executable forms and falsely flagged
+inert text (14 failing tests captured before repair). Replaced with an AST guard
+without widening the bootstrap allowlist; all 16 environment/payment-mode cells
+now prove the intended invariant rather than an unrelated database-target error.
+Focused verification: 94 tests pass; typecheck passes. Full regression result is
+in the linked evidence. Test-only work; R0's human/operational gates and the split
+session replay finding remain open. No production action or capability enablement.
+
 Latest continuation (recorded 2026-09-12, recovering an interrupted session —
 these three were already committed on `remediation/r1-continuation-20260907`
 but had not yet been logged here): **[R1-T7 — foreign Windcave session bypass
