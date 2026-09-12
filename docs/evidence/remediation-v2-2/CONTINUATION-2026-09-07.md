@@ -1,6 +1,41 @@
 # Full integration continuation audit — 2026-09-07
 
-Latest continuation: **[September 11 client containment and the first device smoke](r0/R0-T5-client-containment-and-device-smoke-2026-09-11.md)** — the device gate ran for the first time (10/15; the 5 remaining are one owner-gated desktop-frame question), the User-Agent-derived capability endpoint is truthful, and the NFC simulator consumer is deleted. Alongside it: [R1-T6 bounded query values and the source guard](r1/R1-T6-bounded-query-values-2026-09-11.md) and [the R1-T3 password-path contract](r1/R1-T3-password-path-contract-2026-09-11.md). Earlier that day: [callback/notification containment and credential-storage fix](r0/R0-T5-callback-credential-fix-2026-09-11.md) — the tree's uncommitted `r0-t5-callback-containment.test.ts` was a failing-tests-first checkpoint (16/16 failing) proving five real defects in the Windcave callback/notification handlers and merchant credential storage; all are now fixed and verified (49 suites / 942 tests pass). Device/browser smoke remains explicitly not run — see that record for why. Prior: [September 11 R0-T5 runtime audit and admin containment](r0/R0-T5-continuation-2026-09-11.md). Current resume point: **PDF page 17 (R0-T5); R0 exit on page 21 remains open**.
+Latest continuation (recorded 2026-09-12, recovering an interrupted session —
+these three were already committed on `remediation/r1-continuation-20260907`
+but had not yet been logged here): **[R1-T7 — foreign Windcave session bypass
+on the legacy transaction payment routes](r1/R1-T7-windcave-session-binding-2026-09-11.md)**
+(commit `4183e241`) — a 10-agent cross-tenant/IDOR audit plus an independent
+adversarial re-check found that `hosted-fields-complete` and
+`googlepay-complete` only enforced session-ID binding once a transaction
+already had a `windcaveSessionId`, so any transaction still in its initial
+`null` state accepted an arbitrary client-supplied session and could be
+finalised with a foreign approval. Failing-tests-first (2/4 failing pre-fix),
+fixed by making the guard unconditional, 4/4 pass after. **A second, distinct
+defect was found in the same helper and deliberately left unfixed, flagged
+for the owner**: a session that legitimately funds one split of a split
+transaction can be replayed against the same route to complete the *next*
+split for free (no single-use consumption of a spent session), and the
+non-split branch can replay-inflate a merchant's billed transaction count the
+same way. Closing it correctly needs the R3 durable-payments machinery, not a
+same-day inline patch — see the evidence file for the full mechanism and
+reproduction. Also landed in this window: [R1-T2 route-policy inventory
+regenerated](r1/R1-T2-route-inventory-table.md) against SHA `5d30caf6` (218
+registrations, 96 unclassified — essentially unchanged from the prior 97,
+this was a regen after the R0-T5 fix below, not a new classification pass),
+and [R0-T5 — Apple Pay `/validate` auth gap closed and dead fake-success code
+deleted](r0/R0-T5-wallet-validate-auth-and-dead-code-2026-09-11.md) (commit
+`5d30caf6`) — `/api/payments/apple-pay/validate` was missing the
+`authenticateToken` middleware its sibling wallet routes had (inert in
+practice since `digitalWalletProcessingEnabled` is hardcoded false, but
+against the plan's middleware-order rule and untested), and all three wallet
+routes still carried their pre-containment fake-success bodies
+`/* istanbul ignore next */`'d rather than deleted (plan rule 5: deleting is
+the fix). Both fixed, failing-test-first. Full server regression after all
+three: **52 suites / 974 tests pass** (independently re-verified 2026-09-12),
+`npm run check` clean. No migration, secret rotation, production operation,
+capability enablement, or push in this window.
+
+Prior continuation: **[September 11 client containment and the first device smoke](r0/R0-T5-client-containment-and-device-smoke-2026-09-11.md)** — the device gate ran for the first time (10/15; the 5 remaining are one owner-gated desktop-frame question), the User-Agent-derived capability endpoint is truthful, and the NFC simulator consumer is deleted. Alongside it: [R1-T6 bounded query values and the source guard](r1/R1-T6-bounded-query-values-2026-09-11.md) and [the R1-T3 password-path contract](r1/R1-T3-password-path-contract-2026-09-11.md). Earlier that day: [callback/notification containment and credential-storage fix](r0/R0-T5-callback-credential-fix-2026-09-11.md) — the tree's uncommitted `r0-t5-callback-containment.test.ts` was a failing-tests-first checkpoint (16/16 failing) proving five real defects in the Windcave callback/notification handlers and merchant credential storage; all are now fixed and verified (49 suites / 942 tests pass). Device/browser smoke remains explicitly not run — see that record for why. Prior: [September 11 R0-T5 runtime audit and admin containment](r0/R0-T5-continuation-2026-09-11.md). Resume point at that time: **PDF page 17 (R0-T5); R0 exit on page 21 remains open**.
 
 Prior continuation: **[R0-T6A closure](r0/R0-T6A-closure-2026-09-10.md) — every Check criterion met**, following [the drift findings closed — repair, adoption and an exhaustive gate](r0/R0-T6A-fk-repair-and-adoption-2026-09-10.md)
 (decision: [FK default repair and orphan column adoption](../../decisions/2026-09-10-fk-default-repair-and-orphan-column-adoption.md)),
@@ -125,6 +160,27 @@ backup, deployment or restore checks.
    The reviewed decisions now live in `.gitleaks-dispositions.jsonl` and the scan
    gates on undispositioned findings
    ([how to disposition](../../operations/secret-scan-dispositions.md)).
+11. **New, owner-visible, deliberately unfixed: split-payment session replay
+   in `finaliseHostedPayment` (`server/routes.ts:2823`).** Found while closing
+   the R1-T7 null-session bypass above. Once a session has legitimately
+   funded one split of a split transaction, replaying that same
+   still-bound `sessionId` against `hosted-fields-complete` /
+   `googlepay-complete` again advances `getNextPendingSplit` and marks the
+   *next* split `completed` for free — no new session, no new payment. The
+   non-split branch has a milder version: replaying an already-completed
+   transaction's matching session re-runs `incrementTransactionCount`,
+   inflating billed usage. Root cause is architecturally different from the
+   null-bypass fix (this session is genuinely and correctly bound; the gap
+   is the absence of single-use consumption once a session has funded a
+   finalisation) and needs a schema decision (a tracked-sessions column
+   mirroring `invoicesRentRequests`/`jobInvoices`'s `splitPaidSessions`
+   pattern) that the plan's own reasoning says belongs with R3's durable
+   payments work, not a rushed same-day addendum. See
+   [the evidence file](r1/R1-T7-windcave-session-binding-2026-09-11.md) for
+   exact mechanism and reproduction. Not fixed. Not a stop condition (no
+   live Windcave credentials in this environment; both wallet routes and
+   this flow are currently inert wherever Windcave is unconfigured), but it
+   must not be lost before R3 scoping.
 
 ## Every named task and phase
 
@@ -139,7 +195,7 @@ may proceed where the plan allows it. Code lanes remain gated by their dependenc
 | R0-T2 | Fail-closed configuration module | 431 | Engineering | Implementation and prior tests recorded; review remaining P2.2/exit invariants before closure. |
 | R0-T3 | Make VAPID rotation survivable | 444 | Engineering | Recovery code/tests recorded; real-device resubscribe and real test-push acceptance explicitly open. |
 | R0-T4 | Tombstone cross-tenant clearing, lock down seeding | 455 | Engineering | Implementation and prior tests recorded; preserve runtime production/no-delete checks for final SHA. |
-| R0-T5 | Remove fake-success and merchant credential surfaces | 473 | Engineering | PARTIAL — [September 11 continuation](r0/R0-T5-continuation-2026-09-11.md) fixes five missed admin ecommerce placeholder handlers and extends runtime checks to registered ecommerce routes, refunds, storage snapshots, fetch/SSE/push, retries and concurrency. A same-day [follow-up](r0/R0-T5-callback-credential-fix-2026-09-11.md) then closed a failing-tests-first checkpoint left mid-flight: the Windcave callback ignored `?sim=`, could query a browser-supplied unpersisted session, echoed a browser `result` into the redirect, and finalized a failed provider query as declined; the notification handler wrote transient state before checking configuration; `createMerchantWithPassword` on both storage backends still accepted a caller-supplied `windcaveApiKey`. All fixed. **Device smoke has now RUN for the first time, 10/15** — [client containment and device smoke](r0/R0-T5-client-containment-and-device-smoke-2026-09-11.md): the NFC simulator consumer is deleted, the phone terminal no longer offers an enabled paywave control, and `/api/nfc/capabilities` no longer fabricates capability from the User-Agent string. The 5 remaining scenarios are one **owner-gated** question — the desktop shell renders full-bleed at 1440x900 rather than a centred inset frame (R1-T10/D10, behind R1-H1), raised not changed. An adversarial review of the earlier fix also found and closed: a throwing provider client stranding a session in `processing` forever, an approval with no processor id being recorded as settled, and `updateMerchant` still accepting a credential. The no-side-effect matrix now covers `logTransactionEvent` (a MemStorage no-op, previously invisible) and zero `getDb`; there is **no outbox table in this codebase** to assert on. Historical-credential count: development is 0 ([count](r0/R0-T5-credential-count-2026-09-11.md)); production is owner work. Server 51 suites / 970 tests, client 52 / 487. |
+| R0-T5 | Remove fake-success and merchant credential surfaces | 473 | Engineering | PARTIAL — [September 11 continuation](r0/R0-T5-continuation-2026-09-11.md) fixes five missed admin ecommerce placeholder handlers and extends runtime checks to registered ecommerce routes, refunds, storage snapshots, fetch/SSE/push, retries and concurrency. A same-day [follow-up](r0/R0-T5-callback-credential-fix-2026-09-11.md) then closed a failing-tests-first checkpoint left mid-flight: the Windcave callback ignored `?sim=`, could query a browser-supplied unpersisted session, echoed a browser `result` into the redirect, and finalized a failed provider query as declined; the notification handler wrote transient state before checking configuration; `createMerchantWithPassword` on both storage backends still accepted a caller-supplied `windcaveApiKey`. All fixed. **Device smoke has now RUN for the first time, 10/15** — [client containment and device smoke](r0/R0-T5-client-containment-and-device-smoke-2026-09-11.md): the NFC simulator consumer is deleted, the phone terminal no longer offers an enabled paywave control, and `/api/nfc/capabilities` no longer fabricates capability from the User-Agent string. The 5 remaining scenarios are one **owner-gated** question — the desktop shell renders full-bleed at 1440x900 rather than a centred inset frame (R1-T10/D10, behind R1-H1), raised not changed. An adversarial review of the earlier fix also found and closed: a throwing provider client stranding a session in `processing` forever, an approval with no processor id being recorded as settled, and `updateMerchant` still accepting a credential. The no-side-effect matrix now covers `logTransactionEvent` (a MemStorage no-op, previously invisible) and zero `getDb`; there is **no outbox table in this codebase** to assert on. Historical-credential count: development is 0 ([count](r0/R0-T5-credential-count-2026-09-11.md)); production is owner work. **Same-day follow-up (commit `5d30caf6`)** closed a residual gap: [`/api/payments/apple-pay/validate` was missing `authenticateToken`](r0/R0-T5-wallet-validate-auth-and-dead-code-2026-09-11.md) (inert but untested and against middleware-order rule), and all three wallet routes' pre-containment fake-success bodies were `/* istanbul ignore next */`'d rather than deleted per rule 5 — now deleted outright, including the dead `incrementTransactionCount` side effect on that path and the `digitalWalletProcessingEnabled` stub. Server regression re-verified 2026-09-12: 52 suites / 974 tests. |
 | R0-T6 | Stop startup database dumps and the side-effectful build | 517 | Engineering | Startup/build fixed previously; manual backup safeguard implemented in this continuation. 17 synthetic and 3 existing R0-T6 tests pass; operational restore proof remains open. |
 | R0-T6A | Re-prove the migration contract and continuously gate complete history | 531 | Engineering | Recorded CLOSED 2026-09-10 — [closure evidence](r0/R0-T6A-closure-2026-09-10.md). The later [owner directions and live migration record](../../decisions/2026-09-10-owner-directions-and-live-migration.md) supersedes the claim that no live database was modified: development reached 23 applied, 0 pending/drifted/orphaned, with 0 rogue FK defaults and 82 indexes. Production apply remains pending after the sandbox classifier refused it. The restore ACL repair procedure and offline gate now exist — [`docs/operations/restore-acl.md`](../../operations/restore-acl.md) and `scripts/verify-restore-acl.mjs` (8/8 tests pass) — but neither has been exercised against a real restore; the repair itself remains open until an actual restore rehearsal runs it. Historical convergence, compatibility and budget evidence is retained in linked artifacts, not fresh release approval for subsequent code changes. |
 | R0-T7 | Scrub the tracked configuration | 547 | Engineering | PARTIAL — **classification is COMPLETE** (285 dispositioned triples, **0 `review-required`**, finished 2026-09-09; the earlier "287 remain review-required" reading is stale). The tracked runtime block is scrubbed. What remains is **revocation, not classification**, and it is owner work: two public GCP service-account keys, the production database password, `JWT_SECRET` and `ADMIN_PASSWORD_HASH`. The Figma OAuth client secret is deleted from the local store but stays `exposed-unresolved` until its app is deleted in Figma. `VAPID_PRIVATE_KEY` was already rotated; `WINDCAVE_API_KEY` was never exposed. |
@@ -149,13 +205,13 @@ may proceed where the plan allows it. Code lanes remain gated by their dependenc
 | R0-H4 | Review access logs and scan history | 578 | Owner/professional/provider | OPEN: owner-reported no suspicious activity is recorded, but full redacted history/access review and disposition remain unverified. |
 | R0-H5 | Classify tracked uploads and local dumps | 585 | Owner/professional/provider | PARTIAL: tracked PNG classification recorded; prior inventory was 41; this workspace now has 38 ignored entries. Owner disposition remains open; no contents inspected. |
 | R1-T1 | No-live-system HTTP test harness | 610 | Engineering | Harness implemented early; audit all transport/clock/SSE/push injection and no-network proof after the R0 exit gate. |
-| R1-T2 | Checked-in route policy inventory | 622 | Engineering | PARTIAL: route markers/inventory exist; required per-route fields and all-method/use/mounted-router coverage remain incomplete. |
+| R1-T2 | Checked-in route policy inventory | 622 | Engineering | PARTIAL: [regenerated 2026-09-11 against `5d30caf6`](r1/R1-T2-route-inventory-table.md) — 218 registrations (91 GET/88 POST/3 PATCH/5 ALL/22 PUT/9 DELETE), 96 still unclassified (was 97; essentially a regen after the R0-T5 auth fix, not a new classification pass). Required per-route fields and all-method/use/mounted-router coverage remain incomplete. |
 | R1-T3 | Explicit role and tenant matrix | 639 | Engineering | PARTIAL: owner defaults fixed; full principal/tenant matrix and runtime coverage open. **The password-path contract is corrected (2026-09-11)** — [evidence](r1/R1-T3-password-path-contract-2026-09-11.md): a cross-tenant path id now returns 403 with both accounts' passwords provably unchanged, red run captured first, route policy regenerated. The route was not moved because its only caller builds the URL from the caller's own JWT. |
 | R1-H1 | Accept the device baseline commit before R1 client changes | 651 | Owner/professional/provider | D10 implementation/ADR recorded; exact post-R0 visual baseline and owner acceptance explicitly outstanding. |
 | R1-T4 | OAuth rebuild, session storage and shared security primitives | 660 | Engineering | GATED: R0 exit and R1-H1 acceptance; OAuth/session/reset/CORS/distributed-abuse work remains. |
 | R1-T5 | Sign in with Apple — protocol-specific adapter on T4's primitives | 686 | Engineering | GATED: R1-T4, then real Apple provisioning/device verification. |
 | R1-T6 | Strict numeric path and query parsing — review snapshot has 71 path and 7 query sites | 699 | Engineering | **Task check MET 2026-09-11** — [bounded query values and the source guard](r1/R1-T6-bounded-query-values-2026-09-11.md). The handoff's "five remaining sites" undercounted: four more of the same class hid behind `Number(req.query...)`, `Number.parseInt(String(...))`, `parseInt(String(...))` and a `/^\d+$/` that accepted `0` — one of which passed `NaN` to storage — plus three `parseInt(req.params)` in `middleware/merchant-validation.ts`. All migrated to a reviewed typed schema; zero permissive parses remain in production server code; source guard active **with no allowlist**. Two superseded tests corrected, quoted in the evidence. R1-T2's 97 unclassified registrations are unchanged and still gate the wider task. |
-| R1-T7 | Tenant-scoped storage — close the generated authenticated-route gap | 732 | Engineering | PARTIAL: upload SQL moved behind storage; other tenant methods, upload authorization/content/privacy and two-merchant matrix remain. |
+| R1-T7 | Tenant-scoped storage — close the generated authenticated-route gap | 732 | Engineering | PARTIAL: upload SQL moved behind storage; other tenant methods, upload authorization/content/privacy and two-merchant matrix remain. **Closed 2026-09-11** (commit `4183e241`): a foreign-session bypass on `hosted-fields-complete`/`googlepay-complete` — any transaction still in its initial `windcaveSessionId: null` state accepted an arbitrary client-supplied session and could be finalised with a foreign approval — found by a 10-agent cross-tenant/IDOR audit, confirmed by independent adversarial re-check, fixed failing-tests-first. **New open item found in the same sweep, not fixed**: split-payment session replay in the same `finaliseHostedPayment` helper — see gap 11 above and [the evidence](r1/R1-T7-windcave-session-binding-2026-09-11.md); needs an R3-scoped schema decision. |
 | R1-T8 | Fix the hook-order crash | 758 | Engineering | GATED: R0 exit and R1-H1; crash characterization is not a fix. |
 | R1-T9 | Truthful frontend failure states | 773 | Engineering | GATED: R1-T8; essential/optional failure states and duplicate-action tests remain. |
 | R1-T10 | Device and tutorial acceptance matrix | 780 | Engineering | GATED: T3/T5/T7/T9 and H1; typed routes, devices, tutorials and accessibility acceptance remain. |
