@@ -1,5 +1,11 @@
 # R0-T5 — client containment, truthful capability, and the first device smoke
 
+> Correction, 2026-09-12: the desktop full-bleed diagnosis below was a verifier
+> selector error. It measured the backdrop rather than the actual rounded frame.
+> The owner-question is withdrawn; the corrected matrix passes 20/20 with no
+> application layout change. See [correction and evidence](R0-T5-frame-measurement-2026-09-12.md).
+> The original results below are preserved as historical evidence.
+
 Date: 2026-09-11. Branch: `remediation/r1-continuation-20260907`.
 
 R0-T5's client-side clause had never been executed: "Client side: hide the

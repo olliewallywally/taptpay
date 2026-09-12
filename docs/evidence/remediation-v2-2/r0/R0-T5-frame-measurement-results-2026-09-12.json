@@ -1,0 +1,542 @@
+[
+  {
+    "device": "phone",
+    "path": "/terminal",
+    "status": "passed",
+    "deviceClass": null,
+    "viewport": null,
+    "frame": null,
+    "canvas": null
+  },
+  {
+    "device": "phone",
+    "path": "/property/terminal",
+    "status": "passed",
+    "deviceClass": null,
+    "viewport": null,
+    "frame": null,
+    "canvas": null
+  },
+  {
+    "device": "phone",
+    "path": "/trades/terminal",
+    "status": "passed",
+    "deviceClass": null,
+    "viewport": null,
+    "frame": null,
+    "canvas": null
+  },
+  {
+    "device": "phone",
+    "path": "/settings",
+    "status": "passed",
+    "deviceClass": null,
+    "viewport": null,
+    "frame": null,
+    "canvas": null
+  },
+  {
+    "device": "phone",
+    "path": "/nfc",
+    "status": "passed",
+    "deviceClass": null,
+    "viewport": null,
+    "frame": null,
+    "canvas": null
+  },
+  {
+    "device": "tablet",
+    "path": "/terminal",
+    "status": "passed",
+    "deviceClass": "tablet",
+    "viewport": {
+      "x": 0,
+      "y": 0,
+      "width": 1194,
+      "height": 834,
+      "top": 0,
+      "right": 1194,
+      "bottom": 834,
+      "left": 0
+    },
+    "frame": {
+      "x": 0,
+      "y": 0,
+      "width": 1194,
+      "height": 834,
+      "top": 0,
+      "right": 1194,
+      "bottom": 834,
+      "left": 0,
+      "radius": "0px",
+      "overflow": "hidden"
+    },
+    "canvas": {
+      "width": "1180px",
+      "height": "880px",
+      "scale": "0.9477272727272728"
+    }
+  },
+  {
+    "device": "tablet",
+    "path": "/property/terminal",
+    "status": "passed",
+    "deviceClass": "tablet",
+    "viewport": {
+      "x": 0,
+      "y": 0,
+      "width": 1194,
+      "height": 834,
+      "top": 0,
+      "right": 1194,
+      "bottom": 834,
+      "left": 0
+    },
+    "frame": {
+      "x": 0,
+      "y": 0,
+      "width": 1194,
+      "height": 834,
+      "top": 0,
+      "right": 1194,
+      "bottom": 834,
+      "left": 0,
+      "radius": "0px",
+      "overflow": "hidden"
+    },
+    "canvas": {
+      "width": "1180px",
+      "height": "880px",
+      "scale": "0.9477272727272728"
+    }
+  },
+  {
+    "device": "tablet",
+    "path": "/trades/terminal",
+    "status": "passed",
+    "deviceClass": "tablet",
+    "viewport": {
+      "x": 0,
+      "y": 0,
+      "width": 1194,
+      "height": 834,
+      "top": 0,
+      "right": 1194,
+      "bottom": 834,
+      "left": 0
+    },
+    "frame": {
+      "x": 0,
+      "y": 0,
+      "width": 1194,
+      "height": 834,
+      "top": 0,
+      "right": 1194,
+      "bottom": 834,
+      "left": 0,
+      "radius": "0px",
+      "overflow": "hidden"
+    },
+    "canvas": {
+      "width": "1180px",
+      "height": "880px",
+      "scale": "0.9477272727272728"
+    }
+  },
+  {
+    "device": "tablet",
+    "path": "/settings",
+    "status": "passed",
+    "deviceClass": "tablet",
+    "viewport": {
+      "x": 0,
+      "y": 0,
+      "width": 1194,
+      "height": 834,
+      "top": 0,
+      "right": 1194,
+      "bottom": 834,
+      "left": 0
+    },
+    "frame": {
+      "x": 0,
+      "y": 0,
+      "width": 1194,
+      "height": 834,
+      "top": 0,
+      "right": 1194,
+      "bottom": 834,
+      "left": 0,
+      "radius": "0px",
+      "overflow": "hidden"
+    },
+    "canvas": {
+      "width": "1180px",
+      "height": "880px",
+      "scale": "0.9477272727272728"
+    }
+  },
+  {
+    "device": "tablet",
+    "path": "/nfc",
+    "status": "passed",
+    "deviceClass": "tablet",
+    "viewport": {
+      "x": 0,
+      "y": 0,
+      "width": 1194,
+      "height": 834,
+      "top": 0,
+      "right": 1194,
+      "bottom": 834,
+      "left": 0
+    },
+    "frame": {
+      "x": 0,
+      "y": 0,
+      "width": 1194,
+      "height": 834,
+      "top": 0,
+      "right": 1194,
+      "bottom": 834,
+      "left": 0,
+      "radius": "0px",
+      "overflow": "hidden"
+    },
+    "canvas": {
+      "width": "1180px",
+      "height": "880px",
+      "scale": "0.9477272727272728"
+    }
+  },
+  {
+    "device": "desktop",
+    "path": "/terminal",
+    "status": "passed",
+    "deviceClass": "desktop",
+    "viewport": {
+      "x": 0,
+      "y": 0,
+      "width": 1440,
+      "height": 900,
+      "top": 0,
+      "right": 1440,
+      "bottom": 900,
+      "left": 0
+    },
+    "frame": {
+      "x": 220,
+      "y": 77.125,
+      "width": 1000,
+      "height": 745.75,
+      "top": 77.125,
+      "right": 1220,
+      "bottom": 822.875,
+      "left": 220,
+      "radius": "28px",
+      "overflow": "hidden"
+    },
+    "canvas": {
+      "width": "1180px",
+      "height": "880px",
+      "scale": "0.847457627118644"
+    }
+  },
+  {
+    "device": "desktop",
+    "path": "/property/terminal",
+    "status": "passed",
+    "deviceClass": "desktop",
+    "viewport": {
+      "x": 0,
+      "y": 0,
+      "width": 1440,
+      "height": 900,
+      "top": 0,
+      "right": 1440,
+      "bottom": 900,
+      "left": 0
+    },
+    "frame": {
+      "x": 220,
+      "y": 77.125,
+      "width": 1000,
+      "height": 745.75,
+      "top": 77.125,
+      "right": 1220,
+      "bottom": 822.875,
+      "left": 220,
+      "radius": "28px",
+      "overflow": "hidden"
+    },
+    "canvas": {
+      "width": "1180px",
+      "height": "880px",
+      "scale": "0.847457627118644"
+    }
+  },
+  {
+    "device": "desktop",
+    "path": "/trades/terminal",
+    "status": "passed",
+    "deviceClass": "desktop",
+    "viewport": {
+      "x": 0,
+      "y": 0,
+      "width": 1440,
+      "height": 900,
+      "top": 0,
+      "right": 1440,
+      "bottom": 900,
+      "left": 0
+    },
+    "frame": {
+      "x": 220,
+      "y": 77.125,
+      "width": 1000,
+      "height": 745.75,
+      "top": 77.125,
+      "right": 1220,
+      "bottom": 822.875,
+      "left": 220,
+      "radius": "28px",
+      "overflow": "hidden"
+    },
+    "canvas": {
+      "width": "1180px",
+      "height": "880px",
+      "scale": "0.847457627118644"
+    }
+  },
+  {
+    "device": "desktop",
+    "path": "/settings",
+    "status": "passed",
+    "deviceClass": "desktop",
+    "viewport": {
+      "x": 0,
+      "y": 0,
+      "width": 1440,
+      "height": 900,
+      "top": 0,
+      "right": 1440,
+      "bottom": 900,
+      "left": 0
+    },
+    "frame": {
+      "x": 220,
+      "y": 77.125,
+      "width": 1000,
+      "height": 745.75,
+      "top": 77.125,
+      "right": 1220,
+      "bottom": 822.875,
+      "left": 220,
+      "radius": "28px",
+      "overflow": "hidden"
+    },
+    "canvas": {
+      "width": "1180px",
+      "height": "880px",
+      "scale": "0.847457627118644"
+    }
+  },
+  {
+    "device": "desktop",
+    "path": "/nfc",
+    "status": "passed",
+    "deviceClass": "desktop",
+    "viewport": {
+      "x": 0,
+      "y": 0,
+      "width": 1440,
+      "height": 900,
+      "top": 0,
+      "right": 1440,
+      "bottom": 900,
+      "left": 0
+    },
+    "frame": {
+      "x": 220,
+      "y": 77.125,
+      "width": 1000,
+      "height": 745.75,
+      "top": 77.125,
+      "right": 1220,
+      "bottom": 822.875,
+      "left": 220,
+      "radius": "28px",
+      "overflow": "hidden"
+    },
+    "canvas": {
+      "width": "1180px",
+      "height": "880px",
+      "scale": "0.847457627118644"
+    }
+  },
+  {
+    "device": "desktop-short",
+    "path": "/terminal",
+    "status": "passed",
+    "deviceClass": "desktop",
+    "viewport": {
+      "x": 0,
+      "y": 0,
+      "width": 1440,
+      "height": 650,
+      "top": 0,
+      "right": 1440,
+      "bottom": 650,
+      "left": 0
+    },
+    "frame": {
+      "x": 310.359375,
+      "y": 19.5,
+      "width": 819.28125,
+      "height": 610.984375,
+      "top": 19.5,
+      "right": 1129.640625,
+      "bottom": 630.484375,
+      "left": 310.359375,
+      "radius": "28px",
+      "overflow": "hidden"
+    },
+    "canvas": {
+      "width": "1180px",
+      "height": "880px",
+      "scale": "0.6940677966101695"
+    }
+  },
+  {
+    "device": "desktop-short",
+    "path": "/property/terminal",
+    "status": "passed",
+    "deviceClass": "desktop",
+    "viewport": {
+      "x": 0,
+      "y": 0,
+      "width": 1440,
+      "height": 650,
+      "top": 0,
+      "right": 1440,
+      "bottom": 650,
+      "left": 0
+    },
+    "frame": {
+      "x": 310.359375,
+      "y": 19.5,
+      "width": 819.28125,
+      "height": 610.984375,
+      "top": 19.5,
+      "right": 1129.640625,
+      "bottom": 630.484375,
+      "left": 310.359375,
+      "radius": "28px",
+      "overflow": "hidden"
+    },
+    "canvas": {
+      "width": "1180px",
+      "height": "880px",
+      "scale": "0.6940677966101695"
+    }
+  },
+  {
+    "device": "desktop-short",
+    "path": "/trades/terminal",
+    "status": "passed",
+    "deviceClass": "desktop",
+    "viewport": {
+      "x": 0,
+      "y": 0,
+      "width": 1440,
+      "height": 650,
+      "top": 0,
+      "right": 1440,
+      "bottom": 650,
+      "left": 0
+    },
+    "frame": {
+      "x": 310.359375,
+      "y": 19.5,
+      "width": 819.28125,
+      "height": 610.984375,
+      "top": 19.5,
+      "right": 1129.640625,
+      "bottom": 630.484375,
+      "left": 310.359375,
+      "radius": "28px",
+      "overflow": "hidden"
+    },
+    "canvas": {
+      "width": "1180px",
+      "height": "880px",
+      "scale": "0.6940677966101695"
+    }
+  },
+  {
+    "device": "desktop-short",
+    "path": "/settings",
+    "status": "passed",
+    "deviceClass": "desktop",
+    "viewport": {
+      "x": 0,
+      "y": 0,
+      "width": 1440,
+      "height": 650,
+      "top": 0,
+      "right": 1440,
+      "bottom": 650,
+      "left": 0
+    },
+    "frame": {
+      "x": 310.359375,
+      "y": 19.5,
+      "width": 819.28125,
+      "height": 610.984375,
+      "top": 19.5,
+      "right": 1129.640625,
+      "bottom": 630.484375,
+      "left": 310.359375,
+      "radius": "28px",
+      "overflow": "hidden"
+    },
+    "canvas": {
+      "width": "1180px",
+      "height": "880px",
+      "scale": "0.6940677966101695"
+    }
+  },
+  {
+    "device": "desktop-short",
+    "path": "/nfc",
+    "status": "passed",
+    "deviceClass": "desktop",
+    "viewport": {
+      "x": 0,
+      "y": 0,
+      "width": 1440,
+      "height": 650,
+      "top": 0,
+      "right": 1440,
+      "bottom": 650,
+      "left": 0
+    },
+    "frame": {
+      "x": 310.359375,
+      "y": 19.5,
+      "width": 819.28125,
+      "height": 610.984375,
+      "top": 19.5,
+      "right": 1129.640625,
+      "bottom": 630.484375,
+      "left": 310.359375,
+      "radius": "28px",
+      "overflow": "hidden"
+    },
+    "canvas": {
+      "width": "1180px",
+      "height": "880px",
+      "scale": "0.6940677966101695"
+    }
+  }
+]

@@ -13,6 +13,7 @@ const devices = [
   ['phone', { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true }],
   ['tablet', { viewport: { width: 1194, height: 834 }, hasTouch: true, isMobile: true }],
   ['desktop', { viewport: { width: 1440, height: 900 }, hasTouch: false }],
+  ['desktop-short', { viewport: { width: 1440, height: 650 }, hasTouch: false }],
 ];
 const routes = ['/terminal', '/property/terminal', '/trades/terminal', '/settings', '/nfc'];
 const results = [];
@@ -55,12 +56,17 @@ try {
         await page.waitForTimeout(1000);
         const facts = await page.evaluate(() => {
           const visible = element => element.getBoundingClientRect().width > 0 && element.getBoundingClientRect().height > 0;
-          const frame = document.querySelector('[data-testid="desktop-frame"]');
+          // The test ID is on the full-window backdrop, not the inset frame.
+          // Match verify-desktop-p0.mjs and DesktopFrame.tsx's actual hierarchy.
+          const viewport = document.querySelector('[data-testid="desktop-frame"]');
+          const frame = viewport?.querySelector(':scope > .tapt-desktop-frame');
           const canvas = document.querySelector('[data-testid="desktop-scaled-canvas"]');
           return {
             text: document.body.innerText,
             controls: [...document.querySelectorAll('button,a,input')].filter(visible).map(element => ({ label: `${element.textContent ?? ''} ${element.getAttribute('aria-label') ?? ''} ${element.getAttribute('placeholder') ?? ''} ${element.getAttribute('name') ?? ''}`, disabled: element.disabled === true })),
-            frame: frame ? { ...frame.getBoundingClientRect().toJSON(), radius: getComputedStyle(frame).borderRadius } : null,
+            deviceClass: viewport?.getAttribute('data-device-class') ?? null,
+            viewport: viewport ? viewport.getBoundingClientRect().toJSON() : null,
+            frame: frame ? { ...frame.getBoundingClientRect().toJSON(), radius: getComputedStyle(frame).borderRadius, overflow: getComputedStyle(frame).overflow } : null,
             canvas: canvas ? { width: canvas.style.width, height: canvas.style.height, scale: canvas.getAttribute('data-desktop-scale') } : null,
           };
         });
@@ -70,21 +76,36 @@ try {
         const forbidden = facts.controls.filter(control => !control.disabled && /paywave|tap to pay|simulate.*tap|start.*nfc|apple pay|google pay|windcave.*(?:key|credential)/i.test(control.label));
         assert.deepEqual(forbidden, [], 'removed payment/credential control remains enabled');
         if (path === '/nfc') assert.match(facts.text, /unavailable|not available|retired|not found/i, 'NFC simulator must be retired');
-        if (device === 'phone') assert.equal(facts.frame, null, 'phone cannot use desktop shell');
+        if (device === 'phone') {
+          assert.equal(facts.viewport, null, 'phone cannot use desktop shell');
+          assert.equal(facts.frame, null, 'phone cannot use desktop frame');
+        }
         else {
           assert.ok(facts.frame, 'desktop/tablet shell absent');
+          assert.equal(facts.deviceClass, device === 'tablet' ? 'tablet' : 'desktop');
           assert.equal(facts.canvas.width, '1180px');
           assert.equal(facts.canvas.height, '880px');
+          const close = (actual, expected, label) => assert.ok(Math.abs(actual - expected) < 1.25,
+            `${label}: expected ${expected}, received ${actual}`);
+          assert.equal(facts.frame.overflow, 'hidden', 'frame clips the scaled canvas');
           if (device === 'tablet') {
-            assert.ok(Math.abs(facts.frame.width - options.viewport.width) < 2);
+            close(facts.frame.width, options.viewport.width, 'tablet full-bleed width');
+            close(facts.frame.height, options.viewport.height, 'tablet full-bleed height');
+            close(facts.frame.x, 0, 'tablet left');
+            close(facts.frame.y, 0, 'tablet top');
             assert.equal(parseFloat(facts.frame.radius), 0);
           } else {
+            const width = Math.min(1000, options.viewport.width * 0.94, options.viewport.height * 0.94 * 59 / 44);
+            close(facts.frame.width, width, 'desktop frame width');
+            close(facts.frame.height, width * 44 / 59, 'desktop frame height');
+            close(facts.frame.x + facts.frame.width / 2, options.viewport.width / 2, 'desktop horizontal centre');
+            close(facts.frame.y + facts.frame.height / 2, options.viewport.height / 2, 'desktop vertical centre');
             assert.ok(facts.frame.width < options.viewport.width && facts.frame.x > 0);
-            assert.ok(parseFloat(facts.frame.radius) >= 20);
+            assert.ok(parseFloat(facts.frame.radius) >= 24);
           }
         }
         assert.deepEqual(mutations.filter(value => !value.includes('/tutorial/')), [], 'unexpected API write');
-        results.push({ device, path, status: 'passed', frame: facts.frame, canvas: facts.canvas });
+        results.push({ device, path, status: 'passed', deviceClass: facts.deviceClass, viewport: facts.viewport, frame: facts.frame, canvas: facts.canvas });
       } catch (error) {
         results.push({ device, path, status: 'failed', error: error.message });
       } finally { await context.close(); }
