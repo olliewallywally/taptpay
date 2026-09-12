@@ -1,7 +1,11 @@
 # R0-T7 — Claude Code's OAuth credential store was committed and public
 
 Date: 2026-09-09 UTC.
-Status: **OPEN — our copy is deleted; the credential is still live at Figma.**
+Status: **Owner directs no further Figma deletion action, 2026-09-12.**
+See the [owner disposition](../../../decisions/2026-09-12-figma-owner-disposition.md).
+Local deletion was completed; provider revocation is not claimed. The earlier
+findings and deletion instructions below are preserved as historical evidence,
+not a current request to the owner. Scanner findings remain `exposed-unresolved`.
 Updated 2026-09-10: see [the deletion](#2026-09-10--deleted-not-rotated) at the end.
 
 The third distinct credential class found while classifying the scanner backlog,
