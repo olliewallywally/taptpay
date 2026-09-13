@@ -1,6 +1,75 @@
 # Full integration continuation audit — 2026-09-07
 
-Latest continuation (2026-09-12/13, recovering a session that crashed with this
+Latest continuation (2026-09-13, review-gated multi-agent pass — STOPPED
+MID-DOMAIN, read this before continuing): six lanes were run in sequence
+(gap 12's mitigation, then five R1-T3 tenant-scoping domains), each gated
+by an independent 2-3 reviewer panel using the plan's own §21.1 template
+(Blocking Issues / High-Risk Concerns / Final Recommendation) before any
+code was written. Four completed and are committed; **Trades was stopped
+mid-implementation on operator instruction and is NOT committed** — its
+scratch probe test was deleted, nothing else from it survives, and it needs
+to restart from scratch (a background Workflow run's cache does not survive
+into a new session, so do not look for a `resumeFromRunId` — just re-run the
+domain).
+
+- **Gap 12 mitigated (not closed)**, commit `c1e42db1`: `GET
+  /api/merchants/:id/events`'s unauthenticated `legacy-no-board` branch now
+  calls the same `checkRateLimit(clientIp)` its REST sibling
+  `active-transaction` already used, closing the "anonymous caller can hold
+  unbounded connections" abuse surface. Failing-test-first against the real
+  shared limiter. 53 suites / 1020 tests (was 52/1019), `npm run check`
+  clean. **The deeper fix — a per-transaction identifier for the anonymous
+  no-board customer flow — is still open**; it needs the addressing-scheme
+  product decision the original gap-12 writeup called for, not another
+  same-day patch.
+- **Transactions & Refunds — investigated, no gap found**, commit
+  `1269e644`. All 6 global-fetch-plus-route-level-compare sites correctly
+  deny cross-tenant access today, independently re-verified with a live
+  two-merchant runtime probe (built, run, deleted). Surfaced for the owner
+  rather than guessed at: `POST /api/transactions/:id/split` is
+  unauthenticated by design (is that intended?), and the Tap to Pay
+  `transactionId` branch's scope boundary is worth a second look. Also
+  named: sites 2-6 have no committed cross-tenant regression test even
+  though authorization currently holds — an open, no-schema test-coverage
+  follow-up.
+- **Boards & Stock — investigated, no gap found**, commit `7d3681ca`. Four
+  write routes use the discouraged global-fetch-then-compare shape, but the
+  compared `merchantId` always comes from the caller's own JWT
+  (`checkMerchantOwnership`/inline role check), never attacker input — no
+  real bypass. Re-verified with a throwaway two-merchant probe across all
+  four routes.
+- **Property — investigated, no gap found**, commit `b06c42eb`. All 14
+  `tenantProfiles`/`activeSchedules`/`invoicesRentRequests` route+compare
+  sites correctly 403 a second merchant. Named a real structural gap: this
+  vertical has **zero dedicated committed test file** (`grep -rl "property"
+  server/__tests__/*.ts` finds none) — a test-infrastructure hole, not
+  evidence the routes are unsafe, but worth closing before anyone touches
+  this domain again. Also corrected the task's own wording: the property
+  analog is `tenantProfiles`, not `clientProfiles` (the latter is trades'
+  table).
+- **Trades — NOT completed.** Plan and review panel ran and approved
+  proceeding; the implementer had only written a scratch probe test (since
+  deleted, no conclusion recorded) when this pass was stopped. **Nothing
+  about Trades tenant-scoping is known beyond what R1-T3's original
+  inventory already said.** This is the next thing to pick up.
+- **Settings, Uploads & Exports — not started at all.**
+
+Operational note for whoever picks this up: for most of this pass (from
+roughly the Property domain onward) the working tree also contained a
+second, unrelated, uncommitted in-progress feature (a "mobile quote flow"
+redesign of the trades terminal, `docs/HANDOFF-2026-09-13-mobile-quote.md`,
+owner-confirmed as separately-owned work-in-progress, not part of this
+remediation). Every domain agent in this pass ran `git status` first,
+correctly identified those files as out of scope, and staged only its own
+exact files — verified by re-reading each implementer's own transcript, not
+just trusted. None of the four commits above touch any of that feature's
+files. If that work is still uncommitted when Trades/Settings-Uploads-Exports
+restart, the same discipline applies: `git status` first, stage explicitly,
+never a wildcard add. The Property domain's 54-suite/1024-test count (up
+from 53/1020) reflects that feature's own new test files being picked up by
+the test runner, not a regression from this pass.
+
+Prior continuation (2026-09-12/13, recovering a session that crashed with this
 work uncommitted): **[R1-T2 classifier extension and a new suspected SSE gap](r1/R1-T2-classifier-extension-2026-09-12.md)**
 — the prior session had extended the route-policy classifier from four principal
 categories to eight (adding `admin`, `public`, `provider-webhook`,
@@ -251,7 +320,8 @@ backup, deployment or restore checks.
    live Windcave credentials in this environment; both wallet routes and
    this flow are currently inert wherever Windcave is unconfigured), but it
    must not be lost before R3 scoping.
-12. New, owner-visible, deliberately unfixed: unauthenticated live SSE stream
+12. **PARTIALLY MITIGATED 2026-09-13, commit `c1e42db1`** — was: new,
+   owner-visible, deliberately unfixed unauthenticated live SSE stream
    on `GET /api/merchants/:id/events` (`server/routes.ts` ~line 5289-5360).
    Found by the R1-T2 classifier extension (flagged `unauthenticated-suspect`,
    independently verified 2026-09-12/13). When a request supplies neither an
@@ -260,10 +330,11 @@ backup, deployment or restore checks.
    all - anyone who knows or guesses a numeric merchant ID can subscribe and
    receive a live, unbounded-duration feed of that merchant's item names,
    prices, statuses and split state for every stoneless, non-token
-   transaction. Its REST sibling `active-transaction` has the identical
-   no-stoneId access mode by deliberate, already-accepted design, but is
-   rate-limited and returns one point-in-time snapshot; this route has no rate
-   limit and pushes a continuous feed, and the legitimate caller
+   transaction. **The branch now calls the same `checkRateLimit(clientIp)` its
+   REST sibling `active-transaction` already used**, closing the
+   unbounded-concurrent-connections abuse surface — failing-test-first,
+   53 suites/1020 tests, `npm run check` clean. **Still open:** this route has
+   no per-transaction identifier to scope to, and the legitimate caller
    (`customer-payment.tsx`'s no-stoneId `/pay/:merchantId` flow) has no
    per-transaction identifier to scope to, so concurrent stoneless
    transactions at the same merchant would also bleed across customers. See
@@ -302,7 +373,7 @@ may proceed where the plan allows it. Code lanes remain gated by their dependenc
 | R0-H5 | Classify tracked uploads and local dumps | 585 | Owner/professional/provider | PARTIAL: tracked PNG classification recorded; prior inventory was 41; this workspace now has 38 ignored entries. Owner disposition remains open; no contents inspected. |
 | R1-T1 | No-live-system HTTP test harness | 610 | Engineering | Harness implemented early; audit all transport/clock/SSE/push injection and no-network proof after the R0 exit gate. |
 | R1-T2 | Checked-in route policy inventory | 622 | Engineering | PARTIAL: [classifier extended and regenerated 2026-09-12/13](r1/R1-T2-classifier-extension-2026-09-12.md) — 218 registrations, **0 unclassified** (was 96/97), 8 principal categories (added `admin`/`public`/`provider-webhook`/`unauthenticated-suspect`), full server regression unchanged at 52/52 suites, 1019/1019 tests. **Found a new, unfixed suspected gap in the process — see gap 12.** Required per-route fields (capabilityGate, entitlementGate, idempotencyScope, storageMethods, successDto, errorDisclosure) and all-method/use/mounted-router coverage remain incomplete; 0-unclassified is a labeling improvement, not the completed task. |
-| R1-T3 | Explicit role and tenant matrix | 639 | Engineering | PARTIAL: owner defaults fixed; full principal/tenant matrix and runtime coverage open. **The password-path contract is corrected (2026-09-11)** — [evidence](r1/R1-T3-password-path-contract-2026-09-11.md): a cross-tenant path id now returns 403 with both accounts' passwords provably unchanged, red run captured first, route policy regenerated. The route was not moved because its only caller builds the URL from the caller's own JWT. |
+| R1-T3 | Explicit role and tenant matrix | 639 | Engineering | PARTIAL: owner defaults fixed; full principal/tenant matrix and runtime coverage open. **The password-path contract is corrected (2026-09-11)** — [evidence](r1/R1-T3-password-path-contract-2026-09-11.md): a cross-tenant path id now returns 403 with both accounts' passwords provably unchanged, red run captured first, route policy regenerated. The route was not moved because its only caller builds the URL from the caller's own JWT. **Tenant-scoping domain audit (2026-09-13): Transactions & Refunds** ([evidence](r1/R1-T3-transactions-refunds-tenant-scoping-2026-09-13.md)), **Boards & Stock** ([evidence](r1/R1-T3-boards-stock-tenant-scoping-2026-09-13.md)), and **Property** ([evidence](r1/R1-T3-property-tenant-scoping-2026-09-13.md)) were each independently investigated with a live two-merchant runtime probe — all three found already correctly tenant-scoped today, no code change needed. **Trades and Settings/Uploads/Exports have not been investigated** — next up, same methodology. |
 | R1-H1 | Accept the device baseline commit before R1 client changes | 651 | Owner/professional/provider | D10 implementation/ADR recorded; [auth/onboarding visual baseline captured 2026-09-12/13](r1/R1-H1-auth-onboarding-baseline-2026-09-12.md) — 20/20 captures (4 device classes × 5 routes), zero page errors, zero unexpected API writes. This is a capture for Oliver's review, not the acceptance itself; owner sign-off on the visual baseline remains outstanding. |
 | R1-T4 | OAuth rebuild, session storage and shared security primitives | 660 | Engineering | GATED: R0 exit and R1-H1 acceptance; OAuth/session/reset/CORS/distributed-abuse work remains. |
 | R1-T5 | Sign in with Apple — protocol-specific adapter on T4's primitives | 686 | Engineering | GATED: R1-T4, then real Apple provisioning/device verification. |
