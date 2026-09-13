@@ -299,7 +299,41 @@ backup, deployment or restore checks.
    The reviewed decisions now live in `.gitleaks-dispositions.jsonl` and the scan
    gates on undispositioned findings
    ([how to disposition](../../operations/secret-scan-dispositions.md)).
-11. **New, owner-visible, deliberately unfixed: split-payment session replay
+11. **ESCALATED 2026-09-13 — reproduces without an attacker. Decision memo:
+   [gap11 single-use design](../../decisions/2026-09-13-gap11-split-session-single-use-design.md).**
+   Re-verified against live code before recording: after crediting a split,
+   `finaliseHostedPayment` resets session state with
+   `updateTransactionSessionState(transactionId, "pending")`
+   (`server/routes.ts:2862`, comment: *"Reset session state so next split can
+   start a new session"*) while the transaction stays bound to the same,
+   now-spent `windcaveSessionId`. The notification handler's only guard is
+   `if (transaction.windcaveSessionState !== 'pending') return;`
+   (`server/routes.ts:3950`) — which that reset has just re-opened. So a
+   **repeat Windcave FPRN for the already-spent session** resolves the
+   transaction by session id, passes the guard, and credits the next split for
+   free. Windcave documents that FPRNs may be sent more than once, so this can
+   fire in normal operation; a crafted replay is not required. The memo also
+   records that the browser callback needs only the numeric transaction id
+   (`GET /api/windcave/callback?transactionId=N`, unauthenticated, no session
+   id) to reach the same path, and *downgrades* one part of the original
+   finding: the "inflated billed usage" variant appears to be a usage
+   statistic no billing path reads (`server/storage.ts:5908-5909`) — relayed
+   from the memo, not independently re-verified here.
+   **Recommended fix is already-mandated work, not bespoke:** `payment_attempts`
+   carries exactly four indexes and **none on `processor_session_id`**
+   (verified, `shared/schema.ts:280-289`), yet plan §9.4 already requires
+   adding that unique index. Once it exists, single-use consumption is enforced
+   at the database level and this gap closes as a by-product of R2/R3 work.
+   The memo rejects mirroring `splitPaidSessions` as the primary fix: its
+   atomicity does not transfer to retail (claim and credit would touch
+   different tables), it degrades to no-dedupe via `sessionId ?? randomUUID()`,
+   and MemStorage stubs it to `return null`, so it is untestable in the
+   project's main harness. Open owner decisions: retire vs migrate the legacy
+   numeric flow (still routed in `client/src/App.tsx`), whether to take a
+   non-concurrency-safe interim mitigation or wait for the index, retry
+   semantics, and how to treat sessions already spent before deploy.
+   Original finding follows — was: new, owner-visible, deliberately unfixed:
+   split-payment session replay
    in `finaliseHostedPayment` (`server/routes.ts:2823`).** Found while closing
    the R1-T7 null-session bypass above. Once a session has legitimately
    funded one split of a split transaction, replaying that same
@@ -320,7 +354,41 @@ backup, deployment or restore checks.
    live Windcave credentials in this environment; both wallet routes and
    this flow are currently inert wherever Windcave is unconfigured), but it
    must not be lost before R3 scoping.
-12. **PARTIALLY MITIGATED 2026-09-13, commit `c1e42db1`** — was: new,
+12. **ESCALATED 2026-09-13 — this is a payment-correctness defect, not only a
+   confidentiality leak. Partially mitigated (rate limit only) in commit
+   `c1e42db1`. Decision memo:
+   [gap12 addressing options](../../decisions/2026-09-13-gap12-anonymous-sse-addressing-options.md).**
+   Three findings from the memo pass, each independently re-verified against
+   the live code before being recorded here:
+   (a) **Customers can be routed into the wrong sale.**
+   `getActiveTransactionByMerchant` (`server/storage.ts:4698`) orders
+   `createdAt desc` and returns the *newest* pending stoneless sale;
+   `client/src/pages/customer-payment.tsx:107-129` clears its redirect guard
+   whenever that id changes and auto-navigates to `/checkout/<id>`. With two
+   concurrent stoneless sales, a customer waiting on `/pay/:merchantId` is
+   redirected into the other customer's checkout, at the other customer's
+   amount. That is wrong-payment, not disclosure.
+   (b) **The SSE route cannot be fixed alone.** `GET
+   /api/merchants/:id/active-transaction` has the identical unauthenticated
+   no-stoneId access mode and returns the same `publicTransactionDto`. Any fix
+   touching one route and not the other is cosmetic. This reopens a previously
+   accepted design decision and is itself part of what the owner must decide.
+   (c) **The rate-limit mitigation may bound less than it appears.** No
+   `trust proxy` setting exists anywhere in `server/` (verified by grep), so
+   behind Replit's proxy `req.ip` may not key per client at all; and
+   `checkRateLimit` bounds new *requests*, not already-held SSE connections.
+   The commit is still correct and mirrors its accepted sibling exactly, but
+   must not be read as closing the abuse surface. Recorded as uncertain —
+   it needs a deployment-environment check, not an assumption.
+   Memo recommendation (owner decides): land the fail-closed-on-ambiguity +
+   narrowed-payload option now (no product decision, no schema change,
+   red-testable today, not discarded by the end state), then converge on the
+   existing `/pay/t/:token` per-transaction mechanism, which plan §10.3
+   already requires independently. **Blocking owner question: are there
+   printed no-board QR codes or programmed NFC tags in the field?** The
+   product ships an 800px QR download and an NFC-write button, so "no" cannot
+   be assumed, and the answer decides retire-vs-migrate.
+   Original finding follows — was: new,
    owner-visible, deliberately unfixed unauthenticated live SSE stream
    on `GET /api/merchants/:id/events` (`server/routes.ts` ~line 5289-5360).
    Found by the R1-T2 classifier extension (flagged `unauthenticated-suspect`,
