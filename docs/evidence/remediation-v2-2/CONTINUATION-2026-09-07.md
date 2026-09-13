@@ -1,6 +1,46 @@
 # Full integration continuation audit — 2026-09-07
 
-Latest continuation (2026-09-13, review-gated multi-agent pass — STOPPED
+Latest continuation (2026-09-13, second half — STOPPED ON INSTRUCTION, read
+this and the entry below it before continuing). Three things happened after the
+pass described in the next entry was stopped and restarted:
+
+1. **Trades tenant-scoping completed** ([evidence](r1/R1-T3-trades-tenant-scoping-2026-09-13.md)),
+   commit `06e40012` — investigated, **no gap found**, no code change, same
+   method as its three sibling domains (live-code read plus a throwaway
+   two-merchant runtime probe). That makes **four of five R1-T3 domains
+   investigated with no tenant-scoping gap found**. The fifth, **Settings,
+   Uploads & Exports, was stopped during its read-only planning phase and left
+   no artifacts — it is untouched and still to do.** Its scope, including the
+   plan §8.4 requirement that the logo route must not accept or write a file
+   before merchant ownership is known, is unchanged.
+2. **Gaps 11 and 12 both escalated**, commit `0b144592`, with decision memos —
+   see their entries in the gap list below. Both were found to be materially
+   worse than filed; every escalation claim was independently re-verified
+   against live code before being recorded.
+3. **Gap 12's fix was reframed by a later finding**, recorded in
+   [owner input and the linkMode finding](../../decisions/2026-09-13-gap12-owner-input-and-linkmode-finding.md).
+   Short version: per-transaction addressing (`linkMode: "per_payment"` →
+   `/pay/t/<token>`) **already exists, is already shipped, and the desktop
+   retail terminal already uses it** for board-less sales, which is why those
+   sales are already immune. The entire vulnerable population is three older
+   terminals (`merchant-terminal.tsx:198`,
+   `merchant-terminal-mobile.tsx:237`, `merchant-terminal-mobile-v2.tsx:221`)
+   that never pass `linkMode` and so silently default to `"legacy"`. The fix is
+   therefore not a redesign — it is making three screens do what a fourth
+   already does. **Not implemented: it edits client terminal files, which R1-H1
+   still gates, and it needs the production value of
+   `FEATURE_NEW_RETAIL_PAYMENTS` confirmed first** (the memo gives an exact
+   behavioural check that needs no infra access).
+
+**Owner input recorded this session** (answers to the options memo's blocking
+questions): there are **no printed no-board QR codes or programmed NFC tags in
+the field — demo only**; the no-board `/pay/:merchantId` flow **is** in real use
+for sales not run through a payment board; `FEATURE_NEW_RETAIL_PAYMENTS` is
+believed on in production but is **not** independently verified. The first
+answer removes the only blocker the memo identified to retiring the standing
+merchant-wide address.
+
+Prior continuation (2026-09-13, review-gated multi-agent pass — STOPPED
 MID-DOMAIN, read this before continuing): six lanes were run in sequence
 (gap 12's mitigation, then five R1-T3 tenant-scoping domains), each gated
 by an independent 2-3 reviewer panel using the plan's own §21.1 template
@@ -441,7 +481,7 @@ may proceed where the plan allows it. Code lanes remain gated by their dependenc
 | R0-H5 | Classify tracked uploads and local dumps | 585 | Owner/professional/provider | PARTIAL: tracked PNG classification recorded; prior inventory was 41; this workspace now has 38 ignored entries. Owner disposition remains open; no contents inspected. |
 | R1-T1 | No-live-system HTTP test harness | 610 | Engineering | Harness implemented early; audit all transport/clock/SSE/push injection and no-network proof after the R0 exit gate. |
 | R1-T2 | Checked-in route policy inventory | 622 | Engineering | PARTIAL: [classifier extended and regenerated 2026-09-12/13](r1/R1-T2-classifier-extension-2026-09-12.md) — 218 registrations, **0 unclassified** (was 96/97), 8 principal categories (added `admin`/`public`/`provider-webhook`/`unauthenticated-suspect`), full server regression unchanged at 52/52 suites, 1019/1019 tests. **Found a new, unfixed suspected gap in the process — see gap 12.** Required per-route fields (capabilityGate, entitlementGate, idempotencyScope, storageMethods, successDto, errorDisclosure) and all-method/use/mounted-router coverage remain incomplete; 0-unclassified is a labeling improvement, not the completed task. |
-| R1-T3 | Explicit role and tenant matrix | 639 | Engineering | PARTIAL: owner defaults fixed; full principal/tenant matrix and runtime coverage open. **The password-path contract is corrected (2026-09-11)** — [evidence](r1/R1-T3-password-path-contract-2026-09-11.md): a cross-tenant path id now returns 403 with both accounts' passwords provably unchanged, red run captured first, route policy regenerated. The route was not moved because its only caller builds the URL from the caller's own JWT. **Tenant-scoping domain audit (2026-09-13): Transactions & Refunds** ([evidence](r1/R1-T3-transactions-refunds-tenant-scoping-2026-09-13.md)), **Boards & Stock** ([evidence](r1/R1-T3-boards-stock-tenant-scoping-2026-09-13.md)), and **Property** ([evidence](r1/R1-T3-property-tenant-scoping-2026-09-13.md)) were each independently investigated with a live two-merchant runtime probe — all three found already correctly tenant-scoped today, no code change needed. **Trades and Settings/Uploads/Exports have not been investigated** — next up, same methodology. |
+| R1-T3 | Explicit role and tenant matrix | 639 | Engineering | PARTIAL: owner defaults fixed; full principal/tenant matrix and runtime coverage open. **The password-path contract is corrected (2026-09-11)** — [evidence](r1/R1-T3-password-path-contract-2026-09-11.md): a cross-tenant path id now returns 403 with both accounts' passwords provably unchanged, red run captured first, route policy regenerated. The route was not moved because its only caller builds the URL from the caller's own JWT. **Tenant-scoping domain audit (2026-09-13): Transactions & Refunds** ([evidence](r1/R1-T3-transactions-refunds-tenant-scoping-2026-09-13.md)), **Boards & Stock** ([evidence](r1/R1-T3-boards-stock-tenant-scoping-2026-09-13.md)), **Property** ([evidence](r1/R1-T3-property-tenant-scoping-2026-09-13.md)), and **Trades** ([evidence](r1/R1-T3-trades-tenant-scoping-2026-09-13.md)) were each independently investigated with a live two-merchant runtime probe — all four found already correctly tenant-scoped today, no code change needed. **Settings/Uploads/Exports is the one remaining domain and has NOT been investigated** (stopped during read-only planning, no artifacts left) — next up, same methodology, including the plan §8.4 check that the logo route must not accept or write a file before merchant ownership is known. Note what these four results do and do not establish: they show the *compared* merchantId is JWT-derived rather than attacker-controllable at each site, not that the storage layer has been migrated to tenant-scoped methods as §8.5 prefers; that refactor remains open. |
 | R1-H1 | Accept the device baseline commit before R1 client changes | 651 | Owner/professional/provider | D10 implementation/ADR recorded; [auth/onboarding visual baseline captured 2026-09-12/13](r1/R1-H1-auth-onboarding-baseline-2026-09-12.md) — 20/20 captures (4 device classes × 5 routes), zero page errors, zero unexpected API writes. This is a capture for Oliver's review, not the acceptance itself; owner sign-off on the visual baseline remains outstanding. |
 | R1-T4 | OAuth rebuild, session storage and shared security primitives | 660 | Engineering | GATED: R0 exit and R1-H1 acceptance; OAuth/session/reset/CORS/distributed-abuse work remains. |
 | R1-T5 | Sign in with Apple — protocol-specific adapter on T4's primitives | 686 | Engineering | GATED: R1-T4, then real Apple provisioning/device verification. |
