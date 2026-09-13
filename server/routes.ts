@@ -5334,6 +5334,15 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         }
         audience = { kind: "board", stoneId };
       } else {
+        // SECURITY: this branch has no authentication of any kind (same
+        // no-stoneId access mode as GET /api/merchants/:id/active-transaction
+        // above), so it must not be exempt from the abuse-rate bound that
+        // sibling already enforces.
+        const clientIp = req.ip || 'unknown';
+        if (!checkRateLimit(clientIp)) {
+          console.warn(`SECURITY: Rate limit exceeded for IP ${clientIp} on events endpoint`);
+          return res.status(429).json({ message: "Too many requests. Please try again later." });
+        }
         audience = { kind: "legacy-no-board" };
       }
 
