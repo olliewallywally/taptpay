@@ -1,5 +1,29 @@
 # Full integration continuation audit — 2026-09-07
 
+Latest continuation (2026-09-12/13, recovering a session that crashed with this
+work uncommitted): **[R1-T2 classifier extension and a new suspected SSE gap](r1/R1-T2-classifier-extension-2026-09-12.md)**
+— the prior session had extended the route-policy classifier from four principal
+categories to eight (adding `admin`, `public`, `provider-webhook`,
+`unauthenticated-suspect`) but crashed before regenerating the derived artifacts,
+running regression, or writing up its own finding. This continuation regenerated
+both derived files (218 registrations, **0 unclassified**, down from 96/97 across
+prior continuations, 1 suspected gap), reran the full server suite (52/52 suites,
+1019/1019 tests — unchanged, since this generator only produces policy-table
+output and changes no runtime behavior), and independently verified the flagged
+finding by reading the live handler and broker code: **`GET
+/api/merchants/:id/events` opens its live SSE stream with zero authentication
+when neither an `Authorization` header nor `?stoneId=` is supplied** — worse than
+its already-accepted `active-transaction` sibling because it has no rate limit and
+pushes a continuous feed of every future stoneless transaction event, not one
+rate-limited snapshot. **Confirmed real, not fixed** — see gap 12 below and the
+evidence file for the full mechanism and why a same-day patch was not attempted.
+Also completed in this window: **[R1-H1 auth/onboarding visual baseline
+capture](r1/R1-H1-auth-onboarding-baseline-2026-09-12.md)** — the prior session's
+new capture script had been created but never successfully run; it now has
+run cleanly (20/20 captures across 4 device classes × 5 routes, zero page errors,
+zero unexpected API writes). This is a capture for Oliver's review, not the R1-H1
+acceptance itself.
+
 Owner update 2026-09-12: **the production database password has been rotated**, and
 Oliver confirmed everything else he identified as needing rotation/deletion is done.
 [Decision and exact scope](../../decisions/2026-09-12-production-db-password-rotation-and-r0-h2-disposition.md).
@@ -227,6 +251,32 @@ backup, deployment or restore checks.
    live Windcave credentials in this environment; both wallet routes and
    this flow are currently inert wherever Windcave is unconfigured), but it
    must not be lost before R3 scoping.
+12. New, owner-visible, deliberately unfixed: unauthenticated live SSE stream
+   on `GET /api/merchants/:id/events` (`server/routes.ts` ~line 5289-5360).
+   Found by the R1-T2 classifier extension (flagged `unauthenticated-suspect`,
+   independently verified 2026-09-12/13). When a request supplies neither an
+   `Authorization` header nor `?stoneId=`, the handler opens the SSE stream
+   with a `{ kind: "legacy-no-board" }` audience and no authentication check at
+   all - anyone who knows or guesses a numeric merchant ID can subscribe and
+   receive a live, unbounded-duration feed of that merchant's item names,
+   prices, statuses and split state for every stoneless, non-token
+   transaction. Its REST sibling `active-transaction` has the identical
+   no-stoneId access mode by deliberate, already-accepted design, but is
+   rate-limited and returns one point-in-time snapshot; this route has no rate
+   limit and pushes a continuous feed, and the legitimate caller
+   (`customer-payment.tsx`'s no-stoneId `/pay/:merchantId` flow) has no
+   per-transaction identifier to scope to, so concurrent stoneless
+   transactions at the same merchant would also bleed across customers. See
+   [the evidence file](r1/R1-T2-classifier-extension-2026-09-12.md) for the
+   full mechanism, the comparison against `active-transaction`, and why a
+   same-day patch was not attempted: a narrow rate-limit addition is low-risk
+   and could be done on request, but the real fix needs a decision on how the
+   anonymous no-board customer flow should address its own transaction without
+   a session - an addressing-scheme question that belongs with R1-T3/R1-T7's
+   tenant-scoping work, not a unilateral same-day redesign. Not currently a
+   live-funds risk (no Windcave credentials configured in this environment;
+   the leak is metadata, not payment credentials), but a real confidentiality
+   and tenant-isolation gap that must not be lost.
 
 ## Every named task and phase
 
@@ -251,9 +301,9 @@ may proceed where the plan allows it. Code lanes remain gated by their dependenc
 | R0-H4 | Review access logs and scan history | 578 | Owner/professional/provider | OPEN: owner-reported no suspicious activity is recorded, but full redacted history/access review and disposition remain unverified. |
 | R0-H5 | Classify tracked uploads and local dumps | 585 | Owner/professional/provider | PARTIAL: tracked PNG classification recorded; prior inventory was 41; this workspace now has 38 ignored entries. Owner disposition remains open; no contents inspected. |
 | R1-T1 | No-live-system HTTP test harness | 610 | Engineering | Harness implemented early; audit all transport/clock/SSE/push injection and no-network proof after the R0 exit gate. |
-| R1-T2 | Checked-in route policy inventory | 622 | Engineering | PARTIAL: [regenerated 2026-09-11 against `5d30caf6`](r1/R1-T2-route-inventory-table.md) — 218 registrations (91 GET/88 POST/3 PATCH/5 ALL/22 PUT/9 DELETE), 96 still unclassified (was 97; essentially a regen after the R0-T5 auth fix, not a new classification pass). Required per-route fields and all-method/use/mounted-router coverage remain incomplete. |
+| R1-T2 | Checked-in route policy inventory | 622 | Engineering | PARTIAL: [classifier extended and regenerated 2026-09-12/13](r1/R1-T2-classifier-extension-2026-09-12.md) — 218 registrations, **0 unclassified** (was 96/97), 8 principal categories (added `admin`/`public`/`provider-webhook`/`unauthenticated-suspect`), full server regression unchanged at 52/52 suites, 1019/1019 tests. **Found a new, unfixed suspected gap in the process — see gap 12.** Required per-route fields (capabilityGate, entitlementGate, idempotencyScope, storageMethods, successDto, errorDisclosure) and all-method/use/mounted-router coverage remain incomplete; 0-unclassified is a labeling improvement, not the completed task. |
 | R1-T3 | Explicit role and tenant matrix | 639 | Engineering | PARTIAL: owner defaults fixed; full principal/tenant matrix and runtime coverage open. **The password-path contract is corrected (2026-09-11)** — [evidence](r1/R1-T3-password-path-contract-2026-09-11.md): a cross-tenant path id now returns 403 with both accounts' passwords provably unchanged, red run captured first, route policy regenerated. The route was not moved because its only caller builds the URL from the caller's own JWT. |
-| R1-H1 | Accept the device baseline commit before R1 client changes | 651 | Owner/professional/provider | D10 implementation/ADR recorded; exact post-R0 visual baseline and owner acceptance explicitly outstanding. |
+| R1-H1 | Accept the device baseline commit before R1 client changes | 651 | Owner/professional/provider | D10 implementation/ADR recorded; [auth/onboarding visual baseline captured 2026-09-12/13](r1/R1-H1-auth-onboarding-baseline-2026-09-12.md) — 20/20 captures (4 device classes × 5 routes), zero page errors, zero unexpected API writes. This is a capture for Oliver's review, not the acceptance itself; owner sign-off on the visual baseline remains outstanding. |
 | R1-T4 | OAuth rebuild, session storage and shared security primitives | 660 | Engineering | GATED: R0 exit and R1-H1 acceptance; OAuth/session/reset/CORS/distributed-abuse work remains. |
 | R1-T5 | Sign in with Apple — protocol-specific adapter on T4's primitives | 686 | Engineering | GATED: R1-T4, then real Apple provisioning/device verification. |
 | R1-T6 | Strict numeric path and query parsing — review snapshot has 71 path and 7 query sites | 699 | Engineering | **Task check MET 2026-09-11** — [bounded query values and the source guard](r1/R1-T6-bounded-query-values-2026-09-11.md). The handoff's "five remaining sites" undercounted: four more of the same class hid behind `Number(req.query...)`, `Number.parseInt(String(...))`, `parseInt(String(...))` and a `/^\d+$/` that accepted `0` — one of which passed `NaN` to storage — plus three `parseInt(req.params)` in `middleware/merchant-validation.ts`. All migrated to a reviewed typed schema; zero permissive parses remain in production server code; source guard active **with no allowlist**. Two superseded tests corrected, quoted in the evidence. R1-T2's 97 unclassified registrations are unchanged and still gate the wider task. |

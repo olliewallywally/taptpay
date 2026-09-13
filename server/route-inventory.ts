@@ -128,11 +128,189 @@ export const KNOWN_GATE_MARKERS = [
   "req.user?.role !== \"admin\"",
   "req.user.role === 'admin'",
   "req.user.role !== 'admin'",
+  // R1-T2 2026-09-12 classifier extension (docs/evidence/remediation-v2-2/r1/ —
+  // seven analysis passes over server/routes.ts): `authenticateAdmin` is a
+  // real, strict gate (server/routes.ts ~line 430 — wraps authenticateToken,
+  // then requires role==="admin", merchantId===0, and an exact
+  // config.admin.email match) used as the literal middleware argument on
+  // every /api/admin/* route plus POST /api/merchants/:id/test-payment-link.
+  // It was previously invisible to this list, so every route gated ONLY by
+  // it fell through to "unclassified" despite being the most tightly gated
+  // routes in the file.
+  "authenticateAdmin",
 ] as const;
 
 export function detectGateMarkers(handlerSlice: string): string[] {
   return KNOWN_GATE_MARKERS.filter((marker) => handlerSlice.includes(marker));
 }
+
+/**
+ * R1-T2 2026-09-12 classifier extension — literal call-site substrings this
+ * repo already uses that signal "this handler was deliberately designed to
+ * be reached with no session", not merely "no known gate marker was found
+ * near it". Each entry here was verified by reading the actual handler body
+ * in server/routes.ts (not inferred from the path alone) during the seven
+ * R1-T2 analysis passes recorded under docs/evidence/remediation-v2-2/r1/.
+ * These are NOT auth gates — detectPublicMarkers() is only consulted by
+ * classifyPrincipal() (scripts/generate-route-policy.ts) after every real
+ * gate marker above has already failed to match, so a route that also
+ * carries e.g. authenticateToken is classified "merchant-user" regardless
+ * of whether one of these substrings also appears in its slice (some of
+ * these helpers — generatePaymentUrl(, isTokenAddressedTransaction( — are
+ * reused by authenticated handlers too, purely to build a response field).
+ *
+ * What each one stands for (see the R1-T2 evidence for the per-route
+ * findings that motivated it):
+ *  - resolvePaymentToken(, loadTokenReceipt(, prepareTokenCompletion(:
+ *    the /api/pay/t/:token/* bearer-token customer payment flow. The latter
+ *    two are intermediate helpers whose OWN definition (not each call site)
+ *    contains resolvePaymentToken( — sliceHandlerBodies() does not attribute
+ *    a helper's body to every caller, so the helper-call identifier itself
+ *    is the marker that actually lands in each route's own slice.
+ *  - isTokenAddressedTransaction(: the numeric-id customer payment flow
+ *    (/api/transactions/:id/*, /api/split-payments/:id) — excludes
+ *    token-addressed transactions, the only gate these routes have.
+ *  - getCheckoutInvoiceByToken(: the /api/checkout/* hosted rent/trades
+ *    checkout flow's token lookup.
+ *  - publicMerchantBrandDto(, publicTransactionDto(: the two
+ *    hand-allowlisted "public<Name>Dto(" response projections
+ *    (server/http-contracts.ts) already in use for customer-facing reads.
+ *  - generatePaymentUrl(: pure string templating (server/url-utils.ts), no
+ *    storage access — used by the NFC tap-landing redirects and printable
+ *    QR routes to build the already-public payment URL.
+ *  - paymentAttempts.resolveReturnState(: the HMAC-derived opaque state
+ *    token gating the Windcave hosted-payment browser-return redirect.
+ *  - validateResetToken(, resetPassword(, requestPasswordReset(: the
+ *    password-reset flow, necessarily reachable with no session.
+ *  - getMerchantByToken(, getQuoteByToken(, getUserByInviteToken(,
+ *    storage.verifyMerchant(: this codebase's established
+ *    "opaque-token-is-the-credential" idiom (email-confirmation, trades
+ *    quote magic links, team invite acceptance, merchant signup
+ *    verification) — every `*ByToken(`/`verifyMerchant(` call site in
+ *    routes.ts was checked and none sit in a route that ALSO carries a real
+ *    gate marker.
+ *  - billingCardCallback: the named handler reference shared by the
+ *    GET/POST /api/billing/card/callback pair — their own registration line
+ *    IS their entire slice (no inline body), so the bare identifier is the
+ *    only text available to match.
+ */
+export const KNOWN_PUBLIC_MARKERS = [
+  "resolvePaymentToken(",
+  "loadTokenReceipt(",
+  "prepareTokenCompletion(",
+  "isTokenAddressedTransaction(",
+  "getCheckoutInvoiceByToken(",
+  "publicMerchantBrandDto(",
+  "publicTransactionDto(",
+  "generatePaymentUrl(",
+  "paymentAttempts.resolveReturnState(",
+  "validateResetToken(",
+  "resetPassword(",
+  "requestPasswordReset(",
+  "getMerchantByToken(",
+  "getQuoteByToken(",
+  "getUserByInviteToken(",
+  "storage.verifyMerchant(",
+  "billingCardCallback",
+] as const;
+
+export function detectPublicMarkers(handlerSlice: string): string[] {
+  return KNOWN_PUBLIC_MARKERS.filter((marker) => handlerSlice.includes(marker));
+}
+
+/**
+ * R1-T2 2026-09-12 classifier extension — call-site substrings that signal a
+ * deliberate provider-to-server webhook gate (possession of a shared secret
+ * the provider echoes back, verified in the handler itself) rather than a
+ * bearer-token/session check. This is deliberately small: the dominant
+ * provider-webhook shape in this codebase — Windcave's notificationUrl
+ * callbacks — is caught by path/method instead (see
+ * isNotificationWebhookRegistration below), because those handlers
+ * distrust the inbound body entirely and re-query the provider, leaving no
+ * positive call-site marker to match on.
+ */
+export const KNOWN_PROVIDER_WEBHOOK_MARKERS = ['req.headers["apikey"]'] as const;
+
+export function detectProviderWebhookMarkers(handlerSlice: string): string[] {
+  return KNOWN_PROVIDER_WEBHOOK_MARKERS.filter((marker) => handlerSlice.includes(marker));
+}
+
+/**
+ * R1-T2 2026-09-12 — this repo's consistent naming convention for a
+ * Windcave (or equivalent payment-provider) server-to-server notification
+ * URL: registered with `app.all(...)` (the provider may retry with a
+ * different verb) on a path with a "notification" segment, and the handler
+ * never trusts the inbound body — it re-queries the provider before acting.
+ * Verified against all 5 occurrences in server/routes.ts (ALL
+ * /api/pay/notification/:state, /api/windcave/notification,
+ * /api/windcave/rent-notification, /api/windcave/trades-notification,
+ * /api/billing/card/notification) before adding this rule; checked ahead of
+ * every marker-based rule in classifyPrincipal so it is not defeated by
+ * helper-function text that a neighboring route's slice happens to swallow
+ * (see the sliceHandlerBodies boundary note on KNOWN_PUBLIC_MARKERS above).
+ */
+export function isNotificationWebhookRegistration(method: string, routePath: string): boolean {
+  return method === "ALL" && /notification/i.test(routePath);
+}
+
+/**
+ * R1-T2 2026-09-12 — routes with no reliable call-site text to match on at
+ * all (a static/no-op handler, or the one genuinely-intended marker sits in
+ * a leading comment that sliceHandlerBodies attributes to the PRECEDING
+ * registration, not this one — see the R1-T2 evidence for each). Each entry
+ * was read in full against server/routes.ts, not inferred from its path;
+ * the comment on each line is that reading's conclusion, not a guess.
+ * Curated allowlist, not a text marker — exactly what several of the R1-T2
+ * analysis passes independently recommended for this class of route.
+ */
+export const PUBLIC_PATH_ALLOWLIST: Record<string, string> = {
+  "GET /robots.txt": "static well-known text file, no middleware",
+  "GET /.well-known/apple-developer-merchantid-domain-association":
+    "Apple Pay domain-verification file Apple's own servers must fetch unauthenticated",
+  "GET /api/merchants/:id/stone/:stoneId/qr":
+    "printable per-stone payment QR PNG (stone.paymentUrl, already public); no PII",
+  "GET /api/merchants/:id/email-status":
+    "boolean-only lookup for the pre-session /business-details soft gate; leading '// Public' comment is misattributed by sliceHandlerBodies to the preceding registration",
+  "GET /api/payments/digital-wallet/config":
+    "static Apple/Google Pay capability booleans + publishable merchant ids, no secret",
+  "GET /api/push/capabilities": "static VAPID/APNs-configured booleans, no secret",
+  "GET /api/push/vapid-key": "Web Push VAPID PUBLIC key — not a secret by the standard's own design",
+  "GET /api/windcave/env": "publishable Apple/Google Pay merchant ids for the unauthenticated checkout page",
+  "GET /api/windcave/status": "diagnostic booleans + non-secret API base URL",
+  "GET /uploads/:folder/:name":
+    "static file server; access model is filename unguessability (merchant logo by numeric id is already public, invoice docs by 64-bit random filename) not a server-side authz check — flagged for awareness in R1-T2 notes, not a gap",
+  "GET /api/nfc/capabilities": "static tap-to-pay capability booleans, no secret",
+  "GET /api/tapt-stones/:id":
+    "raw row has no sensitive fields (id/merchantId/name/stoneNumber/qrCodeUrl/paymentUrl/isActive/timestamps) — paymentUrl/qrCodeUrl are already the public payment link",
+  "GET /api/auth/google": "OAuth consent-redirect initiation; necessarily pre-session",
+  "GET /api/auth/google/callback": "OAuth callback that ISSUES the JWT; necessarily pre-session",
+  "POST /api/auth/login": "credential-checked login endpoint that issues the JWT; necessarily pre-session",
+  "POST /api/admin/auth/login": "credential-checked admin login endpoint that issues the admin JWT; necessarily pre-session",
+  "POST /api/auth/resend-confirmation":
+    "leading '// Resend confirmation email (public — for check-email screen)' comment is misattributed by sliceHandlerBodies to the preceding registration; rate-limited, resends only to the account's own on-file email",
+  "POST /api/merchants/signup": "account-creation endpoint; necessarily pre-session, rate-limited",
+  "POST /api/info-pack-leads": "leading '// public endpoint, no auth required' comment misattributed; rate-limited lead capture",
+  "POST /api/board-builder/submit": "leading '(public endpoint)' comment misattributed; emails a submitted PDF, no sensitive read",
+};
+
+/**
+ * R1-T2 2026-09-12 — a route that LOOKS like it should require auth and
+ * does not, found incidentally while classifying the 96 routes above (not
+ * itself one of the 96 — route-policy.ts already called it "merchant-user"
+ * because one of its three branches genuinely does gate on
+ * authenticateToken). Deliberately classified as "unauthenticated-suspect"
+ * rather than silently left at "merchant-user" (which would hide it) or
+ * quietly relabeled "public" (which would look like an intentional,
+ * reviewed design decision, same as everything above) — see
+ * docs/evidence/remediation-v2-2/r1/ for the full writeup. This is NOT a
+ * fix: the route in server/routes.ts is untouched; R1-T3 (or whoever owns
+ * that route) needs to look at the `legacy-no-board` fallback branch
+ * directly.
+ */
+export const SUSPECTED_GAP_ROUTES: Record<string, string> = {
+  "GET /api/merchants/:id/events":
+    "SSE stream (server/routes.ts ~5289-5360): the Authorization-header branch and the stoneId-present branch are properly scoped, but when NEITHER is supplied the handler falls through to audience { kind: 'legacy-no-board' } and opens the merchant's live SSE stream with zero authentication and zero stone-ownership scoping to anyone who knows/guesses the numeric merchantId.",
+};
 
 /** Slices from one registration's start line to just before the next `app.` call, for marker detection. */
 export function sliceHandlerBodies(sourceText: string, registrations: RouteRegistration[]): string[] {
