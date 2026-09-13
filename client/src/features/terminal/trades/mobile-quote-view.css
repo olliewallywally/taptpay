@@ -1,0 +1,124 @@
+.trades-terminal-view.tp-viewport .mq-screen.tp-feature { grid-template-rows: 35% 65%; background: #040D6D; }
+.trades-terminal-view .mq-hero { background: #F4F4F4; color: #040D6D; display: flex; flex-direction: column; }
+.trades-terminal-view .mq-top { display: flex; align-items: center; justify-content: space-between; padding: 20px 22px 0; }
+.trades-terminal-view .mq-top button { font-size: 30px; font-weight: 300; }
+.trades-terminal-view .mq-heading { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 12px; padding: 10px 28px 64px; }
+.trades-terminal-view .mq-heading > div:last-child { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trades-terminal-view .mq-panel { background: #040D6D; color: #58ABFF; padding-top: 18px; }
+.trades-terminal-view .mq-body { display: flex; flex-direction: column; }
+.trades-terminal-view .mq-start { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; }
+.trades-terminal-view .mq-screen h1:not(.mq-success-title) { font-size: 24px; font-weight: 500; margin: 0 0 16px; }
+.trades-terminal-view .mq-arrow { width: 64px; height: 64px; border: 1px solid #58ABFF; color: #58ABFF; background: transparent; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; }
+.trades-terminal-view .mq-arrow:active { transform: scale(.94); }
+.trades-terminal-view .mq-form { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.trades-terminal-view .mq-scroll { flex: 1; min-height: 0; overflow-y: auto; padding-bottom: 10px; }
+.trades-terminal-view .mq-screen label { display: block; font-size: 12px; margin-bottom: 10px; }
+.trades-terminal-view .mq-screen input,
+.trades-terminal-view .mq-screen select,
+.trades-terminal-view .mq-screen textarea { width: 100%; min-width: 0; box-sizing: border-box; border: 1px solid rgba(88,171,255,.5); border-radius: 16px; background: rgba(88,171,255,.025); color: #b9dcff; padding: 11px 12px; font-family: inherit; font-size: 16px; margin-top: 5px; }
+.trades-terminal-view .mq-screen button:focus-visible,
+.trades-terminal-view .mq-screen input:focus-visible,
+.trades-terminal-view .mq-screen select:focus-visible,
+.trades-terminal-view .mq-screen textarea:focus-visible { outline: 2px solid #58ABFF; outline-offset: 3px; }
+.trades-terminal-view .mq-screen button:disabled { opacity: .4; cursor: default; }
+.trades-terminal-view .mq-or { text-align: center; font-size: 12px; margin: 12px 0; }
+.trades-terminal-view .mq-footer { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; padding-top: 8px; }
+.trades-terminal-view .mq-footer [role=alert] { color: #ffb6be; font-size: 13px; margin: 0; }
+.trades-terminal-view .mq-text-button { border: 0; background: transparent; color: #58ABFF; min-height: 44px; padding: 8px 12px; font: inherit; cursor: pointer; }
+.trades-terminal-view .mq-line { display: grid; grid-template-columns: 1fr 1.5fr 44px; gap: 0 8px; margin-bottom: 12px; }
+.trades-terminal-view .mq-description { grid-column: 1 / -1; }
+.trades-terminal-view .mq-remove { align-self: end; min-height: 44px; margin-bottom: 10px; background: transparent; border: 0; color: #58ABFF; font-size: 24px; }
+.trades-terminal-view .mq-totals { width: 100%; background: rgba(88,171,255,.08); border: 1px solid rgba(88,171,255,.25); border-radius: 16px; padding: 12px 16px; font-size: 13px; }
+.trades-terminal-view .mq-totals > div { display: flex; justify-content: space-between; padding: 3px 0; }
+.trades-terminal-view .mq-total { color: #F4F4F4; font-size: 18px; }
+.trades-terminal-view .mq-toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 14px; border: 1px solid #58ABFF; border-radius: 16px; background: transparent; color: #58ABFF; font: inherit; }
+.trades-terminal-view .mq-switch { width: 42px; height: 25px; border-radius: 30px; background: #31589d; position: relative; }
+.trades-terminal-view .mq-switch > span { width: 19px; height: 19px; position: absolute; left: 3px; top: 3px; border-radius: 50%; background: #F4F4F4; transition: transform .2s; }
+.trades-terminal-view .mq-switch[data-on=true] { background: #58ABFF; }
+.trades-terminal-view .mq-switch[data-on=true] > span { transform: translateX(17px); }
+.trades-terminal-view .mq-deposit { animation: tp-popIn .35s ease both; padding-top: 12px; }
+.trades-terminal-view .mq-presets { display: flex; gap: 8px; }
+.trades-terminal-view .mq-presets button { flex: 1; min-height: 44px; border: 1px solid #58ABFF; border-radius: 24px; background: transparent; color: #58ABFF; font: inherit; }
+.trades-terminal-view .mq-presets button[aria-pressed=true] { background: rgba(88,171,255,.16); color: #b9dcff; box-shadow: inset 0 0 16px rgba(88,171,255,.09); }
+.trades-terminal-view .mq-custom { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+.trades-terminal-view .mq-deposit p { font-size: 13px; display: flex; justify-content: space-between; }
+.trades-terminal-view .mq-notes { margin-top: 20px; }
+.trades-terminal-view .mq-notes textarea { min-height: 90px; resize: vertical; }
+.trades-terminal-view .mq-success { display: flex; flex-direction: column; align-items: center; gap: 14px; min-height: 100%; }
+.trades-terminal-view .mq-success-title { font-weight: 900; font-size: 42px; letter-spacing: -.04em; }
+.trades-terminal-view .mq-success p { margin: 0; text-align: center; font-size: 14px; }
+.trades-terminal-view .mq-success-actions { display: flex; gap: 10px; width: 100%; margin-top: auto; }
+.trades-terminal-view .mq-success-actions button { flex: 1; padding-inline: 12px; }
+.trades-terminal-view .mq-success > input { font-size: 16px; }
+@media (prefers-reduced-motion: reduce) {
+  .trades-terminal-view .mq-form, .trades-terminal-view .mq-deposit, .trades-terminal-view .mq-success > *, .trades-terminal-view .mq-success .tp-pulse { animation: none; }
+  .trades-terminal-view .mq-switch > span { transition: none; }
+}
+/* The app's legacy global input rules are !important. Override them only
+   inside this mobile quote form so entered text stays readable on navy. */
+.trades-terminal-view .mq-screen input,
+.trades-terminal-view .mq-screen input:focus { background: rgba(88,171,255,.025) !important; color: #b9dcff !important; border: 1px solid rgba(88,171,255,.5) !important; }
+.trades-terminal-view .mq-screen input::placeholder { color: rgba(185,220,255,.5) !important; }
+.trades-terminal-view:has(.mq-screen[data-quote-step="success"]) .tp-psubbar { visibility: hidden; pointer-events: none; }
+/* Keep the normal 35/65 split until the software keyboard needs the space.
+   The outer panel then scrolls the whole form, including its next action. */
+:root[data-kb-open] .trades-terminal-view.tp-viewport .mq-screen.tp-feature { grid-template-rows: minmax(0, 96px) minmax(calc(176px + var(--kb-h, 0px)), 1fr); }
+:root[data-kb-open] .trades-terminal-view .mq-heading { display: none; }
+:root[data-kb-open] .trades-terminal-view .mq-form { min-height: 280px; flex-shrink: 0; }
+:root[data-kb-open] .trades-terminal-view .mq-scroll { min-height: 96px; }
+
+/* Mobile quote surfaces and motion: no shared terminal geometry changes. */
+.trades-terminal-view .mq-page { display: flex; flex-direction: column; flex: 1; min-height: 0; transform-origin: 50% 40%; }
+.trades-terminal-view .mq-body,
+.trades-terminal-view .mq-scroll,
+.trades-terminal-view .mq-directory-list,
+.trades-terminal-view .mq-screen textarea { scrollbar-width: none; -ms-overflow-style: none; }
+.trades-terminal-view .mq-body::-webkit-scrollbar,
+.trades-terminal-view .mq-scroll::-webkit-scrollbar,
+.trades-terminal-view .mq-directory-list::-webkit-scrollbar,
+.trades-terminal-view .mq-screen textarea::-webkit-scrollbar { display: none; width: 0; height: 0; }
+.trades-terminal-view .mq-navigation { display: flex; align-items: center; justify-content: center; gap: 28px; width: 100%; }
+.trades-terminal-view .mq-navigation > .tp-cta-wire { min-width: 0; padding-inline: 22px; }
+.trades-terminal-view .mq-back svg { transform: rotate(180deg); }
+.trades-terminal-view .mq-arrow { transition: transform 280ms cubic-bezier(.22,.8,.25,1), background 280ms ease-in-out, box-shadow 280ms ease-in-out; }
+.trades-terminal-view .mq-arrow:hover { background: rgba(88,171,255,.06); box-shadow: 0 0 24px rgba(88,171,255,.06); }
+.trades-terminal-view .mq-screen input,
+.trades-terminal-view .mq-screen textarea { transition: border-color 320ms ease-in-out, box-shadow 320ms ease-in-out; }
+.trades-terminal-view .mq-screen input:focus,
+.trades-terminal-view .mq-screen textarea:focus { box-shadow: 0 0 0 2px rgba(88,171,255,.1), inset 0 0 18px rgba(88,171,255,.04); }
+.trades-terminal-view .mq-screen textarea::placeholder { color: rgba(185,220,255,.5); }
+.trades-terminal-view .mq-screen h1:focus { outline: none; }
+.trades-terminal-view .mq-directory { border: 1px solid rgba(88,171,255,.6); border-radius: 24px; background: rgba(88,171,255,.025); transition: border-radius 460ms cubic-bezier(.4,0,.2,1), background 460ms ease-in-out, box-shadow 460ms ease-in-out; }
+.trades-terminal-view .mq-directory.is-open { border-radius: 24px 24px 18px 18px; background: rgba(88,171,255,.045); box-shadow: inset 0 1px 0 rgba(185,220,255,.08), 0 10px 30px rgba(0,0,0,.08); }
+.trades-terminal-view .mq-directory-trigger { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 48px; padding: 12px 16px; border: none; border-radius: inherit; background: transparent; color: #b9dcff; text-align: left; font: inherit; cursor: pointer; }
+.trades-terminal-view .mq-directory-trigger > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.trades-terminal-view .mq-directory-trigger svg { flex-shrink: 0; transition: transform 460ms cubic-bezier(.4,0,.2,1); }
+.trades-terminal-view .mq-directory.is-open .mq-directory-trigger svg { transform: rotate(180deg); }
+.trades-terminal-view .mq-directory-reveal { display: grid; grid-template-rows: 0fr; opacity: 0; visibility: hidden; transition: grid-template-rows 460ms cubic-bezier(.4,0,.2,1), opacity 320ms ease-in-out, visibility 0s linear 460ms; }
+.trades-terminal-view .mq-directory.is-open .mq-directory-reveal { grid-template-rows: 1fr; opacity: 1; visibility: visible; transition-delay: 0s; }
+.trades-terminal-view .mq-directory-clip { min-height: 0; overflow: hidden; }
+.trades-terminal-view .mq-directory-content { padding: 0 12px 6px; }
+.trades-terminal-view .mq-directory-list { max-height: 208px; overflow-y: auto; overscroll-behavior: contain; padding-top: 8px; }
+.trades-terminal-view .mq-directory-list > button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 2px; min-height: 54px; border: 0; border-bottom: 1px solid rgba(88,171,255,.15); background: transparent; color: #b9dcff; text-align: left; font: inherit; cursor: pointer; transition: background 240ms ease-in-out; }
+.trades-terminal-view .mq-directory-list > button[aria-pressed=true],
+.trades-terminal-view .mq-directory-list > button:hover { background: rgba(88,171,255,.08); }
+.trades-terminal-view .mq-client-avatar { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 34px; height: 34px; border: 1px solid rgba(88,171,255,.4); border-radius: 50%; font-size: 12px; }
+.trades-terminal-view .mq-directory-list > button > span:last-child { min-width: 0; }
+.trades-terminal-view .mq-directory-list strong,
+.trades-terminal-view .mq-directory-list small { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.trades-terminal-view .mq-directory-list strong { font-size: 14px; font-weight: 500; }
+.trades-terminal-view .mq-directory-list small { font-size: 11px; opacity: .65; }
+.trades-terminal-view .mq-directory-content > .mq-text-button { width: 100%; font-size: 13px; }
+.trades-terminal-view .mq-directory-list > p { text-align: center; font-size: 13px; padding: 12px; }
+.trades-terminal-view .mq-deposit-kind { display: flex; align-items: end; gap: 6px; padding-bottom: 10px; }
+.trades-terminal-view .mq-deposit-kind button { flex: 1; min-height: 44px; border: 1px solid rgba(88,171,255,.5); border-radius: 16px; background: transparent; color: #b9dcff; font: inherit; }
+.trades-terminal-view .mq-deposit-kind button[aria-pressed=true] { background: rgba(88,171,255,.16); }
+.trades-terminal-view .mq-success-title { margin: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .trades-terminal-view .mq-directory,
+  .trades-terminal-view .mq-directory-reveal,
+  .trades-terminal-view .mq-directory-trigger svg,
+  .trades-terminal-view .mq-arrow,
+  .trades-terminal-view .mq-screen input,
+  .trades-terminal-view .mq-screen textarea { transition: none; }
+}

@@ -148,7 +148,8 @@ describe("TradesTerminalView extraction boundary", () => {
     );
     expect(controller).toContain('from "@/features/terminal/trades/TradesTerminalView"');
     expect(controller).toContain("<TradesTerminalView");
-    expect(controller).toContain("<QuoteView");
+    expect(controller).toContain("<View");
+    expect(controller).toContain("deviceClass === 'mobile' ? MobileQuoteView : QuoteView");
     for (const endpoint of [
       "/api/trades/clients",
       "/api/trades/invoices",

@@ -1,3 +1,5 @@
+import { useDeviceClass } from "@/hooks/use-device-class";
+import { MobileQuoteView } from "@/features/terminal/trades/MobileQuoteView";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { tradesFetch, tradesHeaders } from "@/lib/trades-api";
@@ -32,6 +34,9 @@ const SUBBAR_ROUTE: Record<number, TradesTerminalScreen> = {
 
 /* ═══ PRODUCTION QUOTE CONTROLLER ═══ */
 export function QuoteScreen({ onCancel, onExit }: { onCancel: () => void; onExit: () => void }) {
+  const deviceClass = useDeviceClass();
+  const [recipient, setRecipient] = useState({ name: '', email: '', address: '' });
+  const [skipClient, setSkipClient] = useState(false);
   const queryClient = useQueryClient();
   const [clientId, setClientId]             = useState('');
   const [lines, setLines]                   = useState<QuoteDraftLine[]>([{ id: 1, description: '', qty: '1', unitPrice: '' }]);
@@ -78,12 +83,14 @@ export function QuoteScreen({ onCancel, onExit }: { onCancel: () => void; onExit
         const unitPriceCents = Math.round(Number(line.unitPrice) * 100);
         return { description: line.description.trim(), qty, unitPriceCents, lineTotalCents: Math.round(qty * unitPriceCents) };
       });
-      if (!clientId) throw new Error('Choose a client');
+      if (!clientId && !skipClient && !recipient.name.trim()) throw new Error('Enter a name or skip client details');
       if (lineItems.some(line => !line.description || !Number.isInteger(line.qty) || line.qty <= 0 || line.unitPriceCents < 0)) throw new Error('Complete every line item');
       const validUntil = new Date(); validUntil.setDate(validUntil.getDate() + 30);
       const selected = clients.find((client: any) => client.id === clientId);
       const body = {
-        clientProfileId: clientId,
+        clientProfileId: clientId || undefined,
+        recipient: !clientId && !skipClient ? { name: recipient.name.trim(), email: recipient.email.trim() || undefined, address: recipient.address.trim() || undefined } : undefined,
+        skipClient: !clientId && skipClient ? true : undefined,
         lineItems,
         deliveryChannel: selected?.preferredChannel || 'email',
         depositEnabled,
@@ -118,8 +125,18 @@ export function QuoteScreen({ onCancel, onExit }: { onCancel: () => void; onExit
     URL.revokeObjectURL(url);
   };
 
+  const View = deviceClass === 'mobile' ? MobileQuoteView : QuoteView;
   return (
-    <QuoteView
+    <View
+      recipient={recipient}
+      onRecipientChange={(value) => { setRecipient(value); setSkipClient(false); }}
+      onSkipClient={() => { setClientId(''); setSkipClient(true); }}
+      onShare={async () => {
+        try {
+          if (navigator.share) await navigator.share({ title: 'Quote', url: publicUrl });
+          else { await navigator.clipboard.writeText(publicUrl); setError('Link copied'); }
+        } catch (err: any) { if (err?.name !== 'AbortError') setError('Could not share the quote. Copy the link below.'); }
+      }}
       clients={clients}
       clientId={clientId}
       lines={lines}
@@ -134,7 +151,7 @@ export function QuoteScreen({ onCancel, onExit }: { onCancel: () => void; onExit
       totals={totals}
       publicUrl={publicUrl}
       isCreating={createQuote.isPending}
-      onClientIdChange={setClientId}
+      onClientIdChange={(id) => { setClientId(id); setSkipClient(false); }}
       onLineChange={updateLine}
       onRemoveLine={(id) => setLines(current => current.filter(line => line.id !== id))}
       onAddLine={() => setLines(current => [...current, { id: Date.now(), description: '', qty: '1', unitPrice: '' }])}
@@ -143,7 +160,7 @@ export function QuoteScreen({ onCancel, onExit }: { onCancel: () => void; onExit
       onDepositValueChange={setDepositValue}
       onNotesChange={setNotes}
       onCreate={() => createQuote.mutate()}
-      onCopyLink={() => { void navigator.clipboard?.writeText(publicUrl); }}
+      onCopyLink={async () => { try { await navigator.clipboard.writeText(publicUrl); setError('Link copied'); } catch { setError('Could not copy. Select and copy the link below.'); } }}
       onDownloadPdf={downloadPdf}
       onCancel={onCancel}
       onExit={onExit}

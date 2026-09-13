@@ -8064,8 +8064,26 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(400).json({ message: "Deposit type and value are required" });
       if (parsed.data.depositEnabled && parsed.data.depositType === "percent" && (parsed.data.depositValue ?? 0) > 100)
         return res.status(400).json({ message: "Deposit percentage cannot exceed 100" });
-      const client = await storage.getClientProfile(parsed.data.clientProfileId);
-      if (!client || client.merchantId !== merchantId) return res.status(404).json({ message: "Client not found" });
+      let client;
+      if (parsed.data.clientProfileId) {
+        client = await storage.getClientProfile(parsed.data.clientProfileId);
+        if (!client || client.merchantId !== merchantId) return res.status(404).json({ message: "Client not found" });
+      } else {
+        // Like quick invoices, unsaved recipients use a hidden prospect. Empty
+        // details are intentional for a link-only quote; never invent contact data.
+        const name = parsed.data.recipient?.name ?? "";
+        const split = name.indexOf(" ");
+        client = await storage.createClientProfile({
+          merchantId,
+          firstName: split > 0 ? name.slice(0, split) : name,
+          lastName: split > 0 ? name.slice(split + 1) : "",
+          email: parsed.data.recipient?.email ?? null,
+          phone: null,
+          siteAddress: parsed.data.recipient?.address ?? "",
+          preferredChannel: "email",
+          status: "prospect",
+        });
+      }
       const merchant = await storage.getMerchant(merchantId);
       const lineItems = parsed.data.lineItems.map(item => ({
         ...item,
@@ -8082,7 +8100,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const token = generateInvoiceToken();
       const row = await storage.createQuote({
         merchantId,
-        clientProfileId: parsed.data.clientProfileId,
+        clientProfileId: client.id,
         token, status: "sent",
         lineItems,
         subtotalCents: totals.subtotalCents,

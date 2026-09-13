@@ -1371,7 +1371,13 @@ const quoteLineItemSchema = z.object({
 });
 
 export const createQuoteSchema = z.object({
-  clientProfileId: z.string().uuid(),
+  clientProfileId: z.string().uuid().optional(),
+  recipient: z.object({
+    name: z.string().trim().min(1).max(160),
+    email: z.string().trim().email().max(254).optional(),
+    address: z.string().trim().max(200).optional(),
+  }).optional(),
+  skipClient: z.boolean().optional(),
   lineItems: z.array(quoteLineItemSchema).min(1),
   deliveryChannel: z.enum(["email", "whatsapp", "sms"]).default("email"),
   depositEnabled: z.boolean().default(false),
@@ -1381,6 +1387,9 @@ export const createQuoteSchema = z.object({
   notes: z.string().trim().max(1000).optional().or(z.literal("")).transform(v => v || undefined),
   documentUrl: z.string().trim().max(500).optional().or(z.literal("")).transform(v => v || undefined),
   documentName: z.string().trim().max(255).optional().or(z.literal("")).transform(v => v || undefined),
+}).refine(d => Number(!!d.clientProfileId) + Number(!!d.recipient) + Number(d.skipClient === true) === 1, {
+  message: "Choose a client, enter details, or skip",
+  path: ["clientProfileId"],
 });
 
 export const acceptQuoteSchema = z.object({
