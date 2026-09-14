@@ -115,6 +115,76 @@ describe("R1-T3 safe-default role gates — owner-only merchant configuration", 
   });
 });
 
+/**
+ * R1-T3 domain 5 (Settings, Uploads & Exports), finding UPL-1: the logo
+ * route registered multer (`logoUpload.single('logo')`) BEFORE
+ * `checkAccountOwnership` ran inside the handler body, so an unauthorized
+ * caller's multipart body was fully parsed/buffered (and multer's own
+ * fileFilter/size checks ran) before authorization was ever evaluated. A
+ * caller whose file fails multer's own checks (wrong mimetype here) got a
+ * multer-error 500 instead of a same-shaped 403 — proof multer ran first.
+ * Fixed by moving the id-parse + ownership check into a plain middleware
+ * ahead of `logoUpload.single('logo')` in the route registration.
+ */
+describe("R1-T3 UPL-1 — logo upload authorizes before multer parses the body", () => {
+  beforeEach(() => {
+    resetTestStorage();
+  });
+
+  it("a non-owner's upload is refused with 403 even when the file itself would fail multer's own checks", async () => {
+    const { app } = await createTestApp();
+    const owner = await createOwnerPrincipal();
+    const member = await createMemberPrincipal(owner.merchantId);
+
+    // A body multer's fileFilter would itself reject (non-PNG mimetype, forced
+    // via an explicit contentType so supertest doesn't infer one from the
+    // ".png" extension). Before the fix this never reaches the ownership
+    // check: multer's fileFilter callback errors out first, past the route
+    // handler entirely, into the global error handler's generic 500. Under
+    // the fixed ordering, authorization is decided before multer ever runs,
+    // so the caller gets the same 403 regardless of what the body contains.
+    const res = await request(app)
+      .post(`/api/merchants/${owner.merchantId}/logo`)
+      .set(bearer(member))
+      .attach("logo", Buffer.from("not a png"), { filename: "logo.png", contentType: "image/jpeg" });
+
+    expect(res.status).toBe(403);
+  });
+
+  it("a cross-tenant caller's upload is refused with 403 even when the file itself would fail multer's own checks", async () => {
+    const { app } = await createTestApp();
+    const ownerA = await createOwnerPrincipal();
+    const ownerB = await createOwnerPrincipal();
+
+    const res = await request(app)
+      .post(`/api/merchants/${ownerA.merchantId}/logo`)
+      .set(bearer(ownerB))
+      .attach("logo", Buffer.from("not a png"), { filename: "logo.png", contentType: "image/jpeg" });
+
+    expect(res.status).toBe(403);
+    // Confirms the rejection happened before any write: the target merchant's
+    // upload row was never created.
+    const served = await request(app).get(`/uploads/logos/merchant-${ownerA.merchantId}.png`);
+    expect(served.status).toBe(404);
+  });
+
+  it("an owner's own bad-mimetype upload still gets a real response (sanity: the route runs)", async () => {
+    const { app } = await createTestApp();
+    const owner = await createOwnerPrincipal();
+
+    const res = await request(app)
+      .post(`/api/merchants/${owner.merchantId}/logo`)
+      .set(bearer(owner))
+      .attach("logo", Buffer.from("not a png"), { filename: "logo.png", contentType: "image/jpeg" });
+
+    // Not asserting a specific status here (multer's own fileFilter error
+    // shape is a pre-existing, separate concern from UPL-1's ordering bug) —
+    // only that the true owner reaching this route doesn't 403, proving the
+    // ownership-first reordering doesn't block a legitimate caller.
+    expect(res.status).not.toBe(403);
+  });
+});
+
 describe("R1-T3 safe-default role gates — admin requires the validated principal, not a role claim alone", () => {
   beforeEach(() => {
     resetTestStorage();

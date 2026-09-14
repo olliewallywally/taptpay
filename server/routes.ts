@@ -316,6 +316,26 @@ const invoiceDocUpload = multer({
   },
 });
 
+// UPL-2 (R1-T3 domain 5): multer's fileFilter above only checks the
+// client-supplied `mimetype` header, never the actual bytes — unlike the
+// sibling logo route's server-side PNG magic-byte re-check. Re-verify four
+// of the five allowed types against their real file signature; HEIC is a
+// deliberately narrower, documented interim scope (its box-based `ftyp`
+// signature is meaningfully fiddlier to parse correctly than a fixed byte
+// prefix) and stays mimetype-only for now.
+const INVOICE_DOC_MAGIC_CHECK: Record<string, (buf: Buffer) => boolean> = {
+  'application/pdf': (buf) => buf.subarray(0, 5).toString('latin1') === '%PDF-',
+  'image/png': (buf) => buf.length >= 8 && buf.subarray(0, 8).equals(
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+  ),
+  'image/jpeg': (buf) => buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff,
+  'image/webp': (buf) =>
+    buf.length >= 12 &&
+    buf.subarray(0, 4).toString('latin1') === 'RIFF' &&
+    buf.subarray(8, 12).toString('latin1') === 'WEBP',
+  // 'image/heic' intentionally omitted — mimetype-only, see comment above.
+};
+
 // Upsert a file into uploaded-file storage under its public /uploads path
 // (e.g. "logos/merchant-5.png"). Re-uploading to the same path overwrites.
 async function saveUploadedFile(relPath: string, mimeType: string, data: Buffer): Promise<void> {
@@ -3657,7 +3677,25 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   });
 
   // Upload merchant logo
-  app.post("/api/merchants/:id/logo", authenticateToken, logoUpload.single('logo'), async (req: AuthenticatedRequest, res) => {
+  //
+  // UPL-1 (R1-T3 domain 5): authorization must run BEFORE multer parses/
+  // buffers the multipart body — the plan's uploads text is explicit that
+  // "the logo upload route must not accept or write a file before merchant
+  // ownership is known." This small middleware does exactly the id-parse +
+  // checkAccountOwnership check the handler used to do internally, but ahead
+  // of `logoUpload.single('logo')` in the chain, so an unauthorized caller's
+  // body is never handed to multer at all. The handler keeps its own
+  // (now-redundant) re-check below as defense in depth; it never changes
+  // this route's outcome for a legitimate caller.
+  const requireLogoOwnership = (req: AuthenticatedRequest, res: express.Response, next: express.NextFunction) => {
+    const merchantId = strictPositiveIntegerParam(req.params.id);
+    if (merchantId === null) return res.status(400).json({ message: "Invalid id" });
+    if (!checkAccountOwnership(req, merchantId)) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+    next();
+  };
+  app.post("/api/merchants/:id/logo", authenticateToken, requireLogoOwnership, logoUpload.single('logo'), async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = strictPositiveIntegerParam(req.params.id);
       if (merchantId === null) return res.status(400).json({ message: "Invalid id" });
@@ -3668,6 +3706,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // unlink — req.file.path is always undefined here and calling
       // fs.unlinkSync on it threw, turning every rejection of this check
       // into a 500 instead of the intended 403.
+      // Re-checked here even though requireLogoOwnership above already
+      // enforced it — cheap, and keeps this handler correct on its own if
+      // ever reordered again.
       if (!checkAccountOwnership(req, merchantId)) {
         return res.status(403).json({ message: "Unauthorized" });
       }
@@ -3682,7 +3723,14 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(400).json({ message: "Invalid file: only PNG images are accepted" });
       }
 
-      const filename = `merchant-${merchantId}${path.extname(req.file.originalname) || '.png'}`;
+      // UPL-5: hardcode .png rather than deriving it from the client-supplied
+      // req.file.originalname — this route already only accepts PNG bytes
+      // (verified above by magic-byte check) and always stores mimeType
+      // 'image/png', so a client-controlled extension here served no purpose
+      // except letting a re-upload under a different original filename write
+      // to a new path and orphan the previous blob (old path stays servable
+      // forever, unreferenced by the merchant's customLogoUrl).
+      const filename = `merchant-${merchantId}.png`;
       const logoUrl = `/uploads/logos/${filename}`;
 
       // Persist the file first so the merchant row never points at a missing file
@@ -7346,6 +7394,16 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(401).json({ message: "Authentication required" });
       }
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+
+      // UPL-2: re-verify the declared type against the actual bytes for the
+      // four types with a simple, fixed-offset signature (see
+      // INVOICE_DOC_MAGIC_CHECK's definition above for what's checked, and
+      // why HEIC is excluded from this pass).
+      const magicCheck = INVOICE_DOC_MAGIC_CHECK[req.file.mimetype];
+      if (magicCheck && !magicCheck(req.file.buffer)) {
+        return res.status(400).json({ message: "Invalid file: content does not match declared type" });
+      }
+
       const ext = path.extname(req.file.originalname).toLowerCase();
       const filename = `invoice-${Date.now()}-${crypto.randomBytes(8).toString('hex')}${ext}`;
       await saveUploadedFile(`invoices/${filename}`, req.file.mimetype, req.file.buffer);
