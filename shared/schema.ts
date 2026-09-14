@@ -235,6 +235,12 @@ export const splitPayments = pgTable("split_payments", {
   merchantIdIdx: index("split_payments_merchant_id_idx").on(t.merchantId),
   transactionSplitUnique: uniqueIndex("split_payments_transaction_split_uq")
     .on(t.transactionId, t.splitIndex),
+  // Gap 11 / C1 (docs/decisions/2026-09-13-gap11-split-session-single-use-design.md):
+  // the same provider transaction cannot fund two split shares. Additive,
+  // defense in depth — see migrations/0022_gap11_session_single_use_indexes.sql.
+  windcaveTransactionIdUnique: uniqueIndex("split_payments_windcave_transaction_id_uq")
+    .on(t.windcaveTransactionId)
+    .where(sql`${t.windcaveTransactionId} is not null`),
 }));
 
 export const paymentAttemptStates = [
@@ -287,6 +293,13 @@ export const paymentAttempts = pgTable("payment_attempts", {
   returnStateHashUnique: uniqueIndex("payment_attempts_return_state_hash_uq")
     .on(t.returnStateHash)
     .where(sql`${t.returnStateHash} is not null`),
+  // Gap 11 / C1 (docs/decisions/2026-09-13-gap11-split-session-single-use-design.md):
+  // single-use consumption of a provider session at the database level; also
+  // independently required by R2 section 9.4. Additive, defense in depth —
+  // see migrations/0022_gap11_session_single_use_indexes.sql.
+  processorSessionIdUnique: uniqueIndex("payment_attempts_processor_session_id_uq")
+    .on(t.processorSessionId)
+    .where(sql`${t.processorSessionId} is not null`),
   shareIndexCheck: check(
     "payment_attempts_share_index_check",
     sql`${t.shareIndex} >= 0`,
