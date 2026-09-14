@@ -7000,6 +7000,17 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
   // Serve uploads from the uploaded_files table (durable across deploys), with
   // a local-disk fallback for any legacy file that predates DB-backed storage.
+  //
+  // UPL-3 (R1-T3 domain 5, narrow stopgap only): this route is intentionally
+  // unauthenticated (logos are shown publicly on customer-facing checkout
+  // pages) and `uploaded_files` has no merchant/tenant column, so per-tenant
+  // download authorization is NOT implemented here — that is a real open
+  // product/schema decision, tracked separately (see the R1-T3 domain-5
+  // evidence file and its escalation memo), not something this narrow fix
+  // resolves. `nosniff` only closes the content-type-confusion angle: without
+  // it, a browser sniffing an uploaded file's bytes as `text/html` could
+  // execute embedded script if the file were ever framed/loaded as a page —
+  // schema-free, no product decision, safe to land unconditionally.
   app.get('/uploads/:folder/:name', async (req, res) => {
     try {
       const { folder, name } = req.params;
@@ -7012,11 +7023,15 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (file) {
         res.setHeader('Content-Type', file.mimeType);
         res.setHeader('Cache-Control', 'public, max-age=300');
+        res.setHeader('X-Content-Type-Options', 'nosniff');
         return res.send(file.data);
       }
 
       const diskPath = path.join(process.cwd(), 'uploads', folder, name);
-      if (fs.existsSync(diskPath)) return res.sendFile(diskPath);
+      if (fs.existsSync(diskPath)) {
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        return res.sendFile(diskPath);
+      }
 
       res.status(404).json({ message: 'File not found' });
     } catch (err) {

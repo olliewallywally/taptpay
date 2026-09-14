@@ -37,6 +37,30 @@ describe("R1-T7 uploaded file blobs go through storage, not `db` directly", () =
     expect(Buffer.from(served.body)).toEqual(PNG_MAGIC_ONLY);
   });
 
+  /**
+   * UPL-3 (R1-T3 domain 5): the public /uploads route is unauthenticated by
+   * design (logos are customer-facing), but was missing `nosniff` — a
+   * browser sniffing an uploaded file's bytes as `text/html` could execute
+   * embedded script if the file were ever framed/loaded as a page. This is a
+   * narrow, schema-free mitigation only; it does not add per-tenant download
+   * authorization (see the R1-T3 domain-5 evidence file's escalation memo
+   * for that open product/schema decision).
+   */
+  it("the public /uploads route sends X-Content-Type-Options: nosniff", async () => {
+    const { app } = await createTestApp();
+    const owner = await createOwnerPrincipal();
+
+    const upload = await request(app)
+      .post(`/api/merchants/${owner.merchantId}/logo`)
+      .set(bearer(owner))
+      .attach("logo", PNG_MAGIC_ONLY, "logo.png");
+    expect(upload.status).toBe(200);
+
+    const served = await request(app).get(upload.body.logoUrl);
+    expect(served.status).toBe(200);
+    expect(served.headers["x-content-type-options"]).toBe("nosniff");
+  });
+
   it("deletes the logo blob so the public route no longer serves it", async () => {
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();

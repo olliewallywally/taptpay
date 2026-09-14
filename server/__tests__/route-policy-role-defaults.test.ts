@@ -314,3 +314,174 @@ describe("R1-T3 safe-default: password change proves the path merchant is the ca
     expect(response.body.message).toBe("Invalid id");
   });
 });
+
+/**
+ * R1-T3 domain 5, finding UPL-6: theme/daily-goal/logo/change-password already
+ * had cross-tenant or role-based regression coverage in this file; details,
+ * business-details, the general PUT, and sector did not, despite sharing the
+ * identical checkAccountOwnership/checkMerchantOwnership guard already
+ * exercised above. These four close that gap, following the exact
+ * cross-tenant + zero-side-effect pattern change-password already uses.
+ */
+describe("R1-T3 UPL-6 — cross-tenant regression coverage for the remaining settings routes", () => {
+  beforeEach(() => {
+    resetTestStorage();
+  });
+
+  it("PUT /api/merchants/:id/details refuses a cross-tenant caller and changes nothing", async () => {
+    const { app } = await createTestApp();
+    const ownerA = await createOwnerPrincipal();
+    const ownerB = await createOwnerPrincipal();
+
+    const attack = await request(app)
+      .put(`/api/merchants/${ownerB.merchantId}/details`)
+      .set(bearer(ownerA))
+      .send({
+        businessName: "Hijacked Business",
+        contactEmail: "hijacked@harness.test",
+        contactPhone: "021 000 0000",
+        businessAddress: "1 Hijacked St",
+      });
+    expect(attack.status).toBe(403);
+
+    const bProfile = await request(app).get(`/api/merchants/${ownerB.merchantId}/profile`).set(bearer(ownerB));
+    expect(bProfile.status).toBe(200);
+    expect(bProfile.body.businessName).not.toBe("Hijacked Business");
+
+    const legit = await request(app)
+      .put(`/api/merchants/${ownerB.merchantId}/details`)
+      .set(bearer(ownerB))
+      .send({
+        businessName: "B's Real Business",
+        contactEmail: "b@harness.test",
+        contactPhone: "021 111 1111",
+        businessAddress: "2 Real St",
+      });
+    expect(legit.status).toBe(200);
+  });
+
+  it("PUT /api/merchants/:id/business-details refuses a cross-tenant caller and changes nothing", async () => {
+    const { app } = await createTestApp();
+    const ownerA = await createOwnerPrincipal();
+    const ownerB = await createOwnerPrincipal();
+
+    const attack = await request(app)
+      .put(`/api/merchants/${ownerB.merchantId}/business-details`)
+      .set(bearer(ownerA))
+      .send({
+        businessName: "Hijacked Business",
+        director: "Attacker Name",
+        contactEmail: "hijacked@harness.test",
+        contactPhone: "021 000 0000",
+        gstNumber: "999-999-999",
+      });
+    expect(attack.status).toBe(403);
+
+    const bProfile = await request(app).get(`/api/merchants/${ownerB.merchantId}/profile`).set(bearer(ownerB));
+    expect(bProfile.status).toBe(200);
+    expect(bProfile.body.businessName).not.toBe("Hijacked Business");
+    expect(bProfile.body.director).not.toBe("Attacker Name");
+  });
+
+  it("PUT /api/merchants/:id (general) refuses a cross-tenant caller and changes nothing", async () => {
+    const { app } = await createTestApp();
+    const ownerA = await createOwnerPrincipal();
+    const ownerB = await createOwnerPrincipal();
+
+    const attack = await request(app)
+      .put(`/api/merchants/${ownerB.merchantId}`)
+      .set(bearer(ownerA))
+      .send({ businessName: "Hijacked Business" });
+    expect(attack.status).toBe(403);
+
+    const bProfile = await request(app).get(`/api/merchants/${ownerB.merchantId}/profile`).set(bearer(ownerB));
+    expect(bProfile.status).toBe(200);
+    expect(bProfile.body.businessName).not.toBe("Hijacked Business");
+
+    const legit = await request(app)
+      .put(`/api/merchants/${ownerB.merchantId}`)
+      .set(bearer(ownerB))
+      .send({ businessName: "B's Real Business" });
+    expect(legit.status).toBe(200);
+  });
+
+  it("PUT /api/merchants/:merchantId/sector refuses a cross-tenant caller and changes nothing", async () => {
+    const { app } = await createTestApp();
+    const ownerA = await createOwnerPrincipal();
+    const ownerB = await createOwnerPrincipal();
+
+    const attack = await request(app)
+      .put(`/api/merchants/${ownerB.merchantId}/sector`)
+      .set(bearer(ownerA))
+      .send({ sector: "propertyManagement" });
+    expect(attack.status).toBe(403);
+
+    const legit = await request(app)
+      .put(`/api/merchants/${ownerB.merchantId}/sector`)
+      .set(bearer(ownerB))
+      .send({ sector: "propertyManagement" });
+    expect(legit.status).toBe(200);
+    expect(legit.body.sector).toBe("propertyManagement");
+  });
+});
+
+/**
+ * R1-T3 domain 5, finding UPL-7: the three export/analytics routes
+ * (analytics/export, export/csv, export/pdf) already gate on
+ * checkMerchantOwnership and query storage by the caller's own merchantId
+ * (the §8.5-preferred scoped idiom), but — like UPL-6's routes — had no
+ * committed cross-tenant regression test. These close that gap.
+ */
+describe("R1-T3 UPL-7 — cross-tenant regression coverage for the export/analytics routes", () => {
+  beforeEach(() => {
+    resetTestStorage();
+  });
+
+  it("GET /api/merchants/:id/analytics/export refuses a cross-tenant caller", async () => {
+    const { app } = await createTestApp();
+    const ownerA = await createOwnerPrincipal();
+    const ownerB = await createOwnerPrincipal();
+
+    const attack = await request(app)
+      .get(`/api/merchants/${ownerB.merchantId}/analytics/export`)
+      .set(bearer(ownerA));
+    expect(attack.status).toBe(403);
+
+    const legit = await request(app)
+      .get(`/api/merchants/${ownerB.merchantId}/analytics/export`)
+      .set(bearer(ownerB));
+    expect(legit.status).toBe(200);
+  });
+
+  it("GET /api/merchants/:id/export/csv refuses a cross-tenant caller", async () => {
+    const { app } = await createTestApp();
+    const ownerA = await createOwnerPrincipal();
+    const ownerB = await createOwnerPrincipal();
+
+    const attack = await request(app)
+      .get(`/api/merchants/${ownerB.merchantId}/export/csv`)
+      .set(bearer(ownerA));
+    expect(attack.status).toBe(403);
+
+    const legit = await request(app)
+      .get(`/api/merchants/${ownerB.merchantId}/export/csv`)
+      .set(bearer(ownerB));
+    expect(legit.status).toBe(200);
+  });
+
+  it("GET /api/merchants/:id/export/pdf refuses a cross-tenant caller", async () => {
+    const { app } = await createTestApp();
+    const ownerA = await createOwnerPrincipal();
+    const ownerB = await createOwnerPrincipal();
+
+    const attack = await request(app)
+      .get(`/api/merchants/${ownerB.merchantId}/export/pdf`)
+      .set(bearer(ownerA));
+    expect(attack.status).toBe(403);
+
+    const legit = await request(app)
+      .get(`/api/merchants/${ownerB.merchantId}/export/pdf`)
+      .set(bearer(ownerB));
+    expect(legit.status).toBe(200);
+  });
+});

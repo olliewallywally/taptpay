@@ -1,6 +1,39 @@
 # Full integration continuation audit — 2026-09-07
 
-Latest continuation (2026-09-13, second half — STOPPED ON INSTRUCTION, read
+Latest continuation (2026-09-14 — resumed from an emergency mid-session
+checkpoint, `a1cca2c5`, whose background Workflow state did not survive the
+session boundary; see the domain-5 evidence file's continuity note for what
+that means and how ground truth was independently re-established). Five
+things happened this session:
+
+1. **R1-T3 Settings/Uploads/Exports — the fifth and final tenant-scoping
+   domain — completed**
+   ([evidence](r1/R1-T3-settings-uploads-exports-tenant-scoping-2026-09-14.md)).
+   UPL-1/UPL-2/UPL-5 (already committed in the checkpoint, independently
+   re-verified here rather than trusted) plus this session's UPL-3 (nosniff
+   header), UPL-6/UPL-7 (7 new cross-tenant regression tests, no source
+   change). All five R1-T3 domains are now investigated.
+2. **Uploads tenant-authorization gap escalated, not fixed** —
+   `uploaded_files` has no tenant column and its public serve route has no
+   authorization at all. Decision memo:
+   [uploads tenant authorization](../../decisions/2026-09-14-uploads-tenant-authorization-escalation.md).
+   Gap list item 13.
+3. **R0-H1, R0-H4, R0-H5, R1-H1 closed** on the owner's answers collected in
+   the interrupted prior session (transcribed, not newly decided) — see
+   their tracker rows and `docs/decisions/2026-09-14-*.md`. R1-H1's closure
+   lifts gap-list item 8 (client work gated) for tasks blocked only on that
+   sign-off.
+4. **Gap 11 vs. gap 12 — NOT resolved this session.** The prior session
+   collected an owner answer that maps to gap 12, not gap 11 as originally
+   asked, and flagged that Oliver had not yet confirmed that reframing. This
+   session put that question to Oliver directly rather than assuming an
+   answer; see gap list items 11/12 for the substance and
+   `docs/HANDOFF-2026-09-14-session-checkpoint.md` §4 for the full reasoning
+   trail.
+5. R0-T6 (real backup rehearsal): owner said "will do this later" — no
+   action taken, not chased.
+
+Prior continuation (2026-09-13, second half — STOPPED ON INSTRUCTION, read
 this and the entry below it before continuing). Three things happened after the
 pass described in the next entry was stopped and restarted:
 
@@ -461,6 +494,24 @@ backup, deployment or restore checks.
    live-funds risk (no Windcave credentials configured in this environment;
    the leak is metadata, not payment credentials), but a real confidentiality
    and tenant-isolation gap that must not be lost.
+13. **ESCALATED 2026-09-14 — `uploaded_files` has no merchant/tenant column;
+   `GET /uploads/:folder/:name` is fully unauthenticated.** Found during the
+   R1-T3 Settings/Uploads/Exports domain audit
+   ([evidence](r1/R1-T3-settings-uploads-exports-tenant-scoping-2026-09-14.md)).
+   Serves two different risk profiles under one policy: merchant logos
+   (plausibly intended to be public — shown to customers on checkout pages)
+   and property invoice documents (can carry real tenant financial
+   information, protected today only by unguessable-filename secrecy, no
+   revocation, no expiry, no audit trail). **Narrow mitigation landed now,
+   no product decision**: `X-Content-Type-Options: nosniff` on both response
+   paths, closing the content-type-confusion/stored-XSS angle regardless of
+   how the authorization question is resolved. **The authorization question
+   itself is not fixed** — it needs a decision on whether logos and
+   documents should have different access policies and, if so, which of a
+   signed-short-lived-URL scheme (no schema change) or a tenant column plus
+   an authenticated download route (schema migration) to build. Decision
+   memo: [uploads tenant authorization](../../decisions/2026-09-14-uploads-tenant-authorization-escalation.md).
+   Not evidence of an actual leak — a design gap, not an incident.
 
 ## Every named task and phase
 
@@ -486,7 +537,7 @@ may proceed where the plan allows it. Code lanes remain gated by their dependenc
 | R0-H5 | Classify tracked uploads and local dumps | 585 | Owner/professional/provider | **CLOSED 2026-09-14** — the three tracked `uploads/invoices/` entries (2 dev-fixture PNGs, 1 zero-byte glob artifact) were content-inspected, confirmed unreferenced anywhere in the repo and unreproducible by current code, and `git rm`'d per explicit owner instruction ([record](../../decisions/2026-09-14-r0-h5-tracked-uploads-deletion.md)). The historical "41 tracked, 38 ignored" figure remains unsourced — flagged as an open curiosity, not a known gap. |
 | R1-T1 | No-live-system HTTP test harness | 610 | Engineering | Harness implemented early; audit all transport/clock/SSE/push injection and no-network proof after the R0 exit gate. |
 | R1-T2 | Checked-in route policy inventory | 622 | Engineering | PARTIAL: [classifier extended and regenerated 2026-09-12/13](r1/R1-T2-classifier-extension-2026-09-12.md) — 218 registrations, **0 unclassified** (was 96/97), 8 principal categories (added `admin`/`public`/`provider-webhook`/`unauthenticated-suspect`), full server regression unchanged at 52/52 suites, 1019/1019 tests. **Found a new, unfixed suspected gap in the process — see gap 12.** Required per-route fields (capabilityGate, entitlementGate, idempotencyScope, storageMethods, successDto, errorDisclosure) and all-method/use/mounted-router coverage remain incomplete; 0-unclassified is a labeling improvement, not the completed task. |
-| R1-T3 | Explicit role and tenant matrix | 639 | Engineering | PARTIAL: owner defaults fixed; full principal/tenant matrix and runtime coverage open. **The password-path contract is corrected (2026-09-11)** — [evidence](r1/R1-T3-password-path-contract-2026-09-11.md): a cross-tenant path id now returns 403 with both accounts' passwords provably unchanged, red run captured first, route policy regenerated. The route was not moved because its only caller builds the URL from the caller's own JWT. **Tenant-scoping domain audit (2026-09-13): Transactions & Refunds** ([evidence](r1/R1-T3-transactions-refunds-tenant-scoping-2026-09-13.md)), **Boards & Stock** ([evidence](r1/R1-T3-boards-stock-tenant-scoping-2026-09-13.md)), **Property** ([evidence](r1/R1-T3-property-tenant-scoping-2026-09-13.md)), and **Trades** ([evidence](r1/R1-T3-trades-tenant-scoping-2026-09-13.md)) were each independently investigated with a live two-merchant runtime probe — all four found already correctly tenant-scoped today, no code change needed. **Settings/Uploads/Exports is the one remaining domain and has NOT been investigated** (stopped during read-only planning, no artifacts left) — next up, same methodology, including the plan §8.4 check that the logo route must not accept or write a file before merchant ownership is known. Note what these four results do and do not establish: they show the *compared* merchantId is JWT-derived rather than attacker-controllable at each site, not that the storage layer has been migrated to tenant-scoped methods as §8.5 prefers; that refactor remains open. |
+| R1-T3 | Explicit role and tenant matrix | 639 | Engineering | PARTIAL: owner defaults fixed; full principal/tenant matrix and runtime coverage open. **The password-path contract is corrected (2026-09-11)** — [evidence](r1/R1-T3-password-path-contract-2026-09-11.md): a cross-tenant path id now returns 403 with both accounts' passwords provably unchanged, red run captured first, route policy regenerated. The route was not moved because its only caller builds the URL from the caller's own JWT. **Tenant-scoping domain audit (2026-09-13): Transactions & Refunds** ([evidence](r1/R1-T3-transactions-refunds-tenant-scoping-2026-09-13.md)), **Boards & Stock** ([evidence](r1/R1-T3-boards-stock-tenant-scoping-2026-09-13.md)), **Property** ([evidence](r1/R1-T3-property-tenant-scoping-2026-09-13.md)), and **Trades** ([evidence](r1/R1-T3-trades-tenant-scoping-2026-09-13.md)) were each independently investigated with a live two-merchant runtime probe — all four found already correctly tenant-scoped today, no code change needed. **Settings/Uploads/Exports — completed 2026-09-14** ([evidence](r1/R1-T3-settings-uploads-exports-tenant-scoping-2026-09-14.md)): unlike the four no-gap-found siblings, this domain found and fixed three real upload-handling bugs (UPL-1 auth-before-multer ordering, UPL-2 missing magic-byte check, UPL-5 filename-extension confusion), closed two test-coverage gaps (UPL-6/UPL-7, 7 new cross-tenant tests, no source change), landed a narrow `nosniff` mitigation (UPL-3), and escalated one structural gap rather than fixing it same-day — `uploaded_files` has no tenant column and its public serve route has zero authorization (gap list item 13, decision memo pending Oliver). **All five R1-T3 tenant-scoping domains are now investigated.** Note what the five results do and do not establish: they show the *compared* merchantId is JWT-derived rather than attacker-controllable at each site, not that the storage layer has been migrated to tenant-scoped methods as §8.5 prefers; that refactor remains open. |
 | R1-H1 | Accept the device baseline commit before R1 client changes | 651 | Owner/professional/provider | **CLOSED 2026-09-14** — Oliver accepted the [auth/onboarding visual baseline](r1/R1-H1-auth-onboarding-baseline-2026-09-12.md) ("Looks good", [record](../../decisions/2026-09-14-r1-h1-visual-baseline-acceptance.md)). This lifts gap-list item 8 (client work gated) for tasks blocked only on this sign-off. |
 | R1-T4 | OAuth rebuild, session storage and shared security primitives | 660 | Engineering | GATED: R0 exit and R1-H1 acceptance; OAuth/session/reset/CORS/distributed-abuse work remains. |
 | R1-T5 | Sign in with Apple — protocol-specific adapter on T4's primitives | 686 | Engineering | GATED: R1-T4, then real Apple provisioning/device verification. |
