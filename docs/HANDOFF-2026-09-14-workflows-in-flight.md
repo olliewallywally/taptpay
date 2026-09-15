@@ -1,3 +1,26 @@
+# In-flight background workflows — 2026-09-14/15 (third session, round 3 — resumed)
+
+**Round 2 update (2026-09-14, later): both round-2 workflows partially failed on the session's
+own usage limit, not on review content.** Track A (`wu8zx5bog`): both reviewers errored
+("You've hit your session limit"), correctly left `approved: false` (0 valid reviews), implement
+never even attempted — 0 tool calls, 0 tokens. Safe. Track B (`w4pyb7ouo`): review:1 errored the
+same way, but review:2 completed and said "Approve" — **and the orchestration script incorrectly
+treated that single surviving approval as sufficient**, invoking `implement`, which itself then
+also hit the session limit immediately (0 tool calls, 0 tokens — confirmed via journal, and
+confirmed via `git status`/`git diff` showing a completely clean tree, so no partial edits
+resulted). This was a real bug in the review-gate logic (a reviewer erroring silently dropped out
+of the quorum instead of failing the whole review closed) — **fixed** in both script files
+(`allSucceeded = reviews.every(Boolean)` gates `approved` now, before checking recommendations)
+before resuming. Both workflows resumed via `resumeFromRunId` on the same run IDs, which should
+reuse the completed Plan-stage results (and Track B's one genuine "Approve") from cache and retry
+only the reviewers that errored, now that the usage limit has reset (new day, 2026-09-15).
+
+New task IDs from the resume: **Track A `w1wa27u5b`, Track B `whn2jbsff`** (both same run IDs as
+before: `wf_c47d2679-5cb` / `wf_fbaf83f0-bd0`). Everything else below (mandatory fixes, owner
+sign-off, scope) is unchanged from round 2.
+
+---
+
 # In-flight background workflows — 2026-09-14 (third session, round 2)
 
 Supersedes this file's own prior version (third session, round 1). Gap 11 C0/C1 is done and
