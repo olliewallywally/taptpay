@@ -1,6 +1,62 @@
 # Full integration continuation audit — 2026-09-07
 
-Latest continuation (2026-09-14 — resumed from an emergency mid-session
+Latest continuation (2026-09-16 — resumed after a session/environment
+boundary; the prior session's background-workflow task/run IDs recorded in
+`docs/HANDOFF-2026-09-14-workflows-in-flight.md` did not resolve, exactly as
+that doc warned they might not, so ground truth was re-derived from
+`git status`/`git diff` and the two evidence docs already sitting uncommitted
+in the tree, not assumed from the doc). Both halves of gap 12's approved
+remediation had already been implemented and independently re-verified in
+the prior (2026-09-15) session but left uncommitted; this session re-verified
+both again independently (fresh `npm run check`, full server and client
+suites, and direct reads of the key diffs against the live tree — not
+trusted from either prior session's report) and, finding no discrepancy,
+committed them as two separate commits, then wrote the one decision doc the
+prior session's punch list still owed (Oliver's sign-off on the fail-closed
+change's collateral effect on the staff terminals):
+
+1. **Gap 12 Option C — fail closed on legacy-no-board ambiguity — landed**,
+   commit `72230602`. Both `GET /api/merchants/:id/active-transaction`'s
+   no-stoneId branch and its SSE broadcast counterpart now report ambiguous
+   (no data from either candidate) instead of guessing the newest concurrent
+   stoneless sale, closing the wrong-customer-wrong-amount payment-
+   correctness defect gap 12(a)/(b) described. Merchant/board SSE delivery
+   is unaffected (independently verified via a same-merchant-concurrent-call
+   test against the real broker/route, not simulated). A residual leak (a
+   completing sale's own broadcast can still reach a different concurrent
+   sale's customer at the instant the pending bucket drops to 1) is traced,
+   documented, and deliberately left open — it needs per-transaction
+   addressing to close. See
+   [R1-T2-gap12-option-c-fail-closed-2026-09-15](r1/R1-T2-gap12-option-c-fail-closed-2026-09-15.md)
+   and the sign-off record,
+   [gap12-option-c-failclosed-collateral-signoff](../../decisions/2026-09-14-gap12-option-c-failclosed-collateral-signoff.md).
+2. **Gap 12 — three legacy terminals migrated to per-payment links —
+   landed**, commit `8666dafc`. `merchant-terminal.tsx`,
+   `merchant-terminal-mobile.tsx`, and `merchant-terminal-mobile-v2.tsx` now
+   send `linkMode: "per_payment"` for board-less sales (mirroring the
+   desktop retail terminal, which already did this) and gate a new
+   share-link UI on the client's own board-selection decision, never on
+   response field presence — the exact bug a prior redo's blocked plan would
+   have shipped. See
+   [R1-T2-gap12-terminal-linkmode-migration-2026-09-15](r1/R1-T2-gap12-terminal-linkmode-migration-2026-09-15.md)
+   (independent re-verification) and its
+   [-2026-09-14](r1/R1-T2-gap12-terminal-linkmode-migration-2026-09-14.md)
+   implementer report.
+3. **Full regression after both commits**: server 56 suites / 1063 tests
+   (was 55/1046 before this pair), client 57 suites / 511 tests (was
+   53/492), `npm run check` clean. Independently re-run in this session, not
+   relayed.
+4. **Not done this session, still open**: gap 12's confidentiality half (an
+   anonymous caller who is the sole subscriber can still read a merchant's
+   live sale feed) and the residual leak above remain open by design;
+   retiring the standing `/pay/:merchantId` address needs a production
+   traffic-drain window and is separately scheduled; gap 11's `C2`-`C5`
+   (the actual replay-mechanism fix) remain not started; the uploads
+   tenant-authorization escalation (gap list item 13) — queued behind this
+   pair landing, per `docs/HANDOFF-2026-09-14-workflows-in-flight.md` step
+   5 — has not been started.
+
+Prior continuation (2026-09-14 — resumed from an emergency mid-session
 checkpoint, `a1cca2c5`, whose background Workflow state did not survive the
 session boundary; see the domain-5 evidence file's continuity note for what
 that means and how ground truth was independently re-established). Five
@@ -432,10 +488,31 @@ backup, deployment or restore checks.
    live Windcave credentials in this environment; both wallet routes and
    this flow are currently inert wherever Windcave is unconfigured), but it
    must not be lost before R3 scoping.
-12. **ESCALATED 2026-09-13 — this is a payment-correctness defect, not only a
+12. **PARTIALLY CLOSED 2026-09-16 — the payment-correctness defect (a) is
+   closed; the confidentiality leak is not.** Both approved pieces of the
+   memo's recommended fix landed and were independently re-verified this
+   session: fail-closed-on-ambiguity, commit `72230602`
+   ([evidence](r1/R1-T2-gap12-option-c-fail-closed-2026-09-15.md)), and the
+   three-terminal per-payment-link migration, commit `8666dafc`
+   ([evidence](r1/R1-T2-gap12-terminal-linkmode-migration-2026-09-15.md)).
+   A concurrent customer can no longer be routed into another customer's
+   checkout at their amount. **Still open**: the confidentiality half — an
+   anonymous caller who is the sole subscriber (or arrives when only one sale
+   is open) can still read that merchant's live sale feed, since
+   `GET /api/merchants/:id/events`'s legacy-no-board branch remains
+   unauthenticated; a documented, deliberately-unfixed residual leak (a
+   completing sale's own broadcast can still reach a different concurrent
+   sale's customer at the instant the pending bucket drops to 1, needs
+   per-transaction addressing to close); and retiring the standing
+   `/pay/:merchantId` address itself, which needs a production traffic-drain
+   window and is explicitly not to be attempted until the terminal migration
+   above has had time to drain legacy no-board traffic by attrition.
+   Original escalation, partial mitigation and analysis follow, superseded
+   only where stated above — kept for the reasoning trail:
+   **ESCALATED 2026-09-13** — this is a payment-correctness defect, not only a
    confidentiality leak. Partially mitigated (rate limit only) in commit
    `c1e42db1`. Decision memo:
-   [gap12 addressing options](../../decisions/2026-09-13-gap12-anonymous-sse-addressing-options.md).**
+   [gap12 addressing options](../../decisions/2026-09-13-gap12-anonymous-sse-addressing-options.md).
    Three findings from the memo pass, each independently re-verified against
    the live code before being recorded here:
    (a) **Customers can be routed into the wrong sale.**
@@ -536,7 +613,7 @@ may proceed where the plan allows it. Code lanes remain gated by their dependenc
 | R0-H4 | Review access logs and scan history | 578 | Owner/professional/provider | **CLOSED 2026-09-14 on owner attestation** — no suspicious access found ([record](../../decisions/2026-09-14-r0-h4-access-log-review-disposition.md)); same caveat as R0-H3, no agent here has hosting/log access to independently re-verify. |
 | R0-H5 | Classify tracked uploads and local dumps | 585 | Owner/professional/provider | **CLOSED 2026-09-14** — the three tracked `uploads/invoices/` entries (2 dev-fixture PNGs, 1 zero-byte glob artifact) were content-inspected, confirmed unreferenced anywhere in the repo and unreproducible by current code, and `git rm`'d per explicit owner instruction ([record](../../decisions/2026-09-14-r0-h5-tracked-uploads-deletion.md)). The historical "41 tracked, 38 ignored" figure remains unsourced — flagged as an open curiosity, not a known gap. |
 | R1-T1 | No-live-system HTTP test harness | 610 | Engineering | Harness implemented early; audit all transport/clock/SSE/push injection and no-network proof after the R0 exit gate. |
-| R1-T2 | Checked-in route policy inventory | 622 | Engineering | PARTIAL: [classifier extended and regenerated 2026-09-12/13](r1/R1-T2-classifier-extension-2026-09-12.md) — 218 registrations, **0 unclassified** (was 96/97), 8 principal categories (added `admin`/`public`/`provider-webhook`/`unauthenticated-suspect`), full server regression unchanged at 52/52 suites, 1019/1019 tests. **Found a new, unfixed suspected gap in the process — see gap 12.** Required per-route fields (capabilityGate, entitlementGate, idempotencyScope, storageMethods, successDto, errorDisclosure) and all-method/use/mounted-router coverage remain incomplete; 0-unclassified is a labeling improvement, not the completed task. |
+| R1-T2 | Checked-in route policy inventory | 622 | Engineering | PARTIAL: [classifier extended and regenerated 2026-09-12/13](r1/R1-T2-classifier-extension-2026-09-12.md) — 218 registrations, **0 unclassified** (was 96/97), 8 principal categories (added `admin`/`public`/`provider-webhook`/`unauthenticated-suspect`), full server regression unchanged at 52/52 suites, 1019/1019 tests. **Found a new gap in the process — see gap 12, now partially closed 2026-09-16** (commits `72230602`, `8666dafc` — payment-correctness defect fixed, confidentiality leak still open). Required per-route fields (capabilityGate, entitlementGate, idempotencyScope, storageMethods, successDto, errorDisclosure) and all-method/use/mounted-router coverage remain incomplete; 0-unclassified is a labeling improvement, not the completed task. |
 | R1-T3 | Explicit role and tenant matrix | 639 | Engineering | PARTIAL: owner defaults fixed; full principal/tenant matrix and runtime coverage open. **The password-path contract is corrected (2026-09-11)** — [evidence](r1/R1-T3-password-path-contract-2026-09-11.md): a cross-tenant path id now returns 403 with both accounts' passwords provably unchanged, red run captured first, route policy regenerated. The route was not moved because its only caller builds the URL from the caller's own JWT. **Tenant-scoping domain audit (2026-09-13): Transactions & Refunds** ([evidence](r1/R1-T3-transactions-refunds-tenant-scoping-2026-09-13.md)), **Boards & Stock** ([evidence](r1/R1-T3-boards-stock-tenant-scoping-2026-09-13.md)), **Property** ([evidence](r1/R1-T3-property-tenant-scoping-2026-09-13.md)), and **Trades** ([evidence](r1/R1-T3-trades-tenant-scoping-2026-09-13.md)) were each independently investigated with a live two-merchant runtime probe — all four found already correctly tenant-scoped today, no code change needed. **Settings/Uploads/Exports — completed 2026-09-14** ([evidence](r1/R1-T3-settings-uploads-exports-tenant-scoping-2026-09-14.md)): unlike the four no-gap-found siblings, this domain found and fixed three real upload-handling bugs (UPL-1 auth-before-multer ordering, UPL-2 missing magic-byte check, UPL-5 filename-extension confusion), closed two test-coverage gaps (UPL-6/UPL-7, 7 new cross-tenant tests, no source change), landed a narrow `nosniff` mitigation (UPL-3), and escalated one structural gap rather than fixing it same-day — `uploaded_files` has no tenant column and its public serve route has zero authorization (gap list item 13, decision memo pending Oliver). **All five R1-T3 tenant-scoping domains are now investigated.** Note what the five results do and do not establish: they show the *compared* merchantId is JWT-derived rather than attacker-controllable at each site, not that the storage layer has been migrated to tenant-scoped methods as §8.5 prefers; that refactor remains open. |
 | R1-H1 | Accept the device baseline commit before R1 client changes | 651 | Owner/professional/provider | **CLOSED 2026-09-14** — Oliver accepted the [auth/onboarding visual baseline](r1/R1-H1-auth-onboarding-baseline-2026-09-12.md) ("Looks good", [record](../../decisions/2026-09-14-r1-h1-visual-baseline-acceptance.md)). This lifts gap-list item 8 (client work gated) for tasks blocked only on this sign-off. |
 | R1-T4 | OAuth rebuild, session storage and shared security primitives | 660 | Engineering | GATED: R0 exit and R1-H1 acceptance; OAuth/session/reset/CORS/distributed-abuse work remains. |
