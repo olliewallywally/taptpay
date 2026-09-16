@@ -79,13 +79,20 @@ things happened this session:
    their tracker rows and `docs/decisions/2026-09-14-*.md`. R1-H1's closure
    lifts gap-list item 8 (client work gated) for tasks blocked only on that
    sign-off.
-4. **Gap 11 vs. gap 12 — NOT resolved this session.** The prior session
-   collected an owner answer that maps to gap 12, not gap 11 as originally
-   asked, and flagged that Oliver had not yet confirmed that reframing. This
-   session put that question to Oliver directly rather than assuming an
-   answer; see gap list items 11/12 for the substance and
-   `docs/HANDOFF-2026-09-14-session-checkpoint.md` §4 for the full reasoning
-   trail.
+4. **~~Gap 11 vs. gap 12 — NOT resolved this session~~ — RESOLVED later the
+   same calendar day, in the next session, recorded here 2026-09-16.** The
+   prior session collected an owner answer that maps to gap 12, not gap 11 as
+   originally asked, and flagged that Oliver had not yet confirmed that
+   reframing. A later session put the question to Oliver directly: **"it is
+   about gap 12, not gap 11"**
+   ([record](../../decisions/2026-09-14-gap11-vs-gap12-scope-confirmation.md)).
+   Gap 11 then got its own, separate pacing decision
+   ([land C0/C1 now, schedule the rest](../../decisions/2026-09-14-gap11-c0-c1-now-c2-c5-scheduled.md)),
+   and gap 12's three-terminal migration got its own separate approval
+   ([Yes, proceed now](../../decisions/2026-09-14-gap12-terminal-linkmode-migration-approval.md)).
+   See gap list items 11/12 for the substance and
+   `docs/HANDOFF-2026-09-14-session-checkpoint.md` §4 for the original
+   reasoning trail.
 5. R0-T6 (real backup rehearsal): owner said "will do this later" — no
    action taken, not chased.
 
@@ -433,8 +440,33 @@ backup, deployment or restore checks.
    The reviewed decisions now live in `.gitleaks-dispositions.jsonl` and the scan
    gates on undispositioned findings
    ([how to disposition](../../operations/secret-scan-dispositions.md)).
-11. **ESCALATED 2026-09-13 — reproduces without an attacker. Decision memo:
-   [gap11 single-use design](../../decisions/2026-09-13-gap11-split-session-single-use-design.md).**
+11. **PARTIALLY MITIGATED 2026-09-14 (recorded here 2026-09-16, missed at the
+   time) — `C0`/`C1` of the memo's six-step plan landed, commit `5318496b`.
+   The replay mechanism itself is not closed.** Per the owner's pacing
+   decision
+   ([gap11-c0-c1-now-c2-c5-scheduled](../../decisions/2026-09-14-gap11-c0-c1-now-c2-c5-scheduled.md),
+   "land the safe pieces now, schedule the rest"): a count-only duplicate
+   preflight (`scripts/count-gap11-session-replay-duplicates.mjs`, zero
+   duplicates found — vacuously, since this dev database has zero
+   `payment_attempts`/`split_payments` rows) and two additive partial unique
+   indexes (`payment_attempts.processor_session_id`,
+   `split_payments.windcave_transaction_id`), migration `0022`, applied to
+   the dev database and independently re-verified against `pg_indexes` and a
+   fresh schema fingerprint. See
+   [R1-T7-gap11-c0-preflight-c1-index-2026-09-14](r1/R1-T7-gap11-c0-preflight-c1-index-2026-09-14.md).
+   **These are defense in depth only and do not stop the replay** — the
+   mechanism never produces two rows sharing a session/provider-transaction
+   id in the first place, so the indexes have nothing to reject; `C2`
+   (compare-and-set finaliser), `C3` (migrate onto the `payment_attempts`
+   engine — gap 11's actual close condition), `C4` (callback/notification
+   reconciliation by session), and `C5` (durable inbox) remain **not
+   started**, separately scheduled, and need `verifyWindcaveOutcome`, an
+   R2-phase deliverable that does not exist yet (R2 itself is GATED/not
+   started). Production re-run of the preflight is also still required
+   before migration `0022` may ever be applied to production.
+   Original escalation follows, superseded only where stated above:
+   **ESCALATED 2026-09-13** — reproduces without an attacker. Decision memo:
+   [gap11 single-use design](../../decisions/2026-09-13-gap11-split-session-single-use-design.md).
    Re-verified against live code before recording: after crediting a split,
    `finaliseHostedPayment` resets session state with
    `updateTransactionSessionState(transactionId, "pending")`
@@ -583,11 +615,16 @@ backup, deployment or restore checks.
    no product decision**: `X-Content-Type-Options: nosniff` on both response
    paths, closing the content-type-confusion/stored-XSS angle regardless of
    how the authorization question is resolved. **The authorization question
-   itself is not fixed** — it needs a decision on whether logos and
-   documents should have different access policies and, if so, which of a
-   signed-short-lived-URL scheme (no schema change) or a tenant column plus
-   an authenticated download route (schema migration) to build. Decision
-   memo: [uploads tenant authorization](../../decisions/2026-09-14-uploads-tenant-authorization-escalation.md).
+   itself is not fixed.** Decision memo:
+   [uploads tenant authorization](../../decisions/2026-09-14-uploads-tenant-authorization-escalation.md).
+   **Oliver decided 2026-09-14**: Option C, full tenant-scoped auth — a
+   tenant column on `uploaded_files` plus an authenticated, ownership-checked
+   download route for invoice documents; logos stay public
+   ([disposition](../../decisions/2026-09-14-uploads-tenant-authorization-option-c-disposition.md)).
+   **Not started** — deliberately sequenced behind gap 11's C0/C1 and gap
+   12's two pieces landing first, to avoid concurrent-edit conflicts on
+   `server/routes.ts`/`shared/schema.ts`; all three have now landed, so this
+   is next.
    Not evidence of an actual leak — a design gap, not an incident.
 
 ## Every named task and phase
@@ -619,7 +656,7 @@ may proceed where the plan allows it. Code lanes remain gated by their dependenc
 | R1-T4 | OAuth rebuild, session storage and shared security primitives | 660 | Engineering | GATED: R0 exit and R1-H1 acceptance; OAuth/session/reset/CORS/distributed-abuse work remains. |
 | R1-T5 | Sign in with Apple — protocol-specific adapter on T4's primitives | 686 | Engineering | GATED: R1-T4, then real Apple provisioning/device verification. |
 | R1-T6 | Strict numeric path and query parsing — review snapshot has 71 path and 7 query sites | 699 | Engineering | **Task check MET 2026-09-11** — [bounded query values and the source guard](r1/R1-T6-bounded-query-values-2026-09-11.md). The handoff's "five remaining sites" undercounted: four more of the same class hid behind `Number(req.query...)`, `Number.parseInt(String(...))`, `parseInt(String(...))` and a `/^\d+$/` that accepted `0` — one of which passed `NaN` to storage — plus three `parseInt(req.params)` in `middleware/merchant-validation.ts`. All migrated to a reviewed typed schema; zero permissive parses remain in production server code; source guard active **with no allowlist**. Two superseded tests corrected, quoted in the evidence. R1-T2's 97 unclassified registrations are unchanged and still gate the wider task. |
-| R1-T7 | Tenant-scoped storage — close the generated authenticated-route gap | 732 | Engineering | PARTIAL: upload SQL moved behind storage; other tenant methods, upload authorization/content/privacy and two-merchant matrix remain. **Closed 2026-09-11** (commit `4183e241`): a foreign-session bypass on `hosted-fields-complete`/`googlepay-complete` — any transaction still in its initial `windcaveSessionId: null` state accepted an arbitrary client-supplied session and could be finalised with a foreign approval — found by a 10-agent cross-tenant/IDOR audit, confirmed by independent adversarial re-check, fixed failing-tests-first. **New open item found in the same sweep, not fixed**: split-payment session replay in the same `finaliseHostedPayment` helper — see gap 11 above and [the evidence](r1/R1-T7-windcave-session-binding-2026-09-11.md); needs an R3-scoped schema decision. |
+| R1-T7 | Tenant-scoped storage — close the generated authenticated-route gap | 732 | Engineering | PARTIAL: upload SQL moved behind storage; other tenant methods, upload authorization/content/privacy and two-merchant matrix remain. **Closed 2026-09-11** (commit `4183e241`): a foreign-session bypass on `hosted-fields-complete`/`googlepay-complete` — any transaction still in its initial `windcaveSessionId: null` state accepted an arbitrary client-supplied session and could be finalised with a foreign approval — found by a 10-agent cross-tenant/IDOR audit, confirmed by independent adversarial re-check, fixed failing-tests-first. **New open item found in the same sweep**: split-payment session replay in the same `finaliseHostedPayment` helper — see gap 11 above and [the evidence](r1/R1-T7-windcave-session-binding-2026-09-11.md); needs an R3-scoped schema decision. **`C0`/`C1` (preflight + defense-in-depth indexes) landed 2026-09-14**, commit `5318496b` — [evidence](r1/R1-T7-gap11-c0-preflight-c1-index-2026-09-14.md). The replay mechanism itself (`C2`-`C5`) remains open — see gap 11. |
 | R1-T8 | Fix the hook-order crash | 758 | Engineering | GATED: R0 exit and R1-H1; crash characterization is not a fix. |
 | R1-T9 | Truthful frontend failure states | 773 | Engineering | GATED: R1-T8; essential/optional failure states and duplicate-action tests remain. |
 | R1-T10 | Device and tutorial acceptance matrix | 780 | Engineering | GATED: T3/T5/T7/T9 and H1; typed routes, devices, tutorials and accessibility acceptance remain. |
