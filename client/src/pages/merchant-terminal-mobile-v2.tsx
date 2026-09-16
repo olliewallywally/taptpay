@@ -4,11 +4,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { QRCodeDisplay } from "@/components/qr-code-display";
 import { apiRequest } from "@/lib/queryClient";
+import { apiErrorMessage } from "@/lib/api-error";
 import { sseClient } from "@/lib/sse-client";
 import { useToast } from "@/hooks/use-toast";
 import { useDeviceStatusMonitoring, useSSEConnectionMonitoring } from "@/components/notification-system";
 import { getCurrentMerchantId } from "@/lib/auth";
-import { Loader2, CheckCircle, XCircle, Waves, X } from "lucide-react";
+import { Loader2, CheckCircle, XCircle, Waves, X, Copy, Check } from "lucide-react";
 import { canTapToPay } from "@/lib/native";
 import RetailTerminalView, {
   type RetailCreateOptions,
@@ -59,6 +60,11 @@ export default function MerchantTerminalMobile() {
   const [selectedStoneId, setSelectedStoneId] = useState<number | null>(null);
   const [successNotif, setSuccessNotif] = useState<{ id: string; message: string; amount?: string } | null>(null);
   const prevTransactionStatusRef = useRef<string | null>(null);
+
+  // Gap 12: the private per-payment share-link overlay, shown after a
+  // successful board-less create (see handleLiveSend below).
+  const [shareLink, setShareLink] = useState<{ item: string; amount: string; paymentUrl: string; qrCodeUrl: string } | null>(null);
+  const [copiedShareLink, setCopiedShareLink] = useState(false);
 
   const [tapToPayStatus, setTapToPayStatus] = useState<"idle" | "waiting" | "processing" | "completed" | "failed">("idle");
   const [tapToPayApproved, setTapToPayApproved] = useState<boolean | null>(null);
@@ -211,6 +217,7 @@ export default function MerchantTerminalMobile() {
         ? parseFloat(activeTransaction.price).toFixed(2)
         : undefined;
       setSuccessNotif({ id: `success-${Date.now()}`, message: "Payment Received", amount });
+      setShareLink(null);
       queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "transactions"] });
     }
     prevTransactionStatusRef.current = status;
@@ -223,7 +230,12 @@ export default function MerchantTerminalMobile() {
         itemName: data.itemName,
         price: data.price,
         status: "pending",
-        selectedStoneId: data.selectedStoneId,
+        // Gap 12: mirror retail-terminal.tsx's destination-kind check — a
+        // board selected means the existing shared standing address
+        // ("legacy"); no board means mint a private per-sale link.
+        ...(data.selectedStoneId
+          ? { selectedStoneId: data.selectedStoneId, linkMode: "legacy" as const }
+          : { linkMode: "per_payment" as const }),
         splitEnabled: data.splitEnabled ?? false,
       });
       return r.json();
@@ -232,8 +244,8 @@ export default function MerchantTerminalMobile() {
       queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "active-transaction"] });
       queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "transactions"] });
     },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to create transaction", variant: "destructive" });
+    onError: (error) => {
+      toast({ title: "Error", description: apiErrorMessage(error, "Failed to create transaction"), variant: "destructive" });
     },
   });
 
@@ -400,10 +412,14 @@ export default function MerchantTerminalMobile() {
     draft: RetailSaleDraft,
     options: Partial<RetailCreateOptions> = {}
   ) => {
+    // The same client-known decision sent as linkMode above — never gate the
+    // share overlay on response field presence (server/routes.ts populates
+    // paymentUrl/qrCodeUrl unconditionally on every successful create).
+    const boardId = selectedStoneId ?? undefined;
     const newTx = await createTransactionMutation.mutateAsync({
       itemName: draft.name,
       price: (draft.amount / 100).toFixed(2),
-      selectedStoneId: selectedStoneId ?? undefined,
+      selectedStoneId: boardId,
       splitEnabled: draft.splitEnabled,
     });
     // Push the new transaction into the list cache immediately so it appears in the
@@ -415,8 +431,28 @@ export default function MerchantTerminalMobile() {
         return exists ? prev : [newTx, ...prev];
       }
     );
+    if (!boardId) {
+      setShareLink({
+        item: typeof newTx?.itemName === "string" ? newTx.itemName : draft.name,
+        amount: typeof newTx?.price === "string" ? newTx.price : (draft.amount / 100).toFixed(2),
+        paymentUrl: typeof newTx?.paymentUrl === "string" ? newTx.paymentUrl : "",
+        qrCodeUrl: typeof newTx?.qrCodeUrl === "string" ? newTx.qrCodeUrl : "",
+      });
+    }
     if (options.paywave) {
       startTapToPayPayment(newTx);
+    }
+  };
+
+  // Gap 12: copy handler for the private per-payment share-link overlay.
+  const copyShareLinkToClipboard = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedShareLink(true);
+      toast({ title: "Link Copied!", description: "Payment link has been copied to clipboard" });
+      setTimeout(() => setCopiedShareLink(false), 2000);
+    } catch (error) {
+      toast({ title: "Copy Failed", description: "Unable to copy payment link to clipboard", variant: "destructive" });
     }
   };
 
@@ -570,6 +606,78 @@ export default function MerchantTerminalMobile() {
                   </button>
                 </div>
               )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Gap 12: private per-payment share-link overlay, an independent
+          sibling to the Tap-to-Pay overlay above (same framer-motion/
+          fixed-inset-0/X-close-button idiom). See the accompanying evidence
+          doc for the latent-landmine note re: this overlay vs. Tap-to-Pay
+          when showPaywave is ever turned on for this screen. */}
+      <AnimatePresence>
+        {shareLink && (
+          <motion.div
+            className="fixed inset-0 z-[998] flex items-center justify-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{ backgroundColor: "#060D1F" }}
+            data-testid="share-link-overlay"
+          >
+            <button
+              onClick={() => setShareLink(null)}
+              className="absolute top-6 right-6 w-8 h-8 rounded-full flex items-center justify-center"
+              style={{ background: "rgba(255,255,255,0.08)" }}
+              data-testid="close-share-link"
+            >
+              <X className="h-4 w-4 text-white/60" />
+            </button>
+            <motion.div
+              className="rounded-3xl p-8 max-w-sm w-full mx-6 text-center space-y-4"
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              style={{
+                background: `linear-gradient(135deg, ${BRAND}14, ${BRAND}08)`,
+                border: `1px solid ${BRAND}40`,
+                boxShadow: `0 25px 50px rgba(0,0,0,0.6), 0 0 60px ${BRAND}18`,
+              }}
+            >
+              <div>
+                <p className="text-white text-base font-medium">{shareLink.item}</p>
+                <p className="text-3xl font-bold" style={{ color: BRAND }}>
+                  ${(parseFloat(shareLink.amount) || 0).toFixed(2)}
+                </p>
+              </div>
+              <div className="w-40 h-40 mx-auto bg-white/90 rounded-xl p-2">
+                <QRCodeDisplay paymentUrl={shareLink.paymentUrl} qrCodeUrl={shareLink.qrCodeUrl} />
+              </div>
+              <div
+                className="rounded-lg p-3 text-xs text-white break-all"
+                style={{ background: "rgba(255,255,255,0.06)" }}
+                data-testid="share-link-url"
+              >
+                {shareLink.paymentUrl}
+              </div>
+              <button
+                onClick={() => copyShareLinkToClipboard(shareLink.paymentUrl)}
+                className="w-full py-3 rounded-2xl text-sm font-medium flex items-center justify-center gap-2"
+                style={{ background: `${BRAND}18`, border: `1px solid ${BRAND}40`, color: BRAND }}
+                data-testid="copy-share-link"
+              >
+                {copiedShareLink ? (
+                  <>
+                    <Check className="w-4 h-4" />
+                    Copied!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4" />
+                    Copy Payment Link
+                  </>
+                )}
+              </button>
             </motion.div>
           </motion.div>
         )}

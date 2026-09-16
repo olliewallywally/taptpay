@@ -14,6 +14,7 @@ import { MerchantUrlDisplay } from "@/components/merchant-url-display";
 import { EnhancedPaymentStatus } from "@/components/enhanced-payment-status";
 import { AnimatedBrandBackground } from "@/components/backgrounds/AnimatedBrandBackground";
 import { apiRequest } from "@/lib/queryClient";
+import { apiErrorMessage } from "@/lib/api-error";
 import { sseClient } from "@/lib/sse-client";
 import { useToast } from "@/hooks/use-toast";
 import { useDeviceStatusMonitoring, useSSEConnectionMonitoring } from "@/components/notification-system";
@@ -60,6 +61,13 @@ export default function MerchantTerminal() {
   const tapToPayOverlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const copiedPaymentLinkTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Gap 12: this call site always creates a stoneless (board-less) sale (see
+  // createTransactionMutation below), so every successful create gets its own
+  // private per-payment share link that must be shown to the merchant.
+  const [shareLink, setShareLink] = useState<{ item: string; amount: string; paymentUrl: string; qrCodeUrl: string } | null>(null);
+  const [copiedShareLink, setCopiedShareLink] = useState(false);
+  const copiedShareLinkTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Clear any pending timers on unmount so they never fire against an
   // unmounted component (state-update-after-unmount / memory leak).
   useEffect(() => {
@@ -67,6 +75,7 @@ export default function MerchantTerminal() {
       if (successOverlayTimerRef.current) clearTimeout(successOverlayTimerRef.current);
       if (tapToPayOverlayTimerRef.current) clearTimeout(tapToPayOverlayTimerRef.current);
       if (copiedPaymentLinkTimerRef.current) clearTimeout(copiedPaymentLinkTimerRef.current);
+      if (copiedShareLinkTimerRef.current) clearTimeout(copiedShareLinkTimerRef.current);
     };
   }, []);
 
@@ -201,11 +210,22 @@ export default function MerchantTerminal() {
         price: data.price,
         status: "pending",
         splitEnabled,
+        // Gap 12: this call site never sends selectedStoneId (see the
+        // out-of-scope board-selection-disconnect finding), so every sale it
+        // creates is stoneless — always mint a private per-payment link
+        // rather than falling back to the shared standing address.
+        linkMode: "per_payment",
       });
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (created) => {
       queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "active-transaction"] });
+      setShareLink({
+        item: typeof created?.itemName === "string" ? created.itemName : "",
+        amount: typeof created?.price === "string" ? created.price : "",
+        paymentUrl: typeof created?.paymentUrl === "string" ? created.paymentUrl : "",
+        qrCodeUrl: typeof created?.qrCodeUrl === "string" ? created.qrCodeUrl : "",
+      });
       form.reset();
       setSplitEnabled(false);
       toast({
@@ -215,10 +235,10 @@ export default function MerchantTerminal() {
           : "Customer can now proceed with payment",
       });
     },
-    onError: () => {
+    onError: (error) => {
       toast({
         title: "Error",
-        description: "Failed to create transaction",
+        description: apiErrorMessage(error, "Failed to create transaction"),
         variant: "destructive",
       });
     },
@@ -457,6 +477,7 @@ export default function MerchantTerminal() {
       playSuccessChime();
       form.reset();
       setCurrentTransaction(null);
+      setShareLink(null);
       setShowSuccessOverlay(true);
       if (successOverlayTimerRef.current) clearTimeout(successOverlayTimerRef.current);
       successOverlayTimerRef.current = setTimeout(() => setShowSuccessOverlay(false), 5000);
@@ -561,6 +582,29 @@ export default function MerchantTerminal() {
       copiedPaymentLinkTimerRef.current = setTimeout(() => setCopiedPaymentLink(false), 2000);
     } catch (error) {
       console.error('Failed to copy link:', error);
+      toast({
+        title: "Copy Failed",
+        description: "Unable to copy payment link to clipboard",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Gap 12: copy handler for the private per-payment share-link overlay,
+  // kept separate from copiedPaymentLink (the pre-existing standing-address
+  // "Share Payment Link" panel) so the two "copied" indicators never cross-wire.
+  const copyShareLinkToClipboard = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedShareLink(true);
+      toast({
+        title: "Link Copied!",
+        description: "Payment link has been copied to clipboard",
+      });
+      if (copiedShareLinkTimerRef.current) clearTimeout(copiedShareLinkTimerRef.current);
+      copiedShareLinkTimerRef.current = setTimeout(() => setCopiedShareLink(false), 2000);
+    } catch (error) {
+      console.error('Failed to copy share link:', error);
       toast({
         title: "Copy Failed",
         description: "Unable to copy payment link to clipboard",
@@ -1345,6 +1389,63 @@ function PaymentStatus({ transaction, merchantId }: { transaction: any; merchant
               @keyframes successPop { from { opacity:0; transform:scale(0.6); } to { opacity:1; transform:scale(1); } }
               @keyframes drawTick { from { stroke-dashoffset:60; } to { stroke-dashoffset:0; } }
             `}</style>
+          </div>
+        )}
+
+        {/* Gap 12: private per-payment share-link overlay. Shown after every
+            successful create (this call site is always stoneless), cleared
+            when the sale is paid (see the completion effect above). */}
+        {shareLink && (
+          <div
+            className="fixed inset-0 z-[900] flex items-center justify-center p-4"
+            style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}
+            data-testid="share-link-overlay"
+          >
+            <button
+              onClick={() => setShareLink(null)}
+              className="absolute top-6 right-6 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors z-10"
+              data-testid="close-share-link"
+            >
+              <X className="h-4 w-4 text-white/70" />
+            </button>
+            <div
+              className="rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center space-y-4"
+              style={{ backgroundColor: '#111318', border: '1px solid rgba(0,255,102,0.3)' }}
+            >
+              <div>
+                <p className="text-white text-base font-medium">{shareLink.item}</p>
+                <p className="text-3xl font-bold" style={{ color: '#00FF66' }}>
+                  ${(parseFloat(shareLink.amount) || 0).toFixed(2)}
+                </p>
+              </div>
+              <div className="w-40 h-40 mx-auto">
+                <QRCodeDisplay paymentUrl={shareLink.paymentUrl} qrCodeUrl={shareLink.qrCodeUrl} />
+              </div>
+              <div
+                className="bg-gray-800 rounded-lg p-3 text-xs text-white break-all"
+                data-testid="share-link-url"
+              >
+                {shareLink.paymentUrl}
+              </div>
+              <Button
+                onClick={() => copyShareLinkToClipboard(shareLink.paymentUrl)}
+                className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg h-10"
+                data-testid="copy-share-link"
+              >
+                {copiedShareLink ? (
+                  <>
+                    <Check size={16} className="mr-2" />
+                    Link Copied!
+                  </>
+                ) : (
+                  <>
+                    <Copy size={16} className="mr-2" />
+                    Copy Link
+                  </>
+                )}
+              </Button>
+              <p className="text-gray-400 text-xs">Anyone with this private link can pay for this sale.</p>
+            </div>
           </div>
         )}
 
