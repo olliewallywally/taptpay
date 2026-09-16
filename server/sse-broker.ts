@@ -72,6 +72,17 @@ function isTarget(
   return stoneId !== null && audience.stoneId === stoneId;
 }
 
+/**
+ * Gap 12 Option C: the same eligibility test `isTarget` applies to a
+ * legacy-no-board subscriber, exposed standalone so `server/routes.ts`'s
+ * `dispatchLegacyNoBoard` can decide *whether an ambiguity check is even
+ * relevant* before ever calling storage — a board-scoped or per-payment
+ * event must never trigger the DB round-trip in mandatory fix #2.
+ */
+export function isLegacyNoBoardEligible(stoneId: number | null, data: Record<string, any>): boolean {
+  return isTarget({ kind: "legacy-no-board" }, stoneId, data);
+}
+
 export class SseBroker {
   private subscribers = new Map<number, Set<Subscriber>>();
 
@@ -93,16 +104,50 @@ export class SseBroker {
     };
   }
 
-  broadcast(merchantId: number, stoneId: number | null | undefined, data: Record<string, any>) {
+  /**
+   * `options.audiences`, when given, additionally restricts delivery to
+   * subscribers of those audience kinds — used by gap 12 Option C
+   * (`server/routes.ts`'s `broadcastToStone`) to dispatch to "merchant" and
+   * "board" synchronously while "legacy-no-board" is gated behind an async
+   * ambiguity check. Omitting it (every call site before gap 12 Option C,
+   * and every existing test) is byte-identical to today's behaviour.
+   */
+  broadcast(
+    merchantId: number,
+    stoneId: number | null | undefined,
+    data: Record<string, any>,
+    options?: { audiences?: ReadonlyArray<SseAudience["kind"]> },
+  ) {
     const merchantSubscribers = this.subscribers.get(merchantId);
     if (!merchantSubscribers) return;
     const canonicalStoneId = stoneId ?? null;
 
     for (const subscriber of merchantSubscribers) {
+      if (options?.audiences && !options.audiences.includes(subscriber.audience.kind)) continue;
       if (!isTarget(subscriber.audience, canonicalStoneId, data)) continue;
       subscriber.connection.write(
         `data: ${JSON.stringify(projectEvent(data, subscriber.audience))}\n\n`,
       );
+    }
+  }
+
+  /**
+   * Gap 12 Option C mandatory fix #3's "safe" counterpart: tells every
+   * legacy-no-board subscriber that the merchant currently has 2+ concurrent
+   * candidate stoneless transactions open, so none can be resolved safely.
+   * Carries no transaction data of either candidate — no id, price, item
+   * name or status — by design.
+   */
+  broadcastLegacyNoBoardAmbiguous(merchantId: number) {
+    const merchantSubscribers = this.subscribers.get(merchantId);
+    if (!merchantSubscribers) return;
+    const frame = `data: ${JSON.stringify({
+      type: "legacy_no_board_ambiguous",
+      addressingMode: "legacy-no-board",
+    })}\n\n`;
+    for (const subscriber of merchantSubscribers) {
+      if (subscriber.audience.kind !== "legacy-no-board") continue;
+      subscriber.connection.write(frame);
     }
   }
 
@@ -142,6 +187,25 @@ export class SseBroker {
     let total = 0;
     for (const subscribers of this.subscribers.values()) total += subscribers.size;
     return total;
+  }
+
+  /**
+   * Gap 12 Option C mandatory fix #2: `subscriberCount` is audience-agnostic
+   * (counts "merchant"/"board"/"legacy-no-board" alike), so it cannot be
+   * used as a cheap short-circuit for the legacy-no-board ambiguity check —
+   * a merchant with only their own authenticated dashboard open would still
+   * trigger a DB round-trip on every stoneless broadcast. This counts only
+   * "legacy-no-board" subscribers, so the check runs only when an actual
+   * anonymous legacy-no-board subscriber is connected.
+   */
+  legacyNoBoardSubscriberCount(merchantId: number): number {
+    const merchantSubscribers = this.subscribers.get(merchantId);
+    if (!merchantSubscribers) return 0;
+    let count = 0;
+    for (const subscriber of merchantSubscribers) {
+      if (subscriber.audience.kind === "legacy-no-board") count++;
+    }
+    return count;
   }
 
   clear() {

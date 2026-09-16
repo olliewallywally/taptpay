@@ -59,7 +59,7 @@ import {
   tokenReceiptDto,
 } from "./http-contracts";
 import { PLAN_LIST, planIdSchema } from "@shared/plans";
-import { sseBroker, type SseAudience } from "./sse-broker";
+import { sseBroker, isLegacyNoBoardEligible, type SseAudience } from "./sse-broker";
 import {
   createRetailTransaction,
   PaymentCredentialCollisionError,
@@ -274,7 +274,58 @@ setInterval(() => {
 }, RATE_LIMIT_WINDOW).unref();
 
 function broadcastToStone(merchantId: number, stoneId: number | null | undefined, data: any) {
-  sseBroker.broadcast(merchantId, stoneId, data);
+  const canonicalStoneId = stoneId ?? null;
+  // Gap 12 Option C mandatory fix #1: "merchant" and "board" audiences are
+  // dispatched to synchronously and unconditionally, exactly as before this
+  // change — zero added latency, zero reordering exposure. Only the
+  // "legacy-no-board" leg (below) is gated behind an async ambiguity check;
+  // it must never delay or reorder this line. See
+  // docs/decisions/2026-09-13-gap12-anonymous-sse-addressing-options.md
+  // "Option C" and
+  // docs/evidence/remediation-v2-2/r1/R1-T2-gap12-option-c-fail-closed-2026-09-15.md.
+  sseBroker.broadcast(merchantId, canonicalStoneId, data, { audiences: ["merchant", "board"] });
+  dispatchLegacyNoBoard(merchantId, canonicalStoneId, data);
+}
+
+/**
+ * Gap 12 Option C — the "legacy-no-board" (unauthenticated, no-board)
+ * audience alone is gated behind an async check of whether the merchant
+ * currently has 2+ concurrent candidate stoneless transactions open. If so,
+ * every legacy-no-board subscriber is told the sale is ambiguous instead of
+ * receiving (possibly someone else's) transaction data — see mandatory fix
+ * #1 above for why this must be a separate, later step from the
+ * merchant/board dispatch, not a gate in front of it.
+ *
+ * Mandatory fix #3 (documented, not fixed — see the evidence doc's "what
+ * this does not fix" section): this re-derives ambiguity from the current
+ * database state at the moment the check resolves, then delivers the
+ * ORIGINAL triggering broadcast's data whenever that check comes back
+ * non-ambiguous. If a second concurrent sale completes in the gap between
+ * this function being called and the check resolving, its own completion
+ * broadcast can still be judged non-ambiguous (the pending bucket has
+ * already dropped back to one) and delivered in full to every
+ * legacy-no-board subscriber, including one still watching the other,
+ * still-pending sale.
+ */
+function dispatchLegacyNoBoard(merchantId: number, stoneId: number | null, data: any) {
+  if (!isLegacyNoBoardEligible(stoneId, data)) return;
+  // Mandatory fix #2: an audience-scoped count, not sseBroker.subscriberCount
+  // (which counts every audience) — a merchant-only-audience broadcast with
+  // zero anonymous customers connected must trigger zero DB round-trips.
+  if (sseBroker.legacyNoBoardSubscriberCount(merchantId) === 0) return;
+  void storage.getLegacyNoBoardActiveTransactionOrAmbiguous(merchantId)
+    .then((result) => {
+      if (result.kind === "ambiguous") {
+        sseBroker.broadcastLegacyNoBoardAmbiguous(merchantId);
+      } else {
+        sseBroker.broadcast(merchantId, stoneId, data, { audiences: ["legacy-no-board"] });
+      }
+    })
+    .catch((error) => {
+      // Fail closed: deliver nothing to the anonymous audience rather than a
+      // possibly-wrong transaction when the ambiguity check itself errors.
+      console.error("legacy-no-board ambiguity check failed:", error);
+    });
 }
 
 const loginSchema = z.object({
@@ -2069,12 +2120,31 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
       
       // No stoneId on a public pay link means the *no-board* link, not "any board":
-      // pass null so it scopes to stoneless sales. Filtering by merchant alone
-      // would serve this customer a sale rung up on a specific board.
-      const transaction = await storage.getActiveTransactionByMerchant(
-        merchantId,
-        stoneId === undefined ? { kind: "legacy-no-board" } : { kind: "board", stoneId },
-      );
+      // scope to stoneless sales. Filtering by merchant alone would serve
+      // this customer a sale rung up on a specific board.
+      //
+      // Gap 12 Option C: the no-stoneId (legacy-no-board) branch must fail
+      // closed when the merchant has 2+ concurrent candidate stoneless
+      // transactions open, rather than silently resolving to the newest —
+      // see getLegacyNoBoardActiveTransactionOrAmbiguous's doc comment in
+      // server/storage.ts. The board branch is untouched.
+      let transaction: Awaited<ReturnType<typeof storage.getActiveTransactionByMerchant>>;
+      if (stoneId === undefined) {
+        const result = await storage.getLegacyNoBoardActiveTransactionOrAmbiguous(merchantId);
+        if (result.kind === "ambiguous") {
+          // Owner-approved response shape: the JSON body stays null — byte-
+          // identical to today's "no active transaction" response for any
+          // caller that doesn't look for the header (the three staff
+          // terminal screens and demo-terminal.tsx) — and ambiguity is
+          // signalled only via this header, read only by the modified
+          // customer-payment.tsx.
+          res.set("X-Legacy-No-Board-Ambiguous", "true");
+          return res.json(null);
+        }
+        transaction = result.kind === "found" ? result.transaction : undefined;
+      } else {
+        transaction = await storage.getActiveTransactionByMerchant(merchantId, { kind: "board", stoneId });
+      }
 
       if (!transaction) {
         return res.json(null);
