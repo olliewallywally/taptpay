@@ -1491,7 +1491,16 @@ export const uploadedFiles = pgTable("uploaded_files", {
   path: text("path").notNull().unique(),
   mimeType: text("mime_type").notNull(),
   data: bytea("data").notNull(),
+  // Owning tenant (gap 13, docs/decisions/2026-09-14-uploads-tenant-authorization-option-c-disposition.md).
+  // Nullable on purpose: a row that predates migration 0023 and could not be
+  // attributed unambiguously stays NULL, and no tenant-scoped route serves a
+  // NULL-tenant row (fail closed). Plain FK, matching this schema's dominant
+  // convention: a merchant that still owns uploads cannot be hard-deleted until
+  // retention policy (plan A-H3) says what happens to its documents.
+  merchantId: integer("merchant_id").references(() => merchants.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (t) => ({
+  merchantIdIdx: index("uploaded_files_merchant_id_idx").on(t.merchantId),
+}));
 
 export type UploadedFile = typeof uploadedFiles.$inferSelect;

@@ -31,6 +31,7 @@ import path from "path";
 import fs from "fs";
 import { sendPushToMerchant } from "./push";
 import { resendInvoiceEmail } from "./property-cron";
+import { INVOICE_DOCUMENT_FOLDER, isInvoiceDocumentName, isPublicUploadFolder, parseInvoiceDocumentRef } from "./upload-policy";
 import { resendTradeInvoice, sendTradePaymentInvoice, sendTradeQuote } from "./trades-delivery";
 import { sendGstInvoices, extractEmails } from "./gst-invoice";
 import {
@@ -387,10 +388,39 @@ const INVOICE_DOC_MAGIC_CHECK: Record<string, (buf: Buffer) => boolean> = {
   // 'image/heic' intentionally omitted — mimetype-only, see comment above.
 };
 
-// Upsert a file into uploaded-file storage under its public /uploads path
-// (e.g. "logos/merchant-5.png"). Re-uploading to the same path overwrites.
-async function saveUploadedFile(relPath: string, mimeType: string, data: Buffer): Promise<void> {
-  await storage.saveUploadedFile(relPath, mimeType, data);
+// Upsert a file into uploaded-file storage under its /uploads path
+// (e.g. "logos/merchant-5.png"), stamped with the owning merchant. Re-uploading
+// to the same path by the same merchant overwrites; a path owned by a different
+// merchant is refused by storage (gap 13).
+async function saveUploadedFile(relPath: string, mimeType: string, data: Buffer, merchantId: number): Promise<void> {
+  await storage.saveUploadedFile(relPath, mimeType, data, merchantId);
+}
+
+// Gap 13: a private document is only ever sent after the caller was authorized
+// by the route; it must never be cached by a shared cache, and the stored MIME
+// type is served with `nosniff` so a browser cannot reinterpret the bytes.
+function sendPrivateDocument(res: express.Response, file: { mimeType: string; data: Buffer }) {
+  res.setHeader("Content-Type", file.mimeType);
+  res.setHeader("Cache-Control", "private, no-store");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  return res.send(file.data);
+}
+
+// Gap 13: a document reference on an invoice/quote create must be one of THIS
+// merchant's own uploads (the only thing the upload endpoint ever produced).
+// True when there is nothing to check or the reference is valid; otherwise
+// answers 400 and returns false, and the caller must return without writing
+// anything — including any prospect/client row it would otherwise create first.
+async function requireOwnedInvoiceDocument(
+  merchantId: number,
+  documentUrl: string | undefined,
+  res: express.Response,
+): Promise<boolean> {
+  if (!documentUrl) return true;
+  const ref = parseInvoiceDocumentRef(documentUrl);
+  if (ref && (await storage.uploadedFileOwnedByMerchant(ref.relPath, merchantId))) return true;
+  res.status(400).json({ message: "Invalid document attachment" });
+  return false;
 }
 
 // Utility to remove undefined keys
@@ -3804,11 +3834,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const logoUrl = `/uploads/logos/${filename}`;
 
       // Persist the file first so the merchant row never points at a missing file
-      await saveUploadedFile(`logos/${filename}`, 'image/png', req.file.buffer);
+      await saveUploadedFile(`logos/${filename}`, 'image/png', req.file.buffer, merchantId);
 
       const updatedMerchant = await storage.updateMerchantLogoUrl(merchantId, logoUrl);
       if (!updatedMerchant) {
-        await storage.deleteUploadedFile(`logos/${filename}`);
+        await storage.deleteUploadedFile(`logos/${filename}`, merchantId);
         return res.status(404).json({ message: "Merchant not found" });
       }
 
@@ -3842,7 +3872,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // for a legacy file that predates DB-backed storage.
       if (merchant.customLogoUrl) {
         const relPath = merchant.customLogoUrl.replace(/^\/uploads\//, "");
-        await storage.deleteUploadedFile(relPath);
+        // Tenant-scoped (gap 13): removes the blob only if this merchant owns it,
+        // so a customLogoUrl that points at another tenant's file cannot delete it.
+        await storage.deleteUploadedFile(relPath, merchantId);
 
         const filepath = path.join(process.cwd(), merchant.customLogoUrl);
         if (fs.existsSync(filepath)) {
@@ -7068,25 +7100,27 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  // Serve uploads from the uploaded_files table (durable across deploys), with
-  // a local-disk fallback for any legacy file that predates DB-backed storage.
+  // Serve PUBLIC uploads (merchant logos) from the uploaded_files table (durable
+  // across deploys), with a local-disk fallback for any legacy file that predates
+  // DB-backed storage.
   //
-  // UPL-3 (R1-T3 domain 5, narrow stopgap only): this route is intentionally
-  // unauthenticated (logos are shown publicly on customer-facing checkout
-  // pages) and `uploaded_files` has no merchant/tenant column, so per-tenant
-  // download authorization is NOT implemented here — that is a real open
-  // product/schema decision, tracked separately (see the R1-T3 domain-5
-  // evidence file and its escalation memo), not something this narrow fix
-  // resolves. `nosniff` only closes the content-type-confusion angle: without
-  // it, a browser sniffing an uploaded file's bytes as `text/html` could
-  // execute embedded script if the file were ever framed/loaded as a page —
-  // schema-free, no product decision, safe to land unconditionally.
+  // Gap 13 (Option C, Oliver 2026-09-14): this route is unauthenticated by
+  // design — logos are shown to customers on hosted checkout pages — so it
+  // serves ONLY the folders in PUBLIC_UPLOAD_FOLDERS. Anything else, invoice
+  // documents in particular, is a 404 exactly like a missing file, checked
+  // before either the database or the disk fallback is consulted. Invoice
+  // documents are served by GET /api/invoice-documents/:name (authenticated,
+  // tenant-scoped) and GET /api/checkout/document/:token (checkout-token).
+  //
+  // UPL-3: `nosniff` stays on both response paths so a browser can never
+  // sniff a stored file's bytes into text/html.
   app.get('/uploads/:folder/:name', async (req, res) => {
     try {
       const { folder, name } = req.params;
+      if (!isPublicUploadFolder(folder)) return res.status(404).json({ message: 'File not found' });
       // Route params never contain '/', but keep an explicit guard against
       // traversal for the disk fallback below.
-      if (folder.includes('..') || name.includes('..')) return res.status(400).end();
+      if (name.includes('..')) return res.status(400).end();
       const relPath = `${folder}/${name}`;
 
       const file = await storage.getUploadedFile(relPath);
@@ -7219,6 +7253,24 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     if (propertyInvoice) return { ...propertyInvoice, checkoutVertical: "property" };
     const tradeInvoice = await storage.getJobInvoiceByToken(token);
     return tradeInvoice ? { ...tradeInvoice, checkoutVertical: "trades" } : undefined;
+  }
+
+  // Gap 13: does this invoice carry a document the checkout may expose? Only an
+  // invoice-folder reference that the invoice's OWN merchant owns qualifies — a
+  // legacy row can hold any string (external URL, logo path, another merchant's
+  // document), and none of those is ever surfaced to the customer.
+  //
+  // This runs on the customer's PAYMENT page, so a failure here must only ever
+  // hide the document link — never take the page down and stop someone paying.
+  async function invoiceHasCheckoutDocument(invoice: CheckoutInvoice): Promise<boolean> {
+    const ref = parseInvoiceDocumentRef(invoice.documentUrl);
+    if (!ref) return false;
+    try {
+      return await storage.uploadedFileOwnedByMerchant(ref.relPath, invoice.merchantId);
+    } catch (err) {
+      console.error("[CHECKOUT_DOCUMENT_CHECK]", err);
+      return false;
+    }
   }
 
   async function getCheckoutParty(invoice: CheckoutInvoice): Promise<any> {
@@ -7491,12 +7543,38 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       const ext = path.extname(req.file.originalname).toLowerCase();
       const filename = `invoice-${Date.now()}-${crypto.randomBytes(8).toString('hex')}${ext}`;
-      await saveUploadedFile(`invoices/${filename}`, req.file.mimetype, req.file.buffer);
-      const documentUrl = `/uploads/invoices/${filename}`;
+      // Stamped with the uploader's merchant (gap 13). The returned `documentUrl`
+      // is an opaque reference the create routes validate against that owner —
+      // it is no longer a fetchable public URL (see GET /uploads/:folder/:name).
+      await saveUploadedFile(`${INVOICE_DOCUMENT_FOLDER}/${filename}`, req.file.mimetype, req.file.buffer, req.user.merchantId);
+      const documentUrl = `/uploads/${INVOICE_DOCUMENT_FOLDER}/${filename}`;
       res.json({ documentUrl, documentName: req.file.originalname });
     } catch (err) {
       console.error("[PROP_INVOICE_DOC_UPLOAD]", err);
       res.status(500).json({ message: "Failed to upload document" });
+    }
+  });
+
+  // Gap 13 (Option C, Oliver 2026-09-14): the authenticated, ownership-checked
+  // download for invoice documents. Scoped by the principal's OWN merchant id —
+  // there is deliberately no admin bypass (the platform admin's merchantId is 0
+  // and matches no tenant), and a document owned by anyone else, owned by no one
+  // (a legacy row that could not be attributed), malformed, or missing all give
+  // the same 404, so the route is not an existence oracle. The tenant who was
+  // sent the invoice reads the document through GET /api/checkout/document/:token
+  // instead; they hold no merchant session.
+  app.get("/api/invoice-documents/:name", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const { name } = req.params;
+      if (!isInvoiceDocumentName(name)) return res.status(404).json({ message: "Document not found" });
+      const file = await storage.getUploadedFileForMerchant(`${INVOICE_DOCUMENT_FOLDER}/${name}`, merchantId);
+      if (!file) return res.status(404).json({ message: "Document not found" });
+      return sendPrivateDocument(res, file);
+    } catch (err) {
+      console.error("[INVOICE_DOC_SERVE]", err);
+      res.status(500).json({ message: "Failed to serve document" });
     }
   });
 
@@ -7509,6 +7587,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!checkMerchantOwnership(req, tenant.merchantId)) return res.status(403).json({ message: "Access denied" });
       if (!(await requireBillingCard(merchantId, res))) return;
       const data = createAdHocInvoiceSchema.parse(req.body);
+      // Gap 13: an attached document must be this merchant's own upload.
+      if (!(await requireOwnedInvoiceDocument(merchantId, data.documentUrl, res))) return;
       const baseUrl = getBaseUrl(req);
       const isCharge = data.kind === "charge";
 
@@ -7608,7 +7688,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!invoice) return res.status(404).json({ message: "Payment link not found" });
       if (invoice.status === "voided") return res.status(410).json({ message: "This payment link has been voided" });
       if (invoice.status === "paid" || invoice.status === "paid_external") return res.status(200).json({ alreadyPaid: true, amountCents: invoice.amountCents });
-      const [merchant, party] = await Promise.all([storage.getMerchant(invoice.merchantId), getCheckoutParty(invoice)]);
+      const [merchant, party, hasDocument] = await Promise.all([
+        storage.getMerchant(invoice.merchantId),
+        getCheckoutParty(invoice),
+        invoiceHasCheckoutDocument(invoice),
+      ]);
       if (!merchant || !party) return res.status(404).json({ message: "Payment details unavailable" });
 
       // Additive context for the branded checkout amount subtitle:
@@ -7657,14 +7741,41 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         quote: quoteInfo,
         description: invoice.checkoutVertical === "trades" ? tradesDescription : (invoice.description ?? null),
         // Attached invoice document for one-off charges — surfaced as a
-        // "View invoice" link on the branded checkout page.
-        documentUrl: invoice.documentUrl ?? null,
-        documentName: invoice.documentName ?? null,
+        // "View invoice" link on the branded checkout page. Gap 13: this is the
+        // checkout-token route, never the raw storage path (which no public route
+        // serves any more), and only when the document is genuinely the invoice
+        // merchant's own; the page opens whatever URL it is given.
+        documentUrl: hasDocument ? `/api/checkout/document/${token}` : null,
+        documentName: hasDocument ? (invoice.documentName ?? null) : null,
         splitEnabled: !!invoice.splitEnabled,
         splitCount: invoice.splitCount ?? null,
         splitPaidCount: invoice.splitPaidCount ?? 0,
       });
     } catch (err) { console.error("[CHECKOUT_RESOLVE]", err); res.status(500).json({ message: "Failed to load payment details" }); }
+  });
+
+  // Gap 13, the tenant-facing half of Option C. The reader of an attached
+  // invoice document is the unauthenticated tenant on the checkout page, who
+  // holds no merchant session — so the invoice's checkout token authorizes
+  // exactly the one document attached to that invoice (plan §8.5: "Public
+  // checkout tokens authorize one payment resource only"), and only if the
+  // stored file belongs to the invoice's own merchant. Guards mirror
+  // GET /api/checkout/resolve/:token: unknown -> 404, voided -> 410, and a paid
+  // invoice exposes no document there, so none here. A distinct rate-limit key
+  // keeps viewing a bill from exhausting the page's own per-token budget.
+  app.get("/api/checkout/document/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      if (!tokenRateLimit(`document:${token}`)) return res.status(429).json({ message: "Too many requests" });
+      const invoice = await getCheckoutInvoiceByToken(token);
+      if (!invoice) return res.status(404).json({ message: "Payment link not found" });
+      if (invoice.status === "voided") return res.status(410).json({ message: "This payment link has been voided" });
+      if (invoice.status === "paid" || invoice.status === "paid_external") return res.status(404).json({ message: "Document not found" });
+      const ref = parseInvoiceDocumentRef(invoice.documentUrl);
+      const file = ref ? await storage.getUploadedFileForMerchant(ref.relPath, invoice.merchantId) : undefined;
+      if (!file) return res.status(404).json({ message: "Document not found" });
+      return sendPrivateDocument(res, file);
+    } catch (err) { console.error("[CHECKOUT_DOCUMENT]", err); res.status(500).json({ message: "Failed to load document" }); }
   });
 
   // Tenant chooses how many flatmates to split the rent between (sets splitCount).
@@ -8207,6 +8318,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(400).json({ message: "Deposit type and value are required" });
       if (parsed.data.depositEnabled && parsed.data.depositType === "percent" && (parsed.data.depositValue ?? 0) > 100)
         return res.status(400).json({ message: "Deposit percentage cannot exceed 100" });
+      // Gap 13: an attached document must be this merchant's own upload. Checked
+      // before the hidden prospect below is created, so a rejection writes nothing.
+      if (!(await requireOwnedInvoiceDocument(merchantId, parsed.data.documentUrl, res))) return;
       let client;
       if (parsed.data.clientProfileId) {
         client = await storage.getClientProfile(parsed.data.clientProfileId);
@@ -8442,6 +8556,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!(await requireBillingCard(merchantId, res))) return;
       const parsed = createJobInvoiceSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
+      // Gap 13: an attached document must be this merchant's own upload. Checked
+      // before the hidden prospect below is created, so a rejection writes nothing.
+      if (!(await requireOwnedInvoiceDocument(merchantId, parsed.data.documentUrl, res))) return;
       let client: any;
       if (parsed.data.recipient) {
         // Quick invoice: no pre-existing client. Create a HIDDEN 'prospect'

@@ -874,12 +874,41 @@ export interface IStorage extends PaymentAttemptRepository {
   createJobEvent(data: any): Promise<any>;
   getJobEventsByClient(clientProfileId: string, limit?: number): Promise<any[]>;
 
-  // Uploaded file blobs (logos, invoice attachments), keyed by their public
+  // Uploaded file blobs (logos, invoice attachments), keyed by their
   // /uploads/<path> — R1-T7: routes.ts used to query the uploaded_files table
   // directly via `db`, which is always null in MemStorage/no-database mode.
-  saveUploadedFile(relPath: string, mimeType: string, data: Buffer): Promise<void>;
+  //
+  // Gap 13 (plan §8.5): every write is stamped with its owning merchant and every
+  // read/delete that serves or removes a tenant's file is scoped to one. A
+  // NULL-tenant row (predates migration 0023 and could not be attributed) is
+  // matched by no merchant scope, so no tenant-scoped route ever serves it.
+  //
+  // Rejects — without touching the existing row — when `relPath` already belongs
+  // to a different merchant. The owner may overwrite their own path (a logo
+  // re-upload relies on this).
+  saveUploadedFile(relPath: string, mimeType: string, data: Buffer, merchantId: number): Promise<void>;
+  // UNSCOPED. Exists only for the public logo route, which is authorized by
+  // folder (PUBLIC_UPLOAD_FOLDERS in upload-policy.ts), not by tenant. Do not
+  // use it to serve anything that is not intentionally public.
   getUploadedFile(relPath: string): Promise<{ mimeType: string; data: Buffer } | undefined>;
-  deleteUploadedFile(relPath: string): Promise<void>;
+  getUploadedFileForMerchant(relPath: string, merchantId: number): Promise<{ mimeType: string; data: Buffer } | undefined>;
+  // Metadata-only existence + ownership check (never reads the blob), for the
+  // attach-time and checkout-resolve validations.
+  uploadedFileOwnedByMerchant(relPath: string, merchantId: number): Promise<boolean>;
+  deleteUploadedFile(relPath: string, merchantId: number): Promise<void>;
+}
+
+// A tenant id that can match a real merchant. 0 is the platform admin's
+// principal id and must never match a tenant; NaN/fractions are never valid.
+function isTenantId(merchantId: number): boolean {
+  return Number.isInteger(merchantId) && merchantId > 0;
+}
+
+export class UploadPathOwnershipError extends Error {
+  constructor() {
+    super("Upload path is owned by another merchant");
+    this.name = "UploadPathOwnershipError";
+  }
 }
 
 // Defaults for merchant columns the in-memory mocks don't set explicitly.
@@ -939,7 +968,7 @@ export class MemStorage implements IStorage {
     claimedAt: Date;
   }>;
   private tutorialProgress: Map<string, MerchantTutorialProgress>;
-  private uploadedFileBlobs: Map<string, { mimeType: string; data: Buffer }>;
+  private uploadedFileBlobs: Map<string, { mimeType: string; data: Buffer; merchantId: number }>;
 
   constructor() {
     this.merchants = new Map();
@@ -2427,16 +2456,32 @@ export class MemStorage implements IStorage {
     console.log("All merchants and transactions cleared from memory");
   }
 
-  async saveUploadedFile(relPath: string, mimeType: string, data: Buffer): Promise<void> {
-    this.uploadedFileBlobs.set(relPath, { mimeType, data });
+  async saveUploadedFile(relPath: string, mimeType: string, data: Buffer, merchantId: number): Promise<void> {
+    if (!isTenantId(merchantId)) throw new Error("A valid merchantId is required to save an upload");
+    const existing = this.uploadedFileBlobs.get(relPath);
+    if (existing && existing.merchantId !== merchantId) throw new UploadPathOwnershipError();
+    this.uploadedFileBlobs.set(relPath, { mimeType, data, merchantId });
   }
 
   async getUploadedFile(relPath: string): Promise<{ mimeType: string; data: Buffer } | undefined> {
-    return this.uploadedFileBlobs.get(relPath);
+    const file = this.uploadedFileBlobs.get(relPath);
+    return file ? { mimeType: file.mimeType, data: file.data } : undefined;
   }
 
-  async deleteUploadedFile(relPath: string): Promise<void> {
-    this.uploadedFileBlobs.delete(relPath);
+  async getUploadedFileForMerchant(relPath: string, merchantId: number): Promise<{ mimeType: string; data: Buffer } | undefined> {
+    if (!isTenantId(merchantId)) return undefined;
+    const file = this.uploadedFileBlobs.get(relPath);
+    return file && file.merchantId === merchantId ? { mimeType: file.mimeType, data: file.data } : undefined;
+  }
+
+  async uploadedFileOwnedByMerchant(relPath: string, merchantId: number): Promise<boolean> {
+    if (!isTenantId(merchantId)) return false;
+    return this.uploadedFileBlobs.get(relPath)?.merchantId === merchantId;
+  }
+
+  async deleteUploadedFile(relPath: string, merchantId: number): Promise<void> {
+    if (!isTenantId(merchantId)) return;
+    if (this.uploadedFileBlobs.get(relPath)?.merchantId === merchantId) this.uploadedFileBlobs.delete(relPath);
   }
 
   private createSampleData() {
@@ -7862,14 +7907,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   // ───────── Uploaded file blobs ─────────
-  async saveUploadedFile(relPath: string, mimeType: string, data: Buffer): Promise<void> {
+  async saveUploadedFile(relPath: string, mimeType: string, data: Buffer, merchantId: number): Promise<void> {
     const db = getDb(); if (!db) throw new Error("Database not connected");
-    await db.insert(uploadedFiles)
-      .values({ path: relPath, mimeType, data })
+    if (!isTenantId(merchantId)) throw new Error("A valid merchantId is required to save an upload");
+    // The conflict branch only fires for the row's own tenant. When the path is
+    // already owned by a different merchant (or by no one — a NULL-tenant legacy
+    // row, which `merchant_id = <n>` never matches), ON CONFLICT ... WHERE is
+    // false, nothing is written and RETURNING is empty: refuse rather than
+    // overwrite or re-stamp another tenant's file.
+    const written = await db.insert(uploadedFiles)
+      .values({ path: relPath, mimeType, data, merchantId })
       .onConflictDoUpdate({
         target: uploadedFiles.path,
         set: { mimeType, data, createdAt: new Date() },
-      });
+        setWhere: eq(uploadedFiles.merchantId, merchantId),
+      })
+      .returning({ id: uploadedFiles.id });
+    if (written.length === 0) throw new UploadPathOwnershipError();
   }
 
   async getUploadedFile(relPath: string): Promise<{ mimeType: string; data: Buffer } | undefined> {
@@ -7878,9 +7932,28 @@ export class DatabaseStorage implements IStorage {
     return file ? { mimeType: file.mimeType, data: file.data } : undefined;
   }
 
-  async deleteUploadedFile(relPath: string): Promise<void> {
+  async getUploadedFileForMerchant(relPath: string, merchantId: number): Promise<{ mimeType: string; data: Buffer } | undefined> {
+    const db = getDb(); if (!db || !isTenantId(merchantId)) return undefined;
+    const [file] = await db.select({ mimeType: uploadedFiles.mimeType, data: uploadedFiles.data })
+      .from(uploadedFiles)
+      .where(and(eq(uploadedFiles.path, relPath), eq(uploadedFiles.merchantId, merchantId)));
+    return file ? { mimeType: file.mimeType, data: file.data } : undefined;
+  }
+
+  async uploadedFileOwnedByMerchant(relPath: string, merchantId: number): Promise<boolean> {
+    const db = getDb(); if (!db || !isTenantId(merchantId)) return false;
+    // Selects the id only — the blob is never read for an ownership check.
+    const [row] = await db.select({ id: uploadedFiles.id })
+      .from(uploadedFiles)
+      .where(and(eq(uploadedFiles.path, relPath), eq(uploadedFiles.merchantId, merchantId)))
+      .limit(1);
+    return !!row;
+  }
+
+  async deleteUploadedFile(relPath: string, merchantId: number): Promise<void> {
     const db = getDb(); if (!db) throw new Error("Database not connected");
-    await db.delete(uploadedFiles).where(eq(uploadedFiles.path, relPath));
+    if (!isTenantId(merchantId)) return;
+    await db.delete(uploadedFiles).where(and(eq(uploadedFiles.path, relPath), eq(uploadedFiles.merchantId, merchantId)));
   }
 
 }

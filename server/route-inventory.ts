@@ -278,7 +278,7 @@ export const PUBLIC_PATH_ALLOWLIST: Record<string, string> = {
   "GET /api/windcave/env": "publishable Apple/Google Pay merchant ids for the unauthenticated checkout page",
   "GET /api/windcave/status": "diagnostic booleans + non-secret API base URL",
   "GET /uploads/:folder/:name":
-    "static file server; access model is filename unguessability (merchant logo by numeric id is already public, invoice docs by 64-bit random filename) not a server-side authz check — flagged for awareness in R1-T2 notes, not a gap",
+    "public by design for merchant logos only (shown to customers on hosted checkout pages); PUBLIC_UPLOAD_FOLDERS in upload-policy.ts is an allowlist checked before the database or disk is consulted, so any other folder — invoice documents in particular — is a 404. Invoice documents are served by GET /api/invoice-documents/:name (authenticated, tenant-scoped) and GET /api/checkout/document/:token (checkout-token). Gap 13, Option C",
   "GET /api/nfc/capabilities": "static tap-to-pay capability booleans, no secret",
   "GET /api/tapt-stones/:id":
     "raw row has no sensitive fields (id/merchantId/name/stoneNumber/qrCodeUrl/paymentUrl/isActive/timestamps) — paymentUrl/qrCodeUrl are already the public payment link",

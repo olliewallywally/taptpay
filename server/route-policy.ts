@@ -1,8 +1,8 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/routes.ts @ 2e75a2784b20b50dd4d6a430a732593c7c2ac170 on 2026-09-13.
+ * scripts/generate-route-policy.ts from server/routes.ts @ 454f4120756e3ba26c966659f847280b102a452f on 2026-09-19.
  *
- * 218 registrations (91 GET, 88 POST, 3 PATCH, 5 ALL, 22 PUT, 9 DELETE) on this SHA — evidence for THIS commit, not a timeless
+ * 220 registrations (93 GET, 88 POST, 3 PATCH, 5 ALL, 22 PUT, 9 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
  * live count on every run rather than trusting this comment.
  *
@@ -237,12 +237,14 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
   "DELETE /api/property/schedules/:id": {"method":"DELETE","path":"/api/property/schedules/:id","principal":"merchant-user","markers":["authenticateToken","checkMerchantOwnership"]},
   "GET /api/property/invoices": {"method":"GET","path":"/api/property/invoices","principal":"merchant-user","markers":["authenticateToken"]},
   "POST /api/property/invoices/document": {"method":"POST","path":"/api/property/invoices/document","principal":"merchant-user","markers":["authenticateToken"]},
+  "GET /api/invoice-documents/:name": {"method":"GET","path":"/api/invoice-documents/:name","principal":"merchant-user","markers":["authenticateToken"]},
   "POST /api/property/invoices": {"method":"POST","path":"/api/property/invoices","principal":"merchant-user","markers":["authenticateToken","checkMerchantOwnership"]},
   "POST /api/property/invoices/:id/resend": {"method":"POST","path":"/api/property/invoices/:id/resend","principal":"merchant-user","markers":["authenticateToken","checkMerchantOwnership"]},
   "GET /api/property/invoices/:id": {"method":"GET","path":"/api/property/invoices/:id","principal":"merchant-user","markers":["authenticateToken","checkMerchantOwnership"]},
   "POST /api/property/invoices/:id/void": {"method":"POST","path":"/api/property/invoices/:id/void","principal":"merchant-user","markers":["authenticateToken","checkMerchantOwnership"]},
   "POST /api/property/invoices/:id/mark-paid-external": {"method":"POST","path":"/api/property/invoices/:id/mark-paid-external","principal":"merchant-user","markers":["authenticateToken","checkMerchantOwnership"]},
   "GET /api/checkout/resolve/:token": {"method":"GET","path":"/api/checkout/resolve/:token","principal":"public","markers":["getCheckoutInvoiceByToken("]},
+  "GET /api/checkout/document/:token": {"method":"GET","path":"/api/checkout/document/:token","principal":"public","markers":["getCheckoutInvoiceByToken("]},
   "POST /api/checkout/:token/split": {"method":"POST","path":"/api/checkout/:token/split","principal":"public","markers":["getCheckoutInvoiceByToken("]},
   "POST /api/checkout/pay": {"method":"POST","path":"/api/checkout/pay","principal":"public","markers":["getCheckoutInvoiceByToken("]},
   "POST /api/checkout/:token/session": {"method":"POST","path":"/api/checkout/:token/session","principal":"public","markers":["getCheckoutInvoiceByToken("]},

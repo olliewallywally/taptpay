@@ -169,6 +169,8 @@ export const BASELINE_EFFECT_REQUIREMENTS: readonly Requirement[] = [
   r("0021_create_missing_tapt_stones_index.sql", "index", "tapt_stones", "tapt_stones_merchant_id_idx"),
   r("0022_gap11_session_single_use_indexes.sql", "index", "payment_attempts", "payment_attempts_processor_session_id_uq"),
   r("0022_gap11_session_single_use_indexes.sql", "index", "split_payments", "split_payments_windcave_transaction_id_uq"),
+  r("0023_uploaded_files_tenant_column.sql", "column", "uploaded_files", "merchant_id"),
+  r("0023_uploaded_files_tenant_column.sql", "index", "uploaded_files", "uploaded_files_merchant_id_idx"),
 ];
 
 export const FIND_MISSING_BASELINE_EFFECTS_SQL = `
