@@ -7,8 +7,8 @@ ground truth was re-derived from `git status` (clean) and the baseline was
 57 suites / 511 tests — all equal to the 2026-09-16 entry below.) One piece of
 work, **implemented and verified; migration `0023` applied to the
 development database (`heliumdb`) on Oliver's approval and NOT to production;
-committed on this branch as two commits (code, then docs — see `git log`), not
-pushed**:
+committed on this branch (code `94f24635` and `b0da2f08`, plus two documentation
+commits), not pushed**:
 
 1. **Gap 13 — uploads tenant authorization, Oliver's Option C — implemented**
    ([evidence and handoff](r1/R1-T7-gap13-uploads-tenant-authorization-2026-09-19.md),
@@ -18,8 +18,10 @@ pushed**:
    storage methods are tenant-scoped and refuse to overwrite another tenant's
    row; the public `/uploads` route now serves the `logos` folder only (checked
    before the database or the disk fallback); new
-   `GET /api/invoice-documents/:name` (authenticated, tenant-scoped, no admin
-   bypass, foreign = missing = 404) and `GET /api/checkout/document/:token`
+   `GET /api/invoice-documents/:name` (authenticated, tenant-scoped, foreign =
+   missing = 404 for merchants — **and the validated platform admin may open any
+   document, audited: S1, Oliver's decision later the same day, commit
+   `b0da2f08`**) and `GET /api/checkout/document/:token`
    (checkout-token authorized, that invoice's own document only); the three
    create routes (property invoice, trades quote, trades invoice) now `400` any
    `documentUrl` that is not the caller's own upload. **Two findings shaped it:**
@@ -51,13 +53,20 @@ pushed**:
    the unattributed one 9,076; `0023` added a 16 KB index). One self-review
    finding fixed test-first: the checkout page (the customer's *payment* page)
    must never fail because a document lookup did.
-3. **Not done — and this is the list that matters:** an **independent** review
-   (this was the author's own reread, and the evidence says so — required
-   before merge); the rest of Oliver's S1–S5 confirmation (S1, S2 and S4 answered
-   "yes", S2 with a storage question that is now answered, S3 and S5 asked for an
-   explanation — the
-   [decision record](../../decisions/2026-09-19-gap13-uploads-option-c-implementation-defaults.md)
-   tracks exactly which); the owner-run **production** preflight and apply
+3. **Owner decisions, all answered 2026-09-19:** S2–S5 confirmed as implemented;
+   **S1 reversed — the platform admin may read merchant documents** (my first
+   reading of "s1. yes" was wrong and was corrected;
+   [decision record](../../decisions/2026-09-19-gap13-uploads-option-c-implementation-defaults.md)).
+   Limits of S1: there is **no admin screen or API that lists documents** (the
+   admin needs a name), and the audit trail is the existing file-based
+   `logs/security-audit.log`, which does not survive an ephemeral filesystem.
+4. **Not done — and this is the list that matters:** an **independent** review.
+   The author's own reread is not independent and the evidence says so; Oliver
+   is having **ChatGPT** do it — marker **base `454f4120` → code tip `b0da2f08`**,
+   tag `review/gap13-uploads-2026-09-19`, brief and paste-ready prompt in
+   [R1-T7-gap13-INDEPENDENT-REVIEW-BRIEF-2026-09-19](r1/R1-T7-gap13-INDEPENDENT-REVIEW-BRIEF-2026-09-19.md).
+   Its result is recorded next to the evidence; **not merge-ready until it says
+   Approve**. Also not done: the owner-run **production** preflight and apply
    (before deploying this code); browser/device verification of the checkout
    "View invoice" link (no client file changed, but it is verified at HTTP level
    only); restarting the dev server (now safe) so uploads run on the new code.
@@ -672,7 +681,8 @@ backup, deployment or restore checks.
    the [sub-decisions awaiting Oliver](../../decisions/2026-09-19-gap13-uploads-option-c-implementation-defaults.md).
    Nullable `uploaded_files.merchant_id` + tenant-scoped storage; the public
    `/uploads` route serves logos only; invoice documents are served by
-   `GET /api/invoice-documents/:name` (authenticated, tenant-scoped) and
+   `GET /api/invoice-documents/:name` (authenticated, tenant-scoped; the validated
+   platform admin may also read any document, audited — S1) and
    `GET /api/checkout/document/:token` (the tenant's checkout token); the three
    create routes reject a `documentUrl` that is not the caller's own upload.
    Still open: independent review, S1–S5 confirmation, applying `0023` (dev,

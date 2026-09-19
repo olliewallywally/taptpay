@@ -1,11 +1,10 @@
-# Gap 13, Option C — the sub-decisions implemented at their most restrictive default
+# Gap 13, Option C — sub-decisions S1–S5: the defaults, and Oliver's confirmations
 
 Date: 2026-09-19 UTC.
-Status: **Implemented at restrictive defaults; partly confirmed.** These began as *not* owner decisions —
-engineering choices Option C left open, taken at the setting that exposes least, so each can be confirmed or
-flipped deliberately (every one is a one-line change). On 2026-09-19 Oliver replied to the list; what that
-does and does not settle is in [Confirmation status](#confirmation-status) below. **S3 and S5 are still
-unconfirmed.**
+Status: **All five confirmed by Oliver on 2026-09-19 — and S1 was overridden.** These began as *not* owner
+decisions: engineering choices Option C left open, first implemented at the setting that exposes least, so each
+could be confirmed or flipped deliberately. Oliver's replies (see [Confirmation status](#confirmation-status))
+confirmed S2–S5 as implemented and **reversed S1: the platform admin may open merchants' invoice documents.**
 Execution lineage: `remediation/r1-continuation-20260907`.
 Implements: [Oliver's Option C decision](2026-09-14-uploads-tenant-authorization-option-c-disposition.md) of
 2026-09-14, from the [options memo](2026-09-14-uploads-tenant-authorization-escalation.md).
@@ -27,11 +26,11 @@ showed the decision left five things open, and one fact the options memo had wro
 - The three create routes accept `documentUrl` as any string up to 500 characters, so a tenant column alone
   would not have stopped one merchant attaching another's document, an external URL or a `javascript:` URI.
 
-## Decisions taken (each at its most restrictive setting)
+## Decisions as first implemented (each at its most restrictive setting)
 
 | # | Question left open | Default implemented | Alternative | To flip it |
 |---|---|---|---|---|
-| **S1** | May the platform **admin** read any merchant's invoice documents (as `checkMerchantOwnership` allows elsewhere)? | **No.** `GET /api/invoice-documents/:name` is scoped by the caller's own `merchantId`; the admin principal (`merchantId 0`) matches no tenant. | Admin bypass for support/incident work. | Add one `role === "admin"` branch using the unscoped read. |
+| **S1** | May the platform **admin** read any merchant's invoice documents (as `checkMerchantOwnership` allows elsewhere)? | **First implemented: No.** **Owner decision, 2026-09-19 — Yes** ("i want to see merchant documents"). Now: the *validated* platform admin (dedicated admin principal + configured email + `merchantId 0`; a bare `role: "admin"` claim is not enough) may open **any** invoice document by name — **including ones no merchant could be attributed to** — and every such read writes an `ADMIN_INVOICE_DOCUMENT_READ` audit event (who and which document, never the contents). Merchants stay scoped to their own. | Keep the admin out. | Remove the `isAdmin` branch of `GET /api/invoice-documents/:name`. |
 | **S2** | Legacy documents that cannot be attributed to exactly one merchant (referenced by rows of two merchants, or by none) | Stay **NULL**; served by no route; **retained, never deleted**. | Guess an owner; delete orphans. | Owner decision after the production preflight shows the counts. |
 | **S3** | How the tenant keeps their "View invoice" link | The **checkout token** authorizes exactly the one document attached to its own invoice (`GET /api/checkout/document/:token`), and only if the file's tenant equals the invoice's merchant. `resolve` hands the page that URL; **no client change**. | Drop the link; keep the old public URL for tenants. | — (the alternatives regress a shipped feature or defeat Option C). |
 | **S4** | What a create route does with a `documentUrl` that is not the caller's own upload | **`400 "Invalid document attachment"`, nothing written** — including for the trades routes, before their hidden prospect is created. | Continue accepting arbitrary strings. | Remove `requireOwnedInvoiceDocument` from a route. |
@@ -48,6 +47,14 @@ showed the decision left five things open, and one fact the options memo had wro
   than a broken one; the count-only preflight reports how many that is before anything is applied.
 - Creating an invoice or quote that references a document the caller did not upload now fails with 400.
   Previously any string was stored.
+- **The admin can read documents through the API only.** No admin screen and no admin API lists documents
+  today, so the admin needs a document's name (it sits in an invoice record's `document_url`) to fetch one, and
+  a browser cannot attach the login header to a plain link. A browsable admin view would be new feature work
+  (the branch is under a feature freeze) and needs its own decision.
+- **Admin reads are audited, with a limit.** The event goes through the existing `logSecurityEvent`, which
+  appends to `logs/security-audit.log` on the server's own filesystem; on an ephemeral deployment filesystem
+  that file does not survive a restart or redeploy. It is an audit *trail* until the observability work (plan
+  R6) gives it durable storage — not durable evidence yet.
 - **Deploy order is load-bearing:** apply migration `0023` *before* the code. Code without the column fails on
   the first `uploaded_files` query (logo/document routes error). The checkout page is protected against that:
   a document-lookup failure hides the link and never blocks payment (tested).
@@ -68,22 +75,26 @@ pattern — but worth folding into a later upload-hardening pass); a per-merchan
 
 ## Confirmation status
 
-Oliver's reply of 2026-09-19, verbatim: *"s1. yes, s2 yes but confirm if this will effect storage. s3 explain
+**First reply, 2026-09-19, verbatim:** *"s1. yes, s2 yes but confirm if this will effect storage. s3 explain
 further in a simple way. s4 yes but explain more. s5 - explain"*
 
-| # | Reply | Reading | Status |
-|---|---|---|---|
-| S1 | "yes" | Read as **accepting the default as listed** (admin cannot read merchants' documents). If "yes" was meant as "yes, let admin read them", say so — it is one branch to add. | **Confirmed**, on that reading |
-| S2 | "yes but confirm if this will effect storage" | Accepted, conditional on confirming that keeping unattributable files does not affect storage. | **Condition answered, not yet acknowledged.** Measured on the dev database: nothing is deleted, copied or moved; `uploaded_files` is 2 files / 62,735 bytes, the one unattributed file 9,076 bytes; `0023` added a 4-byte integer per row and a 16,384-byte index. Production sizes are unknown from here — the owner-run preflight reports counts only (byte totals can be added to it on request). |
-| S3 | "explain further in a simple way" | No decision yet. | **Unconfirmed** — explanation below. |
-| S4 | "yes but explain more" | Accepted; a fuller explanation requested. | **Confirmed**, explanation below. |
-| S5 | "explain" | No decision yet. | **Unconfirmed** — explanation below. |
+**Second reply, 2026-09-19, verbatim:** *"s1, i want to see merchant documents/ yes to the rest and confirm s2."*
+
+| # | Outcome | Notes |
+|---|---|---|
+| S1 | **Reversed — the admin may read merchant documents.** Implemented. | I misread the first reply: "s1. yes" was taken as accepting the default (admin cannot read). The second reply corrects it. The change is a small, separately-committed follow-up. Consequences are listed above (unattributed documents included; API only; audit-log limit). |
+| S2 | **Confirmed.** | Storage question answered with measurements (nothing deleted, copied or moved; dev database 2 files / 62,735 bytes, the one unattributed file 9,076 bytes; `0023` added a 4-byte integer per row and a 16,384-byte index) and acknowledged. Production sizes are unknown from here. |
+| S3 | **Confirmed** ("yes to the rest"). | After a plain-language explanation. |
+| S4 | **Confirmed** ("yes to the rest"; "yes" in the first reply). | After a fuller explanation. |
+| S5 | **Confirmed** ("yes to the rest"). | After a plain-language explanation. |
 
 ## What each means, in plain words
 
-- **S1 — admin.** The platform admin login cannot open merchants' invoice documents through the app. Support
-  or an incident that needs one would need a deliberate, separate step. It is the safer default because
-  documents can hold tenants' financial details.
+- **S1 — admin.** *(Owner's decision: yes.)* The platform admin login can open any merchant's invoice
+  document, by its name, through the API — including the few old files nobody could be matched to. Each time it
+  does, a line is written to the security audit log saying who opened which document (never what was in it).
+  A token that merely *says* it is admin is still refused; only the real admin login counts. What does **not**
+  exist yet is a screen for browsing documents.
 - **S2 — legacy documents nobody can be matched to.** A few old uploaded files can't be tied to exactly one
   merchant (uploaded but never attached to anything, or attached by two different merchants). They stay in the
   database exactly as they are, but no one can open them through the app. Nothing is deleted, so **storage use

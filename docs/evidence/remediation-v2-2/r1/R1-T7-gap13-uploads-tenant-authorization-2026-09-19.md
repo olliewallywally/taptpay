@@ -97,9 +97,11 @@ URL, so no data migration and legacy rows keep working).
 
 ### Sub-decisions I took at their most restrictive default — flagged for Oliver, each a one-line change
 
+*Update 2026-09-19: Oliver answered — S2–S5 confirmed as implemented; **S1 reversed** (the admin may read merchant documents; §9). See the [decision record](../../../decisions/2026-09-19-gap13-uploads-option-c-implementation-defaults.md).*
+
 | # | Question | Default taken | Why it is safe to default |
 |---|---|---|---|
-| S1 | Does the platform **admin** bypass tenant scoping for invoice documents (as `checkMerchantOwnership` does elsewhere)? | **No.** Admin (`merchantId 0`) matches no tenant; the route's `!merchantId` guard — the same one every tenant-bound route uses — answers 401. | Nothing new is exposed; adding a bypass later is one branch. The options memo listed this as open and Oliver's answer did not address it. |
+| S1 | Does the platform **admin** bypass tenant scoping for invoice documents (as `checkMerchantOwnership` does elsewhere)? | **First implemented: No** (the admin got the route's `!merchantId` 401). **Overridden by the owner, 2026-09-19: Yes** — "i want to see merchant documents". Implemented as a follow-up; see §9. | It was the restrictive default until the owner decided; the override is one branch plus an audit event. |
 | S2 | Legacy documents that cannot be attributed unambiguously | Stay `NULL`, served by nothing, retained. | Fail closed; no deletion (plan: never delete retained financial data). Preflight counts them so production impact is known before apply. |
 | S3 | How the tenant keeps their "View invoice" link | Checkout **token** authorizes that invoice's own document. | Preserves a shipped product feature; grants no more than the token already grants (the same page shows the amount, address, name). Strictly narrower than today (any holder of the unguessable file URL). |
 | S4 | Creates that reference a foreign/external/`javascript:` `documentUrl` | Now `400`. | Was accepted verbatim and rendered to customers. Only the upload endpoint ever legitimately produced values. |
@@ -189,7 +191,7 @@ red-first evidence.
 
 | File | What it pins |
 |---|---|
-| `server/__tests__/uploaded-file-tenancy.test.ts` | tenant stamped on upload; unscoped/foreign/NULL/invalid-tenant reads match nothing; cross-tenant overwrite refused; tenant-scoped delete (incl. a `customLogoUrl` pointing at another merchant's blob); public route serves logos only (DB **and** disk-fallback branch); `GET /api/invoice-documents/:name` owner/teammate 200, foreign = missing = 404, unauthenticated, no admin bypass, malformed names |
+| `server/__tests__/uploaded-file-tenancy.test.ts` | tenant stamped on upload; unscoped/foreign/NULL/invalid-tenant reads match nothing; cross-tenant overwrite refused; tenant-scoped delete (incl. a `customLogoUrl` pointing at another merchant's blob); public route serves logos only (DB **and** disk-fallback branch); `GET /api/invoice-documents/:name` owner/teammate 200, foreign = missing = 404, unauthenticated, malformed names; **added later for S1 (§9): the validated platform admin reads any merchant's document, audited, with no wider reach, and a bare `role: admin` claim is refused** |
 | `server/__tests__/invoice-document-attach-ownership.test.ts` | for all three create routes: own document accepted; absent/empty unchanged; another merchant's document, an external URL, a `javascript:` URI, a logo path, a never-uploaded name and a traversal → `400`, **and every other write the route makes (incl. the hidden prospect) untouched** |
 | `server/__tests__/checkout-document-token.test.ts` | `resolve` returns the token route, never the raw path, and only for a same-merchant document; `GET /api/checkout/document/:token` (property and trades tokens): 200 unauthenticated, 404 unknown / no document / cross-tenant / logo / paid, 410 voided, own rate-limit budget; a failing document lookup hides the link but never blocks payment |
 | `server/__tests__/upload-policy.test.ts` | the pure folder allowlist and reference parser (accepts only generator-shaped names; rejects external URLs, `javascript:`/`data:`, other folders, traversal, queries, fragments, whitespace, non-strings) |
@@ -271,7 +273,7 @@ External actions:        one, on the owner's approval given in this session: `00
                         production system, secret, provider or customer was touched.
 Feature flags/payment:   unchanged.
 In-flight operations:    none.
-Known warnings/deferred: (1) independent second review not done; (2) S1–S5 await Oliver; (3) client-derived
+Known warnings/deferred: (1) independent second review not done; (2) S1–S5 answered by Oliver 2026-09-19 — S2–S5 confirmed, S1 reversed (§9); (3) client-derived
                         filename extension unchanged; (4) retention/deletion of orphaned documents (A-H3);
                         (5) the legacy on-disk unlink in the logo-delete route still derives its path from
                         `customLogoUrl` (server-set only; DB deletion is now tenant-scoped);
@@ -279,9 +281,9 @@ Known warnings/deferred: (1) independent second review not done; (2) S1–S5 awa
 Rollback:                §5.
 Approvals:               Oliver's Option C decision (2026-09-14). In this session, in answer to direct
                         questions: apply 0023 to the dev database — "Yes, apply it"; commit the work on
-                        the branch — "Yes, two commits". S1, S2 (pending the storage answer) and S4
-                        confirmed "yes"; S3 and S5 asked for an explanation and are UNCONFIRMED — see
-                        the decision record's "Confirmation status".
+                        the branch — "Yes, two commits". S2–S5 confirmed; S1 REVERSED by the owner (the
+                        admin may read merchant documents) — see the decision record's "Confirmation
+                        status" and §9.
 Stop conditions checked: §18 "merchant A can read/upload for merchant B data" — closed for documents and
                         tested; target identity — every runner/preflight invocation named its target and
                         verified host + database before acting; ad-hoc `psql` touched only the loopback
@@ -372,13 +374,13 @@ failing-test-first: the checkout **resolve** page — the customer's *payment* p
 on the new uploads lookup, so any failure of it (e.g. code deployed before `0023`) would have returned `500`
 and stopped payment for every invoice carrying a document. It now hides the link and logs instead. Also
 confirmed: no path lets an unauthenticated caller reach `uploaded_files` except the `logos` allowlist and a
-token that names the invoice whose own document it is; `getUploadedFile` (unscoped) has exactly one caller,
-the public logo route. **This is still the author's reread, not an independent review.**
+token that names the invoice whose own document it is; `getUploadedFile` (unscoped) had exactly one caller,
+the public logo route (it has two since S1 — §9). **This is still the author's reread, not an independent review.**
 
 ### What is left
 
-1. **Oliver:** the rest of S1–S5 ([decision record](../../../decisions/2026-09-19-gap13-uploads-option-c-implementation-defaults.md),
-   which records what has been confirmed so far and what is still open).
+1. ~~Oliver: S1–S5~~ — **all answered 2026-09-19** (S2–S5 confirmed, S1 reversed) —
+   [decision record](../../../decisions/2026-09-19-gap13-uploads-option-c-implementation-defaults.md).
 2. ~~Apply `0023` to the development database~~ — **done 2026-09-19 on the owner's approval** (above). Restart
    the dev server when convenient so uploads run on the new code.
 3. **Owner-run, production:** `scripts/count-gap13-uploaded-files-attribution.mjs` first (a non-zero
@@ -408,3 +410,71 @@ One process note for whoever audits this: an earlier full run showed `tsc` faili
 `uploaded-files-schema.test.ts` (jest, under `isolatedModules`, does not type-check, so the test itself
 passed). It was fixed and `tsc` re-run clean before this final run; the earlier failure is not hidden by
 this table.
+
+## 9. Follow-up — S1: the platform admin may open merchant documents (2026-09-19, later the same day)
+
+**Instruction, verbatim:** *"s1, i want to see merchant documents/ yes to the rest and confirm s2."* This
+reversed my first implementation's default — and corrected my misreading of the earlier "s1. yes", which I had
+taken as accepting "the admin cannot read". S2–S5 were confirmed as implemented. Decision record:
+[Confirmation status](../../../decisions/2026-09-19-gap13-uploads-option-c-implementation-defaults.md).
+
+**What changed — commit `b0da2f08`, code only (3 files):**
+- `GET /api/invoice-documents/:name`: the *validated* platform admin may open **any** invoice document by name,
+  **including ones no merchant could be attributed to** (the S2 orphans). Merchants stay scoped to their own
+  merchant. The admin gets no wider reach: the name must still be a generated invoice-document name, so no other
+  folder and no path can be requested.
+- Each admin read writes `ADMIN_INVOICE_DOCUMENT_READ` (`adminUserId`, `document` — never the contents) through
+  the existing `logSecurityEvent`; a miss is not logged as an access.
+- `isValidatedPlatformAdmin()` (admin role + `merchantId 0` + configured admin email; `authenticateToken` has
+  already refused any token that merely *claims* admin). `IStorage.getUploadedFile` (unscoped) now documents its
+  two authorized callers: the public logo route and this admin branch.
+
+**Tests first.** Five red, all for the right reason (the admin got the route's own 401). The old "admin is
+refused" test was **replaced, not weakened**, because the owner's decision made it wrong. One added guard passes
+vacuously by design: a token that only *claims* admin (merchant principal, wrong email, or admin scoped to a
+merchant) is rejected by `authenticateToken` before the route runs — it pins that the unlock is the validated
+principal, not the word "admin".
+
+**A refactor I tried and reverted.** I first extracted the admin predicate out of `authenticateAdmin` into the
+helper and made the middleware call it. `subscription-route-security.test.ts` failed: it pins the *literal
+shape* of that middleware. The plan forbids loosening an expected-shape check to make a verifier green, and the
+refactor was not needed for the feature, so I restored `authenticateAdmin` **byte-for-byte** (verified against
+`HEAD`) and kept the predicate as a separate function instead. The cost is the same rule written twice, so a
+new tripwire test fails if the two ever stop matching. **Mutation-checked:** deleting the `merchantId === 0`
+clause from the helper fails that test; restoring it passes.
+
+**Verification on the code tip `b0da2f08`:** `tsc` clean; server **61 suites / 1189 tests** (was 1183); client
+57 / 511 unchanged; script tests 51 / 51. The route policy was regenerated: only its header SHA changed and the
+classification is unchanged (`merchant-user`, `authenticateToken` — the same convention as routes that admit the
+admin through `checkMerchantOwnership`), so the two generated files were not re-committed.
+
+**Limits, stated plainly.**
+1. **There is no admin screen or admin API that lists documents.** No `/api/admin/*` route and nothing in the
+   admin dashboard touches invoices or documents (grepped), so the admin can fetch a document only if they know
+   its name — it sits in an invoice record's `document_url` — and a browser cannot attach the login header to a
+   plain link. A browsable admin view is new feature work under this branch's feature freeze and needs its own
+   decision.
+2. **The audit trail is a file.** `logSecurityEvent` appends to `logs/security-audit.log` on the server's own
+   filesystem; on an ephemeral deployment filesystem it does not survive a restart or redeploy. Until the
+   observability work (plan R6) it is a trail, not durable evidence.
+3. **Tested on `MemStorage` only.** The admin branch's storage call is the same unscoped `getUploadedFile` that
+   was exercised against real PostgreSQL (including a `NULL`-tenant row) in the §7 rehearsal, but the admin
+   *route* has not been run against Postgres.
+
+## 10. Independent review — hand-off (2026-09-19)
+
+The owner will have **ChatGPT** perform the independent review (plan §21.1) rather than a person, and asked
+for "a marker for the code it needs to review". The marker is **base `454f4120` → code tip `b0da2f08`** on
+`remediation/r1-continuation-20260907`, also tagged `review/gap13-uploads-2026-09-19` (the tip that contains
+the brief), plus the in-code comment marker `Gap 13` / `S1`. The self-contained brief and a paste-ready prompt:
+[R1-T7-gap13-INDEPENDENT-REVIEW-BRIEF-2026-09-19](R1-T7-gap13-INDEPENDENT-REVIEW-BRIEF-2026-09-19.md).
+
+Nothing was pushed, so the marker (commits and tag) is **local only**. The repository has a GitHub remote
+(`origin`), but this branch has no upstream configured and there is no local `origin/remediation/*` ref
+(whether GitHub has one was not checked — no network call was made), so a reviewer reading from GitHub sees
+nothing until the owner pushes the branch and the tag. Note the scope of that decision: relative to the local
+`origin/main` ref the branch is **338 commits** ahead, so pushing it publishes the whole remediation program's
+history, not only the four gap-13 commits. When the review comes back it is recorded next to this file as the
+independent-review evidence; until its recommendation is **Approve** this work is not merge-ready, and it is
+not production-ready without the owner-run production preflight either.
+
