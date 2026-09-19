@@ -1,3 +1,11 @@
+> **SUPERSEDED 2026-09-19 — kept for the trail only; do not act on anything below.**
+> Both gap-12 tracks it tracked landed (commits `72230602`, `8666dafc`), and its step 5 — the uploads
+> Option C work — has been implemented; see
+> [`R1-T7-gap13-uploads-tenant-authorization-2026-09-19.md`](evidence/remediation-v2-2/r1/R1-T7-gap13-uploads-tenant-authorization-2026-09-19.md).
+> None of the task/run IDs below resolve (background workflow state does not survive a session boundary,
+> as this file itself warned). The live state is the **newest entry at the top of**
+> [`evidence/remediation-v2-2/CONTINUATION-2026-09-07.md`](evidence/remediation-v2-2/CONTINUATION-2026-09-07.md).
+
 # In-flight background workflows — 2026-09-14/15 (third session, round 3 — resumed)
 
 **Round 2 update (2026-09-14, later): both round-2 workflows partially failed on the session's

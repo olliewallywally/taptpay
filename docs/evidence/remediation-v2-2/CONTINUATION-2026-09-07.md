@@ -1,6 +1,69 @@
 # Full integration continuation audit — 2026-09-07
 
-Latest continuation (2026-09-16 — resumed after a session/environment
+Latest continuation (2026-09-19 — resumed after another session/environment
+boundary. The prior handoff's background-workflow IDs did not resolve, so
+ground truth was re-derived from `git status` (clean) and the baseline was
+**re-run, not trusted**: `tsc` clean, server 56 suites / 1063 tests, client
+57 suites / 511 tests — all equal to the 2026-09-16 entry below.) One piece of
+work, **implemented and verified; migration `0023` applied to the
+development database (`heliumdb`) on Oliver's approval and NOT to production;
+committed on this branch as two commits (code, then docs — see `git log`), not
+pushed**:
+
+1. **Gap 13 — uploads tenant authorization, Oliver's Option C — implemented**
+   ([evidence and handoff](r1/R1-T7-gap13-uploads-tenant-authorization-2026-09-19.md),
+   [the sub-decisions taken at their most restrictive default, awaiting Oliver](../../decisions/2026-09-19-gap13-uploads-option-c-implementation-defaults.md)).
+   `uploaded_files` gets a nullable `merchant_id` (migration `0023`; ambiguous
+   and orphaned rows stay NULL = served by nothing, deleted by nothing);
+   storage methods are tenant-scoped and refuse to overwrite another tenant's
+   row; the public `/uploads` route now serves the `logos` folder only (checked
+   before the database or the disk fallback); new
+   `GET /api/invoice-documents/:name` (authenticated, tenant-scoped, no admin
+   bypass, foreign = missing = 404) and `GET /api/checkout/document/:token`
+   (checkout-token authorized, that invoice's own document only); the three
+   create routes (property invoice, trades quote, trades invoice) now `400` any
+   `documentUrl` that is not the caller's own upload. **Two findings shaped it:**
+   (a) the only thing that ever dereferences a `documentUrl` is the
+   *unauthenticated tenant* on the public checkout page — the "linked from the
+   invoicing UI and PDF exports" claim in the R1-T3 uploads evidence and the
+   options memo is **wrong** (merchant UIs show only the name; no server
+   email/PDF embeds it), so a session-only route would have silently broken the
+   tenant's "View invoice"; (b) the three create routes accepted *any* string
+   (another merchant's document, an external URL, a `javascript:` URI) as
+   `documentUrl`. No client file changed.
+2. **Verified** — failing-tests-first (red run: 40 failed on the unmodified
+   tree — `201` for a foreign/external/`javascript:` document, `200` for an
+   invoice document on its old public URL); final: server **61 suites / 1183
+   tests** (was 56/1063), client 57/511 unchanged, script tests 51/51, `tsc`
+   clean. Migration rehearsed on a **throwaway local PostgreSQL 16** through the
+   project's own runner (24 → 25 applied; backfill correct row by row; idempotent;
+   refuses a wrong-shape column; FK bites), and the **real `DatabaseStorage`**
+   run against it (18 checks, incl. exactly one winner when two tenants race for
+   one path). **Dev database (`heliumdb`):** read-only checks first (24 applied /
+   1 pending; count-only preflight = 2 files — 1 attributable, 1 orphan, 0
+   ambiguous; schema fingerprint identical to gap 11 C1's, so no drift), then
+   `0023` **applied on Oliver's explicit "Yes, apply it"**
+   ([record](../../decisions/2026-09-19-gap13-apply-0023-to-dev-approval.md)) and
+   re-verified from the catalogue: 25 applied / 0 pending / 0 drifted / 0
+   orphaned, column + FK + valid index present, checksum equals the file's,
+   attribution 1 attributed / 1 NULL as predicted, fingerprint moved by exactly
+   +1 column / +1 FK / +1 index; storage effect measured (2 files, 62,735 bytes;
+   the unattributed one 9,076; `0023` added a 16 KB index). One self-review
+   finding fixed test-first: the checkout page (the customer's *payment* page)
+   must never fail because a document lookup did.
+3. **Not done — and this is the list that matters:** an **independent** review
+   (this was the author's own reread, and the evidence says so — required
+   before merge); the rest of Oliver's S1–S5 confirmation (S1, S2 and S4 answered
+   "yes", S2 with a storage question that is now answered, S3 and S5 asked for an
+   explanation — the
+   [decision record](../../decisions/2026-09-19-gap13-uploads-option-c-implementation-defaults.md)
+   tracks exactly which); the owner-run **production** preflight and apply
+   (before deploying this code); browser/device verification of the checkout
+   "View invoice" link (no client file changed, but it is verified at HTTP level
+   only); restarting the dev server (now safe) so uploads run on the new code.
+   Gap 12's confidentiality half and gap 11's `C2`–`C5` are unchanged and open.
+
+Prior continuation (2026-09-16 — resumed after a session/environment
 boundary; the prior session's background-workflow task/run IDs recorded in
 `docs/HANDOFF-2026-09-14-workflows-in-flight.md` did not resolve, exactly as
 that doc warned they might not, so ground truth was re-derived from
@@ -603,7 +666,21 @@ backup, deployment or restore checks.
    live-funds risk (no Windcave credentials configured in this environment;
    the leak is metadata, not payment credentials), but a real confidentiality
    and tenant-isolation gap that must not be lost.
-13. **ESCALATED 2026-09-14 — `uploaded_files` has no merchant/tenant column;
+13. **IMPLEMENTED 2026-09-19 (migration `0023` applied to the development
+   database only; not production) — Oliver's Option C, full tenant-scoped auth.** See the
+   [evidence](r1/R1-T7-gap13-uploads-tenant-authorization-2026-09-19.md) and
+   the [sub-decisions awaiting Oliver](../../decisions/2026-09-19-gap13-uploads-option-c-implementation-defaults.md).
+   Nullable `uploaded_files.merchant_id` + tenant-scoped storage; the public
+   `/uploads` route serves logos only; invoice documents are served by
+   `GET /api/invoice-documents/:name` (authenticated, tenant-scoped) and
+   `GET /api/checkout/document/:token` (the tenant's checkout token); the three
+   create routes reject a `documentUrl` that is not the caller's own upload.
+   Still open: independent review, S1–S5 confirmation, applying `0023` (dev,
+   then production after the owner-run preflight), retention/deletion of
+   unreferenced documents (A-H3). Original escalation follows, superseded only
+   where stated above — kept for the reasoning trail (note its "linked from the
+   invoicing UI and PDF exports" claim is wrong; see the evidence):
+   **ESCALATED 2026-09-14 — `uploaded_files` has no merchant/tenant column;
    `GET /uploads/:folder/:name` is fully unauthenticated.** Found during the
    R1-T3 Settings/Uploads/Exports domain audit
    ([evidence](r1/R1-T3-settings-uploads-exports-tenant-scoping-2026-09-14.md)).
@@ -651,12 +728,12 @@ may proceed where the plan allows it. Code lanes remain gated by their dependenc
 | R0-H5 | Classify tracked uploads and local dumps | 585 | Owner/professional/provider | **CLOSED 2026-09-14** — the three tracked `uploads/invoices/` entries (2 dev-fixture PNGs, 1 zero-byte glob artifact) were content-inspected, confirmed unreferenced anywhere in the repo and unreproducible by current code, and `git rm`'d per explicit owner instruction ([record](../../decisions/2026-09-14-r0-h5-tracked-uploads-deletion.md)). The historical "41 tracked, 38 ignored" figure remains unsourced — flagged as an open curiosity, not a known gap. |
 | R1-T1 | No-live-system HTTP test harness | 610 | Engineering | Harness implemented early; audit all transport/clock/SSE/push injection and no-network proof after the R0 exit gate. |
 | R1-T2 | Checked-in route policy inventory | 622 | Engineering | PARTIAL: [classifier extended and regenerated 2026-09-12/13](r1/R1-T2-classifier-extension-2026-09-12.md) — 218 registrations, **0 unclassified** (was 96/97), 8 principal categories (added `admin`/`public`/`provider-webhook`/`unauthenticated-suspect`), full server regression unchanged at 52/52 suites, 1019/1019 tests. **Found a new gap in the process — see gap 12, now partially closed 2026-09-16** (commits `72230602`, `8666dafc` — payment-correctness defect fixed, confidentiality leak still open). Required per-route fields (capabilityGate, entitlementGate, idempotencyScope, storageMethods, successDto, errorDisclosure) and all-method/use/mounted-router coverage remain incomplete; 0-unclassified is a labeling improvement, not the completed task. |
-| R1-T3 | Explicit role and tenant matrix | 639 | Engineering | PARTIAL: owner defaults fixed; full principal/tenant matrix and runtime coverage open. **The password-path contract is corrected (2026-09-11)** — [evidence](r1/R1-T3-password-path-contract-2026-09-11.md): a cross-tenant path id now returns 403 with both accounts' passwords provably unchanged, red run captured first, route policy regenerated. The route was not moved because its only caller builds the URL from the caller's own JWT. **Tenant-scoping domain audit (2026-09-13): Transactions & Refunds** ([evidence](r1/R1-T3-transactions-refunds-tenant-scoping-2026-09-13.md)), **Boards & Stock** ([evidence](r1/R1-T3-boards-stock-tenant-scoping-2026-09-13.md)), **Property** ([evidence](r1/R1-T3-property-tenant-scoping-2026-09-13.md)), and **Trades** ([evidence](r1/R1-T3-trades-tenant-scoping-2026-09-13.md)) were each independently investigated with a live two-merchant runtime probe — all four found already correctly tenant-scoped today, no code change needed. **Settings/Uploads/Exports — completed 2026-09-14** ([evidence](r1/R1-T3-settings-uploads-exports-tenant-scoping-2026-09-14.md)): unlike the four no-gap-found siblings, this domain found and fixed three real upload-handling bugs (UPL-1 auth-before-multer ordering, UPL-2 missing magic-byte check, UPL-5 filename-extension confusion), closed two test-coverage gaps (UPL-6/UPL-7, 7 new cross-tenant tests, no source change), landed a narrow `nosniff` mitigation (UPL-3), and escalated one structural gap rather than fixing it same-day — `uploaded_files` has no tenant column and its public serve route has zero authorization (gap list item 13, decision memo pending Oliver). **All five R1-T3 tenant-scoping domains are now investigated.** Note what the five results do and do not establish: they show the *compared* merchantId is JWT-derived rather than attacker-controllable at each site, not that the storage layer has been migrated to tenant-scoped methods as §8.5 prefers; that refactor remains open. |
+| R1-T3 | Explicit role and tenant matrix | 639 | Engineering | PARTIAL: owner defaults fixed; full principal/tenant matrix and runtime coverage open. **The password-path contract is corrected (2026-09-11)** — [evidence](r1/R1-T3-password-path-contract-2026-09-11.md): a cross-tenant path id now returns 403 with both accounts' passwords provably unchanged, red run captured first, route policy regenerated. The route was not moved because its only caller builds the URL from the caller's own JWT. **Tenant-scoping domain audit (2026-09-13): Transactions & Refunds** ([evidence](r1/R1-T3-transactions-refunds-tenant-scoping-2026-09-13.md)), **Boards & Stock** ([evidence](r1/R1-T3-boards-stock-tenant-scoping-2026-09-13.md)), **Property** ([evidence](r1/R1-T3-property-tenant-scoping-2026-09-13.md)), and **Trades** ([evidence](r1/R1-T3-trades-tenant-scoping-2026-09-13.md)) were each independently investigated with a live two-merchant runtime probe — all four found already correctly tenant-scoped today, no code change needed. **Settings/Uploads/Exports — completed 2026-09-14** ([evidence](r1/R1-T3-settings-uploads-exports-tenant-scoping-2026-09-14.md)): unlike the four no-gap-found siblings, this domain found and fixed three real upload-handling bugs (UPL-1 auth-before-multer ordering, UPL-2 missing magic-byte check, UPL-5 filename-extension confusion), closed two test-coverage gaps (UPL-6/UPL-7, 7 new cross-tenant tests, no source change), landed a narrow `nosniff` mitigation (UPL-3), and escalated one structural gap rather than fixing it same-day — `uploaded_files` has no tenant column and its public serve route has zero authorization (gap list item 13, decision memo pending Oliver). **Update 2026-09-19:** Oliver chose Option C on 2026-09-14 and it is now implemented — migration `0023` applied to the development database only, not production; see gap list item 13. **All five R1-T3 tenant-scoping domains are now investigated.** Note what the five results do and do not establish: they show the *compared* merchantId is JWT-derived rather than attacker-controllable at each site, not that the storage layer has been migrated to tenant-scoped methods as §8.5 prefers; that refactor remains open. |
 | R1-H1 | Accept the device baseline commit before R1 client changes | 651 | Owner/professional/provider | **CLOSED 2026-09-14** — Oliver accepted the [auth/onboarding visual baseline](r1/R1-H1-auth-onboarding-baseline-2026-09-12.md) ("Looks good", [record](../../decisions/2026-09-14-r1-h1-visual-baseline-acceptance.md)). This lifts gap-list item 8 (client work gated) for tasks blocked only on this sign-off. |
 | R1-T4 | OAuth rebuild, session storage and shared security primitives | 660 | Engineering | GATED: R0 exit and R1-H1 acceptance; OAuth/session/reset/CORS/distributed-abuse work remains. |
 | R1-T5 | Sign in with Apple — protocol-specific adapter on T4's primitives | 686 | Engineering | GATED: R1-T4, then real Apple provisioning/device verification. |
 | R1-T6 | Strict numeric path and query parsing — review snapshot has 71 path and 7 query sites | 699 | Engineering | **Task check MET 2026-09-11** — [bounded query values and the source guard](r1/R1-T6-bounded-query-values-2026-09-11.md). The handoff's "five remaining sites" undercounted: four more of the same class hid behind `Number(req.query...)`, `Number.parseInt(String(...))`, `parseInt(String(...))` and a `/^\d+$/` that accepted `0` — one of which passed `NaN` to storage — plus three `parseInt(req.params)` in `middleware/merchant-validation.ts`. All migrated to a reviewed typed schema; zero permissive parses remain in production server code; source guard active **with no allowlist**. Two superseded tests corrected, quoted in the evidence. R1-T2's 97 unclassified registrations are unchanged and still gate the wider task. |
-| R1-T7 | Tenant-scoped storage — close the generated authenticated-route gap | 732 | Engineering | PARTIAL: upload SQL moved behind storage; other tenant methods, upload authorization/content/privacy and two-merchant matrix remain. **Closed 2026-09-11** (commit `4183e241`): a foreign-session bypass on `hosted-fields-complete`/`googlepay-complete` — any transaction still in its initial `windcaveSessionId: null` state accepted an arbitrary client-supplied session and could be finalised with a foreign approval — found by a 10-agent cross-tenant/IDOR audit, confirmed by independent adversarial re-check, fixed failing-tests-first. **New open item found in the same sweep**: split-payment session replay in the same `finaliseHostedPayment` helper — see gap 11 above and [the evidence](r1/R1-T7-windcave-session-binding-2026-09-11.md); needs an R3-scoped schema decision. **`C0`/`C1` (preflight + defense-in-depth indexes) landed 2026-09-14**, commit `5318496b` — [evidence](r1/R1-T7-gap11-c0-preflight-c1-index-2026-09-14.md). The replay mechanism itself (`C2`-`C5`) remains open — see gap 11. |
+| R1-T7 | Tenant-scoped storage — close the generated authenticated-route gap | 732 | Engineering | PARTIAL: upload SQL moved behind storage; other tenant methods, upload authorization/content/privacy and two-merchant matrix remain. **Closed 2026-09-11** (commit `4183e241`): a foreign-session bypass on `hosted-fields-complete`/`googlepay-complete` — any transaction still in its initial `windcaveSessionId: null` state accepted an arbitrary client-supplied session and could be finalised with a foreign approval — found by a 10-agent cross-tenant/IDOR audit, confirmed by independent adversarial re-check, fixed failing-tests-first. **New open item found in the same sweep**: split-payment session replay in the same `finaliseHostedPayment` helper — see gap 11 above and [the evidence](r1/R1-T7-windcave-session-binding-2026-09-11.md); needs an R3-scoped schema decision. **`C0`/`C1` (preflight + defense-in-depth indexes) landed 2026-09-14**, commit `5318496b` — [evidence](r1/R1-T7-gap11-c0-preflight-c1-index-2026-09-14.md). The replay mechanism itself (`C2`-`C5`) remains open — see gap 11. **Uploads tenant authorization (gap 13) implemented 2026-09-19** (dev database migrated; production not): tenant-scoped storage, migration `0023`, and authenticated + checkout-token download routes — [evidence](r1/R1-T7-gap13-uploads-tenant-authorization-2026-09-19.md); the "other tenant methods, upload authorization/content/privacy" remainder above is reduced accordingly, but `IStorage` is still not tenant-scoped across every domain. |
 | R1-T8 | Fix the hook-order crash | 758 | Engineering | GATED: R0 exit and R1-H1; crash characterization is not a fix. |
 | R1-T9 | Truthful frontend failure states | 773 | Engineering | GATED: R1-T8; essential/optional failure states and duplicate-action tests remain. |
 | R1-T10 | Device and tutorial acceptance matrix | 780 | Engineering | GATED: T3/T5/T7/T9 and H1; typed routes, devices, tutorials and accessibility acceptance remain. |
