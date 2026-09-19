@@ -887,9 +887,11 @@ export interface IStorage extends PaymentAttemptRepository {
   // to a different merchant. The owner may overwrite their own path (a logo
   // re-upload relies on this).
   saveUploadedFile(relPath: string, mimeType: string, data: Buffer, merchantId: number): Promise<void>;
-  // UNSCOPED. Exists only for the public logo route, which is authorized by
-  // folder (PUBLIC_UPLOAD_FOLDERS in upload-policy.ts), not by tenant. Do not
-  // use it to serve anything that is not intentionally public.
+  // UNSCOPED — it ignores the tenant, so its callers carry the authorization.
+  // There are exactly two: the public logo route (authorized by folder,
+  // PUBLIC_UPLOAD_FOLDERS in upload-policy.ts) and the platform-admin branch of
+  // GET /api/invoice-documents/:name (authorized by the validated admin
+  // principal, and audited). Do not use it to serve anything else.
   getUploadedFile(relPath: string): Promise<{ mimeType: string; data: Buffer } | undefined>;
   getUploadedFileForMerchant(relPath: string, merchantId: number): Promise<{ mimeType: string; data: Buffer } | undefined>;
   // Metadata-only existence + ownership check (never reads the blob), for the

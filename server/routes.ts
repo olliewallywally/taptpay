@@ -527,6 +527,28 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     );
   });
 
+  // For a route that serves merchants AND admits the platform admin (so it
+  // cannot sit behind authenticateAdmin): true only for the validated platform
+  // admin principal — the admin role, a zero merchant scope and the configured
+  // admin email. A role string alone is never enough (plan §8.5):
+  // authenticateToken already refuses an admin token that lacks the dedicated
+  // principal, and this re-checks the resulting `req.user`.
+  //
+  // This is deliberately the SAME predicate authenticateAdmin enforces, kept as
+  // a separate function so that middleware (whose exact shape a source guard in
+  // subscription-route-security.test.ts pins) is left untouched; a test in
+  // uploaded-file-tenancy.test.ts fails if the two ever stop matching.
+  function isValidatedPlatformAdmin(user: AuthenticatedRequest["user"]): boolean {
+    const adminEmail = config.admin.email;
+    return (
+      !!user &&
+      user.role === "admin" &&
+      user.merchantId === 0 &&
+      !!adminEmail &&
+      user.email.toLowerCase() === adminEmail.toLowerCase()
+    );
+  }
+
   // Admin authentication middleware
   const authenticateAdmin = async (req: AuthenticatedRequest, res: any, next: any) => {
     let authenticated = false;
@@ -7556,21 +7578,33 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   });
 
   // Gap 13 (Option C, Oliver 2026-09-14): the authenticated, ownership-checked
-  // download for invoice documents. Scoped by the principal's OWN merchant id —
-  // there is deliberately no admin bypass (the platform admin's merchantId is 0
-  // and matches no tenant), and a document owned by anyone else, owned by no one
-  // (a legacy row that could not be attributed), malformed, or missing all give
-  // the same 404, so the route is not an existence oracle. The tenant who was
-  // sent the invoice reads the document through GET /api/checkout/document/:token
-  // instead; they hold no merchant session.
+  // download for invoice documents. A merchant principal (owner or teammate) is
+  // scoped to its OWN merchant id, and a document owned by anyone else, owned by
+  // no one (a legacy row that could not be attributed), malformed, or missing all
+  // give the same 404, so the route is not an existence oracle. The tenant who
+  // was sent the invoice reads the document through
+  // GET /api/checkout/document/:token instead; they hold no merchant session.
+  //
+  // S1 (Oliver, 2026-09-19: "i want to see merchant documents"): the VALIDATED
+  // platform admin — not merely a token that says "admin" — may open any invoice
+  // document by name, including one no merchant could be attributed to. Every
+  // such read is written to the security audit log (who and which document,
+  // never the contents), because these are tenants' financial documents. The
+  // admin gets no wider reach than that: the name must still be a generated
+  // invoice-document name, so no other folder and no path can be requested.
   app.get("/api/invoice-documents/:name", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
+      const isAdmin = isValidatedPlatformAdmin(req.user);
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!isAdmin && !merchantId) return res.status(401).json({ message: "Authentication required" });
       const { name } = req.params;
       if (!isInvoiceDocumentName(name)) return res.status(404).json({ message: "Document not found" });
-      const file = await storage.getUploadedFileForMerchant(`${INVOICE_DOCUMENT_FOLDER}/${name}`, merchantId);
+      const relPath = `${INVOICE_DOCUMENT_FOLDER}/${name}`;
+      const file = isAdmin
+        ? await storage.getUploadedFile(relPath)
+        : await storage.getUploadedFileForMerchant(relPath, merchantId as number);
       if (!file) return res.status(404).json({ message: "Document not found" });
+      if (isAdmin) logSecurityEvent("ADMIN_INVOICE_DOCUMENT_READ", { adminUserId: req.user!.id, document: name });
       return sendPrivateDocument(res, file);
     } catch (err) {
       console.error("[INVOICE_DOC_SERVE]", err);

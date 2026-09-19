@@ -2,7 +2,9 @@ import "./support/test-env";
 
 import fs from "fs";
 import path from "path";
+import jwt from "jsonwebtoken";
 import request from "supertest";
+import * as auth from "../auth";
 import {
   bearer,
   createAdminPrincipal,
@@ -252,25 +254,6 @@ describe("gap 13 — GET /api/invoice-documents/:name is authenticated and owner
     expect(res.status).toBe(401);
   });
 
-  it("does not let the platform admin bypass tenant scoping (default S1 — fail closed)", async () => {
-    const { app } = await createTestApp();
-    const a = await createOwnerPrincipal();
-    const admin = createAdminPrincipal();
-    const { name } = await uploadInvoiceDocument(app, a);
-
-    const res = await request(app)
-      .get(`/api/invoice-documents/${name}`)
-      .set(bearer(admin))
-      .buffer(true)
-      .parse(binaryParser);
-
-    // The admin principal has merchantId 0, which every tenant-bound route
-    // already answers with its `!merchantId` guard (401); what matters here is
-    // that the document is not served, whatever the refusal's status.
-    expect([401, 403, 404]).toContain(res.status);
-    expect((res.body as Buffer).equals(PDF_BYTES)).toBe(false);
-  });
-
   it("only ever reads from the invoices folder: a logo cannot be fetched through it", async () => {
     const { app } = await createTestApp();
     const a = await createOwnerPrincipal();
@@ -299,5 +282,182 @@ describe("gap 13 — GET /api/invoice-documents/:name is authenticated and owner
     const res = await request(app).get(`/api/invoice-documents/${name}`).set(bearer(a));
 
     expect(res.status).toBe(404);
+  });
+});
+
+/**
+ * S1 (Oliver, 2026-09-19: "i want to see merchant documents"). The first
+ * implementation kept the platform admin out by default; the owner overrode it.
+ * The admin is the *validated* admin principal that authenticateToken already
+ * insists on (dedicated principal + configured email + merchantId 0) — a bare
+ * `role: "admin"` claim is not authority — and each read is written to the
+ * security audit log, because these are tenants' financial documents.
+ */
+describe("gap 13 (S1) — the platform admin may open any merchant's invoice document, audited", () => {
+  it("lets the validated platform admin read another merchant's document, privately", async () => {
+    const { app } = await createTestApp();
+    const a = await createOwnerPrincipal();
+    const admin = createAdminPrincipal();
+    const { name } = await uploadInvoiceDocument(app, a);
+
+    const res = await request(app)
+      .get(`/api/invoice-documents/${name}`)
+      .set(bearer(admin))
+      .buffer(true)
+      .parse(binaryParser);
+
+    expect(res.status).toBe(200);
+    expect(res.headers["content-type"]).toBe("application/pdf");
+    expect(res.headers["x-content-type-options"]).toBe("nosniff");
+    expect(res.headers["cache-control"]).toBe("private, no-store");
+    expect((res.body as Buffer).equals(PDF_BYTES)).toBe(true);
+  });
+
+  it("reads the documents of every merchant, not one in particular", async () => {
+    const { app } = await createTestApp();
+    const a = await createOwnerPrincipal();
+    const b = await createOwnerPrincipal();
+    const admin = createAdminPrincipal();
+    const docA = await uploadInvoiceDocument(app, a, Buffer.concat([PDF_BYTES, Buffer.from("-a")]));
+    const docB = await uploadInvoiceDocument(app, b, Buffer.concat([PDF_BYTES, Buffer.from("-b")]));
+
+    for (const doc of [docA, docB]) {
+      const res = await request(app).get(`/api/invoice-documents/${doc.name}`).set(bearer(admin));
+      expect(res.status).toBe(200);
+    }
+  });
+
+  it("writes an audit event for an admin read — and none for a merchant reading its own document", async () => {
+    const { app } = await createTestApp();
+    const a = await createOwnerPrincipal();
+    const admin = createAdminPrincipal();
+    const { name } = await uploadInvoiceDocument(app, a);
+    const log = jest.spyOn(auth, "logSecurityEvent").mockImplementation(() => undefined);
+
+    const own = await request(app).get(`/api/invoice-documents/${name}`).set(bearer(a));
+    expect(own.status).toBe(200);
+    expect(log).not.toHaveBeenCalledWith("ADMIN_INVOICE_DOCUMENT_READ", expect.anything());
+
+    const adminRead = await request(app).get(`/api/invoice-documents/${name}`).set(bearer(admin));
+    expect(adminRead.status).toBe(200);
+    expect(log).toHaveBeenCalledWith(
+      "ADMIN_INVOICE_DOCUMENT_READ",
+      expect.objectContaining({ adminUserId: admin.user.id, document: name }),
+    );
+    // Identifies who and which document; never what the document contains.
+    const details = JSON.stringify(log.mock.calls.find(([event]) => event === "ADMIN_INVOICE_DOCUMENT_READ")?.[1]);
+    expect(details).not.toContain("synthetic-fixture-a");
+  });
+
+  it("does not log an access when there was nothing to read", async () => {
+    const { app } = await createTestApp();
+    const admin = createAdminPrincipal();
+    const log = jest.spyOn(auth, "logSecurityEvent").mockImplementation(() => undefined);
+
+    const res = await request(app)
+      .get("/api/invoice-documents/invoice-1700000000000-eeeeeeeeeeeeeeee.pdf")
+      .set(bearer(admin));
+
+    expect(res.status).toBe(404);
+    expect(log).not.toHaveBeenCalledWith("ADMIN_INVOICE_DOCUMENT_READ", expect.anything());
+  });
+
+  it("gives the admin no wider reach through this route: malformed names and other folders stay 404", async () => {
+    const { app } = await createTestApp();
+    const a = await createOwnerPrincipal();
+    const admin = createAdminPrincipal();
+    const upload = await request(app)
+      .post(`/api/merchants/${a.merchantId}/logo`)
+      .set(bearer(a))
+      .attach("logo", PNG_BYTES, "logo.png");
+    expect(upload.status).toBe(200);
+
+    for (const name of [
+      "..%2F..%2Fetc%2Fpasswd",
+      "bill.pdf",
+      `merchant-${a.merchantId}.png`, // a logo, not an invoice document
+      "invoice-1700000000000-gggggggggggggggg.pdf",
+    ]) {
+      const res = await request(app).get(`/api/invoice-documents/${name}`).set(bearer(admin));
+      expect(res.status).toBe(404);
+    }
+  });
+
+  it("is still not reachable by a token that merely CLAIMS the admin role", async () => {
+    // The unlock is the validated principal, not the word "admin": these are
+    // rejected by authenticateToken before the route runs (JWT-signed with the
+    // harness secret so they are genuine tokens carrying unvalidated claims).
+    const { app } = await createTestApp();
+    const a = await createOwnerPrincipal();
+    const { name } = await uploadInvoiceDocument(app, a);
+    const secret = process.env.JWT_SECRET as string;
+    const adminEmail = createAdminPrincipal().user.email;
+    const forged = [
+      // a merchant-principal token that says role: admin
+      { principal: "user", userId: a.user.id, email: a.user.email, merchantId: a.merchantId, role: "admin" },
+      // the admin principal, but not the configured admin email
+      { principal: "admin", userId: 1, email: "someone-else@harness.test", merchantId: 0, role: "admin" },
+      // the admin principal and email, but scoped to a merchant
+      { principal: "admin", userId: 1, email: adminEmail, merchantId: a.merchantId, role: "admin" },
+    ];
+
+    for (const claims of forged) {
+      const res = await request(app)
+        .get(`/api/invoice-documents/${name}`)
+        .set({ Authorization: `Bearer ${jwt.sign(claims, secret, { expiresIn: "1h" })}` })
+        .buffer(true)
+        .parse(binaryParser);
+      expect(res.status).toBe(403);
+      expect((res.body as Buffer).equals(PDF_BYTES)).toBe(false);
+    }
+  });
+});
+
+/**
+ * Tripwire, not behaviour: the document route decides "is this the platform
+ * admin?" with isValidatedPlatformAdmin(), while authenticateAdmin (whose exact
+ * shape subscription-route-security.test.ts pins) decides it inline. They are the
+ * same predicate written twice on purpose; if someone tightens or loosens one,
+ * this fails and says the other must move with it.
+ */
+describe("gap 13 (S1) — the document route's admin predicate is authenticateAdmin's predicate", () => {
+  const source = fs.readFileSync(path.join(process.cwd(), "server/routes.ts"), "utf8");
+  const between = (from: string, to: string) => {
+    const start = source.indexOf(from);
+    expect(start).toBeGreaterThan(-1);
+    const end = source.indexOf(to, start);
+    expect(end).toBeGreaterThan(start);
+    return source.slice(start, end);
+  };
+
+  it("checks exactly the same four things, in the same words", () => {
+    const helper = between("function isValidatedPlatformAdmin", "\n  }\n");
+    const guard = between("const authenticateAdmin", "\n  };");
+
+    const helperClauses = helper
+      .slice(helper.indexOf("return (") + "return (".length, helper.lastIndexOf(");"))
+      .split("&&")
+      .map((clause) => clause.trim());
+    // The admin condition is the `if (` that follows `const adminEmail = ...` (an
+    // earlier `if (!authenticated)` belongs to the token step, not the predicate).
+    const afterEmail = guard.slice(guard.indexOf("const adminEmail = config.admin.email;"));
+    const guardClauses = afterEmail
+      .slice(afterEmail.indexOf("if (") + "if (".length, afterEmail.indexOf(") {\n      logSecurityEvent"))
+      .split("||")
+      .map((clause) => clause.trim());
+
+    expect(helperClauses).toEqual([
+      "!!user",
+      'user.role === "admin"',
+      "user.merchantId === 0",
+      "!!adminEmail",
+      "user.email.toLowerCase() === adminEmail.toLowerCase()",
+    ]);
+    expect(guardClauses).toEqual([
+      'req.user?.role !== "admin"',
+      "req.user.merchantId !== 0",
+      "!adminEmail",
+      "req.user.email.toLowerCase() !== adminEmail.toLowerCase()",
+    ]);
   });
 });
