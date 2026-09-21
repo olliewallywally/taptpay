@@ -3662,6 +3662,7 @@ export class MemStorage implements IStorage {
         lastLoginAt: null,
         resetToken: null,
         resetTokenExpiry: null,
+        sessionVersion: 0,
         createdAt: now,
       };
       this.users.set(user.id, user);

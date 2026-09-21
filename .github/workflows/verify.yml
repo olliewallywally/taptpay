@@ -128,7 +128,9 @@ jobs:
           # foreign key and 6 indexes and removed nothing (v2: 0025's table also
           # records locked documents) — itemised in
           # docs/evidence/remediation-v2-2/r1/R1-T7-gap13-ownership-inventory-gate-2026-09-21.md.
-          RECORDED: docs/evidence/remediation-v2-2/r1/R1-T7-gap13-empty-fingerprint-v2-2026-09-21.json
+          # 2026-09-21 (R1-T4): 0026–0028 added 2 tables, 12 columns, 3
+          # constraints, 1 foreign key and 4 indexes and removed nothing.
+          RECORDED: docs/evidence/remediation-v2-2/r1/R1-T4-empty-fingerprint-2026-09-21.json
         run: |
           node scripts/schema-fingerprint.mjs > "$RUNNER_TEMP/fingerprint.json"
           node -e "

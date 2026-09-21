@@ -64,6 +64,9 @@ const REAL_MIGRATIONS = [
   "0023_uploaded_files_tenant_column.sql",
   "0024_invoice_document_security.sql",
   "0025_verified_upload_ownership.sql",
+  "0026_auth_handoff_codes.sql",
+  "0027_users_session_version.sql",
+  "0028_auth_throttle.sql",
 ];
 
 /** Migrations that own a `BEGIN;` / `COMMIT;` pair. */

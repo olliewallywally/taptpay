@@ -24,6 +24,9 @@ export const users = pgTable("users", {
   lastLoginAt: timestamp("last_login_at"),
   resetToken: text("reset_token"),
   resetTokenExpiry: timestamp("reset_token_expiry"),
+  // R1-T4 (0027): account tokens carry the version they were issued under; one
+  // behind this is refused. Raised by a password reset and "sign out everywhere".
+  sessionVersion: integer("session_version").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow(),
 }, (t) => ({
   merchantIdIdx: index("users_merchant_id_idx").on(t.merchantId),
@@ -1521,6 +1524,31 @@ export const invoiceDocumentReadLimits = pgTable("invoice_document_read_limits",
   count: integer("count").notNull(),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
 });
+
+// R1-T4 (0026): Google sign-in's one-time handoff code — only its SHA-256 is
+// stored; single use (consumed_at), 60-second life.
+export const authHandoffCodes = pgTable("auth_handoff_codes", {
+  codeHash: text("code_hash").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  newUser: boolean("new_user").notNull().default(false),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  consumedAt: timestamp("consumed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  expiresAtIdx: index("auth_handoff_codes_expires_at_idx").on(t.expiresAt),
+}));
+
+// R1-T4 (0028): sign-in and recovery throttles shared by every instance. The key
+// is a purpose and an HMAC of the email or client address — neither is stored.
+export const authThrottle = pgTable("auth_throttle", {
+  bucketKey: text("bucket_key").primaryKey(),
+  failures: integer("failures").notNull().default(0),
+  windowStartedAt: timestamp("window_started_at", { withTimezone: true }).notNull().defaultNow(),
+  nextAllowedAt: timestamp("next_allowed_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  updatedAtIdx: index("auth_throttle_updated_at_idx").on(t.updatedAt),
+}));
 
 // Gap 13 (0025): what the operator-approved inventory decided for each legacy
 // invoice document — an owner with its evidence, or locked (admin-only) with a

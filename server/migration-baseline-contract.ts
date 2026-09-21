@@ -174,6 +174,11 @@ export const BASELINE_EFFECT_REQUIREMENTS: readonly Requirement[] = [
   r("0024_invoice_document_security.sql", "table", "invoice_document_access_audit"),
   r("0024_invoice_document_security.sql", "table", "invoice_document_read_limits"),
   r("0025_verified_upload_ownership.sql", "table", "uploaded_file_ownership_evidence"),
+  r("0026_auth_handoff_codes.sql", "table", "auth_handoff_codes"),
+  r("0026_auth_handoff_codes.sql", "index", "auth_handoff_codes", "auth_handoff_codes_expires_at_idx"),
+  r("0027_users_session_version.sql", "column", "users", "session_version"),
+  r("0028_auth_throttle.sql", "table", "auth_throttle"),
+  r("0028_auth_throttle.sql", "index", "auth_throttle", "auth_throttle_updated_at_idx"),
 ];
 
 export const FIND_MISSING_BASELINE_EFFECTS_SQL = `
