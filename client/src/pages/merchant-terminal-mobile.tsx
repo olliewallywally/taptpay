@@ -14,7 +14,7 @@ import { apiErrorMessage } from "@/lib/api-error";
 import { sseClient } from "@/lib/sse-client";
 import { useToast } from "@/hooks/use-toast";
 import { useDeviceStatusMonitoring, useSSEConnectionMonitoring } from "@/components/notification-system";
-import { getCurrentMerchantId } from "@/lib/auth";
+import { MerchantGate } from "@/components/merchant-gate";
 import { Send, Loader2, CheckCircle, Clock, XCircle, QrCode, Smartphone, Edit, Split, MoreHorizontal, Menu, X, Waves, ChevronDown, Copy, Check, CreditCard } from "lucide-react";
 import { Link } from "wouter";
 import { isNativeIOS, canTapToPay } from "@/lib/native";
@@ -28,6 +28,14 @@ const transactionFormSchema = z.object({
 type TransactionFormData = z.infer<typeof transactionFormSchema>;
 
 export default function MerchantTerminalMobile() {
+  return (
+    <MerchantGate redirect="document" fallback={<div>Redirecting to login...</div>}>
+      {(merchantId) => <MerchantTerminalMobilePage merchantId={merchantId} />}
+    </MerchantGate>
+  );
+}
+
+function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
   const [currentTransaction, setCurrentTransaction] = useState<any>(null);
   const [copiedLink, setCopiedLink] = useState(false);
   const [activeTab, setActiveTab] = useState<"QR" | "NFC" | "TAP">("QR");
@@ -115,7 +123,6 @@ export default function MerchantTerminalMobile() {
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const merchantId = getCurrentMerchantId();
   
   useEffect(() => {
     const checkScreenSize = () => {
@@ -152,12 +159,6 @@ export default function MerchantTerminalMobile() {
       checkNfcCapabilities();
     }
   }, [activeTab, nfcCapabilities, toast]);
-
-  // Redirect to login if no merchantId
-  if (!merchantId) {
-    window.location.href = '/login';
-    return <div>Redirecting to login...</div>;
-  }
 
   const form = useForm<TransactionFormData>({
     resolver: zodResolver(transactionFormSchema),

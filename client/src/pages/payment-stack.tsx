@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getCurrentMerchantId } from "@/lib/auth";
+import { MerchantGate } from "@/components/merchant-gate";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Clock, Loader2, Plus, Copy, X, ChevronRight, Layers, ArrowLeft } from "lucide-react";
@@ -28,16 +28,14 @@ function timeAgo(dateStr: string | Date): string {
 }
 
 export default function PaymentStack() {
-  const merchantId = getCurrentMerchantId();
+  return <MerchantGate redirect="document">{(merchantId) => <PaymentStackPage merchantId={merchantId} />}</MerchantGate>;
+}
+
+function PaymentStackPage({ merchantId }: { merchantId: number }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [copiedId, setCopiedId] = useState<number | null>(null);
-
-  if (!merchantId) {
-    window.location.href = "/login";
-    return null;
-  }
 
   const { data: allTransactions = [], isLoading } = useQuery<Transaction[]>({
     queryKey: ["/api/merchants", merchantId, "transactions"],

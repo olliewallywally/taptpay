@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
-import { getCurrentMerchantId } from "@/lib/auth";
+import { MerchantGate } from "@/components/merchant-gate";
 import { apiErrorMessage } from "@/lib/api-error";
 import { apiRequest } from "@/lib/queryClient";
 import { isNativeApp } from "@/lib/native";
@@ -181,10 +181,13 @@ interface MerchantDetails {
 }
 
 export default function Settings() {
+  return <MerchantGate>{(merchantId) => <SettingsPage merchantId={merchantId} />}</MerchantGate>;
+}
+
+function SettingsPage({ merchantId }: { merchantId: number }) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const merchantId = getCurrentMerchantId();
   const { confirmingCard } = useBillingCardReturn();
   const {
     restartTutorials,
@@ -270,11 +273,6 @@ export default function Settings() {
       toast({ title: "Could not save GST setting", variant: "destructive" });
     });
   };
-
-  if (!merchantId) {
-    setLocation('/login');
-    return null;
-  }
 
   const { data: merchant, isLoading } = useQuery({
     queryKey: ["/api/merchants", merchantId, "profile"],

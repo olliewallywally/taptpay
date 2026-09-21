@@ -7,26 +7,25 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { getCurrentMerchantId } from "@/lib/auth";
+import { MerchantGate } from "@/components/merchant-gate";
 import { Download, FileText, FileSpreadsheet, Calendar, TrendingUp } from "lucide-react";
 import { format } from "date-fns";
 
 type DateRange = "7days" | "30days" | "90days" | "1year" | "lifetime" | "custom";
 
 export default function Exports() {
+  return (
+    <MerchantGate redirect="document" fallback={<div>Redirecting to login...</div>}>
+      {(merchantId) => <ExportsPage merchantId={merchantId} />}
+    </MerchantGate>
+  );
+}
+
+function ExportsPage({ merchantId }: { merchantId: number }) {
   const { toast } = useToast();
   const [dateRange, setDateRange] = useState<DateRange>("30days");
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
-
-  // Get current user's merchant ID from authentication
-  const merchantId = getCurrentMerchantId();
-  
-  // Redirect to login if no merchantId
-  if (!merchantId) {
-    window.location.href = '/login';
-    return <div>Redirecting to login...</div>;
-  }
 
   // Calculate date range based on selection
   const getDateRange = () => {

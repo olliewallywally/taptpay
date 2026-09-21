@@ -14,7 +14,8 @@ jest.mock("@/features/terminal/retail/RetailTerminalView", () => {
   const React = require("react");
   return {
     __esModule: true,
-    default: (props: any) => {
+    // Named, so the hooks rule can tell this stub is a component.
+    default: function RetailTerminalViewStub(props: any) {
       // Exposes a render counter so tests can confirm an actual React
       // re-render (and therefore the completion-detection effect that runs
       // after it) has happened, rather than only that the query cache holds

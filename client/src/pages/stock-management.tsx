@@ -1,8 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-import { getCurrentMerchantId } from "@/lib/auth";
+import { MerchantGate } from "@/components/merchant-gate";
 import {
   type LucideIcon,
   Search, Plus, Package, Trash2, X, ChevronDown, ChevronUp,
@@ -350,7 +349,10 @@ function ProductSheet({
 const blankItem = () => ({ name: "", cost: "", description: "", emoji: "", variations: [] as VariationGroup[] });
 
 export default function StockManagement() {
-  const [, setLocation] = useLocation();
+  return <MerchantGate>{(merchantId) => <StockManagementPage merchantId={merchantId} />}</MerchantGate>;
+}
+
+function StockManagementPage({ merchantId }: { merchantId: number }) {
   const [sheetItem, setSheetItem] = useState<(Partial<StockItem> & { name: string; cost: string; variations: VariationGroup[] }) | null>(null);
   const [isAdd, setIsAdd] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -358,12 +360,6 @@ export default function StockManagement() {
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const merchantId = getCurrentMerchantId();
-
-  if (!merchantId) {
-    setLocation("/login");
-    return null;
-  }
 
   const { data: merchant } = useQuery({
     queryKey: ["/api/merchants", merchantId, "profile"],

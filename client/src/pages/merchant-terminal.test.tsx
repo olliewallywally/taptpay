@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { NotificationProvider } from "@/components/notification-system";
 import MerchantTerminal from "./merchant-terminal";
@@ -79,7 +79,14 @@ function installFetchMock() {
   });
 }
 
-function renderTerminal() {
+// R1-T8: the page's own start-up requests (profile, boards, NFC capabilities)
+// land inside act(), before the test interacts, so React never sees an update
+// outside act() (jest.setup.js fails any test in which React warns).
+const settle = () => act(async () => {
+  for (let i = 0; i < 5; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
+});
+
+async function renderTerminal() {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false, staleTime: 0 },
@@ -97,6 +104,7 @@ function renderTerminal() {
       </NotificationProvider>
     </QueryClientProvider>,
   );
+  await settle();
   return { ...rendered, queryClient };
 }
 
@@ -125,8 +133,10 @@ beforeEach(() => {
 });
 
 describe("merchant-terminal per-payment link migration (gap 12)", () => {
+  afterEach(settle);
+
   it("sends linkMode per_payment (and never selectedStoneId) and shows the share-link overlay after a successful create", async () => {
-    renderTerminal();
+    await renderTerminal();
 
     await createSale();
 
@@ -152,7 +162,7 @@ describe("merchant-terminal per-payment link migration (gap 12)", () => {
   });
 
   it("copy link button copies the created payment URL and shows a copied toast", async () => {
-    renderTerminal();
+    await renderTerminal();
 
     await createSale();
     await screen.findByTestId("share-link-overlay");
@@ -168,7 +178,7 @@ describe("merchant-terminal per-payment link migration (gap 12)", () => {
   });
 
   it("clears the share-link overlay once the active transaction completes", async () => {
-    const { queryClient } = renderTerminal();
+    const { queryClient } = await renderTerminal();
 
     await createSale();
     await screen.findByTestId("share-link-overlay");
@@ -202,7 +212,7 @@ describe("merchant-terminal per-payment link migration (gap 12)", () => {
   it("surfaces the real 503 message instead of a generic fallback", async () => {
     saleHandler = () =>
       jsonResponse({ message: "Per-payment links are not enabled yet" }, 503);
-    renderTerminal();
+    await renderTerminal();
 
     await createSale();
 

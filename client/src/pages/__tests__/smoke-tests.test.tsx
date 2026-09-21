@@ -167,13 +167,19 @@ describe('Page Components Smoke Tests', () => {
 
   basicComponents.forEach(({ name, component: Component }) => {
     it(`should render ${name} without crashing`, () => {
+      let view: ReturnType<typeof render> | undefined;
       expect(() => {
-        render(
+        view = render(
           <TestWrapper>
             <Component />
           </TestWrapper>
         );
       }).not.toThrow();
+      // R1-T8: this checks the first render only. Unmount before any request
+      // resolves — the mocked responses are not shaped for every page, and a
+      // response landing after the test is an update outside act(), which
+      // jest.setup.js now fails.
+      view?.unmount();
     });
   });
 

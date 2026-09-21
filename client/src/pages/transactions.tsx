@@ -1,7 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useLocation } from "wouter";
-import { getCurrentMerchantId } from "@/lib/auth";
+import { MerchantGate } from "@/components/merchant-gate";
 import { Download, FileSpreadsheet, RotateCcw, AlertCircle, Mail, MessageCircle, Link2, Check, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -88,7 +87,10 @@ function buildChartData(txs: Transaction[], tf: Timeframe) {
 }
 
 export default function Transactions() {
-  const [, setLocation] = useLocation();
+  return <MerchantGate>{(merchantId) => <TransactionsPage merchantId={merchantId} />}</MerchantGate>;
+}
+
+function TransactionsPage({ merchantId }: { merchantId: number }) {
   const [tf, setTf] = useState<Timeframe>('week');
   const [totVis, setTotVis] = useState(true);
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
@@ -110,12 +112,6 @@ export default function Transactions() {
   const [sheetOffset, setSheetOffset] = useState<number | null>(null); // null = resting at default
   const [dragging, setDragging] = useState(false);
   const { toast } = useToast();
-  const merchantId = getCurrentMerchantId();
-
-  if (!merchantId) {
-    setLocation('/login');
-    return null;
-  }
 
   const { data: transactions = [], isLoading } = useQuery({
     queryKey: ["/api/merchants", merchantId, "transactions"],

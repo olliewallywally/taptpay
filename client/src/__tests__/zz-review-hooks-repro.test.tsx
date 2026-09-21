@@ -1,10 +1,14 @@
 /**
- * TEMPORARY review artifact — reproduces the Rules-of-Hooks early-return crash
- * in the merchant pages. Delete after the review.
+ * R1-T8 — Settings, the page the original review reproduced the hook-order crash
+ * on. This file used to be a temporary artifact asserting the crash ("Rendered
+ * fewer hooks than expected" once the auth token disappeared while Settings was
+ * mounted); plan R1-T8 converts it to assert the opposite, across the
+ * transitions the plan names: loading → authenticated, loading →
+ * unauthenticated, error → retry, a change of merchant, and unmount. The real
+ * auth module is used — the token is read from localStorage, as in the app.
  */
-import { render } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import React from "react";
 
 jest.mock("@/hooks/use-push-notifications", () => ({
   usePushNotifications: () => ({
@@ -22,44 +26,142 @@ jest.mock("@/features/tutorial/tutorial", () => ({
   }),
 }));
 jest.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: jest.fn() }) }));
-jest.mock("wouter", () => ({ useLocation: () => ["/settings", jest.fn()] }));
+const mockNavigate = jest.fn();
+jest.mock("wouter", () => ({ useLocation: () => ["/settings", mockNavigate] }));
 jest.mock("@/lib/queryClient", () => ({
   apiRequest: jest.fn(async () => ({ ok: true, json: async () => ({}) })),
 }));
 
 import Settings from "@/pages/settings";
 
-// A real bearer-shaped token whose payload decodes to { merchantId: 22 }
-const payload = Buffer.from(JSON.stringify({ merchantId: 22, role: "owner" })).toString("base64");
-const TOKEN = `h.${payload}.s`;
+/** A bearer-shaped token whose payload decodes to that merchant, as the app stores it. */
+const tokenFor = (merchantId: number) =>
+  `h.${Buffer.from(JSON.stringify({ merchantId, role: "owner" })).toString("base64")}.s`;
 
-function Harness() {
-  const client = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+type Reply = { ok: boolean; status: number; json: () => Promise<unknown> };
+const reply = (body: unknown, status = 200): Reply => ({ ok: status < 400, status, json: async () => body });
+const merchant = (id: number) => ({ id, businessName: `Synthetic Merchant ${id}`, status: "active" });
+
+let fetchMock: jest.Mock;
+let consoleErrors: unknown[][];
+let client: QueryClient;
+beforeEach(() => {
+  localStorage.clear();
+  mockNavigate.mockClear();
+  consoleErrors = [];
+  jest.spyOn(console, "error").mockImplementation((...args) => { consoleErrors.push(args); });
+  fetchMock = jest.fn(async (url: unknown) => {
+    const found = /^\/api\/merchants\/(\d+)\/profile$/.exec(String(url));
+    return reply(found ? merchant(Number(found[1])) : {});
   });
-  return (
+  global.fetch = fetchMock as any;
+  client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+});
+afterEach(() => jest.restoreAllMocks());
+
+function mount() {
+  const ui = () => (
     <QueryClientProvider client={client}>
       <Settings />
     </QueryClientProvider>
   );
+  const view = render(ui());
+  return { rerender: () => view.rerender(ui()), unmount: view.unmount };
+}
+const settle = () => act(async () => {
+  for (let i = 0; i < 5; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
+});
+/** Profile requests are held until released, to observe the loading state. */
+function holdProfile() {
+  const held: Array<() => void> = [];
+  fetchMock.mockImplementation((url: unknown) => {
+    const found = /^\/api\/merchants\/(\d+)\/profile$/.exec(String(url));
+    if (!found) return Promise.resolve(reply({}));
+    return new Promise<Reply>((resolve) => held.push(() => resolve(reply(merchant(Number(found[1]))))));
+  });
+  return { release: () => held.splice(0).forEach((resume) => resume()) };
 }
 
-describe("merchant page hook ordering", () => {
-  beforeEach(() => {
-    localStorage.clear();
-    global.fetch = jest.fn(async () => ({
-      ok: true, status: 200, json: async () => ({}),
-    })) as any;
-  });
+describe("Settings keeps its hooks in order (R1-T8)", () => {
+  it("does not crash on re-render once the auth token is gone, and leaves for /login", async () => {
+    localStorage.setItem("authToken", tokenFor(22));
+    const view = mount();
+    await settle();
 
-  it("Settings crashes on re-render once the auth token is gone", () => {
-    localStorage.setItem("authToken", TOKEN);
-    const { rerender } = render(<Harness />);
-
-    // Exactly what handleLogout() does at settings.tsx:606, and what a 401
-    // credential clear does: the token disappears while the page is mounted.
+    // Exactly what handleLogout() does, and what a 401 credential clear does:
+    // the token disappears while the page is mounted.
     localStorage.removeItem("authToken");
 
-    expect(() => rerender(<Harness />)).toThrow(/Rendered fewer hooks than expected/);
+    expect(() => view.rerender()).not.toThrow();
+    await settle();
+    expect(mockNavigate).toHaveBeenCalledTimes(1);
+    expect(mockNavigate).toHaveBeenCalledWith("/login");
+    expect(consoleErrors).toEqual([]);
+  });
+
+  it("loading → authenticated: renders the merchant once the profile arrives", async () => {
+    localStorage.setItem("authToken", tokenFor(22));
+    const profile = holdProfile();
+    mount();
+    await settle();
+    expect(screen.queryByText("Synthetic Merchant 22")).toBeNull();
+
+    profile.release();
+    await settle();
+    expect(screen.getByText("Synthetic Merchant 22")).toBeInTheDocument();
+    expect(mockNavigate).not.toHaveBeenCalled();
+    expect(consoleErrors).toEqual([]);
+  });
+
+  it("loading → unauthenticated: the session ending mid-load neither crashes nor renders the page", async () => {
+    localStorage.setItem("authToken", tokenFor(22));
+    const profile = holdProfile();
+    const view = mount();
+    await settle();
+
+    localStorage.removeItem("authToken");
+    expect(() => view.rerender()).not.toThrow();
+    profile.release();
+    await settle();
+    expect(screen.queryByText("Synthetic Merchant 22")).toBeNull();
+    expect(mockNavigate).toHaveBeenCalledWith("/login");
+    expect(consoleErrors).toEqual([]);
+  });
+
+  it("error → retry: a failed profile load, then a successful retry", async () => {
+    localStorage.setItem("authToken", tokenFor(22));
+    fetchMock.mockImplementationOnce(async () => reply({ message: "unavailable" }, 503));
+    mount();
+    await settle();
+    expect(screen.queryByText("Synthetic Merchant 22")).toBeNull();
+
+    await act(async () => { await client.refetchQueries(); });
+    await settle();
+    expect(screen.getByText("Synthetic Merchant 22")).toBeInTheDocument();
+    expect(consoleErrors).toEqual([]);
+  });
+
+  it("a change of merchant loads the new merchant, with no crash and no state carried over", async () => {
+    localStorage.setItem("authToken", tokenFor(22));
+    const view = mount();
+    await settle();
+    expect(screen.getByText("Synthetic Merchant 22")).toBeInTheDocument();
+
+    localStorage.setItem("authToken", tokenFor(23));
+    expect(() => view.rerender()).not.toThrow();
+    await settle();
+    expect(screen.getByText("Synthetic Merchant 23")).toBeInTheDocument();
+    expect(screen.queryByText("Synthetic Merchant 22")).toBeNull();
+    expect(mockNavigate).not.toHaveBeenCalled();
+    expect(consoleErrors).toEqual([]);
+  });
+
+  it("unmounts cleanly", async () => {
+    localStorage.setItem("authToken", tokenFor(22));
+    const view = mount();
+    await settle();
+    view.unmount();
+    await settle();
+    expect(consoleErrors).toEqual([]);
   });
 });

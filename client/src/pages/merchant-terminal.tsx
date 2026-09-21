@@ -18,7 +18,7 @@ import { apiErrorMessage } from "@/lib/api-error";
 import { sseClient } from "@/lib/sse-client";
 import { useToast } from "@/hooks/use-toast";
 import { useDeviceStatusMonitoring, useSSEConnectionMonitoring } from "@/components/notification-system";
-import { getCurrentMerchantId } from "@/lib/auth";
+import { MerchantGate } from "@/components/merchant-gate";
 import { Send, Loader2, CheckCircle, Clock, XCircle, Eye, Copy, Check, QrCode, Smartphone, Waves, CreditCard, X, Edit, MoreHorizontal, ChevronDown, Tag, Share, Link2, Mail, MessageCircle } from "lucide-react";
 import { isNativeIOS, canTapToPay } from "@/lib/native";
 import { Switch } from "@/components/ui/switch";
@@ -35,6 +35,14 @@ const EMPTY_STOCK_ITEMS: any[] = [];
 type TransactionFormData = z.infer<typeof transactionFormSchema>;
 
 export default function MerchantTerminal() {
+  return (
+    <MerchantGate redirect="document" fallback={<div>Redirecting to login...</div>}>
+      {(merchantId) => <MerchantTerminalPage merchantId={merchantId} />}
+    </MerchantGate>
+  );
+}
+
+function MerchantTerminalPage({ merchantId }: { merchantId: number }) {
   const [currentTransaction, setCurrentTransaction] = useState<any>(null);
   const [copiedLink, setCopiedLink] = useState(false);
   const [stonesCollapsed, setStonesCollapsed] = useState(true);
@@ -136,13 +144,6 @@ export default function MerchantTerminal() {
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const merchantId = getCurrentMerchantId();
-
-  // Redirect to login if no merchantId
-  if (!merchantId) {
-    window.location.href = '/login';
-    return <div>Redirecting to login...</div>;
-  }
 
   const form = useForm<TransactionFormData>({
     resolver: zodResolver(transactionFormSchema),
