@@ -23,8 +23,8 @@ verbatim: **"ok lets move on to the next phase"**.
 | 9 | Legitimate provider reconciliation preserved or covered by a runbook | ✅ | No Windcave credentials are configured in any environment this session can see; nothing in flight to preserve. |
 
 Warnings recorded, as §8.1 requires: the build reports chunks over 500 kB (the lazily loaded PDF
-engine, `savePdf-*.js`, 1.46 MB); the client suite prints 18 React `act(...)` warnings, all from
-`Settings` — they belong to R1-T8, which the plan tasks with removing them.
+engine, `savePdf-*.js`, 1.46 MB); the client suite prints 18 React `act(...)` warnings — 12 from
+`Settings`, 6 from `MerchantTerminal` — which R1-T8 is tasked with removing.
 
 ## What this does not establish
 
