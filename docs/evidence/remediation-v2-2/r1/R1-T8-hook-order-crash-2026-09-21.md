@@ -94,3 +94,32 @@ states).
 
 - **Independent review** of `c6667985..387d189d` before this merges (plan §21.1).
 - R1-T9 (truthful failure states) is next in C16; the six pages above are its first inputs.
+
+## Independent review — brief
+
+**Range:** `c6667985..387d189d` (one code commit), local only.
+
+Paste-ready prompt:
+
+> You are the independent correctness reviewer for TaptPay, a payment-terminal SaaS. Review commit
+> `387d189d` on branch `remediation/r1-continuation-20260907` (range `c6667985..387d189d`). It fixes
+> plan task R1-T8: seven merchant pages returned early ("no merchant: go to login") before most of
+> their hooks, so ending the session while one was open crashed React ("Rendered fewer hooks than
+> expected"). Start from `docs/evidence/remediation-v2-2/r1/R1-T8-hook-order-crash-2026-09-21.md`;
+> treat it as claims and re-derive everything from the code. Attack especially: whether any page can
+> still render without a merchant or run hooks conditionally (`client/src/components/merchant-gate.tsx`
+> and the seven pages); whether each page leaves for /login exactly as before, exactly once, and never
+> loops or reloads the login page; whether a change of merchant can show one merchant's state or data
+> under another's id; what the gate's "reads the token only when it renders" property allows after
+> sign-out or a 401; whether the new client gates (`client/src/__tests__/hooks-order-guard.test.ts`,
+> the React-problem guard in `jest.setup.js`) can be bypassed or can pass vacuously; whether the
+> edits to older tests weakened what they checked; whether any layout changed. Label anything you
+> cannot verify UNVERIFIED; cite `file:line`; give a failing test for every Blocking issue. Return
+> exactly the ten headings of plan §21.1 (`docs/PLAN-2026-08-24-taptpay-remediation-v2-2.md`) and end
+> with Approve / Do not approve naming the commit range.
+
+Reproduce: `npm run check`; `npx jest --selectProjects client`; `npm run build`, then serve it with
+`npx vite preview --host 127.0.0.1 --port 5199 --strictPort` and run
+`R1T8_BASE_URL=http://127.0.0.1:5199 node scripts/verify-r1-t8-browser.mjs` (add
+`R1T8_BEFORE_URL=` pointing at a preview of a `c6667985` build for the pixel and crash-reproduction
+checks) and `R0_BROWSER_BASE_URL=http://127.0.0.1:5199 node scripts/verify-r0-device-containment.mjs`.
