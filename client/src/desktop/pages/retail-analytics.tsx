@@ -44,6 +44,7 @@ import {
   type DesktopRoutePageProps,
 } from "../DesktopPageScaffold";
 import { entranceProps, useListEntrance } from "../list-entrance";
+import { DesktopLoadFailure } from "../DesktopLoadFailure";
 
 /* ── palette ── */
 const ACCENT = "#5E9EFF";
@@ -177,6 +178,11 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
     enabled: !!merchantId,
   });
 
+  /* R1-T9: sales that did not load are not "no sales". With nothing loaded yet,
+     the screen says so and draws no figure, chart or list from the empty
+     fallback below; a failed background refresh keeps the sales already shown. */
+  const salesUnavailable = txQuery.isError && txQuery.data === undefined;
+  const retrySales = () => { void txQuery.refetch(); };
   const transactions = txQuery.data ?? [];
   const stockItems = stockQuery.data ?? [];
   const boards = boardsQuery.data ?? [];
@@ -474,20 +480,33 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
 
             <div className="ra-hero-row dt-rise" style={{ "--dt-i": 1 } as CSSProperties}>
               <div className="ra-hero-col">
-                <div className="ra-hero-amt-row">
-                  <span className="ra-hero">{txQuery.isLoading ? "—" : money(overview.total)}</span>
-                  {overview.growth !== null && (
-                    <span className="ra-hero-pill">
-                      {overview.growth >= 0 ? "+" : ""}
-                      {overview.growth}%
-                    </span>
-                  )}
-                </div>
-                <span className="ra-hero-sub">total revenue</span>
-                <span className="ra-hero-tx">
-                  {txQuery.isLoading ? "—" : overview.count.toLocaleString("en-NZ")}
-                </span>
-                <span className="ra-hero-sub ra-hero-sub-dim">transactions</span>
+                {salesUnavailable ? (
+                  <DesktopLoadFailure
+                    tone="canvas"
+                    title="Sales didn't load"
+                    detail="Your totals stay hidden until they do."
+                    onRetry={retrySales}
+                    retrying={txQuery.isFetching}
+                    testId="retail-analytics-sales-failed"
+                  />
+                ) : (
+                  <>
+                  <div className="ra-hero-amt-row">
+                    <span className="ra-hero">{txQuery.isLoading ? "—" : money(overview.total)}</span>
+                    {overview.growth !== null && (
+                      <span className="ra-hero-pill">
+                        {overview.growth >= 0 ? "+" : ""}
+                        {overview.growth}%
+                      </span>
+                    )}
+                  </div>
+                  <span className="ra-hero-sub">total revenue</span>
+                  <span className="ra-hero-tx">
+                    {txQuery.isLoading ? "—" : overview.count.toLocaleString("en-NZ")}
+                  </span>
+                  <span className="ra-hero-sub ra-hero-sub-dim">transactions</span>
+                  </>
+                )}
               </div>
 
               <div className="ra-segs" role="tablist" aria-label="revenue range" data-tutorial-id="retail-analytics-period">
@@ -514,48 +533,50 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
               </div>
             </div>
 
-            <div className="ra-chart dt-rise" style={{ "--dt-i": 2 } as CSSProperties} ref={chartRef}>
-              <svg className="ra-chart-svg" viewBox="0 0 1076 240" preserveAspectRatio="none" aria-hidden="true">
-                <defs>
-                  <linearGradient id="rtrevfill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0" stopColor={ACCENT} stopOpacity="0.34" />
-                    <stop offset="1" stopColor={ACCENT} stopOpacity="0.02" />
-                  </linearGradient>
-                </defs>
-                <path d={overview.areaD} fill="url(#rtrevfill)" />
-                <path d={overview.lineD} fill="none" stroke="#8CBBFF" strokeWidth="3" strokeLinecap="round" />
-              </svg>
-              {overview.peakValue > 0 && (
-                <>
-                  <div
-                    aria-hidden="true"
-                    className="ra-dot"
-                    data-peak-index={overview.peakIndex}
-                    style={{
-                      left: `${overview.markerLeft}px`,
-                      top: `${overview.markerTop}px`,
-                    }}
-                  />
-                  <div
-                    ref={chipRef}
-                    aria-hidden="true"
-                    className="ra-chip"
-                    style={{ left: `${chipLeft}px` }}
-                  >
-                    {moneyWhole(overview.peakValue)}
-                  </div>
-                </>
-              )}
-              <p
-                className="ra-chart-summary"
-                role="status"
-                aria-live="polite"
-                aria-atomic="true"
-              >
-                {selectedPeriod} selected. Peak bucket {overview.peakLabel}:{" "}
-                {money(overview.peakValue)}.
-              </p>
-            </div>
+            {!salesUnavailable && (
+              <div className="ra-chart dt-rise" style={{ "--dt-i": 2 } as CSSProperties} ref={chartRef}>
+                <svg className="ra-chart-svg" viewBox="0 0 1076 240" preserveAspectRatio="none" aria-hidden="true">
+                  <defs>
+                    <linearGradient id="rtrevfill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0" stopColor={ACCENT} stopOpacity="0.34" />
+                      <stop offset="1" stopColor={ACCENT} stopOpacity="0.02" />
+                    </linearGradient>
+                  </defs>
+                  <path d={overview.areaD} fill="url(#rtrevfill)" />
+                  <path d={overview.lineD} fill="none" stroke="#8CBBFF" strokeWidth="3" strokeLinecap="round" />
+                </svg>
+                {overview.peakValue > 0 && (
+                  <>
+                    <div
+                      aria-hidden="true"
+                      className="ra-dot"
+                      data-peak-index={overview.peakIndex}
+                      style={{
+                        left: `${overview.markerLeft}px`,
+                        top: `${overview.markerTop}px`,
+                      }}
+                    />
+                    <div
+                      ref={chipRef}
+                      aria-hidden="true"
+                      className="ra-chip"
+                      style={{ left: `${chipLeft}px` }}
+                    >
+                      {moneyWhole(overview.peakValue)}
+                    </div>
+                  </>
+                )}
+                <p
+                  className="ra-chart-summary"
+                  role="status"
+                  aria-live="polite"
+                  aria-atomic="true"
+                >
+                  {selectedPeriod} selected. Peak bucket {overview.peakLabel}:{" "}
+                  {money(overview.peakValue)}.
+                </p>
+              </div>
+            )}
           </>
         )}
 
@@ -673,11 +694,24 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
             <div className="ra-sheet-actions">
               {sheetMode === "history" && (
                 <>
-                  <button type="button" className="ra-btn-reports" onClick={openReports}>
+                  <button
+                    type="button"
+                    className="ra-btn-reports"
+                    onClick={openReports}
+                    disabled={salesUnavailable}
+                    title={salesUnavailable ? "Available once your sales load" : undefined}
+                  >
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={DEEP_BLUE} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="7" height="7" rx="1.5" /><rect x="13" y="4" width="7" height="7" rx="1.5" /><rect x="4" y="13" width="7" height="7" rx="1.5" /><rect x="13" y="13" width="7" height="7" rx="1.5" /></svg>
                     <span>Reports</span>
                   </button>
-                  <button type="button" className="ra-btn-white" data-tutorial-id="retail-analytics-export" onClick={() => setExportOpen(true)}>
+                  <button
+                    type="button"
+                    className="ra-btn-white"
+                    data-tutorial-id="retail-analytics-export"
+                    onClick={() => setExportOpen(true)}
+                    disabled={salesUnavailable}
+                    title={salesUnavailable ? "Available once your sales load" : undefined}
+                  >
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={INK} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 4v10M8 10l4 4 4-4" /><path d="M5 19h14" /></svg>
                     <span>Export</span>
                   </button>
@@ -702,6 +736,14 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
             {sheetMode === "history" &&
               (txQuery.isLoading ? (
                 <div className="ra-sheet-empty">loading sales…</div>
+              ) : salesUnavailable ? (
+                <DesktopLoadFailure
+                  tone="sheet"
+                  title="Payment history didn't load."
+                  onRetry={retrySales}
+                  retrying={txQuery.isFetching}
+                  announce={false}
+                />
               ) : historyGroups.length === 0 ? (
                 <div className="ra-sheet-empty">no sales yet — take your first payment from the Terminal</div>
               ) : (
@@ -973,7 +1015,8 @@ const RA_CSS = `
 .ra-sheet-title { font-weight:700; font-size:24px; color:${INK}; }
 .ra-sheet-actions { display:flex; align-items:center; gap:10px; }
 .ra-btn-reports { display:inline-flex; align-items:center; gap:9px; padding:11px 22px; border-radius:9999px; background:transparent; border:1.5px solid ${DEEP_BLUE}; font-weight:700; font-size:14px; color:${DEEP_BLUE}; cursor:pointer; transition:background .15s ease; }
-.ra-btn-reports:hover { background:rgba(29,72,200,0.06); }
+.ra-btn-reports:hover:not(:disabled) { background:rgba(29,72,200,0.06); }
+.ra-btn-reports:disabled { opacity:0.55; cursor:default; }
 .ra-btn-white { display:inline-flex; align-items:center; gap:9px; padding:11px 22px; border-radius:9999px; background:#fff; border:1px solid #E2E5EE; font-weight:700; font-size:14px; color:${INK}; cursor:pointer; transition:background .15s ease; }
 .ra-btn-white:hover:not(:disabled) { background:#FAFBFD; }
 .ra-btn-white:disabled { opacity:0.55; cursor:default; }
