@@ -6,7 +6,7 @@ import {
   ATTACH_WINDOW, INVENTORY_GATED_MIGRATIONS, STAGED_INVENTORY_TABLE, UPLOAD_OWNERSHIP_REPAIR_MIGRATION,
   buildDraftInventory, classifyInvoiceDocument, parseUploadOwnershipInventory, readUploadOwnershipInventory,
   readUploadOwnershipInventoryOption, requireUploadOwnershipInventory, summarizeClassifications,
-  UploadOwnershipInventoryError, type InvoiceDocumentFacts,
+  UploadOwnershipInventoryError, type InvoiceDocumentFacts, type UploadInventoryFailure,
 } from "../upload-ownership-inventory";
 import {
   checksumAll, defaultMigrationsDir, executableStatements, inspectMigrationSafety, listMigrationFiles,
@@ -356,6 +356,38 @@ describe("drafting the list from a database's own records", () => {
     expect(() => buildDraftInventory([facts({ contentSha256: null })], { target, approvedBy: "Operator", approvedAt: "2026-09-21T00:00:00Z" }))
       .toThrow();
   });
+
+  // 2026-09-21 re-read: a draft whose approver broke the list's own rules was
+  // written, its SHA-256 printed for approval, and then refused at release.
+  it("never builds a list the runner would refuse", () => {
+    expect(() => buildDraftInventory(all, { target, approvedBy: "Olivér Léonard", approvedAt: "2026-09-21T00:00:00Z" }))
+      .toThrow("UPLOAD_INVENTORY_INVALID");
+  });
+});
+
+describe("the runner's refusals", () => {
+  const root = path.join(__dirname, "..", "..");
+  const source = fs.readFileSync(path.join(root, "server", "upload-ownership-inventory.ts"), "utf8");
+  const block = source.slice(source.indexOf("const GUIDANCE = {"), source.indexOf("} as const;"));
+  const codes = [...block.matchAll(/^ {2}([A-Z_]+):/gm)].map((match) => match[1] as UploadInventoryFailure);
+
+  it("name only commands and files that exist", () => {
+    expect(codes).toEqual(expect.arrayContaining(["REQUIRED", "INVALID", "EVIDENCE_MISMATCH"]));
+    const scripts = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).scripts;
+    for (const code of codes) {
+      const { message } = new UploadOwnershipInventoryError(code);
+      for (const [file] of message.matchAll(/\b(?:scripts|server|docs|migrations)\/[\w./-]*\w/g)) {
+        expect({ code, file, exists: fs.existsSync(path.join(root, file)) }).toEqual({ code, file, exists: true });
+      }
+      for (const [, command] of message.matchAll(/npm run ([\w:-]+)/g)) {
+        expect({ code, command, defined: command in scripts }).toEqual({ code, command, defined: true });
+      }
+    }
+  });
+
+  it("tell an operator holding an invalid list how to draft a valid one", () => {
+    expect(() => parse({ ...good(), version: 1 })).toThrow(/npm run db:draft-upload-inventory/);
+  });
 });
 
 describe("the command line", () => {
@@ -426,5 +458,15 @@ describe("the drafting command line", () => {
     ["an unknown flag", ["--count-only", "--everything"]],
   ])("refuses %s", (_, extra) => {
     expect(() => parseDraftArguments([...base, ...extra])).toThrow("MIGRATE_CLI_INVALID_ARGUMENTS");
+  });
+
+  // Checked before connecting: drafting reads and hashes every document first.
+  it.each([
+    ["an accented name", "Olivér Léonard"],
+    ["a name over 200 characters", "x".repeat(201)],
+    ["a blank name", "   "],
+  ])("refuses %s as the approver, which the runner would refuse in the list", (_, name) => {
+    expect(() => parseDraftArguments([...base, "--out=/private/draft.json", `--approved-by=${name}`]))
+      .toThrow("UPLOAD_INVENTORY_APPROVER_INVALID");
   });
 });

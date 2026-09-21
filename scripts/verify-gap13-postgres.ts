@@ -1,5 +1,7 @@
 /** Run only against an EMPTY, explicitly marked disposable database.
  * TEST_DATABASE_URL=... TAPTPAY_TEST_DATABASE=1 npx tsx scripts/verify-gap13-postgres.ts
+ * The URL must carry a user and a password: the drafting command it runs
+ * validates its target exactly as the migration runner does.
  * Applies the real migration chain through the project runner — 0025 only after
  * proving it is refused without a verified ownership inventory and with an
  * incomplete, false, forged or stale one, and after running the real drafting

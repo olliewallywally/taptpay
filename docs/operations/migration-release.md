@@ -118,7 +118,9 @@ Every invoice document is listed exactly once, either:
 
 The tool refuses to overwrite an existing file, writes it readable only by its
 owner, and prints its SHA-256. The file holds ids, hashes and merchant ids — no
-document path, content or token.
+document path, content or token. `--approved-by` must be 1–200 printable ASCII
+characters (the list stores it; an identifier, not personal data about anyone
+else); the tool refuses anything else before it reads the database.
 
 ### 3. Review, amend if you have evidence, approve
 

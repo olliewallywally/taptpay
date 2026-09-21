@@ -39,7 +39,10 @@ const GUIDANCE = {
     "the inventory file's SHA-256 is not the approved digest: the file changed after approval, or the wrong digest was given",
   INVALID:
     "the inventory is not a valid version-2 inventory: every invoice document needs either an owner with evidence, " +
-    "or a locked reason — draft it with scripts/draft-gap13-upload-inventory.ts",
+    "or a locked reason — draft it with npm run db:draft-upload-inventory",
+  APPROVER_INVALID:
+    "--approved-by must be 1–200 printable ASCII characters (no accents or symbols beyond ASCII): " +
+    "the list and the evidence table record it",
   DUPLICATE_FILE: "the inventory lists the same file more than once",
   TARGET_MISMATCH: "the inventory was approved for a different database",
   COVERAGE_MISMATCH:
@@ -318,10 +321,15 @@ export function buildDraftInventory(
     };
   });
   const { host, port, database } = meta.target;
-  return {
-    inventory: { version: 2, target: { host, port, database }, approvedBy: meta.approvedBy, approvedAt: meta.approvedAt, entries },
-    summary: summarizeClassifications(all),
-  };
+  const inventory: UploadOwnershipInventoryDraft = { version: 2, target: { host, port, database }, approvedBy: meta.approvedBy, approvedAt: meta.approvedAt, entries };
+  // Never hand an operator a list to approve that the runner would refuse.
+  if (!inventorySchema.safeParse(inventory).success) fail("INVALID");
+  return { inventory, summary: summarizeClassifications(all) };
+}
+
+/** The drafting tool checks its approver before reading anything, by the list's own rule. */
+export function assertInventoryApprover(approvedBy: string): void {
+  if (!label.safeParse(approvedBy).success) fail("APPROVER_INVALID");
 }
 
 // ---------------------------------------------------------------------------

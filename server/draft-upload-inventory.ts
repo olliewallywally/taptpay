@@ -20,6 +20,7 @@ import { createHash } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import { MigrationTargetError, parseCliArgs, redactedFailureText, withValidatedMigrationTarget, type CliOptions } from "./migrate";
 import {
+  assertInventoryApprover,
   buildDraftInventory,
   readInvoiceDocumentFacts,
   summarizeClassifications,
@@ -56,6 +57,7 @@ export function parseDraftArguments(argv: readonly string[]): DraftOptions {
     && !cli.allowDestructive && cli.uploadOwnershipInventoryPath === undefined && cli.uploadOwnershipInventorySha256 === undefined;
   const oneMode = options.countOnly ? !options.out && !options.approvedBy : !!options.out && !!options.approvedBy;
   if (!onlyTarget || !oneMode) throw new MigrationTargetError("MIGRATE_CLI_INVALID_ARGUMENTS");
+  if (options.approvedBy !== undefined) assertInventoryApprover(options.approvedBy);
   return { cli, ...options };
 }
 
