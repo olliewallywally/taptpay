@@ -1,12 +1,11 @@
 import { createHash } from "node:crypto";
 
-// Shared across processes in DatabaseStorage. The aggregate gate runs first:
-// arbitrary distinct tokens cannot create an unbounded number of database rows.
-// This budget is separate from checkout/payment requests.
+// A per-link budget, shared across processes in DatabaseStorage and separate
+// from checkout/payment requests. Only real invoices are counted: the route
+// looks the link up first (owner decision 2026-09-21), so made-up links create
+// no rows and there is no platform-wide pool for them to use up.
 export const DOCUMENT_READ_WINDOW_MS = 60_000;
 export const DOCUMENT_READ_TOKEN_LIMIT = 10;
-export const DOCUMENT_READ_GLOBAL_LIMIT = 600;
-export const DOCUMENT_READ_GLOBAL_KEY = "invoice-documents:global";
 
 export function documentReadTokenKey(token: string): string {
   // Checkout tokens have high entropy. Persist neither bearer tokens nor IPs.

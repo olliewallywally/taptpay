@@ -7806,13 +7806,17 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // checkout tokens authorize one payment resource only"), and only if the
   // stored file belongs to the invoice's own merchant. Guards mirror
   // GET /api/checkout/resolve/:token: unknown -> 404, voided -> 410, and a paid
-  // invoice exposes no document there, so none here. A shared database budget
-  // (10/min/token and 600/min aggregate) is separate from the payment page's
-  // budget; unavailable limiting fails closed before invoice lookup.
+  // invoice exposes no document there, so none here. Each real link gets a
+  // database-shared budget (10 a minute), separate from the payment page's.
+  // The link is looked up FIRST (owner decision 2026-09-21): a made-up link is
+  // answered 404 without touching the budget, so nobody can use it up for other
+  // customers. A limiter outage fails closed before any document byte is read.
   app.get("/api/checkout/document/:token", async (req, res) => {
     try {
       const { token } = req.params;
       if (!/^[A-Za-z0-9_-]{1,200}$/.test(token)) return res.status(404).json({ message: "Payment link not found" });
+      const invoice = await getCheckoutInvoiceByToken(token);
+      if (!invoice) return res.status(404).json({ message: "Payment link not found" });
       let allowed: boolean;
       try {
         allowed = await storage.consumeInvoiceDocumentReadLimit(token);
@@ -7821,8 +7825,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(503).json({ message: "Document temporarily unavailable" });
       }
       if (!allowed) return res.setHeader("Retry-After", "60").status(429).json({ message: "Too many requests" });
-      const invoice = await getCheckoutInvoiceByToken(token);
-      if (!invoice) return res.status(404).json({ message: "Payment link not found" });
       if (invoice.status === "voided") return res.status(410).json({ message: "This payment link has been voided" });
       if (invoice.status === "paid" || invoice.status === "paid_external") return res.status(404).json({ message: "Document not found" });
       const ref = parseInvoiceDocumentRef(invoice.documentUrl);

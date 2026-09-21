@@ -181,3 +181,30 @@ Reproduce: `npm run check`; `npm run test:server`; `npx jest --selectProjects cl
 `TEST_DATABASE_URL=<empty disposable database> TAPTPAY_TEST_DATABASE=1 npx tsx scripts/verify-gap13-postgres.ts`;
 `npx tsx scripts/verify-gap13-browser.ts`; and §5's CLI steps against an empty database named
 `convergence` on `127.0.0.1:5432`.
+
+## 8. Update — Q1 decided: count only real invoices (2026-09-21, later)
+
+Owner, verbatim: **"1. go ahead"** ([decision](../../../decisions/2026-09-21-gap13-owner-directions.md)).
+This closes High-Risk Concern 2 above. `GET /api/checkout/document/:token` now looks the link up
+**first**: a made-up link is answered `404` without touching the budget; a real link has its own
+database-shared budget of 10 a minute; the platform-wide pool of 600 (and its constants) is gone.
+A budget outage still fails closed (`503`) — now after the lookup, still before any document byte
+is read. The `0024` counter table is unchanged; rows exist only for real invoices opened in the
+last minute, and each call first reclaims expired ones.
+
+- **Tests first.** In `gap13-review-regressions.test.ts` three tests that pinned the old order were
+  replaced and two added. Red on `e268d91e`: *a made-up link … never touches the shared budget*;
+  *a flood of made-up links cannot switch off View invoice* (601 junk requests, then a real
+  customer's link must still answer `200`); *the in-memory limiter … has no platform-wide cap*.
+  Two guards pass before and after by design: a budget outage answers `503`, and a spent link
+  answers `429` with `Retry-After`, neither reading the document.
+- **Mutation checks:** counting before the lookup → the "never touches the budget" test fails;
+  budget check removed → 2 tests fail. Restored byte-identical.
+- **PostgreSQL 16.10:** the verifier's budget check now asserts 700 distinct links are all allowed
+  (700 rows) and that expired counters are reclaimed (1 row after the window). On `e268d91e` it
+  fails (600 allowed); on the new code **11 / 11 PASS**. Thirty concurrent requests across two
+  storage instances still yield exactly 10 allowed — the per-link upsert is atomic without the
+  removed global lock.
+
+Open: Q2–Q4 (Q3 has a recommendation awaiting approval; Q4 is answered, the retention period is
+not yet decided or implemented).

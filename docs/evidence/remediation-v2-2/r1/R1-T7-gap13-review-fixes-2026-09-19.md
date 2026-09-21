@@ -192,3 +192,8 @@ lands, the PostgreSQL verifier's two legacy checks stay red and gap 13 stays ope
 *Completed later on 2026-09-21 — see
 [R1-T7-gap13-ownership-inventory-gate-2026-09-21](R1-T7-gap13-ownership-inventory-gate-2026-09-21.md).
 The PostgreSQL verifier now passes 11/11.*
+
+*2026-09-21, later: the document budget described under "Implemented corrections" is superseded
+— the owner approved counting only real invoices (the link is looked up first; the 600-a-minute
+platform-wide pool is removed). See
+[the gate's evidence §8](R1-T7-gap13-ownership-inventory-gate-2026-09-21.md#8-update--q1-decided-count-only-real-invoices-2026-09-21-later).*

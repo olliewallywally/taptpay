@@ -6,7 +6,7 @@ import { config } from "./config";
 import { eq, ne, desc, asc, and, inArray, notInArray, gte, lte, lt, or, ilike, sql, isNull, isNotNull } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
 import { invoiceDocumentAccessAudit, invoiceDocumentReadLimits } from "@shared/schema";
-import { DOCUMENT_READ_GLOBAL_KEY, DOCUMENT_READ_GLOBAL_LIMIT, DOCUMENT_READ_TOKEN_LIMIT, DOCUMENT_READ_WINDOW_MS, documentReadTokenKey } from "./invoice-document-security";
+import { DOCUMENT_READ_TOKEN_LIMIT, DOCUMENT_READ_WINDOW_MS, documentReadTokenKey } from "./invoice-document-security";
 import type {
   AttachPaymentAttemptSessionRecordInput,
   AttachPaymentAttemptSessionResult,
@@ -2505,14 +2505,11 @@ export class MemStorage implements IStorage {
     for (const [key, row] of this.documentReadLimits) {
       if (row.expiresAt <= now) this.documentReadLimits.delete(key);
     }
-    const consume = (key: string, limit: number) => {
-      const row = this.documentReadLimits.get(key);
-      if (row && row.count >= limit) return false;
-      this.documentReadLimits.set(key, { count: (row?.count ?? 0) + 1, expiresAt: row?.expiresAt ?? now + DOCUMENT_READ_WINDOW_MS });
-      return true;
-    };
-    return consume(DOCUMENT_READ_GLOBAL_KEY, DOCUMENT_READ_GLOBAL_LIMIT)
-      && consume(documentReadTokenKey(token), DOCUMENT_READ_TOKEN_LIMIT);
+    const key = documentReadTokenKey(token);
+    const row = this.documentReadLimits.get(key);
+    if (row && row.count >= DOCUMENT_READ_TOKEN_LIMIT) return false;
+    this.documentReadLimits.set(key, { count: (row?.count ?? 0) + 1, expiresAt: row?.expiresAt ?? now + DOCUMENT_READ_WINDOW_MS });
+    return true;
   }
 
   private createSampleData() {
@@ -7998,29 +7995,26 @@ export class DatabaseStorage implements IStorage {
     return this.db.transaction(async (tx) => {
       await tx.execute(sql`SET LOCAL lock_timeout = '2s'`);
       await tx.execute(sql`SET LOCAL statement_timeout = '5s'`);
-      const consume = async (key: string, limit: number) => {
-        const result = await tx.execute(sql`
-          INSERT INTO invoice_document_read_limits (key, count, expires_at)
-          VALUES (${key}, 1, clock_timestamp() + interval '60 seconds')
-          ON CONFLICT (key) DO UPDATE SET
-            count = CASE WHEN invoice_document_read_limits.expires_at <= clock_timestamp()
-                         THEN 1 ELSE invoice_document_read_limits.count + 1 END,
-            expires_at = CASE WHEN invoice_document_read_limits.expires_at <= clock_timestamp()
-                              THEN clock_timestamp() + interval '60 seconds'
-                              ELSE invoice_document_read_limits.expires_at END
-          WHERE invoice_document_read_limits.expires_at <= clock_timestamp()
-             OR invoice_document_read_limits.count < ${limit}
-          RETURNING key`);
-        return result.rows.length === 1;
-      };
-      // Always lock the same bucket first, serializing cleanup and consumption
-      // across instances. The global gate bounds per-token row cardinality.
-      if (!(await consume(DOCUMENT_READ_GLOBAL_KEY, DOCUMENT_READ_GLOBAL_LIMIT))) return false;
-      await tx.delete(invoiceDocumentReadLimits).where(and(
-        ne(invoiceDocumentReadLimits.key, DOCUMENT_READ_GLOBAL_KEY),
-        lte(invoiceDocumentReadLimits.expiresAt, sql`clock_timestamp()`),
-      ));
-      return consume(documentReadTokenKey(token), DOCUMENT_READ_TOKEN_LIMIT);
+      // Reclaim spent counters. The route counts only real invoices (it looks
+      // the link up first), so this holds at most one row per invoice whose
+      // document was opened in the last minute — nothing a made-up link can grow.
+      await tx.delete(invoiceDocumentReadLimits)
+        .where(lte(invoiceDocumentReadLimits.expiresAt, sql`clock_timestamp()`));
+      // One atomic upsert per link: concurrent requests on any instance cannot
+      // both take the last unit of the budget.
+      const result = await tx.execute(sql`
+        INSERT INTO invoice_document_read_limits (key, count, expires_at)
+        VALUES (${documentReadTokenKey(token)}, 1, clock_timestamp() + interval '60 seconds')
+        ON CONFLICT (key) DO UPDATE SET
+          count = CASE WHEN invoice_document_read_limits.expires_at <= clock_timestamp()
+                       THEN 1 ELSE invoice_document_read_limits.count + 1 END,
+          expires_at = CASE WHEN invoice_document_read_limits.expires_at <= clock_timestamp()
+                            THEN clock_timestamp() + interval '60 seconds'
+                            ELSE invoice_document_read_limits.expires_at END
+        WHERE invoice_document_read_limits.expires_at <= clock_timestamp()
+           OR invoice_document_read_limits.count < ${DOCUMENT_READ_TOKEN_LIMIT}
+        RETURNING key`);
+      return result.rows.length === 1;
     });
   }
 

@@ -185,15 +185,17 @@ try {
     const keys = (await pool.query("SELECT key FROM invoice_document_read_limits")).rows;
     assert.ok(keys.every((r:any) => !r.key.includes("shared-synthetic-token")));
   });
-  await check("distinct tokens have a bounded shared budget; expired rows are reclaimed", async () => {
+  // Owner decision 2026-09-21: no platform-wide pool. Distinct links never share
+  // a budget (the route counts only real invoices, so rows stay bounded by them).
+  await check("distinct links never share a budget (no platform-wide cap); expired counters are reclaimed", async () => {
     await pool.query("DELETE FROM invoice_document_read_limits");
     let allowed=0;
-    for(let i=0;i<610;i++) if(await (i%2 ? storage:otherInstance).consumeInvoiceDocumentReadLimit(`token-${i}`)) allowed++;
-    assert.equal(allowed,600);
-    assert.equal((await pool.query("SELECT count(*)::int AS n FROM invoice_document_read_limits")).rows[0].n,601);
+    for(let i=0;i<700;i++) if(await (i%2 ? storage:otherInstance).consumeInvoiceDocumentReadLimit(`token-${i}`)) allowed++;
+    assert.equal(allowed,700);
+    assert.equal((await pool.query("SELECT count(*)::int AS n FROM invoice_document_read_limits")).rows[0].n,700);
     await pool.query("UPDATE invoice_document_read_limits SET expires_at=now()-interval '1 second'");
     assert.equal(await otherInstance.consumeInvoiceDocumentReadLimit("after-window"),true);
-    assert.equal((await pool.query("SELECT count(*)::int AS n FROM invoice_document_read_limits")).rows[0].n,2);
+    assert.equal((await pool.query("SELECT count(*)::int AS n FROM invoice_document_read_limits")).rows[0].n,1);
   });
   assert.deepEqual(failures,[],"gap 13 PostgreSQL verification failed");
 } finally {

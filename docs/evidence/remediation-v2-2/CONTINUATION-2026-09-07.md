@@ -1,6 +1,23 @@
 # Full integration continuation audit — 2026-09-07
 
-Latest continuation (2026-09-21, later — the ownership-inventory gate is
+Latest continuation (2026-09-21, evening — the owner answered Q1–Q4;
+[directions](../../decisions/2026-09-21-gap13-owner-directions.md)). **Q1 done:**
+the checkout document route now looks the link up first and counts only real
+invoices, so the platform-wide 600-a-minute pool (and the off-switch it gave any
+anonymous client) is gone; tests first, 2/2 mutations caught, PostgreSQL
+verifier 11/11 (its budget check fails on `e268d91e`). **Email/SMS in tests
+fixed** as a separate commit: the harness clears `RESEND_API_KEY` and Twilio's
+credentials and routes test email to the `simulation` provider — which exposed
+two suites (`ENV_VALIDATION_MODE=enforce`) that had only ever loaded because a
+real key was present, and so could never have loaded in CI. **Q2** explained,
+rule unchanged. **Q3** recommendation made (TaptPay's own records as proof where
+one merchant attached the document soon after upload; everything else locked to
+the audited admin, not blocking) — **not built until approved**. **Q4** answered
+with sources (tax and landlord records 7 years; privacy: no longer than needed);
+retention period recommended, **nothing implemented** (A-H3). Nothing pushed; no
+live database touched.
+
+Prior continuation (2026-09-21, later — the ownership-inventory gate is
 **implemented, verified and committed; not applied anywhere**). The owner's
 decision (*require a trusted ownership inventory before migration*) is now
 enforced by the runner: `0023`–`0025` run only with an operator-approved

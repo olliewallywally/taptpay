@@ -1,10 +1,11 @@
 import "./support/test-env";
+import crypto from "node:crypto";
 import request from "supertest";
 import express from "express";
 import { bearer, createAdminPrincipal, createOwnerPrincipal, createTestApp, resetTestStorage, storage } from "./support/http-harness";
 import * as billing from "../billing-card";
 import * as delivery from "../trades-delivery";
-import { DOCUMENT_READ_GLOBAL_LIMIT, DOCUMENT_READ_TOKEN_LIMIT, DOCUMENT_READ_WINDOW_MS } from "../invoice-document-security";
+import { DOCUMENT_READ_TOKEN_LIMIT, DOCUMENT_READ_WINDOW_MS } from "../invoice-document-security";
 
 beforeEach(() => resetTestStorage());
 
@@ -72,38 +73,72 @@ it("awaits the admin audit commit before sending bytes and does not audit a tena
   expect((await pending).status).toBe(200);
 });
 
-it("fails closed before a token lookup when the shared document limiter is unavailable", async () => {
+// Owner decision 2026-09-21 ("go ahead"): count only real invoices. The link is
+// looked up first, so a made-up link never touches the shared budget and a flood
+// of them cannot use it up for everyone else (the earlier design counted every
+// request against one 600-a-minute pool before the lookup).
+
+/** A real, unpaid property invoice carrying a document its own merchant uploaded. */
+async function invoiceWithDocument() {
+  const owner = await createOwnerPrincipal();
+  const name = `invoice-1700000000000-${crypto.randomBytes(8).toString("hex")}.pdf`;
+  await storage.saveUploadedFile(`invoices/${name}`, "application/pdf", Buffer.from("%PDF-1.4\nsynthetic"), owner.merchantId);
+  const token = crypto.randomBytes(20).toString("base64url");
+  const invoice = { id: "prop-inv-budget", merchantId: owner.merchantId, token, status: "dispatched", kind: "charge",
+    amountCents: 5000, documentUrl: `/uploads/invoices/${name}`, documentName: "bill.pdf" };
+  jest.spyOn(storage, "getInvoiceRentRequestByToken").mockImplementation(async (t: string) => (t === token ? invoice as any : undefined));
+  jest.spyOn(storage, "getJobInvoiceByToken").mockResolvedValue(undefined);
+  return { token };
+}
+
+it("a made-up link is answered from the lookup alone and never touches the shared budget", async () => {
   const { app } = await createTestApp();
+  await invoiceWithDocument();
+  const consume = jest.spyOn(storage, "consumeInvoiceDocumentReadLimit");
+  const response = await request(app).get(`/api/checkout/document/${crypto.randomBytes(20).toString("base64url")}`);
+  expect(response.status).toBe(404);
+  expect(consume).not.toHaveBeenCalled();
+});
+
+it("a flood of made-up links cannot switch off View invoice for a real customer", async () => {
+  const { app } = await createTestApp();
+  const { token } = await invoiceWithDocument();
+  const junk: number[] = [];
+  for (let i = 0; i <= 600; i++) junk.push((await request(app).get(`/api/checkout/document/junk-${i}`)).status);
+  expect(junk.every((status) => status === 404)).toBe(true);
+  expect((await request(app).get(`/api/checkout/document/${token}`)).status).toBe(200);
+});
+
+it("fails closed for a real invoice when the shared budget is unavailable, before reading the document", async () => {
+  const { app } = await createTestApp();
+  const { token } = await invoiceWithDocument();
   jest.spyOn(storage, "consumeInvoiceDocumentReadLimit").mockRejectedValue(new Error("synthetic limiter outage"));
-  const lookup = jest.spyOn(storage, "getInvoiceRentRequestByToken");
-  const response = await request(app).get("/api/checkout/document/synthetic-token");
+  const read = jest.spyOn(storage, "getUploadedFileForMerchant");
+  const response = await request(app).get(`/api/checkout/document/${token}`);
   expect(response.status).toBe(503);
-  expect(lookup).not.toHaveBeenCalled();
+  expect(read).not.toHaveBeenCalled();
 });
 
-it("aggregate document throttling covers distinct tokens before lookup", async () => {
+it("a link that has used its budget answers 429 with Retry-After, without reading the document", async () => {
   const { app } = await createTestApp();
+  const { token } = await invoiceWithDocument();
   jest.spyOn(storage, "consumeInvoiceDocumentReadLimit").mockResolvedValue(false);
-  const lookup = jest.spyOn(storage, "getInvoiceRentRequestByToken");
-  for (const token of ["first", "second"]) {
-    const response = await request(app).get(`/api/checkout/document/${token}`);
-    expect(response.status).toBe(429);
-    expect(response.headers["retry-after"]).toBe("60");
-  }
-  expect(lookup).not.toHaveBeenCalled();
+  const read = jest.spyOn(storage, "getUploadedFileForMerchant");
+  const response = await request(app).get(`/api/checkout/document/${token}`);
+  expect(response.status).toBe(429);
+  expect(response.headers["retry-after"]).toBe("60");
+  expect(read).not.toHaveBeenCalled();
 });
 
-it("the in-memory limiter preserves token and aggregate budgets and expires them", async () => {
+it("the in-memory limiter keeps a per-link budget, expires it, and has no platform-wide cap", async () => {
   const now = jest.spyOn(Date, "now").mockReturnValue(1_000_000);
   for (let i = 0; i < DOCUMENT_READ_TOKEN_LIMIT; i++) {
     expect(await storage.consumeInvoiceDocumentReadLimit("one-token")).toBe(true);
   }
   expect(await storage.consumeInvoiceDocumentReadLimit("one-token")).toBe(false);
-  // Denied per-token attempts consume aggregate budget too.
-  for (let i = DOCUMENT_READ_TOKEN_LIMIT + 1; i < DOCUMENT_READ_GLOBAL_LIMIT; i++) {
-    expect(await storage.consumeInvoiceDocumentReadLimit(`different-${i}`)).toBe(true);
-  }
-  expect(await storage.consumeInvoiceDocumentReadLimit("new-token")).toBe(false);
+  const others: boolean[] = [];
+  for (let i = 0; i < 1000; i++) others.push(await storage.consumeInvoiceDocumentReadLimit(`different-${i}`));
+  expect(others.every(Boolean)).toBe(true);
   now.mockReturnValue(1_000_000 + DOCUMENT_READ_WINDOW_MS);
   expect(await storage.consumeInvoiceDocumentReadLimit("one-token")).toBe(true);
 });
