@@ -29,6 +29,9 @@ import "./clear-ambient-credentials";
 process.env.APP_ENV = "test";
 process.env.ENV_VALIDATION_MODE = "audit";
 process.env.PAYMENT_MODE = "disabled";
+// The built-in simulated email provider (refused in staging/production): no
+// test sends real email or needs a real key, even under ENV_VALIDATION_MODE=enforce.
+process.env.EMAIL_PROVIDER = "simulation";
 
 process.env.JWT_SECRET = "http-harness-jwt-secret-not-a-real-credential-000";
 process.env.PAYMENT_RETURN_STATE_SECRET = "http-harness-return-state-secret-not-real-000";

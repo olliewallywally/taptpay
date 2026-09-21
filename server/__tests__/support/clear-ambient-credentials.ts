@@ -1,6 +1,7 @@
 /**
- * Deletes every paired credential group in `server/config.ts` from
- * `process.env`, for its side effect on import.
+ * Deletes every paired credential group in `server/config.ts`, and every
+ * provider credential that works on its own, from `process.env`, for its side
+ * effect on import.
  *
  * `requireCompleteGroup` (config.ts:195) throws when a group is only HALF
  * present, and `config.ts:588` freezes the config at import time — so one stray
@@ -29,12 +30,24 @@ export const PAIRED_CREDENTIAL_GROUPS: readonly (readonly string[])[] = [
   ["GMAIL_USER", "GMAIL_APP_PASSWORD"],
   ["OUTLOOK_USER", "OUTLOOK_PASS"],
   ["EVOLUTION_API_URL", "EVOLUTION_API_KEY"],
+  ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM_NUMBER", "TWILIO_MESSAGING_SERVICE_SID"],
 ];
+
+/**
+ * Credentials config.ts accepts on their own. They never crash a suite the way
+ * half a pair does — they make it call a live provider instead. Observed
+ * 2026-09-21: an ambient RESEND_API_KEY sent the team-invite resend test to the
+ * real email API (the sandbox blocked the call, so the route answered 502).
+ * harness-live-provider-credentials.test.ts fails if config.ts starts reading a
+ * provider secret that is in neither list.
+ */
+export const SINGLE_PROVIDER_CREDENTIALS: readonly string[] = ["RESEND_API_KEY"];
 
 export function clearAmbientCredentialGroups(env: NodeJS.ProcessEnv = process.env): void {
   for (const group of PAIRED_CREDENTIAL_GROUPS) {
     for (const key of group) delete env[key];
   }
+  for (const key of SINGLE_PROVIDER_CREDENTIALS) delete env[key];
 }
 
 clearAmbientCredentialGroups();
