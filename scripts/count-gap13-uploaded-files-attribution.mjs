@@ -1,11 +1,12 @@
-// Gap 13 — count-only preflight for migration 0023 (uploaded_files tenant column).
+// Gap 13 — count-only LEGACY reference inventory. References are NOT ownership proof.
+// Migration 0023 is historical; do not use this report to authorize a backfill.
 //
 // See docs/decisions/2026-09-14-uploads-tenant-authorization-option-c-disposition.md
 // and docs/evidence/remediation-v2-2/r1/R1-T7-gap13-uploads-tenant-authorization-2026-09-19.md.
 //
 // Question answered before 0023 is applied anywhere that holds real data: of
 // the rows in `uploaded_files`, how many will the migration attribute to a
-// merchant, how many will it (deliberately) leave NULL as ambiguous or orphaned,
+// merchant by reference consensus (NOT authenticated provenance), how many are ambiguous or orphaned,
 // and how many invoice/quote/job-invoice rows carry a `document_url` the
 // checkout will no longer surface?
 //
@@ -110,7 +111,7 @@ WITH${REFERENCES_CTE},
 SELECT count(*) FILTER (WHERE pp.path IS NULL)::int AS orphan,
        count(*) FILTER (WHERE pp.path IS NOT NULL
                           AND pp.distinct_merchants = 1
-                          AND pp.references_with_existing_merchant = pp.reference_rows)::int AS attributable,
+                          AND pp.references_with_existing_merchant = pp.reference_rows)::int AS single_merchant_references,
        count(*) FILTER (WHERE pp.path IS NOT NULL
                           AND NOT (pp.distinct_merchants = 1
                                    AND pp.references_with_existing_merchant = pp.reference_rows))::int AS ambiguous
@@ -153,7 +154,7 @@ export async function runPreflight(client, expected, settings) {
       files: { total: files.total, logos: files.logos, invoices: files.invoices, other: files.other },
       logos: { attributable: logos.attributable, unattributable: logos.unattributable },
       invoiceDocuments: {
-        attributable: invoiceDocuments.attributable,
+        singleMerchantReferences: invoiceDocuments.single_merchant_references,
         ambiguous: invoiceDocuments.ambiguous,
         orphan: invoiceDocuments.orphan,
       },
@@ -163,14 +164,15 @@ export async function runPreflight(client, expected, settings) {
         pointingAtMissingFile: references.pointing_at_missing_file,
       },
     };
-    // The migration itself is additive and fails closed, so it is always safe to
-    // apply; what an owner must look at first is anything that would change what
-    // a customer sees today: a document that cannot be attributed unambiguously,
-    // or a stored reference the checkout will no longer surface.
+    // None of the legacy reference classes proves the uploader. Every existing
+    // invoice document needs disposition, including single-merchant references
+    // and orphans. This report must never silently authorize tenant attribution.
     return {
       ...result,
       requiresOwnerReview:
-        result.invoiceDocuments.ambiguous > 0
+        result.invoiceDocuments.singleMerchantReferences > 0
+        || result.invoiceDocuments.orphan > 0
+        || result.invoiceDocuments.ambiguous > 0
         || result.referencingRows.unrecognisedShape > 0
         || result.referencingRows.pointingAtMissingFile > 0,
     };
@@ -201,7 +203,7 @@ if (process.argv[1]?.endsWith('count-gap13-uploaded-files-attribution.mjs')) {
       `GAP13_PREFLIGHT database=${result.database} role=${result.role} `
       + `files_total=${result.files.total} logos_attributable=${result.logos.attributable} `
       + `logos_unattributable=${result.logos.unattributable} `
-      + `invoice_docs_attributable=${result.invoiceDocuments.attributable} `
+      + `invoice_docs_single_merchant_references=${result.invoiceDocuments.singleMerchantReferences} `
       + `invoice_docs_ambiguous=${result.invoiceDocuments.ambiguous} `
       + `invoice_docs_orphan=${result.invoiceDocuments.orphan} `
       + `referencing_rows_unrecognised=${result.referencingRows.unrecognisedShape} `

@@ -1504,3 +1504,20 @@ export const uploadedFiles = pgTable("uploaded_files", {
 }));
 
 export type UploadedFile = typeof uploadedFiles.$inferSelect;
+
+// Gap 13: an admin download is served only after this durable append succeeds.
+// No merchant FK: retaining an audit record must not depend on account lifetime.
+export const invoiceDocumentAccessAudit = pgTable("invoice_document_access_audit", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  adminUserId: integer("admin_user_id").notNull(),
+  documentName: text("document_name").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Ephemeral counters, not audit data. Expired rows are cleaned under the global
+// bucket lock. Keys contain only a constant or the SHA-256 of a checkout token.
+export const invoiceDocumentReadLimits = pgTable("invoice_document_read_limits", {
+  key: text("key").primaryKey(),
+  count: integer("count").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+});

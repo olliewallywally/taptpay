@@ -16,7 +16,7 @@ const settings = { host: 'helium', database: 'heliumdb' };
 const ZERO_ROWS = {
   filesByFolder: { total: 0, logos: 0, invoices: 0, other: 0 },
   logosByAttribution: { attributable: 0, unattributable: 0 },
-  invoiceDocumentsByAttribution: { attributable: 0, ambiguous: 0, orphan: 0 },
+  invoiceDocumentsByAttribution: { single_merchant_references: 0, ambiguous: 0, orphan: 0 },
   referencingRows: { total: 0, unrecognised_shape: 0, pointing_at_missing_file: 0 },
 };
 
@@ -125,27 +125,27 @@ test('an empty database reports nothing to review', async () => {
     role: 'reader',
     files: { total: 0, logos: 0, invoices: 0, other: 0 },
     logos: { attributable: 0, unattributable: 0 },
-    invoiceDocuments: { attributable: 0, ambiguous: 0, orphan: 0 },
+    invoiceDocuments: { singleMerchantReferences: 0, ambiguous: 0, orphan: 0 },
     referencingRows: { total: 0, unrecognisedShape: 0, pointingAtMissingFile: 0 },
     requiresOwnerReview: false,
   });
 });
 
-test('attributable rows and orphans alone do not need owner review', async () => {
+test('legacy single-merchant references and orphans still require ownership review', async () => {
   const { client } = fakeClient({
     filesByFolder: { total: 9, logos: 3, invoices: 6, other: 0 },
     logosByAttribution: { attributable: 3, unattributable: 0 },
-    invoiceDocumentsByAttribution: { attributable: 4, ambiguous: 0, orphan: 2 },
+    invoiceDocumentsByAttribution: { single_merchant_references: 4, ambiguous: 0, orphan: 2 },
     referencingRows: { total: 4, unrecognised_shape: 0, pointing_at_missing_file: 0 },
   });
   const result = await runPreflight(client, expected, settings);
-  assert.equal(result.requiresOwnerReview, false);
+  assert.equal(result.requiresOwnerReview, true);
   assert.equal(result.invoiceDocuments.orphan, 2);
 });
 
 test('any ambiguous document, unrecognised reference or dangling reference requires owner review', async () => {
   for (const override of [
-    { invoiceDocumentsByAttribution: { attributable: 0, ambiguous: 1, orphan: 0 } },
+    { invoiceDocumentsByAttribution: { single_merchant_references: 0, ambiguous: 1, orphan: 0 } },
     { referencingRows: { total: 1, unrecognised_shape: 1, pointing_at_missing_file: 0 } },
     { referencingRows: { total: 1, unrecognised_shape: 0, pointing_at_missing_file: 1 } },
   ]) {

@@ -1,6 +1,49 @@
 # Full integration continuation audit — 2026-09-07
 
-Latest continuation (2026-09-19 — resumed after another session/environment
+Latest continuation (2026-09-21 — resumed after an environment reset; Codex's
+gap-13 review corrections re-verified and committed; the ownership-inventory
+gate is still unfinished). The prior session's `/tmp` logs and screenshots were
+gone, so ground truth came from `git status`/`git diff` and every result was
+**re-run, not relayed**. The four finished corrections (atomic merchant delete,
+MIME-derived upload extension, durable admin-read audit, PostgreSQL-shared
+document budget), the corrected preflight and release guidance, `0024`, and the
+two verifiers are **verified and committed with explicit paths**: their
+regression tests fail 8/10 on the old code; re-breaking each correction turns a
+test red (4 of 4); the PostgreSQL verifier on a throwaway PostgreSQL 16.10 gives
+5 pass and the 2 legacy-ownership checks red by design; the browser check passes
+at 390/820/1440 px; client 57/511, scripts 51/51. The owner **had already
+answered** the question the entry below calls pending — *require a trusted
+ownership inventory before migration*
+([decision](../../decisions/2026-09-19-gap13-trusted-ownership-inventory.md)).
+Its implementation was begun but **not finished, and is not committed**:
+`server/upload-ownership-inventory.ts` and its test exist, the runner is not
+wired to them, `0025` does not exist, `tsc` fails on those two files and two of
+their tests fail. Also found, none changed: one anonymous client can exhaust the
+platform-wide 600-a-minute document budget and switch off "View invoice" for
+every tenant (**owner call**); CI's recorded empty-database fingerprint predates
+`0022`–`0024`, so CI would fail on push; an ambient `RESEND_API_KEY` makes one
+unrelated team-invite test fail here (fails identically on `acef4e42`). Full
+record: [re-verification](r1/R1-T7-gap13-review-fixes-2026-09-19.md#re-verification--claude-2026-09-21).
+Unchanged: do not merge or deploy; no live database was touched; nothing pushed.
+
+Prior continuation (2026-09-19 — independent gap-13 review and authorized fixes):
+The independent review of `454f4120..b0da2f08` returned **Do not approve** after
+reproducing legacy reference-based ownership theft and transaction deletion
+before a merchant FK refusal. The owner requested all findings be fixed.
+Uncommitted corrections now make deletion atomic, normalize upload extensions,
+require durable admin-read audit, share document limits in PostgreSQL, correct
+the count-only inventory and rollback guidance, and add reproducible PostgreSQL
+and browser verifiers. See [current evidence](r1/R1-T7-gap13-review-fixes-2026-09-19.md).
+**Still pending:** the owner answer on quarantining existing invoice uploads
+whose authenticated ownership cannot be distinguished from legacy inference.
+The real-PostgreSQL legacy ownership assertions deliberately remain red. Do not
+merge/deploy or claim gap 13 closed. New migration 0024 was tested only on an
+isolated synthetic database; neither development nor production was migrated.
+Migration 0023's bytes remain immutable. Its old rollback/backfill guidance is
+superseded by the current evidence. There are no recoverable background task IDs
+to rely on; inspect the tree and rerun the checked-in verifiers when resuming.
+
+Prior continuation (2026-09-19 — resumed after another session/environment
 boundary. The prior handoff's background-workflow IDs did not resolve, so
 ground truth was re-derived from `git status` (clean) and the baseline was
 **re-run, not trusted**: `tsc` clean, server 56 suites / 1063 tests, client

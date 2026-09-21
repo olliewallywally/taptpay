@@ -62,6 +62,7 @@ const REAL_MIGRATIONS = [
   "0021_create_missing_tapt_stones_index.sql",
   "0022_gap11_session_single_use_indexes.sql",
   "0023_uploaded_files_tenant_column.sql",
+  "0024_invoice_document_security.sql",
 ];
 
 /** Migrations that own a `BEGIN;` / `COMMIT;` pair. */

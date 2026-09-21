@@ -32,6 +32,7 @@ import fs from "fs";
 import { sendPushToMerchant } from "./push";
 import { resendInvoiceEmail } from "./property-cron";
 import { INVOICE_DOCUMENT_FOLDER, isInvoiceDocumentName, isPublicUploadFolder, parseInvoiceDocumentRef } from "./upload-policy";
+import { INVOICE_DOCUMENT_EXTENSIONS } from "./invoice-document-security";
 import { resendTradeInvoice, sendTradePaymentInvoice, sendTradeQuote } from "./trades-delivery";
 import { sendGstInvoices, extractEmails } from "./gst-invoice";
 import {
@@ -7563,7 +7564,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(400).json({ message: "Invalid file: content does not match declared type" });
       }
 
-      const ext = path.extname(req.file.originalname).toLowerCase();
+      const ext = INVOICE_DOCUMENT_EXTENSIONS[req.file.mimetype];
+      if (!ext) return res.status(400).json({ message: "Unsupported document type" });
       const filename = `invoice-${Date.now()}-${crypto.randomBytes(8).toString('hex')}${ext}`;
       // Stamped with the uploader's merchant (gap 13). The returned `documentUrl`
       // is an opaque reference the create routes validate against that owner —
@@ -7604,7 +7606,16 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         ? await storage.getUploadedFile(relPath)
         : await storage.getUploadedFileForMerchant(relPath, merchantId as number);
       if (!file) return res.status(404).json({ message: "Document not found" });
-      if (isAdmin) logSecurityEvent("ADMIN_INVOICE_DOCUMENT_READ", { adminUserId: req.user!.id, document: name });
+      if (isAdmin) {
+        try {
+          await storage.recordInvoiceDocumentAdminRead(req.user!.id, name);
+        } catch {
+          // No document bytes leave the server without a committed audit record.
+          console.error("[INVOICE_DOC_AUDIT_UNAVAILABLE]");
+          return res.status(503).json({ message: "Document temporarily unavailable" });
+        }
+        logSecurityEvent("ADMIN_INVOICE_DOCUMENT_READ", { adminUserId: req.user!.id, document: name });
+      }
       return sendPrivateDocument(res, file);
     } catch (err) {
       console.error("[INVOICE_DOC_SERVE]", err);
@@ -7795,12 +7806,21 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // checkout tokens authorize one payment resource only"), and only if the
   // stored file belongs to the invoice's own merchant. Guards mirror
   // GET /api/checkout/resolve/:token: unknown -> 404, voided -> 410, and a paid
-  // invoice exposes no document there, so none here. A distinct rate-limit key
-  // keeps viewing a bill from exhausting the page's own per-token budget.
+  // invoice exposes no document there, so none here. A shared database budget
+  // (10/min/token and 600/min aggregate) is separate from the payment page's
+  // budget; unavailable limiting fails closed before invoice lookup.
   app.get("/api/checkout/document/:token", async (req, res) => {
     try {
       const { token } = req.params;
-      if (!tokenRateLimit(`document:${token}`)) return res.status(429).json({ message: "Too many requests" });
+      if (!/^[A-Za-z0-9_-]{1,200}$/.test(token)) return res.status(404).json({ message: "Payment link not found" });
+      let allowed: boolean;
+      try {
+        allowed = await storage.consumeInvoiceDocumentReadLimit(token);
+      } catch {
+        console.error("[INVOICE_DOC_LIMIT_UNAVAILABLE]");
+        return res.status(503).json({ message: "Document temporarily unavailable" });
+      }
+      if (!allowed) return res.setHeader("Retry-After", "60").status(429).json({ message: "Too many requests" });
       const invoice = await getCheckoutInvoiceByToken(token);
       if (!invoice) return res.status(404).json({ message: "Payment link not found" });
       if (invoice.status === "voided") return res.status(410).json({ message: "This payment link has been voided" });

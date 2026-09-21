@@ -5,6 +5,8 @@ import { getDb, isDatabaseConnected } from "./database";
 import { config } from "./config";
 import { eq, ne, desc, asc, and, inArray, notInArray, gte, lte, lt, or, ilike, sql, isNull, isNotNull } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
+import { invoiceDocumentAccessAudit, invoiceDocumentReadLimits } from "@shared/schema";
+import { DOCUMENT_READ_GLOBAL_KEY, DOCUMENT_READ_GLOBAL_LIMIT, DOCUMENT_READ_TOKEN_LIMIT, DOCUMENT_READ_WINDOW_MS, documentReadTokenKey } from "./invoice-document-security";
 import type {
   AttachPaymentAttemptSessionRecordInput,
   AttachPaymentAttemptSessionResult,
@@ -898,6 +900,8 @@ export interface IStorage extends PaymentAttemptRepository {
   // attach-time and checkout-resolve validations.
   uploadedFileOwnedByMerchant(relPath: string, merchantId: number): Promise<boolean>;
   deleteUploadedFile(relPath: string, merchantId: number): Promise<void>;
+  recordInvoiceDocumentAdminRead(adminUserId: number, documentName: string): Promise<void>;
+  consumeInvoiceDocumentReadLimit(token: string): Promise<boolean>;
 }
 
 // A tenant id that can match a real merchant. 0 is the platform admin's
@@ -971,6 +975,8 @@ export class MemStorage implements IStorage {
   }>;
   private tutorialProgress: Map<string, MerchantTutorialProgress>;
   private uploadedFileBlobs: Map<string, { mimeType: string; data: Buffer; merchantId: number }>;
+  private documentReadLimits = new Map<string, { count: number; expiresAt: number }>();
+  private documentAccessAudit: Array<{ adminUserId: number; documentName: string }> = [];
 
   constructor() {
     this.merchants = new Map();
@@ -2351,6 +2357,8 @@ export class MemStorage implements IStorage {
     if (!this.merchants.has(id)) {
       return false;
     }
+    // Match the upload FK: reject before deleting any child records.
+    if ([...this.uploadedFileBlobs.values()].some((file) => file.merchantId === id)) return false;
 
     // Delete all transactions associated with this merchant
     const transactionsToDelete: number[] = [];
@@ -2455,6 +2463,8 @@ export class MemStorage implements IStorage {
     this.billSplitLocks.clear();
     this.accountMutationLocks.clear();
     this.uploadedFileBlobs.clear();
+    this.documentReadLimits.clear();
+    this.documentAccessAudit = [];
     console.log("All merchants and transactions cleared from memory");
   }
 
@@ -2484,6 +2494,25 @@ export class MemStorage implements IStorage {
   async deleteUploadedFile(relPath: string, merchantId: number): Promise<void> {
     if (!isTenantId(merchantId)) return;
     if (this.uploadedFileBlobs.get(relPath)?.merchantId === merchantId) this.uploadedFileBlobs.delete(relPath);
+  }
+
+  async recordInvoiceDocumentAdminRead(adminUserId: number, documentName: string): Promise<void> {
+    this.documentAccessAudit.push({ adminUserId, documentName });
+  }
+
+  async consumeInvoiceDocumentReadLimit(token: string): Promise<boolean> {
+    const now = Date.now();
+    for (const [key, row] of this.documentReadLimits) {
+      if (row.expiresAt <= now) this.documentReadLimits.delete(key);
+    }
+    const consume = (key: string, limit: number) => {
+      const row = this.documentReadLimits.get(key);
+      if (row && row.count >= limit) return false;
+      this.documentReadLimits.set(key, { count: (row?.count ?? 0) + 1, expiresAt: row?.expiresAt ?? now + DOCUMENT_READ_WINDOW_MS });
+      return true;
+    };
+    return consume(DOCUMENT_READ_GLOBAL_KEY, DOCUMENT_READ_GLOBAL_LIMIT)
+      && consume(documentReadTokenKey(token), DOCUMENT_READ_TOKEN_LIMIT);
   }
 
   private createSampleData() {
@@ -3907,7 +3936,7 @@ export class MemStorage implements IStorage {
 
 // Database Storage Implementation
 export class DatabaseStorage implements IStorage {
-  private db = getDb();
+  constructor(private db = getDb()) {}
 
   async getMerchant(id: number): Promise<Merchant | undefined> {
     if (!this.db) throw new Error('Database not available');
@@ -5214,13 +5243,14 @@ export class DatabaseStorage implements IStorage {
     if (!this.db) throw new Error('Database not available');
     
     try {
-      // First delete all transactions associated with the merchant
-      await this.db.delete(transactions).where(eq(transactions.merchantId, id));
-      
-      // Then delete the merchant
-      const result = await this.db.delete(merchants).where(eq(merchants.id, id));
-      
-      return true;
+      // Any FK refusal must roll back the child deletes too. In particular,
+      // migration 0023's upload FK must not leave a surviving merchant without
+      // its transactions. The database also arbitrates concurrent upload writes.
+      return await this.db.transaction(async (tx) => {
+        await tx.delete(transactions).where(eq(transactions.merchantId, id));
+        const deleted = await tx.delete(merchants).where(eq(merchants.id, id)).returning({ id: merchants.id });
+        return deleted.length > 0;
+      });
     } catch (error) {
       console.error('Error deleting merchant:', error);
       return false;
@@ -7910,7 +7940,7 @@ export class DatabaseStorage implements IStorage {
 
   // ───────── Uploaded file blobs ─────────
   async saveUploadedFile(relPath: string, mimeType: string, data: Buffer, merchantId: number): Promise<void> {
-    const db = getDb(); if (!db) throw new Error("Database not connected");
+    const db = this.db; if (!db) throw new Error("Database not connected");
     if (!isTenantId(merchantId)) throw new Error("A valid merchantId is required to save an upload");
     // The conflict branch only fires for the row's own tenant. When the path is
     // already owned by a different merchant (or by no one — a NULL-tenant legacy
@@ -7929,13 +7959,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUploadedFile(relPath: string): Promise<{ mimeType: string; data: Buffer } | undefined> {
-    const db = getDb(); if (!db) return undefined;
+    const db = this.db; if (!db) return undefined;
     const [file] = await db.select().from(uploadedFiles).where(eq(uploadedFiles.path, relPath));
     return file ? { mimeType: file.mimeType, data: file.data } : undefined;
   }
 
   async getUploadedFileForMerchant(relPath: string, merchantId: number): Promise<{ mimeType: string; data: Buffer } | undefined> {
-    const db = getDb(); if (!db || !isTenantId(merchantId)) return undefined;
+    const db = this.db; if (!db || !isTenantId(merchantId)) return undefined;
     const [file] = await db.select({ mimeType: uploadedFiles.mimeType, data: uploadedFiles.data })
       .from(uploadedFiles)
       .where(and(eq(uploadedFiles.path, relPath), eq(uploadedFiles.merchantId, merchantId)));
@@ -7943,7 +7973,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async uploadedFileOwnedByMerchant(relPath: string, merchantId: number): Promise<boolean> {
-    const db = getDb(); if (!db || !isTenantId(merchantId)) return false;
+    const db = this.db; if (!db || !isTenantId(merchantId)) return false;
     // Selects the id only — the blob is never read for an ownership check.
     const [row] = await db.select({ id: uploadedFiles.id })
       .from(uploadedFiles)
@@ -7953,9 +7983,45 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteUploadedFile(relPath: string, merchantId: number): Promise<void> {
-    const db = getDb(); if (!db) throw new Error("Database not connected");
+    const db = this.db; if (!db) throw new Error("Database not connected");
     if (!isTenantId(merchantId)) return;
     await db.delete(uploadedFiles).where(and(eq(uploadedFiles.path, relPath), eq(uploadedFiles.merchantId, merchantId)));
+  }
+
+  async recordInvoiceDocumentAdminRead(adminUserId: number, documentName: string): Promise<void> {
+    if (!this.db) throw new Error("Database not connected");
+    await this.db.insert(invoiceDocumentAccessAudit).values({ adminUserId, documentName });
+  }
+
+  async consumeInvoiceDocumentReadLimit(token: string): Promise<boolean> {
+    if (!this.db) throw new Error("Database not connected");
+    return this.db.transaction(async (tx) => {
+      await tx.execute(sql`SET LOCAL lock_timeout = '2s'`);
+      await tx.execute(sql`SET LOCAL statement_timeout = '5s'`);
+      const consume = async (key: string, limit: number) => {
+        const result = await tx.execute(sql`
+          INSERT INTO invoice_document_read_limits (key, count, expires_at)
+          VALUES (${key}, 1, clock_timestamp() + interval '60 seconds')
+          ON CONFLICT (key) DO UPDATE SET
+            count = CASE WHEN invoice_document_read_limits.expires_at <= clock_timestamp()
+                         THEN 1 ELSE invoice_document_read_limits.count + 1 END,
+            expires_at = CASE WHEN invoice_document_read_limits.expires_at <= clock_timestamp()
+                              THEN clock_timestamp() + interval '60 seconds'
+                              ELSE invoice_document_read_limits.expires_at END
+          WHERE invoice_document_read_limits.expires_at <= clock_timestamp()
+             OR invoice_document_read_limits.count < ${limit}
+          RETURNING key`);
+        return result.rows.length === 1;
+      };
+      // Always lock the same bucket first, serializing cleanup and consumption
+      // across instances. The global gate bounds per-token row cardinality.
+      if (!(await consume(DOCUMENT_READ_GLOBAL_KEY, DOCUMENT_READ_GLOBAL_LIMIT))) return false;
+      await tx.delete(invoiceDocumentReadLimits).where(and(
+        ne(invoiceDocumentReadLimits.key, DOCUMENT_READ_GLOBAL_KEY),
+        lte(invoiceDocumentReadLimits.expiresAt, sql`clock_timestamp()`),
+      ));
+      return consume(documentReadTokenKey(token), DOCUMENT_READ_TOKEN_LIMIT);
+    });
   }
 
 }

@@ -25,11 +25,11 @@ export function isPublicUploadFolder(folder: string): boolean {
 }
 
 /**
- * `invoice-<Date.now()>-<8 random bytes, hex><client-derived extension>` — what
- * `POST /api/property/invoices/document` generates. The extension is derived
- * from the client's original filename (lower-cased), so it is accepted here as
- * 1–10 of `[a-z0-9]` rather than a fixed set; anything else is not a name this
- * server generated. Anchored and with no `.` in the classes so a stored
+ * `invoice-<Date.now()>-<8 random bytes, hex><MIME-derived extension>` is what
+ * POST /api/property/invoices/document now generates. Keep short alphanumeric
+ * extensions and extensionless names for legacy references. Older uploads could
+ * produce other extensions; those require legacy reconciliation, never a wider
+ * path parser. Anchored and with no `.` in the classes so a stored
  * reference can never encode a path, query string or traversal.
  */
 const INVOICE_DOCUMENT_NAME = /^invoice-\d{10,16}-[0-9a-f]{16}(?:\.[a-z0-9]{1,10})?$/;
