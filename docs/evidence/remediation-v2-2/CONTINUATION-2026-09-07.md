@@ -1,6 +1,22 @@
 # Full integration continuation audit — 2026-09-07
 
-Latest continuation (2026-09-21, later still — the owner answered the production question,
+Latest continuation (2026-09-21, R1-T8 — the first R1 task after R0 exit). **The hook-order crash
+is fixed on the branch, commit `387d189d`, awaiting independent review**
+([evidence](r1/R1-T8-hook-order-crash-2026-09-21.md)). Seven merchant pages returned early before
+most of their hooks; Sign out on /settings (token removed, then the page transition re-renders the
+outgoing page) threw React error #300, reproduced in a real browser on the pre-fix build.
+`MerchantGate` now resolves the merchant above each page (keyed by merchant; one redirect, from an
+effect, skipped when already on /login; each page's way of leaving unchanged). New gates in the
+client suite, which CI always runs: `rules-of-hooks` over the whole client with inline comments
+ignored (67 findings → 0), and `jest.setup.js` failing any test in which React warns (18 act()
+warnings → 0). Tests first (20 of 42 red for the stated reason); client 60/552; `tsc` clean;
+mutations 5/5; the four routed phone pages pixel-identical to the pre-fix build; device smoke 20/20.
+Three of the seven pages are routed nowhere (R8 dead-code candidates). Found for R1-T9: six pages
+throw on a malformed response instead of showing a failure state. **Next:** R1-T9 (truthful
+failure states, C16), then R1-T1's audit ahead of R1-T4. Independent reviews owed: gap 13
+(`acef4e42..HEAD`, brief in gate evidence §11) and R1-T8 (`c6667985..387d189d`). Nothing pushed.
+
+Prior continuation (2026-09-21, later still — the owner answered the production question,
 verbatim *"the whole site is private"*, and directed *"ok lets move on to the next phase"*).
 **Recorded:** production's closure is deliberate
 ([decision](../../decisions/2026-09-21-production-offline-owner-answer.md)); every production
@@ -9,8 +25,9 @@ ESTABLISHED** ([record](r0/R0-exit-established-2026-09-21.md)): all nine gate cr
 fresh on `4a9129df` — `tsc` clean, client 57/511, server 64/1272, build exit 0 with every database
 variable removed, device smoke 20/20 (phone/tablet/desktop/D10 short desktop × 5 routes), R0-T1
 9/9 — with R0-H1/H4/H5 closed by the owner on 2026-09-14 (attestations, not agent verification).
-**This unblocks R1-T1's audit, R1-T4 and R1-T8** (task rows updated). R1-T8 measured: 67
-`rules-of-hooks` violations in exactly the seven named pages. **Next: R1**, starting with R1-T8
+**This unblocks R1-T1's audit, R1-T4 and R1-T8** (task rows updated). R1-T8 measured: 66
+`rules-of-hooks` violations in exactly the seven named pages, plus 1 in a test file (commit
+`7822b19a`'s message says 67 in the pages — the 67 includes that test file). **Next: R1**, starting with R1-T8
 (the hook-order crash — no owner decision needed), then R1-T1's audit ahead of R1-T4 (plan order
 C09 → C11), whose design will need owner decisions. Gap 13's independent review (§11 brief) is
 still owed before gap 13 can merge. Nothing pushed.
@@ -889,7 +906,7 @@ may proceed where the plan allows it. Code lanes remain gated by their dependenc
 | R1-T5 | Sign in with Apple — protocol-specific adapter on T4's primitives | 686 | Engineering | GATED: R1-T4, then real Apple provisioning/device verification. |
 | R1-T6 | Strict numeric path and query parsing — review snapshot has 71 path and 7 query sites | 699 | Engineering | **Task check MET 2026-09-11** — [bounded query values and the source guard](r1/R1-T6-bounded-query-values-2026-09-11.md). The handoff's "five remaining sites" undercounted: four more of the same class hid behind `Number(req.query...)`, `Number.parseInt(String(...))`, `parseInt(String(...))` and a `/^\d+$/` that accepted `0` — one of which passed `NaN` to storage — plus three `parseInt(req.params)` in `middleware/merchant-validation.ts`. All migrated to a reviewed typed schema; zero permissive parses remain in production server code; source guard active **with no allowlist**. Two superseded tests corrected, quoted in the evidence. R1-T2's 97 unclassified registrations are unchanged and still gate the wider task. |
 | R1-T7 | Tenant-scoped storage — close the generated authenticated-route gap | 732 | Engineering | PARTIAL: upload SQL moved behind storage; other tenant methods, upload authorization/content/privacy and two-merchant matrix remain. **Closed 2026-09-11** (commit `4183e241`): a foreign-session bypass on `hosted-fields-complete`/`googlepay-complete` — any transaction still in its initial `windcaveSessionId: null` state accepted an arbitrary client-supplied session and could be finalised with a foreign approval — found by a 10-agent cross-tenant/IDOR audit, confirmed by independent adversarial re-check, fixed failing-tests-first. **New open item found in the same sweep**: split-payment session replay in the same `finaliseHostedPayment` helper — see gap 11 above and [the evidence](r1/R1-T7-windcave-session-binding-2026-09-11.md); needs an R3-scoped schema decision. **`C0`/`C1` (preflight + defense-in-depth indexes) landed 2026-09-14**, commit `5318496b` — [evidence](r1/R1-T7-gap11-c0-preflight-c1-index-2026-09-14.md). The replay mechanism itself (`C2`-`C5`) remains open — see gap 11. **Uploads tenant authorization (gap 13) implemented 2026-09-19** (dev database migrated; production not): tenant-scoped storage, migration `0023`, and authenticated + checkout-token download routes — [evidence](r1/R1-T7-gap13-uploads-tenant-authorization-2026-09-19.md); the "other tenant methods, upload authorization/content/privacy" remainder above is reduced accordingly, but `IStorage` is still not tenant-scoped across every domain. |
-| R1-T8 | Fix the hook-order crash | 758 | Engineering | **UNBLOCKED 2026-09-21** (R0 exit established; R1-H1 accepted 2026-09-14). Scope measured the same day: `react-hooks/rules-of-hooks` reports **67 violations in exactly the seven named pages** (settings 18, merchant-terminal 13, merchant-terminal-mobile 12, transactions 11, stock-management 6, exports 3, payment-stack 3) plus 1 in `merchant-terminal-mobile-v2.test.tsx`; the repro test still asserts the crash; the client suite prints 18 `act(...)` warnings (12 from `Settings`, 6 from `MerchantTerminal`). Crash characterization is not a fix. |
+| R1-T8 | Fix the hook-order crash | 758 | Engineering | **IMPLEMENTED 2026-09-21, commit `387d189d` — awaiting independent review** ([evidence](r1/R1-T8-hook-order-crash-2026-09-21.md)). `MerchantGate` resolves the merchant above the page (keyed by merchant, redirects once from an effect); a client test gates `rules-of-hooks` over the whole client (67 → 0); `jest.setup.js` fails any client test in which React warns (18 act() warnings → 0); the repro now asserts no throw. Client 60/552; mutations 5/5; the four routed phone pages pixel-identical to the pre-fix build; Sign out on /settings reproduces React #300 before the fix and lands on /login after it. Originally recorded: **UNBLOCKED 2026-09-21** (R0 exit established; R1-H1 accepted 2026-09-14). Scope measured the same day: `react-hooks/rules-of-hooks` reports **66 violations in exactly the seven named pages** (settings 18, merchant-terminal 13, merchant-terminal-mobile 12, transactions 11, stock-management 6, exports 3, payment-stack 3) plus 1 in `merchant-terminal-mobile-v2.test.tsx` — 67 in the client; the repro test still asserts the crash; the client suite prints 18 `act(...)` warnings (12 from `Settings`, 6 from `MerchantTerminal`). Crash characterization is not a fix. |
 | R1-T9 | Truthful frontend failure states | 773 | Engineering | GATED: R1-T8; essential/optional failure states and duplicate-action tests remain. |
 | R1-T10 | Device and tutorial acceptance matrix | 780 | Engineering | GATED: T3/T5/T7/T9 and H1; typed routes, devices, tutorials and accessibility acceptance remain. |
 | R2 | Provider boundary and exact verification | 818 | Engineering | GATED: implement only after the source dependencies; no full-phase completion evidence recorded. |
