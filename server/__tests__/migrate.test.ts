@@ -63,6 +63,7 @@ const REAL_MIGRATIONS = [
   "0022_gap11_session_single_use_indexes.sql",
   "0023_uploaded_files_tenant_column.sql",
   "0024_invoice_document_security.sql",
+  "0025_verified_upload_ownership.sql",
 ];
 
 /** Migrations that own a `BEGIN;` / `COMMIT;` pair. */

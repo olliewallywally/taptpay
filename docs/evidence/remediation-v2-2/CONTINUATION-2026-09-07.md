@@ -1,6 +1,28 @@
 # Full integration continuation audit — 2026-09-07
 
-Latest continuation (2026-09-21 — resumed after an environment reset; Codex's
+Latest continuation (2026-09-21, later — the ownership-inventory gate is
+**implemented, verified and committed; not applied anywhere**). The owner's
+decision (*require a trusted ownership inventory before migration*) is now
+enforced by the runner: `0023`–`0025` run only with an operator-approved
+inventory that is pinned by SHA-256, bound to the declared target and matches
+every invoice document by id, path hash and content hash; the check runs before
+the ledger exists and again under a lock inside `0025`, which clears every
+inferred owner and assigns only verified ones, recording the evidence in
+`uploaded_file_ownership_evidence`. Tests first (15 red → 28/28 green), 7/7
+mutations caught, the PostgreSQL verifier **11/11** (Codex's two red legacy
+checks now pass; refusals proven for no, incomplete, false and stale
+inventories), CI's steps rehearsed through the real CLI with the committed empty
+CI inventory, and CI's fingerprint re-recorded (it predated `0022`; the diff is
+purely additive and itemised). No database outside throwaway loopback ones was
+touched. **Open for the owner:** Q1 the platform-wide document budget; Q2 whether
+a document nobody can evidence should block the release for good (production
+keeps serving invoice documents publicly until gap 13 ships); Q3 where evidence
+will come from; Q4 retention. **Next:** an independent review of
+`acef4e42..HEAD` — brief and prompt in
+[the gate's evidence](r1/R1-T7-gap13-ownership-inventory-gate-2026-09-21.md#7-independent-re-review--brief).
+Not merge-ready or deployable until that says Approve; nothing pushed.
+
+Prior continuation (2026-09-21 — resumed after an environment reset; Codex's
 gap-13 review corrections re-verified and committed; the ownership-inventory
 gate is still unfinished). The prior session's `/tmp` logs and screenshots were
 gone, so ground truth came from `git status`/`git diff` and every result was

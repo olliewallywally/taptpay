@@ -173,6 +173,7 @@ export const BASELINE_EFFECT_REQUIREMENTS: readonly Requirement[] = [
   r("0023_uploaded_files_tenant_column.sql", "index", "uploaded_files", "uploaded_files_merchant_id_idx"),
   r("0024_invoice_document_security.sql", "table", "invoice_document_access_audit"),
   r("0024_invoice_document_security.sql", "table", "invoice_document_read_limits"),
+  r("0025_verified_upload_ownership.sql", "table", "uploaded_file_ownership_evidence"),
 ];
 
 export const FIND_MISSING_BASELINE_EFFECTS_SQL = `

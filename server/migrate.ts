@@ -79,6 +79,15 @@ import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 import { findMissingBaselineEffects } from "./migration-baseline-contract";
+import {
+  INVENTORY_GATED_MIGRATIONS,
+  UPLOAD_OWNERSHIP_REPAIR_MIGRATION,
+  UploadOwnershipInventoryError,
+  assertUploadInventoryCoverage,
+  readUploadOwnershipInventoryOption,
+  stageUploadOwnershipInventory,
+  type UploadOwnershipInventory,
+} from "./upload-ownership-inventory";
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -925,12 +934,15 @@ export class MigrationExecutionError extends Error {
 /**
  * Apply one migration: its statements plus the ledger row, in a single
  * transaction we own. The file's own BEGIN/COMMIT is stripped first.
+ * `prepare` runs inside that transaction before the file's first statement
+ * (gap 13: 0025 reads an inventory staged there).
  */
 export async function applyMigration(
   client: MigrationClient,
   filename: string,
   source: string,
   timeoutOverrides: Partial<MigrationTimeouts> = {},
+  prepare?: (client: MigrationClient) => Promise<void>,
 ): Promise<{ statements: number; durationMs: number }> {
   const budgets = migrationTimeouts(timeoutOverrides);
   const checksum = checksumMigrationSource(source);
@@ -940,6 +952,7 @@ export async function applyMigration(
   await client.query("BEGIN");
   try {
     await client.query(SET_MIGRATION_LOCAL_TIMEOUTS_SQL, [`${budgets.lockMs}ms`, `${budgets.statementMs}ms`]);
+    if (prepare) await prepare(client);
     for (const statement of statements) {
       try {
         await client.query(statement.raw);
@@ -969,6 +982,11 @@ export interface RunOptions {
   timeouts?: Partial<MigrationTimeouts>;
   /** Operator approval for row-destroying statements. Never defaults to true. */
   allowDestructive?: boolean;
+  /**
+   * Gap 13: the operator-approved invoice-document ownership inventory. Required
+   * whenever 0023, 0024 or 0025 is pending — see upload-ownership-inventory.ts.
+   */
+  uploadOwnershipInventory?: UploadOwnershipInventory;
 }
 
 /** Apply every pending migration, in order, aborting on the first failure. */
@@ -1014,6 +1032,9 @@ export async function runPendingMigrations(
   const findings = plan.pending.flatMap((filename) =>
     inspectMigrationSafety(filename, readMigrationSource(dir, filename)),
   );
+  // Gap 13: these set invoice-document ownership, so they need the inventory.
+  const gated = plan.pending.filter((filename) => INVENTORY_GATED_MIGRATIONS.has(filename));
+  const inventory = options.uploadOwnershipInventory;
 
   if (options.dryRun) {
     log(`Would apply ${plan.pending.length} migration(s):`);
@@ -1026,6 +1047,16 @@ export async function runPendingMigrations(
           `(statement ${finding.statement})`,
       );
     }
+    if (gated.length > 0) {
+      try {
+        if (!inventory) throw new UploadOwnershipInventoryError("REQUIRED");
+        await assertUploadInventoryCoverage(client, inventory);
+        log(`  ✓ upload-ownership inventory matches all ${inventory.entries.length} invoice document(s)`);
+      } catch (error) {
+        if (!(error instanceof UploadOwnershipInventoryError)) throw error;
+        log(`  ⚠️  ${error.message}`);
+      }
+    }
     log("Dry run — nothing was executed.");
     return { plan, appliedNow: [] };
   }
@@ -1035,13 +1066,24 @@ export async function runPendingMigrations(
   );
   if (blocking.length > 0) throw new MigrationSafetyError(blocking);
 
+  // Refuse before the ledger exists or any migration runs: a run that stops
+  // between 0023 (inferred owners) and 0025 (verified owners) must not start.
+  // 0025 re-checks under a lock inside its own transaction.
+  if (gated.length > 0) {
+    if (!inventory) throw new UploadOwnershipInventoryError("REQUIRED");
+    await assertUploadInventoryCoverage(client, inventory);
+  }
+
   await ensureMigrationLedger(client);
 
   const appliedNow: string[] = [];
   for (const filename of plan.pending) {
     const source = readMigrationSource(dir, filename);
+    const prepare = filename === UPLOAD_OWNERSHIP_REPAIR_MIGRATION && inventory
+      ? (tx: MigrationClient) => stageUploadOwnershipInventory(tx, inventory)
+      : undefined;
     log(`→ applying ${filename} ...`);
-    const { statements, durationMs } = await applyMigration(client, filename, source, budgets);
+    const { statements, durationMs } = await applyMigration(client, filename, source, budgets, prepare);
     appliedNow.push(filename);
     log(`  ✅ ${filename} (${statements} statement(s), ${durationMs}ms)`);
   }
@@ -1823,7 +1865,8 @@ export const MIGRATION_CLI_USAGE = [
   "         --expected-host=<host> [--expected-port=<port>] --expected-database=<name>",
   "         [--status | --release | --dry-run | --baseline [--confirm] [--force]]",
   "         [--allow-destructive]",
-  "See docs/operations/migration-target.md.",
+  "         [--upload-ownership-inventory=<file> --upload-ownership-inventory-sha256=<sha256>]",
+  "See docs/operations/migration-target.md and docs/operations/migration-release.md.",
 ].join("\n");
 
 export interface CliOptions {
@@ -1836,15 +1879,28 @@ export interface CliOptions {
   expectedHost?: string;
   expectedPort?: string;
   expectedDatabase?: string;
+  /** Gap 13: the approved ownership inventory and its approved SHA-256. */
+  uploadOwnershipInventoryPath?: string;
+  uploadOwnershipInventorySha256?: string;
   unknown: string[];
 }
 
-const VALUE_FLAGS: Readonly<Record<string, "target" | "expectedHost" | "expectedPort" | "expectedDatabase">> =
+type ValueFlagField =
+  | "target"
+  | "expectedHost"
+  | "expectedPort"
+  | "expectedDatabase"
+  | "uploadOwnershipInventoryPath"
+  | "uploadOwnershipInventorySha256";
+
+const VALUE_FLAGS: Readonly<Record<string, ValueFlagField>> =
   Object.freeze({
     "--target": "target",
     "--expected-host": "expectedHost",
     "--expected-port": "expectedPort",
     "--expected-database": "expectedDatabase",
+    "--upload-ownership-inventory": "uploadOwnershipInventoryPath",
+    "--upload-ownership-inventory-sha256": "uploadOwnershipInventorySha256",
   });
 
 /**
@@ -1977,6 +2033,13 @@ async function main(): Promise<void> {
         return;
       }
 
+      // Gap 13: read and validate against the proven target before any
+      // ledger work; the runner decides whether a pending migration needs it.
+      const uploadOwnershipInventory = readUploadOwnershipInventoryOption(
+        { path: options.uploadOwnershipInventoryPath, sha256: options.uploadOwnershipInventorySha256 },
+        { host: target.host, port: target.port, database: target.database },
+      );
+
       if (options.mode === "release") {
         // One command, migrate-first: apply, then prove the end state.
         await withMigrationAdvisoryLock(client, async (timeouts) => {
@@ -1984,6 +2047,7 @@ async function main(): Promise<void> {
             dryRun: options.dryRun,
             timeouts,
             allowDestructive: options.allowDestructive,
+            uploadOwnershipInventory,
           });
           if (options.dryRun) return;
           const verified = await verifyMigrationState(client);
@@ -1999,6 +2063,7 @@ async function main(): Promise<void> {
           dryRun: options.dryRun,
           timeouts,
           allowDestructive: options.allowDestructive,
+          uploadOwnershipInventory,
         }),
       );
     },
@@ -2019,6 +2084,7 @@ export function redactedFailureText(error: unknown): string {
   if (error instanceof Error && /^Migration|^BaselineRefused/.test(error.name)) {
     return error.message;
   }
+  if (error instanceof UploadOwnershipInventoryError) return error.message;
   return (
     `MIGRATE_UNEXPECTED_FAILURE: an unrecognised error reached the entrypoint ` +
     `(${describeDatabaseError(error)}). Its message is withheld because it has ` +

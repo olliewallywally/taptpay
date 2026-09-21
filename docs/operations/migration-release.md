@@ -59,7 +59,7 @@ files.
   checked-in history already uses the drop-then-re-add pattern; flagging them
   would block every fresh database for no safety gain.
 
-All 19 checked-in migrations pass the gate unassisted, and a test asserts it, so
+Every checked-in migration passes the gate unassisted, and a test asserts it, so
 a future migration that needs `--allow-destructive` will announce itself in
 review rather than at 2am.
 
@@ -74,3 +74,68 @@ position. Then choose deliberately.
 - Non-transactional → the migration needs splitting, or it needs the reviewed
   non-transactional mode to be built first. Do not work around the gate by
   editing a historical migration; ship a new forward migration.
+
+## The upload-ownership inventory (gap 13)
+
+Migrations `0023`–`0025` decide which merchant owns each stored invoice document,
+and so who may download it. `0023` guessed owners from the invoices and quotes
+that pointed at each document; a pointer proves nothing about who uploaded the
+file, so `0025` removes every guessed owner and assigns only owners that an
+operator has verified. On the owner's decision
+([2026-09-19](../decisions/2026-09-19-gap13-trusted-ownership-inventory.md)) the
+runner applies **none** of the three without an approved inventory:
+
+```text
+npm run db:release -- <target flags> \
+  --upload-ownership-inventory=<file> \
+  --upload-ownership-inventory-sha256=<SHA-256 of that exact file>
+```
+
+It refuses before it creates the ledger or runs anything when the inventory is
+missing, when the file's SHA-256 is not the approved one, when it was approved
+for a different database (host, port and database name must match the declared
+target), or when it does not match the database exactly: every stored invoice
+document listed once, and every entry matching a real invoice document by id,
+path SHA-256 and content SHA-256 and naming a merchant that exists. Inside
+`0025`'s own transaction it checks all of that again after locking
+`uploaded_files` against writes, so an upload that lands after approval makes the
+approval stale rather than slipping through. `--dry-run` reports whether the
+inventory matches without changing anything.
+
+The file (version 1; no document path, content or token appears in it):
+
+```json
+{
+  "version": 1,
+  "target": { "host": "<host>", "port": 5432, "database": "<database>" },
+  "approvedBy": "<who reviewed the evidence>",
+  "approvedAt": "2026-09-21T09:00:00+12:00",
+  "entries": [
+    {
+      "fileId": 17,
+      "pathSha256": "<sha256 of the stored path, e.g. invoices/invoice-…pdf>",
+      "contentSha256": "<sha256 of the stored bytes>",
+      "merchantId": 42,
+      "evidence": {
+        "kind": "authenticated-upload-log",
+        "reference": "<where the evidence is kept>",
+        "sha256": "<sha256 of the evidence itself>"
+      }
+    }
+  ]
+}
+```
+
+`evidence.kind` is `authenticated-upload-log` or `merchant-attestation`. The
+software checks the file's integrity, completeness and target; **it cannot check
+that the evidence is true**. A person reviews each piece of evidence before
+approving the file's SHA-256. A document with no acceptable evidence blocks the
+release: it is not deleted, quarantined or given an owner by inference.
+
+`0025` records what it applied in `uploaded_file_ownership_evidence` (file id,
+verified merchant, the hashes, the evidence reference, who approved it and when,
+and the inventory's SHA-256).
+
+CI's convergence job uses the committed, approved, empty inventory
+`.github/upload-ownership-inventory.ci-convergence.json`, bound to its disposable
+`127.0.0.1:5432/convergence` database. It is not valid for any other target.

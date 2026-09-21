@@ -188,3 +188,7 @@ staging) and `server/__tests__/upload-ownership-inventory.test.ts` exist, but
 `server/migrate.ts` is not wired to them, `migrations/0025_verified_upload_ownership.sql`
 does not exist, `tsc` fails on the two files, and two of their tests fail. Until it
 lands, the PostgreSQL verifier's two legacy checks stay red and gap 13 stays open.
+
+*Completed later on 2026-09-21 — see
+[R1-T7-gap13-ownership-inventory-gate-2026-09-21](R1-T7-gap13-ownership-inventory-gate-2026-09-21.md).
+The PostgreSQL verifier now passes 11/11.*
