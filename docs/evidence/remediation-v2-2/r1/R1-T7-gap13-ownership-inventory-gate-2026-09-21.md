@@ -155,6 +155,9 @@ Author's view: ready for **independent** review; not merge-ready until that revi
 
 ## 7. Independent re-review — brief
 
+> **Superseded (2026-09-21, late):** the prompt below predates `165fd605`, `d0e99c23` and
+> `60a2ca0b` and attacks none of their surfaces. Use [§11](#11-independent-re-review--refreshed-brief).
+
 **Range:** `acef4e42..<the commit adding this file>` on this branch (two code commits: `8d271733`,
 Codex's review fixes as re-verified by Claude; and this gate). Local only — nothing is pushed.
 
@@ -267,3 +270,126 @@ longer blocks the release — it is locked).
 
 **Retention** — periods decided (see the decision), professional confirmation and the deletion job
 outstanding; nothing deletes automatically.
+
+## 10. Re-verification after a container reboot, and two drafting fixes (2026-09-21, late)
+
+By Claude in a fresh session — the same author lineage as §§2–9, so **not** the independent review
+(§11 is its brief).
+
+**Why.** The container rebooted at about 06:41 UTC, four minutes after the previous session ended
+its turn; that session's `/tmp` scratch files are gone. Everything it did was already committed
+(`60a2ca0b`), so nothing was lost — but by this program's rule every claim above was **re-run, not
+relayed**.
+
+| Claim (§§8–9) | Re-run, 2026-09-21 10:13–10:50 UTC |
+|---|---|
+| `tsc` clean; server 64 / 1266; client 57 / 511; scripts 51 / 51 | identical |
+| PostgreSQL verifier 14 / 14 | 14 / 14 on a throwaway PostgreSQL 16.10 on loopback (see the note) |
+| CI steps with the version-2 list, and the fingerprint | release without the flags refused `UPLOAD_INVENTORY_REQUIRED`, 0 tables; dry run matches 0 documents; release applies 27 and verifies; status `27 applied, 0 pending, 0 drifted, 0 orphaned`; fingerprint `sha256:e0720697…` byte-identical to `R1-T7-gap13-empty-fingerprint-v2-2026-09-21.json` and to a second run; the CI list's SHA-256 equals `verify.yml`'s |
+| `0024` / `0025` applied nowhere | development, read-only (`BEGIN READ ONLY … ROLLBACK`): ledger 25 rows ending at `0023`; neither `0024`'s nor `0025`'s tables exist |
+| Browser check (last run on `8d271733`) | PASS at 390 / 820 / 1440 px on the current tree — the first run since `d0e99c23` reordered the route |
+| Production offline | still so at 10:14 UTC: Neon answers `28000 The endpoint has been disabled`; `taptpay.co.nz` answers `307` → `replit.com/__replshield`. Nothing changed |
+
+Note: a first verifier run gave 13 / 14 only because the test URL carried no password — the
+drafting command validates its target as the runner does (`MIGRATE_TARGET_URL_CREDENTIALS`).
+Environment, not code; the verifier's header now says so.
+
+Also checked, because the automatic rule depends on it: `document_url` is written only when a row
+is created (`server/routes.ts` 7636, 8379, 8617, each through `requireOwnedInvoiceDocument`; no
+update path sets it), so a row's `created_at` is its attach time; the facts query's reference
+pattern equals `parseInvoiceDocumentRef`'s (`server/upload-policy.ts:35,53`), so a reference the
+rule ignores is one the checkout never serves; and the pre-gap-13 upload route lower-cased
+extensions (`454f4120:server/routes.ts:7492`), so legacy names fit the generated-name pattern.
+
+**Findings**
+
+1. *Operator text (low).* `UPLOAD_INVENTORY_INVALID` told the operator to "draft it with
+   scripts/draft-gap13-upload-inventory.ts" (`60a2ca0b:server/upload-ownership-inventory.ts:42`).
+   No such file exists; the tool is `npm run db:draft-upload-inventory`.
+2. *Drafting tool (low, fails closed).* `--approved-by` was never checked against the list's own
+   `label` rule (printable ASCII, 1–200; `60a2ca0b:server/draft-upload-inventory.ts:57`,
+   `server/upload-ownership-inventory.ts:87`). The tool would read and hash every document, write
+   the list and print its SHA-256 for approval — and the release would then refuse the list with
+   finding 1's text. Reproduced through the real functions with `Olivér Léonard` and with a
+   201-character name.
+3. *Stale brief.* §7's prompt named only the 2026-09-19 decision and none of the surfaces added
+   by `165fd605`, `d0e99c23` or `60a2ca0b`.
+4. *Note — unchanged.* The runner re-derives a `system-record` owner, but not a locked entry's
+   `reason` nor a `system-record` entry's `evidence.sha256`; both reach
+   `uploaded_file_ownership_evidence` as the approved list states them. There is no access
+   consequence (locking only removes access; owners are re-derived), but for those two fields the
+   table records the approver's word, not a checked fact.
+
+**Fixed in `a25aaf09`, tests first.** Six new tests, red on `60a2ca0b` for the stated reason
+(the 62 existing ones green), then 68 / 68. The drafting command refuses a bad approver before it
+connects (`UPLOAD_INVENTORY_APPROVER_INVALID`); `buildDraftInventory` validates every draft with the
+runner's own schema before returning it, so the tool cannot hand out a list the runner refuses; a
+test fails if any inventory refusal names a file or `npm` script that does not exist. The operator
+guide states the approver rule. **Mutations, 3 of 3 caught** (the wrong path restored → 2 fail; the
+approver check removed → 3 fail; the draft check removed → 1 fails), restored byte-identical.
+On the fix: PostgreSQL verifier 14 / 14 (fresh empty database), browser check PASS at all three
+widths, server **64 / 1272**, `tsc` clean. Finding 3 is answered by §11. No database outside
+throwaway loopback ones was written; nothing pushed.
+
+## 11. Independent re-review — refreshed brief
+
+**Range:** `acef4e42..HEAD` on this branch, local only. Code commits: `8d271733` (Codex's fixes for
+the earlier review, re-verified), `e268d91e` (the inventory gate, §§1–6), `165fd605` (tests reach
+no live email or SMS provider), `d0e99c23` (the per-link document budget, §8), `60a2ca0b` (the
+automatic rule, locked entries, the drafting tool, §9) and `a25aaf09` (two drafting fixes, §10).
+The rest are documentation.
+
+Paste-ready prompt:
+
+> You are the independent security and correctness reviewer for TaptPay, a payment-terminal SaaS.
+> Review branch `remediation/r1-continuation-20260907`, range `acef4e42..HEAD`, code paths
+> `server shared migrations scripts .github package.json` only. An earlier review of
+> `454f4120..b0da2f08` said "Do not approve": among other things, legacy invoice documents were
+> attributed to whichever merchant's invoice pointed at them, so merchant B could be handed
+> merchant A's document. This range fixes that review's findings (`8d271733`); makes migrations
+> `0023`–`0025` run only with an operator-approved ownership list (`e268d91e`); keeps tests away
+> from live email and SMS providers (`165fd605`); counts only real invoices against the anonymous
+> "View invoice" budget (`d0e99c23`); and implements the owner's amended rule (`60a2ca0b`, fixed in
+> `a25aaf09`): a document gets an owner from TaptPay's own records only when exactly one merchant
+> attached it, first between 5 minutes before and 24 hours after its upload; every other document
+> is locked (kept, admin-only, every read audited) instead of blocking the release. Treat these as
+> claims and re-derive everything from the code:
+> `docs/evidence/remediation-v2-2/r1/R1-T7-gap13-ownership-inventory-gate-2026-09-21.md`,
+> `docs/evidence/remediation-v2-2/r1/R1-T7-gap13-review-fixes-2026-09-19.md`, the decisions
+> `docs/decisions/2026-09-19-gap13-trusted-ownership-inventory.md`,
+> `docs/decisions/2026-09-21-gap13-owner-directions.md` and
+> `docs/decisions/2026-09-21-gap13-ownership-rule-and-retention.md`, and
+> `docs/operations/migration-release.md`.
+> Attack especially:
+> (1) any path that applies `0023`–`0025` without a complete, matching list: runner, CLI, direct
+> `applyMigration`, baseline mode, dry run;
+> (2) races: an upload, or a new invoice, quote or job-invoice row, landing between the pre-check,
+> the locked re-check inside `0025` and the ownership update, while the old application code is
+> still serving during the release;
+> (3) whether `0025` can give any invoice document an owner the list does not evidence, or give a
+> locked entry an owner;
+> (4) the automatic rule: can anyone other than the uploader become "the one merchant who attached
+> it within the window"? Test its premises: that only the uploader receives a document's address
+> before it is attached, that `document_url` is written only when a row is created, that
+> `created_at` is read correctly as UTC, and that the upload time in the generated name can be
+> trusted;
+> (5) the runner's own re-check of "TaptPay's records" claims: can an edited list get past it, and
+> does it matter that locked reasons and the evidence hash are not re-derived;
+> (6) the drafting tool: is it truly read-only, what does it print and write, and is its target
+> binding identical to the runner's;
+> (7) target binding: host normalisation, pooled versus direct hosts;
+> (8) what the list, the evidence table and every error message disclose;
+> (9) the per-link budget: lookup-first ordering, 404/410/429/503 behaviour, row growth,
+> concurrency across instances, and the cost of made-up links now reaching the lookup;
+> (10) whether any server test can still reach a live provider;
+> (11) whether the tests would catch a one-line regression.
+> Label anything you cannot verify UNVERIFIED. Cite `file:line`; give a failing request or test for
+> every Blocking issue. Return exactly the ten headings of plan §21.1
+> (`docs/PLAN-2026-08-24-taptpay-remediation-v2-2.md`) and end with Approve / Do not approve naming
+> the commit range.
+
+Reproduce: `npm run check`; `npm run test:server`; `npx jest --selectProjects client`;
+`node --test scripts/count-gap13-uploaded-files-attribution.test.mjs scripts/count-gap11-session-replay-duplicates.test.mjs scripts/schema-fingerprint.test.mjs scripts/postgres-verifier-safety.test.mjs`;
+`TEST_DATABASE_URL=<empty disposable database; the URL must carry a user and password> TAPTPAY_TEST_DATABASE=1 npx tsx scripts/verify-gap13-postgres.ts`;
+`npx tsx scripts/verify-gap13-browser.ts`; and §5's CLI steps against an empty database named
+`convergence` on `127.0.0.1:5432`, with the committed version-2 CI list.

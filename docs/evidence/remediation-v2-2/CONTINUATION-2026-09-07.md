@@ -1,6 +1,25 @@
 # Full integration continuation audit — 2026-09-07
 
-Latest continuation (2026-09-21, night — the owner approved every
+Latest continuation (2026-09-21, late — resumed after the container rebooted at about 06:41 UTC,
+four minutes after the previous turn ended; **nothing was lost**: all of that work was already
+committed as `60a2ca0b`). Every claim **re-run, not relayed**: `tsc` clean; server 64 / 1266;
+client 57 / 511; scripts 51 / 51; PostgreSQL verifier 14 / 14; CI's migration steps with the
+version-2 list and the fingerprint byte-identical; browser check PASS at 390 / 820 / 1440 (its
+first run since `d0e99c23`); development's ledger still ends at `0023` (read-only check). **Two
+small drafting-tool defects found and fixed** (`a25aaf09`, tests first, 3 / 3 mutations caught,
+server 64 / 1272): a refusal pointed at a script that does not exist, and the tool could draft —
+and print an approval SHA-256 for — a list the runner then refuses (a non-ASCII or over-long
+`--approved-by`). Both failed closed. §7's review prompt predated three commits; the refreshed
+brief is §11. **Production still offline** at 10:14 UTC (Neon endpoint disabled; `taptpay.co.nz`
+private) — the owner question stands; nothing changed. Details:
+[gate evidence §10](r1/R1-T7-gap13-ownership-inventory-gate-2026-09-21.md#10-re-verification-after-a-container-reboot-and-two-drafting-fixes-2026-09-21-late).
+Next: the independent review of `acef4e42..HEAD` using
+[§11](r1/R1-T7-gap13-ownership-inventory-gate-2026-09-21.md#11-independent-re-review--refreshed-brief).
+Nothing pushed. Correction to the entry below: the `.replit` port line (24678 → 5173) was not
+"discarded" for good — Replit re-adds it for the development server's live reload. It is harmless
+and stays out of every commit.
+
+Prior continuation (2026-09-21, night — the owner approved every
 recommendation: "please go ahead with all of your recommendations";
 [decision](../../decisions/2026-09-21-gap13-ownership-rule-and-retention.md)).
 **Ownership rule built and verified, not applied anywhere:** each invoice
