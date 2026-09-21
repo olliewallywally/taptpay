@@ -23,7 +23,8 @@
     "db:migrate": "tsx server/migrate.ts",
     "db:migrate:status": "tsx server/migrate.ts --status",
     "db:migrate:baseline": "tsx server/migrate.ts --baseline",
-    "db:release": "tsx server/migrate.ts --release"
+    "db:release": "tsx server/migrate.ts --release",
+    "db:draft-upload-inventory": "tsx server/draft-upload-inventory.ts"
   },
   "dependencies": {
     "@babel/core": "^7.28.4",

@@ -90,7 +90,7 @@ jobs:
       # inventory is empty and bound to exactly this target; editing the file
       # means re-approving it here. See docs/operations/migration-release.md.
       UPLOAD_OWNERSHIP_INVENTORY: .github/upload-ownership-inventory.ci-convergence.json
-      UPLOAD_OWNERSHIP_INVENTORY_SHA256: 7fc3d6a664a808f6934f1015dda8264f6c8fdc9b1b3de6eb806f869749559717
+      UPLOAD_OWNERSHIP_INVENTORY_SHA256: e65e4847b72f9ea3933a381bb249fe6adf39eafb6bd35dfa9eb92231d199ff19
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -124,10 +124,11 @@ jobs:
       - name: the schema matches the recorded fingerprint
         env:
           FINGERPRINT_DATABASE_URL: ${{ env.DATABASE_URL }}
-          # 2026-09-21: 0022–0025 added 3 tables, 19 columns, 5 constraints, 1
-          # foreign key and 6 indexes and removed nothing — itemised in
+          # 2026-09-21: 0022–0025 added 3 tables, 21 columns, 5 constraints, 1
+          # foreign key and 6 indexes and removed nothing (v2: 0025's table also
+          # records locked documents) — itemised in
           # docs/evidence/remediation-v2-2/r1/R1-T7-gap13-ownership-inventory-gate-2026-09-21.md.
-          RECORDED: docs/evidence/remediation-v2-2/r1/R1-T7-gap13-empty-fingerprint-2026-09-21.json
+          RECORDED: docs/evidence/remediation-v2-2/r1/R1-T7-gap13-empty-fingerprint-v2-2026-09-21.json
         run: |
           node scripts/schema-fingerprint.mjs > "$RUNNER_TEMP/fingerprint.json"
           node -e "

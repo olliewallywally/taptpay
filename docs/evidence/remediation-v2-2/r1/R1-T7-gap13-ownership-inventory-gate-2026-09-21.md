@@ -208,3 +208,62 @@ last minute, and each call first reclaims expired ones.
 
 Open: Q2–Q4 (Q3 has a recommendation awaiting approval; Q4 is answered, the retention period is
 not yet decided or implemented).
+
+## 9. Update — the automatic rule; locked, not blocking (2026-09-21, evening)
+
+Owner, verbatim: **"please go ahead with all of your recommendations"**
+([decision](../../../decisions/2026-09-21-gap13-ownership-rule-and-retention.md)). This amends
+the 2026-09-19 rule and closes High-Risk Concern 1 above (a document nobody could evidence no
+longer blocks the release — it is locked).
+
+**What changed**
+
+- **List version 2** (`server/upload-ownership-inventory.ts`): each invoice document is listed once
+  as `owner` (merchant + evidence) or `locked` (reason only). Version 1 is refused.
+- **TaptPay's own records as evidence** (`system-record`): exactly one merchant attached the
+  document, first between 5 minutes before and 24 hours after the upload time in its generated
+  name. `classifyInvoiceDocument` is the single rule; `invoiceDocumentFactsSql` reads the facts
+  (hashes only — no path or content leaves the database; `created_at` read as UTC).
+- **The runner re-derives every `system-record` claim itself**, in the pre-check and again under
+  the lock inside `0025`, and refuses the release on any mismatch
+  (`UPLOAD_INVENTORY_EVIDENCE_MISMATCH`) — an edited or stale list cannot move a document.
+- **`0025`**: `uploaded_file_ownership_evidence` now also records locked entries (`disposition`,
+  `locked_reason`; owner and evidence columns nullable, tied together by one check constraint);
+  only `owner` entries receive a `merchant_id`.
+- **Drafting tool** `server/draft-upload-inventory.ts` (`npm run db:draft-upload-inventory`):
+  validates the target exactly as the runner does, works in one READ ONLY transaction,
+  `--count-only` prints numbers and the database's TimeZone; a draft is written `0600`, never
+  over an existing file, and prints its SHA-256. `config-source-guard.test.ts` allowlists its two
+  environment reads with reasons, as it does for `migrate.ts`.
+- **CI**: the empty list moved to version 2 (new digest in `verify.yml`); fingerprint re-recorded
+  as `R1-T7-gap13-empty-fingerprint-v2-2026-09-21.json` — the diff against this morning's record
+  is confined to `0025`'s own table (+2 columns, 4 columns now nullable, the check constraint
+  replaced); the morning artefact is unmodified.
+
+**Verified**
+
+- Tests first: the new tests failed for the stated reasons (the functions did not exist; the old
+  code refused version 2). Now `upload-ownership-inventory.test.ts` **62 / 62**, migration suites
+  **178 / 178**.
+- **Mutations, 5 of 5 caught:** runner skipping the records check; window widened to 7 days; two
+  merchants no longer locking; locked entries allowed an owner; `0025` giving owners to locked
+  entries.
+- **PostgreSQL 16.10, 14 / 14 PASS**, including: the rule sorts four purpose-built documents
+  correctly (owner / several-merchants / never-attached / attached-outside-window); a list that
+  forges a `system-record` claim is refused; **the real drafting command** counts
+  (`total=6 owner=1 locked=5`), drafts a `0600` file carrying no path, refuses to overwrite it,
+  and changes nothing; after `0025` only evidenced documents have owners, every row carries the
+  approved list's SHA-256, and a locked document reaches no merchant while the admin's read
+  still works.
+- **CI rehearsal** with the version-2 list: dry run matches 0 documents; release applies 27 and
+  verifies; status clean; fingerprint byte-identical on a second run.
+
+**Read-only counts (approved)**
+
+| Target | Result |
+|---|---|
+| Development (`heliumdb`) | `total=2 owner=1 locked=1 locked.never-attached=1`, TimeZone `GMT` — the same two documents the 2026-09-19 preflight found (1 attributable, 1 orphan); the attributable one passes the timing rule |
+| Production | **Not counted.** The workspace's production address (`NEON_DATABASE_URL`) connects and verifies TLS, but Neon answers `28000 The endpoint has been disabled. Enable it using the API and retry.` Separately, `taptpay.co.nz` redirects every visitor to Replit sign-in (`privateDeployment=true`). No record in the repository explains either. Nothing was changed; both are owner questions. |
+
+**Retention** — periods decided (see the decision), professional confirmation and the deletion job
+outstanding; nothing deletes automatically.

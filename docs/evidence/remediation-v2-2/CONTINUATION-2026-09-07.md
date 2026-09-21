@@ -1,6 +1,29 @@
 # Full integration continuation audit — 2026-09-07
 
-Latest continuation (2026-09-21, evening — the owner answered Q1–Q4;
+Latest continuation (2026-09-21, night — the owner approved every
+recommendation: "please go ahead with all of your recommendations";
+[decision](../../decisions/2026-09-21-gap13-ownership-rule-and-retention.md)).
+**Ownership rule built and verified, not applied anywhere:** each invoice
+document is listed once, as `owner` (evidence: TaptPay's own records — one
+merchant attached it within 24 hours of its upload — or an upload log or
+attestation) or `locked` (kept, admin-only, audited); the runner re-derives
+every records claim itself under the lock; `0025` records locked entries too.
+New read-only drafting tool (`npm run db:draft-upload-inventory`, `--count-only`).
+Tests first; 5/5 mutations caught; PostgreSQL verifier 14/14 including the real
+tool; CI rehearsed with a version-2 list; fingerprint re-recorded (diff confined
+to `0025`'s table). **Counts:** development 2 documents — 1 gets its owner
+automatically, 1 locked (never attached). **Production could not be counted:**
+the workspace's production database endpoint answers "The endpoint has been
+disabled", and `taptpay.co.nz` is a private Replit deployment (every visitor is
+sent to Replit sign-in) — nothing in the repository explains either; **owner
+question**, nothing changed. **Retention:** invoice documents 7 years after the
+tax year, ownership records with their document, admin-read log 7 years —
+decided, professional confirmation (incl. AML/CFT status) and the deletion job
+outstanding (`A-H3` partly decided). `.replit` stray port mapping discarded.
+Details: [gate evidence §9](r1/R1-T7-gap13-ownership-inventory-gate-2026-09-21.md#9-update--the-automatic-rule-locked-not-blocking-2026-09-21-evening).
+Next: the independent review of `acef4e42..HEAD`. Nothing pushed.
+
+Prior continuation (2026-09-21, evening — the owner answered Q1–Q4;
 [directions](../../decisions/2026-09-21-gap13-owner-directions.md)). **Q1 done:**
 the checkout document route now looks the link up first and counts only real
 invoices, so the platform-wide 600-a-minute pool (and the off-switch it gave any
@@ -838,7 +861,7 @@ may proceed where the plan allows it. Code lanes remain gated by their dependenc
 | R8 | CI, dependency hygiene, truthfulness, rehearsal | 926 | Engineering | GATED: implement only after the source dependencies; no full-phase completion evidence recorded. |
 | A-H1 | Formalise the locked companion-v1 subscription model | 974 | Owner/professional/provider | OPEN human gate: discovery may begin as allowed; named approvals/evidence not found in the recovered handoffs. |
 | A-H2 | Confirm legal entity, capabilities, wallet scope and truthful reviewer environment | 980 | Owner/professional/provider | OPEN human gate: discovery may begin as allowed; named approvals/evidence not found in the recovered handoffs. |
-| A-H3 | Approve deletion, retention and legal-hold policy | 988 | Owner/professional/provider | OPEN human gate: discovery may begin as allowed; named approvals/evidence not found in the recovered handoffs. |
+| A-H3 | Approve deletion, retention and legal-hold policy | 988 | Owner/professional/provider | PARTLY DECIDED 2026-09-21 — invoice documents 7 years after the tax year of their invoice, gap-13 ownership records with their document, admin-read log 7 years ([decision](../../decisions/2026-09-21-gap13-ownership-rule-and-retention.md)). Still open: professional confirmation (incl. whether TaptPay is an AML/CFT reporting entity), legal holds, the deletion job itself, and every other data class (bank fields, backups, accounts). Nothing deletes automatically. |
 | A-T1 | Info.plist usage strings and export compliance | 996 | Engineering | GATED: implement only after the source dependencies; no full-phase completion evidence recorded. |
 | A-T2 | Entitlements and Sign in with Apple/push provisioning | 1002 | Engineering | GATED: implement only after the source dependencies; no full-phase completion evidence recorded. |
 | A-T3 | Evidence-driven privacy manifest and App Store privacy label | 1008 | Engineering | GATED: implement only after the source dependencies; no full-phase completion evidence recorded. |

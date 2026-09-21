@@ -9,6 +9,11 @@ const ALLOWLIST: Readonly<Record<string, Readonly<Record<string, string>>>> = Ob
     DATABASE_URL: "Standalone migration CLI must select its database before application bootstrap.",
     JEST_WORKER_ID: "Prevents the migration CLI entry point from executing inside Jest.",
   }),
+  "draft-upload-inventory.ts": Object.freeze({
+    GAP13_INVENTORY_DATABASE_URL:
+      "Standalone read-only drafting CLI (gap 13) must select its database before application bootstrap, under a name no app code reads.",
+    JEST_WORKER_ID: "Prevents the drafting CLI entry point from executing inside Jest.",
+  }),
 });
 
 function sourceFiles(directory: string): string[] {

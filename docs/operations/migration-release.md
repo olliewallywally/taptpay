@@ -79,63 +79,100 @@ position. Then choose deliberately.
 
 Migrations `0023`–`0025` decide which merchant owns each stored invoice document,
 and so who may download it. `0023` guessed owners from the invoices and quotes
-that pointed at each document; a pointer proves nothing about who uploaded the
-file, so `0025` removes every guessed owner and assigns only owners that an
-operator has verified. On the owner's decision
-([2026-09-19](../decisions/2026-09-19-gap13-trusted-ownership-inventory.md)) the
-runner applies **none** of the three without an approved inventory:
+that pointed at each document; a pointer alone proves nothing about who uploaded
+the file, so `0025` removes every guessed owner and assigns only owners that the
+approved list names. The runner applies **none** of the three without that list
+(owner decisions [2026-09-19](../decisions/2026-09-19-gap13-trusted-ownership-inventory.md)
+and [2026-09-21](../decisions/2026-09-21-gap13-ownership-rule-and-retention.md)).
+
+### 1. Count (read-only, numbers only)
+
+```text
+GAP13_INVENTORY_DATABASE_URL=<url> npm run db:draft-upload-inventory -- \
+  <the same --target/--expected-* flags as the release> --count-only
+```
+
+It prints how the rule sorts the target's invoice documents — e.g.
+`total=6 owner=1 locked=5 locked.never-attached=2 …` — and the database's
+`TimeZone` (the rule reads `created_at` as UTC; anything else needs a look before
+drafting). Nothing is written anywhere.
+
+### 2. Draft the list
+
+```text
+GAP13_INVENTORY_DATABASE_URL=<url> npm run db:draft-upload-inventory -- \
+  <target flags> --out=<new file> --approved-by="<who reviews and approves it>"
+```
+
+Every invoice document is listed exactly once, either:
+
+- **owner** — with evidence. The tool gives an owner only by *TaptPay's own
+  records*: exactly one merchant attached the document, first no earlier than 5
+  minutes before its upload time (read from the generated file name) and no later
+  than 24 hours after. That is the normal upload-then-invoice flow.
+- **locked** — kept, never deleted, served to no merchant or customer, readable
+  only by the validated platform admin (every read durably audited). With a
+  reason: `never-attached`, `several-merchants`, `attached-outside-window`,
+  `attach-time-unknown`, `unrecognised-name`, `merchant-missing`, or
+  `operator-decision`.
+
+The tool refuses to overwrite an existing file, writes it readable only by its
+owner, and prints its SHA-256. The file holds ids, hashes and merchant ids — no
+document path, content or token.
+
+### 3. Review, amend if you have evidence, approve
+
+A locked document can be given an owner by editing its entry to
+`"disposition": "owner"` with `evidence.kind` `authenticated-upload-log` or
+`merchant-attestation` (a reference to where the evidence is kept, and its
+SHA-256). Software cannot check that such evidence is true; you are the check.
+Anything can also be locked (`operator-decision`). Recompute the SHA-256 after
+any edit (`sha256sum <file>`). **Approving the list means passing that SHA-256 to
+the release:**
 
 ```text
 npm run db:release -- <target flags> \
   --upload-ownership-inventory=<file> \
-  --upload-ownership-inventory-sha256=<SHA-256 of that exact file>
+  --upload-ownership-inventory-sha256=<its SHA-256>
 ```
 
-It refuses before it creates the ledger or runs anything when the inventory is
-missing, when the file's SHA-256 is not the approved one, when it was approved
-for a different database (host, port and database name must match the declared
-target), or when it does not match the database exactly: every stored invoice
-document listed once, and every entry matching a real invoice document by id,
-path SHA-256 and content SHA-256 and naming a merchant that exists. Inside
-`0025`'s own transaction it checks all of that again after locking
-`uploaded_files` against writes, so an upload that lands after approval makes the
-approval stale rather than slipping through. `--dry-run` reports whether the
-inventory matches without changing anything.
+### What the runner checks
 
-The file (version 1; no document path, content or token appears in it):
+Before it creates the ledger or runs anything, and again after locking
+`uploaded_files` against writes inside `0025`'s own transaction, it refuses when
+the list is missing, its SHA-256 is not the approved one, it was drafted for a
+different target (host, port and database must match the declared target — a
+Neon pooled host and its direct host are different targets), it does not list
+every invoice document exactly once, an entry's file id, path hash or content hash
+does not match, an owner is not an existing merchant, or an entry claims
+TaptPay's own records when the records do not show exactly that merchant
+attaching the document within the window (`UPLOAD_INVENTORY_EVIDENCE_MISMATCH`).
+An upload that lands after approval makes the list stale and the release refuses;
+draft again. `--dry-run` reports whether the list matches without changing
+anything.
+
+`0025` records every entry in `uploaded_file_ownership_evidence` (disposition,
+owner and evidence or locked reason, who approved the list and when, and the
+list's SHA-256).
+
+The file format (version 2):
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "target": { "host": "<host>", "port": 5432, "database": "<database>" },
-  "approvedBy": "<who reviewed the evidence>",
+  "approvedBy": "<who reviewed it>",
   "approvedAt": "2026-09-21T09:00:00+12:00",
   "entries": [
-    {
-      "fileId": 17,
-      "pathSha256": "<sha256 of the stored path, e.g. invoices/invoice-…pdf>",
-      "contentSha256": "<sha256 of the stored bytes>",
-      "merchantId": 42,
-      "evidence": {
-        "kind": "authenticated-upload-log",
-        "reference": "<where the evidence is kept>",
-        "sha256": "<sha256 of the evidence itself>"
-      }
-    }
+    { "fileId": 17, "pathSha256": "<…>", "contentSha256": "<…>",
+      "disposition": "owner", "merchantId": 42,
+      "evidence": { "kind": "system-record", "reference": "TaptPay records: one merchant, first attached 64s after upload", "sha256": "<…>" } },
+    { "fileId": 18, "pathSha256": "<…>", "contentSha256": "<…>",
+      "disposition": "locked", "reason": "never-attached" }
   ]
 }
 ```
 
-`evidence.kind` is `authenticated-upload-log` or `merchant-attestation`. The
-software checks the file's integrity, completeness and target; **it cannot check
-that the evidence is true**. A person reviews each piece of evidence before
-approving the file's SHA-256. A document with no acceptable evidence blocks the
-release: it is not deleted, quarantined or given an owner by inference.
-
-`0025` records what it applied in `uploaded_file_ownership_evidence` (file id,
-verified merchant, the hashes, the evidence reference, who approved it and when,
-and the inventory's SHA-256).
-
-CI's convergence job uses the committed, approved, empty inventory
+CI's convergence job uses the committed, approved, empty list
 `.github/upload-ownership-inventory.ci-convergence.json`, bound to its disposable
 `127.0.0.1:5432/convergence` database. It is not valid for any other target.

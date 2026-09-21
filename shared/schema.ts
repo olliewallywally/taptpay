@@ -1522,17 +1522,20 @@ export const invoiceDocumentReadLimits = pgTable("invoice_document_read_limits",
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
 });
 
-// Gap 13 (0025): the operator-approved evidence behind each legacy invoice
-// document's owner. Written once by the migration, never by the app. Audit data:
-// no foreign keys, so the record outlives the file and the account.
+// Gap 13 (0025): what the operator-approved inventory decided for each legacy
+// invoice document — an owner with its evidence, or locked (admin-only) with a
+// reason. Written once by the migration, never by the app. Audit data: no foreign
+// keys, so the record outlives the file and the account.
 export const uploadedFileOwnershipEvidence = pgTable("uploaded_file_ownership_evidence", {
   fileId: integer("file_id").primaryKey(),
-  merchantId: integer("merchant_id").notNull(),
   pathSha256: text("path_sha256").notNull(),
   contentSha256: text("content_sha256").notNull(),
-  evidenceKind: text("evidence_kind").notNull(),
-  evidenceRef: text("evidence_ref").notNull(),
-  evidenceSha256: text("evidence_sha256").notNull(),
+  disposition: text("disposition").notNull(),
+  merchantId: integer("merchant_id"),
+  evidenceKind: text("evidence_kind"),
+  evidenceRef: text("evidence_ref"),
+  evidenceSha256: text("evidence_sha256"),
+  lockedReason: text("locked_reason"),
   approvedBy: text("approved_by").notNull(),
   approvedAt: timestamp("approved_at", { withTimezone: true }).notNull(),
   inventorySha256: text("inventory_sha256").notNull(),
