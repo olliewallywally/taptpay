@@ -5,6 +5,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { isNativeIOS } from "@/lib/native";
+import {
+  forgetNativeDeviceToken,
+  nativeDeviceState,
+  readNativeDeviceToken,
+  rememberNativeDeviceToken,
+} from "@/lib/push-device";
 
 export type PushNotificationPreferences = {
   paymentReceived: boolean;
@@ -137,6 +143,13 @@ export function usePushNotifications(): PushNotifications {
       const { receive } = await Native.checkPermissions();
       if (receive !== "granted") {
         setEnabled(false);
+        return;
+      }
+      // R1-T4: this iPhone's own state once it is known. "Off" stops this iPhone
+      // only, so the business-wide flag below would show another iPhone's state.
+      const state = nativeDeviceState();
+      if (state !== "unknown") {
+        setEnabled(state === "on");
         return;
       }
       const res = await fetch("/api/push/status", { headers: authHeaders() });
@@ -289,11 +302,16 @@ export function usePushNotifications(): PushNotifications {
     async (enable: boolean): Promise<boolean> => {
       const { PushNotifications: Native } = await import("@capacitor/push-notifications");
       if (!enable) {
+        const deviceToken = readNativeDeviceToken();
         const res = await fetch("/api/push/native-unsubscribe", {
           method: "POST",
           headers: authHeaders(true),
+          // This iPhone only. Set up before tokens were remembered, it has none,
+          // and the server stops this login's iPhones.
+          body: JSON.stringify(deviceToken ? { deviceToken } : {}),
         });
         if (!res.ok) throw new Error("Server failed to remove notification subscription");
+        forgetNativeDeviceToken();
         setEnabled(false);
         toast({ title: "Notifications disabled" });
         return false;
@@ -324,6 +342,7 @@ export function usePushNotifications(): PushNotifications {
               body: JSON.stringify({ deviceToken: token.value }),
             });
             if (!res.ok) throw new Error("Server rejected device token");
+            rememberNativeDeviceToken(token.value);
             setEnabled(true);
             toast({ title: "Notifications enabled", description: "You'll receive alerts for transaction updates" });
             resolve(true);

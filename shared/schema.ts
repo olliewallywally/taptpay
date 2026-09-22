@@ -854,6 +854,8 @@ export type PushNotificationEventType = typeof PUSH_NOTIFICATION_EVENT_TYPES[num
 export const pushSubscriptions = pgTable("push_subscriptions", {
   id: serial("id").primaryKey(),
   merchantId: integer("merchant_id").references(() => merchants.id).notNull(),
+  // R1-T4 (0029): the login that made it; NULL for subscriptions from before.
+  userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }),
   endpoint: text("endpoint").notNull(),
   p256dh: text("p256dh").notNull(),
   auth: text("auth").notNull(),
@@ -864,7 +866,9 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
     .notNull()
     .default(DEFAULT_PUSH_NOTIFICATION_PREFERENCES),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => ({
+  userIdIdx: index("push_subscriptions_user_id_idx").on(t.userId),
+}));
 
 export const insertPushSubscriptionSchema = createInsertSchema(pushSubscriptions).omit({
   id: true,

@@ -28,6 +28,7 @@ import { useKeyboardInset } from "@/hooks/use-keyboard-inset";
 import { desktopChromeForLocation } from "@/lib/desktop-chrome-route";
 import type { TutorialPageKey } from "@shared/tutorial";
 import { sendAnalyticsPageView } from "@/lib/analytics-page";
+import { resyncThisDevicePush, stopThisDevicePush } from "@/lib/push-device";
 
 import { LandingPage } from "@/pages/landing-page";
 import Login from "@/pages/login";
@@ -563,6 +564,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsRetrying(false);
         if (result.kind === "ok") {
           setState({ phase: "resolved", auth: result.value, detail: null });
+          // R1-T4: this device's existing notification subscription follows the
+          // signed-in login. Never turns notifications on; never throws.
+          void resyncThisDevicePush(token);
           return;
         }
         if (result.kind === "rejected") {
@@ -587,6 +591,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // flight (the effect's cleanup), so a retry that lands after the user has
   // chosen to sign out cannot quietly sign them back in.
   const signOut = useCallback(() => {
+    // R1-T4: as Log Out does, stop this device's notifications with the token
+    // being discarded. With the server unreachable, a browser still retires its
+    // subscription locally.
+    void stopThisDevicePush(readStoredToken("authToken"));
     clearStoredSession(MERCHANT_SESSION_KEYS);
     setIsRetrying(false);
     setState({ phase: "resolved", auth: { isAuthenticated: false }, detail: null });

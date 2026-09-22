@@ -67,6 +67,7 @@ const REAL_MIGRATIONS = [
   "0026_auth_handoff_codes.sql",
   "0027_users_session_version.sql",
   "0028_auth_throttle.sql",
+  "0029_push_subscriptions_user.sql",
 ];
 
 /** Migrations that own a `BEGIN;` / `COMMIT;` pair. */

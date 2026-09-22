@@ -1,5 +1,6 @@
-/** R1-T4 sign-in storage against real PostgreSQL: phase A's one-time code (Google sign-in)
- * and phase D's session versions (a password reset and "sign out everywhere").
+/** R1-T4 sign-in storage against real PostgreSQL: phase A's one-time code (Google sign-in),
+ * phase D's session versions (a password reset and "sign out everywhere"), and the push
+ * subscriptions each login now owns (0029).
  * Run only against an EMPTY, explicitly marked disposable database:
  * TEST_DATABASE_URL=... TAPTPAY_TEST_DATABASE=1 npx tsx scripts/verify-google-handoff-postgres.ts
  * The URL must carry a user and a password: the migration runner validates its target.
@@ -151,6 +152,74 @@ try {
   });
   await check("advancing an unknown login reports false", async () => {
     assert.equal(await one.advanceUserSessionVersion(2_000_000_000), false);
+  });
+  // Phase D follow-up: push_subscriptions.user_id (0029, owner decision 2026-09-22).
+  const otherMerchant = (await pool.query(`INSERT INTO merchants(name,business_name,email,status)
+    VALUES ('Other','Other','other@r1-t4.test','active') RETURNING id`)).rows[0].id as number;
+  const otherLogin = (await pool.query(`INSERT INTO users(email,password,merchant_id,role)
+    VALUES ('other@r1-t4.test','synthetic-not-a-hash',$1,'owner') RETURNING id`, [otherMerchant])).rows[0].id as number;
+  const push = (name: string) => `https://push.r1-t4.test/${name}`;
+  const subscribe = async (merchantId: number, userId: number | null, endpoint: string, via = one) =>
+    assert.ok(await via.createPushSubscription({ merchantId, userId, endpoint, p256dh: "synthetic", auth: "synthetic" }),
+      `subscription ${endpoint} was stored`);
+  const pushRows = async (endpoints: string[]) => Object.fromEntries((await pool.query(
+    "SELECT endpoint, is_active, user_id FROM push_subscriptions WHERE endpoint = ANY($1)", [endpoints])).rows
+    .map((r) => [r.endpoint, { active: r.is_active, userId: r.user_id }]));
+  const activeOf = async (endpoints: string[]) =>
+    Object.fromEntries(Object.entries(await pushRows(endpoints)).map(([k, v]) => [k, v.active]));
+  await check("a subscription records its login, and moves with the device to the next login that registers it", async () => {
+    const [first, second] = [await addUser("push-first@r1-t4.test", "member"), await addUser("push-second@r1-t4.test", "member")];
+    await subscribe(merchant, first, push("shared"));
+    assert.deepEqual(await pushRows([push("shared")]), { [push("shared")]: { active: true, userId: first } });
+    await subscribe(merchant, second, push("shared"), two);
+    assert.deepEqual(await pushRows([push("shared")]), { [push("shared")]: { active: true, userId: second } });
+  });
+  await check("a subscription cannot name a login that does not exist", async () => {
+    const quiet = console.error;
+    console.error = () => undefined; // createPushSubscription logs the refusal it returns as null.
+    try {
+      assert.equal(await one.createPushSubscription({ merchantId: merchant, userId: 2_000_000_000,
+        endpoint: push("nobody"), p256dh: "synthetic", auth: "synthetic" }), null);
+    } finally { console.error = quiet; }
+  });
+  await check("ending a login's sessions stops its devices and its business's unattributed ones, never a teammate's or another business's", async () => {
+    const [ended, teammate] = [await addUser("push-ended@r1-t4.test", "member"), await addUser("push-teammate@r1-t4.test", "member")];
+    await subscribe(merchant, ended, push("ended-web"));
+    await subscribe(merchant, ended, "apns://ended-phone-token");
+    await subscribe(merchant, null, push("unattributed-web"));
+    await subscribe(merchant, null, "apns://unattributed-phone-token");
+    await subscribe(merchant, teammate, push("teammate-web"));
+    await subscribe(otherMerchant, otherLogin, push("other-web"));
+    await subscribe(otherMerchant, null, push("other-unattributed-web"));
+    await two.deactivatePushSubscriptionsForLogin(merchant, ended);
+    assert.deepEqual(await activeOf([push("ended-web"), "apns://ended-phone-token", push("unattributed-web"),
+      "apns://unattributed-phone-token", push("teammate-web"), push("other-web"), push("other-unattributed-web")]), {
+      [push("ended-web")]: false, "apns://ended-phone-token": false, [push("unattributed-web")]: false,
+      "apns://unattributed-phone-token": false, [push("teammate-web")]: true, [push("other-web")]: true,
+      [push("other-unattributed-web")]: true,
+    });
+  });
+  await check("turning notifications off with no device token stops that login's and its business's unattributed iPhones only", async () => {
+    const [phoneOwner, teammate] = [await addUser("push-phone@r1-t4.test", "member"), await addUser("push-phone-mate@r1-t4.test", "member")];
+    await subscribe(merchant, phoneOwner, "apns://phone-owner-token");
+    await subscribe(merchant, phoneOwner, push("phone-owner-web"));
+    await subscribe(merchant, null, "apns://phone-unattributed-token");
+    await subscribe(merchant, null, push("phone-unattributed-web"));
+    await subscribe(merchant, teammate, "apns://phone-mate-token");
+    await subscribe(otherMerchant, null, "apns://other-unattributed-token");
+    await one.deactivateNativePushSubscriptionsForLogin(merchant, phoneOwner);
+    assert.deepEqual(await activeOf(["apns://phone-owner-token", push("phone-owner-web"), "apns://phone-unattributed-token",
+      push("phone-unattributed-web"), "apns://phone-mate-token", "apns://other-unattributed-token"]), {
+      "apns://phone-owner-token": false, [push("phone-owner-web")]: true, "apns://phone-unattributed-token": false,
+      [push("phone-unattributed-web")]: true, "apns://phone-mate-token": true, "apns://other-unattributed-token": true,
+    });
+  });
+  await check("a deleted login's subscriptions are deleted with it; unattributed ones stay", async () => {
+    const leaving = await addUser("push-leaving@r1-t4.test", "member");
+    await subscribe(merchant, leaving, push("leaving"));
+    await subscribe(merchant, null, push("staying"));
+    await pool.query("DELETE FROM users WHERE id=$1", [leaving]);
+    assert.deepEqual(Object.keys(await pushRows([push("leaving"), push("staying")])), [push("staying")]);
   });
   assert.deepEqual(failures, [], "R1-T4 sign-in PostgreSQL verification failed");
   console.log("R1-T4 sign-in PostgreSQL verification passed");

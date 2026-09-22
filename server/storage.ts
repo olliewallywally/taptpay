@@ -43,6 +43,8 @@ export type LegacyNoBoardActiveTransactionResult =
 
 export type PushSubscriptionInput = {
   merchantId: number;
+  /** R1-T4 (0029): the login registering this device; null only for rows from before. */
+  userId: number | null;
   endpoint: string;
   p256dh: string;
   auth: string;
@@ -763,6 +765,14 @@ export interface IStorage extends PaymentAttemptRepository {
   ): Promise<PushNotificationPreferences>;
   deactivatePushSubscription(id: number): Promise<void>;
   deactivatePushSubscriptionByEndpoint(endpoint: string): Promise<void>;
+  /**
+   * R1-T4: that login's sessions ended — stop its devices, and the merchant's
+   * unattributed subscriptions from before 0029, which cannot be shown to be
+   * anyone else's.
+   */
+  deactivatePushSubscriptionsForLogin(merchantId: number, userId: number): Promise<void>;
+  /** R1-T4: that login's iPhones, and the merchant's unattributed ones (no device token known). */
+  deactivateNativePushSubscriptionsForLogin(merchantId: number, userId: number): Promise<void>;
   getDailyPushPaymentSummaries(start: Date, end: Date): Promise<DailyPushPaymentSummary[]>;
   claimPushNotificationDelivery(
     merchantId: number,
@@ -2688,6 +2698,7 @@ export class MemStorage implements IStorage {
         : targetPreferences;
       existing.isActive = true;
       existing.merchantId = data.merchantId;
+      existing.userId = data.userId;
       existing.p256dh = data.p256dh;
       existing.auth = data.auth;
       existing.userAgent = data.userAgent ?? existing.userAgent;
@@ -2738,6 +2749,19 @@ export class MemStorage implements IStorage {
   async deactivatePushSubscriptionByEndpoint(endpoint: string): Promise<void> {
     const sub = this.pushSubs.find(s => s.endpoint === endpoint);
     if (sub) sub.isActive = false;
+  }
+
+  async deactivatePushSubscriptionsForLogin(merchantId: number, userId: number): Promise<void> {
+    for (const sub of this.pushSubs) {
+      if (sub.userId === userId || (sub.merchantId === merchantId && sub.userId == null)) sub.isActive = false;
+    }
+  }
+
+  async deactivateNativePushSubscriptionsForLogin(merchantId: number, userId: number): Promise<void> {
+    for (const sub of this.pushSubs) {
+      if (!sub.endpoint.startsWith("apns://") || sub.merchantId !== merchantId) continue;
+      if (sub.userId === userId || sub.userId == null) sub.isActive = false;
+    }
   }
 
   async getDailyPushPaymentSummaries(start: Date, end: Date): Promise<DailyPushPaymentSummary[]> {
@@ -3821,6 +3845,8 @@ export class MemStorage implements IStorage {
       ) {
         return false;
       }
+      // As push_subscriptions.user_id's ON DELETE CASCADE does (0029).
+      this.pushSubs = this.pushSubs.filter((sub) => sub.userId !== userId);
       return this.users.delete(userId);
     });
   }
@@ -5486,6 +5512,7 @@ export class DatabaseStorage implements IStorage {
           .update(pushSubscriptions)
           .set({
             merchantId: data.merchantId,
+            userId: data.userId,
             p256dh: data.p256dh,
             auth: data.auth,
             userAgent: data.userAgent ?? existing[0].userAgent,
@@ -5501,6 +5528,7 @@ export class DatabaseStorage implements IStorage {
         .insert(pushSubscriptions)
         .values({
           merchantId: data.merchantId,
+          userId: data.userId,
           endpoint: data.endpoint,
           p256dh: data.p256dh,
           auth: data.auth,
@@ -5575,6 +5603,29 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error("Database error in deactivatePushSubscriptionByEndpoint:", error);
     }
+  }
+
+  async deactivatePushSubscriptionsForLogin(merchantId: number, userId: number): Promise<void> {
+    if (!this.db) throw new Error("Database not connected");
+    await this.db
+      .update(pushSubscriptions)
+      .set({ isActive: false })
+      .where(or(
+        eq(pushSubscriptions.userId, userId),
+        and(eq(pushSubscriptions.merchantId, merchantId), isNull(pushSubscriptions.userId)),
+      ));
+  }
+
+  async deactivateNativePushSubscriptionsForLogin(merchantId: number, userId: number): Promise<void> {
+    if (!this.db) throw new Error("Database not connected");
+    await this.db
+      .update(pushSubscriptions)
+      .set({ isActive: false })
+      .where(and(
+        eq(pushSubscriptions.merchantId, merchantId),
+        sql`${pushSubscriptions.endpoint} LIKE 'apns://%'`,
+        or(eq(pushSubscriptions.userId, userId), isNull(pushSubscriptions.userId)),
+      ));
   }
 
   async getDailyPushPaymentSummaries(start: Date, end: Date): Promise<DailyPushPaymentSummary[]> {

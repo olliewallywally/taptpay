@@ -179,6 +179,9 @@ export const BASELINE_EFFECT_REQUIREMENTS: readonly Requirement[] = [
   r("0027_users_session_version.sql", "column", "users", "session_version"),
   r("0028_auth_throttle.sql", "table", "auth_throttle"),
   r("0028_auth_throttle.sql", "index", "auth_throttle", "auth_throttle_updated_at_idx"),
+  r("0029_push_subscriptions_user.sql", "column", "push_subscriptions", "user_id"),
+  r("0029_push_subscriptions_user.sql", "constraint", "push_subscriptions", "push_subscriptions_user_id_fkey"),
+  r("0029_push_subscriptions_user.sql", "index", "push_subscriptions", "push_subscriptions_user_id_idx"),
 ];
 
 export const FIND_MISSING_BASELINE_EFFECTS_SQL = `

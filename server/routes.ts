@@ -786,6 +786,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(404).json({ message: 'Login not found' });
       }
       sseBroker.disconnectUser(req.user!.merchantId, userId);
+      // Every session has ended, this caller's included, so a fault from here on
+      // must not answer "try again": the spent token could never retry it.
+      await storage.deactivatePushSubscriptionsForLogin(req.user!.merchantId, userId)
+        .catch((error) => console.error("[SIGN_OUT_EVERYWHERE_PUSH_STOP]", error));
       return res.status(204).end();
     } catch (err) {
       console.error('[SIGN_OUT_EVERYWHERE]', err);
@@ -903,8 +907,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!reset) {
         return res.status(400).json({ message: "Invalid or expired reset token" });
       }
-      // The reset ended every session of this login; close its live streams too.
+      // The reset ended every session of this login; close its live streams and
+      // stop its devices' notifications too.
       sseBroker.disconnectUser(reset.merchantId, reset.userId);
+      await storage.deactivatePushSubscriptionsForLogin(reset.merchantId, reset.userId)
+        .catch((error) => console.error("[RESET_PUSH_STOP]", error));
       
       res.json({ message: "Password has been successfully reset" });
     } catch (error) {
@@ -3753,6 +3760,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(500).json({ message: "Failed to update password" });
       }
       sseBroker.disconnectUser(merchantId, userId);
+      // Every device of this login stops getting notifications; this one
+      // re-registers under the fresh token (client/src/lib/push-device.ts).
+      await storage.deactivatePushSubscriptionsForLogin(merchantId, userId)
+        .catch((error) => console.error("[PASSWORD_CHANGE_PUSH_STOP]", error));
       const token = tokenForUserRow(updated);
       if (!token) {
         return res.status(500).json({ message: "Password changed. Please sign in again." });
@@ -5682,6 +5693,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       const pushSub = await storage.createPushSubscription({
         merchantId,
+        userId: req.user?.userId ?? null,
         endpoint: subscription.endpoint,
         p256dh: subscription.keys.p256dh,
         auth: subscription.keys.auth,
@@ -5742,6 +5754,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const endpoint = `apns://${deviceToken.trim()}`;
       const sub = await storage.createPushSubscription({
         merchantId,
+        userId: req.user?.userId ?? null,
         endpoint,
         p256dh: "",
         auth: "",
@@ -5767,11 +5780,24 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(401).json({ message: "Authentication required" });
       }
 
-      const subs = await storage.getPushSubscriptionsByMerchant(merchantId);
-      const nativeSubs = subs.filter((s: any) => s.endpoint.startsWith("apns://"));
-      await Promise.all(
-        nativeSubs.map((s: any) => storage.deactivatePushSubscriptionByEndpoint(s.endpoint))
-      );
+      // R1-T4: stop this iPhone only. It used to stop every iPhone of the merchant.
+      const { deviceToken } = req.body ?? {};
+      if (deviceToken !== undefined) {
+        if (typeof deviceToken !== "string" || deviceToken.trim().length < 8) {
+          return res.status(400).json({ message: "Invalid device token" });
+        }
+        const endpoint = `apns://${deviceToken.trim()}`;
+        const subs = await storage.getPushSubscriptionsByMerchant(merchantId);
+        if (!subs.some((s) => s.endpoint === endpoint)) {
+          return res.status(403).json({ message: "Not authorized to unsubscribe this device" });
+        }
+        await storage.deactivatePushSubscriptionByEndpoint(endpoint);
+      } else {
+        // Registered before device tokens were remembered: this login's iPhones.
+        const userId = req.user?.userId;
+        if (!userId) return res.status(401).json({ message: "Authentication required" });
+        await storage.deactivateNativePushSubscriptionsForLogin(merchantId, userId);
+      }
 
       res.json({ success: true });
     } catch (error) {

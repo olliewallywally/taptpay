@@ -22,6 +22,10 @@ jest.mock("@/features/tutorial/tutorial", () => ({
     isRestarting: false, canRestart: false,
   }),
 }));
+const mockStopThisDevicePush = jest.fn();
+jest.mock("@/lib/push-device", () => ({
+  stopThisDevicePush: (...args: unknown[]) => mockStopThisDevicePush(...args),
+}));
 const mockToast = jest.fn();
 jest.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: mockToast }) }));
 const mockNavigate = jest.fn();
@@ -43,6 +47,7 @@ beforeEach(() => {
   localStorage.setItem("authToken", TOKEN);
   mockNavigate.mockClear();
   mockToast.mockClear();
+  mockStopThisDevicePush.mockClear();
   signOutReply = reply(undefined, 204);
   fetchMock = jest.fn(async (url: unknown) => {
     if (url === "/api/auth/sign-out-everywhere") return signOutReply;
@@ -98,5 +103,26 @@ describe("phone Settings: sign out of all devices", () => {
     expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
       title: "Couldn't sign out of all devices", variant: "destructive",
     }));
+  });
+
+  it("leaves this device's notifications to the server", async () => {
+    jest.spyOn(window, "confirm").mockReturnValue(true);
+    await userEvent.click(await openSettings());
+
+    expect(mockNavigate).toHaveBeenCalledWith("/login");
+    // The server stopped every device of this login; this one resumes if it signs in again.
+    expect(mockStopThisDevicePush).not.toHaveBeenCalled();
+  });
+});
+
+// R1-T4 phase D follow-up (owner decision 2026-09-22): notifications belong to the login.
+describe("phone Settings: Log Out", () => {
+  it("stops this device's notifications with the token it had, then signs out", async () => {
+    await openSettings();
+    await userEvent.click(screen.getByTestId("button-logout"));
+
+    expect(mockStopThisDevicePush).toHaveBeenCalledWith(TOKEN);
+    expect(localStorage.getItem("authToken")).toBeNull();
+    expect(mockNavigate).toHaveBeenCalledWith("/login");
   });
 });

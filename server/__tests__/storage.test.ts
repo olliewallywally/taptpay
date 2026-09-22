@@ -206,6 +206,7 @@ describe("push notification preference storage", () => {
     const storage = new MemStorage();
     const created = await storage.createPushSubscription({
       merchantId: 7,
+      userId: null,
       endpoint: "https://push.example.test/device",
       p256dh: "public-key",
       auth: "auth-secret",
@@ -225,6 +226,7 @@ describe("push notification preference storage", () => {
     await storage.deactivatePushSubscriptionByEndpoint(created.endpoint);
     await storage.createPushSubscription({
       merchantId: 7,
+      userId: null,
       endpoint: created.endpoint,
       p256dh: "rotated-public-key",
       auth: "rotated-auth-secret",

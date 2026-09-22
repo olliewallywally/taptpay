@@ -54,6 +54,13 @@ jest.mock("@/hooks/use-push-notifications", () => ({
   }),
 }));
 
+const mockStopThisDevicePush = jest.fn();
+const mockResyncThisDevicePush = jest.fn();
+jest.mock("@/lib/push-device", () => ({
+  stopThisDevicePush: (...args: unknown[]) => mockStopThisDevicePush(...args),
+  resyncThisDevicePush: (...args: unknown[]) => mockResyncThisDevicePush(...args),
+}));
+
 jest.mock("./DesktopPageScaffold", () => ({
   DesktopPageScaffold: ({ children }: { children: ReactNode }) => children,
 }));
@@ -607,6 +614,38 @@ describe("desktop settings: sign out of all devices", () => {
       description: "Your other devices have been signed out.",
     }));
     expect(mockSetLocation).not.toHaveBeenCalledWith("/login");
+  });
+
+  // R1-T4 phase D follow-up (owner decision 2026-09-22): notifications belong to the login.
+  it("Log Out stops this device's notifications with the token it had", async () => {
+    renderPage();
+    await userEvent.click(await screen.findByTestId("button-logout"));
+
+    expect(mockStopThisDevicePush).toHaveBeenCalledWith("merchant.jwt.token");
+    expect(localStorage.getItem("authToken")).toBeNull();
+    expect(mockSetLocation).toHaveBeenCalledWith("/login");
+  });
+
+  it("re-registers this device's notifications under the fresh token after a password change", async () => {
+    renderPage();
+    await userEvent.click(await screen.findByRole("button", { name: "Account" }));
+    await userEvent.type(screen.getByLabelText("current password"), "old-password");
+    await userEvent.type(screen.getByLabelText("new password"), "new-password");
+    await userEvent.type(screen.getByLabelText("confirm password"), "new-password");
+    await userEvent.click(screen.getByRole("button", { name: "Change password" }));
+
+    await waitFor(() => expect(mockResyncThisDevicePush).toHaveBeenCalledWith("fresh.jwt.token"));
+    expect(mockStopThisDevicePush).not.toHaveBeenCalled();
+  });
+
+  it("leaves this device's notifications to the server when signing out of all devices", async () => {
+    jest.spyOn(window, "confirm").mockReturnValue(true);
+    renderPage();
+    await userEvent.click(await screen.findByRole("button", { name: "Sign out of all devices" }));
+
+    await waitFor(() => expect(mockSetLocation).toHaveBeenCalledWith("/login"));
+    // The server stopped every device of this login; this one resumes if it signs in again.
+    expect(mockStopThisDevicePush).not.toHaveBeenCalled();
   });
 
   it("signs this device out, without claiming success, when its session had already ended", async () => {

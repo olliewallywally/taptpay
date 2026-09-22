@@ -11,6 +11,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useTutorial } from "@/features/tutorial/tutorial";
 import { useToast } from "@/hooks/use-toast";
 import { SIGN_OUT_EVERYWHERE_CONFIRMATION, signOutEverywhere } from "@/lib/sign-out-everywhere";
+import { resyncThisDevicePush, stopThisDevicePush } from "@/lib/push-device";
 import {
   BILLING_CARD_SESSION_KEY,
   useBillingCardReturn,
@@ -439,7 +440,11 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
       // The change ended every session of this login (R1-T4 phase D); this device
       // carries on under the fresh token the server returned.
       const token = (data as { token?: unknown } | null)?.token;
-      if (typeof token === "string" && token) localStorage.setItem("authToken", token);
+      if (typeof token === "string" && token) {
+        localStorage.setItem("authToken", token);
+        // The change also stopped every device's notifications; this one resumes.
+        void resyncThisDevicePush(token);
+      }
       setPw({ currentPassword: "", newPassword: "", confirmPassword: "" });
       toast({ title: "Password changed", description: "Your other devices have been signed out." });
     },
@@ -521,9 +526,16 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
     setLocation(path);
   };
 
-  const logout = () => {
+  const signOutThisDevice = () => {
     localStorage.removeItem("authToken");
     setLocation("/login");
+  };
+
+  // R1-T4 (owner decision 2026-09-22): Log Out also stops this device's
+  // notifications, with the token it is discarding.
+  const logout = () => {
+    void stopThisDevicePush(localStorage.getItem("authToken"));
+    signOutThisDevice();
   };
 
   const signOutAllDevices = async () => {
@@ -533,7 +545,8 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
       toast(outcome === "ended"
         ? { title: "Signed out of all devices" }
         : { title: "Already signed out", description: "Sign in again to sign out your other devices." });
-      logout();
+      // The server stopped every device of this login; this one resumes if it signs in again.
+      signOutThisDevice();
     } catch (error) {
       toast({
         title: "Couldn't sign out of all devices",

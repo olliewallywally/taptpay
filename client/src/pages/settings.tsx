@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { SIGN_OUT_EVERYWHERE_CONFIRMATION, signOutEverywhere } from "@/lib/sign-out-everywhere";
+import { stopThisDevicePush } from "@/lib/push-device";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -626,9 +627,16 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
     deleteLogoMutation.mutate();
   };
 
-  const handleLogout = () => {
+  const signOutThisDevice = () => {
     localStorage.removeItem("authToken");
     setLocation('/login');
+  };
+
+  // R1-T4 (owner decision 2026-09-22): Log Out also stops this device's
+  // notifications, with the token it is discarding.
+  const handleLogout = () => {
+    void stopThisDevicePush(localStorage.getItem("authToken"));
+    signOutThisDevice();
   };
 
   const handleSignOutAllDevices = async () => {
@@ -638,7 +646,8 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
       toast(outcome === "ended"
         ? { title: "Signed out of all devices" }
         : { title: "Already signed out", description: "Sign in again to sign out your other devices." });
-      handleLogout();
+      // The server stopped every device of this login; this one resumes if it signs in again.
+      signOutThisDevice();
     } catch (error) {
       toast({
         title: "Couldn't sign out of all devices",
