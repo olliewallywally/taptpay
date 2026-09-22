@@ -135,6 +135,21 @@ describe("push subscriptions belong to a login", () => {
     expect(await activeEndpoints(owner.merchantId)).toEqual([web("owner-laptop").endpoint]);
   });
 
+  // Owner decision 2026-09-22 (docs/decisions/2026-09-22-r1-t4-push-follow-up-owner-answers.md).
+  it("disabling a teammate's login stops their devices; the owner's stay", async () => {
+    const { app } = await createTestApp();
+    const owner = await createOwnerPrincipal();
+    const member = await createMemberPrincipal(owner.merchantId);
+    await subscribeWeb(app, owner, "owner-laptop");
+    await subscribeWeb(app, member, "member-laptop");
+    await subscribeNative(app, member, "member-phone");
+
+    const disabled = await request(app).put(`/api/team/${member.user.id}/status`).set(bearer(owner))
+      .send({ status: "disabled" });
+    expect(disabled.status).toBe(200);
+    expect(await activeEndpoints(owner.merchantId)).toEqual([web("owner-laptop").endpoint]);
+  });
+
   it("refuses to stop another business's iPhone", async () => {
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
@@ -169,6 +184,19 @@ describe("a fault stopping notifications never undoes or misreports ending the s
     expect((await request(app).post("/api/auth/sign-out-everywhere").set(bearer(owner))).status).toBe(204);
     expect((await subscribeWeb(app, owner, "after")).status).toBe(401);
     expect(loggedTags(logged)).toContain("[SIGN_OUT_EVERYWHERE_PUSH_STOP]");
+  });
+
+  it("disabling a teammate still succeeds, and the teammate is refused", async () => {
+    const { app } = await createTestApp();
+    const owner = await createOwnerPrincipal();
+    const member = await createMemberPrincipal(owner.merchantId);
+    const logged = failStopping();
+
+    const disabled = await request(app).put(`/api/team/${member.user.id}/status`).set(bearer(owner))
+      .send({ status: "disabled" });
+    expect(disabled.status).toBe(200);
+    expect((await subscribeWeb(app, member, "after")).status).toBe(403);
+    expect(loggedTags(logged)).toContain("[TEAM_DISABLE_PUSH_STOP]");
   });
 
   it("a password reset still succeeds", async () => {

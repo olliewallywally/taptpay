@@ -6908,7 +6908,14 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(404).json({ message: "Login not found" });
       }
 
-      if (status === "disabled") sseBroker.disconnectUser(merchantId, userId);
+      if (status === "disabled") {
+        sseBroker.disconnectUser(merchantId, userId);
+        // Owner decision 2026-09-22: a disabled login's devices stop getting
+        // notifications too. The login is already disabled, so a fault here is
+        // logged, never returned.
+        await storage.deactivatePushSubscriptionsForLogin(merchantId, userId)
+          .catch((error) => console.error("[TEAM_DISABLE_PUSH_STOP]", error));
+      }
       res.json({ member: teamMemberDto(result.user) });
     } catch (error) {
       console.error("Update team member error:", error);
