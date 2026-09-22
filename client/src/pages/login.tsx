@@ -18,39 +18,69 @@ const loginSchema = z.object({
 
 type LoginFormData = z.infer<typeof loginSchema>;
 
+// Google sign-in's results, removed from the address on arrival. Everything else
+// (returnTo) stays for the password form.
+const GOOGLE_SIGN_IN_PARAMS = ['google', 'error', 'token', 'merchantId', 'newUser'];
+
 export default function Login() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [loginType, setLoginType] = useState<'merchant' | 'admin'>('merchant');
 
-  // Handle Google OAuth callback — token arrives as URL query param
+  // Finish Google sign-in (R1-T4 phase A). The server never puts an account
+  // token in the address: it sets a one-time code in an HttpOnly cookie and
+  // sends the browser to /login?google=complete, and this page redeems the code
+  // once, by POST, for the token in the response body. A token found in the
+  // address (the old hand-back, or a crafted link) is dropped unused.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
-    const merchantId = params.get('merchantId');
+    const googleComplete = params.get('google') === 'complete';
     const error = params.get('error');
-    const newUser = params.get('newUser');
 
-    if (token) {
-      trackEvent("login_succeeded", { auth_method: "google", login_type: "merchant", new_user: newUser === "true" });
-      localStorage.setItem('authToken', token);
-      if (merchantId) localStorage.setItem('merchantId', merchantId);
-      window.history.replaceState({}, '', '/login');
-      if (newUser === 'true') {
-        toast({
-          title: 'Welcome to TaptPay!',
-          description: 'Your account has been created. Please complete your profile in Settings.',
-        });
-      } else {
-        toast({ title: 'Welcome back!', description: 'Signed in with Google.' });
-      }
-      // Match password login: force the app-wide AuthProvider to re-mount and
-      // fetch /api/auth/me with the fresh token instead of keeping stale state.
-      window.location.href = '/dashboard';
-    } else if (error) {
+    if (GOOGLE_SIGN_IN_PARAMS.some((name) => params.has(name))) {
+      GOOGLE_SIGN_IN_PARAMS.forEach((name) => params.delete(name));
+      const rest = params.toString();
+      window.history.replaceState({}, '', `/login${rest ? `?${rest}` : ''}${window.location.hash}`);
+    }
+
+    const signInFailed = (description: string) => {
       trackEvent("login_failed", { auth_method: "google", login_type: "merchant" });
-      window.history.replaceState({}, '', '/login');
-      toast({ title: 'Sign in failed', description: decodeURIComponent(error), variant: 'destructive' });
+      toast({ title: 'Sign in failed', description, variant: 'destructive' });
+    };
+
+    if (googleComplete) {
+      void (async () => {
+        let result: { token?: unknown; merchantId?: unknown; newUser?: unknown; message?: unknown } = {};
+        let ok = false;
+        try {
+          const response = await fetch('/api/auth/google/session', { method: 'POST', credentials: 'same-origin' });
+          ok = response.ok;
+          result = await response.json().catch(() => ({}));
+        } catch {
+          // Network failure: fall through to the generic message.
+        }
+        if (!ok || typeof result.token !== 'string') {
+          signInFailed(typeof result.message === 'string' ? result.message : 'Google sign in failed. Please try again.');
+          return;
+        }
+        const newUser = result.newUser === true;
+        trackEvent("login_succeeded", { auth_method: "google", login_type: "merchant", new_user: newUser });
+        localStorage.setItem('authToken', result.token);
+        if (typeof result.merchantId === 'number') localStorage.setItem('merchantId', String(result.merchantId));
+        if (newUser) {
+          toast({
+            title: 'Welcome to TaptPay!',
+            description: 'Your account has been created. Please complete your profile in Settings.',
+          });
+        } else {
+          toast({ title: 'Welcome back!', description: 'Signed in with Google.' });
+        }
+        // Match password login: force the app-wide AuthProvider to re-mount and
+        // fetch /api/auth/me with the fresh token instead of keeping stale state.
+        window.location.href = '/dashboard';
+      })();
+    } else if (error) {
+      signInFailed(error);
     }
   }, []);
 

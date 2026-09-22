@@ -3,9 +3,9 @@ import { DEFAULT_PLAN_ID, isUpgrade, planFor, planForOrDefault, type PlanId } fr
 import { decideBilling, failedPaymentUpdates, immediatePlanUpdates, MAX_PAYMENT_ATTEMPTS, nextBillingPeriodStart, nextPeriodUpdates, proratedUpgradeCents, queuedPlanUpdates, renewalPlan } from "./subscription-billing";
 import { getDb, isDatabaseConnected } from "./database";
 import { config } from "./config";
-import { eq, ne, desc, asc, and, inArray, notInArray, gte, lte, lt, or, ilike, sql, isNull, isNotNull } from "drizzle-orm";
+import { eq, ne, desc, asc, and, inArray, notInArray, gt, gte, lte, lt, or, ilike, sql, isNull, isNotNull } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
-import { invoiceDocumentAccessAudit, invoiceDocumentReadLimits } from "@shared/schema";
+import { authHandoffCodes, invoiceDocumentAccessAudit, invoiceDocumentReadLimits } from "@shared/schema";
 import { DOCUMENT_READ_TOKEN_LIMIT, DOCUMENT_READ_WINDOW_MS, documentReadTokenKey } from "./invoice-document-security";
 import type {
   AttachPaymentAttemptSessionRecordInput,
@@ -902,6 +902,10 @@ export interface IStorage extends PaymentAttemptRepository {
   deleteUploadedFile(relPath: string, merchantId: number): Promise<void>;
   recordInvoiceDocumentAdminRead(adminUserId: number, documentName: string): Promise<void>;
   consumeInvoiceDocumentReadLimit(token: string): Promise<boolean>;
+  /** R1-T4: keep a Google sign-in handoff code — its hash only — and reclaim long-expired ones. */
+  createAuthHandoffCode(input: { codeHash: string; userId: number; newUser: boolean; expiresAt: Date }): Promise<void>;
+  /** R1-T4: redeem a handoff code exactly once; undefined when unknown, already used or expired. */
+  consumeAuthHandoffCode(codeHash: string, now: Date): Promise<{ userId: number; newUser: boolean } | undefined>;
 }
 
 // A tenant id that can match a real merchant. 0 is the platform admin's
@@ -976,6 +980,7 @@ export class MemStorage implements IStorage {
   private tutorialProgress: Map<string, MerchantTutorialProgress>;
   private uploadedFileBlobs: Map<string, { mimeType: string; data: Buffer; merchantId: number }>;
   private documentReadLimits = new Map<string, { count: number; expiresAt: number }>();
+  private authHandoffCodes = new Map<string, { userId: number; newUser: boolean; expiresAt: Date; consumedAt: Date | null }>();
   private documentAccessAudit: Array<{ adminUserId: number; documentName: string }> = [];
 
   constructor() {
@@ -2498,6 +2503,24 @@ export class MemStorage implements IStorage {
 
   async recordInvoiceDocumentAdminRead(adminUserId: number, documentName: string): Promise<void> {
     this.documentAccessAudit.push({ adminUserId, documentName });
+  }
+
+  async createAuthHandoffCode(input: { codeHash: string; userId: number; newUser: boolean; expiresAt: Date }): Promise<void> {
+    const dayAgo = Date.now() - 86_400_000;
+    for (const [key, row] of this.authHandoffCodes) {
+      if (row.expiresAt.getTime() < dayAgo) this.authHandoffCodes.delete(key);
+    }
+    if (this.authHandoffCodes.has(input.codeHash)) throw new Error("handoff code already exists");
+    this.authHandoffCodes.set(input.codeHash, {
+      userId: input.userId, newUser: input.newUser, expiresAt: input.expiresAt, consumedAt: null,
+    });
+  }
+
+  async consumeAuthHandoffCode(codeHash: string, now: Date): Promise<{ userId: number; newUser: boolean } | undefined> {
+    const row = this.authHandoffCodes.get(codeHash);
+    if (!row || row.consumedAt || row.expiresAt.getTime() <= now.getTime()) return undefined;
+    row.consumedAt = now;
+    return { userId: row.userId, newUser: row.newUser };
   }
 
   async consumeInvoiceDocumentReadLimit(token: string): Promise<boolean> {
@@ -7989,6 +8012,33 @@ export class DatabaseStorage implements IStorage {
   async recordInvoiceDocumentAdminRead(adminUserId: number, documentName: string): Promise<void> {
     if (!this.db) throw new Error("Database not connected");
     await this.db.insert(invoiceDocumentAccessAudit).values({ adminUserId, documentName });
+  }
+
+  async createAuthHandoffCode(input: { codeHash: string; userId: number; newUser: boolean; expiresAt: Date }): Promise<void> {
+    if (!this.db) throw new Error("Database not connected");
+    // A code lives 60 seconds; rows a day past expiry are reclaimed on the way in.
+    await this.db.delete(authHandoffCodes)
+      .where(lt(authHandoffCodes.expiresAt, sql`now() - interval '1 day'`));
+    await this.db.insert(authHandoffCodes).values({
+      codeHash: input.codeHash,
+      userId: input.userId,
+      newUser: input.newUser,
+      expiresAt: input.expiresAt,
+    });
+  }
+
+  async consumeAuthHandoffCode(codeHash: string, now: Date): Promise<{ userId: number; newUser: boolean } | undefined> {
+    if (!this.db) throw new Error("Database not connected");
+    // One statement: of two concurrent redemptions, exactly one sees consumed_at IS NULL.
+    const rows = await this.db.update(authHandoffCodes)
+      .set({ consumedAt: now })
+      .where(and(
+        eq(authHandoffCodes.codeHash, codeHash),
+        isNull(authHandoffCodes.consumedAt),
+        gt(authHandoffCodes.expiresAt, now),
+      ))
+      .returning({ userId: authHandoffCodes.userId, newUser: authHandoffCodes.newUser });
+    return rows[0];
   }
 
   async consumeInvoiceDocumentReadLimit(token: string): Promise<boolean> {

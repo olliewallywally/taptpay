@@ -27,7 +27,7 @@ import { useDeviceClass, type DeviceClass } from "@/hooks/use-device-class";
 import { useKeyboardInset } from "@/hooks/use-keyboard-inset";
 import { desktopChromeForLocation } from "@/lib/desktop-chrome-route";
 import type { TutorialPageKey } from "@shared/tutorial";
-import { redactCustomerPaymentAddress } from "@/lib/payment-addressing";
+import { sendAnalyticsPageView } from "@/lib/analytics-page";
 
 import { LandingPage } from "@/pages/landing-page";
 import Login from "@/pages/login";
@@ -705,9 +705,10 @@ function GA4PageTracker() {
   const [location] = useLocation();
   useEffect(() => {
     if (typeof window !== 'undefined' && (window as any).gtag) {
-      (window as any).gtag('event', 'page_view', {
-        page_path: redactCustomerPaymentAddress(location),
-        page_title: document.title,
+      sendAnalyticsPageView((window as any).gtag, location, {
+        origin: window.location.origin,
+        referrer: document.referrer,
+        title: document.title,
       });
     }
   }, [location]);

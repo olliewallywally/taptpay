@@ -224,7 +224,13 @@
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
       gtag('js', new Date());
-      gtag('config', 'G-0MBNS0C2L5', { send_page_view: false });
+      // No page address reaches analytics before the app sets a redacted one:
+      // addresses can carry tokens (client/src/lib/analytics-page.ts).
+      gtag('config', 'G-0MBNS0C2L5', {
+        send_page_view: false,
+        page_location: location.origin + '/',
+        page_referrer: '',
+      });
     </script>
     
   </head>

@@ -331,5 +331,8 @@ export function redactCustomerPaymentAddress(value: string): string {
     .replace(/\/(api\/)?pay\/t\/[^/?#\s]+/g, (_match, api: string | undefined) => `/${api ?? ""}pay/t/:token`)
     .replace(/\/(split|checkout|receipt)\/t\/[^/?#\s]+/g, "/$1/t/:token")
     .replace(/\/(api\/)?pay\/return\/[^/?#\s]+/g, (_match, api: string | undefined) => `/${api ?? ""}pay/return/:state`)
+    // Invoice and quote checkout links (R1-T4 phase A: they reached analytics unredacted).
+    .replace(/\/r\/[^/?#\s]+/g, "/r/:token")
+    .replace(/\/trades\/quote\/[^/?#\s]+/g, "/trades/quote/:token")
     .replace(/[?#].*$/, "");
 }

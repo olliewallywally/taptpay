@@ -168,4 +168,14 @@ describe("discriminated customer payment addressing", () => {
     expect(redactCustomerPaymentAddress(`/api/pay/t/${token}/session`)).toBe("/api/pay/t/:token/session");
     expect(redactCustomerPaymentAddress("/pay/return/secret-state?source=hpp")).toBe("/pay/return/:state");
   });
+
+  // R1-T4 phase A: invoice and quote checkout links carry their token in the path
+  // too, and were sent to analytics unredacted.
+  test("redacts invoice and quote checkout links", () => {
+    expect(redactCustomerPaymentAddress(`/r/${token}`)).toBe("/r/:token");
+    expect(redactCustomerPaymentAddress(`https://pay.test/r/${token}?split=1`)).toBe("https://pay.test/r/:token");
+    expect(redactCustomerPaymentAddress(`/trades/quote/${token}`)).toBe("/trades/quote/:token");
+    expect(redactCustomerPaymentAddress("/trades/quotes")).toBe("/trades/quotes");
+    expect(redactCustomerPaymentAddress("/transactions")).toBe("/transactions");
+  });
 });

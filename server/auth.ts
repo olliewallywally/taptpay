@@ -297,19 +297,45 @@ export async function authenticateUser(email: string, password: string): Promise
   const isValid = await bcrypt.compare(password, userRow.password);
   if (!isValid) return null;
 
-  // Downgrades are normally blocked while too many seats are occupied, but this
-  // second gate covers races, manual repairs and future migrations. The owner
-  // always retains access so the account can remove seats or fix billing.
-  if (user.role === 'member') {
-    const subscription = await storage.getSubscription(user.merchantId);
-    const seatLimit = subscription?.seatLimit;
-    if (!isPositiveInteger(seatLimit)) return null;
-    const seatsInUse = await storage.countSeatsInUse(user.merchantId);
-    if (seatsInUse > seatLimit) return null;
-  }
+  if (!(await memberWithinSeatLimit(user))) return null;
 
   await storage.recordUserLogin(userRow.id, new Date()).catch(() => {});
   return user;
+}
+
+/**
+ * Downgrades are normally blocked while too many seats are occupied, but this
+ * second gate covers races, manual repairs and future migrations. The owner
+ * always retains access so the account can remove seats or fix billing.
+ */
+async function memberWithinSeatLimit(user: User): Promise<boolean> {
+  if (user.role !== 'member') return true;
+  const { storage } = await import('./storage');
+  const subscription = await storage.getSubscription(user.merchantId);
+  const seatLimit = subscription?.seatLimit;
+  if (!isPositiveInteger(seatLimit)) return false;
+  const seatsInUse = await storage.countSeatsInUse(user.merchantId);
+  return seatsInUse <= seatLimit;
+}
+
+/**
+ * R1-T4 phase A: an account token for a users row that has just proved itself
+ * without a password — Google sign-in's one-time code. Every other gate of a
+ * password login applies: the row is active, the merchant verified or active, a
+ * member within the seat limit.
+ */
+export async function issueTokenForUserId(userId: number): Promise<{ token: string; merchantId: number } | null> {
+  if (!isPositiveInteger(userId)) return null;
+  const { storage } = await import('./storage');
+  const userRow = await storage.getUserById(userId);
+  if (!userRow || userRow.status !== 'active') return null;
+  const user = userRowToUser(userRow);
+  if (!user) return null;
+  const merchant = await storage.getMerchant(user.merchantId);
+  if (!merchant || (merchant.status !== 'verified' && merchant.status !== 'active')) return null;
+  if (!(await memberWithinSeatLimit(user))) return null;
+  await storage.recordUserLogin(userRow.id, new Date()).catch(() => {});
+  return { token: generateToken(user), merchantId: user.merchantId };
 }
 
 export function generateToken(user: User): string {

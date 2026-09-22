@@ -15,7 +15,11 @@ import {
 import { TUTORIAL_PAGE_KEYS, isTutorialPageKey } from "@shared/tutorial";
 import { inviteTeamMemberSchema, acceptInviteSchema, retailTransactionCreateRequestSchema, updateMerchantDetailsSchema, updateThemeSchema, updateDailyGoalSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema, pushNotificationPreferencesSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createClientProfileSchema, updateClientProfileSchema, createQuoteSchema, acceptQuoteSchema, createJobInvoiceSchema, markJobPaidExternalSchema, createJobScheduleSchema, updateJobScheduleSchema, updateTradeReminderSettingsSchema, updateTradeGstSettingsSchema } from "@shared/schema";
 import { windcaveService, isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, getWindcaveEnv, submitGooglePayToken, createAttendedSession, submitTapToPayToken, createCardStorageSession, queryStoredCardSession, chargeStoredCard } from "./windcave";
-import { authenticateUser, generateToken, authenticateToken, createUser, isAccountOwner, requestPasswordReset, resetPassword, validateResetToken, type AuthenticatedRequest, isAccountLocked, isIPRateLimited, recordFailedLogin, clearFailedAttempts, logSecurityEvent, syncVerifiedMerchants } from "./auth";
+import { authenticateUser, generateToken, authenticateToken, createUser, issueTokenForUserId, isAccountOwner, requestPasswordReset, resetPassword, validateResetToken, type AuthenticatedRequest, isAccountLocked, isIPRateLimited, recordFailedLogin, clearFailedAttempts, logSecurityEvent, syncVerifiedMerchants } from "./auth";
+import {
+  HANDOFF_CODE_TTL_MS, clearSignInCookie, googleVerifiedEmail, handoffCodeHash, newHandoffCode, readCookie,
+  signInCookies, startGoogleSignIn, verifyGoogleSignInState,
+} from "./google-sign-in";
 import { generateReceiptPdf } from "./pdf-generator";
 import { generateQuotePdf } from "./trades-quote-pdf";
 import { generateBusinessReportPdf } from "./report-generator";
@@ -583,40 +587,59 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     return checkMerchantOwnership(req, merchantId) && isAccountOwner(req.user);
   }
 
-  // Google OAuth routes
+  // Google OAuth routes — R1-T4 phase A (owner decision 2026-09-21,
+  // docs/decisions/2026-09-21-r1-t4-t9-owner-answers.md). No account token ever
+  // travels in an address: state + PKCE are bound to the starting browser by an
+  // HttpOnly cookie, and the callback hands over a one-time code in a second
+  // HttpOnly cookie that the login page redeems once (server/google-sign-in.ts).
+  const googleCookies = signInCookies(getBaseUrl());
+  const googleSignInError = (message: string) => `/login?error=${encodeURIComponent(message)}`;
+
   app.get("/api/auth/google", (req, res) => {
     const clientId = config.oauth.googleClientId;
     if (!clientId) {
-      return res.redirect('/login?error=Google+sign+in+is+not+configured');
+      return res.redirect(googleSignInError('Google sign in is not configured'));
     }
-    const redirectUri = `${getBaseUrl(req)}/api/auth/google/callback`;
+    const start = startGoogleSignIn();
+    res.cookie(googleCookies.oauth.name, start.cookieValue, googleCookies.oauth.options);
+    res.set('Cache-Control', 'no-store');
     const params = new URLSearchParams({
       client_id: clientId,
-      redirect_uri: redirectUri,
+      redirect_uri: `${getBaseUrl(req)}/api/auth/google/callback`,
       response_type: 'code',
       scope: 'openid email profile',
-      access_type: 'offline',
       prompt: 'select_account',
+      state: start.state,
+      code_challenge: start.codeChallenge,
+      code_challenge_method: 'S256',
     });
     res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
   });
 
   app.get("/api/auth/google/callback", async (req, res) => {
-    const { code, error } = req.query as { code?: string; error?: string };
+    const { code, error, state } = req.query as { code?: string; error?: string; state?: string };
+    // The starting cookie is spent whatever happens next.
+    const verifier = verifyGoogleSignInState(readCookie(req.headers.cookie, googleCookies.oauth.name), state);
+    clearSignInCookie(res, googleCookies.oauth);
+    res.set('Cache-Control', 'no-store');
 
     if (error || !code) {
-      return res.redirect('/login?error=Google+sign+in+was+cancelled');
+      return res.redirect(googleSignInError('Google sign in was cancelled'));
+    }
+    // Not this browser's sign-in (or it expired): refuse before asking Google anything.
+    if (!verifier) {
+      return res.redirect(googleSignInError('Google sign in expired. Please try again.'));
     }
 
     try {
       const clientId = config.oauth.googleClientId;
       const clientSecret = config.oauth.googleClientSecret;
       if (!clientId || !clientSecret) {
-        return res.redirect('/login?error=Google+sign+in+is+not+configured');
+        return res.redirect(googleSignInError('Google sign in is not configured'));
       }
       const redirectUri = `${getBaseUrl(req)}/api/auth/google/callback`;
 
-      // Exchange code for tokens
+      // Exchange code for tokens, proving it with this browser's PKCE verifier.
       const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -626,12 +649,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           client_secret: clientSecret,
           redirect_uri: redirectUri,
           grant_type: 'authorization_code',
+          code_verifier: verifier,
         }).toString(),
       });
 
       if (!tokenRes.ok) {
-        console.error('Google token exchange failed:', await tokenRes.text());
-        return res.redirect('/login?error=Google+sign+in+failed');
+        console.error('Google token exchange failed:', tokenRes.status);
+        return res.redirect(googleSignInError('Google sign in failed'));
       }
 
       const tokenData = await tokenRes.json() as { access_token: string };
@@ -642,14 +666,21 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       });
 
       if (!userRes.ok) {
-        return res.redirect('/login?error=Google+sign+in+failed');
+        return res.redirect(googleSignInError('Google sign in failed'));
       }
 
-      const profile = await userRes.json() as { id: string; email: string; name: string };
+      const profile = await userRes.json() as {
+        id: string; email: string; name: string; verified_email?: boolean; email_verified?: boolean;
+      };
       const { id: googleId, email, name } = profile;
 
       if (!email) {
-        return res.redirect('/login?error=Google+account+has+no+email');
+        return res.redirect(googleSignInError('Google account has no email'));
+      }
+      // Owner decision Q1: an email counts only when Google itself verified it —
+      // for joining an existing merchant and for creating a new one alike.
+      if (!googleVerifiedEmail(profile)) {
+        return res.redirect(googleSignInError("Google hasn't verified that email address."));
       }
 
       const normalizedEmail = email.trim().toLowerCase();
@@ -658,14 +689,14 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         storage.getUserByEmail(normalizedEmail),
       ]);
       if (!existingMerchant && existingLogin) {
-        return res.redirect('/login?error=That+email+already+has+a+TaptPay+login.');
+        return res.redirect(googleSignInError('That email already has a TaptPay login.'));
       }
       if (
         existingMerchant &&
         existingLogin &&
         (existingLogin.merchantId !== existingMerchant.id || existingLogin.role !== "owner")
       ) {
-        return res.redirect('/login?error=That+email+already+has+a+TaptPay+login.');
+        return res.redirect(googleSignInError('That email already has a TaptPay login.'));
       }
 
       let merchant = existingMerchant;
@@ -674,17 +705,20 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       if (merchant) {
         if (merchant.status === 'pending') {
-          return res.redirect('/login?error=Your+account+is+pending+verification.+Please+check+your+email.');
+          return res.redirect(googleSignInError('Your account is pending verification. Please check your email.'));
         }
         if (merchant.status !== "verified" && merchant.status !== "active") {
-          return res.redirect("/login?error=Your+account+is+not+active.");
+          return res.redirect(googleSignInError('Your account is not active.'));
         }
-        // Save googleId if not already stored
+        // Linked once, to one Google account: never silently re-linked to another.
+        if (merchant.googleId && merchant.googleId !== googleId) {
+          return res.redirect(googleSignInError('That TaptPay account is linked to a different Google account.'));
+        }
         if (!merchant.googleId) {
           await storage.updateMerchant(merchant.id, { googleId });
         }
       } else {
-        // Create new merchant account — Google already verified the email
+        // Create new merchant account — Google verified the email (checked above)
         const randomPasswordHash = await bcrypt.hash(randomPwd, 12);
         merchant = await storage.createMerchantWithPassword({
           name: name || normalizedEmail.split('@')[0],
@@ -701,17 +735,41 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // seed a random unguessable one if absent (createUser is idempotent).
       const authUser = await createUser(normalizedEmail, randomPwd, merchant.id);
 
-      const token = generateToken(authUser);
-      const redirectParams = new URLSearchParams({
-        token,
-        merchantId: String(merchant.id),
-        ...(isNewUser ? { newUser: 'true' } : {}),
+      const handoff = newHandoffCode();
+      await storage.createAuthHandoffCode({
+        codeHash: handoff.codeHash,
+        userId: authUser.userId ?? authUser.id,
+        newUser: isNewUser,
+        expiresAt: new Date(Date.now() + HANDOFF_CODE_TTL_MS),
       });
-
-      return res.redirect(`/login?${redirectParams.toString()}`);
+      res.cookie(googleCookies.handoff.name, handoff.code, googleCookies.handoff.options);
+      return res.redirect('/login?google=complete');
     } catch (err) {
       console.error('Google OAuth callback error:', err);
-      return res.redirect('/login?error=Google+sign+in+failed.+Please+try+again.');
+      return res.redirect(googleSignInError('Google sign in failed. Please try again.'));
+    }
+  });
+
+  // The login page's half of Google sign-in: redeem the one-time code, once, for
+  // the account token — in the response body, never cached, never in a URL.
+  app.post("/api/auth/google/session", async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    const codeHash = handoffCodeHash(readCookie(req.headers.cookie, googleCookies.handoff.name));
+    clearSignInCookie(res, googleCookies.handoff);
+    const expired = () =>
+      res.status(401).json({ code: 'GOOGLE_SIGN_IN_EXPIRED', message: 'Google sign in expired. Please try again.' });
+    if (!codeHash) return expired();
+    try {
+      const redeemed = await storage.consumeAuthHandoffCode(codeHash, new Date());
+      if (!redeemed) return expired();
+      const issued = await issueTokenForUserId(redeemed.userId);
+      if (!issued) {
+        return res.status(403).json({ code: 'ACCOUNT_UNAVAILABLE', message: 'This account cannot sign in right now.' });
+      }
+      return res.json({ token: issued.token, merchantId: issued.merchantId, newUser: redeemed.newUser });
+    } catch (err) {
+      console.error('[GOOGLE_SESSION]', err);
+      return res.status(500).json({ message: 'Google sign in failed. Please try again.' });
     }
   });
 
