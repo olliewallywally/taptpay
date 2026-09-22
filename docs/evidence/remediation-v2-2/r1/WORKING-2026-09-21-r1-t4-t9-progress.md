@@ -98,4 +98,120 @@ and deleted at the end. Decision: `docs/decisions/2026-09-21-r1-t4-t9-owner-answ
   - dev server still runs the 07:23 server code (no restart loop — do not kill it); correct now
     that the column exists; picks up `b714efda` on the next Run.
   - then: evidence file + review brief, ledger/task row, commit; owner OK needed to apply 0029 to dev.
-- [ ] 4  - [ ] 5  - [ ] 6
+- [x] 4 — **phase C done 2026-09-22, `e60e90c0`** ([evidence](R1-T4-phase-C-throttling-2026-09-22.md)); started ~08:45 UTC (owner: "ok move to next phase").
+  Found (current code):
+  - sign-in (merchant `/api/auth/login` and admin `/api/admin/auth/login`) share in-memory maps in
+    `server/auth.ts`: 5 failures per email → 15-min **lock**; 20 per `req.ip` → 30-min block
+    (for everyone, if `req.ip` is the proxy — phase B). Per process; restart wipes it; check-then-
+    record, so a parallel burst gets unlimited guesses before the first failure lands.
+  - **forgot-password has no limit at all**: unlimited reset emails to any merchant, and each
+    request overwrites (cancels) the merchant's previous reset link.
+  - **Google callback has no limit.** The plan said "move" these; they never existed.
+  - no test covers the lockout; no client reads `attemptsRemaining`/`locked`; the login page shows
+    raw `429: {json}` (apiRequest error text) — use `apiErrorMessage`.
+  - reset-link redemption and the Google one-time code are 256-bit single-use: not throttled
+    (brute force infeasible) — documented, not built.
+  Design (implementing the 2026-09-21 Q5 decision; numbers are constants, reported to the owner):
+  - `auth_throttle` rows, `bucket_key = <purpose>:<hex HMAC-SHA256>`, key = HKDF(JWT_SECRET,
+    "taptpay auth-throttle v1"); no email or address stored.
+  - a bucket counts; once `failures >= free`, `next_allowed_at = now + min(base·2^(failures−free),
+    cap)`; idle past `window` → starts again; waiting = `next_allowed_at > now`.
+  - storage: `takeAuthThrottleSlot(buckets, now)` — one transaction, rows locked in key order: if
+    any bucket is waiting → refuse with the longest wait, change nothing; else charge the
+    `charge` buckets. `chargeAuthThrottle` (after a failure), `clearAuthThrottle` (on success).
+    Reclaims rows idle > 1 day.
+  - sign-in: `signin-pair` (email+address) free 5, 30 s → ×2 → cap 15 min, pre-charged, cleared
+    on success; `signin-account` (email) free 20, same curve, pre-charged, cleared on success;
+    `signin-address` free 50, checked first, charged on failure, never cleared. Admin sign-in the
+    same. Refusal: 429, `Retry-After`, `{code: TOO_MANY_ATTEMPTS, message, retryAfterSeconds}`,
+    the same for any email (no enumeration).
+  - forgot-password: `reset-account` free 3, 5 min → cap 30 min; `reset-address` free 10, 1 min →
+    cap 30 min; both counted per request, checked BEFORE a token is issued (a refused request
+    neither emails nor cancels the live link).
+  - Google callback: `google-address` free 20, 30 s → cap 15 min, checked after the state check
+    (before any call to Google), charged on each failure after it; cancel not charged.
+  - verify: HTTP tests (red first), real PostgreSQL across two pools (a 24-attempt burst allows
+    exactly 5; mutation without the row lock allows more), client message test.
+  **Session stopped 08:50 UTC (usage limit) before any code; resumed 21:55 UTC from its transcript
+  (`bdb038a6-….jsonl`). Tree held only this note. Design re-checked before building — revised:**
+  - **Address keys are unsafe before phase B.** No `trust proxy` is set, so behind Replit's proxy
+    `req.ip` is the proxy for everyone (plan finding 6; the live check is owner item Q4). Any
+    address bucket (`signin-address`, `reset-address`, `google-address`) is then ONE bucket for
+    all merchants: anyone could slow every sign-in, reset or Google sign-in. And the pair bucket
+    (email+address) collapses into a per-email bucket. **Moved to phase B**, active only once the
+    deployment says addresses are real. The old in-memory 20-per-IP block (a global block today)
+    is removed, not ported.
+  - **A per-email bucket alone still lets anyone keep a merchant waiting.** Worked through: even with
+    real addresses, one attacker address reaches the account bucket's 20 after ~2.75 h of paced
+    guesses, then fires the instant each 15-min wait ends — the owner never gets a turn; a botnet
+    does it in seconds. That is the lockout Q5 removed, just slower to start. **Fix: known devices**
+    (OWASP "device cookies"): a successful sign-in gives that browser an HttpOnly cookie holding a
+    random device id and a server HMAC tag binding it to that email. A request carrying a valid tag
+    for the email it signs in to is counted only against its own (device, email) bucket; everyone
+    else shares the email's "unknown devices" bucket. An attacker can slow only unknown devices.
+  - **A completed password reset forgives that login's slow-downs** (its unknown-devices bucket and
+    every device bucket for the email — keys are `signin-device:<h(email)>:<h(device)>`, cleared by
+    prefix) and marks the resetting browser as known. Otherwise the commonest case — forgot the
+    password, tried 8 times on the phone, reset in Safari, back to the app — waits out the backoff.
+  - numbers (constants, reported to the owner): known device and unknown devices alike: 5 free, then
+    30 s doubling to a 15-min cap, forgotten after 1 h idle (the old code's window); a success clears
+    the bucket it was counted against. forgot-password: 3 free per email, then 5 min doubling to a
+    1-h cap, forgotten after 24 h idle, every request counted; refused requests send nothing and
+    leave the live link. Admin sign-in the same as merchant, own buckets and cookie.
+  - worst case against one account ≈ 4 guesses/hour (~100/day) from anywhere; the old lockout
+    allowed 5 per 15 min (~480/day). Note: passwords need only 6 characters (`resetPasswordSchema`).
+  - storage: `takeAuthThrottleSlot(buckets, now)` all-or-nothing (insert-if-missing in key order,
+    `SELECT … FOR UPDATE` in key order, re-insert if a reclaim deleted one mid-take);
+    `settleAuthThrottle(buckets, "success"|"void")` (clear, or give back this attempt's charge);
+    `forgetAuthThrottle(keys, prefixes)`; rows idle > 24 h reclaimed. Pure planner shared by both
+    storages (`server/auth-throttle.ts`); cookie in `server/sign-in-device.ts`.
+  - not throttled, by design: reset-link and Google one-time-code redemption (256-bit, single use).
+    Google callback: address-only, so phase B.
+  - found, not in C: `authenticateUser` returns early for an unknown email and runs bcrypt only for
+    a real one — the time taken tells an attacker which emails have logins.
+  - **red first (22:3x UTC):** `server/__tests__/auth-throttle.test.ts` (15) +
+    `support/admin-sign-in-test-env.ts` on the unchanged code: 15/15 FAIL. Reasons: the 5th wrong
+    password is refused 429 (locked) — tests 1–3, 7–10, admin 1 (each re-run alone, because in one
+    file the old per-IP map is shared: after 20 failures from 127.0.0.1 every later test got 429 —
+    finding 6 reproduced in the harness); no device mark is set — 4–6, reset, admin 2;
+    forgot-password never refuses — both forgot tests. Burst: old checks 12 of 12 passwords.
+  - client red first: `client/src/pages/login-slow-down.test.tsx` 2/2 FAIL — the old page shows
+    `429: {"code":"TOO_MANY_ATTEMPTS",…}` and `401: {"message":…}` raw.
+  - **built (uncommitted):** `server/auth-throttle.ts` (policies, HMAC keys, pure planner, refusal
+    words), `server/sign-in-device.ts` (mark), storage (both: `takeAuthThrottleSlot`,
+    `settleAuthThrottle`, `forgetAuthThrottle`; Mem cleared by `clearAllMerchants`), routes (merchant
+    + admin sign-in, forgot-password, reset completion), `auth.ts` old maps/timer removed,
+    `login.tsx` → `apiErrorMessage`. tsc clean. Green: throttle HTTP 15/15, rules 20/20
+    (`auth-throttle-rules.test.ts`), login page 7/7 (new 2 + phase A 5).
+  - full suites: tsc clean; client 70/616; server 69/1344 after `jest.setTimeout(30_000)` in
+    auth-throttle.test.ts (the reset test timed out at 5 s under full load: ~20 bcrypt-12 checks;
+    `testTimeout: 15_000` in jest.server.config.cjs is ignored in multi-project runs).
+  - **Real PostgreSQL 16.10** (`scripts/verify-google-handoff-postgres.ts`, +8 phase C checks):
+    23/23. Mutations, storage.ts restored identical each time: no `FOR UPDATE` → burst 24 of 24
+    through (5 expected) and 5 checks fail; no re-insert loop → only the vanished-row check fails;
+    no LIKE escaping → only the forget check fails.
+  - **self-review found (both fixed test-first):**
+    1. the reclaim `DELETE … IN (SELECT … LIMIT 100)` queued behind a row another attempt held,
+       and (subquery fixed at statement start) could then delete that row after it had been counted
+       afresh. New verifier check red (`'blocked' !== 'done'`) → `FOR UPDATE SKIP LOCKED` → green.
+    2. **change-password's current-password check had no limit**: with a stolen session, unlimited
+       guesses, then change the password. Same class as sign-in (plan scope said sign-in, reset,
+       Google), so added: `passwordChangeBucket(userId)`, SIGN_IN_POLICY. 3 HTTP tests red (no 429)
+       → green. Desktop settings already shows the server's message (`apiErrorMessage`).
+  - now: throttle HTTP 18/18, rules 20/20, PostgreSQL 24/24. Full: tsc clean, client 70/616,
+    server 69/1347.
+  - **real browser** (`scripts/verify-r1-t4-throttle-browser.mjs` + `r1-t4-throttle-probe-server.ts`:
+    real routes + real login page via Vite, in-memory storage, `env`-clean, Chromium): 12/12;
+    screenshots `r1-t4-phase-c-2026-09-22/`. Same probe on `b9c947bb` (worktree): 7 FAIL — incl.
+    the merchant's laptop refused 429 during someone else's guesses. Old-code burst, measured in a
+    worktree: 12 of 12 passwords checked (statuses 4×401, 8×429).
+  - side effect, owned: `git worktree prune` after removing my worktree also pruned the stale
+    `wt-clean` entry (2026-09-21 history clean; its branch `r1-clean-tmp` already gone; backup
+    branch intact) — partially: its `config.worktree` is a sandbox mount (EBUSY). Nothing lost.
+  - committed `e60e90c0` (13 files, explicit paths; `.replit` is not this work and stays
+    unstaged); evidence, screenshots, ledger in the docs commit after it.
+- [ ] 5 — B: the `TRUST_PROXY_HOPS` setting (off by default) and spoofed-header tests, **plus the
+  address-keyed limits moved here from C**: per-address buckets for sign-in (refunded on success,
+  never cleared), forgot-password and the Google callback — active only when the setting says the
+  client address is real.
+- [ ] 6

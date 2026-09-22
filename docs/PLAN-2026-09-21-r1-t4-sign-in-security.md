@@ -52,6 +52,11 @@ independent review of plan §21.1 before it merges.
 | **D — cancel sessions** | A per-user "valid after" time: tokens issued before it are refused. Set on password reset and a new "sign out everywhere". | small, one migration | — |
 | **E — the full session rebuild** | What plan R1-T4 ultimately requires: revocable server-side sessions with rotating refresh credentials; on the web an `HttpOnly`/`SameSite` `__Host-` cookie plus a CSRF token; in the phone app the refresh credential in iOS Keychain; exact CORS allowlist. This also ends the hourly sign-out. It changes how every screen and the phone app authenticate. | large; its own design and review | Q2 |
 
+**2026-09-22:** C shipped (`e60e90c0`) without its address-keyed parts: per-address limits and the
+Google-callback limit moved to **B**, because until B tells the app how many proxies stand in front
+of it every visitor may share the proxy's address. C added known devices and a change-password limit
+([evidence](evidence/remediation-v2-2/r1/R1-T4-phase-C-throttling-2026-09-22.md)).
+
 A–D are self-contained and each closes a specific finding; E is the architectural change and should
 be designed separately once A–D have landed. Sign in with Apple (R1-T5) builds on A's primitives.
 
