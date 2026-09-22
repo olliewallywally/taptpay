@@ -39,5 +39,8 @@ and deleted at the end. Decision: `docs/decisions/2026-09-21-r1-t4-t9-owner-answ
     `users.session_version` (0027), Drizzle's `select()` asks for it, and the dev database has
     migrations only through 0023. `POST /api/auth/login` with a made-up email → HTTP 500; the same
     SELECT without the column succeeds. Fix = apply 0024–0028 to dev (0025 needs a gap-13 ownership
-    inventory for dev) — owner approval required; asked 2026-09-22.
+    inventory for dev) — owner approval required; asked 2026-09-22. **Approved and done**
+    ([decision + outcome](../../../decisions/2026-09-22-apply-0024-0028-to-dev.md)): released with
+    the inventory as drafted (2 files: 1 owner, 1 locked; no owner changed); dev status 30/0/0/0;
+    the sign-in probe answers 401 again.
 - [ ] 3  - [ ] 4  - [ ] 5  - [ ] 6
