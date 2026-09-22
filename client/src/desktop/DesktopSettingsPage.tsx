@@ -435,9 +435,13 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
       }
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: unknown) => {
+      // The change ended every session of this login (R1-T4 phase D); this device
+      // carries on under the fresh token the server returned.
+      const token = (data as { token?: unknown } | null)?.token;
+      if (typeof token === "string" && token) localStorage.setItem("authToken", token);
       setPw({ currentPassword: "", newPassword: "", confirmPassword: "" });
-      toast({ title: "Password changed" });
+      toast({ title: "Password changed", description: "Your other devices have been signed out." });
     },
     onError: (error: unknown) => toast({ title: apiErrorMessage(error, "Failed to change password"), variant: "destructive" }),
   });

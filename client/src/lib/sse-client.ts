@@ -8,6 +8,14 @@ export interface SSEMessage {
 
 type Listener = (data: SSEMessage) => void;
 
+function readStoredToken(): string | null {
+  try {
+    return localStorage.getItem("authToken");
+  } catch {
+    return null;
+  }
+}
+
 export class SSEClient {
   private eventSource: EventSource | null = null;
   private abortController: AbortController | null = null;
@@ -59,18 +67,24 @@ export class SSEClient {
 
   private async consumeMerchantStream(merchantId: number, token: string, signal: AbortSignal) {
     const decoder = new TextDecoder();
+    let current = token;
     while (!signal.aborted) {
+      // R1-T4 phase D: a password change ends this login's streams and hands this
+      // device a fresh token, so reconnect with the token the device now holds.
+      current = readStoredToken() ?? current;
       try {
         const response = await fetch(`/api/merchants/${merchantId}/events`, {
           headers: {
             Accept: "text/event-stream",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${current}`,
           },
           credentials: "include",
           cache: "no-store",
           signal,
         });
         if (response.status === 401 || response.status === 403) {
+          const latest = readStoredToken();
+          if (latest && latest !== current) continue; // a fresh token arrived meanwhile
           console.error("Merchant SSE authentication expired or was revoked");
           return;
         }

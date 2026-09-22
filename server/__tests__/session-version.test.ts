@@ -151,6 +151,41 @@ describe("session versions", () => {
     }
   });
 
+  it("a password change ends every other session and keeps this device signed in", async () => {
+    const { app } = await createTestApp();
+    const disconnect = jest.spyOn(sseBroker, "disconnectUser");
+    try {
+      const owner = await createOwnerPrincipal();
+      const otherDevice = await passwordLogin(app, owner.user.email);
+
+      const change = await request(app).put(`/api/merchants/${owner.merchantId}/change-password`)
+        .set(bearer(owner))
+        .send({ currentPassword: VALID_PASSWORD, newPassword: "Changed789", confirmPassword: "Changed789" });
+      expect(change.status).toBe(200);
+      expect(typeof change.body.token).toBe("string");
+      expect(sessionVersionOf(change.body.token)).toBe(1);
+
+      await expectSessionEnded(app, owner.token);
+      await expectSessionEnded(app, otherDevice);
+      expect((await me(app, change.body.token)).status).toBe(200);
+      expect(disconnect).toHaveBeenCalledWith(owner.merchantId, owner.user.id);
+      expect((await me(app, await passwordLogin(app, owner.user.email, "Changed789"))).status).toBe(200);
+    } finally {
+      disconnect.mockRestore();
+    }
+  });
+
+  it("a refused password change ends nothing", async () => {
+    const { app } = await createTestApp();
+    const owner = await createOwnerPrincipal();
+    const change = await request(app).put(`/api/merchants/${owner.merchantId}/change-password`)
+      .set(bearer(owner))
+      .send({ currentPassword: "not-the-password", newPassword: "Changed789", confirmPassword: "Changed789" });
+    expect(change.status).toBe(400);
+    expect(change.body.token).toBeUndefined();
+    expect((await me(app, owner.token)).status).toBe(200);
+  });
+
   it("Google sign-in issues its token under the current session version", async () => {
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();

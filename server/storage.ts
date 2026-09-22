@@ -742,6 +742,7 @@ export interface IStorage extends PaymentAttemptRepository {
   getUserByInviteToken(tokenHash: string): Promise<User | undefined>;
   activateInvitedUser(userId: number, tokenHash: string, passwordHash: string, name?: string | null, now?: Date): Promise<User | null>;
   recordUserLogin(userId: number, at: Date): Promise<void>;
+  /** Sets a login's password and ends every session issued before it (advances session_version). */
   updateUserPassword(userId: number, passwordHash: string): Promise<User | null>;
   setUserResetToken(
     userId: number,
@@ -3887,6 +3888,8 @@ export class MemStorage implements IStorage {
       const user = this.users.get(userId);
       if (!user) return null;
       user.password = passwordHash;
+      // R1-T4 phase D: a password change ends every session issued before it.
+      user.sessionVersion = (user.sessionVersion ?? 0) + 1;
       if (user.role === "owner" && user.merchantId != null) {
         const merchant = this.merchants.get(user.merchantId);
         if (merchant) {
@@ -7499,7 +7502,8 @@ export class DatabaseStorage implements IStorage {
     return this.db.transaction(async (tx) => {
       const result = await tx
         .update(users)
-        .set({ password: passwordHash })
+        // R1-T4 phase D: a password change ends every session issued before it.
+        .set({ password: passwordHash, sessionVersion: sql`${users.sessionVersion} + 1` })
         .where(eq(users.id, userId))
         .returning();
       const updated = result[0] ?? null;

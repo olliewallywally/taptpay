@@ -15,7 +15,7 @@ import {
 import { TUTORIAL_PAGE_KEYS, isTutorialPageKey } from "@shared/tutorial";
 import { inviteTeamMemberSchema, acceptInviteSchema, retailTransactionCreateRequestSchema, updateMerchantDetailsSchema, updateThemeSchema, updateDailyGoalSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema, pushNotificationPreferencesSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createClientProfileSchema, updateClientProfileSchema, createQuoteSchema, acceptQuoteSchema, createJobInvoiceSchema, markJobPaidExternalSchema, createJobScheduleSchema, updateJobScheduleSchema, updateTradeReminderSettingsSchema, updateTradeGstSettingsSchema } from "@shared/schema";
 import { windcaveService, isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, getWindcaveEnv, submitGooglePayToken, createAttendedSession, submitTapToPayToken, createCardStorageSession, queryStoredCardSession, chargeStoredCard } from "./windcave";
-import { authenticateUser, generateToken, authenticateToken, createUser, issueTokenForUserId, isAccountOwner, requestPasswordReset, resetPassword, validateResetToken, type AuthenticatedRequest, isAccountLocked, isIPRateLimited, recordFailedLogin, clearFailedAttempts, logSecurityEvent, syncVerifiedMerchants } from "./auth";
+import { authenticateUser, generateToken, authenticateToken, createUser, issueTokenForUserId, tokenForUserRow, isAccountOwner, requestPasswordReset, resetPassword, validateResetToken, type AuthenticatedRequest, isAccountLocked, isIPRateLimited, recordFailedLogin, clearFailedAttempts, logSecurityEvent, syncVerifiedMerchants } from "./auth";
 import {
   HANDOFF_CODE_TTL_MS, clearSignInCookie, googleVerifiedEmail, handoffCodeHash, newHandoffCode, readCookie,
   signInCookies, startGoogleSignIn, verifyGoogleSignInState,
@@ -3745,13 +3745,21 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
 
       const newPasswordHash = await bcrypt.hash(newPassword, 12);
+      // Also ends every session of this login (R1-T4 phase D, owner decision
+      // 2026-09-22): this device carries on under the fresh token returned below.
       const updated = await storage.updateUserPassword(userId, newPasswordHash);
 
       if (!updated) {
         return res.status(500).json({ message: "Failed to update password" });
       }
+      sseBroker.disconnectUser(merchantId, userId);
+      const token = tokenForUserRow(updated);
+      if (!token) {
+        return res.status(500).json({ message: "Password changed. Please sign in again." });
+      }
 
-      res.json({ message: "Password updated successfully" });
+      res.set("Cache-Control", "no-store");
+      res.json({ message: "Password updated successfully", token });
 
     } catch (error) {
       console.error("Change password error:", error);

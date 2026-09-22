@@ -345,6 +345,12 @@ export async function issueTokenForUserId(userId: number): Promise<{ token: stri
   return { token: generateToken(user), merchantId: user.merchantId };
 }
 
+/** A token for a users row just read or updated, under its current session version; null if it is not a merchant login. */
+export function tokenForUserRow(row: Parameters<typeof userRowToUser>[0]): string | null {
+  const user = userRowToUser(row);
+  return user ? generateToken(user) : null;
+}
+
 export function generateToken(user: User): string {
   const userId = user.userId ?? user.id;
   if (!isPositiveInteger(userId) || typeof user.email !== 'string' || !user.email) {

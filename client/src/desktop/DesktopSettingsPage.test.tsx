@@ -540,6 +540,9 @@ describe("desktop settings: sign out of all devices", () => {
       if (method === "GET" && path.startsWith("/api/subscription/billing-history")) {
         return jsonResponse({ history: [] });
       }
+      if (method === "PUT" && path === "/api/merchants/42/change-password") {
+        return jsonResponse({ message: "Password updated successfully", token: "fresh.jwt.token" });
+      }
       throw new Error(`Unexpected apiRequest: ${method} ${path}`);
     });
     fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
@@ -588,6 +591,22 @@ describe("desktop settings: sign out of all devices", () => {
     })));
     expect(localStorage.getItem("authToken")).toBe("merchant.jwt.token");
     expect(mockSetLocation).not.toHaveBeenCalled();
+  });
+
+  it("keeps this device signed in under the fresh token after a password change", async () => {
+    renderPage();
+    await userEvent.click(await screen.findByRole("button", { name: "Account" }));
+    await userEvent.type(screen.getByLabelText("current password"), "old-password");
+    await userEvent.type(screen.getByLabelText("new password"), "new-password");
+    await userEvent.type(screen.getByLabelText("confirm password"), "new-password");
+    await userEvent.click(screen.getByRole("button", { name: "Change password" }));
+
+    await waitFor(() => expect(localStorage.getItem("authToken")).toBe("fresh.jwt.token"));
+    expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Password changed",
+      description: "Your other devices have been signed out.",
+    }));
+    expect(mockSetLocation).not.toHaveBeenCalledWith("/login");
   });
 
   it("signs this device out, without claiming success, when its session had already ended", async () => {
