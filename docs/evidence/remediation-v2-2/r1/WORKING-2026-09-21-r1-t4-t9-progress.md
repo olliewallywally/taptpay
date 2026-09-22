@@ -45,4 +45,8 @@ and deleted at the end. Decision: `docs/decisions/2026-09-21-r1-t4-t9-owner-answ
     the sign-in probe answers 401 again.
   - evidence and review brief: `R1-T4-phase-A-google-sign-in-2026-09-22.md`; real-browser probe
     `scripts/verify-r1-t4-analytics-browser.mjs` 30/30 on the build (pre-fix build: 19 FAIL).
-- [ ] 3  - [ ] 4  - [ ] 5  - [ ] 6
+- [x] 3 — phase D **done 2026-09-22**, `44a5cfc2`
+  ([evidence](R1-T4-phase-D-sessions-2026-09-22.md)): `sv` in tokens, 401 `SESSION_ENDED`,
+  `POST /api/auth/sign-out-everywhere`, the reset advances the version, SSE streams closed, UI on
+  phone, tablet and desktop. Owner questions: password change; push subscriptions per login.
+- [ ] 4  - [ ] 5  - [ ] 6
