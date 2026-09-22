@@ -43,4 +43,6 @@ and deleted at the end. Decision: `docs/decisions/2026-09-21-r1-t4-t9-owner-answ
     ([decision + outcome](../../../decisions/2026-09-22-apply-0024-0028-to-dev.md)): released with
     the inventory as drafted (2 files: 1 owner, 1 locked; no owner changed); dev status 30/0/0/0;
     the sign-in probe answers 401 again.
+  - evidence and review brief: `R1-T4-phase-A-google-sign-in-2026-09-22.md`; real-browser probe
+    `scripts/verify-r1-t4-analytics-browser.mjs` 30/30 on the build (pre-fix build: 19 FAIL).
 - [ ] 3  - [ ] 4  - [ ] 5  - [ ] 6
