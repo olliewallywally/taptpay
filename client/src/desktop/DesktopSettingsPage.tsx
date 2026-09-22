@@ -10,6 +10,7 @@ import { apiErrorMessage } from "@/lib/api-error";
 import { apiRequest } from "@/lib/queryClient";
 import { useTutorial } from "@/features/tutorial/tutorial";
 import { useToast } from "@/hooks/use-toast";
+import { SIGN_OUT_EVERYWHERE_CONFIRMATION, signOutEverywhere } from "@/lib/sign-out-everywhere";
 import {
   BILLING_CARD_SESSION_KEY,
   useBillingCardReturn,
@@ -521,6 +522,23 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
     setLocation("/login");
   };
 
+  const signOutAllDevices = async () => {
+    if (!window.confirm(SIGN_OUT_EVERYWHERE_CONFIRMATION)) return;
+    try {
+      const outcome = await signOutEverywhere();
+      toast(outcome === "ended"
+        ? { title: "Signed out of all devices" }
+        : { title: "Already signed out", description: "Sign in again to sign out your other devices." });
+      logout();
+    } catch (error) {
+      toast({
+        title: "Couldn't sign out of all devices",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const pickHistoryStart = (v: HistoryStart) => {
     setHistoryStart(v);
     writeDesktopPrefs(merchantId, { historyStart: v });
@@ -617,6 +635,9 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
           <button type="button" className="ds-logout" onClick={logout} data-testid="button-logout">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={RED} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M9 4H5v16h4" /><path d="M14 8l4 4-4 4M18 12H9" /></svg>
             <span>Log Out</span>
+          </button>
+          <button type="button" className="ds-logout-all" onClick={signOutAllDevices} data-testid="button-sign-out-everywhere">
+            Sign out of all devices
           </button>
         </div>
 
@@ -1167,6 +1188,8 @@ const DS_CSS = `
 .ds-mode-sub { font-weight:600; font-size:10.5px; }
 .ds-logout { margin-top:auto; display:inline-flex; align-items:center; justify-content:center; gap:10px; height:52px; border-radius:9999px; border:1.5px solid rgba(240,74,84,0.55); background:transparent; font-weight:700; font-size:14px; color:${RED}; cursor:pointer; transition:background .15s ease; }
 .ds-logout:hover { background:rgba(240,74,84,0.08); }
+.ds-logout-all { margin-top:4px; height:52px; border:none; border-radius:9999px; background:transparent; font-weight:600; font-size:13px; color:rgba(255,255,255,0.55); cursor:pointer; transition:color .15s ease; }
+.ds-logout-all:hover { color:#FFFFFF; }
 
 /* ── right column ── */
 .ds-right { flex:1; display:flex; flex-direction:column; gap:12px; min-width:0; overflow-y:auto; scrollbar-width:none; }

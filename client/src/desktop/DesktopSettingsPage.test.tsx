@@ -8,9 +8,11 @@ import { DesktopSettingsPage } from "./DesktopSettingsPage";
 
 const mockSetPreference = jest.fn();
 const mockRestartTutorials = jest.fn();
+const mockSetLocation = jest.fn();
+const mockToast = jest.fn();
 
 jest.mock("wouter", () => ({
-  useLocation: () => ["/settings", jest.fn()],
+  useLocation: () => ["/settings", mockSetLocation],
 }));
 
 jest.mock("@/lib/auth", () => ({
@@ -22,7 +24,7 @@ jest.mock("@/lib/queryClient", () => ({
 }));
 
 jest.mock("@/hooks/use-toast", () => ({
-  useToast: () => ({ toast: jest.fn() }),
+  useToast: () => ({ toast: mockToast }),
 }));
 
 jest.mock("@/features/tutorial/tutorial", () => ({
@@ -494,5 +496,108 @@ describe("desktop settings business-details save contract", () => {
     });
     expect(sessionStorage.getItem(BILLING_CARD_SESSION_KEY)).toBeNull();
     expect(window.location.search).toBe("?section=billing");
+  });
+});
+
+// R1-T4 phase D: "Sign out of all devices" ends every session of this login.
+describe("desktop settings: sign out of all devices", () => {
+  const fetchMock = global.fetch as jest.Mock;
+  const apiRequestMock = apiRequest as jest.Mock;
+  let signOutReply: { ok: boolean; status: number; json: () => Promise<unknown> };
+
+  const renderPage = () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+          queryFn: async ({ queryKey }) => {
+            if (queryKey[0] === "/api/billing/card") return { ready: false, card: null };
+            throw new Error(`Unexpected query: ${String(queryKey[0])}`);
+          },
+        },
+        mutations: { retry: false },
+      },
+    });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <DesktopSettingsPage deviceClass="desktop" vertical="retail" />
+      </QueryClientProvider>,
+    );
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    localStorage.clear();
+    localStorage.setItem("authToken", "merchant.jwt.token");
+    signOutReply = { ok: true, status: 204, json: async () => ({}) };
+    apiRequestMock.mockImplementation(async (method: string, path: string) => {
+      if (method === "GET" && path === "/api/auth/me") {
+        return jsonResponse({ user: { id: 7, email: "owner@example.test", role: "owner" } });
+      }
+      if (method === "GET" && path === "/api/subscription") {
+        return jsonResponse({ subscription: { status: "active", planId: "solo", priceCents: 799, seatLimit: 1, seatsInUse: 1 } });
+      }
+      if (method === "GET" && path.startsWith("/api/subscription/billing-history")) {
+        return jsonResponse({ history: [] });
+      }
+      throw new Error(`Unexpected apiRequest: ${method} ${path}`);
+    });
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url === "/api/merchants/42/profile" && !init?.method) return jsonResponse(safeOwnerProfile);
+      if (url === "/api/auth/sign-out-everywhere" && init?.method === "POST") return signOutReply;
+      throw new Error(`Unexpected fetch: ${init?.method ?? "GET"} ${url}`);
+    });
+  });
+  afterEach(() => jest.restoreAllMocks());
+
+  const signOutCalls = () => fetchMock.mock.calls.filter(([url]) => url === "/api/auth/sign-out-everywhere");
+
+  it("asks first, then ends every session and signs this device out", async () => {
+    const confirm = jest.spyOn(window, "confirm").mockReturnValue(true);
+    renderPage();
+    await userEvent.click(await screen.findByRole("button", { name: "Sign out of all devices" }));
+
+    await waitFor(() => expect(mockSetLocation).toHaveBeenCalledWith("/login"));
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(signOutCalls()).toHaveLength(1);
+    expect(signOutCalls()[0][1]).toEqual({ method: "POST", headers: { Authorization: "Bearer merchant.jwt.token" } });
+    expect(localStorage.getItem("authToken")).toBeNull();
+    expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ title: "Signed out of all devices" }));
+  });
+
+  it("changes nothing when the confirmation is declined", async () => {
+    jest.spyOn(window, "confirm").mockReturnValue(false);
+    renderPage();
+    await userEvent.click(await screen.findByRole("button", { name: "Sign out of all devices" }));
+
+    expect(signOutCalls()).toHaveLength(0);
+    expect(localStorage.getItem("authToken")).toBe("merchant.jwt.token");
+    expect(mockSetLocation).not.toHaveBeenCalled();
+  });
+
+  it("keeps this device signed in and says so when the server fails", async () => {
+    jest.spyOn(window, "confirm").mockReturnValue(true);
+    signOutReply = { ok: false, status: 500, json: async () => ({ message: "Could not sign out everywhere. Please try again." }) };
+    renderPage();
+    await userEvent.click(await screen.findByRole("button", { name: "Sign out of all devices" }));
+
+    await waitFor(() => expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Couldn't sign out of all devices",
+      description: "Could not sign out everywhere. Please try again.",
+      variant: "destructive",
+    })));
+    expect(localStorage.getItem("authToken")).toBe("merchant.jwt.token");
+    expect(mockSetLocation).not.toHaveBeenCalled();
+  });
+
+  it("signs this device out, without claiming success, when its session had already ended", async () => {
+    jest.spyOn(window, "confirm").mockReturnValue(true);
+    signOutReply = { ok: false, status: 401, json: async () => ({ code: "SESSION_ENDED" }) };
+    renderPage();
+    await userEvent.click(await screen.findByRole("button", { name: "Sign out of all devices" }));
+
+    await waitFor(() => expect(mockSetLocation).toHaveBeenCalledWith("/login"));
+    expect(mockToast).not.toHaveBeenCalledWith(expect.objectContaining({ title: "Signed out of all devices" }));
+    expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ title: "Already signed out" }));
   });
 });

@@ -30,6 +30,11 @@ export interface User {
   role: 'owner' | 'member' | 'merchant' | 'admin';
   /** Identity of the users row this principal came from, when there is one. */
   userId?: number;
+  /**
+   * R1-T4 phase D: the users row's session version. Tokens carry the version they
+   * were issued under; a password reset or "sign out everywhere" advances it.
+   */
+  sessionVersion?: number;
   resetToken?: string;
   resetTokenExpiry?: Date;
   createdAt: Date;
@@ -248,6 +253,7 @@ function userRowToUser(row: {
   password: string;
   merchantId: number | null;
   role: string;
+  sessionVersion?: number | null;
   createdAt?: Date | null;
 }): User | null {
   // Admins are environment-backed, never merchant-scoped database users. Unknown
@@ -268,6 +274,7 @@ function userRowToUser(row: {
     password: row.password,
     merchantId: row.merchantId,
     role: row.role,
+    sessionVersion: row.sessionVersion ?? 0,
     createdAt: row.createdAt ?? new Date(),
   };
 }
@@ -366,7 +373,8 @@ export function generateToken(user: User): string {
       userId,
       email: user.email,
       merchantId: user.merchantId,
-      role: user.role
+      role: user.role,
+      sv: user.sessionVersion ?? 0,
     },
     JWT_SECRET,
     { expiresIn: '1h' } // 1 hour as requested
@@ -464,10 +472,15 @@ export async function authenticateToken(req: AuthenticatedRequest, res: Response
     return res.status(401).json({ message: 'Session expired. Please sign in again.' });
   }
 
+  // R1-T4 phase D: tokens issued before session versions carry none and count as
+  // version 0, so they last only until the login's sessions are first ended.
+  const tokenSessionVersion = decoded.sv === undefined ? 0 : decoded.sv;
   if (
     !isPositiveInteger(decoded.merchantId) ||
     !isPositiveInteger(decoded.userId) ||
-    !isMerchantUserRole(decoded.role)
+    !isMerchantUserRole(decoded.role) ||
+    !Number.isInteger(tokenSessionVersion) ||
+    tokenSessionVersion < 0
   ) {
     return res.status(401).json({ code: 'INVALID_SESSION', message: 'Invalid session' });
   }
@@ -488,6 +501,12 @@ export async function authenticateToken(req: AuthenticatedRequest, res: Response
   // within the token's remaining lifetime rather than at its natural expiry.
   if (!userRow || !user || userRow.status !== 'active' || user.merchantId !== decoded.merchantId) {
     return res.status(403).json({ message: 'Access revoked' });
+  }
+
+  // A password reset or "sign out everywhere" advanced the version: every token
+  // issued before it is spent. 401, so the client drops it and signs in again.
+  if (tokenSessionVersion !== (userRow.sessionVersion ?? 0)) {
+    return res.status(401).json({ code: 'SESSION_ENDED', message: 'You were signed out. Please sign in again.' });
   }
 
   const merchant = await readForAuth('read the merchant row', () => storage.getMerchant(decoded.merchantId));
@@ -583,20 +602,29 @@ export async function requestPasswordReset(email: string, baseUrl?: string): Pro
   }
 }
 
-export async function resetPassword(token: string, newPassword: string): Promise<boolean> {
+/**
+ * The login whose password was reset, or null. The reset also ends every session
+ * of that login (R1-T4 phase D); the caller closes its live streams.
+ */
+export async function resetPassword(
+  token: string,
+  newPassword: string,
+): Promise<{ userId: number; merchantId: number } | null> {
   try {
     const { storage } = await import('./storage');
     const tokenHash = hashResetToken(token);
     const now = new Date();
     const candidate = await storage.getUserByResetToken(tokenHash);
-    if (!candidate || !resetEligible(candidate, now)) return false;
+    if (!candidate || !resetEligible(candidate, now)) return null;
 
     const hashedPassword = await bcrypt.hash(newPassword, 12);
     const updated = await storage.resetUserPasswordByToken(tokenHash, hashedPassword, now);
-    return !!updated && isMerchantUserRole(updated.role) && updated.status === 'active';
+    if (!updated || !isMerchantUserRole(updated.role) || updated.status !== 'active') return null;
+    if (!isPositiveInteger(updated.id) || !isPositiveInteger(updated.merchantId)) return null;
+    return { userId: updated.id, merchantId: updated.merchantId };
   } catch (error) {
     console.error('Failed to reset password:', error);
-    return false;
+    return null;
   }
 }
 

@@ -1,4 +1,5 @@
-/** R1-T4 phase A — Google sign-in's one-time code, against real PostgreSQL.
+/** R1-T4 sign-in storage against real PostgreSQL: phase A's one-time code (Google sign-in)
+ * and phase D's session versions (a password reset and "sign out everywhere").
  * Run only against an EMPTY, explicitly marked disposable database:
  * TEST_DATABASE_URL=... TAPTPAY_TEST_DATABASE=1 npx tsx scripts/verify-google-handoff-postgres.ts
  * The URL must carry a user and a password: the migration runner validates its target.
@@ -124,8 +125,35 @@ try {
     await pool.query("DELETE FROM users WHERE id=$1", [member]);
     assert.equal(await stored(hash), undefined);
   });
-  assert.deepEqual(failures, [], "R1-T4 handoff PostgreSQL verification failed");
-  console.log("R1-T4 handoff PostgreSQL verification passed");
+  // Phase D: users.session_version (0027).
+  const versionOf = async (id: number) =>
+    (await pool.query("SELECT session_version FROM users WHERE id=$1", [id])).rows[0].session_version as number;
+  await check("a login starts at session version 0", async () => {
+    assert.equal(await versionOf(await addUser("fresh@r1-t4.test", "member")), 0);
+  });
+  await check("20 simultaneous 'sign out everywhere' from two instances advance it 20 times, none lost", async () => {
+    const login = await addUser("busy@r1-t4.test", "member");
+    const results = await Promise.all(Array.from({ length: 20 }, (_, i) =>
+      (i % 2 ? two : one).advanceUserSessionVersion(login)));
+    assert.ok(results.every(Boolean));
+    assert.equal(await versionOf(login), 20);
+  });
+  await check("a password reset advances it in the same statement that sets the password", async () => {
+    const login = await addUser("reset@r1-t4.test", "member");
+    const resetHash = sha(randomBytes(32).toString("hex"));
+    await one.setUserResetToken(login, resetHash, new Date(Date.now() + 3_600_000));
+    const updated = await two.resetUserPasswordByToken(resetHash, "synthetic-new-hash", new Date());
+    assert.ok(updated, "the reset applied");
+    const row = (await pool.query("SELECT password, reset_token, session_version FROM users WHERE id=$1", [login])).rows[0];
+    assert.deepEqual(row, { password: "synthetic-new-hash", reset_token: null, session_version: 1 });
+    assert.equal(await one.resetUserPasswordByToken(resetHash, "again", new Date()), null, "the reset token is spent");
+    assert.equal(await versionOf(login), 1, "a refused reset advances nothing");
+  });
+  await check("advancing an unknown login reports false", async () => {
+    assert.equal(await one.advanceUserSessionVersion(2_000_000_000), false);
+  });
+  assert.deepEqual(failures, [], "R1-T4 sign-in PostgreSQL verification failed");
+  console.log("R1-T4 sign-in PostgreSQL verification passed");
 } finally {
   await Promise.all(pools.map((p) => p.end()));
 }

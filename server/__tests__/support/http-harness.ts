@@ -71,7 +71,7 @@ function randomEmail(label: string): string {
   return `${label}.${crypto.randomBytes(4).toString("hex")}@harness.test`;
 }
 
-const VALID_PASSWORD = "Harness123";
+export const VALID_PASSWORD = "Harness123";
 
 async function createActiveMerchant(overrides: Partial<Merchant> & { email?: string } = {}): Promise<Merchant> {
   const email = overrides.email ?? randomEmail("owner");

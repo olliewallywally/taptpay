@@ -373,7 +373,7 @@ describe('user-backed password resets', () => {
       resetTokenExpiry: new Date(Date.now() + 60_000),
     });
 
-    await expect(resetPassword(rawToken, 'new-password')).resolves.toBe(true);
+    await expect(resetPassword(rawToken, 'new-password')).resolves.toEqual({ userId: 5, merchantId: 22 });
 
     const [storedTokenHash, storedPasswordHash, now] = storageMock.resetUserPasswordByToken.mock.calls[0];
     expect(storedTokenHash).toBe(tokenHash);
@@ -387,7 +387,7 @@ describe('user-backed password resets', () => {
       resetTokenExpiry: new Date(Date.now() + 60_000),
     });
     storageMock.resetUserPasswordByToken.mockResolvedValue(null);
-    await expect(resetPassword('b'.repeat(64), 'new-password')).resolves.toBe(false);
+    await expect(resetPassword('b'.repeat(64), 'new-password')).resolves.toBeNull();
   });
 
   it('hashes validation tokens and rejects expired ones', async () => {

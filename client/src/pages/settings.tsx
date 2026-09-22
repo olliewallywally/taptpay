@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
+import { SIGN_OUT_EVERYWHERE_CONFIRMATION, signOutEverywhere } from "@/lib/sign-out-everywhere";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -628,6 +629,23 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
   const handleLogout = () => {
     localStorage.removeItem("authToken");
     setLocation('/login');
+  };
+
+  const handleSignOutAllDevices = async () => {
+    if (!window.confirm(SIGN_OUT_EVERYWHERE_CONFIRMATION)) return;
+    try {
+      const outcome = await signOutEverywhere();
+      toast(outcome === "ended"
+        ? { title: "Signed out of all devices" }
+        : { title: "Already signed out", description: "Sign in again to sign out your other devices." });
+      handleLogout();
+    } catch (error) {
+      toast({
+        title: "Couldn't sign out of all devices",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleRestartTutorials = async () => {
@@ -1626,6 +1644,15 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
             <LogOut size={20} />
             Log Out
           </Button>
+          <button
+            type="button"
+            onClick={handleSignOutAllDevices}
+            className="w-full mt-2 py-3 text-sm font-semibold"
+            style={{ color: APPLE_MUTED, background: 'transparent', border: 'none', minHeight: 44 }}
+            data-testid="button-sign-out-everywhere"
+          >
+            Sign out of all devices
+          </button>
         </div>
         </>
         )}

@@ -773,6 +773,26 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
+  // R1-T4 phase D: end every session of the signed-in login, this one included.
+  // Advancing the login's session version spends every token issued before it.
+  app.post("/api/auth/sign-out-everywhere", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    res.set('Cache-Control', 'no-store');
+    const userId = req.user?.userId;
+    if (req.user?.role === 'admin' || !userId) {
+      return res.status(403).json({ message: 'Only a TaptPay login can do this.' });
+    }
+    try {
+      if (!(await storage.advanceUserSessionVersion(userId))) {
+        return res.status(404).json({ message: 'Login not found' });
+      }
+      sseBroker.disconnectUser(req.user!.merchantId, userId);
+      return res.status(204).end();
+    } catch (err) {
+      console.error('[SIGN_OUT_EVERYWHERE]', err);
+      return res.status(500).json({ message: 'Could not sign out everywhere. Please try again.' });
+    }
+  });
+
   // Authentication routes
   app.post("/api/auth/login", async (req, res) => {
     try {
@@ -878,11 +898,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
 
       const { token, password } = validation.data;
-      const success = await resetPassword(token, password);
+      const reset = await resetPassword(token, password);
       
-      if (!success) {
+      if (!reset) {
         return res.status(400).json({ message: "Invalid or expired reset token" });
       }
+      // The reset ended every session of this login; close its live streams too.
+      sseBroker.disconnectUser(reset.merchantId, reset.userId);
       
       res.json({ message: "Password has been successfully reset" });
     } catch (error) {

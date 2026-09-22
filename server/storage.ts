@@ -906,6 +906,8 @@ export interface IStorage extends PaymentAttemptRepository {
   createAuthHandoffCode(input: { codeHash: string; userId: number; newUser: boolean; expiresAt: Date }): Promise<void>;
   /** R1-T4: redeem a handoff code exactly once; undefined when unknown, already used or expired. */
   consumeAuthHandoffCode(codeHash: string, now: Date): Promise<{ userId: number; newUser: boolean } | undefined>;
+  /** R1-T4 phase D: end every session of one login; false when there is no such login. */
+  advanceUserSessionVersion(userId: number): Promise<boolean>;
 }
 
 // A tenant id that can match a real merchant. 0 is the platform admin's
@@ -1066,6 +1068,7 @@ export class MemStorage implements IStorage {
       resetToken: current?.resetToken ?? null,
       resetTokenExpiry: current?.resetTokenExpiry ?? null,
       lastLoginAt: current?.lastLoginAt ?? null,
+      sessionVersion: current?.sessionVersion ?? 0,
       createdAt: current?.createdAt ?? new Date(),
     } as User;
     this.users.set(user.id, user);
@@ -2523,6 +2526,13 @@ export class MemStorage implements IStorage {
     return { userId: row.userId, newUser: row.newUser };
   }
 
+  async advanceUserSessionVersion(userId: number): Promise<boolean> {
+    const user = this.users.get(userId);
+    if (!user) return false;
+    user.sessionVersion = (user.sessionVersion ?? 0) + 1;
+    return true;
+  }
+
   async consumeInvoiceDocumentReadLimit(token: string): Promise<boolean> {
     const now = Date.now();
     for (const [key, row] of this.documentReadLimits) {
@@ -3943,6 +3953,8 @@ export class MemStorage implements IStorage {
       user.password = passwordHash;
       user.resetToken = null;
       user.resetTokenExpiry = null;
+      // R1-T4 phase D: a reset ends every session issued before it.
+      user.sessionVersion = (user.sessionVersion ?? 0) + 1;
       if (user.role === "owner") {
         const merchant = this.merchants.get(user.merchantId);
         if (merchant) {
@@ -7539,6 +7551,8 @@ export class DatabaseStorage implements IStorage {
           password: passwordHash,
           resetToken: null,
           resetTokenExpiry: null,
+          // R1-T4 phase D: a reset ends every session issued before it.
+          sessionVersion: sql`${users.sessionVersion} + 1`,
         })
         .where(and(
           eq(users.resetToken, tokenHash),
@@ -8039,6 +8053,16 @@ export class DatabaseStorage implements IStorage {
       ))
       .returning({ userId: authHandoffCodes.userId, newUser: authHandoffCodes.newUser });
     return rows[0];
+  }
+
+  async advanceUserSessionVersion(userId: number): Promise<boolean> {
+    if (!this.db) throw new Error("Database not connected");
+    // One statement, so concurrent calls each advance it: none is lost.
+    const rows = await this.db.update(users)
+      .set({ sessionVersion: sql`${users.sessionVersion} + 1` })
+      .where(eq(users.id, userId))
+      .returning({ id: users.id });
+    return rows.length === 1;
   }
 
   async consumeInvoiceDocumentReadLimit(token: string): Promise<boolean> {

@@ -78,6 +78,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
   "GET /api/auth/google": {"method":"GET","path":"/api/auth/google","principal":"public","markers":[]},
   "GET /api/auth/google/callback": {"method":"GET","path":"/api/auth/google/callback","principal":"public","markers":[]},
   "POST /api/auth/google/session": {"method":"POST","path":"/api/auth/google/session","principal":"public","markers":[]},
+  "POST /api/auth/sign-out-everywhere": {"method":"POST","path":"/api/auth/sign-out-everywhere","principal":"merchant-user","markers":["authenticateToken"]},
   "POST /api/auth/login": {"method":"POST","path":"/api/auth/login","principal":"public","markers":[]},
   "POST /api/auth/forgot-password": {"method":"POST","path":"/api/auth/forgot-password","principal":"public","markers":["requestPasswordReset("]},
   "POST /api/auth/reset-password": {"method":"POST","path":"/api/auth/reset-password","principal":"public","markers":["resetPassword("]},
