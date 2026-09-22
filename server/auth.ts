@@ -65,24 +65,10 @@ function isPositiveInteger(value: unknown): value is number {
 }
 
 // ============================================
-// LOGIN SECURITY - Brute Force Protection
+// LOGIN SECURITY
 // ============================================
-interface LoginAttempt {
-  count: number;
-  lastAttempt: number;
-  lockoutUntil: number | null;
-}
-
-// Email-based lockout (prevents account enumeration attacks)
-const loginAttempts = new Map<string, LoginAttempt>();
-// IP-based rate limiting (prevents distributed attacks)
-const ipLoginAttempts = new Map<string, LoginAttempt>();
-
-const MAX_LOGIN_ATTEMPTS = 5;
-const MAX_IP_LOGIN_ATTEMPTS = 20; // Allow more attempts per IP (multiple users may share)
-const LOCKOUT_DURATION = 15 * 60 * 1000; // 15 minutes
-const IP_LOCKOUT_DURATION = 30 * 60 * 1000; // 30 minutes for IP-based lockout
-const ATTEMPT_WINDOW = 60 * 60 * 1000; // 1 hour
+// Sign-in and password-reset attempts are throttled in shared storage — slowed
+// down, never locked (R1-T4 phase C): server/auth-throttle.ts, server/sign-in-device.ts.
 
 // Security audit logging - writes to dedicated file with PII redaction
 export function logSecurityEvent(event: string, details: Record<string, any>) {
@@ -115,125 +101,6 @@ export function logSecurityEvent(event: string, details: Record<string, any>) {
     console.error(`[SECURITY_LOG_ERROR] Failed to write audit log for event: ${event}`);
   }
 }
-
-// Check if account is locked out (by email)
-export function isAccountLocked(email: string): { locked: boolean; remainingTime?: number } {
-  const normalizedEmail = email.toLowerCase();
-  const attempt = loginAttempts.get(normalizedEmail);
-  
-  if (!attempt || !attempt.lockoutUntil) {
-    return { locked: false };
-  }
-  
-  const now = Date.now();
-  if (now < attempt.lockoutUntil) {
-    const remainingTime = Math.ceil((attempt.lockoutUntil - now) / 1000 / 60);
-    return { locked: true, remainingTime };
-  }
-  
-  // Lockout expired, reset
-  loginAttempts.delete(normalizedEmail);
-  return { locked: false };
-}
-
-// Check if IP is rate limited
-export function isIPRateLimited(ip: string): { limited: boolean; remainingTime?: number } {
-  const attempt = ipLoginAttempts.get(ip);
-  
-  if (!attempt || !attempt.lockoutUntil) {
-    return { limited: false };
-  }
-  
-  const now = Date.now();
-  if (now < attempt.lockoutUntil) {
-    const remainingTime = Math.ceil((attempt.lockoutUntil - now) / 1000 / 60);
-    return { limited: true, remainingTime };
-  }
-  
-  // Lockout expired, reset
-  ipLoginAttempts.delete(ip);
-  return { limited: false };
-}
-
-// Record failed login attempt (both email and IP tracking)
-export function recordFailedLogin(email: string, ip: string): { locked: boolean; ipLimited?: boolean; attemptsRemaining?: number } {
-  const normalizedEmail = email.toLowerCase();
-  const now = Date.now();
-  
-  // Track by email
-  let emailAttempt = loginAttempts.get(normalizedEmail);
-  if (!emailAttempt || now - emailAttempt.lastAttempt > ATTEMPT_WINDOW) {
-    emailAttempt = { count: 1, lastAttempt: now, lockoutUntil: null };
-  } else {
-    emailAttempt.count++;
-    emailAttempt.lastAttempt = now;
-  }
-  
-  // Track by IP
-  let ipAttempt = ipLoginAttempts.get(ip);
-  if (!ipAttempt || now - ipAttempt.lastAttempt > ATTEMPT_WINDOW) {
-    ipAttempt = { count: 1, lastAttempt: now, lockoutUntil: null };
-  } else {
-    ipAttempt.count++;
-    ipAttempt.lastAttempt = now;
-  }
-  
-  logSecurityEvent('FAILED_LOGIN', { 
-    email: normalizedEmail, 
-    ip, 
-    emailAttemptCount: emailAttempt.count,
-    ipAttemptCount: ipAttempt.count 
-  });
-  
-  // Check IP lockout first (affects all users from that IP)
-  if (ipAttempt.count >= MAX_IP_LOGIN_ATTEMPTS) {
-    ipAttempt.lockoutUntil = now + IP_LOCKOUT_DURATION;
-    ipLoginAttempts.set(ip, ipAttempt);
-    logSecurityEvent('IP_RATE_LIMITED', { ip, lockoutMinutes: IP_LOCKOUT_DURATION / 60000 });
-    return { locked: false, ipLimited: true };
-  }
-  ipLoginAttempts.set(ip, ipAttempt);
-  
-  // Check email lockout
-  if (emailAttempt.count >= MAX_LOGIN_ATTEMPTS) {
-    emailAttempt.lockoutUntil = now + LOCKOUT_DURATION;
-    loginAttempts.set(normalizedEmail, emailAttempt);
-    logSecurityEvent('ACCOUNT_LOCKED', { email: normalizedEmail, ip, lockoutMinutes: LOCKOUT_DURATION / 60000 });
-    return { locked: true };
-  }
-  
-  loginAttempts.set(normalizedEmail, emailAttempt);
-  return { locked: false, attemptsRemaining: MAX_LOGIN_ATTEMPTS - emailAttempt.count };
-}
-
-// Clear failed attempts on successful login
-export function clearFailedAttempts(email: string) {
-  const normalizedEmail = email.toLowerCase();
-  loginAttempts.delete(normalizedEmail);
-  // Note: IP attempts are NOT cleared on successful login to prevent abuse
-}
-
-// Cleanup old login attempts periodically
-const loginAttemptCleanupTimer = setInterval(() => {
-  const now = Date.now();
-  
-  // Clean email-based attempts
-  const emailEntries = Array.from(loginAttempts.entries());
-  for (const [email, attempt] of emailEntries) {
-    if (now - attempt.lastAttempt > ATTEMPT_WINDOW && (!attempt.lockoutUntil || now > attempt.lockoutUntil)) {
-      loginAttempts.delete(email);
-    }
-  }
-  
-  // Clean IP-based attempts
-  const ipEntries = Array.from(ipLoginAttempts.entries());
-  for (const [ip, attempt] of ipEntries) {
-    if (now - attempt.lastAttempt > ATTEMPT_WINDOW && (!attempt.lockoutUntil || now > attempt.lockoutUntil)) {
-      ipLoginAttempts.delete(ip);
-    }
-  }
-}, 10 * 60 * 1000); // Clean up every 10 minutes
-loginAttemptCleanupTimer.unref();
 
 export interface AuthenticatedRequest extends Request {
   user?: User;

@@ -1,6 +1,6 @@
 /** R1-T4 sign-in storage against real PostgreSQL: phase A's one-time code (Google sign-in),
- * phase D's session versions (a password reset and "sign out everywhere"), and the push
- * subscriptions each login now owns (0029).
+ * phase D's session versions (a password reset and "sign out everywhere"), the push
+ * subscriptions each login now owns (0029), and phase C's shared sign-in throttle (0028).
  * Run only against an EMPTY, explicitly marked disposable database:
  * TEST_DATABASE_URL=... TAPTPAY_TEST_DATABASE=1 npx tsx scripts/verify-google-handoff-postgres.ts
  * The URL must carry a user and a password: the migration runner validates its target.
@@ -220,6 +220,114 @@ try {
     await subscribe(merchant, null, push("staying"));
     await pool.query("DELETE FROM users WHERE id=$1", [leaving]);
     assert.deepEqual(Object.keys(await pushRows([push("leaving"), push("staying")])), [push("staying")]);
+  });
+  // Phase C: auth_throttle (0028) — attempts counted across instances, slowed not locked.
+  const throttle = await import("../server/auth-throttle");
+  const { SIGN_IN_POLICY } = throttle;
+  const bucketOf = (key: string) => ({ key, policy: SIGN_IN_POLICY });
+  const throttleRow = async (key: string) => (await pool.query(
+    "SELECT failures, next_allowed_at FROM auth_throttle WHERE bucket_key=$1", [key])).rows[0] as
+    { failures: number; next_allowed_at: Date | null } | undefined;
+  const take = (buckets: { key: string; policy: typeof SIGN_IN_POLICY }[], via = one) =>
+    via.takeAuthThrottleSlot(buckets, new Date());
+  await check("24 simultaneous sign-in attempts from two instances: exactly 5 let through and counted; no email stored", async () => {
+    const bucket = throttle.signInAccountBucket("merchant", "Burst@R1-T4.test");
+    const started = Date.now();
+    const results = await Promise.all(Array.from({ length: 24 }, (_, i) => take([bucket], i % 2 ? two : one)));
+    assert.equal(results.filter((r) => r.allowed).length, 5);
+    const stored = await throttleRow(bucket.key);
+    assert.equal(stored?.failures, 5);
+    const wait = stored!.next_allowed_at!.getTime() - started;
+    assert.ok(wait >= 30_000 && wait < 35_000, `the fifth starts a 30-second wait (${wait} ms)`);
+    assert.ok(!bucket.key.includes("@") && !/burst/i.test(bucket.key), "the key holds no email");
+  });
+  await check("a waiting bucket refuses, says how long, and counts nothing", async () => {
+    const bucket = throttle.signInAccountBucket("merchant", "burst@r1-t4.test");
+    const refused = await take([bucket], two);
+    assert.equal(refused.allowed, false);
+    assert.ok(!refused.allowed && refused.retryAfterMs > 25_000 && refused.retryAfterMs <= 30_000);
+    assert.equal((await throttleRow(bucket.key))?.failures, 5);
+  });
+  await check("an attempt counts against every bucket or none: one waiting bucket refuses the lot", async () => {
+    const waiting = throttle.signInAccountBucket("merchant", "burst@r1-t4.test");
+    const [fresh, other] = [bucketOf("verifier-all-or-none:fresh"), bucketOf("verifier-all-or-none:other")];
+    assert.equal((await take([fresh, waiting])).allowed, false);
+    assert.equal((await throttleRow(fresh.key))?.failures ?? 0, 0, "the free bucket was not counted");
+    assert.equal((await take([other, fresh], two)).allowed, true);
+    assert.deepEqual([(await throttleRow(fresh.key))?.failures, (await throttleRow(other.key))?.failures], [1, 1]);
+  });
+  await check("20 attempts naming two buckets in opposite orders, from two instances: no deadlock, 5 through", async () => {
+    const [a, b] = [bucketOf("verifier-order:a"), bucketOf("verifier-order:b")];
+    const results = await Promise.all(Array.from({ length: 20 }, (_, i) =>
+      take(i % 2 ? [a, b] : [b, a], i % 4 < 2 ? one : two)));
+    assert.equal(results.filter((r) => r.allowed).length, 5);
+    assert.deepEqual([(await throttleRow(a.key))?.failures, (await throttleRow(b.key))?.failures], [5, 5]);
+  });
+  await check("a void attempt gives back its count and its wait; a success clears the bucket", async () => {
+    const bucket = bucketOf("verifier-settle:x");
+    for (let i = 0; i < 5; i += 1) assert.equal((await take([bucket])).allowed, true);
+    assert.ok((await throttleRow(bucket.key))?.next_allowed_at, "the fifth started a wait");
+    await two.settleAuthThrottle([bucket], "void", new Date());
+    assert.deepEqual(await throttleRow(bucket.key), { failures: 4, next_allowed_at: null });
+    assert.equal((await take([bucket])).allowed, true, "let through again at once");
+    await one.settleAuthThrottle([bucket], "success", new Date());
+    assert.deepEqual(await throttleRow(bucket.key), { failures: 0, next_allowed_at: null });
+  });
+  await check("forgetting clears the named keys and every key under a prefix — and nothing else", async () => {
+    const keys = ["signin-device:v1:phone", "signin-device:v1:laptop", "signin-device:v2:phone",
+      "signin-account:v1", "wild_%:1", "wildAB:1"];
+    for (const key of keys) await take([bucketOf(key)]);
+    await two.forgetAuthThrottle(["signin-account:v1"], ["signin-device:v1:", "wild_%:"]);
+    const left = (await pool.query("SELECT bucket_key FROM auth_throttle WHERE bucket_key = ANY($1) ORDER BY 1", [keys]))
+      .rows.map((r) => r.bucket_key);
+    assert.deepEqual(left, ["signin-device:v2:phone", "wildAB:1"]);
+  });
+  await check("rows untouched for a day are reclaimed by the next attempt; a day less a minute stays", async () => {
+    await pool.query(`INSERT INTO auth_throttle(bucket_key, failures, updated_at) VALUES
+      ('verifier-reclaim:old', 3, now() - interval '1 day 1 minute'),
+      ('verifier-reclaim:recent', 3, now() - interval '1 day' + interval '1 minute')`);
+    await take([bucketOf("verifier-reclaim:trigger")], two);
+    assert.equal(await throttleRow("verifier-reclaim:old"), undefined);
+    assert.equal((await throttleRow("verifier-reclaim:recent"))?.failures, 3);
+  });
+  await check("an attempt's reclaim skips a row another attempt holds — never waits for it, never deletes it", async () => {
+    await pool.query(`INSERT INTO auth_throttle(bucket_key, failures, updated_at)
+      VALUES ('verifier-held:stale', 2, now() - interval '2 days')`);
+    const blocker = await pool.connect();
+    let outcome: unknown;
+    try {
+      await blocker.query("BEGIN");
+      await blocker.query("SELECT 1 FROM auth_throttle WHERE bucket_key='verifier-held:stale' FOR UPDATE");
+      outcome = await Promise.race([
+        take([bucketOf("verifier-held:other")], two).then(() => "done"),
+        new Promise((resolve) => setTimeout(resolve, 3_000, "blocked")),
+      ]);
+    } finally {
+      await blocker.query("COMMIT").catch(() => undefined);
+      blocker.release();
+    }
+    assert.equal(outcome, "done", "the attempt queued behind a row it was only tidying away");
+    assert.equal((await throttleRow("verifier-held:stale"))?.failures, 2, "a held row is left for a later reclaim");
+  });
+  await check("a row deleted while an attempt waits to lock it is made again and counted, not lost", async () => {
+    const bucket = bucketOf("verifier-vanish:x");
+    await take([bucket]);
+    const blocker = await pool.connect();
+    try {
+      await blocker.query("BEGIN");
+      await blocker.query("SELECT 1 FROM auth_throttle WHERE bucket_key=$1 FOR UPDATE", [bucket.key]);
+      const pending = take([bucket], two);
+      for (let i = 0; ; i += 1) {
+        const waiting = await pool.query(`SELECT count(*)::int AS n FROM pg_locks WHERE NOT granted`);
+        if (waiting.rows[0].n > 0) break;
+        assert.ok(i < 100, "the attempt never queued behind the lock");
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      await blocker.query("DELETE FROM auth_throttle WHERE bucket_key=$1", [bucket.key]);
+      await blocker.query("COMMIT");
+      assert.equal((await pending).allowed, true);
+      assert.deepEqual(await throttleRow(bucket.key), { failures: 1, next_allowed_at: null });
+    } finally { blocker.release(); }
   });
   assert.deepEqual(failures, [], "R1-T4 sign-in PostgreSQL verification failed");
   console.log("R1-T4 sign-in PostgreSQL verification passed");

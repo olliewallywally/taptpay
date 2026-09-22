@@ -6,6 +6,7 @@ import { z } from "zod";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { apiErrorMessage } from "@/lib/api-error";
 import { trackEvent } from "@/lib/analytics";
 import { SEOHead } from "@/components/SEOHead";
 import { ChevronDown, ArrowLeft } from "lucide-react";
@@ -136,9 +137,11 @@ export default function Login() {
         window.location.href = "/admin";
       }
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       trackEvent("login_failed", { auth_method: "password", login_type: loginType });
-      setErrors({ general: error.message || "Invalid credentials. Please try again." });
+      // The server's words, not the raw "429: {…}" failure text: a slowed-down
+      // sign-in says how long to wait (R1-T4 phase C).
+      setErrors({ general: apiErrorMessage(error, "Invalid credentials. Please try again.") });
     },
   });
 

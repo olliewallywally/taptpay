@@ -3,9 +3,13 @@ import { DEFAULT_PLAN_ID, isUpgrade, planFor, planForOrDefault, type PlanId } fr
 import { decideBilling, failedPaymentUpdates, immediatePlanUpdates, MAX_PAYMENT_ATTEMPTS, nextBillingPeriodStart, nextPeriodUpdates, proratedUpgradeCents, queuedPlanUpdates, renewalPlan } from "./subscription-billing";
 import { getDb, isDatabaseConnected } from "./database";
 import { config } from "./config";
-import { eq, ne, desc, asc, and, inArray, notInArray, gt, gte, lte, lt, or, ilike, sql, isNull, isNotNull } from "drizzle-orm";
+import { eq, ne, desc, asc, and, inArray, notInArray, gt, gte, lte, lt, or, ilike, like, sql, isNull, isNotNull } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
-import { authHandoffCodes, invoiceDocumentAccessAudit, invoiceDocumentReadLimits } from "@shared/schema";
+import { authHandoffCodes, authThrottle, invoiceDocumentAccessAudit, invoiceDocumentReadLimits } from "@shared/schema";
+import {
+  AUTH_THROTTLE_RECLAIM_AFTER_MS, planAuthThrottleTake, settleAuthThrottleRow, uniqueAuthThrottleBuckets,
+  type AuthThrottleBucket, type AuthThrottleOutcome, type AuthThrottleRow, type AuthThrottleTake,
+} from "./auth-throttle";
 import { DOCUMENT_READ_TOKEN_LIMIT, DOCUMENT_READ_WINDOW_MS, documentReadTokenKey } from "./invoice-document-security";
 import type {
   AttachPaymentAttemptSessionRecordInput,
@@ -919,6 +923,16 @@ export interface IStorage extends PaymentAttemptRepository {
   consumeAuthHandoffCode(codeHash: string, now: Date): Promise<{ userId: number; newUser: boolean } | undefined>;
   /** R1-T4 phase D: end every session of one login; false when there is no such login. */
   advanceUserSessionVersion(userId: number): Promise<boolean>;
+  /**
+   * R1-T4 phase C: count one attempt against every bucket — or, when any bucket is
+   * still waiting, count nothing and say how long. All-or-nothing, and atomic across
+   * app instances: a burst of attempts gets exactly the allowance.
+   */
+  takeAuthThrottleSlot(buckets: readonly AuthThrottleBucket[], now: Date): Promise<AuthThrottleTake>;
+  /** R1-T4 phase C: after an attempt was let through — see AuthThrottleOutcome. */
+  settleAuthThrottle(buckets: readonly AuthThrottleBucket[], outcome: AuthThrottleOutcome, now: Date): Promise<void>;
+  /** R1-T4 phase C: forget buckets outright — these keys, and every key starting with a prefix. */
+  forgetAuthThrottle(keys: readonly string[], keyPrefixes: readonly string[]): Promise<void>;
 }
 
 // A tenant id that can match a real merchant. 0 is the platform admin's
@@ -994,6 +1008,7 @@ export class MemStorage implements IStorage {
   private uploadedFileBlobs: Map<string, { mimeType: string; data: Buffer; merchantId: number }>;
   private documentReadLimits = new Map<string, { count: number; expiresAt: number }>();
   private authHandoffCodes = new Map<string, { userId: number; newUser: boolean; expiresAt: Date; consumedAt: Date | null }>();
+  private authThrottleRows = new Map<string, AuthThrottleRow>();
   private documentAccessAudit: Array<{ adminUserId: number; documentName: string }> = [];
 
   constructor() {
@@ -2483,6 +2498,7 @@ export class MemStorage implements IStorage {
     this.accountMutationLocks.clear();
     this.uploadedFileBlobs.clear();
     this.documentReadLimits.clear();
+    this.authThrottleRows.clear();
     this.documentAccessAudit = [];
     console.log("All merchants and transactions cleared from memory");
   }
@@ -2542,6 +2558,33 @@ export class MemStorage implements IStorage {
     if (!user) return false;
     user.sessionVersion = (user.sessionVersion ?? 0) + 1;
     return true;
+  }
+
+  // No await between reading and writing the rows: each call is atomic here.
+  async takeAuthThrottleSlot(buckets: readonly AuthThrottleBucket[], now: Date): Promise<AuthThrottleTake> {
+    const cutoff = now.getTime() - AUTH_THROTTLE_RECLAIM_AFTER_MS;
+    for (const [key, row] of this.authThrottleRows) {
+      if (row.updatedAt.getTime() < cutoff) this.authThrottleRows.delete(key);
+    }
+    const unique = uniqueAuthThrottleBuckets(buckets);
+    const rows = unique.flatMap((bucket) => this.authThrottleRows.get(bucket.key) ?? []);
+    const plan = planAuthThrottleTake(unique, rows, now);
+    if (!plan.allowed) return plan;
+    for (const row of plan.charged) this.authThrottleRows.set(row.bucketKey, row);
+    return { allowed: true };
+  }
+
+  async settleAuthThrottle(buckets: readonly AuthThrottleBucket[], outcome: AuthThrottleOutcome, now: Date): Promise<void> {
+    for (const bucket of uniqueAuthThrottleBuckets(buckets)) {
+      const row = this.authThrottleRows.get(bucket.key);
+      if (row) this.authThrottleRows.set(bucket.key, settleAuthThrottleRow(row, outcome, now));
+    }
+  }
+
+  async forgetAuthThrottle(keys: readonly string[], keyPrefixes: readonly string[]): Promise<void> {
+    for (const key of Array.from(this.authThrottleRows.keys())) {
+      if (keys.includes(key) || keyPrefixes.some((prefix) => key.startsWith(prefix))) this.authThrottleRows.delete(key);
+    }
   }
 
   async consumeInvoiceDocumentReadLimit(token: string): Promise<boolean> {
@@ -8118,6 +8161,69 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, userId))
       .returning({ id: users.id });
     return rows.length === 1;
+  }
+
+  async takeAuthThrottleSlot(buckets: readonly AuthThrottleBucket[], now: Date): Promise<AuthThrottleTake> {
+    const db = this.db; if (!db) throw new Error("Database not connected");
+    const unique = uniqueAuthThrottleBuckets(buckets);
+    if (unique.length === 0) return { allowed: true };
+    const keys = unique.map((bucket) => bucket.key);
+    // Reclaim rows no policy counts any more, a bounded batch per attempt. SKIP
+    // LOCKED: a row another attempt holds is left for later — never waited on, and
+    // never deleted after that attempt has counted it afresh.
+    await db.execute(sql`DELETE FROM auth_throttle WHERE bucket_key IN (
+      SELECT bucket_key FROM auth_throttle
+      WHERE updated_at < ${new Date(now.getTime() - AUTH_THROTTLE_RECLAIM_AFTER_MS)}
+      LIMIT 100 FOR UPDATE SKIP LOCKED)`);
+    return db.transaction(async (tx) => {
+      await tx.execute(sql`SET LOCAL lock_timeout = '2s'`);
+      await tx.execute(sql`SET LOCAL statement_timeout = '5s'`);
+      // Hold every bucket's row, in key order (so two attempts never deadlock),
+      // before deciding: of concurrent attempts on any instance, each sees the
+      // counts the ones before it wrote. A row must exist to be locked, and another
+      // attempt's reclaim or a reset can delete one between the insert and the
+      // lock — so insert again until all are held.
+      let rows: AuthThrottleRow[] = [];
+      for (let round = 0; rows.length < keys.length; round += 1) {
+        if (round === 3) throw new Error("auth throttle rows kept disappearing while being locked");
+        await tx.insert(authThrottle)
+          .values(keys.map((bucketKey) => ({ bucketKey, failures: 0, windowStartedAt: now, nextAllowedAt: null, updatedAt: now })))
+          .onConflictDoNothing();
+        rows = await tx.select().from(authThrottle)
+          .where(inArray(authThrottle.bucketKey, keys))
+          .orderBy(asc(authThrottle.bucketKey))
+          .for("update");
+      }
+      const plan = planAuthThrottleTake(unique, rows, now);
+      // Refused: nothing is counted (a row inserted just now holds zero).
+      if (!plan.allowed) return plan;
+      for (const row of plan.charged) {
+        await tx.update(authThrottle)
+          .set({ failures: row.failures, windowStartedAt: row.windowStartedAt, nextAllowedAt: row.nextAllowedAt, updatedAt: row.updatedAt })
+          .where(eq(authThrottle.bucketKey, row.bucketKey));
+      }
+      return { allowed: true } as const;
+    });
+  }
+
+  async settleAuthThrottle(buckets: readonly AuthThrottleBucket[], outcome: AuthThrottleOutcome, now: Date): Promise<void> {
+    const db = this.db; if (!db) throw new Error("Database not connected");
+    // One row per statement, in key order: each is atomic on its own.
+    for (const { key } of uniqueAuthThrottleBuckets(buckets)) {
+      await db.update(authThrottle)
+        .set(outcome === "success"
+          ? { failures: 0, windowStartedAt: now, nextAllowedAt: null, updatedAt: now }
+          : { failures: sql`GREATEST(${authThrottle.failures} - 1, 0)`, nextAllowedAt: null, updatedAt: now })
+        .where(eq(authThrottle.bucketKey, key));
+    }
+  }
+
+  async forgetAuthThrottle(keys: readonly string[], keyPrefixes: readonly string[]): Promise<void> {
+    const db = this.db; if (!db) throw new Error("Database not connected");
+    if (keys.length > 0) await db.delete(authThrottle).where(inArray(authThrottle.bucketKey, [...keys]));
+    for (const prefix of keyPrefixes) {
+      await db.delete(authThrottle).where(like(authThrottle.bucketKey, `${prefix.replace(/[\\%_]/g, "\\$&")}%`));
+    }
   }
 
   async consumeInvoiceDocumentReadLimit(token: string): Promise<boolean> {

@@ -15,11 +15,13 @@ import {
 import { TUTORIAL_PAGE_KEYS, isTutorialPageKey } from "@shared/tutorial";
 import { inviteTeamMemberSchema, acceptInviteSchema, retailTransactionCreateRequestSchema, updateMerchantDetailsSchema, updateThemeSchema, updateDailyGoalSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema, pushNotificationPreferencesSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createClientProfileSchema, updateClientProfileSchema, createQuoteSchema, acceptQuoteSchema, createJobInvoiceSchema, markJobPaidExternalSchema, createJobScheduleSchema, updateJobScheduleSchema, updateTradeReminderSettingsSchema, updateTradeGstSettingsSchema } from "@shared/schema";
 import { windcaveService, isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, getWindcaveEnv, submitGooglePayToken, createAttendedSession, submitTapToPayToken, createCardStorageSession, queryStoredCardSession, chargeStoredCard } from "./windcave";
-import { authenticateUser, generateToken, authenticateToken, createUser, issueTokenForUserId, tokenForUserRow, isAccountOwner, requestPasswordReset, resetPassword, validateResetToken, type AuthenticatedRequest, isAccountLocked, isIPRateLimited, recordFailedLogin, clearFailedAttempts, logSecurityEvent, syncVerifiedMerchants } from "./auth";
+import { authenticateUser, generateToken, authenticateToken, createUser, issueTokenForUserId, tokenForUserRow, isAccountOwner, requestPasswordReset, resetPassword, validateResetToken, type AuthenticatedRequest, logSecurityEvent, syncVerifiedMerchants } from "./auth";
 import {
   HANDOFF_CODE_TTL_MS, clearSignInCookie, googleVerifiedEmail, handoffCodeHash, newHandoffCode, readCookie,
   signInCookies, startGoogleSignIn, verifyGoogleSignInState,
 } from "./google-sign-in";
+import { passwordChangeBucket, passwordResetBucket, signInAccountBucket, signInDeviceKeyPrefix, tooManyAttempts } from "./auth-throttle";
+import { markSignInDevice, readSignInDevice, signInBucketFor, signInDeviceCookie } from "./sign-in-device";
 import { generateReceiptPdf } from "./pdf-generator";
 import { generateQuotePdf } from "./trades-quote-pdf";
 import { generateBusinessReportPdf } from "./report-generator";
@@ -797,7 +799,19 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  // Authentication routes
+  // Password sign-in — R1-T4 phase C (owner decision 2026-09-21, Q5): attempts are
+  // counted in shared storage before the password is checked, and repeated failures
+  // are slowed down rather than locking the account (server/auth-throttle.ts). A
+  // device that has signed in before is counted on its own, so no one else's
+  // guesses can slow it down (server/sign-in-device.ts).
+  const merchantDeviceCookie = signInDeviceCookie("merchant", getBaseUrl());
+  const adminDeviceCookie = signInDeviceCookie("admin", getBaseUrl());
+  const refuseTooManyAttempts = (res: express.Response, retryAfterMs: number, what: "sign-in" | "password-reset") => {
+    const refusal = tooManyAttempts(retryAfterMs, what);
+    res.set("Retry-After", String(refusal.retryAfterSeconds));
+    return res.status(429).json(refusal.body);
+  };
+
   app.post("/api/auth/login", async (req, res) => {
     try {
       const validation = loginSchema.safeParse(req.body);
@@ -807,53 +821,30 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       const { email, password } = validation.data;
       const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
-      
-      // Check if IP is rate limited (distributed attack protection)
-      const ipStatus = isIPRateLimited(clientIp);
-      if (ipStatus.limited) {
-        logSecurityEvent('LOGIN_BLOCKED_IP_LIMIT', { ip: clientIp });
-        return res.status(429).json({ 
-          message: `Too many login attempts. Please try again in ${ipStatus.remainingTime} minutes.`,
-          rateLimited: true,
-          remainingTime: ipStatus.remainingTime 
-        });
-      }
-      
-      // Check if account is locked (per-email protection)
-      const lockStatus = isAccountLocked(email);
-      if (lockStatus.locked) {
-        logSecurityEvent('LOGIN_BLOCKED_LOCKOUT', { email, ip: clientIp });
-        return res.status(429).json({ 
-          message: `Account temporarily locked. Please try again in ${lockStatus.remainingTime} minutes.`,
-          locked: true,
-          remainingTime: lockStatus.remainingTime 
-        });
+      const device = readSignInDevice(req, merchantDeviceCookie);
+      const bucket = signInBucketFor("merchant", email, device);
+      const slot = await storage.takeAuthThrottleSlot([bucket], new Date());
+      if (!slot.allowed) {
+        logSecurityEvent('LOGIN_SLOWED', { email, ip: clientIp });
+        return refuseTooManyAttempts(res, slot.retryAfterMs, "sign-in");
       }
 
-      const user = await authenticateUser(email, password);
-      
+      let user: Awaited<ReturnType<typeof authenticateUser>>;
+      try {
+        user = await authenticateUser(email, password);
+      } catch (error) {
+        // Not a guess that was answered: give the attempt back.
+        await storage.settleAuthThrottle([bucket], "void", new Date()).catch(() => undefined);
+        throw error;
+      }
       if (!user) {
-        const result = recordFailedLogin(email, clientIp);
-        if (result.ipLimited) {
-          return res.status(429).json({ 
-            message: "Too many login attempts from your location. Please try again in 30 minutes.",
-            rateLimited: true 
-          });
-        }
-        if (result.locked) {
-          return res.status(429).json({ 
-            message: "Too many failed attempts. Account locked for 15 minutes.",
-            locked: true 
-          });
-        }
-        return res.status(401).json({ 
-          message: "Invalid email or password",
-          attemptsRemaining: result.attemptsRemaining 
-        });
+        logSecurityEvent('FAILED_LOGIN', { email, ip: clientIp });
+        return res.status(401).json({ message: "Invalid email or password" });
       }
 
-      // Clear failed attempts on successful login
-      clearFailedAttempts(email);
+      await storage.settleAuthThrottle([bucket], "success", new Date())
+        .catch((error) => console.error("[LOGIN_THROTTLE_CLEAR]", error));
+      markSignInDevice(res, merchantDeviceCookie, device, email);
       logSecurityEvent('LOGIN_SUCCESS', { email, ip: clientIp, userId: user.id });
 
       const token = generateToken(user);
@@ -882,6 +873,15 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
 
       const { email } = validation.data;
+      // R1-T4 phase C: each request sends an email and replaces the live link, so
+      // every one counts, checked before a link is made: a refused request sends
+      // nothing and leaves the link already sent working. Counted per email whether
+      // or not it has a login, so the answer never tells which.
+      const slot = await storage.takeAuthThrottleSlot([passwordResetBucket(email)], new Date());
+      if (!slot.allowed) {
+        logSecurityEvent('PASSWORD_RESET_SLOWED', { email, ip: req.ip || req.socket.remoteAddress || 'unknown' });
+        return refuseTooManyAttempts(res, slot.retryAfterMs, "password-reset");
+      }
       const baseUrl = getBaseUrl(req);
       
       await requestPasswordReset(email, baseUrl);
@@ -912,6 +912,17 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       sseBroker.disconnectUser(reset.merchantId, reset.userId);
       await storage.deactivatePushSubscriptionsForLogin(reset.merchantId, reset.userId)
         .catch((error) => console.error("[RESET_PUSH_STOP]", error));
+      // R1-T4 phase C: the link proved the email is theirs. Forgive the login's
+      // sign-in slow-downs — its unknown devices' and every known device's — and
+      // count this browser as known from now on.
+      const login = await storage.getUserById(reset.userId).catch(() => undefined);
+      if (login?.email) {
+        await storage.forgetAuthThrottle(
+          [signInAccountBucket("merchant", login.email).key],
+          [signInDeviceKeyPrefix("merchant", login.email)],
+        ).catch((error) => console.error("[RESET_THROTTLE_FORGET]", error));
+        markSignInDevice(res, merchantDeviceCookie, readSignInDevice(req, merchantDeviceCookie), login.email);
+      }
       
       res.json({ message: "Password has been successfully reset" });
     } catch (error) {
@@ -935,7 +946,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  // Admin Authentication routes
+  // Admin Authentication routes — slowed down like merchant sign-in (R1-T4 phase C),
+  // with their own buckets and their own known-device mark.
   app.post("/api/admin/auth/login", async (req, res) => {
     try {
       const validation = loginSchema.safeParse(req.body);
@@ -945,88 +957,63 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       const { email, password } = validation.data;
       const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
-      
-      // Check if IP is rate limited (distributed attack protection)
-      const ipStatus = isIPRateLimited(clientIp);
-      if (ipStatus.limited) {
-        logSecurityEvent('ADMIN_LOGIN_BLOCKED_IP_LIMIT', { ip: clientIp });
-        return res.status(429).json({ 
-          message: `Too many login attempts. Please try again in ${ipStatus.remainingTime} minutes.`,
-          rateLimited: true,
-          remainingTime: ipStatus.remainingTime 
-        });
-      }
-      
-      // Check if account is locked (per-email protection)
-      const lockStatus = isAccountLocked(email);
-      if (lockStatus.locked) {
-        logSecurityEvent('ADMIN_LOGIN_BLOCKED_LOCKOUT', { email, ip: clientIp });
-        return res.status(429).json({ 
-          message: `Account temporarily locked. Please try again in ${lockStatus.remainingTime} minutes.`,
-          locked: true,
-          remainingTime: lockStatus.remainingTime 
-        });
+      const device = readSignInDevice(req, adminDeviceCookie);
+      const bucket = signInBucketFor("admin", email, device);
+      const slot = await storage.takeAuthThrottleSlot([bucket], new Date());
+      if (!slot.allowed) {
+        logSecurityEvent('ADMIN_LOGIN_SLOWED', { email, ip: clientIp });
+        return refuseTooManyAttempts(res, slot.retryAfterMs, "sign-in");
       }
       
       // Check for admin credentials
       const adminEmail = config.admin.email;
       const adminPasswordHash = config.admin.passwordHash;
+      let passwordValid = false;
 
       if (adminEmail && email === adminEmail) {
-        let passwordValid = false;
-        if (adminPasswordHash) {
-          passwordValid = await bcrypt.compare(password, adminPasswordHash);
-        } else {
+        if (!adminPasswordHash) {
+          await storage.settleAuthThrottle([bucket], "void", new Date()).catch(() => undefined);
           console.error("CRITICAL: ADMIN_PASSWORD_HASH env var not set. Admin login disabled.");
           return res.status(500).json({ message: "Admin login unavailable - contact system administrator" });
         }
-
-        if (passwordValid) {
-          clearFailedAttempts(email);
-          logSecurityEvent('ADMIN_LOGIN_SUCCESS', { email, ip: clientIp });
-          
-          const adminUser = {
-            id: 1,
-            email: adminEmail,
-            password: "",
-            merchantId: 0,
-            role: "admin" as const,
-            createdAt: new Date(),
-          };
-
-          const token = generateToken(adminUser);
-          
-          return res.json({
-            token,
-            user: {
-              id: adminUser.id,
-              email: adminUser.email,
-              merchantId: adminUser.merchantId,
-              role: adminUser.role,
-            },
-          });
+        try {
+          passwordValid = await bcrypt.compare(password, adminPasswordHash);
+        } catch (error) {
+          await storage.settleAuthThrottle([bucket], "void", new Date()).catch(() => undefined);
+          throw error;
         }
       }
 
-      {
-        const result = recordFailedLogin(email, clientIp);
-        if (result.ipLimited) {
-          return res.status(429).json({ 
-            message: "Too many login attempts from your location. Please try again in 30 minutes.",
-            rateLimited: true 
-          });
-        }
-        if (result.locked) {
-          return res.status(429).json({ 
-            message: "Too many failed attempts. Account locked for 15 minutes.",
-            locked: true 
-          });
-        }
-        return res.status(401).json({ 
-          message: "Invalid admin credentials",
-          attemptsRemaining: result.attemptsRemaining 
-        });
+      if (!passwordValid) {
+        logSecurityEvent('ADMIN_FAILED_LOGIN', { email, ip: clientIp });
+        return res.status(401).json({ message: "Invalid admin credentials" });
       }
+
+      await storage.settleAuthThrottle([bucket], "success", new Date())
+        .catch((error) => console.error("[ADMIN_LOGIN_THROTTLE_CLEAR]", error));
+      markSignInDevice(res, adminDeviceCookie, device, email);
+      logSecurityEvent('ADMIN_LOGIN_SUCCESS', { email, ip: clientIp });
+
+      const adminUser = {
+        id: 1,
+        email: adminEmail!,
+        password: "",
+        merchantId: 0,
+        role: "admin" as const,
+        createdAt: new Date(),
+      };
+
+      const token = generateToken(adminUser);
+      
+      return res.json({
+        token,
+        user: {
+          id: adminUser.id,
+          email: adminUser.email,
+          merchantId: adminUser.merchantId,
+          role: adminUser.role,
+        },
+      });
     } catch (error) {
       logSecurityEvent('ADMIN_LOGIN_ERROR', { error: String(error) });
       res.status(500).json({ message: "Admin login failed" });
@@ -3746,10 +3733,27 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(404).json({ message: "Login not found" });
       }
 
-      const currentPasswordValid = await bcrypt.compare(currentPassword, userRow.password);
+      // R1-T4 phase C: this is a password check too. Unlimited, someone holding a
+      // stolen session could guess the password here, then change it. Counted per
+      // login and slowed down like sign-in.
+      const throttleBucket = passwordChangeBucket(userId);
+      const slot = await storage.takeAuthThrottleSlot([throttleBucket], new Date());
+      if (!slot.allowed) {
+        logSecurityEvent('PASSWORD_CHANGE_SLOWED', { userId });
+        return refuseTooManyAttempts(res, slot.retryAfterMs, "sign-in");
+      }
+      let currentPasswordValid: boolean;
+      try {
+        currentPasswordValid = await bcrypt.compare(currentPassword, userRow.password);
+      } catch (error) {
+        await storage.settleAuthThrottle([throttleBucket], "void", new Date()).catch(() => undefined);
+        throw error;
+      }
       if (!currentPasswordValid) {
         return res.status(400).json({ message: "Current password is incorrect" });
       }
+      await storage.settleAuthThrottle([throttleBucket], "success", new Date())
+        .catch((error) => console.error("[PASSWORD_CHANGE_THROTTLE_CLEAR]", error));
 
       const newPasswordHash = await bcrypt.hash(newPassword, 12);
       // Also ends every session of this login (R1-T4 phase D, owner decision
