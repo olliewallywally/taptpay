@@ -92,7 +92,10 @@ and deleted at the end. Decision: `docs/decisions/2026-09-21-r1-t4-t9-owner-answ
     mobile-header, demo-terminal) are unreachable — left alone.
   - full suites: client 69/614, server 67/1307; CI rehearsal re-run on the final 0029 text:
     31/0/0/0, fingerprint byte-identical, test:fingerprint 28/28. Committed `36a320d6`.
-  - owner questions: apply 0029 to dev (dev push broken until then); disable a teammate → stop
-    their notifications?; confirm resume-on-sign-in after remote sign-out.
+  - owner answered all three (recommended): 0029 applied to dev 08:04 UTC, 31/0/0/0
+    ([decision](../../../decisions/2026-09-22-apply-0029-to-dev.md)); disabling a teammate stops
+    their notifications (`b714efda`, 2 tests red first); resume-on-sign-in confirmed.
+  - dev server still runs the 07:23 server code (no restart loop — do not kill it); correct now
+    that the column exists; picks up `b714efda` on the next Run.
   - then: evidence file + review brief, ledger/task row, commit; owner OK needed to apply 0029 to dev.
 - [ ] 4  - [ ] 5  - [ ] 6

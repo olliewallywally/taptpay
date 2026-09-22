@@ -1,9 +1,11 @@
 # R1-T4 phase D follow-ups — password change, and notifications per login (2026-09-22)
 
-Owner decision: [2026-09-22 answers](../../../decisions/2026-09-22-r1-t4-phase-d-owner-answers.md)
-to open items 1 and 2 of [phase D](R1-T4-phase-D-sessions-2026-09-22.md). Commits (local, not
-pushed): `50a469e7` (password change) and `36a320d6` (notifications). **Not independently reviewed
-yet.** The brief is at the end.
+Owner decisions: [2026-09-22 answers](../../../decisions/2026-09-22-r1-t4-phase-d-owner-answers.md)
+to open items 1 and 2 of [phase D](R1-T4-phase-D-sessions-2026-09-22.md), then the
+[follow-up answers](../../../decisions/2026-09-22-r1-t4-push-follow-up-owner-answers.md) and the
+[dev-database apply of 0029](../../../decisions/2026-09-22-apply-0029-to-dev.md). Commits (local,
+not pushed): `50a469e7` (password change), `36a320d6` (notifications) and `b714efda` (disabling a
+teammate). **Not independently reviewed yet.** The brief is at the end.
 
 **Recovery.** The session doing this work stopped at 07:23 UTC, partway through the notifications
 fix: the container restarted at 07:23:28. The next session recovered it from the transcript
@@ -68,6 +70,10 @@ and the empty-database CI rehearsal (below).
   never remembered a token.
 - **MemStorage `removeTeamMember`** now drops the removed login's subscriptions, as the database's
   `ON DELETE CASCADE` does. It kept them before (test red first).
+- **Disabling a teammate** (`PUT /api/team/:id/status` → `disabled`) stops that login's devices
+  with the same call (`b714efda`; owner answer 1 of the follow-up decision). As in the other
+  routes, the login is disabled first, and a fault is logged (`[TEAM_DISABLE_PUSH_STOP]`), never
+  returned. Removing a teammate already deleted their rows, through the cascade.
 
 ### The fix — client (`client/src/lib/push-device.ts`)
 
@@ -104,15 +110,17 @@ and the empty-database CI rehearsal (below).
    done": it turns notifications off there until they are turned on again. Consequence: whoever
    signs in next on a device that was signed out remotely inherits that device's switch. It shows
    as on, and can be turned off. It moves to their login and business, so nothing reaches a device
-   signed in to someone else.
+   signed in to someone else. **Confirmed by the owner, 2026-09-22** (follow-up answer 2).
 
 ### Tests first
 
-- Server `push-subscriptions-per-login.test.ts`, 11 tests. The crashed pass's 7 were red first (6
+- Server `push-subscriptions-per-login.test.ts`, 13 tests. The crashed pass's 7 were red first (6
   red, 1 green). Its "Log Out stops only that device" case already held for the web route. Added
   today, red first: "sign out everywhere still answers 204 when stopping notifications fails" (was
   500), and "removing a teammate's login takes their devices with it". Added as guards (green
-  before and after): the same fault during a password reset and a password change.
+  before and after): the same fault during a password reset and a password change. Added after the
+  owner's answer, both red first: disabling a teammate stops their devices (both stayed active),
+  and its fault case (no stop was attempted, so nothing was logged).
 - Client:
   - `lib/__tests__/push-device.test.ts`, 15 tests. The module is new.
   - `use-push-notifications-native.test.tsx`: 7 tests, 5 red on the old hook, 2 guards.
@@ -125,7 +133,8 @@ and the empty-database CI rehearsal (below).
 
 ### Verified (2026-09-22)
 
-- **Suites:** client 69 suites / 614 tests; server 67 / 1,307; `tsc` clean.
+- **Suites:** client 69 suites / 614 tests; server 67 / 1,307; `tsc` clean. After `b714efda`:
+  server 67 / 1,309, `tsc` clean.
 - **Real PostgreSQL 16.10**, `scripts/verify-google-handoff-postgres.ts`: 15/15 (10 from phases A
   and D, plus 5 new). It runs 0029 through the project runner, then exercises the actual
   `DatabaseStorage` from two pools. The new checks:
@@ -149,18 +158,16 @@ and the empty-database CI rehearsal (below).
 
 ## Not done / open — for the owner
 
-1. **Apply 0029 to the development database.** Needs approval, as the decision says. The dev server
-   restarted at 07:23:29 on the crashed pass's tree, which already declared the column. So in dev
-   now:
-   - turning notifications on fails, and none are delivered;
-   - "sign out of all devices" answers 500 after ending the sessions, because that process predates
-     today's fix. A restart picks the fix up.
-
-   Nothing crashes: every push read is caught.
-2. **Disabling a teammate** (`PUT /api/team/:id/status` → disabled) closes their live streams but
-   leaves their devices' notifications on. Removing them deletes the rows (cascade). Recommended:
-   stop them on disable too, with the same call. It was outside the approved scope.
-3. **Confirm the resume behaviour** in design choice 2 above.
+1. ~~Apply 0029 to the development database~~: **done at 08:04 UTC**, owner-approved
+   ([decision and outcome](../../../decisions/2026-09-22-apply-0029-to-dev.md)). Status is
+   31/0/0/0, the reads that failed work again, and the two existing rows are unchanged.
+   - Until then, dev push was broken: the dev server restarted at 07:23:29 on the crashed pass's
+     tree, which already declared the column.
+   - The dev server still runs the server code it loaded at 07:23. It is correct now that the
+     column exists, but it lacks `b714efda` until it is restarted (Run). No restart loop wraps
+     it, so killing it would leave dev down.
+2. ~~Disabling a teammate~~: **done** (`b714efda`), owner decision.
+3. ~~Confirm the resume behaviour~~: **confirmed** by the owner.
 4. **Reset is best-effort.** The password reset stops notifications after the reset. If that one
    statement fails, the signed-out devices keep receiving them, and the failure is logged.
    Putting it inside the reset's `UPDATE` would make it atomic, but a fault there would then block
@@ -170,45 +177,49 @@ and the empty-database CI rehearsal (below).
 6. **Unreachable logout code is untouched:** `components/layout.tsx`, `components/navigation.tsx`,
    `components/mobile-header.tsx` (imported nowhere), and `demo-terminal.tsx`'s `handleLogout`
    (never called).
-7. **Independent review** of `50a469e7` and `36a320d6` (plan §21.1).
+7. **Independent review** of `50a469e7`, `36a320d6` and `b714efda` (plan §21.1).
 
 ## Handoff (plan §21.2)
 
 ```text
 Phase / release:        R1-T4 phase D follow-ups (password change; push per login), code complete;
                         not merged, not deployed
-Exact branch and commit: remediation/r1-continuation-20260907 @ 36a320d6 (local); GitHub head 93aa6a0a
+Exact branch and commit: remediation/r1-continuation-20260907 @ b714efda (local); GitHub head 93aa6a0a
 Scope completed:        password change ends other sessions + fresh token; push subscriptions record
                         their login; Log Out / sign-out-everywhere / reset / password change stop
-                        the right devices; per-iPhone off; app-open re-registration
+                        the right devices; per-iPhone off; app-open re-registration; disabling a
+                        teammate stops their devices
 Files changed:          `git diff --stat 6abc2a03 50a469e7` (9 files); `git diff --stat 50a469e7
-                        36a320d6` (22 files, most lines the recorded fingerprint JSON)
-Migrations:             0029 (9899463a…401c2), additive; applied to no database
-Commands run:           tsc; jest client 69/614, server 67/1307; verify-google-handoff-postgres 15/15;
+                        36a320d6` (22 files, most lines the recorded fingerprint JSON);
+                        `git diff --stat a7dc7db5 b714efda` (2 code files + 1 decision)
+Migrations:             0029 (9899463a…401c2), additive; applied to the development database only
+                        (2026-09-22 08:04 UTC, owner decision; 31/0/0/0)
+Commands run:           tsc; jest client 69/614, server 67/1309; verify-google-handoff-postgres 15/15;
                         CI convergence rehearsal 31/0/0/0 + fingerprint byte-identical;
                         test:fingerprint 28/28
 Negative tests:         mutated storage → the 2 targeted PostgreSQL checks FAIL; old pages/hook/App →
-                        10 red; sign-out-everywhere fault → 500 before the fix
+                        10 red; sign-out-everywhere fault → 500 before the fix; team disable → 2 red
 Provider/UAT activity:  none (no push sent; test VAPID keys generated per run)
 Security/privacy:       signed-out devices stop receiving payment notifications; one iPhone's "off"
                         no longer affects the business's other iPhones
-Rollback:               revert 36a320d6 (0029 may stay: the old schema never selects user_id);
-                        revert 50a469e7 separately
-Approvals:              owner 2026-09-22 (both); dev-database apply of 0029 and §21.1 review owed
+Rollback:               revert b714efda, then 36a320d6 (0029 may stay: the old schema never selects
+                        user_id); revert 50a469e7 separately
+Approvals:              owner 2026-09-22 (all four answers); §21.1 review owed
 Next phase:             C (shared throttling, slow down instead of lockout), then B, R1-T9 rollout
 ```
 
 ## Independent review — brief
 
-**Range:** `6abc2a03..36a320d6` (two code commits), local only.
+**Range:** `6abc2a03..b714efda` (three code commits and one docs commit), local only.
 
 Paste-ready prompt:
 
 > You are the independent security reviewer for TaptPay, a payment-terminal SaaS. Review commits
-> `50a469e7` and `36a320d6` on branch `remediation/r1-continuation-20260907` (range
-> `6abc2a03..36a320d6`): R1-T4 phase D follow-ups. A signed-in password change now ends every other
+> `50a469e7`, `36a320d6` and `b714efda` on branch `remediation/r1-continuation-20260907` (range
+> `6abc2a03..b714efda`): R1-T4 phase D follow-ups. A signed-in password change now ends every other
 > session. Push subscriptions now record the login that made them (migration 0029). Log Out, "sign
-> out everywhere", a password reset and a password change stop the right devices' notifications.
+> out everywhere", a password reset, a password change and disabling a teammate stop the right
+> devices' notifications.
 > Start from `docs/evidence/remediation-v2-2/r1/R1-T4-phase-D-follow-ups-2026-09-22.md`; treat it
 > as claims and re-derive everything from the code. Attack especially:
 > - Can a signed-out device keep receiving notifications, or re-register itself, by any path:
