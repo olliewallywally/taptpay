@@ -13,9 +13,11 @@ import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom";
 import DesktopTradesTerminal from "./pages/trades-terminal";
+import { BILLING_CARD_REQUIRED_EVENT } from "@/lib/queryClient";
 
 jest.mock("@/lib/auth", () => ({ getCurrentMerchantId: () => 77 }));
-jest.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: jest.fn() }) }));
+const mockToast = jest.fn();
+jest.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: mockToast }) }));
 jest.mock("./DesktopPageScaffold", () => ({
   DesktopPageScaffold: ({ children }: { children: React.ReactNode }) => children,
 }));
@@ -46,7 +48,12 @@ const REMINDERS = { tradeRemindersEnabled: false };
 const PROFILE = { id: 77, businessName: "Test Trades", gstRegistered: true, tradeGstMode: "exclusive" };
 
 type Answer = () => Response | Promise<Response>;
-type Answers = { invoices?: Answer; clients?: Answer; quotes?: Answer; schedules?: Answer; reminders?: Answer; profile?: Answer };
+type Answers = { invoices?: Answer; clients?: Answer; quotes?: Answer; schedules?: Answer; reminders?: Answer; profile?: Answer; billingBlocked?: boolean };
+const BILLING_402 = {
+  code: "BILLING_CARD_REQUIRED",
+  message: "Your subscription needs attention before you can send payments. Open Billing in Settings.",
+};
+const BILLING_GATED = ["/api/trades/invoices", "/api/trades/quotes", "/api/trades/schedules"];
 /** Answers the terminal's reads as given; the rest as a working day would. */
 function serve({
   invoices = () => reply(INVOICES),
@@ -55,10 +62,13 @@ function serve({
   schedules = () => reply(SCHEDULES),
   reminders = () => reply(REMINDERS),
   profile = () => reply(PROFILE),
+  billingBlocked = false,
 }: Answers) {
   fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
-    if ((init?.method ?? "GET") !== "GET") return reply({});
+    if ((init?.method ?? "GET") !== "GET") {
+      return billingBlocked && BILLING_GATED.includes(url) ? reply(BILLING_402, 402) : reply({});
+    }
     if (url === "/api/trades/invoices") return invoices();
     if (url === "/api/trades/clients") return clients();
     if (url === "/api/trades/quotes") return quotes();
@@ -96,6 +106,7 @@ async function keyInAmount(keys: string[]) {
 
 beforeEach(() => {
   fetchMock.mockReset();
+  mockToast.mockReset();
   localStorage.setItem("authToken", "h.e30.s");
 });
 afterEach(() => {
@@ -339,5 +350,62 @@ describe("trades terminal's quote builder when the business details fail to load
     expect(screen.getByText("GST (15%)")).toBeInTheDocument();
     expect(screen.getByText("$1,150.00", { selector: ".tt-q-grand" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "create quote" })).toBeEnabled();
+  });
+});
+
+/* R1-T9: a billing 402 is stated once, by the app's billing banner, with the way
+   to Billing. The action adds no message of its own, and what was typed stays
+   for when billing is sorted. */
+describe("trades terminal on a billing 402 (R1-T9)", () => {
+  let banners: number;
+  const countBanner = () => { banners += 1; };
+  beforeEach(() => {
+    banners = 0;
+    window.addEventListener(BILLING_CARD_REQUIRED_EVENT, countBanner);
+  });
+  afterEach(() => window.removeEventListener(BILLING_CARD_REQUIRED_EVENT, countBanner));
+
+  it("send invoice: the banner says it, no toast of its own, and the amount stays", async () => {
+    serve({ billingBlocked: true });
+    renderPage();
+    await settle();
+    await chooseAroha();
+    await keyInAmount(["1", "2", "0"]);
+    await userEvent.click(sendButton());
+    await settle();
+
+    expect(banners).toBe(1);
+    expect(mockToast).not.toHaveBeenCalled();
+    expect(document.querySelector(".tt-inv-amt")).toHaveTextContent("$120.00");
+  });
+
+  it("create quote: the banner says it, no toast of its own, and the lines stay", async () => {
+    serve({ billingBlocked: true });
+    renderPage();
+    await settle();
+    await chooseAroha();
+    await rail("quote builder");
+    await userEvent.type(screen.getByRole("textbox", { name: "line 1 description" }), "Rewire kitchen");
+    await userEvent.type(screen.getByRole("textbox", { name: "line 1 unit price" }), "1000");
+    await userEvent.click(screen.getByRole("button", { name: "create quote" }));
+    await settle();
+
+    expect(banners).toBe(1);
+    expect(mockToast).not.toHaveBeenCalled();
+    expect(screen.getByRole("textbox", { name: "line 1 description" })).toHaveValue("Rewire kitchen");
+  });
+
+  it("create recurring invoice: the banner says it, no failure line of its own, and the form stays", async () => {
+    serve({ billingBlocked: true });
+    renderPage("/trades/recurring");
+    await settle();
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "recurring client" }), "c1");
+    await userEvent.type(screen.getByRole("textbox", { name: "recurring amount" }), "200");
+    await userEvent.click(screen.getByRole("button", { name: "create recurring invoice" }));
+    await settle();
+
+    expect(banners).toBe(1);
+    expect(document.querySelector(".tt-rec-error")).toBeNull();
+    expect(screen.getByRole("textbox", { name: "recurring amount" })).toHaveValue("200");
   });
 });

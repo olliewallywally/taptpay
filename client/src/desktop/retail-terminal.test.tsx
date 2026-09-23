@@ -3,6 +3,7 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom";
 import DesktopRetailTerminal from "./pages/retail-terminal";
+import { BILLING_CARD_REQUIRED_EVENT } from "@/lib/queryClient";
 
 const mockToast = jest.fn();
 
@@ -413,5 +414,34 @@ describe("desktop retail terminal payment destinations", () => {
     );
     expect(screen.queryByText(/merchant\.example\/pay\/77/)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "copy link" })).not.toBeInTheDocument();
+  });
+});
+
+/* R1-T9: a billing 402 is stated once, by the app's billing banner, with the way
+   to Billing. The sale adds no message of its own, and stays to send again. */
+describe("desktop retail terminal — billing 402 (R1-T9)", () => {
+  it("send payment: the banner says it, no toast or inline failure, and the sale stays", async () => {
+    saleHandler = () =>
+      jsonResponse(
+        { code: "BILLING_CARD_REQUIRED", message: "Your subscription needs attention before you can send payments. Open Billing in Settings." },
+        402,
+      );
+    let banners = 0;
+    const countBanner = () => { banners += 1; };
+    window.addEventListener(BILLING_CARD_REQUIRED_EVENT, countBanner);
+    try {
+      const { user } = renderTerminal();
+      await enterFiveDollarSale(user, "Flat white");
+      await user.click(screen.getByRole("button", { name: "send payment" }));
+
+      await waitFor(() => expect(banners).toBe(1));
+      expect(saleBodies).toHaveLength(1);
+      expect(mockToast).not.toHaveBeenCalled();
+      expect(screen.queryByRole("alert")).toBeNull();
+      expect(screen.getByRole("textbox", { name: "item name" })).toHaveValue("Flat white");
+      expect(screen.getByRole("button", { name: "send payment" })).toBeEnabled();
+    } finally {
+      window.removeEventListener(BILLING_CARD_REQUIRED_EVENT, countBanner);
+    }
   });
 });

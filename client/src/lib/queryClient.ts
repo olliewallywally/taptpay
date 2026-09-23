@@ -13,6 +13,9 @@ export const BILLING_REQUIRED_MESSAGE = "You can't send payments until it's sort
     states the required action, so the action shows nothing more (R1-T9: no
     duplicate or conflicting billing messages). */
 export class BillingCardRequiredError extends Error {
+  /* The server's code for it; also keeps the type distinct from a plain Error. */
+  readonly code = "BILLING_CARD_REQUIRED";
+
   constructor() {
     super(`${BILLING_REQUIRED_TITLE}: ${BILLING_REQUIRED_MESSAGE}`);
     this.name = "BillingCardRequiredError";

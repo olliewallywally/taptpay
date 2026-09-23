@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getCurrentMerchantId } from "@/lib/auth";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, isBillingCardRequired } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
   DesktopPageScaffold,
@@ -283,7 +283,9 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
       setSplitOn(false);
     },
     onError: (error) => {
-      /* 402 BILLING_CARD_REQUIRED surfaces its own persistent warning via apiRequest. */
+      /* A billing 402 is stated once, by the billing banner apiRequest raises; the
+         sale adds nothing and stays to send again (R1-T9). */
+      if (isBillingCardRequired(error)) return;
       const detail = apiErrorDetails(error);
       const message = detail.message || "Please try again";
       setSaleError(message);

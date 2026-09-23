@@ -3,6 +3,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom";
 import DesktopPropertyTerminal from "./pages/property-terminal";
+import { BILLING_CARD_REQUIRED_EVENT } from "@/lib/queryClient";
 
 const mockToast = jest.fn();
 
@@ -117,6 +118,11 @@ const INVOICES = [
   },
 ];
 
+const BILLING_402 = {
+  code: "BILLING_CARD_REQUIRED",
+  message: "Your subscription needs attention before you can send payments. Open Billing in Settings.",
+};
+let billingBlocked: boolean;
 let invoicePosts: Record<string, unknown>[];
 let rowActionCalls: string[];
 let markPaidBodies: Record<string, unknown>[];
@@ -168,6 +174,7 @@ function installFetchMock() {
     if (method === "POST" && url === "/api/property/invoices") {
       const body = JSON.parse(String(init?.body ?? "{}"));
       invoicePosts.push(body);
+      if (billingBlocked) return jsonResponse(BILLING_402, 402);
       return jsonResponse({ id: `new-${invoicePosts.length}` });
     }
     if (method === "POST" && url === "/api/property/invoices/document") {
@@ -181,6 +188,7 @@ function installFetchMock() {
     );
     if (method === "POST" && rowAction) {
       rowActionCalls.push(`${rowAction[2]}:${rowAction[1]}`);
+      if (billingBlocked && rowAction[2] === "resend") return jsonResponse(BILLING_402, 402);
       if (rowAction[2] === "mark-paid-external") {
         markPaidBodies.push(JSON.parse(String(init?.body ?? "{}")));
       }
@@ -232,6 +240,7 @@ function enterWith(query: string) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  billingBlocked = false;
   invoicePosts = [];
   rowActionCalls = [];
   markPaidBodies = [];
@@ -925,5 +934,51 @@ describe("desktop property terminal — bill description", () => {
     await user.clear(screen.getByRole("textbox", { name: "bill description" }));
     await user.click(screen.getByRole("button", { name: "damages" }));
     expect(screen.getByRole("textbox", { name: "bill description" })).toHaveValue("Damages");
+  });
+});
+
+/* R1-T9: a billing 402 is stated once, by the app's billing banner, with the way
+   to Billing. The action adds no message of its own, and what was typed stays
+   for when billing is sorted. */
+describe("desktop property terminal — billing 402 (R1-T9)", () => {
+  let banners: number;
+  const countBanner = () => { banners += 1; };
+  beforeEach(() => {
+    billingBlocked = true;
+    banners = 0;
+    window.addEventListener(BILLING_CARD_REQUIRED_EVENT, countBanner);
+  });
+  afterEach(() => window.removeEventListener(BILLING_CARD_REQUIRED_EVENT, countBanner));
+
+  it("send rent request: the banner says it, no toast of its own, and the amount stays", async () => {
+    const { user } = renderTerminal();
+    await pickTenant(user);
+    await user.click(screen.getByRole("button", { name: "send rent request" }));
+
+    await waitFor(() => expect(banners).toBe(1));
+    expect(invoicePosts).toHaveLength(1);
+    expect(mockToast).not.toHaveBeenCalled();
+    expect(panelAmount()).toBe("$800.00");
+  });
+
+  it("send bill: the banner says it, no toast of its own, and the amount stays", async () => {
+    const { user } = renderTerminal();
+    await pickTenant(user);
+    await user.click(railButton("send bill"));
+    await user.click(panelSendButton("send bill"));
+
+    await waitFor(() => expect(banners).toBe(1));
+    expect(mockToast).not.toHaveBeenCalled();
+    expect(document.querySelector(".pt-bill-amt")?.textContent).toBe("$800.00");
+  });
+
+  it("resend link: the banner says it, no toast of its own", async () => {
+    const { user } = renderTerminal();
+    await user.click(await screen.findByRole("button", { name: "actions for Tane Walker, sent · utilities" }));
+    await user.click(screen.getByRole("menuitem", { name: "resend link" }));
+
+    await waitFor(() => expect(banners).toBe(1));
+    expect(rowActionCalls).toEqual(["resend:i2"]);
+    expect(mockToast).not.toHaveBeenCalled();
   });
 });

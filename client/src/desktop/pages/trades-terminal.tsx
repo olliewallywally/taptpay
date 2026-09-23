@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getCurrentMerchantId } from "@/lib/auth";
+import { isBillingCardRequired } from "@/lib/queryClient";
 import { tradesFetch } from "@/lib/trades-api";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -464,8 +465,10 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
         setInvType("full");
       }
     },
+    /* A billing 402 is stated once, by the billing banner tradesFetch raises;
+       nothing more here, and the invoice stays to send again (R1-T9). */
     onError: (error: unknown) =>
-      toast({
+      isBillingCardRequired(error) ? undefined : toast({
         title: "Invoice not sent",
         description: error instanceof Error ? error.message : "Could not send the invoice",
         variant: "destructive",
@@ -540,7 +543,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
       setDepositChip("none");
     },
     onError: (error: unknown) =>
-      toast({
+      isBillingCardRequired(error) ? undefined : toast({
         title: "Quote not created",
         description: error instanceof Error ? error.message : "Could not create the quote",
         variant: "destructive",
@@ -560,7 +563,12 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
       return response.json();
     },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/trades/schedules"] }); setRecurringError(""); },
-    onError: (error) => setRecurringError(error instanceof Error ? error.message : "Could not create recurring invoice"),
+    onError: (error) =>
+      setRecurringError(
+        isBillingCardRequired(error)
+          ? ""
+          : error instanceof Error ? error.message : "Could not create recurring invoice",
+      ),
   });
 
   const toggleReminders = useMutation({

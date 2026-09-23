@@ -7,7 +7,11 @@ import {
   PROPERTY_KEYS,
 } from "@/lib/property-data";
 import { propFetch, propHeaders } from "@/lib/property-api";
-import { notifyIfBillingCardRequired } from "@/lib/queryClient";
+import {
+  BillingCardRequiredError,
+  isBillingCardRequired,
+  notifyIfBillingCardRequired,
+} from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { fmtNZD } from "@/lib/report-utils";
 import {
@@ -320,7 +324,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
         }),
       });
       if (!res.ok) {
-        notifyIfBillingCardRequired(res);
+        if (notifyIfBillingCardRequired(res)) throw new BillingCardRequiredError();
         const message = await res
           .json()
           .then((d: any) => d.message)
@@ -362,7 +366,12 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
          and the 1.6s "sent ✓" flash covers the transition. */
       setAmountCents(0);
     },
-    onError: (e: any) => toast({ title: e?.message || "Failed to send", variant: "destructive" }),
+    /* A billing 402 is stated once, by the billing banner; nothing more here, and
+       the request stays to send again (R1-T9). */
+    onError: (e: any) => {
+      if (isBillingCardRequired(e)) return;
+      toast({ title: e?.message || "Failed to send", variant: "destructive" });
+    },
   });
 
   const sendBill = useMutation({
@@ -385,7 +394,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
         }),
       });
       if (!res.ok) {
-        notifyIfBillingCardRequired(res);
+        if (notifyIfBillingCardRequired(res)) throw new BillingCardRequiredError();
         const message = await res
           .json()
           .then((d: any) => d.message)
@@ -405,8 +414,10 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
       setSplitEnabled(false);
       clearDoc();
     },
-    onError: (e: any) =>
-      toast({ title: e?.message || "Failed to send bill", variant: "destructive" }),
+    onError: (e: any) => {
+      if (isBillingCardRequired(e)) return;
+      toast({ title: e?.message || "Failed to send bill", variant: "destructive" });
+    },
   });
 
   const markPaid = useMutation({
@@ -444,7 +455,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
         headers: propHeaders(),
       });
       if (!res.ok) {
-        notifyIfBillingCardRequired(res);
+        if (notifyIfBillingCardRequired(res)) throw new BillingCardRequiredError();
         throw new Error("Failed to resend");
       }
       return res.json();
@@ -453,7 +464,10 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
       queryClient.invalidateQueries({ queryKey: PROPERTY_KEYS.invoices as any });
       toast({ title: "Link resent" });
     },
-    onError: () => toast({ title: "Could not resend link", variant: "destructive" }),
+    onError: (e) => {
+      if (isBillingCardRequired(e)) return;
+      toast({ title: "Could not resend link", variant: "destructive" });
+    },
   });
 
   const voidInvoice = useMutation({
