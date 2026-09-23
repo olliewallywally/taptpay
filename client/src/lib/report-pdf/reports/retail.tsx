@@ -53,7 +53,8 @@ function SalesSummaryDoc(data: RetailReportData, range: DateRange) {
   const grossCents = sumCents(captured, priceCents);
   const refundsCents = sumCents(txs, refundCents);
   const netCents = grossCents - refundsCents;
-  const gst = calcGST(netCents);
+  /* Sale prices include GST; a business that is not GST registered has none. */
+  const gst = data.merchant.gstRegistered ? calcGST(netCents) : null;
   const splitCents = sumCents(captured.filter((t) => t.isSplit || t.splitEnabled), priceCents);
   const avgCents = captured.length ? Math.round(grossCents / captured.length) : 0;
 
@@ -87,7 +88,7 @@ function SalesSummaryDoc(data: RetailReportData, range: DateRange) {
         />
         <KpiRow
           items={[
-            { label: "GST (15%) incl.", value: fmtNZD(gst.gst), sub: "in net revenue" },
+            ...(gst ? [{ label: "GST (15%) incl.", value: fmtNZD(gst.gst), sub: "in net revenue" }] : []),
             { label: "Refunds", value: fmtNZD(refundsCents), sub: `${refunded.length} refunded` },
             { label: "Split Payments", value: fmtNZD(splitCents) },
           ]}

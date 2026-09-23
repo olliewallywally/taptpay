@@ -7,7 +7,7 @@
  * data: one asked for while a request is still loading waits for it, and one
  * asked for before a failure is not offered on the failed data. Without the
  * clients, the history keeps its payments and says their names did not load.
- * An export also waits for the business details (its header and GST mode).
+ * An export also waits for the business details (its header, and whether to show GST).
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, within } from "@testing-library/react";
@@ -259,9 +259,9 @@ describe("trades analytics when clients or quotes fail to load (R1-T9)", () => {
   });
 });
 
-/* An export prints the business name and works out GST in the business's mode
-   (inclusive or exclusive), both from the business details. Without them it would
-   print "TaptPay" and GST in the default mode. The on-screen reports use neither. */
+/* An export prints the business name and GST number, and shows GST only for a
+   GST-registered business, all from the business details. Without them it would
+   print "TaptPay" and guess at GST. The on-screen reports use neither. */
 describe("trades analytics when the business details fail to load (R1-T9)", () => {
   it("the totals and Reports still work; Export waits for the business details", async () => {
     serve({ profile: outage });

@@ -2,8 +2,6 @@ import {
   dollarsToCents,
   fmtNZD,
   calcGST,
-  calcGSTExclusive,
-  calcGSTByMode,
   fmtDate,
   dateRangeLabel,
   daysOverdue,
@@ -51,14 +49,10 @@ describe("GST (NZ 15%)", () => {
     expect(g.gst).toBe(1304);
   });
 
-  test("exclusive adds 15% on top", () => {
-    expect(calcGSTExclusive(10000)).toEqual({ excl: 10000, gst: 1500, incl: 11500 });
-  });
-
-  test("byMode honours merchant trade GST mode", () => {
-    expect(calcGSTByMode(11500, "inclusive")).toEqual(calcGST(11500));
-    expect(calcGSTByMode(10000, "exclusive")).toEqual(calcGSTExclusive(10000));
-    expect(calcGSTByMode(11500, null)).toEqual(calcGST(11500)); // default inclusive
+  test("the GST in an amount paid is 15% of the amount before GST", () => {
+    const g = calcGST(1_091_600); // $10,916.00 paid
+    expect(g).toEqual({ excl: 949_217, gst: 142_383, incl: 1_091_600 });
+    expect(g.gst).toBe(Math.round(g.excl * 0.15)); // $1,423.83 = 15% of $9,492.17
   });
 });
 

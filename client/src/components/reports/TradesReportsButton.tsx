@@ -50,7 +50,6 @@ export function TradesReportsButton({
     clients: fClients,
     invoices: fInvoices,
     quotes: fQuotes,
-    gstMode: merchant?.tradeGstMode ?? undefined,
     scope: siteFilter ?? undefined,
   };
 

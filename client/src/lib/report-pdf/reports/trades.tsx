@@ -1,8 +1,9 @@
 /* The four Trades reports (Invoice Summary, Quote Conversion, Aged Receivables,
    Client Statement). Builders are plain functions returning a @react-pdf
    <Document>. Data is the trades caches: clients (client_profiles), invoices
-   (job_invoices) and quotes. All money is already integer cents. GST follows the
-   merchant's trade GST mode (inclusive default) via calcGSTByMode. */
+   (job_invoices) and quotes. All money is already integer cents. An invoice's
+   amount is what the customer pays, GST included, so the GST in it is the 15%
+   inside it (calcGST), shown only for a GST-registered business. */
 import React from "react";
 import { Document } from "@react-pdf/renderer";
 
@@ -11,7 +12,7 @@ import {
   type Column, type MerchantHeader,
 } from "../components";
 import {
-  fmtNZD, fmtDate, dateRangeLabel, calcGSTByMode, daysOverdue,
+  fmtNZD, fmtDate, dateRangeLabel, calcGST, daysOverdue,
   inRange, agedBuckets, sumCents, ratePct, fmtPct, buildCSV,
 } from "../../report-utils";
 import {
@@ -26,8 +27,6 @@ export interface TradesReportData {
   clients: any[];
   invoices: any[];
   quotes: any[];
-  /** Merchant trade GST mode ("inclusive" default). */
-  gstMode?: string | null;
   /** Selected site address when the page is filtered to one site. */
   scope?: string;
 }
@@ -98,7 +97,11 @@ function InvoiceSummaryDoc(data: TradesReportData, range: DateRange) {
   const invoiced = rows.reduce((s, r) => s + r.invoicedCents, 0);
   const collected = rows.reduce((s, r) => s + r.collectedCents, 0);
   const count = rows.reduce((s, r) => s + r.count, 0);
-  const gst = calcGSTByMode(invoiced, data.gstMode);
+  /* The customer pays each invoice's amount as it is, GST included: a quote in
+     "exclusive" mode adds the 15% to its lines before its total is invoiced. So
+     the GST is the 15% inside what was invoiced (total − total ÷ 1.15), whatever
+     the mode, and a business that is not GST registered has none. */
+  const gst = data.merchant.gstRegistered ? calcGST(invoiced) : null;
 
   const columns: Column<GroupRow>[] = [
     { header: "Type", flex: 2.4, render: (r) => r.type },
@@ -125,14 +128,18 @@ function InvoiceSummaryDoc(data: TradesReportData, range: DateRange) {
           foot={["Total", String(count), fmtNZD(invoiced), fmtNZD(collected), ""]}
           emptyText="No invoices in this period."
         />
-        <SectionTitle>GST summary ({data.gstMode === "exclusive" ? "exclusive" : "inclusive"}, 15%)</SectionTitle>
-        <KpiRow
-          items={[
-            { label: "Excl. GST", value: fmtNZD(gst.excl) },
-            { label: "GST", value: fmtNZD(gst.gst) },
-            { label: "Incl. GST", value: fmtNZD(gst.incl) },
-          ]}
-        />
+        {gst && (
+          <>
+            <SectionTitle>GST summary (15%)</SectionTitle>
+            <KpiRow
+              items={[
+                { label: "Excl. GST", value: fmtNZD(gst.excl) },
+                { label: "GST", value: fmtNZD(gst.gst) },
+                { label: "Incl. GST", value: fmtNZD(gst.incl) },
+              ]}
+            />
+          </>
+        )}
       </ReportPage>
     </Document>
   );

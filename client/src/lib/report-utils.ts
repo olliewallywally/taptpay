@@ -49,16 +49,6 @@ export function calcGST(centsInclGst: number): GstBreakdown {
   return { excl, gst: centsInclGst - excl, incl: centsInclGst };
 }
 
-/** GST-exclusive (net) amount → its split, in whole cents. */
-export function calcGSTExclusive(centsExclGst: number): GstBreakdown {
-  const gst = Math.round(centsExclGst * GST_RATE);
-  return { excl: centsExclGst, gst, incl: centsExclGst + gst };
-}
-
-/** Interpret `cents` per the merchant's trade GST mode ("inclusive" default). */
-export function calcGSTByMode(cents: number, mode?: string | null): GstBreakdown {
-  return mode === "exclusive" ? calcGSTExclusive(cents) : calcGST(cents);
-}
 
 /* ── Dates (all formatting/bucketing in NZ time) ────────────────────── */
 

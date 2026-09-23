@@ -161,9 +161,9 @@ export default function DesktopTradesAnalytics(props: DesktopRoutePageProps) {
      from those fallbacks while a request is still loading or after it failed.
      The totals need neither the clients nor the quotes; the history needs the
      clients only for its names, and says when those did not load. An export also
-     prints the business name and works GST out in the business's mode, both from
-     the business details, so it waits for those as well; the on-screen reports
-     use neither. */
+     prints the business name and GST number, and shows GST only if the business
+     is GST registered, all from the business details, so it waits for those as
+     well; the on-screen reports use neither. */
   const paymentsUnavailable = invoicesQuery.isError && invoicesQuery.data === undefined;
   const clientsUnavailable = clientsQuery.isError && clientsQuery.data === undefined;
   const quotesUnavailable = quotesQuery.isError && quotesQuery.data === undefined;
@@ -327,7 +327,6 @@ export default function DesktopTradesAnalytics(props: DesktopRoutePageProps) {
     clients: scoped.clients,
     invoices: scoped.invoices,
     quotes: scoped.quotes,
-    gstMode: merchant?.tradeGstMode ?? undefined,
     scope: scope === ALL_SITES ? undefined : scope,
   };
   const exportClients = useMemo(
