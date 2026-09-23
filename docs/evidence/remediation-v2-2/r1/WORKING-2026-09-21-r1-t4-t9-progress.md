@@ -493,7 +493,17 @@ and deleted at the end. Decision: `docs/decisions/2026-09-21-r1-t4-t9-owner-answ
     no GST for unregistered businesses (trades + retail summaries). Red 9/10, mutations 5/5,
     client 82/729, browser PDFs cf408c7e vs fix. Evidence + ledger corrected (they had it
     backwards).
-  - [ ] R1-T9 other items: mutations pending / keep input / no double submit; 402 banners.
+  - [x] 402 banners: `1f6a8673` (one BillingCardRequiredError from apiRequest/tradesFetch/
+    propFetch; banner words = the server's meaning), `8a4e8c20` (desktop), `09b07a43` (customer
+    quote page), `a2dee290` (phone: retail sale + Tap to Pay, property rent/bill/resend/batch,
+    trades quote/invoice/send-balance/recurring). Evidence `R1-T9-billing-402-2026-09-23.md`.
+    Stopped 09:51 on the usage limit after `8a4e8c20` (quote test red+green+mutation done,
+    uncommitted); resumed ~20:00: re-ran 85/85 and the quote mutation, then phone: red 11/11,
+    mutations 22/22, client 86/754. Owner questions in the evidence (business not told of a
+    refused acceptance; public 402 body carries the business's words).
+  - [ ] 402 browser check: banner visible and alone on the real screens (phone, desktop, customer
+    quote page), typed input kept.
+  - [ ] R1-T9 last item: mutations disabled while pending / keep input / no double submit.
   - Screenshots: `npx vite build --outDir <dir>` (default is dist/public, untracked) and `npx vite
     preview`, then `scripts/capture-r1-t9-failure-states.mjs` (add each screen to SCREENS). The
     "before" build comes from a worktree at `e4c25fb1` (the rollout's base).
