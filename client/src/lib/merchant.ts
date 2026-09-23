@@ -3,6 +3,7 @@
    ["/api/merchants", id, "profile"] query cache with the settings page, so editing the
    business details there refreshes report headers with no extra fetch. */
 import { useQuery } from "@tanstack/react-query";
+import { getCurrentMerchantId } from "@/lib/auth";
 
 export interface MerchantProfile {
   id: number;
@@ -15,7 +16,11 @@ export interface MerchantProfile {
 }
 
 export function useMerchantProfile() {
-  const merchantId = typeof localStorage !== "undefined" ? localStorage.getItem("merchantId") : null;
+  /* The merchant comes from the session token, as on every other page. A
+     "merchantId" storage key was written only by Google sign-in, so after a
+     password sign-in this never ran and reports printed "TaptPay" with GST in
+     the default mode. */
+  const merchantId = getCurrentMerchantId();
   return useQuery<MerchantProfile>({
     queryKey: ["/api/merchants", merchantId, "profile"],
     enabled: !!merchantId,
