@@ -408,4 +408,45 @@ and deleted at the end. Decision: `docs/decisions/2026-09-21-r1-t4-t9-owner-answ
     "Admin login unavailable" (recognised). Read-only count on dev: 1 of 3 waiting applications has
     no password (psql needs the sandbox off: `helium` does not resolve inside it).
   - Results: tsc clean; server 79/1432; client 72/627; browser 18/18.
-- [ ] 6
+- [ ] 6 — **R1-T9 rollout, started 2026-09-23 ~03:50 UTC** (owner: "keep going"; design approved
+  2026-09-21). The pattern is the pilot's (`2c013f33`): `xUnavailable = query.isError && query.data
+  === undefined`; `DesktopLoadFailure` canvas (role=alert, Try again) in the figure's place; quiet
+  text elsewhere; data-needing actions disabled; a failed background refresh keeps what is shown.
+  Optional sources say "unavailable", never zero. Tests first, then a mutation check with
+  `.local/claude-scratch/r1-t9/mutate.py <src> <test> <mutations.json>` (restores the file; prints
+  CAUGHT/MISSED). `.local/` is git-ignored (Replit's global ignore) and, unlike `/tmp`, survives a
+  container restart — keep scratch there.
+  - **Container restart 03:53:19 UTC** (every user process restarted, `/tmp` wiped) mid-way through
+    the terminal's mutation check (`f708258c`, last line a tool call at 03:52:49; the page file last
+    written 03:53:12). Recovered 03:56–04:05: the terminal page rebuilt from the transcript's edit
+    script on `HEAD` is byte-identical to the file on disk (no mutation left behind); `mutate.py`
+    rebuilt from the transcript into `.local/claude-scratch/r1-t9/`.
+  - [x] retail stock (`client/src/desktop/pages/retail-stock.tsx`): products fail → alert
+    "Products didn't load" + Try again in the count's place, grid says "inventory didn't load",
+    best seller "shows once your products load"; sales fail → each card "sales unavailable", best
+    seller "this week's sales didn't load". Add product stays available (needs no loaded data).
+    Test `client/src/desktop/retail-stock-failure.test.tsx`: red 3/5 first (2 pin loading/loaded);
+    6/6 with the refresh test; mutations 4/4.
+  - [x] retail terminal (`retail-terminal.tsx`): sales fail → alert "Sales didn't load" + Try again
+    in the figures' place, list "sales didn't load", **send payment and send split payment off**
+    (title "Available once your sales load"; the rail's buttons only switch panels, `send()` has no
+    other caller); products fail → stock tiles alert "Products didn't load" + Try again, a keyed-in
+    sale still works. Test `retail-terminal-failure.test.tsx` 6 (red 3/6 first) + the 10 existing
+    terminal tests: 16/16; mutations 7/7 (re-run after the restart). Both re-run red on `e4c25fb1`
+    (worktree): 3/6 and 3/6 fail for their reasons. tsc clean; client 74/639. **Committed
+    `0b0a9fb7`**; evidence `R1-T9-rollout-2026-09-23.md`.
+  - screenshots (04:10): `scripts/capture-r1-t9-failure-states.mjs` + stock, terminal, terminal stock
+    tiles; builds of `e4c25fb1` (worktree `.local/claude-scratch/r1-t9/wt-before`) and the tree. Loaded
+    view before vs after: terminal 0/0, stock tiles 0/0, stock 0 visible (90 pixels off by 1 shade,
+    all on the "my store" pill). Harness made deterministic first — the same build captured twice
+    differed: 2858 px (stock cards' entrance) → `animations: "disabled"`; 13 px on the analytics
+    chart (drawn against the live clock) → `page.clock.setFixedTime(RUN_AT)`; ±1-shade gradient noise
+    → check on pixels off by > 2 in a channel, report both counts; builds whose chunks load in a
+    different order still differed on analytics (chart edge, then the nav pill under reduced
+    motion) though its code is byte-identical → `reducedMotion: "reduce"` and `R1T9_SCREENS` to run
+    only the screens a change touches (a zero is proof; a non-zero may be timing).
+  - [ ] property analytics; [ ] property terminal; [ ] trades analytics; [ ] trades terminal;
+    [ ] settings ×3.
+  - Screenshots: `npx vite build --outDir <dir>` (default is dist/public, untracked) and `npx vite
+    preview`, then `scripts/capture-r1-t9-failure-states.mjs` (add each screen to SCREENS). The
+    "before" build comes from a worktree at `e4c25fb1` (the rollout's base).
