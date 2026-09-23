@@ -478,7 +478,12 @@ and deleted at the end. Decision: `docs/decisions/2026-09-21-r1-t4-t9-owner-answ
     sales + business details). Mutations 36/36, client 78/692, loaded views match `c3dab4a8`.
     Retail chart crossing the transaction count when the week's first day peaks: pre-existing,
     noted, not changed.
-  - [ ] trades terminal; [ ] settings ×3.
+  - [x] trades terminal **`2e8b308a`**: invoices/clients/quotes/schedules/reminders/business
+    details each truthful; schedules and business-details queries now throw (the latter's null
+    was cached under the shared profile key → exports would read it as loaded). Test 16 (red
+    10/16), mutations 30/30, client 80/709, loaded views match `c3dab4a8` (5 screens). Also
+    **`0f748fde`**: desktop quick invoice "add client" URL had no id (since 41267fb7).
+  - [ ] settings ×3 (DesktopSettingsPage: retail, property, trades).
   - Screenshots: `npx vite build --outDir <dir>` (default is dist/public, untracked) and `npx vite
     preview`, then `scripts/capture-r1-t9-failure-states.mjs` (add each screen to SCREENS). The
     "before" build comes from a worktree at `e4c25fb1` (the rollout's base).
