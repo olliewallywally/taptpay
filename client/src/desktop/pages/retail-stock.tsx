@@ -8,6 +8,7 @@ import {
   type DesktopRoutePageProps,
 } from "../DesktopPageScaffold";
 import { entranceProps, useListEntrance } from "../list-entrance";
+import { DesktopLoadFailure } from "../DesktopLoadFailure";
 
 /* ── palette ── */
 const ACCENT = "#5E9EFF";
@@ -104,6 +105,13 @@ export default function DesktopRetailStock(props: DesktopRoutePageProps) {
     enabled: !!merchantId,
   });
 
+  /* R1-T9: products that did not load are not "no products", and sales that did
+     not load are not "no sales". With nothing loaded yet, the screen says so and
+     draws no count, grid or sold figure from the empty fallbacks below; a failed
+     background refresh keeps what is already shown. */
+  const productsUnavailable = stockQuery.isError && stockQuery.data === undefined;
+  const salesUnavailable = txQuery.isError && txQuery.data === undefined;
+  const retryProducts = () => { void stockQuery.refetch(); };
   const stockItems = stockQuery.data ?? [];
 
   const invalidate = () =>
@@ -266,8 +274,21 @@ export default function DesktopRetailStock(props: DesktopRoutePageProps) {
           </button>
 
           <div className="rs-hero">
-            <span className="rs-count">{stockQuery.isLoading ? "—" : stockItems.length}</span>
-            <span className="rs-count-sub">products in inventory</span>
+            {productsUnavailable ? (
+              <DesktopLoadFailure
+                tone="canvas"
+                title="Products didn't load"
+                detail="Your inventory stays hidden until it does."
+                onRetry={retryProducts}
+                retrying={stockQuery.isFetching}
+                testId="retail-stock-products-failed"
+              />
+            ) : (
+              <>
+                <span className="rs-count">{stockQuery.isLoading ? "—" : stockItems.length}</span>
+                <span className="rs-count-sub">products in inventory</span>
+              </>
+            )}
           </div>
 
           <div className="rs-search" data-tutorial-id="retail-stock-directory">
@@ -304,7 +325,11 @@ export default function DesktopRetailStock(props: DesktopRoutePageProps) {
 
           <div className="rs-best">
             <span className="rs-best-label">BEST SELLER THIS WEEK</span>
-            {bestSeller ? (
+            {productsUnavailable ? (
+              <div className="rs-best-empty">shows once your products load</div>
+            ) : salesUnavailable ? (
+              <div className="rs-best-empty">this week's sales didn't load</div>
+            ) : bestSeller ? (
               <div className="rs-best-row">
                 <span className="rs-best-name">{bestSeller.name}</span>
                 <span className="rs-best-pill">{bestSeller.sold} sold</span>
@@ -328,6 +353,8 @@ export default function DesktopRetailStock(props: DesktopRoutePageProps) {
 
             {stockQuery.isLoading ? (
               <div className="rs-grid-msg">loading inventory…</div>
+            ) : productsUnavailable ? (
+              <div className="rs-grid-msg">inventory didn't load</div>
             ) : filtered.length === 0 ? (
               <div className="rs-grid-msg">
                 {search ? "no matching products" : "no products yet — add your first"}
@@ -353,7 +380,7 @@ export default function DesktopRetailStock(props: DesktopRoutePageProps) {
                     </span>
                     <span className="rs-card-name">{p.name}</span>
                     <span className="rs-card-sub">
-                      {sold > 0 ? `${sold} sold this week` : "no sales this week"}
+                      {salesUnavailable ? "sales unavailable" : sold > 0 ? `${sold} sold this week` : "no sales this week"}
                     </span>
                     <span className="rs-card-price">{fmtPrice(p.cost)}</span>
                   </div>

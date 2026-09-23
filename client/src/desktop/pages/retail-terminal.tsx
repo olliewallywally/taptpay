@@ -15,6 +15,7 @@ import {
   formatDesktopKeypadMoney,
   type DesktopKeypadKey,
 } from "../desktop-keypad";
+import { DesktopLoadFailure } from "../DesktopLoadFailure";
 
 /* ── palette ── */
 const ACCENT = "#5E9EFF";
@@ -220,6 +221,16 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
     enabled: !!merchantId,
   });
 
+  /* R1-T9: sales that did not load are not "no sales", and products that did not
+     load are not "no products". With nothing loaded yet, the screen says so and
+     draws no figure or list from the empty fallbacks below; a failed background
+     refresh keeps what is already shown. The sales list is where a merchant sees
+     a payment land, so no payment can be started while it is unavailable. */
+  const salesUnavailable = txQuery.isError && txQuery.data === undefined;
+  const productsUnavailable = stockQuery.isError && stockQuery.data === undefined;
+  const retrySales = () => { void txQuery.refetch(); };
+  const retryProducts = () => { void stockQuery.refetch(); };
+  const sendUnavailableHint = salesUnavailable ? "Available once your sales load" : undefined;
   const transactions = txQuery.data ?? [];
   const stockItems = stockQuery.data ?? [];
   const stones = stonesQuery.data ?? [];
@@ -657,18 +668,33 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
             </button>
           </div>
 
-          <div className="rt-hero-row">
-            <span className="rt-hero">{txQuery.isLoading ? "—" : moneyWhole(revenueToday)}</span>
-            {pctVsYesterday !== null && (
-              <span className="rt-hero-pill">
-                {pctVsYesterday >= 0 ? "+" : ""}
-                {pctVsYesterday}%
-              </span>
-            )}
-          </div>
-          <span className="rt-hero-sub">sales revenue today</span>
-          <span className="rt-hero rt-hero-dim">{txQuery.isLoading ? "—" : txnsToday}</span>
-          <span className="rt-hero-sub rt-hero-sub-dim">transactions today</span>
+          {salesUnavailable ? (
+            <div className="rt-hero-row">
+              <DesktopLoadFailure
+                tone="canvas"
+                title="Sales didn't load"
+                detail="Your totals stay hidden until they do."
+                onRetry={retrySales}
+                retrying={txQuery.isFetching}
+                testId="retail-terminal-sales-failed"
+              />
+            </div>
+          ) : (
+            <>
+              <div className="rt-hero-row">
+                <span className="rt-hero">{txQuery.isLoading ? "—" : moneyWhole(revenueToday)}</span>
+                {pctVsYesterday !== null && (
+                  <span className="rt-hero-pill">
+                    {pctVsYesterday >= 0 ? "+" : ""}
+                    {pctVsYesterday}%
+                  </span>
+                )}
+              </div>
+              <span className="rt-hero-sub">sales revenue today</span>
+              <span className="rt-hero rt-hero-dim">{txQuery.isLoading ? "—" : txnsToday}</span>
+              <span className="rt-hero-sub rt-hero-sub-dim">transactions today</span>
+            </>
+          )}
 
           {/* The shell is pinned: header/search/chips hold the same canvas y in
               every filter, data and error state, and only the row viewport
@@ -726,6 +752,8 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
             >
               {txQuery.isLoading ? (
                 <div className="rt-empty">loading…</div>
+              ) : salesUnavailable ? (
+                <div className="rt-empty">sales didn't load</div>
               ) : stackRows.length === 0 ? (
                 <div className="rt-empty">no sales yet</div>
               ) : (
@@ -1031,7 +1059,8 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
                   aria-label="send payment"
                   aria-busy={createMutation.isPending}
                   aria-describedby={createMutation.isPending || saleError ? "rt-sale-status" : undefined}
-                  disabled={createMutation.isPending}
+                  disabled={createMutation.isPending || salesUnavailable}
+                  title={sendUnavailableHint}
                   onClick={() => send(splitOn)}
                 >
                   {sendLabel}
@@ -1095,6 +1124,16 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
               <div className="rt-stock-grid">
                 {stockQuery.isLoading ? (
                   <div className="rt-empty rt-stock-empty">loading…</div>
+                ) : productsUnavailable ? (
+                  <div className="rt-stock-empty">
+                    <DesktopLoadFailure
+                      tone="canvas"
+                      title="Products didn't load"
+                      onRetry={retryProducts}
+                      retrying={stockQuery.isFetching}
+                      testId="retail-terminal-products-failed"
+                    />
+                  </div>
                 ) : stockItems.length === 0 ? (
                   <div className="rt-empty rt-stock-empty">no products yet — add them on the Stock page</div>
                 ) : (
@@ -1148,7 +1187,8 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
                   aria-label="send split payment"
                   aria-busy={createMutation.isPending}
                   aria-describedby={createMutation.isPending || saleError ? "rt-sale-status" : undefined}
-                  disabled={createMutation.isPending}
+                  disabled={createMutation.isPending || salesUnavailable}
+                  title={sendUnavailableHint}
                   onClick={() => send(true)}
                 >
                   {sendLabel}
