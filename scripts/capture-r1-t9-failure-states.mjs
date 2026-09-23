@@ -1,7 +1,8 @@
 // R1-T9 — capture desktop screens as they render when their data loads and when an
 // essential request fails. Synthetic and loopback-only: every /api request is answered
-// by scripts/desktop-shots/retail-fixtures.mjs (or failed here with a 500), and every
-// other origin — the page's analytics, the Replit dev banner — is blocked.
+// by scripts/desktop-shots/retail-fixtures.mjs or the property or trades fixtures (or
+// failed here with a 500), and every other origin — the page's analytics, the Replit
+// dev banner — is blocked.
 //
 //   R1T9_AFTER_URL=http://127.0.0.1:5199 [R1T9_BEFORE_URL=http://127.0.0.1:5198] \
 //   [R1T9_SCREENS=retail-stock,retail-terminal] R1T9_OUT=<dir> node scripts/capture-r1-t9-failure-states.mjs
@@ -16,6 +17,7 @@ import playwrightCore from "playwright-core/lib/coreBundle";
 import { PNG } from "pngjs";
 import { CHROMIUM_PATH, MERCHANT_ID, newRetailPage } from "./desktop-shots/retail-fixtures.mjs";
 import { installPropertyData } from "./desktop-shots/property-fixtures.mjs";
+import { installTradesData } from "./desktop-shots/trades-fixtures.mjs";
 
 const out = process.env.R1T9_OUT ?? "/tmp/taptpay-r1-t9";
 // Every capture sees the same "now" (the fixtures' dates are relative to it). A chart
@@ -50,6 +52,9 @@ const SCREENS = [
     name: "property-terminal-automation", path: "/property/terminal", essential: "/api/property/reminder-settings", install: installPropertyData,
     prepare: (page) => page.getByRole("button", { name: "automation" }).click(),
   },
+  { name: "trades-analytics", path: "/trades/analytics", essential: "/api/trades/invoices", install: installTradesData },
+  { name: "trades-analytics-clients", path: "/trades/analytics", essential: "/api/trades/clients", install: installTradesData },
+  { name: "trades-analytics-quotes", path: "/trades/analytics", essential: "/api/trades/quotes", install: installTradesData },
 ];
 
 async function capture(browser, base, screen, mode, file) {

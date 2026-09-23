@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -47,6 +48,7 @@ import {
   DesktopPageScaffold,
   type DesktopRoutePageProps,
 } from "../DesktopPageScaffold";
+import { DesktopLoadFailure } from "../DesktopLoadFailure";
 
 /* ── palette ── */
 const ACCENT = "#5E9EFF";
@@ -150,6 +152,39 @@ export default function DesktopTradesAnalytics(props: DesktopRoutePageProps) {
   const drag = useRef({ startY: 0, startT: CLOSED, moved: false, scale: 1 });
   const chartRef = useRef<HTMLDivElement>(null);
   const chipRef = useRef<HTMLDivElement>(null);
+
+  /* R1-T9: payments that did not load are not "no payments". With nothing loaded
+     yet, the screen says so and draws no figure, chart or history from the empty
+     fallbacks below; a failed background refresh keeps what is already shown.
+     Reports and exports are built from the payments, the clients and the quotes,
+     so they wait for all three, and are generated only from loaded data — never
+     from those fallbacks while a request is still loading or after it failed.
+     The totals need neither the clients nor the quotes; the history needs the
+     clients only for its names, and says when those did not load. */
+  const paymentsUnavailable = invoicesQuery.isError && invoicesQuery.data === undefined;
+  const clientsUnavailable = clientsQuery.isError && clientsQuery.data === undefined;
+  const quotesUnavailable = quotesQuery.isError && quotesQuery.data === undefined;
+  const reportsUnavailableHint = paymentsUnavailable
+    ? "Available once your payments load"
+    : clientsUnavailable
+      ? "Available once your clients load"
+      : quotesUnavailable
+        ? "Available once your quotes load"
+        : undefined;
+  const reportsUnavailable = reportsUnavailableHint !== undefined;
+  const reportsReady =
+    invoicesQuery.data !== undefined &&
+    clientsQuery.data !== undefined &&
+    quotesQuery.data !== undefined;
+  const retryPayments = () => { void invoicesQuery.refetch(); };
+  const retryClients = () => { void clientsQuery.refetch(); };
+
+  /* An export asked for while the data was loading opens once it has loaded. If
+     a source fails instead, the request is dropped, so it cannot pop up after a
+     later retry. */
+  useEffect(() => {
+    if (reportsUnavailable) setExportOpen(false);
+  }, [reportsUnavailable]);
 
   const clients = useMemo(() => clientsQuery.data ?? [], [clientsQuery.data]);
   const invoices = useMemo(() => invoicesQuery.data ?? [], [invoicesQuery.data]);
@@ -443,68 +478,83 @@ export default function DesktopTradesAnalytics(props: DesktopRoutePageProps) {
 
             <div className="ta-hero-row dt-rise" style={{ "--dt-i": 1 } as CSSProperties} data-tutorial-id="ta-total">
               <div className="ta-hero-col">
-                <div className="ta-hero-amt-row">
-                  <span className="ta-hero">{invoicesQuery.isLoading ? "—" : money(overview.total)}</span>
-                  {overview.growth !== null && (
-                    <span className="ta-hero-pill">
-                      {overview.growth >= 0 ? "+" : ""}
-                      {overview.growth}%
+                {paymentsUnavailable ? (
+                  <DesktopLoadFailure
+                    tone="canvas"
+                    title="Payments didn't load"
+                    detail="Your totals stay hidden until they do."
+                    onRetry={retryPayments}
+                    retrying={invoicesQuery.isFetching}
+                    testId="trades-analytics-payments-failed"
+                  />
+                ) : (
+                  <>
+                    <div className="ta-hero-amt-row">
+                      <span className="ta-hero">{invoicesQuery.isLoading ? "—" : money(overview.total)}</span>
+                      {overview.growth !== null && (
+                        <span className="ta-hero-pill">
+                          {overview.growth >= 0 ? "+" : ""}
+                          {overview.growth}%
+                        </span>
+                      )}
+                    </div>
+                    <span className="ta-hero-sub">total revenue</span>
+                    <span className="ta-hero-out">
+                      {invoicesQuery.isLoading ? "—" : money(overview.outstanding)}
                     </span>
-                  )}
-                </div>
-                <span className="ta-hero-sub">total revenue</span>
-                <span className="ta-hero-out">
-                  {invoicesQuery.isLoading ? "—" : money(overview.outstanding)}
-                </span>
-                {/* Every open invoice, not the selected period's — money you are
-                    owed doesn't stop being owed because the user picked "week".
-                    Labelled so the one figure that ignores the period says so. */}
-                <span className="ta-hero-sub ta-hero-sub-dim">outstanding invoices · all time</span>
+                    {/* Every open invoice, not the selected period's — money you are
+                        owed doesn't stop being owed because the user picked "week".
+                        Labelled so the one figure that ignores the period says so. */}
+                    <span className="ta-hero-sub ta-hero-sub-dim">outstanding invoices · all time</span>
+                  </>
+                )}
               </div>
             </div>
 
-            <div className="ta-chart dt-rise" style={{ "--dt-i": 2 } as CSSProperties} ref={chartRef}>
-              <svg className="ta-chart-svg" viewBox="0 0 1076 240" preserveAspectRatio="none" aria-hidden="true">
-                <defs>
-                  <linearGradient id="traderevfill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0" stopColor={ACCENT} stopOpacity="0.34" />
-                    <stop offset="1" stopColor={ACCENT} stopOpacity="0.02" />
-                  </linearGradient>
-                </defs>
-                <path d={overview.areaD} fill="url(#traderevfill)" />
-                <path d={overview.lineD} fill="none" stroke="#8CBBFF" strokeWidth="3" strokeLinecap="round" />
-              </svg>
-              {overview.peakValue > 0 && (
-                <>
-                  <div
-                    ref={chipRef}
-                    aria-hidden="true"
-                    className="ta-chip"
-                    style={{ left: `${chipLeft}px` }}
-                  >
-                    {moneyWhole(overview.peakValue)}
-                  </div>
-                  <div
-                    aria-hidden="true"
-                    className="ta-dot"
-                    data-peak-index={overview.peakIndex}
-                    style={{
-                      left: `${overview.markerLeft}px`,
-                      top: `${overview.markerTop}px`,
-                    }}
-                  />
-                </>
-              )}
-              <p
-                className="ta-chart-summary"
-                role="status"
-                aria-live="polite"
-                aria-atomic="true"
-              >
-                {selectedPeriod} selected. Peak bucket {overview.peakLabel}:{" "}
-                {money(overview.peakValue)}.
-              </p>
-            </div>
+            {!paymentsUnavailable && (
+              <div className="ta-chart dt-rise" style={{ "--dt-i": 2 } as CSSProperties} ref={chartRef}>
+                <svg className="ta-chart-svg" viewBox="0 0 1076 240" preserveAspectRatio="none" aria-hidden="true">
+                  <defs>
+                    <linearGradient id="traderevfill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0" stopColor={ACCENT} stopOpacity="0.34" />
+                      <stop offset="1" stopColor={ACCENT} stopOpacity="0.02" />
+                    </linearGradient>
+                  </defs>
+                  <path d={overview.areaD} fill="url(#traderevfill)" />
+                  <path d={overview.lineD} fill="none" stroke="#8CBBFF" strokeWidth="3" strokeLinecap="round" />
+                </svg>
+                {overview.peakValue > 0 && (
+                  <>
+                    <div
+                      ref={chipRef}
+                      aria-hidden="true"
+                      className="ta-chip"
+                      style={{ left: `${chipLeft}px` }}
+                    >
+                      {moneyWhole(overview.peakValue)}
+                    </div>
+                    <div
+                      aria-hidden="true"
+                      className="ta-dot"
+                      data-peak-index={overview.peakIndex}
+                      style={{
+                        left: `${overview.markerLeft}px`,
+                        top: `${overview.markerTop}px`,
+                      }}
+                    />
+                  </>
+                )}
+                <p
+                  className="ta-chart-summary"
+                  role="status"
+                  aria-live="polite"
+                  aria-atomic="true"
+                >
+                  {selectedPeriod} selected. Peak bucket {overview.peakLabel}:{" "}
+                  {money(overview.peakValue)}.
+                </p>
+              </div>
+            )}
           </>
         )}
 
@@ -622,11 +672,24 @@ export default function DesktopTradesAnalytics(props: DesktopRoutePageProps) {
             <div className="ta-sheet-actions">
               {sheetMode === "history" && (
                 <>
-                  <button type="button" className="ta-btn-reports" data-tutorial-id="ta-reports" onClick={openReports}>
+                  <button
+                    type="button"
+                    className="ta-btn-reports"
+                    data-tutorial-id="ta-reports"
+                    onClick={openReports}
+                    disabled={reportsUnavailable}
+                    title={reportsUnavailableHint}
+                  >
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={DEEP_BLUE} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="7" height="7" rx="1.5" /><rect x="13" y="4" width="7" height="7" rx="1.5" /><rect x="4" y="13" width="7" height="7" rx="1.5" /><rect x="13" y="13" width="7" height="7" rx="1.5" /></svg>
                     <span>Reports</span>
                   </button>
-                  <button type="button" className="ta-btn-white" onClick={() => setExportOpen(true)}>
+                  <button
+                    type="button"
+                    className="ta-btn-white"
+                    onClick={() => setExportOpen(true)}
+                    disabled={reportsUnavailable}
+                    title={reportsUnavailableHint}
+                  >
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={INK} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 4v10M8 10l4 4 4-4" /><path d="M5 19h14" /></svg>
                     <span>Export</span>
                   </button>
@@ -651,44 +714,67 @@ export default function DesktopTradesAnalytics(props: DesktopRoutePageProps) {
             {sheetMode === "history" &&
               (invoicesQuery.isLoading || clientsQuery.isLoading ? (
                 <div className="ta-sheet-empty">loading payments…</div>
+              ) : paymentsUnavailable ? (
+                <DesktopLoadFailure
+                  tone="sheet"
+                  title="Payment history didn't load."
+                  onRetry={retryPayments}
+                  retrying={invoicesQuery.isFetching}
+                  announce={false}
+                />
               ) : historyGroups.length === 0 ? (
                 <div className="ta-sheet-empty">no payments in this period</div>
               ) : (
-                historyGroups.map((group) => (
-                  <div key={group.label}>
-                    <div className="ta-group-label">{group.label}</div>
-                    {group.rows.map((invoice) => {
-                      const client = clientById.get(invoice.clientProfileId);
-                      const name = clientName(client) || "Job payment";
-                      const address =
-                        client?.siteAddress?.trim() ||
-                        invoice.jobDetails?.trim() ||
-                        "site address unavailable";
-                      const splitStatus =
-                        invoice.splitCount && invoice.splitCount > 1
-                          ? " · " + String(invoice.splitPaidCount ?? 0) + " of " + String(invoice.splitCount) + " shares paid"
-                          : "";
-                      return (
-                        <div key={invoice.id} className="ta-tx-row">
-                          <span className="ta-tx-initials">{initials(name)}</span>
-                          <span className="ta-tx-mid">
-                            <span className="ta-tx-name">{name}</span>
-                            <span className="ta-tx-sub">{address}</span>
-                          </span>
-                          <span className="ta-tx-right">
-                            <span className="ta-tx-amt">
-                              {money(invoice.amountCents)}
+                <>
+                  {clientsUnavailable && (
+                    <div className="ta-sheet-note">
+                      <span>client names didn't load</span>
+                      <button
+                        type="button"
+                        className="ta-btn-white ta-btn-sm"
+                        disabled={clientsQuery.isFetching}
+                        onClick={retryClients}
+                      >
+                        {clientsQuery.isFetching ? "trying…" : "try again"}
+                      </button>
+                    </div>
+                  )}
+                  {historyGroups.map((group) => (
+                    <div key={group.label}>
+                      <div className="ta-group-label">{group.label}</div>
+                      {group.rows.map((invoice) => {
+                        const client = clientById.get(invoice.clientProfileId);
+                        const name = clientName(client) || "Job payment";
+                        const address =
+                          client?.siteAddress?.trim() ||
+                          invoice.jobDetails?.trim() ||
+                          "site address unavailable";
+                        const splitStatus =
+                          invoice.splitCount && invoice.splitCount > 1
+                            ? " · " + String(invoice.splitPaidCount ?? 0) + " of " + String(invoice.splitCount) + " shares paid"
+                            : "";
+                        return (
+                          <div key={invoice.id} className="ta-tx-row">
+                            <span className="ta-tx-initials">{initials(name)}</span>
+                            <span className="ta-tx-mid">
+                              <span className="ta-tx-name">{name}</span>
+                              <span className="ta-tx-sub">{address}</span>
                             </span>
-                            <span className="ta-tx-status">
-                              {STATUS_LABEL[invoice.status] ?? invoice.status.replace(/_/g, " ")}
-                              {splitStatus}
+                            <span className="ta-tx-right">
+                              <span className="ta-tx-amt">
+                                {money(invoice.amountCents)}
+                              </span>
+                              <span className="ta-tx-status">
+                                {STATUS_LABEL[invoice.status] ?? invoice.status.replace(/_/g, " ")}
+                                {splitStatus}
+                              </span>
                             </span>
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </>
               ))}
 
             {sheetMode === "tiles" && (
@@ -753,7 +839,15 @@ export default function DesktopTradesAnalytics(props: DesktopRoutePageProps) {
                 </div>
 
                 <div className="ta-generate-row">
-                  <button type="button" className="ta-generate" onClick={generate}>Generate Report</button>
+                  <button
+                    type="button"
+                    className="ta-generate"
+                    onClick={generate}
+                    disabled={!reportsReady}
+                    title={reportsUnavailableHint}
+                  >
+                    Generate Report
+                  </button>
                   <span className="ta-generate-note">
                     the top section becomes your report — jump back with the analytics button
                   </span>
@@ -764,7 +858,7 @@ export default function DesktopTradesAnalytics(props: DesktopRoutePageProps) {
         </div>
       </div>
 
-      {exportOpen && (
+      {exportOpen && reportsReady && (
         <ReportModal
           title="Trades Reports"
           options={TRADES_REPORT_OPTIONS}
@@ -858,7 +952,8 @@ const TA_CSS = `
 .ta-sheet-title { font-weight:700; font-size:24px; color:${INK}; }
 .ta-sheet-actions { display:flex; align-items:center; gap:10px; }
 .ta-btn-reports { display:inline-flex; align-items:center; gap:9px; padding:11px 22px; border-radius:9999px; background:transparent; border:1.5px solid ${DEEP_BLUE}; font-weight:700; font-size:14px; color:${DEEP_BLUE}; cursor:pointer; transition:background .15s ease; }
-.ta-btn-reports:hover { background:rgba(29,72,200,0.06); }
+.ta-btn-reports:hover:not(:disabled) { background:rgba(29,72,200,0.06); }
+.ta-btn-reports:disabled { opacity:0.55; cursor:default; }
 .ta-btn-white { display:inline-flex; align-items:center; gap:9px; padding:11px 22px; border-radius:9999px; background:#fff; border:1px solid #E2E5EE; font-weight:700; font-size:14px; color:${INK}; cursor:pointer; transition:background .15s ease; }
 .ta-btn-white:hover:not(:disabled) { background:#FAFBFD; }
 .ta-btn-white:disabled { opacity:0.55; cursor:default; }
@@ -866,6 +961,7 @@ const TA_CSS = `
 .ta-btn-danger { color:#C0343C; border-color:#F0C9CC; }
 .ta-sheet-body { flex:1 1 auto; overflow-y:auto; padding:0 46px 26px; }
 .ta-sheet-empty { padding:28px 0; font-weight:600; font-size:13px; color:${SHEET_DIM}; }
+.ta-sheet-note { display:flex; align-items:center; gap:14px; font-weight:600; font-size:13px; color:${SHEET_DIM}; }
 
 .ta-group-label { margin-top:24px; font-weight:700; font-size:12px; letter-spacing:0.16em; color:${SHEET_LABEL}; }
 .ta-sheet-body > div:first-child > .ta-group-label { margin-top:0; }
