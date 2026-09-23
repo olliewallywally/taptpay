@@ -74,6 +74,15 @@ const SCREENS = [
   },
   { name: "trades-terminal-schedules", path: "/trades/recurring", essential: "/api/trades/schedules", install: installTradesData },
   { name: "trades-terminal-reminders", path: "/trades/recurring", essential: "/api/trades/reminder-settings", install: installTradesData },
+  { name: "settings-business", path: "/settings", essential: `/api/merchants/${MERCHANT_ID}/profile` },
+  {
+    name: "settings-plan", path: "/settings", essential: "/api/subscription",
+    prepare: (page) => page.getByRole("button", { name: "Subscription & Billing" }).click(),
+  },
+  {
+    name: "settings-card", path: "/settings", essential: "/api/billing/card",
+    prepare: (page) => page.getByRole("button", { name: "Subscription & Billing" }).click(),
+  },
 ];
 
 async function capture(browser, base, screen, mode, file) {

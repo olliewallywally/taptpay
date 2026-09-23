@@ -33,6 +33,7 @@ import {
   DesktopPageScaffold,
   type DesktopRoutePageProps,
 } from "./DesktopPageScaffold";
+import { DesktopLoadFailure } from "./DesktopLoadFailure";
 
 /* ── palette ── */
 const ACCENT = "#5E9EFF";
@@ -220,6 +221,25 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
     queryKey: ["/api/billing/card"],
     enabled: !!merchantId && isOwner,
   });
+
+  /* R1-T9: data that did not load is not "not set", "pending", "someone else's
+     to manage", the default plan or "no saved card". Business details that did
+     not load show no form (its Save sends every field, so blanks would overwrite
+     the real details) and no name or status. Access that did not load is not
+     "managed by the account owner": nothing is editable until it loads. A plan
+     that did not load shows no plan, no charge disclosure (both are worked out
+     from it) and no plan, card or cancellation action. A payment method that did
+     not load offers no card action. A failed background refresh keeps what is
+     already shown. */
+  const businessUnavailable = merchantQuery.isError && merchantQuery.data === undefined;
+  const accessUnavailable = authQuery.isError && authQuery.data === undefined;
+  const planUnavailable = subscriptionQuery.isError && subscriptionQuery.data === undefined;
+  const cardUnavailable = cardQuery.isError && cardQuery.data === undefined;
+  const planHint = planUnavailable ? "Available once your plan loads" : undefined;
+  const retryBusiness = () => { void merchantQuery.refetch(); };
+  const retryAccess = () => { void authQuery.refetch(); };
+  const retryPlan = () => { void subscriptionQuery.refetch(); };
+  const retryCard = () => { void cardQuery.refetch(); };
 
   const merchant = merchantQuery.data;
   const subscription = subscriptionQuery.data?.subscription;
@@ -601,14 +621,26 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
         {/* ── LEFT ── */}
         <div className="ds-left dt-cascade">
           <div className="ds-id-row">
-            <span className="ds-avatar">{initialsOf(businessName)}</span>
-            <span className="ds-status" style={{ color: isActive ? GREEN : "#F0A34E" }}>
-              <span className="ds-status-dot" style={{ background: isActive ? GREEN : "#F0A34E" }} />
-              <span>{status.toUpperCase()}</span>
-            </span>
+            <span className="ds-avatar">{businessUnavailable ? "–" : initialsOf(businessName)}</span>
+            {!businessUnavailable && (
+              <span className="ds-status" style={{ color: isActive ? GREEN : "#F0A34E" }}>
+                <span className="ds-status-dot" style={{ background: isActive ? GREEN : "#F0A34E" }} />
+                <span>{status.toUpperCase()}</span>
+              </span>
+            )}
           </div>
 
-          <span className="ds-name">{businessName}</span>
+          {businessUnavailable ? (
+            <DesktopLoadFailure
+              tone="canvas"
+              title="Business details didn't load"
+              onRetry={retryBusiness}
+              retrying={merchantQuery.isFetching}
+              testId="settings-business-failed"
+            />
+          ) : (
+            <span className="ds-name">{businessName}</span>
+          )}
           <span className="ds-kicker">SETTINGS</span>
 
           <button
@@ -711,7 +743,23 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
 
                 {open && sec.k === "business" && (
                   <div className="ds-sec-body">
-                    {!isOwner && (
+                    {businessUnavailable ? (
+                      <DesktopLoadFailure
+                        tone="panel"
+                        title="Business details didn't load"
+                        onRetry={retryBusiness}
+                        retrying={merchantQuery.isFetching}
+                        announce={false}
+                      />
+                    ) : (<>
+                    {accessUnavailable ? (
+                      <DesktopLoadFailure
+                        tone="panel"
+                        title="Your access didn't load"
+                        onRetry={retryAccess}
+                        retrying={authQuery.isFetching}
+                      />
+                    ) : !isOwner && (
                       <div className="ds-warn ds-info">
                         Business details are managed by the account owner.
                       </div>
@@ -765,6 +813,7 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
                         {saveDetails.isPending ? "Saving…" : "Save changes"}
                       </button>
                     </div>}
+                    </>)}
                   </div>
                 )}
 
@@ -773,6 +822,9 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
                     <div className="ds-row">
                       <span className="ds-row-label">Daily revenue goal</span>
                       <span className="ds-row-controls">
+                        {businessUnavailable ? (
+                          <span className="ds-row-value">goal didn't load</span>
+                        ) : (<>
                         <input
                           className="ds-inline-input"
                           value={dailyGoal}
@@ -789,6 +841,7 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
                         >
                           {saveGoal.isPending ? "Saving…" : "Save"}
                         </button>}
+                        </>)}
                       </span>
                     </div>
                     <div className="ds-row">
@@ -810,10 +863,20 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
 
                 {open && sec.k === "billing" && (
                   <div className="ds-sec-body">
+                    {planUnavailable && (
+                      <DesktopLoadFailure
+                        tone="panel"
+                        title="Your plan didn't load"
+                        onRetry={retryPlan}
+                        retrying={subscriptionQuery.isFetching}
+                      />
+                    )}
                     <div className="ds-row">
                       <span className="ds-row-label">Plan</span>
                       <span className="ds-row-value">
-                        {plan.name} · {formatPlanPrice(subscription?.priceCents ?? plan.priceCents)}/mo · {seatsInUse} of {seatLimit} {seatLimit === 1 ? "login" : "logins"}
+                        {planUnavailable
+                          ? "unavailable"
+                          : `${plan.name} · ${formatPlanPrice(subscription?.priceCents ?? plan.priceCents)}/mo · ${seatsInUse} of ${seatLimit} ${seatLimit === 1 ? "login" : "logins"}`}
                       </span>
                     </div>
                     {subscription?.pendingPlanName && (
@@ -829,7 +892,9 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
                         {isCancelled ? "Subscription status" : isCancelling ? "Access until" : "Next invoice"}
                       </span>
                       <span className="ds-row-value">
-                        {isCancelled
+                        {planUnavailable
+                          ? "unavailable"
+                          : isCancelled
                           ? "Ended"
                           : fmtDate(isCancelling
                             ? subscription?.cancellationEffectiveDate ?? subscription?.currentPeriodEnd
@@ -838,14 +903,25 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
                     </div>
 
                     {!isOwner ? (
-                      <div className="ds-warn ds-info">
-                        The account owner manages plans, team logins, payment methods and billing history.
-                      </div>
+                      accessUnavailable ? (
+                        <DesktopLoadFailure
+                          tone="panel"
+                          title="Your access didn't load"
+                          onRetry={retryAccess}
+                          retrying={authQuery.isFetching}
+                        />
+                      ) : (
+                        <div className="ds-warn ds-info">
+                          The account owner manages plans, team logins, payment methods and billing history.
+                        </div>
+                      )
                     ) : (
                       <>
-                        <div className="ds-note ds-note-block" data-testid="plan-change-billing-disclosure">
-                          {planBillingDisclosure}
-                        </div>
+                        {!planUnavailable && (
+                          <div className="ds-note ds-note-block" data-testid="plan-change-billing-disclosure">
+                            {planBillingDisclosure}
+                          </div>
+                        )}
                         <div className="ds-row">
                           <span className="ds-row-label">Change plan</span>
                           <span className="ds-row-controls">
@@ -854,8 +930,9 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
                                 key={p.id}
                                 type="button"
                                 className="ds-chip"
-                                style={chip(p.id === plan.id)}
-                                disabled={p.id === plan.id || changePlan.isPending}
+                                style={chip(!planUnavailable && p.id === plan.id)}
+                                disabled={planUnavailable || p.id === plan.id || changePlan.isPending}
+                                title={planHint}
                                 onClick={() => changePlan.mutate(p.id)}
                               >
                                 {p.name.toLowerCase()} · {formatPlanPrice(p.priceCents)}
@@ -923,19 +1000,28 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
                           </div>
                         )}
 
-                        <div className="ds-warn ds-info" data-testid="billing-card-charge-disclosure">
-                          {cardBillingDisclosure}
-                        </div>
+                        {!planUnavailable && (
+                          <div className="ds-warn ds-info" data-testid="billing-card-charge-disclosure">
+                            {cardBillingDisclosure}
+                          </div>
+                        )}
 
                         <div className="ds-row ds-row-tall">
                           <span className="ds-row-label">Payment method</span>
-                          {cardQuery.data?.card ? (
+                          {cardUnavailable ? (
+                            <DesktopLoadFailure
+                              tone="panel"
+                              title="Payment method didn't load"
+                              onRetry={retryCard}
+                              retrying={cardQuery.isFetching}
+                            />
+                          ) : cardQuery.data?.card ? (
                             <span className="ds-row-controls">
                               <span className="ds-row-value">
                                 {cardQuery.data.card.brand || "Card"} ···· {cardQuery.data.card.last4}
                                 {cardQuery.data.card.expiry ? ` · expires ${cardQuery.data.card.expiry}` : ""}
                               </span>
-                              <button type="button" className="ds-ghost" disabled={cardBusy === "save" || confirmingCard} onClick={startCardSetup}>
+                              <button type="button" className="ds-ghost" disabled={cardBusy === "save" || confirmingCard || planUnavailable} title={planHint} onClick={startCardSetup}>
                                 {confirmingCard ? "confirming…" : cardBusy === "save" ? "opening…" : isCancelled ? "restart" : "replace"}
                               </button>
                               <button type="button" className="ds-ghost ds-ghost-danger" disabled={cardBusy === "remove"} onClick={removeCard}>
@@ -944,7 +1030,7 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
                             </span>
                           ) : (
                             <span className="ds-row-controls">
-                              <button type="button" className="ds-primary ds-primary-sm" disabled={cardBusy === "save" || confirmingCard} onClick={startCardSetup}>
+                              <button type="button" className="ds-primary ds-primary-sm" disabled={cardBusy === "save" || confirmingCard || planUnavailable} title={planHint} onClick={startCardSetup}>
                                 {confirmingCard ? "Confirming payment method…" : cardBusy === "save" ? "Opening secure page…" : "Add payment method"}
                               </button>
                               <span className="ds-row-value" style={{ opacity: 0.6 }}>entered on Windcave's secure page</span>
@@ -986,7 +1072,9 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
 
                         <div className="ds-row ds-row-last ds-row-tall">
                           <span className="ds-row-label">Subscription</span>
-                          {isCancelled ? (
+                          {planUnavailable ? (
+                            <span className="ds-row-value">unavailable</span>
+                          ) : isCancelled ? (
                             <span className="ds-row-controls">
                               <span className="ds-row-value">Subscription ended</span>
                               <button
@@ -1042,12 +1130,14 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
                     </div>
                     <div className="ds-row">
                       <span className="ds-row-label">Phone</span>
-                      <span className="ds-row-value">{merchant?.phone || "—"}</span>
+                      <span className="ds-row-value">{businessUnavailable ? "unavailable" : merchant?.phone || "—"}</span>
                     </div>
                     <div className="ds-row">
                       <span className="ds-row-label">Account status</span>
                       <span className="ds-row-value">
-                        {isActive
+                        {businessUnavailable
+                          ? "unavailable"
+                          : isActive
                           ? "Active — connected to the payment network"
                           : status === "verified"
                             ? "Pending — being reviewed for Windcave onboarding"
