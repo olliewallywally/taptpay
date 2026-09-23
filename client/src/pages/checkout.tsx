@@ -277,6 +277,12 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ accept }),
       });
+      /* 402: the business's subscription needs attention. The server's message is
+         written for the business; the customer is told what they can do instead,
+         without the business's billing (R1-T9). */
+      if (res.status === 402) {
+        throw new Error("This quote can't be accepted online right now. Please contact the business to go ahead.");
+      }
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || "Could not respond");
       const result = await res.json();
       trackEvent("quote_responded", { outcome: accept ? "accepted" : "declined" });
