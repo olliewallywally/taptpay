@@ -431,7 +431,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
   const promoteClient = useMutation({
     mutationFn: async () => {
       if (!sentInvoice?.clientProfileId) throw new Error("No client to save");
-      const res = await tradesFetch(`/api/trades/clients//promote`, { method: "POST" });
+      const res = await tradesFetch(`/api/trades/clients/${sentInvoice.clientProfileId}/promote`, { method: "POST" });
       if (!res.ok) throw await failure(res, "Could not save the client");
       return res.json();
     },
