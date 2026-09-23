@@ -20,7 +20,7 @@ import {
   HANDOFF_CODE_TTL_MS, clearSignInCookie, googleVerifiedEmail, handoffCodeHash, newHandoffCode, readCookie,
   signInCookies, startGoogleSignIn, verifyGoogleSignInState,
 } from "./google-sign-in";
-import { type SignInRealm, confirmationResendBucket, googleCallbackAddressBucket, passwordChangeBucket, passwordResetAddressBucket, passwordResetBucket, signInAccountBucket, signInAddressBucket, signInDeviceKeyPrefix, signupNoticeBucket, tooManyAttempts } from "./auth-throttle";
+import { type SignInRealm, confirmationResendBucket, googleCallbackAddressBucket, normalizeThrottleEmail, passwordChangeBucket, passwordResetAddressBucket, passwordResetBucket, signInAccountBucket, signInAddressBucket, signInDeviceKeyPrefix, signupNoticeBucket, tooManyAttempts } from "./auth-throttle";
 import { clientAddressForLimits } from "./client-address";
 import { ACCOUNT_EMAIL_REPLY_FLOOR_MS, SIGN_UP_REPLY_FLOOR_MS, replyNoSoonerThan, replyStart } from "./even-reply";
 import { deviceKnowsEmail, markSignInDevice, readSignInDevice, signInBucketFor, signInDeviceCookie, type SignInDevice } from "./sign-in-device";
@@ -1039,7 +1039,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // Check for admin credentials
       const adminEmail = config.admin.email;
       const adminPasswordHash = config.admin.passwordHash;
-      const isAdminEmail = !!adminEmail && email === adminEmail;
+      // Email addresses are compared without regard to case, as merchant sign-in does:
+      // a phone keyboard's capital first letter must not read as wrong credentials.
+      const isAdminEmail = !!adminEmail && normalizeThrottleEmail(email) === normalizeThrottleEmail(adminEmail);
       if (isAdminEmail && !adminPasswordHash) {
         await storage.settleAuthThrottle([bucket, ...addressBuckets], "void", new Date()).catch(() => undefined);
         console.error("CRITICAL: ADMIN_PASSWORD_HASH env var not set. Admin login disabled.");

@@ -118,6 +118,11 @@ app.use(createRequestLogger(log));
     }
   }
 
+  // Admin sign-in refuses everyone without ADMIN_PASSWORD_HASH: say so where it shows.
+  if (config.admin.email && !config.admin.passwordHash) {
+    console.warn('⚠️  Admin sign-in is off: ADMIN_PASSWORD_HASH is not set. Run `npm run admin:password` in the Shell to make one.');
+  }
+
   // ── Read-only migration gate ─────────────────────────────────────────────
   // Production must never accept traffic against pending, drifted, orphaned,
   // or out-of-order schema history. Development reports the same issues loudly.
