@@ -2,7 +2,11 @@ import { useState, useEffect, useRef, createContext, useContext, useCallback, us
 import { AnimatePresence, motion, useMotionValue, useTransform } from "framer-motion";
 import { X, WifiOff, AlertTriangle, CheckCircle, Info, Smartphone } from "lucide-react";
 import { sseClient } from "@/lib/sse-client";
-import { BILLING_CARD_REQUIRED_EVENT } from "@/lib/queryClient";
+import {
+  BILLING_CARD_REQUIRED_EVENT,
+  BILLING_REQUIRED_MESSAGE,
+  BILLING_REQUIRED_TITLE,
+} from "@/lib/queryClient";
 
 interface Notification {
   id: string;
@@ -78,11 +82,11 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     const handleCardRequired = () => {
       addNotification({
         type: "warning",
-        title: "Credit or debit card required",
-        message: "Please enter a valid credit or debit card in Settings before sending payments.",
+        title: BILLING_REQUIRED_TITLE,
+        message: BILLING_REQUIRED_MESSAGE,
         duration: 0,
         actions: [{
-          label: "Open Settings",
+          label: "Open Billing",
           variant: "primary",
           onClick: () => { window.location.href = "/settings?section=billing"; },
         }],
