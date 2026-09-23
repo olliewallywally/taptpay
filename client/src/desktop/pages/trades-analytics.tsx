@@ -160,7 +160,10 @@ export default function DesktopTradesAnalytics(props: DesktopRoutePageProps) {
      so they wait for all three, and are generated only from loaded data — never
      from those fallbacks while a request is still loading or after it failed.
      The totals need neither the clients nor the quotes; the history needs the
-     clients only for its names, and says when those did not load. */
+     clients only for its names, and says when those did not load. An export also
+     prints the business name and works GST out in the business's mode, both from
+     the business details, so it waits for those as well; the on-screen reports
+     use neither. */
   const paymentsUnavailable = invoicesQuery.isError && invoicesQuery.data === undefined;
   const clientsUnavailable = clientsQuery.isError && clientsQuery.data === undefined;
   const quotesUnavailable = quotesQuery.isError && quotesQuery.data === undefined;
@@ -176,6 +179,12 @@ export default function DesktopTradesAnalytics(props: DesktopRoutePageProps) {
     invoicesQuery.data !== undefined &&
     clientsQuery.data !== undefined &&
     quotesQuery.data !== undefined;
+  const profileUnavailable = merchantQuery.isError && merchantQuery.data === undefined;
+  const exportUnavailableHint =
+    reportsUnavailableHint ??
+    (profileUnavailable ? "Available once your business details load" : undefined);
+  const exportUnavailable = exportUnavailableHint !== undefined;
+  const exportReady = reportsReady && merchantQuery.data !== undefined;
   const retryPayments = () => { void invoicesQuery.refetch(); };
   const retryClients = () => { void clientsQuery.refetch(); };
 
@@ -183,8 +192,8 @@ export default function DesktopTradesAnalytics(props: DesktopRoutePageProps) {
      a source fails instead, the request is dropped, so it cannot pop up after a
      later retry. */
   useEffect(() => {
-    if (reportsUnavailable) setExportOpen(false);
-  }, [reportsUnavailable]);
+    if (exportUnavailable) setExportOpen(false);
+  }, [exportUnavailable]);
 
   const clients = useMemo(() => clientsQuery.data ?? [], [clientsQuery.data]);
   const invoices = useMemo(() => invoicesQuery.data ?? [], [invoicesQuery.data]);
@@ -687,8 +696,8 @@ export default function DesktopTradesAnalytics(props: DesktopRoutePageProps) {
                     type="button"
                     className="ta-btn-white"
                     onClick={() => setExportOpen(true)}
-                    disabled={reportsUnavailable}
-                    title={reportsUnavailableHint}
+                    disabled={exportUnavailable}
+                    title={exportUnavailableHint}
                   >
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={INK} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 4v10M8 10l4 4 4-4" /><path d="M5 19h14" /></svg>
                     <span>Export</span>
@@ -858,7 +867,7 @@ export default function DesktopTradesAnalytics(props: DesktopRoutePageProps) {
         </div>
       </div>
 
-      {exportOpen && reportsReady && (
+      {exportOpen && exportReady && (
         <ReportModal
           title="Trades Reports"
           options={TRADES_REPORT_OPTIONS}

@@ -7,6 +7,7 @@
  * data: one asked for while a request is still loading waits for it, and one
  * asked for before a failure is not offered on the failed data. Without the
  * clients, the history keeps its payments and says their names did not load.
+ * An export also waits for the business details (its header and GST mode).
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, within } from "@testing-library/react";
@@ -35,14 +36,20 @@ const INVOICES = [
 const QUOTES = [{ id: "q1", clientProfileId: "c1", totalCents: 99_000, status: "sent", createdAt: now }];
 
 type Answer = () => Response | Promise<Response>;
-/** Answers the three trades requests as given; the rest as a working day would. */
-function serve({ invoices = () => reply(INVOICES), clients = () => reply(CLIENTS), quotes = () => reply(QUOTES) }: { invoices?: Answer; clients?: Answer; quotes?: Answer }) {
+const PROFILE = { id: 77, businessName: "Test Trades", tradeGstMode: "exclusive" };
+/** Answers the three trades requests and the business details as given; the rest as a working day would. */
+function serve({
+  invoices = () => reply(INVOICES),
+  clients = () => reply(CLIENTS),
+  quotes = () => reply(QUOTES),
+  profile = () => reply(PROFILE),
+}: { invoices?: Answer; clients?: Answer; quotes?: Answer; profile?: Answer }) {
   fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
     const url = String(input);
     if (url === "/api/trades/invoices") return invoices();
     if (url === "/api/trades/clients") return clients();
     if (url === "/api/trades/quotes") return quotes();
-    if (url === "/api/merchants/77/profile") return reply({ id: 77, businessName: "Test Trades" });
+    if (url === "/api/merchants/77/profile") return profile();
     return reply([]);
   });
 }
@@ -236,5 +243,46 @@ describe("trades analytics when clients or quotes fail to load (R1-T9)", () => {
     expect(reports()).toBeDisabled();
     expect(exportButton()).toBeDisabled();
     expect(reports()).toHaveAttribute("title", "Available once your quotes load");
+  });
+});
+
+/* An export prints the business name and works out GST in the business's mode
+   (inclusive or exclusive), both from the business details. Without them it would
+   print "TaptPay" and GST in the default mode. The on-screen reports use neither. */
+describe("trades analytics when the business details fail to load (R1-T9)", () => {
+  it("the totals and Reports still work; Export waits for the business details", async () => {
+    serve({ profile: outage });
+    renderPage();
+    await settle();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(document.querySelector(".ta-hero")).toHaveTextContent("$1,500.00");
+    expect(reports()).toBeEnabled();
+    expect(exportButton()).toBeDisabled();
+    expect(exportButton()).toHaveAttribute("title", "Available once your business details load");
+  });
+
+  it("an export asked for while they were loading waits for them, is not offered if they fail, and does not pop up once they load", async () => {
+    let calls = 0;
+    let answer: (response: Response) => void = () => undefined;
+    serve({
+      profile: () =>
+        calls++ === 0 ? new Promise<Response>((resolve) => { answer = resolve; }) : reply(PROFILE),
+    });
+    const client = renderPage();
+    await settle();
+
+    await userEvent.click(exportButton());
+    expect(screen.queryByText("Trades Reports")).toBeNull();
+    await act(async () => { answer(outage()); });
+    await settle();
+    expect(screen.queryByText("Trades Reports")).toBeNull();
+    expect(exportButton()).toBeDisabled();
+
+    await act(async () => {
+      await client.refetchQueries({ queryKey: ["/api/merchants", 77, "profile"] });
+    });
+    await settle();
+    expect(exportButton()).toBeEnabled();
+    expect(screen.queryByText("Trades Reports")).toBeNull(); // the abandoned export does not pop up
   });
 });
