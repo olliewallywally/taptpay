@@ -76,7 +76,7 @@ describe("merchant signup plan selection", () => {
     jest.clearAllMocks();
     (apiRequest as jest.Mock).mockResolvedValue({
       ok: true,
-      json: async () => ({ merchant: { id: 42 } }),
+      json: async () => ({ message: "Check your email to continue." }),
     });
   });
 
@@ -132,7 +132,7 @@ describe("merchant signup plan selection", () => {
         expect.objectContaining({ planId: "team" }),
       );
     });
-    expect(setLocation).toHaveBeenCalledWith("/check-email?email=jamie%40example.test&id=42");
+    expect(setLocation).toHaveBeenCalledWith("/check-email?email=jamie%40example.test");
   });
 
   // Owner decision 2026-09-23: 8+ characters, a capital letter, and a number or symbol.

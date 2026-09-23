@@ -196,9 +196,11 @@ export default function MerchantSignup() {
       const response = await apiRequest("POST", "/api/merchants/signup", form);
       return response.json();
     },
-    onSuccess: data => {
+    onSuccess: () => {
       trackEvent("signup_submitted", { plan: form.planId, outcome: "success" });
-      setLocation(`/check-email?email=${encodeURIComponent(form.email)}&id=${data.merchant.id}`);
+      // The reply is the same for every address, so it names no account: the
+      // confirmation page asks by address (owner decision 2026-09-23).
+      setLocation(`/check-email?email=${encodeURIComponent(form.email)}`);
     },
     onError: (error: unknown) => {
       trackEvent("signup_submitted", { plan: form.planId, outcome: "failed" });

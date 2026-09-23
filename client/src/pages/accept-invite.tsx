@@ -123,7 +123,7 @@ export default function AcceptInvite() {
           </p>
         </div>
 
-        <form onSubmit={submit} style={{ padding: "0 clamp(1.1rem, 4vw, 2.6rem) 2.4rem" }}>
+        <form onSubmit={submit} className="signup-invite-card">
           <div className="signup-step-heading">
             <div className="signup-step-icon">
               <UserRound aria-hidden="true" />

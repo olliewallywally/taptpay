@@ -1,8 +1,8 @@
 import "./support/test-env";
 
 import {
-  AUTH_THROTTLE_RECLAIM_AFTER_MS, PASSWORD_RESET_POLICY, SIGN_IN_POLICY, passwordChangeBucket, passwordResetBucket,
-  planAuthThrottleTake,
+  AUTH_THROTTLE_RECLAIM_AFTER_MS, PASSWORD_RESET_POLICY, SIGN_IN_POLICY, confirmationResendBucket, passwordChangeBucket,
+  passwordResetBucket, planAuthThrottleTake, signupNoticeBucket,
   retryAfterSeconds, settleAuthThrottleRow, signInAccountBucket, signInDeviceBucket, signInDeviceKeyPrefix,
   tooManyAttempts, uniqueAuthThrottleBuckets, waitAfter, waitInWords,
   type AuthThrottleBucket, type AuthThrottleRow,
@@ -93,16 +93,25 @@ describe("bucket keys", () => {
     expect(signInAccountBucket("merchant", " owner@example.TEST ").key).toBe(key);
   });
 
-  it("keep sign-in, admin sign-in, reset requests and password changes apart", () => {
+  it("keep sign-in, admin sign-in, reset requests, password changes, sign-up notes and confirmation resends apart", () => {
     const keys = [
       signInAccountBucket("merchant", "a@example.test").key,
       signInAccountBucket("admin", "a@example.test").key,
       passwordResetBucket("a@example.test").key,
       signInDeviceBucket("merchant", "a@example.test", "d".repeat(22)).key,
       passwordChangeBucket(7).key,
+      signupNoticeBucket("a@example.test").key,
+      confirmationResendBucket({ email: "a@example.test" }).key,
+      confirmationResendBucket({ merchantId: 7 }).key,
     ];
-    expect(new Set(keys).size).toBe(5);
-    expect(new Set(keys.map((key) => key.split(":")[1])).size).toBe(5);
+    expect(new Set(keys).size).toBe(8);
+    expect(new Set(keys.map((key) => key.split(":")[1])).size).toBe(8);
+    // Each emails its address, so each is limited like a reset.
+    for (const emailing of [signupNoticeBucket("a@example.test"), confirmationResendBucket({ merchantId: 7 })]) {
+      expect(emailing.policy).toBe(PASSWORD_RESET_POLICY);
+    }
+    expect(confirmationResendBucket({ email: " A@Example.test" }).key)
+      .toBe(confirmationResendBucket({ email: "a@example.test" }).key);
     expect(passwordChangeBucket(7).key).toBe(passwordChangeBucket(7).key);
     expect(passwordChangeBucket(7).key).not.toBe(passwordChangeBucket(8).key);
   });

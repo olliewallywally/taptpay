@@ -278,6 +278,19 @@
 
 .signup-consent a { color: #6eaeff; }
 
+/* The team-invite form sits on the same dark card as the invite's other states and
+   the sign-up form: its heading, labels and fields are styled for one. Without it the
+   white heading sat on the cream page (owner decision 2026-09-23). */
+.signup-invite-card {
+  width: min(100%, 31rem);
+  margin: 0 auto;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 2rem;
+  background: #060d2f;
+  box-shadow: 0 30px 80px rgba(6, 13, 47, 0.18);
+  padding: 2.4rem clamp(1.1rem, 4vw, 2.6rem);
+}
+
 .verification-sent-card {
   width: min(100%, 31rem);
   margin: clamp(4rem, 10vh, 8rem) auto 0;

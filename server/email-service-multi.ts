@@ -137,16 +137,19 @@ export async function sendEmailMulti(params: EmailParams): Promise<boolean> {
   return success;
 }
 
+function emailBaseUrl(baseUrl?: string): string {
+  return baseUrl || config.publicOrigin || (config.legacyDomains.replitDomains
+    ? `https://${config.legacyDomains.replitDomains.split(',')[0]}`
+    : 'http://localhost:5000');
+}
+
 export async function sendMerchantVerificationEmail(
   email: string,
   token: string,
   merchantName: string,
   baseUrl?: string
 ): Promise<boolean> {
-  const properBaseUrl = baseUrl || config.publicOrigin || (config.legacyDomains.replitDomains
-    ? `https://${config.legacyDomains.replitDomains.split(',')[0]}`
-    : 'http://localhost:5000');
-  const confirmUrl = `${properBaseUrl}/confirm-email?token=${token}`;
+  const confirmUrl = `${emailBaseUrl(baseUrl)}/confirm-email?token=${token}`;
 
   const html = `
     <div style="font-family: 'Outfit', Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #060e42; padding: 32px 20px;">
@@ -155,7 +158,7 @@ export async function sendMerchantVerificationEmail(
           <p style="font-size: 22px; font-weight: 700; color: #ffffff; margin: 0; letter-spacing: -0.5px;">TaptPay</p>
           <p style="color: rgba(255,255,255,0.5); margin: 6px 0 0 0; font-size: 14px;">Merchant Account Verification</p>
         </div>
-        <p style="color: rgba(255,255,255,0.85); font-size: 15px; line-height: 1.6; margin: 0 0 12px 0;">Hi ${merchantName},</p>
+        <p style="color: rgba(255,255,255,0.85); font-size: 15px; line-height: 1.6; margin: 0 0 12px 0;">Hi ${escHtml(merchantName)},</p>
         <p style="color: rgba(255,255,255,0.65); font-size: 14px; line-height: 1.7; margin: 0 0 28px 0;">
           Thanks for signing up. Please confirm your email address to continue setting up your TaptPay merchant account.
         </p>
@@ -191,6 +194,66 @@ Need help? Contact us at support@taptpay.co.nz`;
     subject: 'Confirm your TaptPay email address',
     html,
     text: textContent,
+  });
+}
+
+/**
+ * Sent instead of a second application when a sign-up names an address that already
+ * has an account, so the sign-up form can answer every address alike (owner decision
+ * 2026-09-23). It carries nothing from the form: whoever filled it in may not own the
+ * address. Nor does it point at confirming an application: one waiting for this address
+ * may have been started by a stranger, with the stranger's password.
+ */
+export async function sendExistingAccountNoticeEmail(email: string, baseUrl?: string): Promise<boolean> {
+  const base = emailBaseUrl(baseUrl);
+  const signInUrl = `${base}/login`;
+  const resetUrl = `${base}/forgot-password`;
+
+  const html = `
+    <div style="font-family: 'Outfit', Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #060e42; padding: 32px 20px;">
+      <div style="background-color: #0d1147; border: 1px solid rgba(255,255,255,0.08); padding: 40px 36px; border-radius: 20px;">
+        <div style="text-align: center; margin-bottom: 32px;">
+          <p style="font-size: 22px; font-weight: 700; color: #ffffff; margin: 0; letter-spacing: -0.5px;">TaptPay</p>
+          <p style="color: rgba(255,255,255,0.5); margin: 6px 0 0 0; font-size: 14px;">Sign-up attempt</p>
+        </div>
+        <p style="color: rgba(255,255,255,0.65); font-size: 14px; line-height: 1.7; margin: 0 0 20px 0;">
+          Someone, maybe you, just tried to create a new TaptPay account with this email address.
+          It already has one, so nothing new was made.
+        </p>
+        <div style="text-align: center; margin: 32px 0;">
+          <a href="${signInUrl}"
+             style="background-color: #00f1d7; color: #000a36; padding: 14px 36px; text-decoration: none; border-radius: 50px; display: inline-block; font-weight: 700; font-size: 15px; letter-spacing: 0.2px;">
+            Sign in
+          </a>
+        </div>
+        <p style="color: rgba(255,255,255,0.65); font-size: 14px; line-height: 1.7; margin: 0 0 12px 0;">
+          Forgotten your password? <a href="${resetUrl}" style="color: #00f1d7; text-decoration: none;">Reset it here</a>.
+        </p>
+        <p style="color: rgba(255,255,255,0.35); font-size: 12px; line-height: 1.6; margin: 28px 0 0 0; text-align: center;">
+          If this wasn't you, you can ignore this email. Nothing about your account has changed.
+        </p>
+        <p style="color: rgba(255,255,255,0.35); font-size: 12px; margin: 8px 0 0 0; text-align: center;">
+          Need help? <a href="mailto:support@taptpay.co.nz" style="color: #00f1d7; text-decoration: none;">support@taptpay.co.nz</a>
+        </p>
+      </div>
+    </div>
+  `;
+
+  const text = `Someone, maybe you, just tried to create a new TaptPay account with this email address. It already has one, so nothing new was made.
+
+Sign in: ${signInUrl}
+Forgotten your password? Reset it: ${resetUrl}
+
+If this wasn't you, you can ignore this email. Nothing about your account has changed.
+
+Need help? Contact us at support@taptpay.co.nz`;
+
+  return sendEmailMulti({
+    to: email,
+    from: EMAIL_CONFIG.resend.fromEmail,
+    subject: 'Someone tried to sign up to TaptPay with your email',
+    html,
+    text,
   });
 }
 

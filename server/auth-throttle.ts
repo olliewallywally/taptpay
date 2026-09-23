@@ -38,7 +38,10 @@ export const SIGN_IN_POLICY: AuthThrottlePolicy = Object.freeze({
   free: 5, firstWaitMs: 30_000, maxWaitMs: 15 * MINUTE, forgetAfterMs: 60 * MINUTE,
 });
 
-/** Forgot-password requests: every request counts, since each one sends an email. */
+/**
+ * Requests that each send an email: forgot-password, the "you already have an
+ * account" note a sign-up sends, and a resent confirmation link. Every one counts.
+ */
 export const PASSWORD_RESET_POLICY: AuthThrottlePolicy = Object.freeze({
   free: 3, firstWaitMs: 5 * MINUTE, maxWaitMs: 60 * MINUTE, forgetAfterMs: 24 * 60 * MINUTE,
 });
@@ -181,6 +184,22 @@ export function passwordResetBucket(email: string): AuthThrottleBucket {
   return { key: `reset-account:${bucketKeyHmac("reset-account", normalizeThrottleEmail(email))}`, policy: PASSWORD_RESET_POLICY };
 }
 
+/** Sign-ups naming an address that already has an account: each would mail it a note. */
+export function signupNoticeBucket(email: string): AuthThrottleBucket {
+  return { key: `signup-notice:${bucketKeyHmac("signup-notice", normalizeThrottleEmail(email))}`, policy: PASSWORD_RESET_POLICY };
+}
+
+/**
+ * Confirmation-link resends, per the address or account number asked about: counted
+ * whether or not it exists, so a refusal says nothing about it.
+ */
+export function confirmationResendBucket(asked: { email: string } | { merchantId: number }): AuthThrottleBucket {
+  const [purpose, value] = "email" in asked
+    ? ["confirm-resend", normalizeThrottleEmail(asked.email)]
+    : ["confirm-resend-id", String(asked.merchantId)];
+  return { key: `${purpose}:${bucketKeyHmac(purpose, value)}`, policy: PASSWORD_RESET_POLICY };
+}
+
 // ── The refusal ──────────────────────────────────────────────────────────────
 
 /** Whole seconds, never zero: Retry-After and the message agree. */
@@ -195,9 +214,11 @@ export function waitInWords(seconds: number): string {
 }
 
 /** The 429 body. The same for every email, with a login or without. */
-export function tooManyAttempts(retryAfterMs: number, what: "sign-in" | "password-reset") {
+export function tooManyAttempts(retryAfterMs: number, what: "sign-in" | "password-reset" | "confirmation-resend") {
   const seconds = retryAfterSeconds(retryAfterMs);
-  const subject = what === "password-reset" ? "Too many password reset requests" : "Too many attempts";
+  const subject = what === "password-reset" ? "Too many password reset requests"
+    : what === "confirmation-resend" ? "Too many confirmation emails requested"
+    : "Too many attempts";
   return {
     retryAfterSeconds: seconds,
     body: { code: "TOO_MANY_ATTEMPTS", message: `${subject}. Please try again in ${waitInWords(seconds)}.`, retryAfterSeconds: seconds },

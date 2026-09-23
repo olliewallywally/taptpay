@@ -20,7 +20,8 @@ import {
   HANDOFF_CODE_TTL_MS, clearSignInCookie, googleVerifiedEmail, handoffCodeHash, newHandoffCode, readCookie,
   signInCookies, startGoogleSignIn, verifyGoogleSignInState,
 } from "./google-sign-in";
-import { passwordChangeBucket, passwordResetBucket, signInAccountBucket, signInDeviceKeyPrefix, tooManyAttempts } from "./auth-throttle";
+import { confirmationResendBucket, passwordChangeBucket, passwordResetBucket, signInAccountBucket, signInDeviceKeyPrefix, signupNoticeBucket, tooManyAttempts } from "./auth-throttle";
+import { ACCOUNT_EMAIL_REPLY_FLOOR_MS, SIGN_UP_REPLY_FLOOR_MS, replyNoSoonerThan, replyStart } from "./even-reply";
 import { markSignInDevice, readSignInDevice, signInBucketFor, signInDeviceCookie } from "./sign-in-device";
 import { generateReceiptPdf } from "./pdf-generator";
 import { generateQuotePdf } from "./trades-quote-pdf";
@@ -806,7 +807,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // guesses can slow it down (server/sign-in-device.ts).
   const merchantDeviceCookie = signInDeviceCookie("merchant", getBaseUrl());
   const adminDeviceCookie = signInDeviceCookie("admin", getBaseUrl());
-  const refuseTooManyAttempts = (res: express.Response, retryAfterMs: number, what: "sign-in" | "password-reset") => {
+  const refuseTooManyAttempts = (
+    res: express.Response, retryAfterMs: number, what: "sign-in" | "password-reset" | "confirmation-resend",
+  ) => {
     const refusal = tooManyAttempts(retryAfterMs, what);
     res.set("Retry-After", String(refusal.retryAfterSeconds));
     return res.status(429).json(refusal.body);
@@ -866,6 +869,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
   // Password reset routes
   app.post("/api/auth/forgot-password", async (req, res) => {
+    const startedAt = replyStart();
     try {
       const validation = forgotPasswordSchema.safeParse(req.body);
       if (!validation.success) {
@@ -886,7 +890,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       
       await requestPasswordReset(email, baseUrl);
       
-      // Always return success to prevent email enumeration
+      // The same answer, after the same wait, whether or not the address has a login
+      // (owner decision 2026-09-23): only a login's request saves a link and sends
+      // an email, and the reply must not show that it took longer.
+      const worked = await replyNoSoonerThan(startedAt, ACCOUNT_EMAIL_REPLY_FLOOR_MS);
+      if (worked > ACCOUNT_EMAIL_REPLY_FLOOR_MS) {
+        console.warn(`[FORGOT_PASSWORD_SLOW] took ${Math.round(worked)} ms, over the ${ACCOUNT_EMAIL_REPLY_FLOOR_MS} ms floor`);
+      }
       res.json({ message: "If an account with that email exists, a password reset link has been sent." });
     } catch (error) {
       console.error("Password reset request error:", error);
@@ -5263,32 +5273,40 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   });
 
   // Resend confirmation email (public — for check-email screen)
+  // Resends a sign-up's confirmation link, asked by address (the check-email page) or by
+  // account number (business-details). Owner decision 2026-09-23: the same answer, after
+  // the same wait, whether or not an application is waiting; only a waiting one is sent
+  // its own link. Limited per address or number asked, whether it exists or not, so a
+  // refusal says nothing about it either.
   app.post("/api/auth/resend-confirmation", async (req, res) => {
+    const startedAt = replyStart();
     try {
-      const ip = req.ip || req.socket.remoteAddress || 'unknown';
-      const { merchantId, email } = req.body;
-      const rateLimitKey = `resend:${ip}:${merchantId || email || 'unknown'}`;
-      if (!checkResendRateLimit(rateLimitKey)) {
-        return res.status(429).json({ message: "Too many resend attempts. Please wait a few minutes." });
+      const byEmail = forgotPasswordSchema.safeParse({ email: req.body?.email });
+      const merchantId = req.body?.merchantId === undefined
+        ? null
+        : strictPositiveIntegerParam(String(req.body.merchantId));
+      const asked: { email: string } | { merchantId: number } | null = byEmail.success
+        ? { email: byEmail.data.email.trim().toLowerCase() }
+        : merchantId !== null ? { merchantId } : null;
+      if (!asked) return res.status(400).json({ message: "Enter the email address you signed up with." });
+
+      const slot = await storage.takeAuthThrottleSlot([confirmationResendBucket(asked)], new Date());
+      if (!slot.allowed) return refuseTooManyAttempts(res, slot.retryAfterMs, "confirmation-resend");
+
+      const merchant = "email" in asked
+        ? await storage.getMerchantByEmail(asked.email)
+        : await storage.getMerchant(asked.merchantId);
+      if (merchant && !merchant.emailVerified && merchant.verificationToken) {
+        const { sendMerchantVerificationEmail } = await import('./email-service-multi');
+        const { getBaseUrl } = await import('./url-utils');
+        await sendMerchantVerificationEmail(merchant.email, merchant.verificationToken, merchant.name, getBaseUrl(req));
       }
 
-      let merchant;
-      if (merchantId) {
-        const id = parseInt(merchantId);
-        if (!isNaN(id)) merchant = await storage.getMerchant(id);
-      } else if (email) {
-        merchant = await storage.getMerchantByEmail(email);
+      const worked = await replyNoSoonerThan(startedAt, ACCOUNT_EMAIL_REPLY_FLOOR_MS);
+      if (worked > ACCOUNT_EMAIL_REPLY_FLOOR_MS) {
+        console.warn(`[CONFIRMATION_RESEND_SLOW] took ${Math.round(worked)} ms, over the ${ACCOUNT_EMAIL_REPLY_FLOOR_MS} ms floor`);
       }
-
-      if (!merchant) return res.status(404).json({ message: "Merchant not found" });
-      if (merchant.emailVerified) return res.json({ message: "Email is already verified" });
-      if (!merchant.verificationToken) return res.status(400).json({ message: "No verification token found" });
-
-      const { sendMerchantVerificationEmail } = await import('./email-service-multi');
-      const { getBaseUrl } = await import('./url-utils');
-      const baseUrl = getBaseUrl(req);
-      await sendMerchantVerificationEmail(merchant.email, merchant.verificationToken, merchant.name, baseUrl);
-      res.json({ message: "Verification email sent" });
+      res.json({ message: "If that address is waiting to be confirmed, we've sent the link again." });
     } catch (error) {
       console.error("Resend confirmation error:", error);
       res.status(500).json({ message: "Failed to resend email" });
@@ -5339,7 +5357,19 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
+  // The one answer sign-up gives a valid request, new address or not, never sooner than
+  // SIGN_UP_REPLY_FLOOR_MS after it began (owner decision 2026-09-23). It carries no
+  // account number: the confirmation page asks by address.
+  async function replyToSignup(res: express.Response, startedAt: number) {
+    const worked = await replyNoSoonerThan(startedAt, SIGN_UP_REPLY_FLOOR_MS);
+    if (worked > SIGN_UP_REPLY_FLOOR_MS) {
+      console.warn(`[SIGNUP_SLOW] took ${Math.round(worked)} ms, over the ${SIGN_UP_REPLY_FLOOR_MS} ms floor`);
+    }
+    return res.json({ message: "Check your email to continue." });
+  }
+
   app.post("/api/merchants/signup", async (req, res) => {
+    const startedAt = replyStart();
     try {
       const ip = req.ip || req.socket.remoteAddress || 'unknown';
       if (!checkRateLimit(ip)) {
@@ -5374,16 +5404,25 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       } = validation.data;
 
       const normalizedEmail = email.trim().toLowerCase();
+      // Hashed whichever way this goes, so both ways do the same work.
+      const passwordHash = await bcrypt.hash(password, 12);
       const [existingMerchant, existingLogin] = await Promise.all([
         storage.getMerchantByEmail(normalizedEmail),
         storage.getUserByEmail(normalizedEmail),
       ]);
+      const { getBaseUrl } = await import('./url-utils');
+      const baseUrl = getBaseUrl(req);
       if (existingMerchant || existingLogin) {
-        return res.status(409).json({ message: "Email already registered" });
+        // Owner decision 2026-09-23: answered exactly as a new address is, so the form
+        // never says which addresses have accounts. The address's owner is mailed a
+        // note instead of a second application: a few, then slowed down, silently.
+        const slot = await storage.takeAuthThrottleSlot([signupNoticeBucket(normalizedEmail)], new Date());
+        if (slot.allowed) {
+          const { sendExistingAccountNoticeEmail } = await import('./email-service-multi');
+          await sendExistingAccountNoticeEmail(normalizedEmail, baseUrl);
+        }
+        return replyToSignup(res, startedAt);
       }
-
-      // Hash password for storage
-      const passwordHash = await bcrypt.hash(password, 12);
 
       // Generate verification token
       const verificationToken = crypto.randomBytes(32).toString('hex');
@@ -5416,23 +5455,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       // Send verification email
       const { sendMerchantVerificationEmail } = await import('./email-service-multi');
-      const { getBaseUrl } = await import('./url-utils');
-      const baseUrl = getBaseUrl(req);
-      
       const emailSent = await sendMerchantVerificationEmail(normalizedEmail, verificationToken, name, baseUrl);
       if (!emailSent) {
         console.warn('Failed to send verification email, but merchant account was created');
       }
+      console.log(`Signup application ${merchant.id} created; waiting for its email to be confirmed`);
 
-      res.json({
-        message: "Account created. Please check your email to continue.",
-        merchant: {
-          id: merchant.id,
-          name: merchant.name,
-          email: merchant.email,
-          status: merchant.status
-        }
-      });
+      return replyToSignup(res, startedAt);
 
     } catch (error) {
       console.error("Public merchant signup error:", error);

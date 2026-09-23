@@ -1,5 +1,6 @@
-// Owner decision 2026-09-23: a new password needs at least 8 characters, a capital
-// letter, and a number or symbol. This drives the real sign-up and team-invite pages in
+// Owner decisions 2026-09-23: a new password needs at least 8 characters, a capital
+// letter, and a number or symbol; and the team-invite page's heading must be readable
+// (it was white on the cream page). This drives the real sign-up and team-invite pages in
 // Chromium against the real routes (scripts/r1-t4-throttle-probe-server.ts, started with
 // a clean environment: in-memory storage, simulated email, no ambient credentials).
 // Loopback only; every other request is aborted.
@@ -57,6 +58,23 @@ async function openPage(viewport, path) {
 }
 const visible = (locator) => locator.waitFor({ timeout: 15_000 }).then(() => true, () => false);
 
+/** WCAG contrast of an element's text against the first solid background behind it. */
+const contrastOf = (page, selector) => page.evaluate((sel) => {
+  const element = document.querySelector(sel);
+  if (!element) return { ratio: 0, missing: true };
+  const rgba = (color) => (color.match(/[\d.]+/g) || []).map(Number);
+  const channel = (value) => { const v = value / 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+  const luminance = ([r, g, b]) => 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+  let background = [255, 255, 255];
+  for (let node = element; node; node = node.parentElement) {
+    const color = rgba(getComputedStyle(node).backgroundColor);
+    if (color.length === 3 || (color.length === 4 && color[3] > 0)) { background = color.slice(0, 3); break; }
+  }
+  const text = rgba(getComputedStyle(element).color).slice(0, 3);
+  const [light, dark] = [luminance(text), luminance(background)].sort((a, b) => b - a);
+  return { ratio: Math.round(((light + 0.05) / (dark + 0.05)) * 10) / 10, text, background };
+}, selector);
+
 async function signUpToPasswordStep(page, email) {
   await page.getByLabel('Full name').waitFor({ timeout: 180_000 });
   await page.getByLabel('Full name').fill('Jamie Smith');
@@ -100,12 +118,31 @@ try {
       await page.getByTestId('signup-next').click(); // review → submit
       const response = await answered.catch(() => null);
       check('desktop sign-up: the server accepts it too', response?.status() === 200, `HTTP ${response?.status()}`);
+      // The reply names no account (owner decision 2026-09-23): the confirmation page
+      // is reached by address alone, and resends by address.
+      await page.waitForURL('**/check-email?**', { timeout: 30_000 }).catch(() => undefined);
+      const landed = new URL(page.url());
+      check('desktop sign-up: the confirmation page is asked by address, with no account number',
+        landed.pathname === '/check-email' && landed.searchParams.get('email') === 'jamie.desktop@probe.test'
+          && !landed.searchParams.has('id'), landed.pathname + landed.search);
+      const resent = page.waitForResponse((r) => r.url().endsWith('/api/auth/resend-confirmation'), { timeout: 30_000 });
+      await page.getByRole('button', { name: 'Resend confirmation email' }).click();
+      const resendReply = await resent.catch(() => null);
+      const resendBody = await resendReply?.json().catch(() => null);
+      check('desktop check-email: Resend is answered the same for every address',
+        resendReply?.status() === 200 && resendBody?.message === "If that address is waiting to be confirmed, we've sent the link again.",
+        `HTTP ${resendReply?.status()} ${JSON.stringify(resendBody)}`);
+      check('desktop check-email: the page says it was sent', await visible(page.getByText('Email sent!')));
     }
     await page.context().close();
   }
 
   const { page, posts } = await openPage({ width: 390, height: 844 }, '/accept-invite?token=probe-invite-token');
   await page.locator('input[name="password"]').waitFor({ timeout: 180_000 });
+  for (const [what, selector] of [['heading', '.signup-step-heading h1'], ['description', '.signup-step-heading .signup-description']]) {
+    const contrast = await contrastOf(page, selector);
+    check(`phone invite: the ${what} is readable (contrast at least 4.5)`, contrast.ratio >= 4.5, JSON.stringify(contrast));
+  }
   await page.locator('input[name="password"]').fill('password1');
   await page.locator('input[name="confirmPassword"]').fill('password1');
   await page.getByTestId('accept-invite-submit').click();
