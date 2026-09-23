@@ -372,4 +372,40 @@ and deleted at the end. Decision: `docs/decisions/2026-09-21-r1-t4-t9-owner-answ
     - Evidence `R1-T4-phase-B-trusted-proxy-2026-09-23.md`, with the owner's live-check steps (§5).
     - Trap: a background `(…) &` inside a sandboxed Bash call dies with the call. Use the tool's
       run_in_background.
+- [x] 5a — **owner answers 2026-09-23 ~03:20 UTC** to the phase B report: "1. i cant log into admin
+  anymore. 2 fix it with your recommendation. 3. happy with your recommendation. 4. keep going".
+  - 1, admin sign-in, diagnosed from `logs/security-audit.log` and the dev process:
+    - two ADMIN_FAILED_LOGIN at 03:20:50 (`ol***@gmail.com`) and 03:20:53 (`ol***@taptpay.co.nz`),
+      i.e. 401 wrong credentials, not slowed;
+    - dev runs phase C code (pid 145, started 23:25);
+    - `ADMIN_EMAIL` = oliverleonard.professional@gmail.com (from `.replit` userenv);
+    - **`ADMIN_PASSWORD_HASH` is set nowhere** (not in the secrets, userenv or any `.env`), so admin
+      sign-in cannot succeed in dev for anyone. It was exposed 2026-09-09; the owner said "forget
+      the admin creds" 2026-09-12; the value is simply gone.
+    - The two attempts also named addresses other than ADMIN_EMAIL (the admin's address would have
+      answered 500 "Admin login unavailable").
+    - Not caused by today's changes: dev does not run them yet.
+  - fix: `npm run admin:password` (the owner types a new password twice, hidden, in the Replit Shell;
+    it prints the bcrypt-12 hash for Secrets; the password never passes through chat); the admin
+    email compared without regard to case; a boot warning when ADMIN_EMAIL is set without a hash.
+  - 2: confirming an email asks for the sign-up password (the recommendation). 3: the team-invite
+    409 stays. 4: continue with R1-T9.
+  - **admin: done, `ff16abfe`** (03:27). **Confirm with password: done, `2a935b02`.**
+  - The session stopped at 03:31 UTC during the browser check. That was its last command, after it
+    had edited the probe server and the browser script. Dev relaunched at 03:31:55 on the working
+    tree (GET / 200; made-up sign-in 401). It was recovered from transcript `f98eba1d` and every
+    claim re-run.
+  - Added in recovery:
+    - "Reset your password" after a refused password. Its test failed first. A server guard checks
+      that a reset replaces the password on `merchants` too.
+    - The admin tool's last step said `/admin-login`. No route serves that; it now says `/login`
+      under "Admin". Its test failed on `ff16abfe`.
+  - Corrected in recovery: an application with no password *could* do something before, namely
+    confirm by link and then sign in with Google. Raised with the owner (evidence §4.3).
+  - Found: the unused public `POST /api/merchants/verify` confirms with the link and a *new*
+    password. It does not reopen the hole. Recommend removing it (§4.2).
+  - Dev: `ADMIN_PASSWORD_HASH` is still unset (~03:40); the mixed-case admin email now answers 500
+    "Admin login unavailable" (recognised). Read-only count on dev: 1 of 3 waiting applications has
+    no password (psql needs the sandbox off: `helium` does not resolve inside it).
+  - Results: tsc clean; server 79/1432; client 72/627; browser 18/18.
 - [ ] 6

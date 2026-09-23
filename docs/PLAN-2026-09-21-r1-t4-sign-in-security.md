@@ -52,6 +52,10 @@ independent review of plan §21.1 before it merges.
 | **D — cancel sessions** | A per-user "valid after" time: tokens issued before it are refused. Set on password reset and a new "sign out everywhere". | small, one migration | — |
 | **E — the full session rebuild** | What plan R1-T4 ultimately requires: revocable server-side sessions with rotating refresh credentials; on the web an `HttpOnly`/`SameSite` `__Host-` cookie plus a CSRF token; in the phone app the refresh credential in iOS Keychain; exact CORS allowlist. This also ends the hourly sign-out. It changes how every screen and the phone app authenticate. | large; its own design and review | Q2 |
 
+**2026-09-23 (later):** confirming a sign-up's email needs the password chosen at sign-up
+(`2a935b02`); admin sign-in got `npm run admin:password` and a case-blind email (`ff16abfe`)
+([evidence](evidence/remediation-v2-2/r1/R1-T4-admin-sign-in-and-confirm-password-2026-09-23.md)).
+
 **2026-09-23:** B shipped (`ce3c13de`), off by default: `TRUST_PROXY_HOPS` plus the address-keyed
 limits moved from C. The owner's live check switches it on
 ([evidence](evidence/remediation-v2-2/r1/R1-T4-phase-B-trusted-proxy-2026-09-23.md) §5).
