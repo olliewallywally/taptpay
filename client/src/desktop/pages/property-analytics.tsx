@@ -36,6 +36,7 @@ import {
   DesktopPageScaffold,
   type DesktopRoutePageProps,
 } from "../DesktopPageScaffold";
+import { DesktopLoadFailure } from "../DesktopLoadFailure";
 
 /* ── palette ── */
 const ACCENT = "#5E9EFF";
@@ -155,6 +156,23 @@ export default function DesktopPropertyAnalytics(props: DesktopRoutePageProps) {
 
   const drag = useRef({ startY: 0, startT: CLOSED, moved: false, scale: 1 });
 
+  /* R1-T9: payments that did not load are not "no payments". With nothing loaded
+     yet, the screen says so and draws no figure, chart or history from the empty
+     fallbacks below; a failed background refresh keeps what is already shown.
+     Reports and exports are built from the payments, the tenants and the rent
+     schedules, so they wait for all three. */
+  const paymentsUnavailable = invoicesQuery.isError && invoicesQuery.data === undefined;
+  const tenantsUnavailable = tenantsQuery.isError && tenantsQuery.data === undefined;
+  const schedulesUnavailable = schedulesQuery.isError && schedulesQuery.data === undefined;
+  const reportsUnavailableHint = paymentsUnavailable
+    ? "Available once your payments load"
+    : tenantsUnavailable
+      ? "Available once your tenants load"
+      : schedulesUnavailable
+        ? "Available once your rent schedules load"
+        : undefined;
+  const reportsUnavailable = reportsUnavailableHint !== undefined;
+  const retryPayments = () => { void invoicesQuery.refetch(); };
   const tenants = (tenantsQuery.data ?? []) as PropertyTenant[];
   const invoices = (invoicesQuery.data ?? []) as Invoice[];
   const schedules = (schedulesQuery.data ?? []) as PropertySchedule[];
@@ -425,41 +443,56 @@ export default function DesktopPropertyAnalytics(props: DesktopRoutePageProps) {
 
             <div className="pa-hero-row" data-tutorial-id="pa-total">
               <div className="pa-hero-col dt-cascade">
-                <div className="pa-hero-amt-row">
-                  <span className="pa-hero">{invoicesQuery.isLoading ? "—" : money(overview.total)}</span>
-                  {overview.growth !== null && (
-                    <span className="pa-hero-pill">
-                      {overview.growth >= 0 ? "+" : ""}
-                      {overview.growth}%
+                {paymentsUnavailable ? (
+                  <DesktopLoadFailure
+                    tone="canvas"
+                    title="Payments didn't load"
+                    detail="Your totals stay hidden until they do."
+                    onRetry={retryPayments}
+                    retrying={invoicesQuery.isFetching}
+                    testId="property-analytics-payments-failed"
+                  />
+                ) : (
+                  <>
+                    <div className="pa-hero-amt-row">
+                      <span className="pa-hero">{invoicesQuery.isLoading ? "—" : money(overview.total)}</span>
+                      {overview.growth !== null && (
+                        <span className="pa-hero-pill">
+                          {overview.growth >= 0 ? "+" : ""}
+                          {overview.growth}%
+                        </span>
+                      )}
+                    </div>
+                    <span className="pa-hero-sub">total revenue</span>
+                    <span className="pa-hero-out">
+                      {invoicesQuery.isLoading ? "—" : money(overview.outstanding)}
                     </span>
-                  )}
-                </div>
-                <span className="pa-hero-sub">total revenue</span>
-                <span className="pa-hero-out">
-                  {invoicesQuery.isLoading ? "—" : money(overview.outstanding)}
-                </span>
-                <span className="pa-hero-sub pa-hero-sub-dim">outstanding payments</span>
+                    <span className="pa-hero-sub pa-hero-sub-dim">outstanding payments</span>
+                  </>
+                )}
               </div>
             </div>
 
-            <div className="pa-chart dt-rise">
-              <svg className="pa-chart-svg" viewBox="0 0 1076 240" preserveAspectRatio="none" aria-label="collected rent chart">
-                <defs>
-                  <linearGradient id="proprevfill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0" stopColor={ACCENT} stopOpacity="0.34" />
-                    <stop offset="1" stopColor={ACCENT} stopOpacity="0.02" />
-                  </linearGradient>
-                </defs>
-                <path d={overview.areaD} fill="url(#proprevfill)" />
-                <path d={overview.lineD} fill="none" stroke="#8CBBFF" strokeWidth="3" strokeLinecap="round" />
-              </svg>
-              {overview.peakValue > 0 && (
-                <div className="pa-chip" style={{ left: overview.dotLeft }}>
-                  {moneyWhole(overview.peakValue)}
-                </div>
-              )}
-            </div>
-            {overview.peakValue > 0 && (
+            {!paymentsUnavailable && (
+              <div className="pa-chart dt-rise">
+                <svg className="pa-chart-svg" viewBox="0 0 1076 240" preserveAspectRatio="none" aria-label="collected rent chart">
+                  <defs>
+                    <linearGradient id="proprevfill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0" stopColor={ACCENT} stopOpacity="0.34" />
+                      <stop offset="1" stopColor={ACCENT} stopOpacity="0.02" />
+                    </linearGradient>
+                  </defs>
+                  <path d={overview.areaD} fill="url(#proprevfill)" />
+                  <path d={overview.lineD} fill="none" stroke="#8CBBFF" strokeWidth="3" strokeLinecap="round" />
+                </svg>
+                {overview.peakValue > 0 && (
+                  <div className="pa-chip" style={{ left: overview.dotLeft }}>
+                    {moneyWhole(overview.peakValue)}
+                  </div>
+                )}
+              </div>
+            )}
+            {!paymentsUnavailable && overview.peakValue > 0 && (
               <div
                 className="pa-dot"
                 style={{ left: overview.floatingDotLeft }}
@@ -579,11 +612,24 @@ export default function DesktopPropertyAnalytics(props: DesktopRoutePageProps) {
             <div className="pa-sheet-actions">
               {sheetMode === "history" && (
                 <>
-                  <button type="button" className="pa-btn-reports" data-tutorial-id="pa-reports" onClick={openReports}>
+                  <button
+                    type="button"
+                    className="pa-btn-reports"
+                    data-tutorial-id="pa-reports"
+                    onClick={openReports}
+                    disabled={reportsUnavailable}
+                    title={reportsUnavailableHint}
+                  >
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={DEEP_BLUE} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="7" height="7" rx="1.5" /><rect x="13" y="4" width="7" height="7" rx="1.5" /><rect x="4" y="13" width="7" height="7" rx="1.5" /><rect x="13" y="13" width="7" height="7" rx="1.5" /></svg>
                     <span>Reports</span>
                   </button>
-                  <button type="button" className="pa-btn-white" onClick={() => setExportOpen(true)}>
+                  <button
+                    type="button"
+                    className="pa-btn-white"
+                    onClick={() => setExportOpen(true)}
+                    disabled={reportsUnavailable}
+                    title={reportsUnavailableHint}
+                  >
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={INK} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 4v10M8 10l4 4 4-4" /><path d="M5 19h14" /></svg>
                     <span>Export</span>
                   </button>
@@ -608,6 +654,14 @@ export default function DesktopPropertyAnalytics(props: DesktopRoutePageProps) {
             {sheetMode === "history" &&
               (invoicesQuery.isLoading || tenantsQuery.isLoading ? (
                 <div className="pa-sheet-empty">loading payments…</div>
+              ) : paymentsUnavailable ? (
+                <DesktopLoadFailure
+                  tone="sheet"
+                  title="Payment history didn't load."
+                  onRetry={retryPayments}
+                  retrying={invoicesQuery.isFetching}
+                  announce={false}
+                />
               ) : historyGroups.length === 0 ? (
                 <div className="pa-sheet-empty">no payments in this period</div>
               ) : (
@@ -713,7 +767,15 @@ export default function DesktopPropertyAnalytics(props: DesktopRoutePageProps) {
                 </div>
 
                 <div className="pa-generate-row">
-                  <button type="button" className="pa-generate" onClick={generate}>Generate Report</button>
+                  <button
+                    type="button"
+                    className="pa-generate"
+                    onClick={generate}
+                    disabled={reportsUnavailable}
+                    title={reportsUnavailableHint}
+                  >
+                    Generate Report
+                  </button>
                   <span className="pa-generate-note">
                     the top section becomes your report — jump back with the analytics button
                   </span>
@@ -818,7 +880,8 @@ const PA_CSS = `
 .pa-sheet-title { font-weight:700; font-size:24px; color:${INK}; }
 .pa-sheet-actions { display:flex; align-items:center; gap:10px; }
 .pa-btn-reports { display:inline-flex; align-items:center; gap:9px; padding:11px 22px; border-radius:9999px; background:transparent; border:1.5px solid ${DEEP_BLUE}; font-weight:700; font-size:14px; color:${DEEP_BLUE}; cursor:pointer; transition:background .15s ease; }
-.pa-btn-reports:hover { background:rgba(29,72,200,0.06); }
+.pa-btn-reports:hover:not(:disabled) { background:rgba(29,72,200,0.06); }
+.pa-btn-reports:disabled { opacity:0.55; cursor:default; }
 .pa-btn-white { display:inline-flex; align-items:center; gap:9px; padding:11px 22px; border-radius:9999px; background:#fff; border:1px solid #E2E5EE; font-weight:700; font-size:14px; color:${INK}; cursor:pointer; transition:background .15s ease; }
 .pa-btn-white:hover:not(:disabled) { background:#FAFBFD; }
 .pa-btn-white:disabled { opacity:0.55; cursor:default; }

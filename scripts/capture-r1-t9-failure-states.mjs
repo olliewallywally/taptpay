@@ -7,13 +7,15 @@
 //   [R1T9_SCREENS=retail-stock,retail-terminal] R1T9_OUT=<dir> node scripts/capture-r1-t9-failure-states.mjs
 //
 // With a build from before the change (R1T9_BEFORE_URL), both are captured in the same
-// run from the same fixtures, and each screen's loaded view must match pixel for pixel:
-// R1-T9 changes what a failure looks like, never what loaded data looks like.
+// run from the same fixtures, and each screen's loaded view must match: R1-T9 changes
+// what a failure looks like, never what loaded data looks like.
 import assert from "node:assert/strict";
 import { mkdir, readFile } from "node:fs/promises";
 import { chromium } from "playwright";
+import playwrightCore from "playwright-core/lib/coreBundle";
 import { PNG } from "pngjs";
 import { CHROMIUM_PATH, MERCHANT_ID, newRetailPage } from "./desktop-shots/retail-fixtures.mjs";
+import { installPropertyData } from "./desktop-shots/property-fixtures.mjs";
 
 const out = process.env.R1T9_OUT ?? "/tmp/taptpay-r1-t9";
 // Every capture sees the same "now" (the fixtures' dates are relative to it). A chart
@@ -25,7 +27,10 @@ const builds = [
 ].filter(([, url]) => url);
 for (const [, url] of builds) assert.ok(["127.0.0.1", "localhost"].includes(new URL(url).hostname), "local servers only");
 
-/** Each screen, the request whose failure it must not disguise, and any step to reach it. */
+/**
+ * Each screen, the request whose failure it must not disguise, any data beyond the
+ * retail fixtures (`install`), and any step to reach it (`prepare`).
+ */
 const SCREENS = [
   { name: "retail-analytics", path: "/transactions", essential: `/api/merchants/${MERCHANT_ID}/transactions` },
   { name: "retail-stock", path: "/stock", essential: `/api/merchants/${MERCHANT_ID}/stock-items` },
@@ -34,6 +39,8 @@ const SCREENS = [
     name: "retail-terminal-stock-tiles", path: "/terminal", essential: `/api/merchants/${MERCHANT_ID}/stock-items`,
     prepare: (page) => page.getByRole("button", { name: "stock tiles" }).click(),
   },
+  { name: "property-analytics", path: "/property/analytics", essential: "/api/property/invoices", install: installPropertyData },
+  { name: "property-analytics-tenants", path: "/property/analytics", essential: "/api/property/tenants", install: installPropertyData },
 ];
 
 async function capture(browser, base, screen, mode, file) {
@@ -46,6 +53,7 @@ async function capture(browser, base, screen, mode, file) {
   const local = new URL(base).origin;
   await page.clock.setFixedTime(RUN_AT);
   await page.route((url) => url.origin !== local, (route) => route.abort("blockedbyclient"));
+  if (screen.install) await screen.install(page);
   if (mode === "failed") {
     // Registered last, so it wins over the fixture for the same path.
     await page.route(`**${screen.essential}`, (route) =>
@@ -67,22 +75,21 @@ async function capture(browser, base, screen, mode, file) {
 }
 
 /**
- * Pixels that differ at all, and pixels that differ visibly: by more than 2 in some
- * channel. The first can be non-zero for one build captured twice — a gradient's
- * rasterisation varies by a shade — so the check is on the second.
+ * Playwright's own screenshot comparison, the one `toHaveScreenshot` uses: pixelmatch,
+ * ignoring anti-aliased pixels. One build captured twice still differs by a shade on a
+ * few edges (the sliding tab highlight, a pill's outline), which a raw pixel count
+ * would report as a change. The raw count is printed as well.
  */
-async function differingPixels(left, right) {
-  const a = PNG.sync.read(await readFile(left));
-  const b = PNG.sync.read(await readFile(right));
-  if (a.width !== b.width || a.height !== b.height) return { any: Number.POSITIVE_INFINITY, visible: Number.POSITIVE_INFINITY };
-  let any = 0;
-  let visible = 0;
-  for (let i = 0; i < a.data.length; i += 4) {
-    if (a.data.readUInt32BE(i) === b.data.readUInt32BE(i)) continue;
-    any += 1;
-    if ([0, 1, 2, 3].some((k) => Math.abs(a.data[i + k] - b.data[i + k]) > 2)) visible += 1;
-  }
-  return { any, visible };
+const compareScreenshots = playwrightCore.utils.getComparator("image/png");
+async function compareLoaded(left, right) {
+  const [leftPng, rightPng] = [await readFile(left), await readFile(right)];
+  const verdict = compareScreenshots(rightPng, leftPng, {});
+  const a = PNG.sync.read(leftPng);
+  const b = PNG.sync.read(rightPng);
+  let raw = 0;
+  if (a.width !== b.width || a.height !== b.height) raw = Number.POSITIVE_INFINITY;
+  else for (let i = 0; i < a.data.length; i += 4) if (a.data.readUInt32BE(i) !== b.data.readUInt32BE(i)) raw += 1;
+  return { verdict: verdict ? verdict.errorMessage.split("\n")[0] : null, raw };
 }
 
 const only = process.env.R1T9_SCREENS?.split(",").filter(Boolean);
@@ -100,9 +107,9 @@ try {
       }
     }
     if (files["before-loaded"]) {
-      const { any, visible } = await differingPixels(files["before-loaded"], files["after-loaded"]);
-      console.log(`${screen.name}: loaded view, before vs after: ${visible} visibly differing pixels (${any} differing at all)`);
-      assert.equal(visible, 0, `${screen.name}: the loaded view changed`);
+      const { verdict, raw } = await compareLoaded(files["before-loaded"], files["after-loaded"]);
+      console.log(`${screen.name}: loaded view, before vs after: ${verdict ?? "match"} (${raw} pixels differ at all)`);
+      assert.equal(verdict, null, `${screen.name}: the loaded view changed`);
     }
   }
 } finally {
