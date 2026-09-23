@@ -450,7 +450,12 @@ and deleted at the end. Decision: `docs/decisions/2026-09-21-r1-t4-t9-owner-answ
     the missing one). Test 8 (red 5/8), mutations 9/9, client 75/647. Capture now uses
     Playwright's comparator (`playwright-core/lib/coreBundle` `utils.getComparator`); all six
     screens match `fafc6598`. Worktree moved to `fafc6598` for "before".
-  - [ ] property terminal; [ ] trades analytics; [ ] trades terminal; [ ] settings ×3.
+  - [x] property terminal, **`f48139f6`**: requests fail → alert + Try again, lists and tenant cards
+    say so, both send buttons off; tenants fail → picker alert, sends off; reminder settings
+    fetch now throws (it read a failure as null → defaults shown as the merchant's own); schedules
+    say so. Test 9 (red 6/9) + 45 existing, mutations 15/15, client 76/656; loaded views match
+    `568d85c9`. User asked mid-task (04:5x) "what page of the plan": PDF p. 29 of 72 (R1-T9).
+  - [ ] trades analytics; [ ] trades terminal; [ ] settings ×3.
   - Screenshots: `npx vite build --outDir <dir>` (default is dist/public, untracked) and `npx vite
     preview`, then `scripts/capture-r1-t9-failure-states.mjs` (add each screen to SCREENS). The
     "before" build comes from a worktree at `e4c25fb1` (the rollout's base).
