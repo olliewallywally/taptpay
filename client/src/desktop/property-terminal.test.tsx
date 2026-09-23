@@ -132,6 +132,9 @@ let schedules: Record<string, unknown>[];
 let scheduleCalls: string[];
 let reminderSettings: Record<string, unknown>;
 let reminderPuts: Record<string, unknown>[];
+/* Set by a test to hold a reminder save open, or to answer a mark-paid itself. */
+let reminderPutGate: Promise<void> | null;
+let markPaidAnswer: (() => Response | Promise<Response>) | null;
 
 const jsonResponse = (body: unknown, status = 200): Response =>
   ({
@@ -156,6 +159,7 @@ function installFetchMock() {
     if (method === "PUT" && url === "/api/property/reminder-settings") {
       const patch = JSON.parse(String(init?.body ?? "{}"));
       reminderPuts.push(patch);
+      if (reminderPutGate) await reminderPutGate;
       /* Persist, as the server does — the component writes the response back
          into the cache, so a non-persisting mock would mask a working save. */
       reminderSettings = { ...reminderSettings, ...patch };
@@ -191,6 +195,7 @@ function installFetchMock() {
       if (billingBlocked && rowAction[2] === "resend") return jsonResponse(BILLING_402, 402);
       if (rowAction[2] === "mark-paid-external") {
         markPaidBodies.push(JSON.parse(String(init?.body ?? "{}")));
+        if (markPaidAnswer) return markPaidAnswer();
       }
       return jsonResponse({ id: rowAction[1] });
     }
@@ -271,6 +276,8 @@ beforeEach(() => {
     rentReminderMaxCount: 3,
   };
   reminderPuts = [];
+  reminderPutGate = null;
+  markPaidAnswer = null;
   docUploadHandler = (file) =>
     jsonResponse({ documentUrl: `https://docs.example/${file.name}`, documentName: file.name });
   enterWith("");
@@ -980,5 +987,71 @@ describe("desktop property terminal — billing 402 (R1-T9)", () => {
     await waitFor(() => expect(banners).toBe(1));
     expect(rowActionCalls).toEqual(["resend:i2"]);
     expect(mockToast).not.toHaveBeenCalled();
+  });
+});
+
+/* R1-T9: an action waits while it is pending, cannot be sent twice, and a failure
+   keeps what was typed. */
+describe("desktop property terminal — pending and failed actions (R1-T9)", () => {
+  const referenceBox = () => screen.getByRole("textbox", { name: "payment reference for Mia Chen" });
+
+  it("marking paid with a reference: a failure keeps the row open with the reference typed", async () => {
+    markPaidAnswer = () => jsonResponse({ message: "nope" }, 500);
+    const { user } = renderTerminal();
+    await user.click(screen.getByRole("button", { name: "mark as paid" }));
+    await user.click(await screen.findByRole("button", { name: "mark Mia Chen paid" }));
+    await user.type(referenceBox(), "ANZ 4471");
+    await user.click(screen.getByRole("button", { name: "confirm" }));
+
+    await waitFor(() =>
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ title: "Failed to mark as paid" })),
+    );
+    expect(rowActionCalls).toEqual(["mark-paid-external:i1"]);
+    expect(referenceBox()).toHaveValue("ANZ 4471");
+  });
+
+  it("marking paid: while it is pending a second confirm sends nothing more, and the row closes once marked", async () => {
+    let release!: () => void;
+    markPaidAnswer = () =>
+      new Promise<Response>((resolve) => { release = () => resolve(jsonResponse({ id: "i1" })); });
+    const { user } = renderTerminal();
+    await user.click(screen.getByRole("button", { name: "mark as paid" }));
+    await user.click(await screen.findByRole("button", { name: "mark Mia Chen paid" }));
+    await user.type(referenceBox(), "ANZ 4471{Enter}");
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "confirm" })).toBeDisabled());
+    expect(referenceBox()).toHaveAttribute("readonly");
+    await user.type(referenceBox(), "{Enter}");
+    expect(rowActionCalls).toEqual(["mark-paid-external:i1"]);
+
+    release();
+    await waitFor(() =>
+      expect(screen.queryByRole("textbox", { name: "payment reference for Mia Chen" })).not.toBeInTheDocument(),
+    );
+    expect(rowActionCalls).toEqual(["mark-paid-external:i1"]);
+    expect(markPaidBodies).toEqual([{ externalPaymentReference: "ANZ 4471" }]);
+  });
+
+  it("reminder settings: the switch and the cadence chips wait while a change saves", async () => {
+    let release!: () => void;
+    reminderPutGate = new Promise<void>((resolve) => { release = resolve; });
+    const { user } = renderTerminal();
+    await user.click(screen.getByRole("button", { name: "automation" }));
+    const remindAfter = await screen.findByRole("group", { name: "remind after" });
+    await user.click(within(remindAfter).getByRole("button", { name: "7d" }));
+
+    await waitFor(() => expect(reminderPuts).toEqual([{ rentReminderDelayDays: 7 }]));
+    expect(screen.getByRole("switch", { name: "overdue reminders" })).toBeDisabled();
+    for (const name of ["remind after", "repeat every", "max reminders"]) {
+      for (const chip of within(screen.getByRole("group", { name })).getAllByRole("button")) {
+        expect(chip).toBeDisabled();
+      }
+    }
+    await user.click(within(remindAfter).getByRole("button", { name: "1d" }));
+    expect(reminderPuts).toEqual([{ rentReminderDelayDays: 7 }]);
+
+    release();
+    await waitFor(() => expect(screen.getByRole("switch", { name: "overdue reminders" })).toBeEnabled());
+    expect(within(remindAfter).getByRole("button", { name: "1d" })).toBeEnabled();
   });
 });

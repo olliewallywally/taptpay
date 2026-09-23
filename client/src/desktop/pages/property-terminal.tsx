@@ -637,9 +637,12 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
     setRefRowId(null);
     setRefValue("");
   };
+  /* The row and its reference stay until the payment is marked, so a failure
+     keeps what was typed, and a second confirm while it is pending does nothing
+     (R1-T9). */
   const confirmRefRow = (id: string) => {
-    markPaid.mutate({ invoiceId: id, reference: refValue });
-    closeRefRow();
+    if (markPaid.isPending) return;
+    markPaid.mutate({ invoiceId: id, reference: refValue }, { onSuccess: closeRefRow });
   };
 
   /* ── attached invoice document ── */
@@ -844,7 +847,8 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
             role="switch"
             aria-checked={reminders.rentReminderEnabled}
             aria-label="overdue reminders"
-            disabled={reminderQuery.isLoading}
+            /* One change at a time: a second tap while one saves would race it (R1-T9). */
+            disabled={reminderQuery.isLoading || updateReminders.isPending}
             style={{
               background: reminders.rentReminderEnabled
                 ? ACTIVE
@@ -901,6 +905,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
                       type="button"
                       className="pt-auto-chip"
                       aria-pressed={row.value === o}
+                      disabled={updateReminders.isPending}
                       style={chip(row.value === o, 1.5)}
                       onClick={() => updateReminders.mutate({ [row.field]: o })}
                     >
@@ -1667,6 +1672,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
                             <input
                               className="pt-paid-ref-input"
                               value={refValue}
+                              readOnly={markPaid.isPending}
                               autoFocus
                               placeholder="reference (optional)"
                               aria-label={`payment reference for ${r.name}`}
