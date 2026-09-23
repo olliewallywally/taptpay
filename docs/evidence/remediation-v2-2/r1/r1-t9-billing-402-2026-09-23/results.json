@@ -1,0 +1,270 @@
+[
+ {
+  "flow": "phone-retail-sale",
+  "mode": "before",
+  "gatedCalls": 1,
+  "bannerCount": 0,
+  "found": [
+   "/Credit or debit card required/",
+   "/before you can send payments/"
+  ],
+  "customerWords": false,
+  "shot": "phone-retail-sale-before.png",
+  "typed": [
+   "$12.34",
+   "$12.34"
+  ]
+ },
+ {
+  "flow": "phone-retail-sale",
+  "mode": "after",
+  "gatedCalls": 1,
+  "bannerCount": 1,
+  "found": [],
+  "customerWords": false,
+  "shot": "phone-retail-sale-after.png",
+  "bannerTop": 47,
+  "typed": [
+   "$12.34",
+   "$12.34"
+  ]
+ },
+ {
+  "flow": "desktop-retail-sale",
+  "mode": "before",
+  "gatedCalls": 1,
+  "bannerCount": 0,
+  "found": [
+   "/Credit or debit card required/",
+   "/before you can send payments/"
+  ],
+  "customerWords": false,
+  "shot": "desktop-retail-sale-before.png",
+  "typed": [
+   "Flat white",
+   "Flat white"
+  ]
+ },
+ {
+  "flow": "desktop-retail-sale",
+  "mode": "after",
+  "gatedCalls": 1,
+  "bannerCount": 1,
+  "found": [],
+  "customerWords": false,
+  "shot": "desktop-retail-sale-after.png",
+  "bannerTop": 47,
+  "typed": [
+   "Flat white",
+   "Flat white"
+  ]
+ },
+ {
+  "flow": "phone-property-rent",
+  "mode": "before",
+  "gatedCalls": 1,
+  "bannerCount": 0,
+  "found": [
+   "/Credit or debit card required/",
+   "/before you can send payments/"
+  ],
+  "customerWords": false,
+  "shot": "phone-property-rent-before.png",
+  "typed": [
+   "$610.00",
+   "$610.00"
+  ]
+ },
+ {
+  "flow": "phone-property-rent",
+  "mode": "after",
+  "gatedCalls": 1,
+  "bannerCount": 1,
+  "found": [],
+  "customerWords": false,
+  "shot": "phone-property-rent-after.png",
+  "bannerTop": 47,
+  "typed": [
+   "$610.00",
+   "$610.00"
+  ]
+ },
+ {
+  "flow": "desktop-property-rent",
+  "mode": "before",
+  "gatedCalls": 1,
+  "bannerCount": 0,
+  "found": [
+   "/before you can send payments/",
+   "/Credit or debit card required/"
+  ],
+  "customerWords": false,
+  "shot": "desktop-property-rent-before.png",
+  "typed": [
+   "$610.00",
+   "$610.00"
+  ]
+ },
+ {
+  "flow": "desktop-property-rent",
+  "mode": "after",
+  "gatedCalls": 1,
+  "bannerCount": 1,
+  "found": [],
+  "customerWords": false,
+  "shot": "desktop-property-rent-after.png",
+  "bannerTop": 47,
+  "typed": [
+   "$610.00",
+   "$610.00"
+  ]
+ },
+ {
+  "flow": "phone-trades-invoice",
+  "mode": "before",
+  "gatedCalls": 1,
+  "bannerCount": 0,
+  "found": [
+   "/Credit or debit card required/",
+   "/before you can send payments/"
+  ],
+  "customerWords": false,
+  "shot": "phone-trades-invoice-before.png",
+  "typed": [
+   "$1.20",
+   "$1.20"
+  ]
+ },
+ {
+  "flow": "phone-trades-invoice",
+  "mode": "after",
+  "gatedCalls": 1,
+  "bannerCount": 1,
+  "found": [],
+  "customerWords": false,
+  "shot": "phone-trades-invoice-after.png",
+  "bannerTop": 47,
+  "typed": [
+   "$1.20",
+   "$1.20"
+  ]
+ },
+ {
+  "flow": "desktop-trades-invoice",
+  "mode": "before",
+  "gatedCalls": 1,
+  "bannerCount": 0,
+  "found": [
+   "/Credit or debit card required/",
+   "/before you can send payments/",
+   "/Invoice not sent/"
+  ],
+  "customerWords": false,
+  "shot": "desktop-trades-invoice-before.png",
+  "typed": [
+   "$120.00",
+   "$120.00"
+  ]
+ },
+ {
+  "flow": "desktop-trades-invoice",
+  "mode": "after",
+  "gatedCalls": 1,
+  "bannerCount": 1,
+  "found": [],
+  "customerWords": false,
+  "shot": "desktop-trades-invoice-after.png",
+  "bannerTop": 47,
+  "typed": [
+   "$120.00",
+   "$120.00"
+  ]
+ },
+ {
+  "flow": "phone-trades-quote",
+  "mode": "before",
+  "gatedCalls": 1,
+  "bannerCount": 0,
+  "found": [
+   "/Credit or debit card required/",
+   "/before you can send payments/"
+  ],
+  "customerWords": false,
+  "shot": "phone-trades-quote-before.png",
+  "typed": [
+   "$1,000.00",
+   "$1,000.00"
+  ]
+ },
+ {
+  "flow": "phone-trades-quote",
+  "mode": "after",
+  "gatedCalls": 1,
+  "bannerCount": 1,
+  "found": [],
+  "customerWords": false,
+  "shot": "phone-trades-quote-after.png",
+  "bannerTop": 47,
+  "typed": [
+   "$1,000.00",
+   "$1,000.00"
+  ]
+ },
+ {
+  "flow": "phone-trades-recurring",
+  "mode": "before",
+  "gatedCalls": 1,
+  "bannerCount": 0,
+  "found": [
+   "/before you can send payments/"
+  ],
+  "customerWords": false,
+  "shot": "phone-trades-recurring-before.png",
+  "typed": [
+   "00000000-0000-4000-8000-000000000002 200",
+   "00000000-0000-4000-8000-000000000002 200"
+  ]
+ },
+ {
+  "flow": "phone-trades-recurring",
+  "mode": "after",
+  "gatedCalls": 1,
+  "bannerCount": 1,
+  "found": [],
+  "customerWords": false,
+  "shot": "phone-trades-recurring-after.png",
+  "bannerTop": 47,
+  "typed": [
+   "00000000-0000-4000-8000-000000000002 200",
+   "00000000-0000-4000-8000-000000000002 200"
+  ]
+ },
+ {
+  "flow": "customer-quote-accept",
+  "mode": "before",
+  "gatedCalls": 1,
+  "bannerCount": 0,
+  "found": [
+   "/before you can send payments/"
+  ],
+  "customerWords": false,
+  "shot": "customer-quote-accept-before.png",
+  "typed": [
+   "",
+   ""
+  ]
+ },
+ {
+  "flow": "customer-quote-accept",
+  "mode": "after",
+  "gatedCalls": 1,
+  "bannerCount": 0,
+  "found": [],
+  "customerWords": true,
+  "shot": "customer-quote-accept-after.png",
+  "typed": [
+   "",
+   ""
+  ]
+ }
+]

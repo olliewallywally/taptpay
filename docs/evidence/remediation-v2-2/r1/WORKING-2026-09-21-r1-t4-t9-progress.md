@@ -501,8 +501,12 @@ and deleted at the end. Decision: `docs/decisions/2026-09-21-r1-t4-t9-owner-answ
     uncommitted); resumed ~20:00: re-ran 85/85 and the quote mutation, then phone: red 11/11,
     mutations 22/22, client 86/754. Owner questions in the evidence (business not told of a
     refused acceptance; public 402 body carries the business's words).
-  - [ ] 402 browser check: banner visible and alone on the real screens (phone, desktop, customer
-    quote page), typed input kept.
+  - [x] 402 browser check: `scripts/verify-r1-t9-billing-402-browser.mjs`, 9/9 on a build of
+    `43466d70` vs a build of `d4bd9af0` (worktree `r1-t9/wt-before` now at `d4bd9af0`). Traps:
+    `vite preview --outDir` resolves a relative path against `client/` (use an absolute one);
+    sandboxed Chromium reports offline (script forces `navigator.onLine`); phone toasts last
+    1.6 s (script samples every 100 ms). Found: phone property batch/schedules screen
+    unreachable since `7b99299a`.
   - [ ] R1-T9 last item: mutations disabled while pending / keep input / no double submit.
   - Screenshots: `npx vite build --outDir <dir>` (default is dist/public, untracked) and `npx vite
     preview`, then `scripts/capture-r1-t9-failure-states.mjs` (add each screen to SCREENS). The

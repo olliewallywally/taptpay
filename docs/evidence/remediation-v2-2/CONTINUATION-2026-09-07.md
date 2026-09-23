@@ -233,8 +233,12 @@ The work itself:
     failed", with no banner. A customer accepting a quote was shown the business's billing
     message; now "This quote can't be accepted online right now. Please contact the business to
     go ahead." Red first on every screen; mutations 39/39 (shared 6, desktop 10, quote 1, phone
-    22); client 86/754, `tsc` clean. The session stopped at 09:51 UTC on the usage limit after
-    `8a4e8c20`; the next re-ran its claims (85/85, the quote mutation) before continuing.
+    22); client 86/754, `tsc` clean; real browser 9/9 on a production build, each against a build
+    of `d4bd9af0` (screenshots). The session stopped at 09:51 UTC on the usage limit after
+    `8a4e8c20`; the next re-ran its claims (85/85, the quote mutation) before continuing. Found
+    (pre-existing, not changed): on a phone, rent automations cannot be paused, resumed or
+    cancelled, and batch resend cannot be reached. Nothing opens that screen since `7b99299a`
+    (2026-06-02).
     **Owner questions:** should the business be told when a customer's acceptance is refused for
     billing? Should the public quote route's 402 carry the customer wording too (its body still
     has the business's message)?
