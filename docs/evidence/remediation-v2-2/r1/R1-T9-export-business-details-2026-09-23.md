@@ -6,11 +6,11 @@ Found while making the analytics screens' exports wait for the data they are bui
 
 ## In plain words
 
-Every report and export prints the business's name and GST number at the top, and works GST out
-the way the business chose (GST included in the price, or added on top). One helper fetches those
-details. It only worked for merchants who signed in with Google. For everyone who signed in with
-an email and password it never fetched them, so their exports said "TaptPay Merchant", showed no
-GST number, and worked GST out the default way. It now works for every sign-in.
+Every report and export prints the business's name and GST number at the top, and shows GST only
+if the business is GST registered. One helper fetches those details. It only worked for merchants
+who signed in with Google. For everyone who signed in with an email and password it never fetched
+them, so their exports said "TaptPay Merchant" and showed no GST number. It now works for every
+sign-in. (The GST itself was then found wrong in one case and fixed: see the correction below.)
 
 ## What was wrong
 
