@@ -1,7 +1,8 @@
 // Owner decisions 2026-09-23: a new password needs at least 8 characters, a capital
-// letter, and a number or symbol; and the team-invite page's heading must be readable
-// (it was white on the cream page). This drives the real sign-up and team-invite pages in
-// Chromium against the real routes (scripts/r1-t4-throttle-probe-server.ts, started with
+// letter, and a number or symbol; the team-invite page's heading must be readable
+// (it was white on the cream page); and confirming an email needs the sign-up password.
+// This drives the real sign-up, team-invite and confirm-email pages in Chromium against
+// the real routes (scripts/r1-t4-throttle-probe-server.ts, started with
 // a clean environment: in-memory storage, simulated email, no ambient credentials).
 // Loopback only; every other request is aborted.
 //
@@ -135,6 +136,24 @@ try {
       check('desktop check-email: the page says it was sent', await visible(page.getByText('Email sent!')));
     }
     await page.context().close();
+  }
+
+  // Confirming an email needs the password chosen at sign-up (owner decision 2026-09-23).
+  {
+    const { page: confirmPage, posts: confirmPosts } = await openPage({ width: 390, height: 844 }, '/confirm-email?token=probe-confirm-token');
+    await confirmPage.getByLabel('Your password').waitFor({ timeout: 180_000 });
+    check('phone confirm-email: the link alone confirms nothing', !confirmPosts.includes('/api/auth/confirm-email'));
+    await confirmPage.getByLabel('Your password').fill('Not-the-password-9');
+    await confirmPage.getByRole('button', { name: 'Confirm email' }).click();
+    check('phone confirm-email: a wrong password is refused, in words',
+      await visible(confirmPage.getByText("That isn't the password chosen when this application was made.")));
+    check('phone confirm-email: a refused password offers a reset',
+      await visible(confirmPage.getByRole('button', { name: 'Reset your password' })));
+    await confirmPage.screenshot({ path: `${out}/confirm-email-phone.png` });
+    await confirmPage.getByLabel('Your password').fill('Probe-password-1');
+    await confirmPage.getByRole('button', { name: 'Confirm email' }).click();
+    check('phone confirm-email: the chosen password confirms', await visible(confirmPage.getByText('Email confirmed!')));
+    await confirmPage.context().close();
   }
 
   const { page, posts } = await openPage({ width: 390, height: 844 }, '/accept-invite?token=probe-invite-token');

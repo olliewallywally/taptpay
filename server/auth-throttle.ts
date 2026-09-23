@@ -221,6 +221,11 @@ export function googleCallbackAddressBucket(address: string): AuthThrottleBucket
   return { key: `google-address:${bucketKeyHmac("google-address", address)}`, policy: ADDRESS_GOOGLE_POLICY };
 }
 
+/** Password tries on one email-confirmation link (owner decision 2026-09-23). */
+export function confirmEmailBucket(token: string): AuthThrottleBucket {
+  return { key: `confirm-email:${bucketKeyHmac("confirm-email", token)}`, policy: SIGN_IN_POLICY };
+}
+
 /** Sign-ups naming an address that already has an account: each would mail it a note. */
 export function signupNoticeBucket(email: string): AuthThrottleBucket {
   return { key: `signup-notice:${bucketKeyHmac("signup-notice", normalizeThrottleEmail(email))}`, policy: PASSWORD_RESET_POLICY };

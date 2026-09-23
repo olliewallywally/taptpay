@@ -2,6 +2,7 @@
 // page (Vite, as `npm run dev` serves it) on in-memory storage with one synthetic
 // merchant. Started by scripts/verify-r1-t4-throttle-browser.mjs with a clean
 // environment, so no ambient credential or database reaches it; not for other use.
+import bcrypt from "bcrypt";
 import express from "express";
 import { registerRoutes } from "../server/routes";
 import { createGlobalErrorHandler } from "../server/http-error-handler";
@@ -27,4 +28,12 @@ const merchant = await storage.createMerchant({
 } as any);
 await storage.updateMerchantStatus(merchant.id, "active");
 await createUser("owner@probe.test", "Probe-password-1", merchant.id, "merchant");
+// A pending sign-up with a known confirmation link, for the confirm-email check.
+await storage.createMerchantWithSignup({
+  name: "Jamie Smith", businessName: "Kauri Studio", businessType: "sole-trader",
+  email: "applicant@probe.test", phone: "021 555 0101", address: "1 Kauri Road, Auckland",
+  businessAddress: "1 Kauri Road, Auckland", director: "Jamie Smith",
+  businessDescription: "Independent design studio", estimatedAnnualTurnover: "Under $50k",
+  verificationToken: "probe-confirm-token", passwordHash: await bcrypt.hash("Probe-password-1", 4),
+} as any);
 server.listen(port, "127.0.0.1", () => console.log("PROBE SERVER READY"));

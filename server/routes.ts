@@ -20,7 +20,7 @@ import {
   HANDOFF_CODE_TTL_MS, clearSignInCookie, googleVerifiedEmail, handoffCodeHash, newHandoffCode, readCookie,
   signInCookies, startGoogleSignIn, verifyGoogleSignInState,
 } from "./google-sign-in";
-import { type SignInRealm, confirmationResendBucket, googleCallbackAddressBucket, normalizeThrottleEmail, passwordChangeBucket, passwordResetAddressBucket, passwordResetBucket, signInAccountBucket, signInAddressBucket, signInDeviceKeyPrefix, signupNoticeBucket, tooManyAttempts } from "./auth-throttle";
+import { type SignInRealm, confirmEmailBucket, confirmationResendBucket, googleCallbackAddressBucket, normalizeThrottleEmail, passwordChangeBucket, passwordResetAddressBucket, passwordResetBucket, signInAccountBucket, signInAddressBucket, signInDeviceKeyPrefix, signupNoticeBucket, tooManyAttempts } from "./auth-throttle";
 import { clientAddressForLimits } from "./client-address";
 import { ACCOUNT_EMAIL_REPLY_FLOOR_MS, SIGN_UP_REPLY_FLOOR_MS, replyNoSoonerThan, replyStart } from "./even-reply";
 import { deviceKnowsEmail, markSignInDevice, readSignInDevice, signInBucketFor, signInDeviceCookie, type SignInDevice } from "./sign-in-device";
@@ -5238,13 +5238,42 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   });
 
   // Confirm email via token (public signup flow)
-  app.get("/api/auth/confirm-email", async (req, res) => {
+  // Confirms a sign-up's email. Owner decision 2026-09-23: the link alone no longer
+  // does. Anyone can start an application with any address and choose its password;
+  // the address's owner, who holds only the emailed link, must not be led to confirm a
+  // stranger's application. The person who applied knows the password they chose.
+  app.post("/api/auth/confirm-email", async (req, res) => {
     try {
-      const token = req.query.token as string;
+      const token = typeof req.body?.token === "string" ? req.body.token : "";
+      const password = typeof req.body?.password === "string" ? req.body.password : "";
       if (!token) return res.status(400).json({ message: "Token is required" });
 
       const merchant = await storage.getMerchantByToken(token);
       if (!merchant) return res.status(400).json({ message: "Invalid or expired verification token" });
+      if (!merchant.passwordHash) {
+        return res.status(400).json({
+          code: "NO_PASSWORD_CHOSEN",
+          message: "This application can't be confirmed online. Please email support@taptpay.co.nz and we'll help.",
+        });
+      }
+      const bucket = confirmEmailBucket(token);
+      const slot = await storage.takeAuthThrottleSlot([bucket], new Date());
+      if (!slot.allowed) return refuseTooManyAttempts(res, slot.retryAfterMs, "sign-in");
+      let chosen: boolean;
+      try {
+        chosen = await bcrypt.compare(password, merchant.passwordHash);
+      } catch (error) {
+        await storage.settleAuthThrottle([bucket], "void", new Date()).catch(() => undefined);
+        throw error;
+      }
+      if (!chosen) {
+        return res.status(400).json({
+          code: "WRONG_PASSWORD",
+          message: "That isn't the password chosen when this application was made.",
+        });
+      }
+      await storage.settleAuthThrottle([bucket], "success", new Date())
+        .catch((error) => console.error("[CONFIRM_EMAIL_THROTTLE_CLEAR]", error));
 
       // New stepper signups arrive with the full KYC application already stored.
       // Legacy pending accounts may not have these fields, so only mark onboarding

@@ -161,6 +161,7 @@ export async function sendMerchantVerificationEmail(
         <p style="color: rgba(255,255,255,0.85); font-size: 15px; line-height: 1.6; margin: 0 0 12px 0;">Hi ${escHtml(merchantName)},</p>
         <p style="color: rgba(255,255,255,0.65); font-size: 14px; line-height: 1.7; margin: 0 0 28px 0;">
           Thanks for signing up. Please confirm your email address to continue setting up your TaptPay merchant account.
+          You'll be asked for the password you chose when you signed up.
         </p>
         <div style="text-align: center; margin: 32px 0;">
           <a href="${confirmUrl}"
@@ -180,7 +181,7 @@ export async function sendMerchantVerificationEmail(
 
   const textContent = `Hi ${merchantName},
 
-Please confirm your email address to continue setting up your TaptPay merchant account:
+Please confirm your email address to continue setting up your TaptPay merchant account. You'll be asked for the password you chose when you signed up:
 
 ${confirmUrl}
 

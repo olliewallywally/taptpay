@@ -73,5 +73,5 @@ Next:
 1. In Replit, open Secrets and add ADMIN_PASSWORD_HASH with the line above as its value
    (or replace it, if it is there already). The published app needs it in its secrets too.
 2. Stop and Run the app.
-3. Sign in at /admin-login with ${adminEmail} and the password you just typed.
+3. Sign in at /login: choose Admin, then ${adminEmail} and the password you just typed.
 `);

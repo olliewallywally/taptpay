@@ -46,3 +46,11 @@ it("refuses a password that breaks the rule, and says the rule", () => {
   expect(hashIn(run.stdout)).toBeUndefined();
   expect(run.stderr).toContain("Use at least 8 characters, including a capital letter and a number or symbol.");
 });
+
+it("sends the admin to the sign-in page the app serves", () => {
+  // It said /admin-login, a page no route serves; admins sign in at /login under "Admin".
+  const run = runTool("Admin-password-1\nAdmin-password-1\n");
+
+  expect(run.stdout).toContain("Sign in at /login: choose Admin");
+  expect(run.stdout).not.toContain("/admin-login");
+});

@@ -1,8 +1,8 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/routes.ts @ fa0b0230b51f02bad5cf7114078350d3b697273a on 2026-09-23.
+ * scripts/generate-route-policy.ts from server/routes.ts @ ff16abfeaa870671248257ee5f98623ac1f88fd3 on 2026-09-23.
  *
- * 223 registrations (94 GET, 90 POST, 3 PATCH, 5 ALL, 22 PUT, 9 DELETE) on this SHA — evidence for THIS commit, not a timeless
+ * 223 registrations (93 GET, 91 POST, 3 PATCH, 5 ALL, 22 PUT, 9 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
  * live count on every run rather than trusting this comment.
  *
@@ -169,7 +169,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
   "GET /api/admin/email-status": {"method":"GET","path":"/api/admin/email-status","principal":"admin","markers":["authenticateAdmin"]},
   "POST /api/merchants/verify": {"method":"POST","path":"/api/merchants/verify","principal":"public","markers":["storage.verifyMerchant("]},
   "GET /api/merchants/:id/email-status": {"method":"GET","path":"/api/merchants/:id/email-status","principal":"public","markers":[]},
-  "GET /api/auth/confirm-email": {"method":"GET","path":"/api/auth/confirm-email","principal":"public","markers":["getMerchantByToken("]},
+  "POST /api/auth/confirm-email": {"method":"POST","path":"/api/auth/confirm-email","principal":"public","markers":["getMerchantByToken("]},
   "POST /api/auth/resend-confirmation": {"method":"POST","path":"/api/auth/resend-confirmation","principal":"public","markers":[]},
   "POST /api/info-pack-leads": {"method":"POST","path":"/api/info-pack-leads","principal":"public","markers":[]},
   "POST /api/merchants/signup": {"method":"POST","path":"/api/merchants/signup","principal":"public","markers":[]},
