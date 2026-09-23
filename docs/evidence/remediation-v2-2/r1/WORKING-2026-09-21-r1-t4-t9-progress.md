@@ -445,8 +445,12 @@ and deleted at the end. Decision: `docs/decisions/2026-09-21-r1-t4-t9-owner-answ
     different order still differed on analytics (chart edge, then the nav pill under reduced
     motion) though its code is byte-identical → `reducedMotion: "reduce"` and `R1T9_SCREENS` to run
     only the screens a change touches (a zero is proof; a non-zero may be timing).
-  - [ ] property analytics; [ ] property terminal; [ ] trades analytics; [ ] trades terminal;
-    [ ] settings ×3.
+  - [x] property analytics, **`5805a416`**: payments fail → alert + Try again, no chart, sheet
+    failure; Reports / Export / Generate wait for payments, tenants and schedules (tooltip names
+    the missing one). Test 8 (red 5/8), mutations 9/9, client 75/647. Capture now uses
+    Playwright's comparator (`playwright-core/lib/coreBundle` `utils.getComparator`); all six
+    screens match `fafc6598`. Worktree moved to `fafc6598` for "before".
+  - [ ] property terminal; [ ] trades analytics; [ ] trades terminal; [ ] settings ×3.
   - Screenshots: `npx vite build --outDir <dir>` (default is dist/public, untracked) and `npx vite
     preview`, then `scripts/capture-r1-t9-failure-states.mjs` (add each screen to SCREENS). The
     "before" build comes from a worktree at `e4c25fb1` (the rollout's base).
