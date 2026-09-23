@@ -382,16 +382,31 @@ export async function installTradesMocks(page) {
   await page.route(`**/api/merchants/${MERCHANT_ID}/profile`, (route) => json(route, MERCHANT));
 }
 
+export const SCHEDULES = [
+  {
+    id: "sched-mike",
+    clientProfileId: C.mike,
+    amountCents: 45000,
+    frequency: "monthly",
+    deliveryChannel: "email",
+    status: "active",
+    nextRunDate: ahead(10),
+  },
+];
+
 /* For a page made by `newRetailPage` (retail-fixtures.mjs), as the R1-T9 capture
-   does: only the trades rows and mode, registered after the retail routes so they
-   win, and the page clock moved to FIXED_NOW, which these rows' dates count from. */
+   does: the trades rows, schedules, reminder settings, business details and mode,
+   registered after the retail routes so they win, and the page clock moved to
+   FIXED_NOW, which these rows' dates count from. */
 export async function installTradesData(page) {
   await page.clock.setFixedTime(Date.parse(FIXED_NOW));
   await page.addInitScript(() => localStorage.setItem("taptMode", "trades"));
   await page.route("**/api/trades/clients", (route) => json(route, CLIENTS));
   await page.route("**/api/trades/invoices", (route) => json(route, INVOICES));
   await page.route("**/api/trades/quotes", (route) => json(route, QUOTES));
-  await page.route("**/api/trades/schedules", (route) => json(route, []));
+  await page.route("**/api/trades/schedules", (route) => json(route, SCHEDULES));
+  await page.route("**/api/trades/reminder-settings", (route) => json(route, { tradeRemindersEnabled: true }));
+  await page.route(`**/api/merchants/${MERCHANT_ID}/profile`, (route) => json(route, MERCHANT));
 }
 
 export async function assertVisible(locator, description) {

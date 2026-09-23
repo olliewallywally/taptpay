@@ -34,6 +34,7 @@ import {
   DesktopPageScaffold,
   type DesktopRoutePageProps,
 } from "../DesktopPageScaffold";
+import { DesktopLoadFailure } from "../DesktopLoadFailure";
 import {
   DESKTOP_KEYPAD_KEYS,
   DesktopKeypadButton,
@@ -162,7 +163,15 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
   const clientsQuery = useTradesClientsQuery();
   const invoicesQuery = useTradesInvoicesQuery();
   const quotesQuery = useTradesQuotesQuery();
-  const schedulesQuery = useQuery<TradesSchedule[]>({ queryKey: ["/api/trades/schedules"], queryFn: () => tradesFetch("/api/trades/schedules").then((r) => r.ok ? r.json() : []) });
+  /* A failed answer is a failure, not "no schedules" (R1-T9). */
+  const schedulesQuery = useQuery<TradesSchedule[]>({
+    queryKey: ["/api/trades/schedules"],
+    queryFn: async () => {
+      const response = await tradesFetch("/api/trades/schedules");
+      if (!response.ok) throw new Error("Could not load recurring invoices");
+      return response.json();
+    },
+  });
   const reminderSettingsQuery = useQuery<{ tradeRemindersEnabled: boolean }>({
     queryKey: ["/api/trades/reminder-settings"],
     queryFn: async () => {
@@ -173,12 +182,41 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
     },
   });
 
+  /* A failed answer is a failure, not "not GST registered": read as null, it priced
+     quotes without GST, and the null was cached under the key every page shares
+     for the business details, where exports would read it as loaded (R1-T9). */
   const merchantQuery = useQuery<any>({
     queryKey: ["/api/merchants", merchantId, "profile"],
-    queryFn: () =>
-      tradesFetch(`/api/merchants/${merchantId}/profile`).then((r) => (r.ok ? r.json() : null)),
+    queryFn: async () => {
+      const response = await tradesFetch(`/api/merchants/${merchantId}/profile`);
+      if (!response.ok) throw new Error("Could not load the business details");
+      return response.json();
+    },
     enabled: !!merchantId,
   });
+
+  /* R1-T9: invoices that did not load are not "no revenue", "nothing outstanding"
+     or "paid up", and clients that did not load are not "no clients". With nothing
+     loaded yet, the screen says so and draws no figure or list from the empty
+     fallbacks below; a failed background refresh keeps what is already shown. The
+     jobs and outstanding lists are where a sent invoice lands, so sending waits for
+     the invoices, and an invoice needs a client, so sending to one waits for the
+     clients (a quick invoice needs none). A deposit is linked to a quote and a
+     balance is worked out from one, so both wait for the quotes. Quote totals wait
+     for the business details (whether and how GST applies); schedules and reminder
+     settings that did not load are neither "none" nor shown as defaults. */
+  const invoicesUnavailable = invoicesQuery.isError && invoicesQuery.data === undefined;
+  const clientsUnavailable = clientsQuery.isError && clientsQuery.data === undefined;
+  const quotesUnavailable = quotesQuery.isError && quotesQuery.data === undefined;
+  const schedulesUnavailable = schedulesQuery.isError && schedulesQuery.data === undefined;
+  const remindersUnavailable =
+    reminderSettingsQuery.isError && reminderSettingsQuery.data === undefined;
+  const profileUnavailable = merchantQuery.isError && merchantQuery.data === undefined;
+  const retryInvoices = () => { void invoicesQuery.refetch(); };
+  const retryClients = () => { void clientsQuery.refetch(); };
+  const retrySchedules = () => { void schedulesQuery.refetch(); };
+  const retryReminders = () => { void reminderSettingsQuery.refetch(); };
+  const retryProfile = () => { void merchantQuery.refetch(); };
 
   const clients = useMemo(() => clientsQuery.data ?? [], [clientsQuery.data]);
   const invoices = useMemo(() => invoicesQuery.data ?? [], [invoicesQuery.data]);
@@ -294,12 +332,18 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
   const typeAvailable: Record<InvoiceType, boolean> = {
     full: true,
     deposit: !!depositQuote,
-    balance: !!balanceDeposit,
+    balance: !!balanceDeposit && !quotesUnavailable,
   };
   const typeHint: Record<InvoiceType, string> = {
     full: "",
-    deposit: "a deposit must be linked to a quote — create one first",
-    balance: "a balance needs a paid, quote-linked deposit",
+    deposit: quotesUnavailable
+      ? "Available once your quotes load"
+      : "a deposit must be linked to a quote — create one first",
+    balance: invoicesUnavailable
+      ? "Available once your invoices load"
+      : quotesUnavailable
+        ? "Available once your quotes load"
+        : "a balance needs a paid, quote-linked deposit",
   };
 
   /* The balance amount is computed by the server from the quote total, so the
@@ -649,7 +693,13 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
   const remindersEnabled = reminderSettingsQuery.data?.tradeRemindersEnabled ?? true;
   const quickRecipientValid = recipient.name.trim().length > 0 &&
     (recipient.channel === "email" ? recipient.email.trim().length > 0 : recipient.phone.trim().length > 0);
+  const sendUnavailableHint = invoicesUnavailable
+    ? "Available once your invoices load"
+    : clientsUnavailable && !quickMode
+      ? "Available once your clients load"
+      : undefined;
   const canSend =
+    sendUnavailableHint === undefined &&
     (!!selectedClient || (quickMode && quickRecipientValid)) &&
     typeAvailable[invType] &&
     (invType === "balance" ? balanceCents > 0 : amountCents > 0) &&
@@ -710,18 +760,33 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
             )}
           </div>
 
-          <div className="tt-hero-row">
-            <span className="tt-hero">{isLoading ? "—" : wholeNzd(revenueCents)}</span>
-            {growthPct !== null && (
-              <span className="tt-growth">
-                {growthPct >= 0 ? "+" : ""}
-                {growthPct}%
-              </span>
-            )}
-          </div>
-          <span className="tt-hero-label">revenue this week</span>
-          <span className="tt-hero-2">{isLoading ? "—" : wholeNzd(outstandingCents)}</span>
-          <span className="tt-hero-2-label">outstanding invoices</span>
+          {invoicesUnavailable ? (
+            <div className="tt-hero-row">
+              <DesktopLoadFailure
+                tone="canvas"
+                title="Invoices didn't load"
+                detail="Your revenue and outstanding stay hidden until they do."
+                onRetry={retryInvoices}
+                retrying={invoicesQuery.isFetching}
+                testId="trades-terminal-invoices-failed"
+              />
+            </div>
+          ) : (
+            <>
+              <div className="tt-hero-row">
+                <span className="tt-hero">{isLoading ? "—" : wholeNzd(revenueCents)}</span>
+                {growthPct !== null && (
+                  <span className="tt-growth">
+                    {growthPct >= 0 ? "+" : ""}
+                    {growthPct}%
+                  </span>
+                )}
+              </div>
+              <span className="tt-hero-label">revenue this week</span>
+              <span className="tt-hero-2">{isLoading ? "—" : wholeNzd(outstandingCents)}</span>
+              <span className="tt-hero-2-label">outstanding invoices</span>
+            </>
+          )}
 
           <div className="tt-jobs">
             <div className="tt-jobs-head">
@@ -788,6 +853,8 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
                 <div className="tt-rows">
                   {isLoading ? (
                     <div className="tt-empty">loading jobs…</div>
+                  ) : invoicesUnavailable || clientsUnavailable ? (
+                    <div className="tt-empty">jobs didn't load</div>
                   ) : visibleJobs.length === 0 ? (
                     <div className="tt-empty">no jobs match</div>
                   ) : (
@@ -831,6 +898,16 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
                       <button type="button" aria-pressed={recipient.channel === "sms"} onClick={() => setRecipient((r) => ({ ...r, channel: "sms" }))}>sms</button>
                     </div>
                     <input aria-label={recipient.channel === "email" ? "customer email" : "customer phone"} placeholder={recipient.channel === "email" ? "customer email" : "customer phone"} value={recipient.channel === "email" ? recipient.email : recipient.phone} onChange={(e) => setRecipient((r) => ({ ...r, [r.channel === "email" ? "email" : "phone"]: e.target.value }))} />
+                  </div>
+                ) : clientsUnavailable ? (
+                  <div className="tt-inv-client">
+                    <DesktopLoadFailure
+                      tone="canvas"
+                      title="Clients didn't load"
+                      onRetry={retryClients}
+                      retrying={clientsQuery.isFetching}
+                      testId="trades-terminal-clients-failed"
+                    />
                   </div>
                 ) : (<>
                   <div className="tt-inv-client">{selectedClient ? clientName(selectedClient) : "no client chosen"}</div>
@@ -901,6 +978,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
                   className="tt-send"
                   data-tutorial-id="trades-terminal-send"
                   disabled={!canSend}
+                  title={sendUnavailableHint}
                   onClick={() => sendInvoice.mutate()}
                 >
                   {sendInvoice.isPending ? "sending…" : sentFlash ? "invoice sent ✓" : quickMode ? "send quick invoice" : "send invoice"}
@@ -930,7 +1008,16 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
                 />
               </div>
               <div className="tt-client-cards">
-                {clientCards.length === 0 ? (
+                {clientsQuery.isLoading ? (
+                  <div className="tt-empty">loading clients…</div>
+                ) : clientsUnavailable ? (
+                  <DesktopLoadFailure
+                    tone="canvas"
+                    title="Clients didn't load"
+                    onRetry={retryClients}
+                    retrying={clientsQuery.isFetching}
+                  />
+                ) : clientCards.length === 0 ? (
                   <div className="tt-empty">no clients match</div>
                 ) : (
                   clientCards.map(({ row, owedCents, sub }) => (
@@ -947,8 +1034,8 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
                         <span className="tt-card-address">{row.siteAddress}</span>
                       </span>
                       <span className="tt-card-right">
-                        <span className="tt-card-amt">{wholeNzd(owedCents)}</span>
-                        <span className="tt-card-sub">{sub}</span>
+                        <span className="tt-card-amt">{invoicesUnavailable ? "—" : wholeNzd(owedCents)}</span>
+                        <span className="tt-card-sub">{invoicesUnavailable ? "unavailable" : sub}</span>
                       </span>
                     </button>
                   ))
@@ -1056,6 +1143,22 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
               </div>
 
               <div className="tt-q-totals" data-tutorial-id="trades-quote-totals">
+                {profileUnavailable ? (
+                  <div className="tt-failed-line">
+                    <span className="tt-q-unavailable">
+                      <span>totals unavailable</span>
+                      <small>business details didn't load</small>
+                    </span>
+                    <button
+                      type="button"
+                      className="tt-retry"
+                      disabled={merchantQuery.isFetching}
+                      onClick={retryProfile}
+                    >
+                      {merchantQuery.isFetching ? "trying…" : "try again"}
+                    </button>
+                  </div>
+                ) : (<>
                 {gstRegistered && (
                   <>
                     <div className="tt-q-tot-row">
@@ -1083,13 +1186,15 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
                   </span>
                   <span className="tt-q-grand">{formatNzd(quoteTotals.totalCents)}</span>
                 </div>
+                </>)}
               </div>
 
               <button
                 type="button"
                 className="tt-q-create"
                 data-tutorial-id="trades-quote-create"
-                disabled={!selectedClient || quoteTotals.totalCents <= 0 || createQuote.isPending}
+                disabled={!selectedClient || quoteTotals.totalCents <= 0 || createQuote.isPending || profileUnavailable}
+                title={profileUnavailable ? "Available once your business details load" : undefined}
                 onClick={() => createQuote.mutate()}
               >
                 {createQuote.isPending ? "creating…" : quoteFlash ? "quote created ✓" : "create quote"}
@@ -1140,7 +1245,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
               <div className="tt-mode-title">Recurring invoices</div>
               <div className="tt-rec-grid" data-tutorial-id="trades-recurring-create">
                 <select aria-label="recurring client" value={recurring.clientProfileId} onChange={(e) => setRecurring({ ...recurring, clientProfileId: e.target.value })}>
-                  <option value="">choose client</option>
+                  <option value="">{clientsUnavailable ? "clients didn't load" : "choose client"}</option>
                   {clients.filter((c) => !["archived", "prospect"].includes(c.status)).map((c) => <option key={c.id} value={c.id}>{clientName(c)} — {c.siteAddress}</option>)}
                 </select>
                 <input aria-label="recurring amount" inputMode="decimal" placeholder="amount" value={recurring.amount} onChange={(e) => setRecurring({ ...recurring, amount: e.target.value.replace(/[^\d.]/g, "") })} />
@@ -1149,29 +1254,66 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
                 <select aria-label="recurring delivery channel" value={recurring.deliveryChannel} onChange={(e) => setRecurring({ ...recurring, deliveryChannel: e.target.value })}><option value="email">email</option><option value="sms">sms</option><option value="whatsapp">whatsapp</option></select>
               </div>
               {recurringError && <div className="tt-rec-error">{recurringError}</div>}
-              <button type="button" className="tt-rec-create" disabled={createRecurring.isPending} onClick={() => createRecurring.mutate()}>{createRecurring.isPending ? "saving…" : "create recurring invoice"}</button>
+              <button
+                type="button"
+                className="tt-rec-create"
+                disabled={createRecurring.isPending || clientsUnavailable}
+                title={clientsUnavailable ? "Available once your clients load" : undefined}
+                onClick={() => createRecurring.mutate()}
+              >
+                {createRecurring.isPending ? "saving…" : "create recurring invoice"}
+              </button>
 
               <div className="tt-rec-reminders" data-tutorial-id="trades-recurring-reminders">
                 <span>
                   <strong>Overdue reminders</strong>
-                  <small>Automatically chase unpaid job invoices after their due date</small>
+                  <small>
+                    {remindersUnavailable
+                      ? "settings didn't load"
+                      : "Automatically chase unpaid job invoices after their due date"}
+                  </small>
                 </span>
-                <button
-                  type="button"
-                  className="tt-rec-switch"
-                  role="switch"
-                  aria-label="toggle trades reminders"
-                  aria-checked={remindersEnabled}
-                  disabled={reminderSettingsQuery.isLoading || toggleReminders.isPending}
-                  onClick={() => toggleReminders.mutate(!remindersEnabled)}
-                >
-                  <span style={{ transform: remindersEnabled ? "translateX(20px)" : "translateX(0)" }} />
-                </button>
+                {remindersUnavailable ? (
+                  <button
+                    type="button"
+                    className="tt-retry"
+                    disabled={reminderSettingsQuery.isFetching}
+                    onClick={retryReminders}
+                  >
+                    {reminderSettingsQuery.isFetching ? "trying…" : "try again"}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="tt-rec-switch"
+                    role="switch"
+                    aria-label="toggle trades reminders"
+                    aria-checked={remindersEnabled}
+                    disabled={reminderSettingsQuery.isLoading || toggleReminders.isPending}
+                    onClick={() => toggleReminders.mutate(!remindersEnabled)}
+                  >
+                    <span style={{ transform: remindersEnabled ? "translateX(20px)" : "translateX(0)" }} />
+                  </button>
+                )}
               </div>
 
               <div className="tt-rec-title" data-tutorial-id="trades-recurring-schedules">active schedules</div>
               <div className="tt-rec-list">
-                {(schedulesQuery.data ?? []).length === 0 ? (
+                {schedulesQuery.isLoading ? (
+                  <div className="tt-empty">loading…</div>
+                ) : schedulesUnavailable ? (
+                  <div className="tt-failed-line">
+                    <span className="tt-empty">recurring invoices didn't load</span>
+                    <button
+                      type="button"
+                      className="tt-retry"
+                      disabled={schedulesQuery.isFetching}
+                      onClick={retrySchedules}
+                    >
+                      {schedulesQuery.isFetching ? "trying…" : "try again"}
+                    </button>
+                  </div>
+                ) : (schedulesQuery.data ?? []).length === 0 ? (
                   <div className="tt-empty">no recurring invoices</div>
                 ) : (schedulesQuery.data ?? []).map((schedule) => (
                   <div className="tt-rec-row" key={schedule.id}>
@@ -1219,6 +1361,8 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
               <div className="tt-paid-rows">
                 {isLoading ? (
                   <div className="tt-empty">loading invoices…</div>
+                ) : invoicesUnavailable ? (
+                  <div className="tt-empty">invoices didn't load</div>
                 ) : openInvoices.length === 0 ? (
                   <div className="tt-empty">nothing outstanding</div>
                 ) : (
@@ -1434,6 +1578,12 @@ const TT_CSS = `
 
 /* mark received */
 .tt-recurring { padding-top:58px; width:445px; }.tt-rec-grid { margin-top:18px; display:grid; grid-template-columns:1fr 1fr; gap:10px; }.tt-rec-grid select,.tt-rec-grid input { min-width:0; height:44px; border-radius:11px; border:1px solid rgba(94,158,255,.35); background:rgba(94,158,255,.08); color:#fff; padding:0 12px; font:inherit; }.tt-rec-grid select:first-child { grid-column:1/-1; }.tt-rec-grid option { color:#000F3F; }.tt-rec-create { margin-top:14px; height:44px; width:100%; border-radius:999px; background:${ACTIVE}; color:${NAVY}; font-weight:800; cursor:pointer; }.tt-rec-create:disabled { opacity:.5; }.tt-rec-error { margin-top:10px; color:#FFB3B8; font-size:12px; }.tt-rec-title { margin-top:28px; color:${ACCENT_SOFT}; font-size:11px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; }.tt-rec-list { margin-top:8px; max-height:230px; overflow:auto; }.tt-rec-row { display:flex; justify-content:space-between; align-items:center; padding:11px 2px; border-bottom:1px solid rgba(94,158,255,.14); }.tt-rec-row span { display:flex; flex-direction:column; gap:2px; }.tt-rec-row strong { font-size:13px; }.tt-rec-row small { color:rgba(244,246,255,.5); font-size:10.5px; }
+/* R1-T9: a quiet "didn't load" line with a small retry, in the panel's blue language. */
+.tt-failed-line { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.tt-retry { flex:0 0 auto; padding:4px 11px; border:1px solid rgba(94,158,255,.5); border-radius:999px; background:transparent; color:${ACCENT_SOFT}; font:inherit; font-size:11px; font-weight:600; cursor:pointer; }
+.tt-retry:disabled { opacity:.5; cursor:default; }
+.tt-q-unavailable { display:flex; flex-direction:column; gap:3px; font-weight:600; font-size:12.5px; color:${TEXT_SOFT}; }
+.tt-q-unavailable small { font-weight:500; font-size:11px; color:rgba(244,246,255,0.55); }
 .tt-rec-reminders { margin-top:18px; display:flex; align-items:center; justify-content:space-between; gap:18px; padding:12px 14px; border-radius:13px; background:rgba(94,158,255,.08); }
 .tt-rec-reminders > span { display:flex; flex-direction:column; gap:3px; }
 .tt-rec-reminders strong { font-size:13px; }

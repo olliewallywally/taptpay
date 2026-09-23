@@ -60,6 +60,20 @@ const SCREENS = [
   { name: "trades-analytics", path: "/trades/analytics", essential: "/api/trades/invoices", install: installTradesData },
   { name: "trades-analytics-clients", path: "/trades/analytics", essential: "/api/trades/clients", install: installTradesData },
   { name: "trades-analytics-quotes", path: "/trades/analytics", essential: "/api/trades/quotes", install: installTradesData },
+  { name: "trades-terminal", path: "/trades/terminal", essential: "/api/trades/invoices", install: installTradesData },
+  { name: "trades-terminal-clients", path: "/trades/terminal", essential: "/api/trades/clients", install: installTradesData },
+  {
+    name: "trades-terminal-quote", path: "/trades/terminal", essential: `/api/merchants/${MERCHANT_ID}/profile`, install: installTradesData,
+    prepare: async (page) => {
+      await page.getByRole("button", { name: "choose client" }).click();
+      await page.getByRole("button", { name: "choose Mike Thompson" }).click();
+      await page.getByRole("button", { name: "quote builder" }).click();
+      await page.getByRole("textbox", { name: "line 1 description" }).fill("Rewire kitchen");
+      await page.getByRole("textbox", { name: "line 1 unit price" }).fill("1000");
+    },
+  },
+  { name: "trades-terminal-schedules", path: "/trades/recurring", essential: "/api/trades/schedules", install: installTradesData },
+  { name: "trades-terminal-reminders", path: "/trades/recurring", essential: "/api/trades/reminder-settings", install: installTradesData },
 ];
 
 async function capture(browser, base, screen, mode, file) {
