@@ -463,8 +463,17 @@ and deleted at the end. Decision: `docs/decisions/2026-09-21-r1-t4-t9-owner-answ
     8/11: the 8 the previous session wrote, never run, plus 3), mutations 18/18, client 77/667;
     loaded views match `c3dab4a8`. Worktree moved to `c3dab4a8`. Resumed 07:52 after the 04:41
     usage-limit stop.
+  - [x] found while extending "exports only from loaded data" to the business details:
+    `useMerchantProfile` read localStorage `merchantId`, written only by Google sign-in → password
+    users' exports "TaptPay Merchant", default GST. **`707cff2f`**: session token instead. Tests
+    `client/src/lib/merchant.test.tsx` red 4/4, mutations 3/3, client 78/671; browser PDF probe
+    `scripts/verify-export-business-details.mjs` (before GST $1,423.83 inclusive, after $1,637.40
+    exclusive). Only after this can exports wait for the business details (else a dead Export for
+    password users). Pending red tests for trades' Export waiting for them: patch
+    `.local/claude-scratch/r1-t9/ta-profile-tests.patch`.
   - [ ] retail + property analytics: Generate off while loading, export dialog only on loaded data
-    (the gaps found on trades analytics); [ ] trades terminal; [ ] settings ×3.
+    (the gaps found on trades analytics); exports wait for the business details on all three;
+    retail's reports also for stock and boards; [ ] trades terminal; [ ] settings ×3.
   - Screenshots: `npx vite build --outDir <dir>` (default is dist/public, untracked) and `npx vite
     preview`, then `scripts/capture-r1-t9-failure-states.mjs` (add each screen to SCREENS). The
     "before" build comes from a worktree at `e4c25fb1` (the rollout's base).
