@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
@@ -90,5 +90,43 @@ describe("RetailTerminalView safety boundary", () => {
         existing: true,
       });
     });
+  });
+
+  /* R1-T9: no double submit. A second tap on send while the first sale is still
+     being created made a second sale (a second payment link). */
+  it("sends one sale however often send is tapped while it is being created; a failed one can be sent again", async () => {
+    const outcomes: Array<{ resolve: () => void; reject: (error: Error) => void }> = [];
+    const onCreateSale = jest.fn(() => new Promise<void>((resolve, reject) => { outcomes.push({ resolve, reject }); }));
+    render(<RetailTerminalView liveState={{ items: [], pending: null, sent: [] }} onCreateSale={onCreateSale} />);
+    const commit = () =>
+      fireEvent.click(document.querySelector('.tp-layer:not(.leaving) button[aria-label="commit"]') as HTMLElement);
+
+    fireEvent.click(screen.getByRole("button", { name: "add item" }));
+    for (const digit of ["1", "2", "3", "4"]) fireEvent.click(await screen.findByRole("button", { name: digit }));
+    commit();
+    fireEvent.change(await screen.findByPlaceholderText("item name"), { target: { value: "phone sale" } });
+    commit();
+
+    const send = await screen.findByRole("button", { name: "send" });
+    fireEvent.click(send);
+    fireEvent.click(send);
+    fireEvent.click(send);
+    await waitFor(() => expect(onCreateSale).toHaveBeenCalled());
+    expect(onCreateSale).toHaveBeenCalledTimes(1);
+    expect(onCreateSale).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "phone sale", amount: 1234 }),
+      expect.objectContaining({ existing: false }),
+    );
+
+    /* The sale failed: the draft stays, and send tries it again. */
+    await act(async () => outcomes[0].reject(new Error("offline")));
+    fireEvent.click(screen.getByRole("button", { name: "send" }));
+    await waitFor(() => expect(onCreateSale).toHaveBeenCalledTimes(2));
+    expect(onCreateSale).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ name: "phone sale", amount: 1234 }),
+      expect.objectContaining({ existing: false }),
+    );
+    await act(async () => outcomes[1].resolve());
   });
 });

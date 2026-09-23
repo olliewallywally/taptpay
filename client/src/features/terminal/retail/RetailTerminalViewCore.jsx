@@ -938,6 +938,9 @@ export default function RetailTerminalViewCore({
   });
 
   const [localDraft, setLocalDraft] = useState(null);
+  /* True while a live sale is being created: a second tap on send then would
+     create a second sale (R1-T9). A ref, so it holds before the next render. */
+  const creatingSaleRef = useRef(false);
 
   const effectivePending = isLive ? (localDraft ?? liveState?.pending ?? null) : demoState.pending;
   const state    = isLive ? { ...liveState, pending: effectivePending } : demoState;
@@ -1076,12 +1079,16 @@ export default function RetailTerminalViewCore({
         return;
       }
 
+      if (creatingSaleRef.current) return;
+      creatingSaleRef.current = true;
       const create = localDraft.splitEnabled ? (onCreateSplit ?? onCreateSale) : onCreateSale;
       try {
         await create?.(localDraft, { paywave: paywaveOn, existing: false });
         setLocalDraft(null);
       } catch {
         /* draft preserved — error shown by parent */
+      } finally {
+        creatingSaleRef.current = false;
       }
       return;
     }
