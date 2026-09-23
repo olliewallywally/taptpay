@@ -181,6 +181,19 @@ describe("trades analytics when invoices fail to load (R1-T9)", () => {
     expect(screen.getByText("Trades Reports")).toBeInTheDocument(); // the click was not lost
   });
 
+  it.each([
+    ["clients", { clients: () => new Promise<Response>(() => undefined) }],
+    ["quotes", { quotes: () => new Promise<Response>(() => undefined) }],
+  ])("while the %s are still loading, a report cannot be generated", async (_source, pending) => {
+    serve(pending);
+    renderPage();
+    await settle();
+
+    await userEvent.click(reports());
+    await userEvent.click(document.querySelector(".ta-tile") as HTMLElement);
+    expect(screen.getByRole("button", { name: "Generate Report" })).toBeDisabled();
+  });
+
   it("while loading shows neither a figure nor a failure", async () => {
     serve({ invoices: () => new Promise<Response>(() => undefined) }); // never answers
     renderPage();
