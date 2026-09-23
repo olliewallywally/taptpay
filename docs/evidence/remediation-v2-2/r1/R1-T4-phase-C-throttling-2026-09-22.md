@@ -163,6 +163,13 @@ lockout allowed 5 per 15 minutes, about 480 a day, and more in a burst.
 
 ## 6. Not done / open — for the owner
 
+**2026-09-23:** the owner answered items 1 and 3
+([decision](../../../decisions/2026-09-23-r1-t4-phase-c-owner-answers.md)). The numbers stay; new
+passwords need 8+ characters, a capital and a number or symbol; the sign-in timing leak is fixed
+([evidence](R1-T4-password-rule-and-sign-in-timing-2026-09-23.md)). Item 6 is out of date: a
+container restart at 23:13 UTC relaunched dev on `e60e90c0`, and a made-up-email sign-in there
+answered 401 through the real Neon driver.
+
 1. **The numbers** (table above) are constants. Recommended: keep them. Note that a password needs
    only 6 characters (`resetPasswordSchema`, `changePasswordSchema`), and at ~100 guesses a day a
    very common password can still fall. A stronger minimum and a check against known-breached

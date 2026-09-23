@@ -210,6 +210,76 @@ and deleted at the end. Decision: `docs/decisions/2026-09-21-r1-t4-t9-owner-answ
     branch intact) — partially: its `config.worktree` is a sandbox mount (EBUSY). Nothing lost.
   - committed `e60e90c0` (13 files, explicit paths; `.replit` is not this work and stays
     unstaged); evidence, screenshots, ledger in the docs commit after it.
+- [x] 4b — **phase C follow-ups, owner answers 2026-09-23 ~00:10 UTC** — **done, `f6c62f50`** (to "Questions for you" in
+  the phase C report): "1. yes thats ok, 2. make it need captials, and symbols/numbers and makew it
+  8 characters. 3 yes". Recovery first: the "crash" was a container restart at 23:13 after phase C's
+  turn ended cleanly at 22:40 (last JSONL line `turn_duration`). Re-ran every claim: tsc clean, client
+  70/616, server 69/1347, PostgreSQL 24/24, browser 12/12; live dev (restarted onto `e60e90c0`):
+  `GET /` 200, made-up-email sign-in 401 via the real Neon driver (0.95 s cold, then 31–48 ms).
+  - Q1: the numbers stay. Q2: new passwords need **8+ characters, a capital, and a number or
+    symbol** (reading: `\p{Lu}`; `[\p{N}\p{P}\p{S}]`, so a space is not a symbol). Q3: fix the
+    sign-in timing leak.
+  - **Q2 found:** six schemas, three rules. signup / accept-invite / admin-create / verify:
+    8 + upper + lower + digit (a symbol did not count). reset + change-password: **6, nothing else**.
+    `/api/merchants/verify` and `/api/admin/merchants/:id/activate` parse **no schema at all** (any
+    non-empty password; neither has a client caller, both reachable). Client rules copied by hand
+    in merchant-signup.tsx, accept-invite.tsx; create-merchant.tsx says "Minimum 6 characters".
+    Plan: one shared `newPasswordSchema` (shared/schema.ts) in all six schemas + both schema-less
+    routes; the owner's rule exactly (the lowercase requirement goes; a symbol counts), flagged in
+    the report. Sign-in is not touched: existing passwords keep working.
+  - **Q3 found:** `authenticateUser` returns before bcrypt for an unknown email, an inactive login
+    or a non-active merchant; admin sign-in runs bcrypt only for the admin's email. Fix: exactly one
+    bcrypt compare per attempt, against a stand-in hash (random password, same cost) when there is
+    no usable hash. Test with a `bcrypt.compare` spy (deterministic), timing measured for evidence.
+  - **Q3 design, revised after measuring:** dev's active logins are **3 × `$2b$10$`, 2 × `$2b$12$`**
+    (read-only prefix count, unsandboxed psql; merchants.password_hash likewise mixed). A cost-12
+    stand-in alone would make a cost-10 login (67 ms) *faster* than "no login" (272 ms): still a leak,
+    for most real accounts. Fix: every attempt spends **one cost-12 check's worth of hashing** — no
+    login / malformed hash (bcrypt 6.0.0 returns false in ~0.1 ms for those): one stand-in at 12;
+    a cost-c hash: its own check plus stand-ins at c, c+1, …, 11 (2^c + Σ = 2^12). Stand-in =
+    `bcrypt.genSaltSync(c) + "."×31`: no hashing to make, never matches. Measured: synthetic-12
+    272.9 ms, real-12 271.8, real-10 66.8, real-10 + synth 10 + synth 11 273.3. Admin: budget
+    max(12, admin hash cost). Tests assert the work (Σ 2^cost over a `bcrypt.compare` spy) = 2^12.
+    Checked and dismissed: Google sign-in's `createUser` copies merchants.password_hash onto the
+    owner row, but change-password and reset update both in one transaction, so no revert.
+  - **Red first (server), on `4b496104`:** `password-rule.test.ts` + `sign-in-timing.test.ts`: 23 of 28
+    fail, each for its reason — timing work 0 (unknown email, disabled login, pending business,
+    unreadable hash), 16 (cost-4 login), admin 16 vs 0; schemas keep old messages / refuse
+    `Password!`, `PASSWORD1`, `Élan-vital`; reset + change take `password1` (200); verify + activate
+    take `password` (200); invite / admin-create answer "Invalid invite details" / "Invalid input".
+    The 5 passing are meant to pass both sides (baseline wrong-password check, admin signs in, reset
+    and change allow the ALLOWED list, a `demo123`-era password still signs in).
+  - **Red first (client):** 6 of 9 in accept-invite / merchant-signup / password-rule-forms fail for
+    their reasons (old words shown; invite blocks `Password!`; reset submits `abcdef`; admin hint
+    "Minimum 6 characters"); the 3 passing are the 2 old tests + "sends a password that meets it".
+  - **Built:** `shared/schema.ts` PASSWORD_RULE / meetsPasswordRule / newPasswordSchema in all six
+    schemas (reset's confirm now min 1); routes: reset, change, invite, admin-create answer
+    `issues[0].message`; verify + activate check `newPasswordSchema` (non-strings refused, the
+    parsed value is what gets hashed); `auth.ts` PASSWORD_HASH_COST, `checkPasswordEvenly`,
+    `passwordCheckBudget`; `authenticateUser` checks the password first for every attempt; admin
+    sign-in uses the even check with budget max(12, admin hash cost); signup + invite pages use the
+    shared rule; admin placeholder "8+ characters". tsc clean; new server 28/28, pages 9/9 (signup
+    test matches labels by prefix: a field's error sits inside its label).
+  - **Full suites:** tsc clean; server 71/1375 (1347 + 28), client 71/623 (616 + 7). No older test
+    set a password the rule refuses.
+  - **Timing, measured** (`node --import tsx scripts/measure-sign-in-timing.ts`: real routes,
+    in-memory storage, clean env, admin hash at cost 10, cases round-robin, median of 9; admin's
+    email n=5, its free attempts). Old code (`4b496104`, worktree, removed without prune), two runs:
+    no login 5/5 ms, cost-12 login 282/279, cost-10 login 77/74, admin's email 73/73, other email
+    4/4. New code, two runs: 275/281, 276/278, 281/277, 295/284, 278/283 — ranges overlap.
+  - **Q3 not fixed, for the owner (tradeoffs):** (a) `POST /api/merchants/signup` answers 409
+    "Email already registered", which states outright what the timing only hinted; (b)
+    forgot-password awaits the reset write + the email send only when the login exists: a timing
+    leak. Replying first and sending after is the standard fix, but the deployment is Replit
+    **Autoscale**, where work after the reply may be starved or lost, so reset emails could be
+    delayed or lost.
+  - **Also after the refactor** (rule moved to `shared/password-rule.ts`, no imports: `App.tsx` imports
+    MerchantSignup eagerly, and `@shared/schema` would have put drizzle into every first load): final
+    tsc clean, server 71/1375, client 71/623; browser `scripts/verify-password-rule-browser.mjs` 9/9,
+    old commit 6 FAIL (the 3 "sends nothing" pass there too: the old pages refused, in other words).
+    Seen, not touched: the invite page's `h1` is white on cream (predates, `c350644a`).
+  - committed `f6c62f50` (14 files, explicit paths; `.replit` not staged); decision, evidence,
+    screenshots, ledger in the docs commit after it.
 - [ ] 5 — B: the `TRUST_PROXY_HOPS` setting (off by default) and spoofed-header tests, **plus the
   address-keyed limits moved here from C**: per-address buckets for sign-in (refunded on success,
   never cleared), forgot-password and the Google callback — active only when the setting says the
