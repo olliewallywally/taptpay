@@ -471,9 +471,14 @@ and deleted at the end. Decision: `docs/decisions/2026-09-21-r1-t4-t9-owner-answ
     exclusive). Only after this can exports wait for the business details (else a dead Export for
     password users). Pending red tests for trades' Export waiting for them: patch
     `.local/claude-scratch/r1-t9/ta-profile-tests.patch`.
-  - [ ] retail + property analytics: Generate off while loading, export dialog only on loaded data
-    (the gaps found on trades analytics); exports wait for the business details on all three;
-    retail's reports also for stock and boards; [ ] trades terminal; [ ] settings ×3.
+  - [x] reports and exports only from loaded data: trades export waits for the business details
+    **`0c75e747`** (+ per-source Generate tests **`88fe0e3f`**); property **`d5cf4d5f`** (Generate
+    off while loading, dialog on loaded data, export waits for the business details); retail
+    **`721ce328`** (per report: stockrep/products, boards/boards, gst/business details; export
+    sales + business details). Mutations 36/36, client 78/692, loaded views match `c3dab4a8`.
+    Retail chart crossing the transaction count when the week's first day peaks: pre-existing,
+    noted, not changed.
+  - [ ] trades terminal; [ ] settings ×3.
   - Screenshots: `npx vite build --outDir <dir>` (default is dist/public, untracked) and `npx vite
     preview`, then `scripts/capture-r1-t9-failure-states.mjs` (add each screen to SCREENS). The
     "before" build comes from a worktree at `e4c25fb1` (the rollout's base).
