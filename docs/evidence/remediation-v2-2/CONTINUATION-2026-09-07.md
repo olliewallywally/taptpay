@@ -192,11 +192,21 @@ The work itself:
   - **Found and fixed, `707cff2f`: exports lacked the business details after a password
     sign-in** ([evidence](r1/R1-T9-export-business-details-2026-09-23.md)). The helper that
     stamps reports with the business name, GST number and GST settings read a storage key only
-    Google sign-in writes, so since 2026-07-11 password users' exports said "TaptPay Merchant",
-    with trades GST worked out inclusive whatever the setting and no GST line on property's
-    income statement. Shown in a browser: the same invoices, GST $1,423.83 before and $1,637.40
-    after, for a GST-exclusive business. Tests red 4/4 first, mutations 3/3, client 78/671.
+    Google sign-in writes, so since 2026-07-11 password users' exports said "TaptPay Merchant"
+    with no GST number, and property's income statement had no GST line. Tests red 4/4 first,
+    mutations 3/3, client 78/671. (This entry first called trades GST "worked out inclusive" a
+    fault and $1,637.40 the fix; that was backwards, corrected by `5132caa9` below.)
     **Owner question:** did anyone rely on an earlier export, e.g. for a GST return?
+  - **GST corrected, `5132caa9`** (owner, 2026-09-23: *"gst is 15% its a very simple
+    calculation, get it right"*): every trades invoice amount is what the customer pays, GST
+    included (a quote's total includes it; the checkout charges the amount as it is; the
+    server's own receipt shows GST as total − total / 1.15). So the GST in what was invoiced is
+    total − total / 1.15: $1,423.83 on $10,916.00. The Invoice Summary's "exclusive" branch,
+    there since 2026-07-10/11, added 15% on top ($1,637.40, "incl." $12,553.40); `707cff2f` had
+    spread it to password sign-ins (not released). Also: no GST figure for businesses that are
+    not GST registered (trades Invoice Summary, retail Sales Summary). Red 9/10, mutations 5/5,
+    client 82/729; browser PDFs before/after
+    ([evidence](r1/R1-T9-export-business-details-2026-09-23.md)).
   - Then all three analytics screens make reports and exports only from loaded data, each waiting
     for exactly its sources (exports also for the business details): trades `0c75e747`
     `88fe0e3f`, property `d5cf4d5f`, retail `721ce328` (per report: with the boards failed, only
@@ -228,7 +238,8 @@ Independent reviews owed:
   (`fafc6598..5805a416`), property terminal (`568d85c9..f48139f6`), trades analytics
   (`c3dab4a8..64e12ef8`); exports' business details (`dc07b6b8..707cff2f`); reports and exports
   from loaded data (`37da05d1..721ce328`); trades terminal and the quick invoice's add client
-  (`9be83f59..2e8b308a`); desktop settings (`ca6573be..6dd7bc68`).
+  (`9be83f59..2e8b308a`); desktop settings (`ca6573be..6dd7bc68`); GST in exports
+  (`cf408c7e..5132caa9`).
 
 Prior continuation (2026-09-21, R1-T4 plan). **Security finding:** on Google sign-in the server
 redirects to `/login?token=<one-hour JWT>`, and GA4 records the page address before the login page

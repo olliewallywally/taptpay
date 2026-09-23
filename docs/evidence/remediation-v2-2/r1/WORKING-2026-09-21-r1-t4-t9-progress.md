@@ -487,6 +487,12 @@ and deleted at the end. Decision: `docs/decisions/2026-09-21-r1-t4-t9-owner-answ
     form whose Save overwrites; "Your Business" PENDING), access (owner told the owner manages),
     plan (default plan + disclosures + actions), card ("Add payment method"). DesktopLoadFailure
     gains tone "panel". Test 11 (red 7/9 +2), mutations 28/28, client 81/720, loaded views match.
+  - [x] owner 2026-09-23 "gst is 15% … get it right" → **`5132caa9`**: invoice amounts include GST
+    (quote totals, checkout charges amountCents, server receipt total − total/1.15), so GST =
+    total − total/1.15 in any mode; exclusive branch (added 15% on top, since 07-10/11) removed;
+    no GST for unregistered businesses (trades + retail summaries). Red 9/10, mutations 5/5,
+    client 82/729, browser PDFs cf408c7e vs fix. Evidence + ledger corrected (they had it
+    backwards).
   - [ ] R1-T9 other items: mutations pending / keep input / no double submit; 402 banners.
   - Screenshots: `npx vite build --outDir <dir>` (default is dist/public, untracked) and `npx vite
     preview`, then `scripts/capture-r1-t9-failure-states.mjs` (add each screen to SCREENS). The
