@@ -507,7 +507,28 @@ and deleted at the end. Decision: `docs/decisions/2026-09-21-r1-t4-t9-owner-answ
     sandboxed Chromium reports offline (script forces `navigator.onLine`); phone toasts last
     1.6 s (script samples every 100 ms). Found: phone property batch/schedules screen
     unreachable since `7b99299a`.
-  - [ ] R1-T9 last item: mutations disabled while pending / keep input / no double submit.
+  - [x] R1-T9 last item: mutations disabled while pending / keep input / no double submit —
+    `0a257926` (desktop property: reference kept + guarded; reminders wait), `0220c6f9` (phone
+    property/trades mark received reports failure), `09000e9f` (phone retail one sale per tap).
+    Red 6/6, mutations 9/9, client 86/760. Evidence `R1-T9-pending-and-double-submit-2026-09-23.md`.
+    **R1-T9 complete, awaiting independent review.**
+    Survey (2026-09-23 ~21:30, desktop R1-T9 screens, 34 mutations):
+    - retail terminal: sale (both send buttons disabled + aria-busy; input cleared on success
+      only) ok; create board (guarded + disabled) ok; cancel ok; rename board: no pending guard,
+      but rename is idempotent and a guard would drop a newer typed name, so left.
+    - retail stock: add/update/delete share `busy` (dialog buttons + scrim) ok, draft cleared on
+      success only. Retail analytics: refund disabled while pending, fields cleared on success
+      only, ok (its failure toast shows raw `400: {json}`: wording, not this item).
+    - property terminal: send request/bill (one caller each, disabled) ok; row menu (menuBusy,
+      closes on click) ok; inline remind (disabled for its row) ok; schedules (scheduleBusy) ok.
+      **GAP 1** `confirmRefRow` closes the reference row and clears the typed reference before
+      the result: a failed mark-paid loses it. **GAP 2** reminder switch + cadence chips not
+      disabled while `updateReminders` is pending (overlapping PUTs; trades desktop disables its
+      switch).
+    - trades terminal: all 7 disabled while pending, inputs cleared on success only: ok.
+    - settings: all 11 disabled while pending, inputs cleared on success only: ok.
+    - found, phone (not in the R1-T9 list): property and trades "mark received" have no
+      onError: a failure shows nothing.
   - Screenshots: `npx vite build --outDir <dir>` (default is dist/public, untracked) and `npx vite
     preview`, then `scripts/capture-r1-t9-failure-states.mjs` (add each screen to SCREENS). The
     "before" build comes from a worktree at `e4c25fb1` (the rollout's base).
