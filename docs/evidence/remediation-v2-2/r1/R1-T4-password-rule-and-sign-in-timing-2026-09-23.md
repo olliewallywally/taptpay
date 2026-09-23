@@ -148,6 +148,11 @@ Every new test was run against the unchanged code first.
 
 ## 5. Not done / open — for the owner
 
+**2026-09-23, later:** items 1, 2 and 6 were answered and built (`8fdb63e0`,
+[decision](../../../decisions/2026-09-23-r1-t4-enumeration-owner-answers.md),
+[evidence](R1-T4-account-discovery-2026-09-23.md)). Sign-up and the confirmation resend now answer
+every address alike, forgot-password waits 1 s, and the invite form sits on its dark card.
+
 1. **Sign-up says outright which emails have accounts.** `POST /api/merchants/signup` answers 409
    "Email already registered" (`server/routes.ts:5382`), so the timing fix
    alone does not stop someone working out which emails are merchants.

@@ -280,6 +280,50 @@ and deleted at the end. Decision: `docs/decisions/2026-09-21-r1-t4-t9-owner-answ
     Seen, not touched: the invite page's `h1` is white on cream (predates, `c350644a`).
   - committed `f6c62f50` (14 files, explicit paths; `.replit` not staged); decision, evidence,
     screenshots, ledger in the docs commit after it.
+- [x] 4c — **enumeration follow-ups, owner answers 2026-09-23 ~01:00 UTC** — **done, `8fdb63e0`** (to the questions in the
+  `f6c62f50` report): "1 yes 2 yes 3 yes, then start phase B".
+  - 1: sign-up answers every address the same ("check your email"); an address that already has an
+    account gets a note instead of a new application.
+  - 2: forgot-password never answers sooner than about one second, so its timing tells nothing.
+  - 3: fix the team-invite page's heading (white `h1` on the cream page).
+  - then phase B (item 5).
+  - **found, before building:**
+    - `POST /api/auth/resend-confirmation` is a direct oracle, next to the sign-up form. By email
+      it answers 404 "Merchant not found", "Email is already verified" or "Verification email sent".
+      By `merchantId` it also sends pending applicants a link. Its limiter is keyed on ip plus the
+      target. Sign-up alone would not meet the owner's intent, so this route is in scope.
+    - The sign-up verification email puts the form's name into its HTML unescaped
+      (`email-service-multi.ts`, `Hi ${merchantName}`). Anyone can make TaptPay mail any address
+      arbitrary links. The same module's `escHtml` is used for board-builder emails; in scope, same
+      flow.
+    - Left alone: public `GET /api/merchants/:id/email-status` (by id, not by email; already
+      inventoried as an accepted public route). `business-details.tsx` resends by `merchantId`, so
+      id requests stay supported.
+  - **design:**
+    - sign-up: hash first on both paths. An address with an account or a login gets a note (no
+      form text in it), limited per address by `signup-notice` (reset policy), and no new
+      application. A new address is handled as before. Both reply no sooner than 1.5 s, with
+      `{message: "Check your email to continue."}` and no merchant id; the page drops `&id=`.
+    - resend: `{email}` or `{merchantId}`, limited per the given address or id (the limit never
+      depends on whether it exists). Only a pending application with a token gets its link. The same
+      200 comes no sooner than 1 s; the ip+target limiter is dropped from this route.
+    - forgot-password: the 200 no sooner than 1 s; 400/429 answer at once (they do not depend on
+      the address). Log when the work passes the floor.
+    - invite page: the form moves onto the same dark card as its other states
+      (`.signup-invite-card`); red-first check = browser contrast of the `h1`.
+  - **red first (server), `account-discovery.test.ts` on `04e557eb`: 8 of 9 fail, each for its reason:**
+    - sign-up: a new address gets `{merchant:{id,…}, "Account created…"}`; an address with an
+      account or a teammate login gets 409;
+    - the captured email HTML holds the raw `<a href="https://evil.test">` (so the capture works);
+    - resend: 404 "Merchant not found" and "Verification email sent"; no 429 after 3;
+    - forgot-password: 10.5 ms.
+    - The 1 passing (a 429 answers at once) is a guard for both sides.
+  - built and green: server 72/1384, client 71/623, browser 14/14 (old commit 4 FAIL: `&id=2`,
+    "Verification email sent", invite contrast 1.1 / 2.2). While reviewing, found that confirming an
+    application needs only the link (`GET /api/auth/confirm-email`), so a stranger-made application
+    confirmed by the address's owner signs in with the stranger's password (pre-existing). The note
+    was reworded to point at neither confirming nor resending; reported to the owner.
+  - committed `8fdb63e0` (12 files, explicit paths); decision, evidence, screenshot, ledger after it.
 - [ ] 5 — B: the `TRUST_PROXY_HOPS` setting (off by default) and spoofed-header tests, **plus the
   address-keyed limits moved here from C**: per-address buckets for sign-in (refunded on success,
   never cleared), forgot-password and the Google callback — active only when the setting says the
