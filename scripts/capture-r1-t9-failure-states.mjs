@@ -35,6 +35,11 @@ for (const [, url] of builds) assert.ok(["127.0.0.1", "localhost"].includes(new 
  */
 const SCREENS = [
   { name: "retail-analytics", path: "/transactions", essential: `/api/merchants/${MERCHANT_ID}/transactions` },
+  {
+    name: "retail-analytics-boards-reports", path: "/transactions", essential: `/api/merchants/${MERCHANT_ID}/tapt-stones`,
+    prepare: (page) => page.getByRole("button", { name: "Reports", exact: true }).click(),
+  },
+  { name: "retail-analytics-business-details", path: "/transactions", essential: `/api/merchants/${MERCHANT_ID}/profile` },
   { name: "retail-stock", path: "/stock", essential: `/api/merchants/${MERCHANT_ID}/stock-items` },
   { name: "retail-terminal", path: "/terminal", essential: `/api/merchants/${MERCHANT_ID}/transactions` },
   {

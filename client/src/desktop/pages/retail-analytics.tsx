@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -183,6 +184,51 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
      fallback below; a failed background refresh keeps the sales already shown. */
   const salesUnavailable = txQuery.isError && txQuery.data === undefined;
   const retrySales = () => { void txQuery.refetch(); };
+
+  /* Reports and exports are generated only from loaded data — never from the empty
+     fallbacks below while a request is still loading or after it failed. Every
+     one needs the sales. Three reports need one more source each, and only they
+     wait for it: Stock Performance the products, Revenue by Board the boards,
+     and the GST & Tax Summary whether the business is GST-registered (the
+     business details). An export prints the business name and GST number, so it
+     waits for the business details too. */
+  const salesHint = "Available once your sales load";
+  const profileUnavailable = merchantQuery.isError && merchantQuery.data === undefined;
+  const reportNeeds: Partial<Record<RetailReportId, { loaded: boolean; unavailable: boolean; hint: string }>> = {
+    stockrep: {
+      loaded: stockQuery.data !== undefined,
+      unavailable: stockQuery.isError && stockQuery.data === undefined,
+      hint: "Available once your products load",
+    },
+    boards: {
+      loaded: boardsQuery.data !== undefined,
+      unavailable: boardsQuery.isError && boardsQuery.data === undefined,
+      hint: "Available once your boards load",
+    },
+    gst: {
+      loaded: merchantQuery.data !== undefined,
+      unavailable: profileUnavailable,
+      hint: "Available once your business details load",
+    },
+  };
+  const reportUnavailableHint = (id: RetailReportId) =>
+    salesUnavailable ? salesHint : reportNeeds[id]?.unavailable ? reportNeeds[id]?.hint : undefined;
+  const reportReady = (id: RetailReportId) =>
+    txQuery.data !== undefined && (reportNeeds[id]?.loaded ?? true);
+  const exportUnavailableHint = salesUnavailable
+    ? salesHint
+    : profileUnavailable
+      ? "Available once your business details load"
+      : undefined;
+  const exportUnavailable = exportUnavailableHint !== undefined;
+  const exportReady = txQuery.data !== undefined && merchantQuery.data !== undefined;
+
+  /* An export asked for while the data was loading opens once it has loaded. If
+     a source fails instead, the request is dropped, so it cannot pop up after a
+     later retry. */
+  useEffect(() => {
+    if (exportUnavailable) setExportOpen(false);
+  }, [exportUnavailable]);
   const transactions = txQuery.data ?? [];
   const stockItems = stockQuery.data ?? [];
   const boards = boardsQuery.data ?? [];
@@ -709,8 +755,8 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
                     className="ra-btn-white"
                     data-tutorial-id="retail-analytics-export"
                     onClick={() => setExportOpen(true)}
-                    disabled={salesUnavailable}
-                    title={salesUnavailable ? "Available once your sales load" : undefined}
+                    disabled={exportUnavailable}
+                    title={exportUnavailableHint}
                   >
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={INK} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 4v10M8 10l4 4 4-4" /><path d="M5 19h14" /></svg>
                     <span>Export</span>
@@ -861,7 +907,14 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
                 <div className="ra-tiles-hint">Pick a report to generate — filters come next.</div>
                 <div className="ra-tiles">
                   {RETAIL_DESKTOP_REPORTS.map((r) => (
-                    <button key={r.id} type="button" className="ra-tile" onClick={() => pickTile(r.id)}>
+                    <button
+                      key={r.id}
+                      type="button"
+                      className="ra-tile"
+                      onClick={() => pickTile(r.id)}
+                      disabled={reportUnavailableHint(r.id) !== undefined}
+                      title={reportUnavailableHint(r.id)}
+                    >
                       <span className="ra-tile-ico">
                         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={DEEP_BLUE} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={r.icon} /></svg>
                       </span>
@@ -911,7 +964,15 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
                 </div>
 
                 <div className="ra-generate-row">
-                  <button type="button" className="ra-generate" onClick={generate}>Generate Report</button>
+                  <button
+                    type="button"
+                    className="ra-generate"
+                    onClick={generate}
+                    disabled={!reportReady(pendReport)}
+                    title={reportUnavailableHint(pendReport)}
+                  >
+                    Generate Report
+                  </button>
                   <span className="ra-generate-note">
                     the top section becomes your report — jump back with the analytics button
                   </span>
@@ -922,7 +983,7 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
         </div>
       </div>
 
-      {exportOpen && (
+      {exportOpen && exportReady && (
         <ReportModal
           title="Sales Reports"
           options={
@@ -1051,7 +1112,8 @@ const RA_CSS = `
 .ra-tiles-hint { font-weight:600; font-size:13px; color:${SHEET_DIM}; }
 .ra-tiles { margin-top:16px; display:grid; grid-template-columns:repeat(5,1fr); gap:10px; }
 .ra-tile { display:flex; flex-direction:column; align-items:flex-start; gap:11px; padding:16px; border-radius:14px; background:#fff; border:1px solid #E6E8F0; cursor:pointer; text-align:left; transition:background .15s ease, transform .15s ease; }
-.ra-tile:hover { background:#F7F9FD; transform:translateY(-1px); }
+.ra-tile:hover:not(:disabled) { background:#F7F9FD; transform:translateY(-1px); }
+.ra-tile:disabled { opacity:0.55; cursor:default; }
 .ra-tile-ico { width:34px; height:34px; border-radius:10px; background:${SHEET_BG}; display:flex; align-items:center; justify-content:center; flex:0 0 auto; }
 .ra-tile-text { display:flex; flex-direction:column; gap:3px; }
 .ra-tile-title { font-weight:700; font-size:13.5px; color:${SHEET_INK}; }
