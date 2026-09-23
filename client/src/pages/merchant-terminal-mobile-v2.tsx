@@ -3,7 +3,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { QRCodeDisplay } from "@/components/qr-code-display";
-import { apiRequest } from "@/lib/queryClient";
+import {
+  apiRequest,
+  BillingCardRequiredError,
+  isBillingCardRequired,
+  notifyIfBillingCardRequired,
+} from "@/lib/queryClient";
 import { apiErrorMessage } from "@/lib/api-error";
 import { sseClient } from "@/lib/sse-client";
 import { useToast } from "@/hooks/use-toast";
@@ -245,6 +250,9 @@ export default function MerchantTerminalMobile() {
       queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "transactions"] });
     },
     onError: (error) => {
+      /* A billing 402 is stated once, by the billing banner apiRequest raises; the
+         sale adds nothing and stays to send again (R1-T9). */
+      if (isBillingCardRequired(error)) return;
       toast({ title: "Error", description: apiErrorMessage(error, "Failed to create transaction"), variant: "destructive" });
     },
   });
@@ -342,6 +350,7 @@ export default function MerchantTerminalMobile() {
           windcaveToken: bridgeResult.token,
         }),
       });
+      if (notifyIfBillingCardRequired(r)) throw new BillingCardRequiredError();
       if (!r.ok) {
         const errData = await r.json().catch(() => ({}));
         throw new Error(errData.message || `Processor error (${r.status})`);
@@ -352,6 +361,14 @@ export default function MerchantTerminalMobile() {
       queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "active-transaction"] });
       setTimeout(() => { setShowTapToPayOverlay(false); setTapToPayStatus("idle"); setTapToPayApproved(null); }, 3500);
     } catch (err: any) {
+      /* A billing 402: the server refused before charging, so no card was
+         declined. The billing banner says why (R1-T9); the overlay closes and the
+         sale stays pending to take again. */
+      if (isBillingCardRequired(err)) {
+        setTapToPayStatus("idle");
+        setShowTapToPayOverlay(false);
+        return;
+      }
       setTapToPayStatus("failed");
       setTapToPayApproved(false);
       toast({ title: "Payment error", description: err?.message || "Tap to Pay failed", variant: "destructive" });
@@ -516,6 +533,7 @@ export default function MerchantTerminalMobile() {
       <AnimatePresence>
         {showTapToPayOverlay && (
           <motion.div
+            data-testid="tap-to-pay-overlay"
             className="fixed inset-0 z-[999] flex items-center justify-center"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

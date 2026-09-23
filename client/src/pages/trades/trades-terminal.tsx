@@ -6,7 +6,11 @@ import { tradesFetch, tradesHeaders } from "@/lib/trades-api";
 import { computeQuoteTotals } from "@shared/trades-gst";
 import { TRADES_THEME } from "@/lib/trades-theme";
 import ClientProfile from "./client-profile";
-import { notifyIfBillingCardRequired } from "@/lib/queryClient";
+import {
+  BillingCardRequiredError,
+  isBillingCardRequired,
+  notifyIfBillingCardRequired,
+} from "@/lib/queryClient";
 import {
   QuoteView,
   TradesTerminalView,
@@ -101,13 +105,15 @@ export function QuoteScreen({ onCancel, onExit }: { onCancel: () => void; onExit
       };
       const response = await fetch('/api/trades/quotes', { method: 'POST', headers: { 'Content-Type': 'application/json', ...tradesHeaders() }, body: JSON.stringify(body) });
       if (!response.ok) {
-        notifyIfBillingCardRequired(response);
+        if (notifyIfBillingCardRequired(response)) throw new BillingCardRequiredError();
         throw new Error(await response.json().then((d: any) => d.message).catch(() => 'Could not create quote'));
       }
       return response.json();
     },
     onSuccess: quote => { queryClient.invalidateQueries({ queryKey: ['/api/trades/quotes'] }); setCreated(quote); },
-    onError: (err: any) => setError(err?.message || 'Could not create quote'),
+    /* A billing 402 is stated once, by the billing banner; nothing more here, and
+       the quote stays to create again (R1-T9). */
+    onError: (err: any) => { if (!isBillingCardRequired(err)) setError(err?.message || 'Could not create quote'); },
   });
 
   const updateLine = (id: number, field: keyof QuoteDraftLine, value: string) => setLines(cur => cur.map(l => l.id === id ? { ...l, [field]: value } : l));
@@ -261,7 +267,7 @@ export default function TradesTerminal() {
         }),
       });
       if (!r.ok) {
-        notifyIfBillingCardRequired(r);
+        if (notifyIfBillingCardRequired(r)) throw new BillingCardRequiredError();
         const msg = await r.json().then((d: any) => d.message).catch(() => 'Failed to send invoice');
         throw new Error(msg);
       }
@@ -279,7 +285,9 @@ export default function TradesTerminal() {
       setContentKey(k => k + 1);
       setScreen('success');
     },
-    onError: (err: any) => { toast(err?.message || 'Failed to send invoice'); },
+    /* A billing 402 is stated once, by the billing banner; nothing more here, and
+       the invoice stays to send again (R1-T9). */
+    onError: (err: any) => { if (!isBillingCardRequired(err)) toast(err?.message || 'Failed to send invoice'); },
   });
 
   // "add client" on the quick-invoice success screen — turns the hidden
@@ -331,6 +339,7 @@ export default function TradesTerminal() {
         headers: { 'Content-Type': 'application/json', ...tradesHeaders() },
         body: action === 'send-balance' ? JSON.stringify({ splitEnabled: !!splitEnabled }) : undefined,
       });
+      if (notifyIfBillingCardRequired(r)) throw new BillingCardRequiredError();
       if (!r.ok) throw new Error(await r.json().then((d: any) => d.message).catch(() => 'Action failed'));
       return r.json();
     },
@@ -339,7 +348,7 @@ export default function TradesTerminal() {
       setBanner(vars.action === 'send-balance' ? 'Balance invoice created' : 'Job completed');
       setRowAction(null);
     },
-    onError: (e: any) => toast(e?.message || 'Action failed'),
+    onError: (e: any) => { if (!isBillingCardRequired(e)) toast(e?.message || 'Action failed'); },
   });
 
   /* Helpers */

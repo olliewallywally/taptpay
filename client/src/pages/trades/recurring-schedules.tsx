@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { tradesFetch, tradesHeaders } from "@/lib/trades-api";
+import { BillingCardRequiredError, isBillingCardRequired, notifyIfBillingCardRequired } from "@/lib/queryClient";
 import { formatNzd } from "@/lib/trades-money";
 import { TRADES_THEME as T } from "@/lib/trades-theme";
 
@@ -24,9 +25,10 @@ export default function RecurringSchedules() {
   });
   const client = (id: string) => clients.find((item: any) => item.id === id);
   const action = useMutation({
-    mutationFn: async ({ url, method, body }: any) => { const response = await fetch(url, { method, headers: { ...(body ? { "Content-Type": "application/json" } : {}), ...tradesHeaders() }, body: body ? JSON.stringify(body) : undefined }); if (!response.ok) throw new Error(await response.json().then(d => d.message).catch(() => "Action failed")); return response.json(); },
+    mutationFn: async ({ url, method, body }: any) => { const response = await fetch(url, { method, headers: { ...(body ? { "Content-Type": "application/json" } : {}), ...tradesHeaders() }, body: body ? JSON.stringify(body) : undefined }); if (notifyIfBillingCardRequired(response)) throw new BillingCardRequiredError(); if (!response.ok) throw new Error(await response.json().then(d => d.message).catch(() => "Action failed")); return response.json(); },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/trades/schedules"] }); setError(""); },
-    onError: (err: any) => setError(err?.message || "Action failed"),
+    // A billing 402 is stated once, by the billing banner; the form stays to create again (R1-T9).
+    onError: (err: any) => setError(isBillingCardRequired(err) ? "" : err?.message || "Action failed"),
   });
   const create = () => {
     const amountCents = Math.round(Number(form.amount) * 100);

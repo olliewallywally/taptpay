@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { NotificationProvider } from "@/components/notification-system";
+import { BILLING_CARD_REQUIRED_EVENT } from "@/lib/queryClient";
 import MerchantTerminalMobileV2 from "./merchant-terminal-mobile-v2";
 
 /*
@@ -38,15 +39,31 @@ jest.mock("@/features/terminal/retail/RetailTerminalView", () => {
           "button",
           {
             onClick: () => {
-              props.onCreateSale({ name: "Coffee", amount: 500, splitEnabled: false }, {}).catch(() => {});
+              // The real view keeps the typed sale when this rejects ("draft
+              // preserved"), so the outcome is recorded for the tests.
+              props.onCreateSale({ name: "Coffee", amount: 500, splitEnabled: false }, {}).then(
+                () => mockCreateOutcomes.push("resolved"),
+                () => mockCreateOutcomes.push("rejected"),
+              );
             },
           },
           "create sale",
+        ),
+        React.createElement(
+          "button",
+          {
+            onClick: () => {
+              props.onCreateSale({ name: "Coffee", amount: 500, splitEnabled: false }, { paywave: true, existing: true });
+            },
+          },
+          "tap to pay the pending sale",
         ),
       );
     },
   };
 });
+
+const mockCreateOutcomes: string[] = [];
 
 const mockToast = jest.fn();
 
@@ -67,6 +84,8 @@ const fetchMock = global.fetch as jest.Mock;
 const mockWriteText = jest.fn();
 let saleBodies: Record<string, unknown>[];
 let saleHandler: Handler;
+let tapToPayRequests: number;
+let tapToPayHandler: () => Response;
 let activeTransactionFixture: unknown;
 let taptStonesFixture: Array<{ id: number; name: string; stoneNumber: number }>;
 
@@ -101,17 +120,22 @@ function installFetchMock() {
       saleBodies.push(body);
       return saleHandler(body);
     }
+    if (method === "POST" && url === "/api/transactions/tap-to-pay") {
+      tapToPayRequests += 1;
+      return tapToPayHandler();
+    }
     throw new Error(`Unhandled test request: ${method} ${url}`);
   });
 }
 
-function renderTerminal() {
+function renderTerminal(seed?: (queryClient: QueryClient) => void) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false, staleTime: 0 },
       mutations: { retry: false },
     },
   });
+  seed?.(queryClient);
   Object.defineProperty(navigator, "clipboard", {
     configurable: true,
     value: { writeText: mockWriteText },
@@ -129,6 +153,9 @@ function renderTerminal() {
 beforeEach(() => {
   jest.clearAllMocks();
   saleBodies = [];
+  mockCreateOutcomes.length = 0;
+  tapToPayRequests = 0;
+  tapToPayHandler = () => jsonResponse({ approved: true });
   activeTransactionFixture = null;
   taptStonesFixture = [];
   saleHandler = () =>
@@ -284,5 +311,65 @@ describe("merchant-terminal-mobile-v2 per-payment link migration (gap 12)", () =
     await waitFor(() =>
       expect(screen.queryByTestId("share-link-overlay")).not.toBeInTheDocument(),
     );
+  });
+});
+
+/*
+ * R1-T9: a billing 402 states the required action once, in the banner the fetch
+ * layer raises (lib/queryClient.ts). The action adds no message of its own, and
+ * what was typed stays to send again.
+ */
+describe("a billing 402 on the phone retail terminal (R1-T9)", () => {
+  const BILLING_402 = {
+    code: "BILLING_CARD_REQUIRED",
+    message: "Your subscription needs attention before you can send payments. Open Billing in Settings.",
+  };
+  let banners: number;
+  const countBanner = () => { banners += 1; };
+  beforeEach(() => {
+    banners = 0;
+    window.addEventListener(BILLING_CARD_REQUIRED_EVENT, countBanner);
+  });
+  afterEach(() => {
+    window.removeEventListener(BILLING_CARD_REQUIRED_EVENT, countBanner);
+    delete (window as any).Capacitor;
+    delete (window as any).TaptPay;
+  });
+
+  it("a sale: the banner alone says so, and the sale stays to send again", async () => {
+    saleHandler = () => jsonResponse(BILLING_402, 402);
+    renderTerminal();
+    await screen.findByTestId("retail-terminal-view-stub");
+
+    fireEvent.click(screen.getByText("create sale"));
+
+    await waitFor(() => expect(mockCreateOutcomes).toEqual(["rejected"]));
+    expect(banners).toBe(1);
+    expect(screen.getAllByText("Subscription needs attention")).toHaveLength(1);
+    expect(mockToast).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("share-link-overlay")).not.toBeInTheDocument();
+  });
+
+  it("Tap to Pay on a pending sale: the banner alone says why, with no \"Payment Declined\" (no card was declined)", async () => {
+    const pendingSale = { id: 7, status: "pending", price: "5.00", itemName: "Coffee" };
+    activeTransactionFixture = pendingSale;
+    tapToPayHandler = () => jsonResponse(BILLING_402, 402);
+    const startTapToPay = jest.fn(async () => ({ approved: true, token: "card-token" }));
+    (window as any).Capacitor = { isNativePlatform: () => true, getPlatform: () => "ios" };
+    (window as any).TaptPay = { startTapToPay };
+    renderTerminal((queryClient) => {
+      queryClient.setQueryData(["/api/merchants", 1, "active-transaction"], pendingSale);
+    });
+    await screen.findByTestId("retail-terminal-view-stub");
+
+    fireEvent.click(screen.getByText("tap to pay the pending sale"));
+    expect(screen.getByTestId("tap-to-pay-overlay")).toBeInTheDocument();
+
+    await waitFor(() => expect(tapToPayRequests).toBe(1));
+    await waitFor(() => expect(screen.queryByTestId("tap-to-pay-overlay")).not.toBeInTheDocument());
+    expect(startTapToPay).toHaveBeenCalledTimes(1);
+    expect(banners).toBe(1);
+    expect(screen.queryByText("Payment Declined")).not.toBeInTheDocument();
+    expect(mockToast).not.toHaveBeenCalled();
   });
 });

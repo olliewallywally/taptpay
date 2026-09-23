@@ -2,7 +2,11 @@ import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { propFetch } from "@/lib/property-api";
 import { usePropertyTenants, usePropertyInvoices } from "@/lib/property-data";
-import { notifyIfBillingCardRequired } from "@/lib/queryClient";
+import {
+  BillingCardRequiredError,
+  isBillingCardRequired,
+  notifyIfBillingCardRequired,
+} from "@/lib/queryClient";
 import {
   PropertyTerminalView,
   type PropertyTerminalScreen,
@@ -100,7 +104,7 @@ export default function PropertyTerminal() {
         body: JSON.stringify({ tenantProfileId: tenantId, amountCents, deliveryChannel: channel, dueAt: due.toISOString(), splitEnabled: !!split }),
       });
       if (!r.ok) {
-        notifyIfBillingCardRequired(r);
+        if (notifyIfBillingCardRequired(r)) throw new BillingCardRequiredError();
         const message = await r.json().then((data: any) => data.message).catch(() => 'Failed to send');
         throw new Error(message);
       }
@@ -129,7 +133,12 @@ export default function PropertyTerminal() {
       setFrequency('once');
       setSplitMode(false);
     },
-    onError: (err: any) => { toast(err?.message || 'Failed to send'); },
+    /* A billing 402 is stated once, by the billing banner; nothing more here, and
+       the request stays to send again (R1-T9). */
+    onError: (err: any) => {
+      if (isBillingCardRequired(err)) return;
+      toast(err?.message || 'Failed to send');
+    },
   });
 
   const billMutation = useMutation({
@@ -144,7 +153,7 @@ export default function PropertyTerminal() {
         }),
       });
       if (!r.ok) {
-        notifyIfBillingCardRequired(r);
+        if (notifyIfBillingCardRequired(r)) throw new BillingCardRequiredError();
         const msg = await r.json().then((d: any) => d.message).catch(() => 'Failed to send bill');
         throw new Error(msg);
       }
@@ -159,7 +168,10 @@ export default function PropertyTerminal() {
       setSplitMode(false);
       setChargeDocUrl(null); setChargeDocName('');
     },
-    onError: (err: any) => { toast(err?.message || 'Failed to send bill'); },
+    onError: (err: any) => {
+      if (isBillingCardRequired(err)) return;
+      toast(err?.message || 'Failed to send bill');
+    },
   });
 
   const scheduleActionMutation = useMutation({
@@ -230,10 +242,14 @@ export default function PropertyTerminal() {
         if (!inv) return 'skipped';
         try {
           const r = await fetch(`/api/property/invoices/${inv.id}/resend`, { method: 'POST', headers: propHeaders() });
+          if (notifyIfBillingCardRequired(r)) return 'billing';
           return r.ok ? 'sent' : 'failed';
         } catch { return 'failed'; }
       }));
-      return outcomes;
+      /* Refused for billing and nothing resent: the billing banner says why, and
+         the batch stays open to send again (R1-T9). */
+      if (outcomes.includes('billing') && !outcomes.includes('sent')) throw new BillingCardRequiredError();
+      return outcomes.map(outcome => outcome === 'billing' ? 'failed' : outcome);
     },
     onSuccess: (outcomes: string[]) => {
       queryClient.invalidateQueries({ queryKey: ['/api/property/invoices'] });
@@ -247,7 +263,10 @@ export default function PropertyTerminal() {
       triggerConveyor(screen, 'down');
       setScreen('home');
     },
-    onError: () => { toast('Batch resend failed'); },
+    onError: (e) => {
+      if (isBillingCardRequired(e)) return;
+      toast('Batch resend failed');
+    },
   });
 
   // Cancel (void) a single invoice/charge — from the row action sheet.
@@ -268,11 +287,17 @@ export default function PropertyTerminal() {
   const resendOneMutation = useMutation({
     mutationFn: async (invoiceId: string) => {
       const r = await fetch(`/api/property/invoices/${invoiceId}/resend`, { method: 'POST', headers: propHeaders() });
-      if (!r.ok) throw new Error('Failed to resend');
+      if (!r.ok) {
+        if (notifyIfBillingCardRequired(r)) throw new BillingCardRequiredError();
+        throw new Error('Failed to resend');
+      }
       return r.json();
     },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['/api/property/invoices'] }); setBanner('Link resent'); },
-    onError: () => { toast('Could not resend link'); },
+    onError: (e) => {
+      if (isBillingCardRequired(e)) return;
+      toast('Could not resend link');
+    },
   });
 
   /* Helpers */
