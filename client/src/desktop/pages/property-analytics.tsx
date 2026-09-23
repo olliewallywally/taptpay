@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentMerchantId } from "@/lib/auth";
 import {
   usePropertyInvoices,
@@ -160,7 +160,11 @@ export default function DesktopPropertyAnalytics(props: DesktopRoutePageProps) {
      yet, the screen says so and draws no figure, chart or history from the empty
      fallbacks below; a failed background refresh keeps what is already shown.
      Reports and exports are built from the payments, the tenants and the rent
-     schedules, so they wait for all three. */
+     schedules, so they wait for all three, and are generated only from loaded
+     data — never from those fallbacks while a request is still loading or after
+     it failed. An export also prints the business name and, when the business is
+     GST-registered, a GST line, both from the business details, so it waits for
+     those as well; the on-screen reports use neither. */
   const paymentsUnavailable = invoicesQuery.isError && invoicesQuery.data === undefined;
   const tenantsUnavailable = tenantsQuery.isError && tenantsQuery.data === undefined;
   const schedulesUnavailable = schedulesQuery.isError && schedulesQuery.data === undefined;
@@ -172,7 +176,24 @@ export default function DesktopPropertyAnalytics(props: DesktopRoutePageProps) {
         ? "Available once your rent schedules load"
         : undefined;
   const reportsUnavailable = reportsUnavailableHint !== undefined;
+  const reportsReady =
+    invoicesQuery.data !== undefined &&
+    tenantsQuery.data !== undefined &&
+    schedulesQuery.data !== undefined;
+  const profileUnavailable = merchantQuery.isError && merchantQuery.data === undefined;
+  const exportUnavailableHint =
+    reportsUnavailableHint ??
+    (profileUnavailable ? "Available once your business details load" : undefined);
+  const exportUnavailable = exportUnavailableHint !== undefined;
+  const exportReady = reportsReady && merchantQuery.data !== undefined;
   const retryPayments = () => { void invoicesQuery.refetch(); };
+
+  /* An export asked for while the data was loading opens once it has loaded. If
+     a source fails instead, the request is dropped, so it cannot pop up after a
+     later retry. */
+  useEffect(() => {
+    if (exportUnavailable) setExportOpen(false);
+  }, [exportUnavailable]);
   const tenants = (tenantsQuery.data ?? []) as PropertyTenant[];
   const invoices = (invoicesQuery.data ?? []) as Invoice[];
   const schedules = (schedulesQuery.data ?? []) as PropertySchedule[];
@@ -627,8 +648,8 @@ export default function DesktopPropertyAnalytics(props: DesktopRoutePageProps) {
                     type="button"
                     className="pa-btn-white"
                     onClick={() => setExportOpen(true)}
-                    disabled={reportsUnavailable}
-                    title={reportsUnavailableHint}
+                    disabled={exportUnavailable}
+                    title={exportUnavailableHint}
                   >
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={INK} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 4v10M8 10l4 4 4-4" /><path d="M5 19h14" /></svg>
                     <span>Export</span>
@@ -771,7 +792,7 @@ export default function DesktopPropertyAnalytics(props: DesktopRoutePageProps) {
                     type="button"
                     className="pa-generate"
                     onClick={generate}
-                    disabled={reportsUnavailable}
+                    disabled={!reportsReady}
                     title={reportsUnavailableHint}
                   >
                     Generate Report
@@ -786,7 +807,7 @@ export default function DesktopPropertyAnalytics(props: DesktopRoutePageProps) {
         </div>
       </div>
 
-      {exportOpen && (
+      {exportOpen && exportReady && (
         <ReportModal
           title="Property Reports"
           options={PROPERTY_REPORT_OPTIONS}

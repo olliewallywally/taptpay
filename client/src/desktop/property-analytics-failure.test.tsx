@@ -3,7 +3,10 @@
  * used to turn a failed payments request into "$0.00 total revenue", "$0.00
  * outstanding payments", a flat chart and "no payments in this period", with
  * Reports and Export live. Reports and exports are also built from the tenants
- * and the rent schedules, so they wait for those too.
+ * and the rent schedules, so they wait for those too, and are made only from
+ * loaded data: one asked for while a request is still loading waits for it, and
+ * one asked for before a failure is not offered on the failed data. An export
+ * also waits for the business details (its header and GST line).
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, within } from "@testing-library/react";
@@ -32,14 +35,20 @@ const INVOICES = [
 const SCHEDULES = [{ id: "s1", tenantProfileId: "t1", amountCents: 80_000, frequency: "monthly", status: "active" }];
 
 type Answer = () => Response | Promise<Response>;
-/** Answers the three property requests as given; the rest as a working day would. */
-function serve({ invoices = () => reply(INVOICES), tenants = () => reply(TENANTS), schedules = () => reply(SCHEDULES) }: { invoices?: Answer; tenants?: Answer; schedules?: Answer }) {
+const PROFILE = { id: 77, businessName: "Test Rentals", gstRegistered: true };
+/** Answers the three property requests and the business details as given; the rest as a working day would. */
+function serve({
+  invoices = () => reply(INVOICES),
+  tenants = () => reply(TENANTS),
+  schedules = () => reply(SCHEDULES),
+  profile = () => reply(PROFILE),
+}: { invoices?: Answer; tenants?: Answer; schedules?: Answer; profile?: Answer }) {
   fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
     const url = String(input);
     if (url === "/api/property/invoices") return invoices();
     if (url === "/api/property/tenants") return tenants();
     if (url === "/api/property/schedules") return schedules();
-    if (url === "/api/merchants/77/profile") return reply({ id: 77, businessName: "Test Rentals" });
+    if (url === "/api/merchants/77/profile") return profile();
     return reply([]);
   });
 }
@@ -129,6 +138,61 @@ describe("property analytics when payments fail to load (R1-T9)", () => {
     expect(screen.getByRole("button", { name: "Generate Report" })).toBeDisabled();
   });
 
+  it("an export opened while payments were loading is not offered once they fail, nor after Try again", async () => {
+    let calls = 0;
+    let fail: (answer: Response) => void = () => undefined;
+    serve({
+      invoices: () =>
+        calls++ === 0 ? new Promise<Response>((resolve) => { fail = resolve; }) : reply(INVOICES),
+    });
+    renderPage();
+    await settle();
+
+    await userEvent.click(exportButton());
+    await act(async () => { fail(outage()); });
+    await settle();
+
+    expect(screen.queryByText("Property Reports")).toBeNull(); // no export from payments that failed
+    expect(exportButton()).toBeDisabled();
+
+    await userEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Try again" }));
+    await settle();
+    expect(document.querySelector(".pa-hero")).toHaveTextContent("$800.00");
+    expect(screen.queryByText("Property Reports")).toBeNull(); // the abandoned export does not pop up
+  });
+
+  it("while loading, a report cannot be generated and an export waits for the data", async () => {
+    let answer: (response: Response) => void = () => undefined;
+    serve({ invoices: () => new Promise<Response>((resolve) => { answer = resolve; }) });
+    renderPage();
+    await settle();
+
+    await userEvent.click(reports());
+    await userEvent.click(document.querySelector(".pa-tile") as HTMLElement);
+    expect(screen.getByRole("button", { name: "Generate Report" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "All Reports" }));
+    await userEvent.click(screen.getByRole("button", { name: "Payment History" }));
+    await userEvent.click(exportButton());
+    expect(screen.queryByText("Property Reports")).toBeNull(); // not built from payments still loading
+
+    await act(async () => { answer(reply(INVOICES)); });
+    await settle();
+    expect(screen.getByText("Property Reports")).toBeInTheDocument(); // the click was not lost
+  });
+
+  it.each([
+    ["tenants", { tenants: () => new Promise<Response>(() => undefined) }],
+    ["rent schedules", { schedules: () => new Promise<Response>(() => undefined) }],
+  ])("while the %s are still loading, a report cannot be generated", async (_source, pending) => {
+    serve(pending);
+    renderPage();
+    await settle();
+
+    await userEvent.click(reports());
+    await userEvent.click(document.querySelector(".pa-tile") as HTMLElement);
+    expect(screen.getByRole("button", { name: "Generate Report" })).toBeDisabled();
+  });
+
   it("while loading shows neither a figure nor a failure", async () => {
     serve({ invoices: () => new Promise<Response>(() => undefined) }); // never answers
     renderPage();
@@ -174,5 +238,46 @@ describe("property analytics when tenants or rent schedules fail to load (R1-T9)
     expect(reports()).toBeDisabled();
     expect(exportButton()).toBeDisabled();
     expect(reports()).toHaveAttribute("title", "Available once your rent schedules load");
+  });
+});
+
+/* An export prints the business name and, for the annual income statement, a GST
+   line only when the business is GST-registered: both from the business details.
+   The on-screen reports use neither. */
+describe("property analytics when the business details fail to load (R1-T9)", () => {
+  it("the totals and Reports still work; Export waits for the business details", async () => {
+    serve({ profile: outage });
+    renderPage();
+    await settle();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(document.querySelector(".pa-hero")).toHaveTextContent("$800.00");
+    expect(reports()).toBeEnabled();
+    expect(exportButton()).toBeDisabled();
+    expect(exportButton()).toHaveAttribute("title", "Available once your business details load");
+  });
+
+  it("an export asked for while they were loading waits for them, is not offered if they fail, and does not pop up once they load", async () => {
+    let calls = 0;
+    let answer: (response: Response) => void = () => undefined;
+    serve({
+      profile: () =>
+        calls++ === 0 ? new Promise<Response>((resolve) => { answer = resolve; }) : reply(PROFILE),
+    });
+    const client = renderPage();
+    await settle();
+
+    await userEvent.click(exportButton());
+    expect(screen.queryByText("Property Reports")).toBeNull();
+    await act(async () => { answer(outage()); });
+    await settle();
+    expect(screen.queryByText("Property Reports")).toBeNull();
+    expect(exportButton()).toBeDisabled();
+
+    await act(async () => {
+      await client.refetchQueries({ queryKey: ["/api/merchants", 77, "profile"] });
+    });
+    await settle();
+    expect(exportButton()).toBeEnabled();
+    expect(screen.queryByText("Property Reports")).toBeNull(); // the abandoned export does not pop up
   });
 });
