@@ -455,7 +455,16 @@ and deleted at the end. Decision: `docs/decisions/2026-09-21-r1-t4-t9-owner-answ
     fetch now throws (it read a failure as null → defaults shown as the merchant's own); schedules
     say so. Test 9 (red 6/9) + 45 existing, mutations 15/15, client 76/656; loaded views match
     `568d85c9`. User asked mid-task (04:5x) "what page of the plan": PDF p. 29 of 72 (R1-T9).
-  - [ ] trades analytics; [ ] trades terminal; [ ] settings ×3.
+  - [x] trades analytics, **`64e12ef8`**: payments fail → alert + Try again, no chart, sheet
+    failure; Reports / Export / Generate wait for payments, clients and quotes; clients fail →
+    rows keep their payments, "client names didn't load" + try again above them (names come from
+    the clients request). Reports and exports only from loaded data: Generate off while loading,
+    the export dialog opens once loaded and a pending one is dropped on a failure. Test 11 (red
+    8/11: the 8 the previous session wrote, never run, plus 3), mutations 18/18, client 77/667;
+    loaded views match `c3dab4a8`. Worktree moved to `c3dab4a8`. Resumed 07:52 after the 04:41
+    usage-limit stop.
+  - [ ] retail + property analytics: Generate off while loading, export dialog only on loaded data
+    (the gaps found on trades analytics); [ ] trades terminal; [ ] settings ×3.
   - Screenshots: `npx vite build --outDir <dir>` (default is dist/public, untracked) and `npx vite
     preview`, then `scripts/capture-r1-t9-failure-states.mjs` (add each screen to SCREENS). The
     "before" build comes from a worktree at `e4c25fb1` (the rollout's base).
