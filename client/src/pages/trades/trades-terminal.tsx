@@ -319,6 +319,8 @@ export default function TradesTerminal() {
       setSelectedClient(null);
       setRowAction(null);
     },
+    // A failure said nothing, so the payment looked recorded (R1-T9); what was typed stays.
+    onError: () => { toast('Could not mark as received'); },
   });
 
   // Cancel (void) a single job invoice — from the row action sheet.

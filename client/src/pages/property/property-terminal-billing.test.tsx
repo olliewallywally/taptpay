@@ -5,7 +5,7 @@
  *
  * PropertyTerminalView is stubbed with buttons that call the page's real
  * callbacks, and it shows the page's own toast and banner lines, so the page's
- * handling is what is tested.
+ * handling is what is tested. The last block: any other failed action says so.
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -42,6 +42,7 @@ jest.mock("@/features/terminal/property/PropertyTerminalView", () => {
         button("open batch", () => props.onNavigate("batch")),
         button("resend all", () => props.onBatchSend(["tenant-mia"])),
         button("resend both", () => props.onBatchSend(["tenant-mia", "tenant-leo"])),
+        button("mark received", () => props.onMarkExternal("inv-1", "ANZ 4471")),
         React.createElement("output", { "data-testid": "toast" }, props.toastMessage ?? ""),
         React.createElement("output", { "data-testid": "page-banner" }, props.banner ?? ""),
       );
@@ -81,6 +82,7 @@ beforeEach(() => {
       return reply(BILLING_402, 402);
     }
     if (method === "POST" && url === "/api/property/invoices/inv-2/resend") return reply({});
+    if (method === "POST" && url === "/api/property/invoices/inv-1/mark-paid-external") return reply({ message: "nope" }, 500);
     throw new Error(`Unhandled test request: ${method} ${url}`);
   });
 });
@@ -177,5 +179,19 @@ describe("a billing 402 on the phone property terminal (R1-T9)", () => {
     expect(banners).toBe(1);
     expect(screen.getByTestId("page-banner")).toHaveTextContent("Resent 1 · 1 failed");
     expect(screen.getByTestId("toast")).toBeEmptyDOMElement();
+  });
+});
+
+/* R1-T9: a failed action says so. Marking a payment received showed nothing when it
+   failed; the merchant could not tell it had not been recorded. */
+describe("a failed action on the phone property terminal says so (R1-T9)", () => {
+  it("marking a payment received: a failure is reported", async () => {
+    const { queryClient } = renderTerminal();
+    fireEvent.click(screen.getByText("mark received"));
+
+    await settled(queryClient);
+    expect(writes).toEqual(["POST /api/property/invoices/inv-1/mark-paid-external"]);
+    expect(screen.getByTestId("toast")).toHaveTextContent("Could not mark as received");
+    expect(banners).toBe(0);
   });
 });

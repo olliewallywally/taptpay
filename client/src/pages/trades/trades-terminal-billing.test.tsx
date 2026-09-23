@@ -5,7 +5,8 @@
  *
  * The terminal and quote views are stubbed with buttons that call the pages'
  * real callbacks and show the pages' own error, toast and banner lines, so the
- * pages' handling is what is tested. The recurring page renders for real.
+ * pages' handling is what is tested. The recurring page renders for real. The
+ * last block: any other failed action says so.
  */
 import type { ReactElement } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -56,6 +57,7 @@ jest.mock("@/features/terminal/trades/TradesTerminalView", () => {
         button("send invoice", () => props.onSendInvoice()),
         button("open deposit row", () => props.onRowTap(props.invoices.find((invoice: any) => invoice.id === "inv-dep"))),
         button("send balance", () => props.onSendBalance(false)),
+        button("mark received", () => props.onMarkExternal("inv-dep", "ANZ 4471")),
         React.createElement("output", { "data-testid": "toast" }, props.toastMessage ?? ""),
         React.createElement("output", { "data-testid": "page-banner" }, props.banner ?? ""),
       );
@@ -104,6 +106,7 @@ beforeEach(() => {
     if (method === "GET" && url === "/api/auth/me") return reply({ user: { gstRegistered: false } });
     writes.push(`${method} ${url}`);
     if (GATED.includes(`${method} ${url}`)) return reply(BILLING_402, 402);
+    if (method === "POST" && url === "/api/trades/invoices/inv-dep/mark-paid-external") return reply({ message: "nope" }, 500);
     throw new Error(`Unhandled test request: ${method} ${url}`);
   });
 });
@@ -188,5 +191,19 @@ describe("a billing 402 on the phone trades screens (R1-T9)", () => {
     expect(screen.queryByText(/subscription|Open Billing|Action failed/i)).toBeNull();
     expect(clientSelect).toHaveValue("client-1");
     expect(screen.getByPlaceholderText("Amount")).toHaveValue("1200");
+  });
+});
+
+/* R1-T9: a failed action says so. Marking a job payment received showed nothing
+   when it failed; the merchant could not tell it had not been recorded. */
+describe("a failed action on the phone trades terminal says so (R1-T9)", () => {
+  it("marking a payment received: a failure is reported", async () => {
+    const queryClient = renderPage(<TradesTerminal />);
+    fireEvent.click(screen.getByText("mark received"));
+
+    await settled(queryClient);
+    expect(writes).toEqual(["POST /api/trades/invoices/inv-dep/mark-paid-external"]);
+    expect(screen.getByTestId("toast")).toHaveTextContent("Could not mark as received");
+    expect(banners).toBe(0);
   });
 });

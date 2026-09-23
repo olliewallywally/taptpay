@@ -229,6 +229,8 @@ export default function PropertyTerminal() {
       setScreen('home');
       setSelectedTenant(null);
     },
+    // A failure said nothing, so the payment looked recorded (R1-T9); what was typed stays.
+    onError: () => { toast('Could not mark as received'); },
   });
 
   const batchMutation = useMutation({
