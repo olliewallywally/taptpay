@@ -483,7 +483,11 @@ and deleted at the end. Decision: `docs/decisions/2026-09-21-r1-t4-t9-owner-answ
     was cached under the shared profile key → exports would read it as loaded). Test 16 (red
     10/16), mutations 30/30, client 80/709, loaded views match `c3dab4a8` (5 screens). Also
     **`0f748fde`**: desktop quick invoice "add client" URL had no id (since 41267fb7).
-  - [ ] settings ×3 (DesktopSettingsPage: retail, property, trades).
+  - [x] settings (one DesktopSettingsPage for all three) **`6dd7bc68`**: business details (blank
+    form whose Save overwrites; "Your Business" PENDING), access (owner told the owner manages),
+    plan (default plan + disclosures + actions), card ("Add payment method"). DesktopLoadFailure
+    gains tone "panel". Test 11 (red 7/9 +2), mutations 28/28, client 81/720, loaded views match.
+  - [ ] R1-T9 other items: mutations pending / keep input / no double submit; 402 banners.
   - Screenshots: `npx vite build --outDir <dir>` (default is dist/public, untracked) and `npx vite
     preview`, then `scripts/capture-r1-t9-failure-states.mjs` (add each screen to SCREENS). The
     "before" build comes from a worktree at `e4c25fb1` (the rollout's base).
