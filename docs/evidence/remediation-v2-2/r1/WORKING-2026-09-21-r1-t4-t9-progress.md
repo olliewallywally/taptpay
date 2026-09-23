@@ -324,8 +324,52 @@ and deleted at the end. Decision: `docs/decisions/2026-09-21-r1-t4-t9-owner-answ
     confirmed by the address's owner signs in with the stranger's password (pre-existing). The note
     was reworded to point at neither confirming nor resending; reported to the owner.
   - committed `8fdb63e0` (12 files, explicit paths); decision, evidence, screenshot, ledger after it.
-- [ ] 5 — B: the `TRUST_PROXY_HOPS` setting (off by default) and spoofed-header tests, **plus the
+- [x] 5 — B: the `TRUST_PROXY_HOPS` setting (off by default) and spoofed-header tests, **plus the
   address-keyed limits moved here from C**: per-address buckets for sign-in (refunded on success,
   never cleared), forgot-password and the Google callback — active only when the setting says the
   client address is real.
+  - **started 2026-09-23 (owner: "then start phase B").** Found, mapping it:
+    - no `trust proxy` anywhere;
+    - `getBaseUrl` reads raw `X-Forwarded-Proto`/`-Host` when no origin is configured (dev only:
+      production requires PUBLIC_ORIGIN);
+    - 9 `req.ip` uses: sign-in logs, the in-memory `checkRateLimit` (sign-up, pay-return,
+      nfc-capabilities, SSE), `paymentTokenRateLimiter`. With the setting off these stay one
+      bucket for everyone, as today; once it is on, per visitor. Not changed.
+  - **design:**
+    - `TRUST_PROXY_HOPS`: unset = unknown (trust nothing, address limits off); `0` = no proxy
+      (the connection is the visitor); `1`–`9` = trust that many hops. Anything else fails config.
+    - `registerRoutes` sets `trust proxy` to N when N > 0 (index.ts, the harness and the probes
+      alike).
+    - `getBaseUrl`'s fallback uses `req.protocol` (believes X-Forwarded-Proto only from a trusted
+      proxy) and the Host header, never raw `X-Forwarded-*`.
+    - `clientAddressForLimits(req)` (`server/client-address.ts`): null while unset; IPv4-mapped →
+      IPv4; IPv6 grouped by /64.
+    - Address buckets, HMAC-keyed like the others:
+      - `signin-address` / `admin-signin-address`: free 50, 30 s doubling to 15 min, forget 1 h.
+        Not charged for a device known to that email (phase C's promise: no one else's guesses
+        keep a merchant's device out). A success gives its count back (void), never clears.
+      - `reset-address`: free 10, 1 min to 30 min, forget 1 h.
+      - `google-address`: free 20, 30 s to 15 min, forget 1 h. Taken after the state check,
+        before Google is asked; a success gives its count back; cancels and bad states are never
+        counted.
+    - `GET /api/admin/request-origin` (admin-only): the caller's own request (forwarded chain,
+      connection address, the address and protocol the app takes), and which address each hop
+      count would take. It is the tool for the owner's live check (Q4) and the tests' observable.
+  - **red first, on `fa0b0230`: 20 fail, each for its reason:**
+    - config ×12: no `trustProxyHops`; nothing refused;
+    - the diagnostic ×3: 404;
+    - sign-in and admin sign-in: 401 where the 51st should wait;
+    - forgot-password: 200 at the 11th;
+    - Google: the 21st still asks Google;
+    - the reset link: `https://evil.test/reset-password?token=…` from a forged X-Forwarded-Host.
+    - Guards passing on both: cancels and bad states are never counted; with the setting off, 25
+      callbacks from one address all reach Google.
+  - **done 2026-09-23, `ce3c13de`:**
+    - tsc clean; server 76/1420 (+36), client 71/623; phase B and route suites 149/149.
+    - Route inventory regenerated (0 unclassified): a fresh generation on `fa0b0230` already called
+      `POST /api/auth/google/session` "unclassified" (phase A hand-set "public"), so it joined
+      `PUBLIC_PATH_ALLOWLIST`. The drifted documentation table was regenerated with it.
+    - Evidence `R1-T4-phase-B-trusted-proxy-2026-09-23.md`, with the owner's live-check steps (§5).
+    - Trap: a background `(…) &` inside a sandboxed Bash call dies with the call. Use the tool's
+      run_in_background.
 - [ ] 6
