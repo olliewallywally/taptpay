@@ -13,9 +13,9 @@ import {
   subscriptionCardSessionState,
 } from "./storage";
 import { TUTORIAL_PAGE_KEYS, isTutorialPageKey } from "@shared/tutorial";
-import { inviteTeamMemberSchema, acceptInviteSchema, retailTransactionCreateRequestSchema, updateMerchantDetailsSchema, updateThemeSchema, updateDailyGoalSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema, pushNotificationPreferencesSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createClientProfileSchema, updateClientProfileSchema, createQuoteSchema, acceptQuoteSchema, createJobInvoiceSchema, markJobPaidExternalSchema, createJobScheduleSchema, updateJobScheduleSchema, updateTradeReminderSettingsSchema, updateTradeGstSettingsSchema } from "@shared/schema";
+import { inviteTeamMemberSchema, acceptInviteSchema, retailTransactionCreateRequestSchema, updateMerchantDetailsSchema, updateThemeSchema, updateDailyGoalSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, changePasswordSchema, newPasswordSchema, createRefundSchema, insertRefundSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema, pushNotificationPreferencesSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createClientProfileSchema, updateClientProfileSchema, createQuoteSchema, acceptQuoteSchema, createJobInvoiceSchema, markJobPaidExternalSchema, createJobScheduleSchema, updateJobScheduleSchema, updateTradeReminderSettingsSchema, updateTradeGstSettingsSchema } from "@shared/schema";
 import { windcaveService, isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, getWindcaveEnv, submitGooglePayToken, createAttendedSession, submitTapToPayToken, createCardStorageSession, queryStoredCardSession, chargeStoredCard } from "./windcave";
-import { authenticateUser, generateToken, authenticateToken, createUser, issueTokenForUserId, tokenForUserRow, isAccountOwner, requestPasswordReset, resetPassword, validateResetToken, type AuthenticatedRequest, logSecurityEvent, syncVerifiedMerchants } from "./auth";
+import { authenticateUser, checkPasswordEvenly, passwordCheckBudget, generateToken, authenticateToken, createUser, issueTokenForUserId, tokenForUserRow, isAccountOwner, requestPasswordReset, resetPassword, validateResetToken, type AuthenticatedRequest, logSecurityEvent, syncVerifiedMerchants } from "./auth";
 import {
   HANDOFF_CODE_TTL_MS, clearSignInCookie, googleVerifiedEmail, handoffCodeHash, newHandoffCode, readCookie,
   signInCookies, startGoogleSignIn, verifyGoogleSignInState,
@@ -898,7 +898,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const validation = resetPasswordSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ message: "Invalid reset data", errors: validation.error.errors });
+        return res.status(400).json({
+          message: validation.error.issues[0]?.message ?? "Invalid reset data",
+          errors: validation.error.errors,
+        });
       }
 
       const { token, password } = validation.data;
@@ -968,20 +971,24 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // Check for admin credentials
       const adminEmail = config.admin.email;
       const adminPasswordHash = config.admin.passwordHash;
-      let passwordValid = false;
-
-      if (adminEmail && email === adminEmail) {
-        if (!adminPasswordHash) {
-          await storage.settleAuthThrottle([bucket], "void", new Date()).catch(() => undefined);
-          console.error("CRITICAL: ADMIN_PASSWORD_HASH env var not set. Admin login disabled.");
-          return res.status(500).json({ message: "Admin login unavailable - contact system administrator" });
-        }
-        try {
-          passwordValid = await bcrypt.compare(password, adminPasswordHash);
-        } catch (error) {
-          await storage.settleAuthThrottle([bucket], "void", new Date()).catch(() => undefined);
-          throw error;
-        }
+      const isAdminEmail = !!adminEmail && email === adminEmail;
+      if (isAdminEmail && !adminPasswordHash) {
+        await storage.settleAuthThrottle([bucket], "void", new Date()).catch(() => undefined);
+        console.error("CRITICAL: ADMIN_PASSWORD_HASH env var not set. Admin login disabled.");
+        return res.status(500).json({ message: "Admin login unavailable - contact system administrator" });
+      }
+      let passwordValid: boolean;
+      try {
+        // The same work for any email as for the admin's (owner decision
+        // 2026-09-23), so the time taken does not point at the admin's email.
+        passwordValid = await checkPasswordEvenly(
+          password,
+          isAdminEmail ? adminPasswordHash : null,
+          passwordCheckBudget(adminPasswordHash),
+        );
+      } catch (error) {
+        await storage.settleAuthThrottle([bucket], "void", new Date()).catch(() => undefined);
+        throw error;
       }
 
       if (!passwordValid) {
@@ -3630,6 +3637,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!password) {
         return res.status(400).json({ message: "Password is required for activation" });
       }
+      // The rule every new password meets (owner decision 2026-09-23).
+      const checked = newPasswordSchema.safeParse(password);
+      if (!checked.success) {
+        return res.status(400).json({ message: checked.error.issues[0]?.message });
+      }
 
       const merchant = await storage.getMerchant(merchantId);
       if (!merchant) {
@@ -3640,7 +3652,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(400).json({ message: "Merchant already verified" });
       }
 
-      const passwordHash = await bcrypt.hash(password, 12);
+      const passwordHash = await bcrypt.hash(checked.data, 12);
       const updatedMerchant = await storage.verifyMerchant(merchant.verificationToken || '', passwordHash);
 
       if (!updatedMerchant) {
@@ -3713,9 +3725,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const validation = changePasswordSchema.safeParse(req.body);
       
       if (!validation.success) {
-        return res.status(400).json({ 
-          message: "Validation failed", 
-          errors: validation.error.errors 
+        return res.status(400).json({
+          message: validation.error.issues[0]?.message ?? "Validation failed",
+          errors: validation.error.errors,
         });
       }
 
@@ -5094,9 +5106,14 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           message: "Token and password are required"
         });
       }
+      // The rule every new password meets (owner decision 2026-09-23).
+      const checked = newPasswordSchema.safeParse(password);
+      if (!checked.success) {
+        return res.status(400).json({ message: checked.error.issues[0]?.message });
+      }
 
       // Hash the password
-      const passwordHash = await bcrypt.hash(password, 12);
+      const passwordHash = await bcrypt.hash(checked.data, 12);
 
       // Verify the merchant
       const merchant = await storage.verifyMerchant(token, passwordHash);
@@ -5106,7 +5123,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       // Create user account for the verified merchant
       try {
-        await createUser(merchant.email, password, merchant.id, 'merchant');
+        await createUser(merchant.email, checked.data, merchant.id, 'merchant');
         console.log("User account created successfully for merchant:", merchant.email);
       } catch (error) {
         console.error("Error creating user account:", error);
@@ -5495,9 +5512,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       const validation = createMerchantSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ 
-          message: "Invalid input", 
-          errors: validation.error.issues 
+        return res.status(400).json({
+          message: validation.error.issues[0]?.message ?? "Invalid input",
+          errors: validation.error.issues,
         });
       }
 
@@ -6963,7 +6980,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const parsed = acceptInviteSchema.safeParse(req.body);
       if (!parsed.success) {
-        return res.status(400).json({ message: "Invalid invite details", errors: parsed.error.errors });
+        return res.status(400).json({
+          message: parsed.error.issues[0]?.message ?? "Invalid invite details",
+          errors: parsed.error.errors,
+        });
       }
 
       const tokenHash = crypto.createHash("sha256").update(parsed.data.token).digest("hex");

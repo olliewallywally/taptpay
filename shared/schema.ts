@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { planIdSchema } from "./plans";
+import { PASSWORD_RULE, meetsPasswordRule } from "./password-rule";
 
 /**
  * Login identities. One row per person who can sign in, so a merchant on a
@@ -426,6 +427,9 @@ export const createRefundSchema = z.object({
   refundMethod: z.enum(["original_payment_method", "bank_transfer", "manual"]).default("original_payment_method"),
 });
 
+// Every new password meets the owner's rule (shared/password-rule.ts, 2026-09-23).
+export const newPasswordSchema = z.string().refine(meetsPasswordRule, PASSWORD_RULE);
+
 export const publicSignupSchema = z.object({
   name: z.string().min(1, "Full name is required").max(100),
   email: z.string().email("Valid email is required"),
@@ -440,11 +444,7 @@ export const publicSignupSchema = z.object({
   websiteUrl: z.union([z.string().url("Enter a valid website URL"), z.literal("")]).default(""),
   estimatedAnnualTurnover: z.enum(["Under $50k", "$50k–$150k", "$150k–$500k", "$500k–$1m", "Over $1m"]),
   planId: planIdSchema.default("solo"),
-  password: z.string()
-    .min(8, "Password must be at least 8 characters")
-    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
-    .regex(/[a-z]/, "Password must contain at least one lowercase letter")
-    .regex(/[0-9]/, "Password must contain at least one number"),
+  password: newPasswordSchema,
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
@@ -459,11 +459,7 @@ export const inviteTeamMemberSchema = z.object({
 export const acceptInviteSchema = z.object({
   token: z.string().min(1, "Invite token is required"),
   name: z.string().max(100).optional(),
-  password: z.string()
-    .min(8, "Password must be at least 8 characters")
-    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
-    .regex(/[a-z]/, "Password must contain at least one lowercase letter")
-    .regex(/[0-9]/, "Password must contain at least one number"),
+  password: newPasswordSchema,
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
@@ -493,11 +489,7 @@ export const createMerchantSchema = z.object({
   ),
   phone: z.string().min(1, "Phone number is required").max(20),
   address: z.string().min(1, "Address is required").max(200),
-  password: z.string()
-    .min(8, "Password must be at least 8 characters")
-    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
-    .regex(/[a-z]/, "Password must contain at least one lowercase letter")
-    .regex(/[0-9]/, "Password must contain at least one number"),
+  password: newPasswordSchema,
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
@@ -506,11 +498,7 @@ export const createMerchantSchema = z.object({
 
 export const verifyMerchantSchema = z.object({
   token: z.string().min(1, "Verification token is required"),
-  password: z.string()
-    .min(8, "Password must be at least 8 characters")
-    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
-    .regex(/[a-z]/, "Password must contain at least one lowercase letter")
-    .regex(/[0-9]/, "Password must contain at least one number"),
+  password: newPasswordSchema,
   confirmPassword: z.string().min(1, "Password confirmation is required"),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
@@ -534,7 +522,7 @@ export const updateDailyGoalSchema = z.object({
 
 export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, "Current password is required"),
-  newPassword: z.string().min(6, "New password must be at least 6 characters"),
+  newPassword: newPasswordSchema,
   confirmPassword: z.string(),
 }).refine((data) => data.newPassword === data.confirmPassword, {
   message: "Passwords don't match",
@@ -584,8 +572,8 @@ export const forgotPasswordSchema = z.object({
 
 export const resetPasswordSchema = z.object({
   token: z.string().min(1, "Reset token is required"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
-  confirmPassword: z.string().min(6, "Password confirmation is required"),
+  password: newPasswordSchema,
+  confirmPassword: z.string().min(1, "Password confirmation is required"),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],

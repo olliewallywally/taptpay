@@ -134,4 +134,52 @@ describe("merchant signup plan selection", () => {
     });
     expect(setLocation).toHaveBeenCalledWith("/check-email?email=jamie%40example.test&id=42");
   });
+
+  // Owner decision 2026-09-23: 8+ characters, a capital letter, and a number or symbol.
+  it("holds the password to the rule, in its words, and takes a symbol in place of a number", async () => {
+    const RULE = "Use at least 8 characters, including a capital letter and a number or symbol.";
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    const user = userEvent.setup();
+    const clickNext = async () => {
+      const button = screen.getByTestId("signup-next");
+      await waitFor(() => expect(button).toBeEnabled());
+      await user.click(button);
+    };
+    // A field's error is part of its label, so match the label by its start.
+    const choosePassword = async (password: string) => {
+      for (const label of [/^Create password/, /^Confirm password/]) {
+        await user.clear(screen.getByLabelText(label));
+        await user.type(screen.getByLabelText(label), password);
+      }
+    };
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MerchantSignup />
+      </QueryClientProvider>,
+    );
+
+    await user.type(screen.getByLabelText("Full name"), "Jamie Smith");
+    await user.type(screen.getByLabelText("Email address"), "jamie@example.test");
+    await user.type(screen.getByLabelText("Phone number"), "0210000000");
+    await clickNext();
+    await user.type(await screen.findByLabelText("Business name"), "Kauri Studio");
+    await user.selectOptions(screen.getByLabelText("Business type"), "limited-company");
+    await user.type(screen.getByLabelText("Business address"), "1 Kauri Road, Auckland");
+    await clickNext();
+    await user.type(await screen.findByLabelText("Director / owner"), "Jamie Smith");
+    await user.selectOptions(screen.getByLabelText("Estimated annual card turnover"), "$150k–$500k");
+    await user.type(screen.getByLabelText("Business description"), "Independent design studio");
+
+    await choosePassword("password1");
+    await clickNext();
+    expect(await screen.findByText(RULE)).toBeInTheDocument();
+    expect(screen.queryByTestId("signup-plan-team")).not.toBeInTheDocument();
+
+    await choosePassword("Password!");
+    await clickNext();
+    expect(await screen.findByTestId("signup-plan-team")).toBeInTheDocument();
+  });
 });

@@ -8,6 +8,7 @@ import {
 
 import Stepper, { Step } from "@/components/Stepper";
 import { DEFAULT_PLAN_ID, PLAN_LIST, formatPlanPrice, type PlanId } from "@shared/plans";
+import { PASSWORD_RULE, meetsPasswordRule } from "@shared/password-rule";
 import { apiRequest } from "@/lib/queryClient";
 import { apiErrorMessage } from "@/lib/api-error";
 import { trackEvent } from "@/lib/analytics";
@@ -80,10 +81,7 @@ function getErrors(form: SignupForm, step: number): FieldErrors {
     if (!form.businessDescription.trim()) errors.businessDescription = "Tell us briefly what the business does.";
     if (form.websiteUrl && !/^https?:\/\//i.test(form.websiteUrl)) errors.websiteUrl = "Start the website address with http:// or https://.";
     if (!form.estimatedAnnualTurnover) errors.estimatedAnnualTurnover = "Select an estimated annual turnover.";
-    if (form.password.length < 8) errors.password = "Use at least 8 characters.";
-    else if (!/[A-Z]/.test(form.password) || !/[a-z]/.test(form.password) || !/[0-9]/.test(form.password)) {
-      errors.password = "Include uppercase, lowercase and a number.";
-    }
+    if (!meetsPasswordRule(form.password)) errors.password = PASSWORD_RULE;
     if (form.confirmPassword !== form.password) errors.confirmPassword = "Passwords do not match.";
   }
   if (step === 4) {

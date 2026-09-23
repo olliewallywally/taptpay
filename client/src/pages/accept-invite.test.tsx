@@ -47,3 +47,38 @@ describe("team invite privacy", () => {
     expect(await screen.findByText("Your login is ready")).toBeInTheDocument();
   });
 });
+
+// Owner decision 2026-09-23: 8+ characters, a capital letter, and a number or symbol.
+describe("team invite password rule", () => {
+  const RULE = "Use at least 8 characters, including a capital letter and a number or symbol.";
+
+  beforeEach(() => {
+    (global.fetch as jest.Mock).mockReset();
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => ({ message: "ready" }) });
+    window.history.replaceState({}, "", "/accept-invite?token=secret-token");
+  });
+
+  function choose(container: HTMLElement, password: string) {
+    fireEvent.change(container.querySelector('input[name="password"]')!, { target: { value: password } });
+    fireEvent.change(container.querySelector('input[name="confirmPassword"]')!, { target: { value: password } });
+    fireEvent.click(screen.getByTestId("accept-invite-submit"));
+  }
+
+  it("says the rule and sends nothing when the password breaks it", async () => {
+    const { container } = render(<AcceptInvite />);
+
+    choose(container, "password1");
+
+    expect(await screen.findByText(RULE)).toBeInTheDocument();
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("takes a symbol in place of a number", async () => {
+    const { container } = render(<AcceptInvite />);
+
+    choose(container, "Password!");
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText("Your login is ready")).toBeInTheDocument();
+  });
+});

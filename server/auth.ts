@@ -146,34 +146,88 @@ function userRowToUser(row: {
   };
 }
 
+// ============================================
+// PASSWORD CHECKS THAT DO NOT TELL WHO HAS A LOGIN
+// ============================================
+// Owner decision 2026-09-23: how long a sign-in takes must not tell whether the
+// email has a login. bcrypt's work doubles with each step of cost, and it answers
+// a malformed hash at once, so a check here always spends the work of one check at
+// PASSWORD_HASH_COST, whatever the stored hash is.
+
+/** The bcrypt cost of every password hash the app writes. */
+export const PASSWORD_HASH_COST = 12;
+
+const BCRYPT_HASH = /^\$2[aby]\$(\d{2})\$[./A-Za-z0-9]{53}$/;
+
+/** The cost of a well-formed bcrypt hash; null for anything else. */
+function bcryptCost(hash: string | null | undefined): number | null {
+  const match = hash ? BCRYPT_HASH.exec(hash) : null;
+  const cost = match ? Number(match[1]) : Number.NaN;
+  return cost >= 4 && cost <= 31 ? cost : null;
+}
+
+// Costs what a real hash of the same cost does, and matches no password: a fresh
+// salt with a result no password produces. Nothing is hashed to make one.
+function standInHash(cost: number): string {
+  return bcrypt.genSaltSync(cost) + '.'.repeat(31);
+}
+
+/** The work a check against `hash` must spend: a full check, or the hash's own if dearer. */
+export function passwordCheckBudget(hash: string | null | undefined): number {
+  return Math.max(PASSWORD_HASH_COST, bcryptCost(hash) ?? 0);
+}
+
+/**
+ * Whether `password` matches `storedHash`, after the work of one check at
+ * `budgetCost` whatever the hash: missing, malformed, or made at a lower cost
+ * (most older accounts carry cost 10). A lower-cost check is topped up with
+ * stand-ins at costs c, c+1, …, budget−1: 2^c + 2^c + 2^(c+1) + … = 2^budget.
+ */
+export async function checkPasswordEvenly(
+  password: string,
+  storedHash: string | null | undefined,
+  budgetCost = PASSWORD_HASH_COST,
+): Promise<boolean> {
+  const cost = bcryptCost(storedHash);
+  if (cost === null) {
+    await bcrypt.compare(password, standInHash(budgetCost));
+    return false;
+  }
+  const matches = await bcrypt.compare(password, storedHash!);
+  for (let topUp = cost; topUp < budgetCost; topUp += 1) {
+    await bcrypt.compare(password, standInHash(topUp));
+  }
+  return matches;
+}
+
 /**
  * Resolves a login against the `users` table — one row per person, so a seat can
  * be revoked without disturbing anyone else's access.
  *
  * Three gates, all of which must pass: the user row is active, the parent
  * merchant is verified/active, and the password matches. A disabled teammate
- * fails the first gate even though their password is still correct.
+ * fails the first gate even though their password is still correct. The password
+ * is checked first, at full cost, for every attempt — an email with no login
+ * included — so how long a refusal takes tells nothing.
  */
 export async function authenticateUser(email: string, password: string): Promise<User | null> {
-  if (isDemoAccountLoginBlocked(config.appEnv, email)) return null;
   const { storage } = await import('./storage');
 
   const userRow = await storage.getUserByEmail(email);
-  if (!userRow || userRow.status !== 'active') return null;
+  const candidate = userRow && !isDemoAccountLoginBlocked(config.appEnv, email) ? userRow : undefined;
+  const isValid = await checkPasswordEvenly(password, candidate?.password);
+  if (!candidate || !isValid || candidate.status !== 'active') return null;
 
-  const user = userRowToUser(userRow);
+  const user = userRowToUser(candidate);
   if (!user) return null;
 
   const merchant = await storage.getMerchant(user.merchantId);
   if (!merchant) return null;
   if (merchant.status !== 'verified' && merchant.status !== 'active') return null;
 
-  const isValid = await bcrypt.compare(password, userRow.password);
-  if (!isValid) return null;
-
   if (!(await memberWithinSeatLimit(user))) return null;
 
-  await storage.recordUserLogin(userRow.id, new Date()).catch(() => {});
+  await storage.recordUserLogin(candidate.id, new Date()).catch(() => {});
   return user;
 }
 

@@ -4,6 +4,7 @@ import { ArrowLeft, Check, Eye, EyeOff, UserRound } from "lucide-react";
 
 import { useToast } from "@/hooks/use-toast";
 import { useTokenPagePrivacy } from "@/hooks/use-token-page-privacy";
+import { PASSWORD_RULE, meetsPasswordRule } from "@shared/password-rule";
 import logoImage from "@assets/IMG_6592_1755070818452.png";
 import "./merchant-signup.css";
 
@@ -45,8 +46,8 @@ export default function AcceptInvite() {
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (password.length < 8 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
-      setError("Use at least 8 characters with an uppercase letter, a lowercase letter and a number.");
+    if (!meetsPasswordRule(password)) {
+      setError(PASSWORD_RULE);
       return;
     }
     if (password !== confirmPassword) {
