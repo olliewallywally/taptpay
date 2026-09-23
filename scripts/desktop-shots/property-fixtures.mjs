@@ -60,6 +60,13 @@ export const PROPERTY_SCHEDULES = PROPERTY_TENANTS.map((tenant, index) => ({
   nextRunAt: daysAgo(-20),
 }));
 
+export const PROPERTY_REMINDERS = {
+  rentReminderEnabled: true,
+  rentReminderDelayDays: 7,
+  rentReminderIntervalDays: 3,
+  rentReminderMaxCount: 5,
+};
+
 const json = (route, body, status = 200) =>
   route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
 
@@ -68,4 +75,5 @@ export async function installPropertyData(page) {
   await page.route("**/api/property/tenants", (route) => json(route, PROPERTY_TENANTS));
   await page.route("**/api/property/invoices", (route) => json(route, PROPERTY_INVOICES));
   await page.route("**/api/property/schedules", (route) => json(route, PROPERTY_SCHEDULES));
+  await page.route("**/api/property/reminder-settings", (route) => json(route, PROPERTY_REMINDERS));
 }

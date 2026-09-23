@@ -41,6 +41,15 @@ const SCREENS = [
   },
   { name: "property-analytics", path: "/property/analytics", essential: "/api/property/invoices", install: installPropertyData },
   { name: "property-analytics-tenants", path: "/property/analytics", essential: "/api/property/tenants", install: installPropertyData },
+  { name: "property-terminal", path: "/property/terminal", essential: "/api/property/invoices", install: installPropertyData },
+  {
+    name: "property-terminal-tenants", path: "/property/terminal", essential: "/api/property/tenants", install: installPropertyData,
+    prepare: (page) => page.getByRole("button", { name: "select tenant" }).click(),
+  },
+  {
+    name: "property-terminal-automation", path: "/property/terminal", essential: "/api/property/reminder-settings", install: installPropertyData,
+    prepare: (page) => page.getByRole("button", { name: "automation" }).click(),
+  },
 ];
 
 async function capture(browser, base, screen, mode, file) {

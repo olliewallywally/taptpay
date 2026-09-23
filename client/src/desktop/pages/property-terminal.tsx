@@ -14,6 +14,7 @@ import {
   DesktopPageScaffold,
   type DesktopRoutePageProps,
 } from "../DesktopPageScaffold";
+import { DesktopLoadFailure } from "../DesktopLoadFailure";
 import {
   DESKTOP_KEYPAD_KEYS,
   DesktopKeypadButton,
@@ -200,11 +201,38 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
   const schedulesQuery = usePropertySchedules();
   const reminderQuery = useQuery<any>({
     queryKey: REMINDER_KEY,
+    /* A failed answer is a failure, not "no settings": read as null, it showed the
+       defaults as the merchant's own and let them be changed from there (R1-T9). */
     queryFn: () =>
-      propFetch("/api/property/reminder-settings").then((r) => (r.ok ? r.json() : null)),
+      propFetch("/api/property/reminder-settings").then((r) => {
+        if (!r.ok) throw new Error("load failed");
+        return r.json();
+      }),
     staleTime: 60_000,
     retry: false,
   });
+
+  /* R1-T9: requests (invoices) that did not load are not "nothing owing", and
+     tenants that did not load are not "no tenants". With nothing loaded yet, the
+     screen says so and draws no figure or list from the empty fallbacks below; a
+     failed background refresh keeps what is already shown. The request list is
+     where a sent request lands, and a request needs a tenant, so neither send
+     button works while either is unavailable. Reminder settings and schedules
+     that did not load are neither shown as defaults or "none" nor editable. */
+  const requestsUnavailable = invoicesQuery.isError && invoicesQuery.data === undefined;
+  const tenantsUnavailable = tenantsQuery.isError && tenantsQuery.data === undefined;
+  const remindersUnavailable = reminderQuery.isError && reminderQuery.data === undefined;
+  const schedulesUnavailable = schedulesQuery.isError && schedulesQuery.data === undefined;
+  const sendUnavailableHint = requestsUnavailable
+    ? "Available once your requests load"
+    : tenantsUnavailable
+      ? "Available once your tenants load"
+      : undefined;
+  const sendUnavailable = sendUnavailableHint !== undefined;
+  const retryRequests = () => { void invoicesQuery.refetch(); };
+  const retryTenants = () => { void tenantsQuery.refetch(); };
+  const retryReminders = () => { void reminderQuery.refetch(); };
+  const retrySchedules = () => { void schedulesQuery.refetch(); };
   const tenants = (tenantsQuery.data ?? []).filter((t: any) => t.status !== "archived");
   const invoices = invoicesQuery.data ?? [];
 
@@ -758,7 +786,11 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
   /* Collapsed line: the chosen frequency, then enough of the automation state to
      tell whether anything is running without opening the panel. */
   const autoSummary = `${FREQ_LABEL[frequency]} · ${
-    reminders.rentReminderEnabled ? "reminders on" : "reminders off"
+    remindersUnavailable
+      ? "reminders unavailable"
+      : reminders.rentReminderEnabled
+        ? "reminders on"
+        : "reminders off"
   }${liveSchedules.length > 0 ? ` · ${liveSchedules.length} running` : ""}`;
 
   /* Lifted out of the JSX because it sits inside the rent request's repeat
@@ -768,6 +800,24 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
       {/* Deliberately in the page's blue language, not the phone's amber
           card: amber means "overdue" here, so an amber panel would read
           as an alert rather than a setting. */}
+      {remindersUnavailable ? (
+        <div className="pt-auto-block">
+          <div className="pt-auto-head">
+            <span className="pt-auto-head-mid">
+              <span className="pt-auto-title">overdue reminders</span>
+              <span className="pt-auto-cap">settings didn't load</span>
+            </span>
+            <button
+              type="button"
+              className="pt-auto-btn"
+              disabled={reminderQuery.isFetching}
+              onClick={retryReminders}
+            >
+              {reminderQuery.isFetching ? "trying…" : "try again"}
+            </button>
+          </div>
+        </div>
+      ) : (
       <div className="pt-auto-block">
         <div className="pt-auto-head">
           <span className="pt-auto-head-mid">
@@ -858,11 +908,24 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
           </>
         )}
       </div>
+      )}
 
       <div className="pt-auto-label">RECURRING RENT</div>
       <div className="pt-auto-list">
         {schedulesQuery.isLoading ? (
           <div className="pt-empty">loading…</div>
+        ) : schedulesUnavailable ? (
+          <div className="pt-auto-failed">
+            <span className="pt-empty">recurring rent didn't load</span>
+            <button
+              type="button"
+              className="pt-auto-btn"
+              disabled={schedulesQuery.isFetching}
+              onClick={retrySchedules}
+            >
+              {schedulesQuery.isFetching ? "trying…" : "try again"}
+            </button>
+          </div>
         ) : liveSchedules.length === 0 ? (
           <div className="pt-empty">
             no schedules yet — choose a repeat frequency above
@@ -985,16 +1048,31 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
             )}
           </div>
 
-          <div className="pt-hero-row">
-            <span className="pt-hero">
-              {invoicesQuery.isLoading ? "—" : whole(model.outstandingRent)}
-            </span>
-          </div>
-          <span className="pt-hero-sub">outstanding rent</span>
-          <span className="pt-hero pt-hero-dim">
-            {invoicesQuery.isLoading ? "—" : whole(model.outstandingExpenses)}
-          </span>
-          <span className="pt-hero-sub pt-hero-sub-dim">outstanding expenses</span>
+          {requestsUnavailable ? (
+            <div className="pt-hero-row">
+              <DesktopLoadFailure
+                tone="canvas"
+                title="Requests didn't load"
+                detail="Your outstanding totals stay hidden until they do."
+                onRetry={retryRequests}
+                retrying={invoicesQuery.isFetching}
+                testId="property-terminal-requests-failed"
+              />
+            </div>
+          ) : (
+            <>
+              <div className="pt-hero-row">
+                <span className="pt-hero">
+                  {invoicesQuery.isLoading ? "—" : whole(model.outstandingRent)}
+                </span>
+              </div>
+              <span className="pt-hero-sub">outstanding rent</span>
+              <span className="pt-hero pt-hero-dim">
+                {invoicesQuery.isLoading ? "—" : whole(model.outstandingExpenses)}
+              </span>
+              <span className="pt-hero-sub pt-hero-sub-dim">outstanding expenses</span>
+            </>
+          )}
 
           <div className="pt-stack" ref={stackRef}>
             <div className="pt-stack-head">
@@ -1028,6 +1106,8 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
             >
               {invoicesQuery.isLoading ? (
                 <div className="pt-empty">loading…</div>
+              ) : requestsUnavailable ? (
+                <div className="pt-empty">requests didn't load</div>
               ) : stackRows.length === 0 ? (
                 <div className="pt-empty">no requests here</div>
               ) : (
@@ -1286,7 +1366,8 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
                   className="pt-send-btn"
                   data-tutorial-id="property-terminal-send"
                   aria-label="send rent request"
-                  disabled={sendRequest.isPending}
+                  disabled={sendRequest.isPending || sendUnavailable}
+                  title={sendUnavailableHint}
                   style={reqFlash ? { borderColor: GREEN, color: GREEN } : undefined}
                   onClick={doSendRequest}
                 >
@@ -1311,6 +1392,14 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
               <AnimatedScrollList className="pt-tenant-cards">
                 {tenantsQuery.isLoading ? (
                   <div className="pt-empty">loading tenants…</div>
+                ) : tenantsUnavailable ? (
+                  <DesktopLoadFailure
+                    tone="canvas"
+                    title="Tenants didn't load"
+                    onRetry={retryTenants}
+                    retrying={tenantsQuery.isFetching}
+                    testId="property-terminal-tenants-failed"
+                  />
                 ) : tenantCards.length === 0 ? (
                   <div className="pt-empty">no tenants match</div>
                 ) : (
@@ -1341,7 +1430,9 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
                         </span>
                         <span className="pt-tc-right">
                           <span className="pt-tc-amt">{next ? fmtNZD(next.amountCents ?? 0) : "—"}</span>
-                          <span className="pt-tc-cap">{next ? "due" : "nothing due"}</span>
+                          <span className="pt-tc-cap">
+                            {next ? "due" : requestsUnavailable ? "unavailable" : "nothing due"}
+                          </span>
                         </span>
                       </AnimatedListRow>
                     );
@@ -1512,7 +1603,8 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
                 type="button"
                 className="pt-send-btn pt-bill-send"
                 aria-label="send bill"
-                disabled={sendBill.isPending}
+                disabled={sendBill.isPending || sendUnavailable}
+                title={sendUnavailableHint}
                 style={billFlash ? { borderColor: GREEN, color: GREEN } : undefined}
                 onClick={doSendBill}
               >
@@ -1528,7 +1620,9 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
                 record a payment that arrived outside TaptPay — the tenant stops being chased
               </div>
               <div className="pt-paid-rows">
-                {model.rows.filter((r) => r.bucket !== "paid").length === 0 ? (
+                {requestsUnavailable ? (
+                  <div className="pt-empty">requests didn't load</div>
+                ) : model.rows.filter((r) => r.bucket !== "paid").length === 0 ? (
                   <div className="pt-empty">nothing outstanding</div>
                 ) : (
                   model.rows
@@ -1774,6 +1868,7 @@ const PT_CSS = `
 .pt-auto-btn { height:40px; padding:0 12px; border-radius:9999px; border:1px solid rgba(94,158,255,0.5); background:transparent; color:${ACCENT_SOFT}; font-weight:600; font-size:11.5px; cursor:pointer; transition:background .15s ease; }
 .pt-auto-btn:hover:not(:disabled) { background:rgba(94,158,255,0.12); }
 .pt-auto-btn:disabled { opacity:0.5; cursor:default; }
+.pt-auto-failed { display:flex; align-items:center; justify-content:space-between; gap:12px; }
 /* The destructive confirm carries weight through a filled chip, not a red one. */
 .pt-auto-btn-strong { border-color:transparent; background:${ACTIVE}; color:${NAVY}; font-weight:700; }
 .pt-auto-btn-strong:hover:not(:disabled) { background:${ACTIVE}; opacity:0.85; }
