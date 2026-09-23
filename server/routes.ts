@@ -20,9 +20,10 @@ import {
   HANDOFF_CODE_TTL_MS, clearSignInCookie, googleVerifiedEmail, handoffCodeHash, newHandoffCode, readCookie,
   signInCookies, startGoogleSignIn, verifyGoogleSignInState,
 } from "./google-sign-in";
-import { confirmationResendBucket, passwordChangeBucket, passwordResetBucket, signInAccountBucket, signInDeviceKeyPrefix, signupNoticeBucket, tooManyAttempts } from "./auth-throttle";
+import { type SignInRealm, confirmationResendBucket, googleCallbackAddressBucket, passwordChangeBucket, passwordResetAddressBucket, passwordResetBucket, signInAccountBucket, signInAddressBucket, signInDeviceKeyPrefix, signupNoticeBucket, tooManyAttempts } from "./auth-throttle";
+import { clientAddressForLimits } from "./client-address";
 import { ACCOUNT_EMAIL_REPLY_FLOOR_MS, SIGN_UP_REPLY_FLOOR_MS, replyNoSoonerThan, replyStart } from "./even-reply";
-import { markSignInDevice, readSignInDevice, signInBucketFor, signInDeviceCookie } from "./sign-in-device";
+import { deviceKnowsEmail, markSignInDevice, readSignInDevice, signInBucketFor, signInDeviceCookie, type SignInDevice } from "./sign-in-device";
 import { generateReceiptPdf } from "./pdf-generator";
 import { generateQuotePdf } from "./trades-quote-pdf";
 import { generateBusinessReportPdf } from "./report-generator";
@@ -457,6 +458,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // handlers registered after it. See server/async-route-guard.ts.
   installAsyncRouteGuard(app);
 
+  // R1-T4 phase B: believe X-Forwarded-For/-Proto only from as many proxies as the
+  // deployment says stand in front (TRUST_PROXY_HOPS). Unset or 0: from none, so a
+  // visitor's own forwarded headers change nothing.
+  if (config.trustProxyHops) app.set("trust proxy", config.trustProxyHops);
+
   const paymentAttempts = new PaymentAttemptService(storage);
 
   app.get("/robots.txt", (_req, res) => {
@@ -640,6 +646,17 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!clientId || !clientSecret) {
         return res.redirect(googleSignInError('Google sign in is not configured'));
       }
+      // R1-T4 phase B: callbacks that get as far as asking Google are counted per
+      // visitor address, once addresses can be told apart; a success gives its count
+      // back. Cancels and failed state checks above cost nothing, so are not counted.
+      const address = clientAddressForLimits(req);
+      const addressBuckets = address ? [googleCallbackAddressBucket(address)] : [];
+      if (addressBuckets.length > 0) {
+        const slot = await storage.takeAuthThrottleSlot(addressBuckets, new Date());
+        if (!slot.allowed) {
+          return res.redirect(googleSignInError(tooManyAttempts(slot.retryAfterMs, "sign-in").body.message));
+        }
+      }
       const redirectUri = `${getBaseUrl(req)}/api/auth/google/callback`;
 
       // Exchange code for tokens, proving it with this browser's PKCE verifier.
@@ -746,6 +763,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         expiresAt: new Date(Date.now() + HANDOFF_CODE_TTL_MS),
       });
       res.cookie(googleCookies.handoff.name, handoff.code, googleCookies.handoff.options);
+      await storage.settleAuthThrottle(addressBuckets, "void", new Date())
+        .catch((error) => console.error("[GOOGLE_ADDRESS_THROTTLE_RETURN]", error));
       return res.redirect('/login?google=complete');
     } catch (err) {
       console.error('Google OAuth callback error:', err);
@@ -814,6 +833,14 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     res.set("Retry-After", String(refusal.retryAfterSeconds));
     return res.status(429).json(refusal.body);
   };
+  // R1-T4 phase B: a sign-in also counts against its visitor's address, once addresses
+  // can be told apart (server/client-address.ts), unless its device already knows this
+  // email: no one else's guesses may keep a merchant's own device out.
+  const signInAddressBuckets = (req: express.Request, realm: SignInRealm, email: string, device: SignInDevice | null) => {
+    if (deviceKnowsEmail(device, realm, email)) return [];
+    const address = clientAddressForLimits(req);
+    return address ? [signInAddressBucket(realm, address)] : [];
+  };
 
   app.post("/api/auth/login", async (req, res) => {
     try {
@@ -826,7 +853,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
       const device = readSignInDevice(req, merchantDeviceCookie);
       const bucket = signInBucketFor("merchant", email, device);
-      const slot = await storage.takeAuthThrottleSlot([bucket], new Date());
+      const addressBuckets = signInAddressBuckets(req, "merchant", email, device);
+      const slot = await storage.takeAuthThrottleSlot([bucket, ...addressBuckets], new Date());
       if (!slot.allowed) {
         logSecurityEvent('LOGIN_SLOWED', { email, ip: clientIp });
         return refuseTooManyAttempts(res, slot.retryAfterMs, "sign-in");
@@ -837,7 +865,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         user = await authenticateUser(email, password);
       } catch (error) {
         // Not a guess that was answered: give the attempt back.
-        await storage.settleAuthThrottle([bucket], "void", new Date()).catch(() => undefined);
+        await storage.settleAuthThrottle([bucket, ...addressBuckets], "void", new Date()).catch(() => undefined);
         throw error;
       }
       if (!user) {
@@ -847,6 +875,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       await storage.settleAuthThrottle([bucket], "success", new Date())
         .catch((error) => console.error("[LOGIN_THROTTLE_CLEAR]", error));
+      // A success gives its address try back; it never clears the address's count.
+      await storage.settleAuthThrottle(addressBuckets, "void", new Date())
+        .catch((error) => console.error("[LOGIN_ADDRESS_THROTTLE_RETURN]", error));
       markSignInDevice(res, merchantDeviceCookie, device, email);
       logSecurityEvent('LOGIN_SUCCESS', { email, ip: clientIp, userId: user.id });
 
@@ -881,7 +912,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // every one counts, checked before a link is made: a refused request sends
       // nothing and leaves the link already sent working. Counted per email whether
       // or not it has a login, so the answer never tells which.
-      const slot = await storage.takeAuthThrottleSlot([passwordResetBucket(email)], new Date());
+      const address = clientAddressForLimits(req);
+      const slot = await storage.takeAuthThrottleSlot(
+        [passwordResetBucket(email), ...(address ? [passwordResetAddressBucket(address)] : [])],
+        new Date(),
+      );
       if (!slot.allowed) {
         logSecurityEvent('PASSWORD_RESET_SLOWED', { email, ip: req.ip || req.socket.remoteAddress || 'unknown' });
         return refuseTooManyAttempts(res, slot.retryAfterMs, "password-reset");
@@ -959,6 +994,28 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
+  // R1-T4 phase B, for the owner's live check (decision 2026-09-21, Q4): how this request
+  // arrived, and which address each TRUST_PROXY_HOPS value would take as the visitor's.
+  // The one showing the caller's own public address is the setting to use. Admin-only;
+  // it shows the caller nothing but their own request.
+  app.get("/api/admin/request-origin", authenticateAdmin, (req, res) => {
+    res.set("Cache-Control", "no-store");
+    const forwardedFor = String(req.headers["x-forwarded-for"] ?? "")
+      .split(",").map((entry) => entry.trim()).filter(Boolean);
+    const connectionAddress = req.socket.remoteAddress ?? null;
+    const chain = connectionAddress ? [...forwardedFor, connectionAddress] : forwardedFor;
+    res.json({
+      trustProxyHops: config.trustProxyHops,
+      addressLimits: config.trustProxyHops === null ? "off" : "on",
+      clientAddress: req.ip ?? null,
+      protocol: req.protocol,
+      host: req.get("host") ?? null,
+      forwardedFor,
+      connectionAddress,
+      candidates: chain.map((_, hops) => ({ hops, clientAddress: chain[chain.length - 1 - hops] })),
+    });
+  });
+
   // Admin Authentication routes — slowed down like merchant sign-in (R1-T4 phase C),
   // with their own buckets and their own known-device mark.
   app.post("/api/admin/auth/login", async (req, res) => {
@@ -972,7 +1029,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
       const device = readSignInDevice(req, adminDeviceCookie);
       const bucket = signInBucketFor("admin", email, device);
-      const slot = await storage.takeAuthThrottleSlot([bucket], new Date());
+      const addressBuckets = signInAddressBuckets(req, "admin", email, device);
+      const slot = await storage.takeAuthThrottleSlot([bucket, ...addressBuckets], new Date());
       if (!slot.allowed) {
         logSecurityEvent('ADMIN_LOGIN_SLOWED', { email, ip: clientIp });
         return refuseTooManyAttempts(res, slot.retryAfterMs, "sign-in");
@@ -983,7 +1041,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const adminPasswordHash = config.admin.passwordHash;
       const isAdminEmail = !!adminEmail && email === adminEmail;
       if (isAdminEmail && !adminPasswordHash) {
-        await storage.settleAuthThrottle([bucket], "void", new Date()).catch(() => undefined);
+        await storage.settleAuthThrottle([bucket, ...addressBuckets], "void", new Date()).catch(() => undefined);
         console.error("CRITICAL: ADMIN_PASSWORD_HASH env var not set. Admin login disabled.");
         return res.status(500).json({ message: "Admin login unavailable - contact system administrator" });
       }
@@ -997,7 +1055,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           passwordCheckBudget(adminPasswordHash),
         );
       } catch (error) {
-        await storage.settleAuthThrottle([bucket], "void", new Date()).catch(() => undefined);
+        await storage.settleAuthThrottle([bucket, ...addressBuckets], "void", new Date()).catch(() => undefined);
         throw error;
       }
 
@@ -1008,6 +1066,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       await storage.settleAuthThrottle([bucket], "success", new Date())
         .catch((error) => console.error("[ADMIN_LOGIN_THROTTLE_CLEAR]", error));
+      await storage.settleAuthThrottle(addressBuckets, "void", new Date())
+        .catch((error) => console.error("[ADMIN_LOGIN_ADDRESS_THROTTLE_RETURN]", error));
       markSignInDevice(res, adminDeviceCookie, device, email);
       logSecurityEvent('ADMIN_LOGIN_SUCCESS', { email, ip: clientIp });
 

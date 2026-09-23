@@ -283,7 +283,10 @@ export const PUBLIC_PATH_ALLOWLIST: Record<string, string> = {
   "GET /api/tapt-stones/:id":
     "raw row has no sensitive fields (id/merchantId/name/stoneNumber/qrCodeUrl/paymentUrl/isActive/timestamps) — paymentUrl/qrCodeUrl are already the public payment link",
   "GET /api/auth/google": "OAuth consent-redirect initiation; necessarily pre-session",
-  "GET /api/auth/google/callback": "OAuth callback that ISSUES the JWT; necessarily pre-session",
+  "GET /api/auth/google/callback":
+    "OAuth callback that issues the one-time sign-in handoff code (R1-T4 phase A); necessarily pre-session",
+  "POST /api/auth/google/session":
+    "redeems the one-time handoff code its HttpOnly cookie carries, once, for the account token (R1-T4 phase A); the code is the credential, so necessarily pre-session",
   "POST /api/auth/login": "credential-checked login endpoint that issues the JWT; necessarily pre-session",
   "POST /api/admin/auth/login": "credential-checked admin login endpoint that issues the admin JWT; necessarily pre-session",
   "POST /api/auth/resend-confirmation":

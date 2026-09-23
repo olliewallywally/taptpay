@@ -16,10 +16,12 @@ import { config } from "./config";
  * again. A correct password clears the bucket it was counted against.
  *
  * Buckets are rows of `auth_throttle` (0028), keyed `<purpose>:<HMAC>` under a key
- * derived from JWT_SECRET: no email or device id is stored. Client addresses are
- * deliberately not a subject yet. Until the app is told how many proxies stand in
- * front of it (phase B), every visitor may arrive from the proxy's address, and an
- * address bucket would let anyone slow everyone down.
+ * derived from JWT_SECRET: no email, device id or address is stored.
+ *
+ * Phase B adds the visitor's address as a subject, but only once the deployment says
+ * how many proxies stand in front of the app (TRUST_PROXY_HOPS, server/client-address.ts).
+ * Until then every visitor may arrive from the proxy's address, and an address bucket
+ * would let anyone slow everyone down.
  */
 
 export interface AuthThrottlePolicy {
@@ -44,6 +46,25 @@ export const SIGN_IN_POLICY: AuthThrottlePolicy = Object.freeze({
  */
 export const PASSWORD_RESET_POLICY: AuthThrottlePolicy = Object.freeze({
   free: 3, firstWaitMs: 5 * MINUTE, maxWaitMs: 60 * MINUTE, forgetAfterMs: 24 * 60 * MINUTE,
+});
+
+/**
+ * Sign-ins from one address (phase B): many accounts tried from one place. Never
+ * charged for a device already known to the email it signs in to, so no one else's
+ * guesses can keep a merchant's own device out.
+ */
+export const ADDRESS_SIGN_IN_POLICY: AuthThrottlePolicy = Object.freeze({
+  free: 50, firstWaitMs: 30_000, maxWaitMs: 15 * MINUTE, forgetAfterMs: 60 * MINUTE,
+});
+
+/** Forgot-password requests from one address (phase B). */
+export const ADDRESS_RESET_POLICY: AuthThrottlePolicy = Object.freeze({
+  free: 10, firstWaitMs: MINUTE, maxWaitMs: 30 * MINUTE, forgetAfterMs: 60 * MINUTE,
+});
+
+/** Google callbacks from one address that get as far as asking Google (phase B). */
+export const ADDRESS_GOOGLE_POLICY: AuthThrottlePolicy = Object.freeze({
+  free: 20, firstWaitMs: 30_000, maxWaitMs: 15 * MINUTE, forgetAfterMs: 60 * MINUTE,
 });
 
 /** Rows untouched this long are deleted: no policy counts them any more. */
@@ -182,6 +203,22 @@ export function passwordChangeBucket(userId: number): AuthThrottleBucket {
 /** Forgot-password requests for this email, whether or not it has a login. */
 export function passwordResetBucket(email: string): AuthThrottleBucket {
   return { key: `reset-account:${bucketKeyHmac("reset-account", normalizeThrottleEmail(email))}`, policy: PASSWORD_RESET_POLICY };
+}
+
+/** Sign-ins from one visitor address (server/client-address.ts), merchant and admin apart. */
+export function signInAddressBucket(realm: SignInRealm, address: string): AuthThrottleBucket {
+  const purpose = realm === "admin" ? "admin-signin-address" : "signin-address";
+  return { key: `${purpose}:${bucketKeyHmac(purpose, address)}`, policy: ADDRESS_SIGN_IN_POLICY };
+}
+
+/** Forgot-password requests from one visitor address. */
+export function passwordResetAddressBucket(address: string): AuthThrottleBucket {
+  return { key: `reset-address:${bucketKeyHmac("reset-address", address)}`, policy: ADDRESS_RESET_POLICY };
+}
+
+/** Google callbacks from one visitor address. */
+export function googleCallbackAddressBucket(address: string): AuthThrottleBucket {
+  return { key: `google-address:${bucketKeyHmac("google-address", address)}`, policy: ADDRESS_GOOGLE_POLICY };
 }
 
 /** Sign-ups naming an address that already has an account: each would mail it a note. */

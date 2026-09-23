@@ -18,6 +18,9 @@
 delete process.env.DATABASE_URL;
 delete process.env.NEON_DATABASE_URL;
 delete process.env.DATABASE_TARGET;
+// R1-T4 phase B: how many proxies to trust is a per-file choice
+// (./trusted-proxy-env.ts), never inherited from the shell or an earlier file.
+delete process.env.TRUST_PROXY_HOPS;
 
 // Force explicit, deterministic values rather than relying on config.ts's
 // JEST_WORKER_ID fallbacks, so this harness behaves the same under `jest`

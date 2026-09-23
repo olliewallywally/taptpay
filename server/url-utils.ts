@@ -18,10 +18,13 @@ export function getBaseUrl(req?: any): string {
     return `https://${domain}`;
   }
   
-  // In development, try to get from request headers
+  // In development, from the request: its protocol as Express reads it, which believes
+  // X-Forwarded-Proto only from a trusted proxy (TRUST_PROXY_HOPS), and its Host. Never
+  // a raw X-Forwarded-* header: any visitor can write one, and a reset link built from
+  // it would point wherever they chose (R1-T4 phase B).
   if (req) {
-    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
-    const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost:5000';
+    const protocol = req.protocol || 'http';
+    const host = req.headers?.host || 'localhost:5000';
     return `${protocol}://${host}`;
   }
   

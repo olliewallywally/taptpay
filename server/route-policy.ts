@@ -1,8 +1,8 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/routes.ts @ 454f4120756e3ba26c966659f847280b102a452f on 2026-09-19.
+ * scripts/generate-route-policy.ts from server/routes.ts @ fa0b0230b51f02bad5cf7114078350d3b697273a on 2026-09-23.
  *
- * 220 registrations (93 GET, 88 POST, 3 PATCH, 5 ALL, 22 PUT, 9 DELETE) on this SHA — evidence for THIS commit, not a timeless
+ * 223 registrations (94 GET, 90 POST, 3 PATCH, 5 ALL, 22 PUT, 9 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
  * live count on every run rather than trusting this comment.
  *
@@ -83,6 +83,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
   "POST /api/auth/forgot-password": {"method":"POST","path":"/api/auth/forgot-password","principal":"public","markers":["requestPasswordReset("]},
   "POST /api/auth/reset-password": {"method":"POST","path":"/api/auth/reset-password","principal":"public","markers":["resetPassword("]},
   "GET /api/auth/validate-reset-token/:token": {"method":"GET","path":"/api/auth/validate-reset-token/:token","principal":"public","markers":["validateResetToken("]},
+  "GET /api/admin/request-origin": {"method":"GET","path":"/api/admin/request-origin","principal":"admin","markers":["authenticateAdmin"]},
   "POST /api/admin/auth/login": {"method":"POST","path":"/api/admin/auth/login","principal":"public","markers":[]},
   "GET /api/auth/me": {"method":"GET","path":"/api/auth/me","principal":"merchant-user","markers":["authenticateToken"]},
   "GET /api/tutorial/state": {"method":"GET","path":"/api/tutorial/state","principal":"merchant-user","markers":["authenticateToken","req.user?.role === \"admin\""]},

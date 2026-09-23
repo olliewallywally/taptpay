@@ -255,3 +255,19 @@ describe("fail-closed runtime configuration", () => {
     }
   });
 });
+
+// R1-T4 phase B (owner decision 2026-09-21, Q4: off until checked on the live deployment).
+describe("TRUST_PROXY_HOPS", () => {
+  test("unset means unknown: no proxy is trusted and address limits stay off", () => {
+    expect(loadConfig(BASE_ENV).trustProxyHops).toBeNull();
+    expect(loadConfig({ ...BASE_ENV, TRUST_PROXY_HOPS: "" }).trustProxyHops).toBeNull();
+  });
+
+  test.each([["0", 0], ["1", 1], ["2", 2], ["9", 9]])("%p is %p hops", (raw, hops) => {
+    expect(loadConfig({ ...BASE_ENV, TRUST_PROXY_HOPS: raw }).trustProxyHops).toBe(hops);
+  });
+
+  test.each(["-1", "10", "1.5", "01", " 1", "one", "true"])("refuses %p", (raw) => {
+    expect(() => loadConfig({ ...BASE_ENV, TRUST_PROXY_HOPS: raw })).toThrow(/TRUST_PROXY_HOPS/);
+  });
+});

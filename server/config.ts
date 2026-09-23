@@ -61,6 +61,11 @@ export interface AppConfig {
   readonly isProduction: boolean;
   readonly publicOrigin?: string;
   readonly publicApiOrigin?: string;
+  /**
+   * How many proxies stand in front of the app (TRUST_PROXY_HOPS). null = not known, so no
+   * forwarded header is believed and no limit is keyed on the visitor's address; 0 = none.
+   */
+  readonly trustProxyHops: number | null;
   readonly databaseTarget: DatabaseTarget;
   readonly databaseUrl?: string;
   readonly jwtSecret: string;
@@ -159,6 +164,18 @@ function nonempty(env: EnvironmentSource, key: string): string | undefined {
 function enumValue<T extends string>(key: string, raw: string | undefined, allowed: Set<T>): T {
   if (!raw || !allowed.has(raw as T)) throw new ConfigValidationError(key, "core");
   return raw as T;
+}
+
+/**
+ * R1-T4 phase B (owner decision 2026-09-21, Q4: off until checked on the live
+ * deployment). Unset: not known — behind a proxy every visitor may arrive from the
+ * proxy's address, so nothing keyed on the address is safe. "0": no proxy, the
+ * connection's own address is the visitor's. "1"–"9": trust that many proxy hops.
+ */
+export function parseTrustProxyHops(raw: string | undefined): number | null {
+  if (raw === undefined) return null;
+  if (!/^[0-9]$/.test(raw)) throw new ConfigValidationError("TRUST_PROXY_HOPS", "network", "must be a whole number from 0 to 9");
+  return Number(raw);
 }
 
 export function parseStrictBoolean(key: string, raw: string | undefined, defaultValue: boolean): boolean {
@@ -512,6 +529,7 @@ export function loadConfig(env: EnvironmentSource): Readonly<AppConfig> {
     isProduction,
     publicOrigin,
     publicApiOrigin,
+    trustProxyHops: parseTrustProxyHops(nonempty(env, "TRUST_PROXY_HOPS")),
     databaseTarget,
     databaseUrl,
     jwtSecret: jwtSecret ?? "dev-only-jwt-secret-not-for-production",
