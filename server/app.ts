@@ -56,7 +56,15 @@ export function createApp(options: { writeRequestLog: (line: string) => void }):
 
   // Gzip compression for all responses — skips already-compressed assets and
   // very small payloads (< 1 KB) where compression overhead outweighs savings.
-  app.use(compression({ threshold: 1024 }));
+  // Never a live event stream: the compressor would hold each event until it
+  // had enough bytes to squeeze, so no browser (they all accept compression)
+  // received live updates from 2026-04-07 until the R1-T1 audit found it.
+  app.use(compression({
+    threshold: 1024,
+    filter: (req, res) =>
+      !String(res.getHeader("Content-Type") ?? "").startsWith("text/event-stream") &&
+      compression.filter(req, res),
+  }));
 
   // Bearer-addressed payment pages must not leak their URL through browser
   // referrers or shared caches. This runs before Vite/static fallback, so the HTML

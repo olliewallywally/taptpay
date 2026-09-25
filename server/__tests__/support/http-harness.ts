@@ -17,8 +17,6 @@ import crypto from "crypto";
 import type { Express } from "express";
 import http, { type IncomingHttpHeaders, type Server as HttpServer } from "http";
 import type { AddressInfo } from "net";
-import type { Readable } from "stream";
-import zlib from "zlib";
 import { createApp } from "../../app";
 import { registerRoutes } from "../../routes";
 import { createGlobalErrorHandler } from "../../http-error-handler";
@@ -238,9 +236,10 @@ export interface EventStream {
 }
 
 /**
- * Opens a live event stream (SSE) on a loopback listener and reads it the way
- * a browser does: decompressing a gzip, deflate or brotli body, one `data:`
- * event at a time. (supertest cannot read a response that never ends.)
+ * Opens a live event stream (SSE) on a loopback listener and reads it one
+ * `data:` event at a time, as a browser's EventSource does. (supertest cannot
+ * read a response that never ends.) An event stream is never compressed
+ * (server/app.ts); a compressed one reads as nothing here, as in a browser.
  */
 export async function openEventStream(
   app: Express,
@@ -255,14 +254,7 @@ export async function openEventStream(
     http.get({ host: "127.0.0.1", port, path, headers }, resolve).on("error", reject);
   });
 
-  const decoders: Record<string, () => zlib.Gunzip | zlib.Inflate | zlib.BrotliDecompress> = {
-    gzip: () => zlib.createGunzip(),
-    deflate: () => zlib.createInflate(),
-    br: () => zlib.createBrotliDecompress(),
-  };
-  const decoder = decoders[String(response.headers["content-encoding"] ?? "")];
-  const body: Readable = decoder ? response.pipe(decoder()) : response;
-
+  const body = response;
   const events: unknown[] = [];
   const waiting: Array<(event: unknown) => void> = [];
   let buffered = "";
