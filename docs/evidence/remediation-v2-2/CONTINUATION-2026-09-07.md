@@ -319,6 +319,23 @@ The work itself:
     reload; two pre-existing faults found (the phone share screen's "download QR" saves an
     unscannable picture; the cash-sale "copy receipt link" copies the demo address).
 
+- **Owner answers on the rework (2026-09-25)**
+  ([decision](../../decisions/2026-09-25-share-dropdown-and-fixes-owner-answers.md)): the model
+  confirmed (per-sale links without a board; a board is one printed QR, fixed until deleted); a
+  sale dropdown on the phone share page; "fix them".
+  - **`1fb41d14`, local, awaiting independent review**
+    ([evidence](r1/R1-share-dropdown-and-cash-2026-09-25.md)):
+    - the share page lists the open sales it can share, and sending opens it with that sale;
+    - "download QR" saves a real PNG;
+    - **phone cash sales are recorded**: they never were, the screen said "success" and saved
+      nothing.
+    Red first 6/9 and 10/14; mutations 22/22; client 93/789; real Chromium 28/28.
+  - Back to the owner: the settings button (unanswered); boards are capped at 10 at a time
+    (`TAPT_STONE_LIMIT`) though he said "as much as they want".
+  - **His request to exempt `oliverharryleonard@gmail.com` from the card requirement was not
+    done:** the auto-mode safety check denied reaching the development database. His to allow or
+    do.
+
 **Next:** R1-T2's remaining parts (C10: the per-route fields, and every `app.use` and mounted
 router, which now include `server/app.ts`), then R1-T3's runtime matrix, both on the audited
 harness. Also for R1-T2: `POST /api/board-builder/submit` is public with no rate limit (it emails
@@ -328,8 +345,8 @@ rework (above). Release of the rework: when production has no pending shared no-
 
 The phase B live check waits for the owner to set `ADMIN_PASSWORD_HASH`.
 Independent reviews owed (each evidence file ends with its brief):
-- the no-board rework (`da90d1a1..5c2cdb27`) and the owner-answer fixes 2a–2c
-  (`aba7b2be..da90d1a1`);
+- the no-board rework (`da90d1a1..5c2cdb27`), its follow-up (`7051e25e..1fb41d14`), and the
+  owner-answer fixes 2a–2c (`aba7b2be..da90d1a1`);
 - R1-T1 (`03c4663b..05195728`) and the live-updates fix (`05195728..3fac8ac8`);
 - gap 13, R1-T8;
 - R1-T4 A (`ed847cda..a9426330`), D (`46cdc475..44a5cfc2`), the D follow-ups (`6abc2a03..b714efda`);
