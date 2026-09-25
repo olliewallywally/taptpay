@@ -258,14 +258,43 @@ The work itself:
   below had left out two code commits: the pilot (`025d638d`) and the 402 browser check
   (`6562cf4f`). The brief's two ranges, `c37f1602..025d638d` and `e4c25fb1..b86f0071`, cover
   all of R1-T9.
+- **R1-T1's audit (C09) is code-complete: `05195728`, local, awaiting independent review**
+  ([evidence](r1/R1-T1-harness-audit-2026-09-25.md)). The harness's "no network, no database,
+  no cron, no Vite" was only a test title, and the app it built lacked production's pipeline.
+  - Every server test file now runs with a guard. It refuses and records any connection, name
+    lookup or UDP send off the machine, and fails the test even when the code swallowed the
+    error.
+  - It caught two tests that dialled `192.0.2.1:5432` to imitate an unreachable database. They
+    now use a silent server on this machine.
+  - `server/app.ts` is the pipeline `index.ts` had, moved unchanged except the log writer. The
+    harness builds the same app, so tests see production's headers and request log.
+  - Added `providerNotification`, `useFakeClock` and `openEventStream`. The public payment bearer
+    fixture is now exercised.
+  - Red first 21 of 24; mutations 30/30; server 81/1,456 with the guard; client 86/760; `tsc`
+    clean. Pipeline headers are identical to the running dev server's.
+- **Found by that audit and fixed: live updates never reached a browser** (`3fac8ac8`,
+  [evidence](r1/R1-live-updates-compression-2026-09-25.md)).
+  - Since `7f52fe11` (2026-04-07), compression held back every event of
+    `GET /api/merchants/:id/events` for any client that accepts compression, which is every
+    browser. Screens polled instead (every 3–30 s), so it looked fine.
+  - Shown on the dev server, and in real Chromium 125 before and after: nothing in 3 s, then the
+    event at once.
+  - Compression now skips event streams. Red first 2 of 3; mutations 3/3; server 82/1,459.
+  - **Owner question (gap 12):** customers' no-board page receives live events again, and with
+    them the residual you accepted in September. Nothing changes for an attacker. Keep this, or
+    keep live updates off for that page until per-transaction addressing closes the residual?
 
-**Next:** R1-T1's audit (C09, the first open item in the plan's core order; no owner decision
-needed). R1-T9 is complete, awaiting independent review
-([brief](r1/R1-T9-INDEPENDENT-REVIEW-BRIEF-2026-09-25.md)). Open for the owner: the two 402
-questions (a refused acceptance the business never hears of; the public quote route's 402 body)
-and the unreachable phone batch/schedules screen. The phase B live check waits for the
-owner to set `ADMIN_PASSWORD_HASH`.
+**Next:** R1-T2's remaining parts (C10: the per-route fields, and every `app.use` and mounted
+router, which now include `server/app.ts`), then R1-T3's runtime matrix, both on the audited
+harness. Open for the owner:
+- the gap-12 question above;
+- the two 402 questions (a refused acceptance the business never hears of; the public quote
+  route's 402 body);
+- the unreachable phone batch/schedules screen.
+
+The phase B live check waits for the owner to set `ADMIN_PASSWORD_HASH`.
 Independent reviews owed (each evidence file ends with its brief):
+- R1-T1 (`03c4663b..05195728`) and the live-updates fix (`05195728..3fac8ac8`);
 - gap 13, R1-T8;
 - R1-T4 A (`ed847cda..a9426330`), D (`46cdc475..44a5cfc2`), the D follow-ups (`6abc2a03..b714efda`);
 - C (`b9c947bb..e60e90c0`), the C follow-ups (`4b496104..f6c62f50`);
@@ -1202,7 +1231,7 @@ may proceed where the plan allows it. Code lanes remain gated by their dependenc
 | R0-H3 | Deploy and verify the rotation took | 567 | Owner/professional/provider | **Owner-attested via H2's disposition records (2026-09-12).** This check's own acceptance criterion (old credential rejected) is itself owner-badged in the plan; this session never had visibility into old secret values and does not independently re-test it. Not the same as an agent-verified technical re-check. |
 | R0-H4 | Review access logs and scan history | 578 | Owner/professional/provider | **CLOSED 2026-09-14 on owner attestation** — no suspicious access found ([record](../../decisions/2026-09-14-r0-h4-access-log-review-disposition.md)); same caveat as R0-H3, no agent here has hosting/log access to independently re-verify. |
 | R0-H5 | Classify tracked uploads and local dumps | 585 | Owner/professional/provider | **CLOSED 2026-09-14** — the three tracked `uploads/invoices/` entries (2 dev-fixture PNGs, 1 zero-byte glob artifact) were content-inspected, confirmed unreferenced anywhere in the repo and unreproducible by current code, and `git rm`'d per explicit owner instruction ([record](../../decisions/2026-09-14-r0-h5-tracked-uploads-deletion.md)). The historical "41 tracked, 38 ignored" figure remains unsourced — flagged as an open curiosity, not a known gap. |
-| R1-T1 | No-live-system HTTP test harness | 610 | Engineering | Harness implemented early; audit all transport/clock/SSE/push injection and no-network proof — **unblocked 2026-09-21** (R0 exit established). `165fd605` already made the server harness clear single-key email and SMS credentials. |
+| R1-T1 | No-live-system HTTP test harness | 610 | Engineering | **AUDIT CODE-COMPLETE 2026-09-25 (`05195728`; local), awaiting independent review** ([evidence](r1/R1-T1-harness-audit-2026-09-25.md)): every server test fails if it reaches off the machine (the guard caught two that dialled `192.0.2.1`); the harness builds production's app (`server/app.ts`, shared with `index.ts`); `providerNotification`, `useFakeClock`, `openEventStream`; the public payment bearer is exercised; red first 21 of 24, mutations 30/30, server 81/1,456. Found by it and fixed: live updates never reached a browser (`3fac8ac8`, [evidence](r1/R1-live-updates-compression-2026-09-25.md)). Was: Harness implemented early; audit all transport/clock/SSE/push injection and no-network proof — **unblocked 2026-09-21** (R0 exit established). `165fd605` already made the server harness clear single-key email and SMS credentials. |
 | R1-T2 | Checked-in route policy inventory | 622 | Engineering | PARTIAL: [classifier extended and regenerated 2026-09-12/13](r1/R1-T2-classifier-extension-2026-09-12.md) — 218 registrations, **0 unclassified** (was 96/97), 8 principal categories (added `admin`/`public`/`provider-webhook`/`unauthenticated-suspect`), full server regression unchanged at 52/52 suites, 1019/1019 tests. **Found a new gap in the process — see gap 12, now partially closed 2026-09-16** (commits `72230602`, `8666dafc` — payment-correctness defect fixed, confidentiality leak still open). Required per-route fields (capabilityGate, entitlementGate, idempotencyScope, storageMethods, successDto, errorDisclosure) and all-method/use/mounted-router coverage remain incomplete; 0-unclassified is a labeling improvement, not the completed task. |
 | R1-T3 | Explicit role and tenant matrix | 639 | Engineering | PARTIAL: owner defaults fixed; full principal/tenant matrix and runtime coverage open. **The password-path contract is corrected (2026-09-11)** — [evidence](r1/R1-T3-password-path-contract-2026-09-11.md): a cross-tenant path id now returns 403 with both accounts' passwords provably unchanged, red run captured first, route policy regenerated. The route was not moved because its only caller builds the URL from the caller's own JWT. **Tenant-scoping domain audit (2026-09-13): Transactions & Refunds** ([evidence](r1/R1-T3-transactions-refunds-tenant-scoping-2026-09-13.md)), **Boards & Stock** ([evidence](r1/R1-T3-boards-stock-tenant-scoping-2026-09-13.md)), **Property** ([evidence](r1/R1-T3-property-tenant-scoping-2026-09-13.md)), and **Trades** ([evidence](r1/R1-T3-trades-tenant-scoping-2026-09-13.md)) were each independently investigated with a live two-merchant runtime probe — all four found already correctly tenant-scoped today, no code change needed. **Settings/Uploads/Exports — completed 2026-09-14** ([evidence](r1/R1-T3-settings-uploads-exports-tenant-scoping-2026-09-14.md)): unlike the four no-gap-found siblings, this domain found and fixed three real upload-handling bugs (UPL-1 auth-before-multer ordering, UPL-2 missing magic-byte check, UPL-5 filename-extension confusion), closed two test-coverage gaps (UPL-6/UPL-7, 7 new cross-tenant tests, no source change), landed a narrow `nosniff` mitigation (UPL-3), and escalated one structural gap rather than fixing it same-day — `uploaded_files` has no tenant column and its public serve route has zero authorization (gap list item 13, decision memo pending Oliver). **Update 2026-09-19:** Oliver chose Option C on 2026-09-14 and it is now implemented — migration `0023` applied to the development database only, not production; see gap list item 13. **All five R1-T3 tenant-scoping domains are now investigated.** Note what the five results do and do not establish: they show the *compared* merchantId is JWT-derived rather than attacker-controllable at each site, not that the storage layer has been migrated to tenant-scoped methods as §8.5 prefers; that refactor remains open. |
 | R1-H1 | Accept the device baseline commit before R1 client changes | 651 | Owner/professional/provider | **CLOSED 2026-09-14** — Oliver accepted the [auth/onboarding visual baseline](r1/R1-H1-auth-onboarding-baseline-2026-09-12.md) ("Looks good", [record](../../decisions/2026-09-14-r1-h1-visual-baseline-acceptance.md)). This lifts gap-list item 8 (client work gated) for tasks blocked only on this sign-off. |
