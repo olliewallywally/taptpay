@@ -408,7 +408,8 @@ and deleted at the end. Decision: `docs/decisions/2026-09-21-r1-t4-t9-owner-answ
     "Admin login unavailable" (recognised). Read-only count on dev: 1 of 3 waiting applications has
     no password (psql needs the sandbox off: `helium` does not resolve inside it).
   - Results: tsc clean; server 79/1432; client 72/627; browser 18/18.
-- [ ] 6 — **R1-T9 rollout, started 2026-09-23 ~03:50 UTC** (owner: "keep going"; design approved
+- [x] 6 — **R1-T9 rollout, started 2026-09-23 ~03:50 UTC, complete 20:50 UTC; handoff and review
+  brief added 2026-09-25 ([brief](R1-T9-INDEPENDENT-REVIEW-BRIEF-2026-09-25.md))** (owner: "keep going"; design approved
   2026-09-21). The pattern is the pilot's (`2c013f33`): `xUnavailable = query.isError && query.data
   === undefined`; `DesktopLoadFailure` canvas (role=alert, Try again) in the figure's place; quiet
   text elsewhere; data-needing actions disabled; a failed background refresh keeps what is shown.
