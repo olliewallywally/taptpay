@@ -82,11 +82,15 @@ function PaymentStackPage({ merchantId }: { merchantId: number }) {
     (tx) => tx.status === "pending" || tx.status === "processing"
   );
 
-  const copyPaymentLink = (tx: Transaction) => {
+  // A board sale's link is its board's (in its NFC-tag form). A sale without a board has its
+  // own link, shown when it was made and not kept (only its hash is), so there is none to
+  // copy; the business-wide /pay/<merchant> it used to copy was retired on 2026-09-25.
+  const boardLinkFor = (tx: Transaction): string | null => {
     const stone = taptStones.find((s: any) => s.id === (tx as any).taptStoneId);
-    const url = stone?.paymentUrl
-      ? stone.paymentUrl.replace(/\/pay\//, "/nfc/")
-      : `${window.location.origin}/pay/${merchantId}`;
+    return stone?.paymentUrl ? stone.paymentUrl.replace(/\/pay\//, "/nfc/") : null;
+  };
+
+  const copyPaymentLink = (tx: Transaction, url: string) => {
     navigator.clipboard.writeText(url);
     setCopiedId(tx.id);
     setTimeout(() => setCopiedId(null), 2000);
@@ -147,6 +151,7 @@ function PaymentStackPage({ merchantId }: { merchantId: number }) {
           const sc = statusConfig[tx.status] ?? statusConfig.pending;
           const isExpanded = expandedId === tx.id;
           const amount = parseFloat(tx.price as string);
+          const boardLink = boardLinkFor(tx);
 
           return (
             <motion.div
@@ -209,15 +214,17 @@ function PaymentStackPage({ merchantId }: { merchantId: number }) {
                     )}
 
                     <div className="flex gap-2 pt-1">
+                      {boardLink && (
                       <motion.button
                         whileTap={{ scale: 0.95 }}
                         transition={{ type: "spring", stiffness: 600, damping: 26 }}
-                        onClick={() => copyPaymentLink(tx)}
+                        onClick={() => copyPaymentLink(tx, boardLink)}
                         className="flex-1 py-3 rounded-xl text-sm font-semibold text-black flex items-center justify-center gap-2"
                         style={{ backgroundColor: BRAND }}>
                         <Copy size={14} />
                         {copiedId === tx.id ? "Copied!" : "Copy Link"}
                       </motion.button>
+                      )}
                       <motion.button
                         whileTap={{ scale: 0.95 }}
                         transition={{ type: "spring", stiffness: 600, damping: 26 }}

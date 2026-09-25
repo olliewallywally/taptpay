@@ -336,7 +336,9 @@ export default function BoardBuilder() {
   const [logoDataUrl, setLogoDataUrl] = useState("");
   const [selectedFont, setSelectedFont] = useState("Outfit");
   const [customFontDataUrl, setCustomFontDataUrl] = useState("");
-  const [selectedStoneId, setSelectedStoneId] = useState<string>("main");
+  // A payment board's id. The business-wide "Main Payment Link" QR was retired on 2026-09-25
+  // (server/no-board-address.ts): a printed board carries a board's own QR.
+  const [selectedStoneId, setSelectedStoneId] = useState<string>("");
   const [qrDataUrl, setQrDataUrl] = useState("");
   const [fetchingQr, setFetchingQr] = useState(false);
   const [svgTemplate, setSvgTemplate] = useState("");
@@ -382,14 +384,21 @@ export default function BoardBuilder() {
     }
   }, [merchantQuery.data]);
 
-  // Fetch QR code as data URL when stone selection changes
+  // Choose the first active board once they load, and again if the chosen one goes.
   useEffect(() => {
-    if (!merchantId) return;
+    const active = (stonesQuery.data ?? []).filter((stone) => stone.isActive);
+    if (active.some((stone) => String(stone.id) === selectedStoneId)) return;
+    setSelectedStoneId(active[0] ? String(active[0].id) : "");
+  }, [stonesQuery.data]);
+
+  // Fetch the chosen board's QR code as a data URL
+  useEffect(() => {
+    if (!merchantId || !selectedStoneId) {
+      setQrDataUrl("");
+      return;
+    }
     setFetchingQr(true);
-    const url =
-      selectedStoneId === "main"
-        ? `/api/merchants/${merchantId}/qr?size=600`
-        : `/api/merchants/${merchantId}/stone/${selectedStoneId}/qr?size=600`;
+    const url = `/api/merchants/${merchantId}/stone/${selectedStoneId}/qr?size=600`;
     fetchAsDataUrl(url, token)
       .then(setQrDataUrl)
       .catch(() => setQrDataUrl(""))
@@ -478,6 +487,10 @@ export default function BoardBuilder() {
     }
     if (!svgTemplate) {
       toast({ title: "Template not loaded yet, please wait.", variant: "destructive" });
+      return;
+    }
+    if (!selectedStoneId) {
+      toast({ title: "Choose a payment board for the QR code first.", variant: "destructive" });
       return;
     }
 
@@ -622,7 +635,7 @@ export default function BoardBuilder() {
               <Input placeholder="Your email" type="email" value={submitterEmail} onChange={(e) => setSubmitterEmail(e.target.value)} className="border-gray-200 focus:border-[#0055FF]" />
               <Button
                 onClick={handleGeneratePdf}
-                disabled={isSubmitting || templateLoading}
+                disabled={isSubmitting || templateLoading || !selectedStoneId}
                 className="w-full bg-[#0055FF] hover:bg-[#0044DD] text-white font-medium py-3 rounded-xl"
               >
                 {isSubmitting ? (
@@ -644,13 +657,15 @@ export default function BoardBuilder() {
 
             <ControlSection anchor="bb-qr" icon={<QrCode size={16} />} title="Payment QR Code" isOpen={openSection === "stone"} onToggle={() => toggle("stone")}>
               <div className="space-y-2">
-                <Label className="text-xs text-gray-500">Select which Tapt Stone or payment link to show</Label>
+                <Label className="text-xs text-gray-500">Select which Tapt Stone's QR code to show</Label>
+                {stonesQuery.isSuccess && !stones.some((s) => s.isActive) && (
+                  <p className="text-xs text-gray-500">No payment boards yet. Add one from the terminal first; its QR code goes on your print.</p>
+                )}
                 <Select value={selectedStoneId} onValueChange={setSelectedStoneId}>
                   <SelectTrigger className="border-gray-200 focus:border-[#0055FF]">
                     <SelectValue placeholder="Select stone…" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="main">Main Payment Link</SelectItem>
                     {stones.filter((s) => s.isActive).map((stone) => (
                       <SelectItem key={stone.id} value={String(stone.id)}>
                         {stone.name} (Stone {stone.stoneNumber})

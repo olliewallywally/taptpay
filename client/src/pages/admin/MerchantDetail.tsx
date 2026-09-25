@@ -4,7 +4,7 @@ import { useLocation } from 'wouter';
 import {
   ArrowLeft, DollarSign, Activity, MapPin, Mail, User, Phone, Building,
   CreditCard, CheckCircle, Send, Shield, AlertTriangle, Download, Share2,
-  Receipt, Search, Edit2, Check, X, ExternalLink, Hash, Landmark,
+  Receipt, Search, Edit2, Check, X, Hash, Landmark,
   FileText, CalendarDays, TrendingUp, BadgeCheck, BadgeX
 } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
@@ -395,19 +395,8 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
               )}
             </div>
 
-            {/* Payment URL */}
-            <div className="bg-[#1a1b2e] rounded-xl p-4 mb-3">
-              <p className="text-[#dbdfea]/50 text-xs mb-1 uppercase tracking-wide">Payment URL</p>
-              <div className="flex items-center gap-2">
-                <p className="text-[#00E5CC] text-xs font-mono truncate flex-1">{merchant.paymentUrl || '—'}</p>
-                {merchant.paymentUrl && (
-                  <a href={merchant.paymentUrl} target="_blank" rel="noopener noreferrer" className="text-[#dbdfea]/40 hover:text-[#00E5CC]">
-                    <ExternalLink className="size-3.5" />
-                  </a>
-                )}
-              </div>
-            </div>
-
+            {/* No "Payment URL" row: the business-wide no-board address was retired on
+                2026-09-25 (server/no-board-address.ts); boards and sales have their own. */}
             {/* Windcave integration status — never return the credential itself. */}
             <div className="bg-[#1a1b2e] rounded-xl p-4">
               <p className="text-[#dbdfea]/50 text-xs mb-1 uppercase tracking-wide">Windcave integration</p>

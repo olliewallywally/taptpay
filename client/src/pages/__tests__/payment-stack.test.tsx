@@ -6,6 +6,9 @@ import PaymentStack from "@/pages/payment-stack";
  * The phone Payment Stack lists this business's open sales.
  * - It reads them signed in: both reads are behind authenticateToken, which reads only the
  *   Authorization header, and the page sent none (since c7220cea, 2026-05-12).
+ * - Owner decision 2026-09-25 (server/no-board-address.ts): "Copy Link" gives a board sale its
+ *   board's address. A sale without a board has its own link, shown when it was made and not
+ *   kept (only its hash is), so there is no link to copy — never the retired /pay/<merchant>.
  */
 
 jest.mock("@/components/merchant-gate", () => ({
@@ -68,4 +71,14 @@ it("copies a board sale's board address", async () => {
   fireEvent.click(await screen.findByRole("button", { name: /copy link/i }));
 
   await waitFor(() => expect(mockWriteText).toHaveBeenCalledWith("https://shop.example/nfc/1/stone/7"));
+});
+
+it("offers no link to copy for a sale without a board, and never the business-wide address", async () => {
+  renderStack();
+  fireEvent.click(await screen.findByText("Takeaway lunch"));
+
+  expect(await screen.findByRole("button", { name: /cancel/i })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /copy link/i })).toBeNull();
+  expect(mockWriteText).not.toHaveBeenCalled();
+  expect(document.body.innerHTML).not.toMatch(/\/pay\/1(?!\/stone)/);
 });
