@@ -70,7 +70,8 @@ import {
   tokenReceiptDto,
 } from "./http-contracts";
 import { PLAN_LIST, planIdSchema } from "@shared/plans";
-import { sseBroker, isLegacyNoBoardEligible, type SseAudience } from "./sse-broker";
+import { sseBroker, type SseAudience } from "./sse-broker";
+import { NO_BOARD_ADDRESS_RETIRED, NO_BOARD_SALE_NEEDS_OWN_LINK } from "./no-board-address";
 import {
   createRetailTransaction,
   PaymentCredentialCollisionError,
@@ -284,59 +285,11 @@ setInterval(() => {
   }
 }, RATE_LIMIT_WINDOW).unref();
 
+// The business's own streams and its boards' streams. The anonymous business-wide
+// no-board stream, and gap 12 Option C's ambiguity gate in front of it, were retired on
+// 2026-09-25 (server/no-board-address.ts): no anonymous stream carries a no-board sale.
 function broadcastToStone(merchantId: number, stoneId: number | null | undefined, data: any) {
-  const canonicalStoneId = stoneId ?? null;
-  // Gap 12 Option C mandatory fix #1: "merchant" and "board" audiences are
-  // dispatched to synchronously and unconditionally, exactly as before this
-  // change — zero added latency, zero reordering exposure. Only the
-  // "legacy-no-board" leg (below) is gated behind an async ambiguity check;
-  // it must never delay or reorder this line. See
-  // docs/decisions/2026-09-13-gap12-anonymous-sse-addressing-options.md
-  // "Option C" and
-  // docs/evidence/remediation-v2-2/r1/R1-T2-gap12-option-c-fail-closed-2026-09-15.md.
-  sseBroker.broadcast(merchantId, canonicalStoneId, data, { audiences: ["merchant", "board"] });
-  dispatchLegacyNoBoard(merchantId, canonicalStoneId, data);
-}
-
-/**
- * Gap 12 Option C — the "legacy-no-board" (unauthenticated, no-board)
- * audience alone is gated behind an async check of whether the merchant
- * currently has 2+ concurrent candidate stoneless transactions open. If so,
- * every legacy-no-board subscriber is told the sale is ambiguous instead of
- * receiving (possibly someone else's) transaction data — see mandatory fix
- * #1 above for why this must be a separate, later step from the
- * merchant/board dispatch, not a gate in front of it.
- *
- * Mandatory fix #3 (documented, not fixed — see the evidence doc's "what
- * this does not fix" section): this re-derives ambiguity from the current
- * database state at the moment the check resolves, then delivers the
- * ORIGINAL triggering broadcast's data whenever that check comes back
- * non-ambiguous. If a second concurrent sale completes in the gap between
- * this function being called and the check resolving, its own completion
- * broadcast can still be judged non-ambiguous (the pending bucket has
- * already dropped back to one) and delivered in full to every
- * legacy-no-board subscriber, including one still watching the other,
- * still-pending sale.
- */
-function dispatchLegacyNoBoard(merchantId: number, stoneId: number | null, data: any) {
-  if (!isLegacyNoBoardEligible(stoneId, data)) return;
-  // Mandatory fix #2: an audience-scoped count, not sseBroker.subscriberCount
-  // (which counts every audience) — a merchant-only-audience broadcast with
-  // zero anonymous customers connected must trigger zero DB round-trips.
-  if (sseBroker.legacyNoBoardSubscriberCount(merchantId) === 0) return;
-  void storage.getLegacyNoBoardActiveTransactionOrAmbiguous(merchantId)
-    .then((result) => {
-      if (result.kind === "ambiguous") {
-        sseBroker.broadcastLegacyNoBoardAmbiguous(merchantId);
-      } else {
-        sseBroker.broadcast(merchantId, stoneId, data, { audiences: ["legacy-no-board"] });
-      }
-    })
-    .catch((error) => {
-      // Fail closed: deliver nothing to the anonymous audience rather than a
-      // possibly-wrong transaction when the ambiguity check itself errors.
-      console.error("legacy-no-board ambiguity check failed:", error);
-    });
+  sseBroker.broadcast(merchantId, stoneId ?? null, data);
 }
 
 const loginSchema = z.object({
@@ -2297,6 +2250,52 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       return res.status(400).json({ message: "Invalid stoneId" });
     }
 
+    const noStore = {
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+      'Content-Type': 'application/json'
+    };
+
+    // The business's own terminal, signed in: its newest open sale on any board or
+    // none, including a sale with its own link, which no public read can see. The
+    // same shape its own event stream sends.
+    if (req.headers.authorization !== undefined) {
+      let authenticated = false;
+      await authenticateToken(req as AuthenticatedRequest, res, () => {
+        authenticated = true;
+      });
+      if (!authenticated) return;
+      if (!checkMerchantOwnership(req as AuthenticatedRequest, merchantId)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      res.set(noStore);
+      try {
+        const transaction = await storage.getActiveTransactionByMerchant(
+          merchantId,
+          stoneId === undefined ? { kind: "merchant-any" } : { kind: "board", stoneId },
+        );
+        if (!transaction) return res.json(null);
+        // A board sale keeps its board's address. A sale with its own link can't have
+        // it rebuilt (only its hash is kept), so it has none here.
+        const boardUrls = transaction.taptStoneId != null && transaction.paymentTokenHash == null
+          ? {
+              paymentUrl: generatePaymentUrl(merchantId, transaction.taptStoneId, req),
+              qrCodeUrl: generateQrCodeUrl(merchantId, transaction.taptStoneId, req),
+            }
+          : {};
+        return res.json(ownerTransactionDto({ ...transaction, ...boardUrls }));
+      } catch (error) {
+        return res.status(500).json({ message: "Failed to get active transaction" });
+      }
+    }
+
+    // No board and no sign-in: the retired business-wide no-board address.
+    if (stoneId === undefined) {
+      return res.status(410).json(NO_BOARD_ADDRESS_RETIRED);
+    }
+
+    // A board's customer page: public, scoped to that board.
     // SECURITY: Rate limiting
     const clientIp = req.ip || 'unknown';
     if (!checkRateLimit(clientIp)) {
@@ -2305,53 +2304,21 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
     
     // Ultra-fast headers for immediate response
-    res.set({
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
-      'Pragma': 'no-cache',
-      'Expires': '0',
-      'Content-Type': 'application/json'
-    });
+    res.set(noStore);
     
     try {
       // AUDIT: Log access to payment page
-      console.log(`Active transaction requested: merchant ${merchantId}, stone ${stoneId || 'none'}, IP ${clientIp}`);
+      console.log(`Active transaction requested: merchant ${merchantId}, stone ${stoneId}, IP ${clientIp}`);
       
-      // SECURITY: If stoneId is provided, verify it belongs to this merchant
-      if (stoneId !== undefined) {
-        const stone = await storage.getTaptStone(stoneId);
-        if (!stone || stone.merchantId !== merchantId) {
-          return res.status(403).json({ 
-            message: "Invalid stone access - stone does not belong to this merchant" 
-          });
-        }
+      // SECURITY: verify the board belongs to this merchant
+      const stone = await storage.getTaptStone(stoneId);
+      if (!stone || stone.merchantId !== merchantId) {
+        return res.status(403).json({
+          message: "Invalid stone access - stone does not belong to this merchant"
+        });
       }
-      
-      // No stoneId on a public pay link means the *no-board* link, not "any board":
-      // scope to stoneless sales. Filtering by merchant alone would serve
-      // this customer a sale rung up on a specific board.
-      //
-      // Gap 12 Option C: the no-stoneId (legacy-no-board) branch must fail
-      // closed when the merchant has 2+ concurrent candidate stoneless
-      // transactions open, rather than silently resolving to the newest —
-      // see getLegacyNoBoardActiveTransactionOrAmbiguous's doc comment in
-      // server/storage.ts. The board branch is untouched.
-      let transaction: Awaited<ReturnType<typeof storage.getActiveTransactionByMerchant>>;
-      if (stoneId === undefined) {
-        const result = await storage.getLegacyNoBoardActiveTransactionOrAmbiguous(merchantId);
-        if (result.kind === "ambiguous") {
-          // Owner-approved response shape: the JSON body stays null — byte-
-          // identical to today's "no active transaction" response for any
-          // caller that doesn't look for the header (the three staff
-          // terminal screens and demo-terminal.tsx) — and ambiguity is
-          // signalled only via this header, read only by the modified
-          // customer-payment.tsx.
-          res.set("X-Legacy-No-Board-Ambiguous", "true");
-          return res.json(null);
-        }
-        transaction = result.kind === "found" ? result.transaction : undefined;
-      } else {
-        transaction = await storage.getActiveTransactionByMerchant(merchantId, { kind: "board", stoneId });
-      }
+
+      const transaction = await storage.getActiveTransactionByMerchant(merchantId, { kind: "board", stoneId });
 
       if (!transaction) {
         return res.json(null);
@@ -2364,8 +2331,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         });
       }
       
-      // SECURITY: If stoneId specified, verify transaction is for that stone
-      if (stoneId !== undefined && transaction.taptStoneId !== stoneId) {
+      // SECURITY: verify the transaction is for that board
+      if (transaction.taptStoneId !== stoneId) {
         return res.json(null); // Return null instead of wrong stone's transaction
       }
       
@@ -2398,22 +2365,28 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
       if (!(await requireBillingCard(validation.data.merchantId, res))) return;
 
-      if (validation.data.linkMode === "per_payment" && !config.features.newRetailPayments) {
+      const selectedStoneId = validation.data.selectedStoneId ?? null;
+      // A sale without a payment board always has its own private link (owner decision
+      // 2026-09-25, server/no-board-address.ts); only a board sale uses a shared address,
+      // its board's. So no link type named means per-payment without a board.
+      const linkMode = validation.data.linkMode ?? (selectedStoneId === null ? "per_payment" : "legacy");
+      if (selectedStoneId === null && linkMode === "legacy") {
+        return res.status(400).json(NO_BOARD_SALE_NEEDS_OWN_LINK);
+      }
+      if (linkMode === "per_payment" && !config.features.newRetailPayments) {
         return res.status(503).json({ message: "Per-payment links are not enabled yet" });
       }
 
-      const selectedStoneId = validation.data.selectedStoneId ?? null;
       if (selectedStoneId !== null) {
         const stone = await storage.getTaptStone(selectedStoneId);
         if (!stone || stone.merchantId !== validation.data.merchantId || !stone.isActive) {
           return res.status(400).json({ message: "Selected payment board is unavailable" });
         }
       }
-      if (selectedStoneId !== null && validation.data.linkMode === "per_payment") {
+      if (selectedStoneId !== null && linkMode === "per_payment") {
         return res.status(400).json({ message: "Per-payment links cannot use a payment board" });
       }
 
-      const linkMode = validation.data.linkMode ?? "legacy";
       const { transaction, rawToken } = await createRetailTransaction(storage, {
         merchantId: validation.data.merchantId,
         itemName: validation.data.itemName,
@@ -2425,7 +2398,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }, linkMode);
 
       // The bearer token is disclosed exactly once, in this authenticated create
-      // response. Legacy/board sales retain their stable shared URLs.
+      // response. A board sale keeps its board's stable shared URL.
       const paymentUrl = rawToken
         ? `${getBaseUrl(req)}/pay/t/${rawToken}`
         : generatePaymentUrl(transaction.merchantId!, transaction.taptStoneId, req);
@@ -5748,16 +5721,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         }
         audience = { kind: "board", stoneId };
       } else {
-        // SECURITY: this branch has no authentication of any kind (same
-        // no-stoneId access mode as GET /api/merchants/:id/active-transaction
-        // above), so it must not be exempt from the abuse-rate bound that
-        // sibling already enforces.
-        const clientIp = req.ip || 'unknown';
-        if (!checkRateLimit(clientIp)) {
-          console.warn(`SECURITY: Rate limit exceeded for IP ${clientIp} on events endpoint`);
-          return res.status(429).json({ message: "Too many requests. Please try again later." });
-        }
-        audience = { kind: "legacy-no-board" };
+        // No board and no sign-in: the retired business-wide no-board feed, which let
+        // anyone who knew a business's number watch its no-board sales (gap 12).
+        return res.status(410).json(NO_BOARD_ADDRESS_RETIRED);
       }
 
       res.writeHead(200, {

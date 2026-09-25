@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/routes.ts @ ff16abfeaa870671248257ee5f98623ac1f88fd3 on 2026-09-23.
+ * scripts/generate-route-policy.ts from server/routes.ts @ da90d1a11d48858ee7a37997a7b316134875d2f6 on 2026-09-25.
  *
  * 223 registrations (93 GET, 91 POST, 3 PATCH, 5 ALL, 22 PUT, 9 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -106,7 +106,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
   "POST /api/pay/t/:token/googlepay-complete": {"method":"POST","path":"/api/pay/t/:token/googlepay-complete","principal":"public","markers":["prepareTokenCompletion(","paymentAttempts.resolveReturnState("]},
   "GET /api/pay/return/:state": {"method":"GET","path":"/api/pay/return/:state","principal":"public","markers":["paymentAttempts.resolveReturnState("]},
   "ALL /api/pay/notification/:state": {"method":"ALL","path":"/api/pay/notification/:state","principal":"provider-webhook","markers":[]},
-  "GET /api/merchants/:id/active-transaction": {"method":"GET","path":"/api/merchants/:id/active-transaction","principal":"public","markers":["publicTransactionDto(","generatePaymentUrl("]},
+  "GET /api/merchants/:id/active-transaction": {"method":"GET","path":"/api/merchants/:id/active-transaction","principal":"merchant-user","markers":["authenticateToken","checkMerchantOwnership","publicTransactionDto(","generatePaymentUrl("]},
   "POST /api/transactions": {"method":"POST","path":"/api/transactions","principal":"merchant-user","markers":["authenticateToken","checkMerchantOwnership","generatePaymentUrl("]},
   "POST /api/transactions/cash-sale": {"method":"POST","path":"/api/transactions/cash-sale","principal":"merchant-user","markers":["authenticateToken","checkMerchantOwnership"]},
   "POST /api/transactions/tap-to-pay": {"method":"POST","path":"/api/transactions/tap-to-pay","principal":"merchant-user","markers":["authenticateToken","checkMerchantOwnership"]},
@@ -175,7 +175,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
   "POST /api/merchants/signup": {"method":"POST","path":"/api/merchants/signup","principal":"public","markers":[]},
   "PUT /api/merchants/:id/business-details": {"method":"PUT","path":"/api/merchants/:id/business-details","principal":"merchant-user","markers":["authenticateToken","checkAccountOwnership"]},
   "POST /api/admin/merchants/signup": {"method":"POST","path":"/api/admin/merchants/signup","principal":"admin","markers":["authenticateAdmin","generatePaymentUrl("]},
-  "GET /api/merchants/:id/events": {"method":"GET","path":"/api/merchants/:id/events","principal":"unauthenticated-suspect","markers":["authenticateToken","checkMerchantOwnership"]},
+  "GET /api/merchants/:id/events": {"method":"GET","path":"/api/merchants/:id/events","principal":"merchant-user","markers":["authenticateToken","checkMerchantOwnership"]},
   "GET /api/push/capabilities": {"method":"GET","path":"/api/push/capabilities","principal":"public","markers":[]},
   "GET /api/push/vapid-key": {"method":"GET","path":"/api/push/vapid-key","principal":"public","markers":[]},
   "POST /api/push/subscribe": {"method":"POST","path":"/api/push/subscribe","principal":"merchant-user","markers":["authenticateToken"]},

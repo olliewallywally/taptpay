@@ -256,24 +256,23 @@ describe("Phase 0 SSE audience matrix", () => {
     };
   };
 
-  test("board, no-board and merchant audiences receive only their events", () => {
+  // The anonymous business-wide no-board audience was retired on 2026-09-25
+  // (server/no-board-address.ts): a no-board sale reaches only the business's own stream.
+  test("board and merchant audiences receive only their events; a no-board sale reaches only the merchant", () => {
     const broker = new SseBroker();
     const merchantConn = connection();
-    const noBoardConn = connection();
     const boardThreeConn = connection();
     const boardFourConn = connection();
     broker.subscribe(7, { kind: "merchant", userId: 5, principal: "user" }, merchantConn);
-    broker.subscribe(7, { kind: "legacy-no-board" }, noBoardConn);
     broker.subscribe(7, { kind: "board", stoneId: 3 }, boardThreeConn);
     broker.subscribe(7, { kind: "board", stoneId: 4 }, boardFourConn);
-    for (const conn of [merchantConn, noBoardConn, boardThreeConn, boardFourConn]) {
+    for (const conn of [merchantConn, boardThreeConn, boardFourConn]) {
       conn.frames.length = 0;
     }
 
     broker.broadcast(7, 3, { type: "transaction_updated", transaction });
     expect(merchantConn.frames).toHaveLength(1);
     expect(boardThreeConn.frames).toHaveLength(1);
-    expect(noBoardConn.frames).toHaveLength(0);
     expect(boardFourConn.frames).toHaveLength(0);
     expect(boardThreeConn.frames[0]).toMatchObject({
       addressingMode: "board",
@@ -287,8 +286,7 @@ describe("Phase 0 SSE audience matrix", () => {
       transaction: { ...transaction, taptStoneId: null },
     });
     expect(merchantConn.frames).toHaveLength(2);
-    expect(noBoardConn.frames).toHaveLength(1);
-    expect(noBoardConn.frames[0].addressingMode).toBe("legacy-no-board");
+    expect(merchantConn.frames[1]).not.toHaveProperty("addressingMode");
     expect(boardThreeConn.frames).toHaveLength(1);
     expect(boardFourConn.frames).toHaveLength(0);
 
@@ -301,7 +299,8 @@ describe("Phase 0 SSE audience matrix", () => {
       },
     });
     expect(merchantConn.frames).toHaveLength(3);
-    expect(noBoardConn.frames).toHaveLength(1);
+    expect(boardThreeConn.frames).toHaveLength(1);
+    expect(boardFourConn.frames).toHaveLength(0);
     expect(merchantConn.frames[2].transaction).not.toHaveProperty("paymentTokenHash");
   });
 

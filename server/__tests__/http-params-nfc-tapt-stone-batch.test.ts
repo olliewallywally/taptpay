@@ -110,11 +110,15 @@ describe("R1-T6 — /nfc, /api/tapt-stones, active-transaction stoneId", () => {
   });
 
   describe("GET /api/merchants/:id/active-transaction — optional ?stoneId", () => {
-    it("still works with no stoneId at all (stays optional)", async () => {
+    // With no stoneId, only the business's own signed-in terminal is answered: the
+    // anonymous no-board read was retired on 2026-09-25 (no-board-address-retired.test.ts).
+    it("still works with no stoneId at all when signed in (stays optional)", async () => {
       const { app } = await createTestApp();
       const owner = await createOwnerPrincipal();
 
-      const response = await request(app).get(`/api/merchants/${owner.merchantId}/active-transaction`);
+      const response = await request(app)
+        .get(`/api/merchants/${owner.merchantId}/active-transaction`)
+        .set(bearer(owner));
       expect(response.status).toBe(200);
       expect(response.body).toBeNull();
     });

@@ -297,23 +297,15 @@ export const PUBLIC_PATH_ALLOWLIST: Record<string, string> = {
 };
 
 /**
- * R1-T2 2026-09-12 — a route that LOOKS like it should require auth and
- * does not, found incidentally while classifying the 96 routes above (not
- * itself one of the 96 — route-policy.ts already called it "merchant-user"
- * because one of its three branches genuinely does gate on
- * authenticateToken). Deliberately classified as "unauthenticated-suspect"
- * rather than silently left at "merchant-user" (which would hide it) or
- * quietly relabeled "public" (which would look like an intentional,
- * reviewed design decision, same as everything above) — see
- * docs/evidence/remediation-v2-2/r1/ for the full writeup. This is NOT a
- * fix: the route in server/routes.ts is untouched; R1-T3 (or whoever owns
- * that route) needs to look at the `legacy-no-board` fallback branch
- * directly.
+ * Routes that LOOK like they should require auth and do not, in at least one
+ * reachable branch — a deliberate loud flag ("unauthenticated-suspect"), not a
+ * fix. Empty since 2026-09-25: its one entry, `GET /api/merchants/:id/events`
+ * (flagged R1-T2 2026-09-12 for its anonymous "legacy-no-board" branch, gap 12),
+ * was resolved when that branch was retired (owner decision 2026-09-25,
+ * server/no-board-address.ts). The route's two remaining branches are a signed-in
+ * merchant and a board's customer page, scoped to that board.
  */
-export const SUSPECTED_GAP_ROUTES: Record<string, string> = {
-  "GET /api/merchants/:id/events":
-    "SSE stream (server/routes.ts ~5289-5360): the Authorization-header branch and the stoneId-present branch are properly scoped, but when NEITHER is supplied the handler falls through to audience { kind: 'legacy-no-board' } and opens the merchant's live SSE stream with zero authentication and zero stone-ownership scoping to anyone who knows/guesses the numeric merchantId.",
-};
+export const SUSPECTED_GAP_ROUTES: Record<string, string> = {};
 
 /** Slices from one registration's start line to just before the next `app.` call, for marker detection. */
 export function sliceHandlerBodies(sourceText: string, registrations: RouteRegistration[]): string[] {

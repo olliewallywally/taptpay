@@ -23,27 +23,11 @@ import type {
   PaymentAttemptRepository,
 } from "./payment-attempt-service";
 
+// The anonymous business-wide "legacy-no-board" scope was retired on 2026-09-25 with the
+// address it served (server/no-board-address.ts): no public caller reads a no-board sale.
 export type ActiveTransactionScope =
   | { kind: "merchant-any" }
-  // SUPERSEDED for anonymous/legacy-no-board callers — see
-  // getActiveTransactionByMerchant's doc comment and
-  // getLegacyNoBoardActiveTransactionOrAmbiguous below (gap 12 Option C,
-  // docs/decisions/2026-09-13-gap12-anonymous-sse-addressing-options.md).
-  // Kept for callers that intentionally want "the single newest" (e.g. a
-  // non-anonymous scope with the same shape); never reach for it to answer
-  // an anonymous customer.
-  | { kind: "legacy-no-board" }
   | { kind: "board"; stoneId: number };
-
-/**
- * Gap 12 Option C — the result of resolving "the" anonymous stoneless sale
- * for a merchant when more than one candidate can legitimately exist at
- * once. See getLegacyNoBoardActiveTransactionOrAmbiguous.
- */
-export type LegacyNoBoardActiveTransactionResult =
-  | { kind: "none" }
-  | { kind: "ambiguous" }
-  | { kind: "found"; transaction: Transaction };
 
 export type PushSubscriptionInput = {
   merchantId: number;
@@ -569,46 +553,13 @@ export interface IStorage extends PaymentAttemptRepository {
   getTransaction(id: number): Promise<Transaction | undefined>;
   getTransactionByPaymentTokenHash(paymentTokenHash: string): Promise<Transaction | undefined>;
   /**
-   * Find the merchant's newest active transaction within an explicit audience
-   * scope. Public shared-link callers use `legacy-no-board`, which excludes
-   * per-payment credentials as well as board-bound rows; authenticated
-   * merchant callers that intentionally see every board use `merchant-any`.
-   *
-   * SUPERSEDED for anonymous/legacy-no-board callers by
-   * `getLegacyNoBoardActiveTransactionOrAmbiguous` below (gap 12 Option C,
-   * docs/decisions/2026-09-13-gap12-anonymous-sse-addressing-options.md
-   * §3.3, and
-   * docs/evidence/remediation-v2-2/r1/R1-T2-gap12-option-c-fail-closed-2026-09-15.md).
-   * Reason: called with `{ kind: "legacy-no-board" }`, this method silently
-   * resolves ties by picking the single *newest* candidate — so if a
-   * merchant ever has two concurrent stoneless (no board, no payment token)
-   * sales open, every anonymous customer converges on the newer one,
-   * including a customer already correctly shown the other. That is not
-   * just a cross-customer confidentiality leak: `customer-payment.tsx`
-   * redirects on the transaction id it is watching, so a customer can be
-   * routed onto a *different customer's* checkout and pay their amount.
-   * Do not reach for `{ kind: "legacy-no-board" }` on this method for any
-   * new anonymous-customer-facing code path — use the method below, which
-   * refuses to resolve at all when 2+ candidates are open. This method's
-   * `legacy-no-board` branch is kept only so existing tests that pin its
-   * "prefers the newest" behaviour keep exercising it; its only production
-   * caller as of gap 12 Option C is the `merchant-any`/`board` scopes.
+   * Find the merchant's newest active transaction within an explicit scope: a
+   * board's customer page uses `board`; the business's own signed-in terminal,
+   * which sees every board and every sale with its own link, uses
+   * `merchant-any`. Newest pending/processing first, else a completion within
+   * the last 3 minutes (so a terminal sees pending turn to completed).
    */
   getActiveTransactionByMerchant(merchantId: number, scope: ActiveTransactionScope): Promise<Transaction | undefined>;
-  /**
-   * Gap 12 Option C — the anonymous/legacy-no-board-safe replacement for
-   * `getActiveTransactionByMerchant(merchantId, { kind: "legacy-no-board" })`.
-   * Same two-step "prefer pending/processing, else a completion within the
-   * last 3 minutes" shape, but at each step: 0 candidates -> `{kind:"none"}`,
-   * exactly 1 -> `{kind:"found", transaction}`, 2+ -> `{kind:"ambiguous"}` —
-   * fails closed rather than silently picking the newest. Used by both
-   * `GET /api/merchants/:id/active-transaction`'s no-stoneId branch and the
-   * SSE legacy-no-board broadcast gate in `server/routes.ts`'s
-   * `dispatchLegacyNoBoard`, so the definition of "ambiguous" cannot drift
-   * between the two. See the doc comment above for what this supersedes and
-   * why.
-   */
-  getLegacyNoBoardActiveTransactionOrAmbiguous(merchantId: number): Promise<LegacyNoBoardActiveTransactionResult>;
   getTransactionByNfcSession(nfcSessionId: string): Promise<Transaction | undefined>;
   createTransaction(transaction: TransactionStorageInput): Promise<Transaction>;
   updateTransactionStatus(id: number, status: string, windcaveTransactionId?: string): Promise<Transaction | undefined>;
@@ -1763,10 +1714,6 @@ export class MemStorage implements IStorage {
         switch (scope.kind) {
           case "merchant-any":
             return true;
-          case "legacy-no-board":
-            // SUPERSEDED for anonymous callers — see the interface doc
-            // comment above and getLegacyNoBoardActiveTransactionOrAmbiguous.
-            return transaction.taptStoneId == null && transaction.paymentTokenHash == null;
           case "board":
             return transaction.taptStoneId === scope.stoneId;
         }
@@ -1781,36 +1728,6 @@ export class MemStorage implements IStorage {
         transaction.createdAt != null &&
         transaction.createdAt >= cutoff,
     );
-  }
-
-  async getLegacyNoBoardActiveTransactionOrAmbiguous(
-    merchantId: number,
-  ): Promise<LegacyNoBoardActiveTransactionResult> {
-    const cutoff = new Date(Date.now() - 3 * 60 * 1000);
-    const scoped = Array.from(this.transactions.values())
-      .filter(
-        (transaction) =>
-          transaction.merchantId === merchantId &&
-          transaction.taptStoneId == null &&
-          transaction.paymentTokenHash == null,
-      )
-      .sort(compareTransactionsNewest);
-
-    const active = scoped.filter(
-      (transaction) => transaction.status === "pending" || transaction.status === "processing",
-    );
-    if (active.length >= 2) return { kind: "ambiguous" };
-    if (active.length === 1) return { kind: "found", transaction: active[0] };
-
-    const recentlyCompleted = scoped.filter(
-      (transaction) =>
-        transaction.status === "completed" &&
-        transaction.createdAt != null &&
-        transaction.createdAt >= cutoff,
-    );
-    if (recentlyCompleted.length >= 2) return { kind: "ambiguous" };
-    if (recentlyCompleted.length === 1) return { kind: "found", transaction: recentlyCompleted[0] };
-    return { kind: "none" };
   }
 
   async getTransactionByNfcSession(nfcSessionId: string): Promise<Transaction | undefined> {
@@ -4965,18 +4882,10 @@ export class DatabaseStorage implements IStorage {
   ): Promise<Transaction | undefined> {
     if (!this.db) throw new Error('Database not available');
 
-    // SUPERSEDED for anonymous callers when scope.kind === "legacy-no-board"
-    // — see the interface doc comment above and
-    // getLegacyNoBoardActiveTransactionOrAmbiguous.
     const stoneCondition =
       scope.kind === "merchant-any"
         ? undefined
-        : scope.kind === "legacy-no-board"
-          ? and(
-              isNull(transactions.taptStoneId),
-              isNull(transactions.paymentTokenHash),
-            )
-          : eq(transactions.taptStoneId, scope.stoneId);
+        : eq(transactions.taptStoneId, scope.stoneId);
 
     // 1. Prefer pending/processing (in-flight) transactions
     const activeConditions = [
@@ -5012,51 +4921,6 @@ export class DatabaseStorage implements IStorage {
       .orderBy(sql`${transactions.createdAt} desc nulls last`, desc(transactions.id))
       .limit(1);
     return completedResult[0];
-  }
-
-  async getLegacyNoBoardActiveTransactionOrAmbiguous(
-    merchantId: number,
-  ): Promise<LegacyNoBoardActiveTransactionResult> {
-    if (!this.db) throw new Error('Database not available');
-
-    const noBoardCondition = and(
-      isNull(transactions.taptStoneId),
-      isNull(transactions.paymentTokenHash),
-    );
-
-    // 1. Prefer pending/processing (in-flight) transactions — fetch 2, not
-    // 1, so two concurrent stoneless sales are distinguishable from exactly
-    // one (gap 12 Option C: never silently pick the newest of 2+).
-    const activeResult = await this.db
-      .select()
-      .from(transactions)
-      .where(and(
-        eq(transactions.merchantId, merchantId),
-        inArray(transactions.status, ['pending', 'processing']),
-        noBoardCondition,
-      ))
-      .orderBy(sql`${transactions.createdAt} desc nulls last`, desc(transactions.id))
-      .limit(2);
-    if (activeResult.length >= 2) return { kind: "ambiguous" };
-    if (activeResult.length === 1) return { kind: "found", transaction: activeResult[0] };
-
-    // 2. Fall back to the most-recently completed transaction (within last 3
-    // min), same "fetch 2, fail if 2" ambiguity rule.
-    const cutoff = new Date(Date.now() - 3 * 60 * 1000);
-    const completedResult = await this.db
-      .select()
-      .from(transactions)
-      .where(and(
-        eq(transactions.merchantId, merchantId),
-        eq(transactions.status, 'completed'),
-        gte(transactions.createdAt, cutoff),
-        noBoardCondition,
-      ))
-      .orderBy(sql`${transactions.createdAt} desc nulls last`, desc(transactions.id))
-      .limit(2);
-    if (completedResult.length >= 2) return { kind: "ambiguous" };
-    if (completedResult.length === 1) return { kind: "found", transaction: completedResult[0] };
-    return { kind: "none" };
   }
 
   async createTransaction(input: TransactionStorageInput): Promise<Transaction> {

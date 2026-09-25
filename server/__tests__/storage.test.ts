@@ -54,11 +54,13 @@ describe("transaction storage addressing", () => {
       .toMatchObject({ taptStoneId: 7, paymentTokenHash: serverHash });
   });
 
-  test("uses explicit merchant, no-board, and board scopes without stale misses", async () => {
+  // The anonymous "legacy-no-board" scope was retired on 2026-09-25 with the address it
+  // served (server/no-board-address.ts); these cover the two scopes that remain.
+  test("uses explicit merchant and board scopes without stale misses", async () => {
     const storage = new MemStorage();
 
     await expect(
-      storage.getActiveTransactionByMerchant(1, { kind: "legacy-no-board" }),
+      storage.getActiveTransactionByMerchant(1, { kind: "merchant-any" }),
     ).resolves.toBeUndefined();
 
     const boardOne = await storage.createTransaction(transactionInput({ taptStoneId: 11 }));
@@ -77,19 +79,23 @@ describe("transaction storage addressing", () => {
       storage.getActiveTransactionByMerchant(1, { kind: "merchant-any" }),
     ).resolves.toMatchObject({ id: tokenizedNoBoard.id });
     await expect(
-      storage.getActiveTransactionByMerchant(1, { kind: "legacy-no-board" }),
-    ).resolves.toMatchObject({ id: noBoard.id });
-    await expect(
       storage.getActiveTransactionByMerchant(1, { kind: "board", stoneId: 11 }),
     ).resolves.toMatchObject({ id: boardOne.id });
     await expect(
       storage.getActiveTransactionByMerchant(1, { kind: "board", stoneId: 12 }),
     ).resolves.toMatchObject({ id: boardTwo.id });
 
-    await storage.updateTransactionStatus(noBoard.id, "failed");
+    await storage.updateTransactionStatus(tokenizedNoBoard.id, "failed");
     await expect(
-      storage.getActiveTransactionByMerchant(1, { kind: "legacy-no-board" }),
+      storage.getActiveTransactionByMerchant(1, { kind: "merchant-any" }),
+    ).resolves.toMatchObject({ id: boardTwo.id });
+    await storage.updateTransactionStatus(boardTwo.id, "failed");
+    await expect(
+      storage.getActiveTransactionByMerchant(1, { kind: "board", stoneId: 12 }),
     ).resolves.toBeUndefined();
+    await expect(
+      storage.getActiveTransactionByMerchant(1, { kind: "merchant-any" }),
+    ).resolves.toMatchObject({ id: noBoard.id });
   });
 
   test("prefers the newest active transaction and then a recent completion", async () => {
@@ -102,13 +108,13 @@ describe("transaction storage addressing", () => {
 
       // Both rows have the exact same createdAt, so this proves the ID tie-break.
       await expect(
-        storage.getActiveTransactionByMerchant(1, { kind: "legacy-no-board" }),
+        storage.getActiveTransactionByMerchant(1, { kind: "merchant-any" }),
       ).resolves.toMatchObject({ id: newer.id });
 
       await storage.updateTransactionStatus(older.id, "failed");
       await storage.updateTransactionStatus(newer.id, "completed");
       await expect(
-        storage.getActiveTransactionByMerchant(1, { kind: "legacy-no-board" }),
+        storage.getActiveTransactionByMerchant(1, { kind: "merchant-any" }),
       ).resolves.toMatchObject({ id: newer.id, status: "completed" });
     } finally {
       jest.useRealTimers();

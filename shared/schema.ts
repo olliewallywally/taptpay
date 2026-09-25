@@ -559,7 +559,9 @@ export const retailTransactionCreateRequestSchema = z.object({
     .refine((value) => Number(value) > 0, "Price must be greater than zero"),
   splitEnabled: z.boolean().optional().default(false),
   selectedStoneId: z.number().int().positive().nullable().optional(),
-  linkMode: z.enum(["legacy", "per_payment"]).optional().default("legacy"),
+  // No default: without a board a sale is per-payment, with one it uses its board's
+  // shared address ("legacy"); server/routes.ts decides when this is omitted.
+  linkMode: z.enum(["legacy", "per_payment"]).optional(),
   status: z.literal("pending").optional(),
 }).strict();
 
