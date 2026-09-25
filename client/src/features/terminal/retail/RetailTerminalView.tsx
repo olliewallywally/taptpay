@@ -80,6 +80,27 @@ export interface RetailStone {
   stoneNumber: number;
 }
 
+/**
+ * A sale the live share page can share: a board sale's link is its board's page; a sale without
+ * a board has its own link. Newest first. (Owner decision 2026-09-25: the share page's dropdown.)
+ */
+export interface RetailShareSale {
+  id: string | number;
+  name: string;
+  /** cents */
+  amount: number;
+  payLink: string;
+  qrElement?: ReactNode;
+}
+
+/** A cash sale as recorded, for the live success screen and its receipt link. */
+export interface RetailReceipt {
+  name: string;
+  /** cents */
+  amount: number;
+  url: string;
+}
+
 export interface RetailSuccessNotification {
   id: string;
   message: string;
@@ -103,8 +124,8 @@ export interface RetailTerminalViewProps {
   onStoneRename?: (stoneId: number, name: string) => void | Promise<unknown>;
   onStoneDelete?: (stoneId: number) => void | Promise<unknown>;
   liveStones?: RetailStone[] | null;
-  livePayLink?: string | null;
-  qrElement?: ReactNode;
+  liveShareSales?: RetailShareSale[] | null;
+  liveReceipt?: RetailReceipt | null;
   showPaywave?: boolean;
   successNotification?: RetailSuccessNotification | null;
   /* Phase D of docs/PLAN-2026-08-17-terminal-panels-and-dock.md. Gated so the

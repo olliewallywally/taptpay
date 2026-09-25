@@ -14,19 +14,56 @@ import { sseClient } from "@/lib/sse-client";
 import { useToast } from "@/hooks/use-toast";
 import { useDeviceStatusMonitoring, useSSEConnectionMonitoring } from "@/components/notification-system";
 import { getCurrentMerchantId } from "@/lib/auth";
-import { Loader2, CheckCircle, XCircle, Waves, X, Copy, Check } from "lucide-react";
+import { Loader2, CheckCircle, XCircle, Waves, X } from "lucide-react";
 import { canTapToPay } from "@/lib/native";
 import RetailTerminalView, {
   type RetailCreateOptions,
+  type RetailReceipt,
   type RetailRefundIntent,
   type RetailSaleDraft,
   type RetailShareIntent,
+  type RetailShareSale,
   type RetailTerminalState,
 } from "@/features/terminal/retail/RetailTerminalView";
 
 const BRAND = "#00DFC8";
 
-const RETAIL_QR_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 60 60" fill="none"><rect width="60" height="60" fill="#040D6D"/><path d="M6 14V8a2 2 0 012-2h6" stroke="#58ABFF" stroke-width="3" stroke-linecap="round"/><path d="M54 14V8a2 2 0 00-2-2h-6" stroke="#58ABFF" stroke-width="3" stroke-linecap="round"/><path d="M6 46v6a2 2 0 002 2h6" stroke="#58ABFF" stroke-width="3" stroke-linecap="round"/><path d="M54 46v6a2 2 0 01-2 2h-6" stroke="#58ABFF" stroke-width="3" stroke-linecap="round"/><rect x="18" y="18" width="9" height="9" rx="1.5" fill="#58ABFF"/><rect x="33" y="18" width="9" height="9" rx="1.5" fill="#58ABFF"/><rect x="18" y="33" width="9" height="9" rx="1.5" fill="#58ABFF"/><rect x="33" y="33" width="3" height="3" fill="#58ABFF"/><rect x="38" y="33" width="3" height="3" fill="#58ABFF"/><rect x="33" y="38" width="3" height="3" fill="#58ABFF"/><rect x="38" y="38" width="3" height="3" fill="#58ABFF"/></svg>`;
+/*
+ * A board-less sale's own link, as the server gave it once when the sale was made (only its
+ * hash is kept there). This phone remembers it for its share page (owner decision 2026-09-25:
+ * the share page's sale dropdown), until the sale is no longer open, and at most a day. It
+ * lives in localStorage beside the login's own token, which can do far more.
+ */
+type SaleLink = { paymentUrl: string; qrCodeUrl: string; savedAt: number };
+const SALE_LINK_TTL_MS = 24 * 60 * 60 * 1000;
+const OPEN_SALE_STATUSES = new Set(["pending", "processing"]);
+const saleLinksKey = (merchantId: number) => `taptpay:retail-sale-links:v1:${merchantId}`;
+
+function readSaleLinks(merchantId: number | null): Record<string, SaleLink> {
+  if (!merchantId) return {};
+  try {
+    const stored = JSON.parse(localStorage.getItem(saleLinksKey(merchantId)) ?? "{}");
+    const fresh: Record<string, SaleLink> = {};
+    for (const [id, link] of Object.entries(stored as Record<string, SaleLink>)) {
+      if (link && typeof link.paymentUrl === "string" && Date.now() - Number(link.savedAt) < SALE_LINK_TTL_MS) {
+        fresh[id] = link;
+      }
+    }
+    return fresh;
+  } catch {
+    return {};
+  }
+}
+
+function writeSaleLinks(merchantId: number | null, links: Record<string, SaleLink>) {
+  if (!merchantId) return;
+  try {
+    if (Object.keys(links).length === 0) localStorage.removeItem(saleLinksKey(merchantId));
+    else localStorage.setItem(saleLinksKey(merchantId), JSON.stringify(links));
+  } catch {
+    // Storage refused (private mode, quota): the links still serve this visit.
+  }
+}
 
 async function handleBrowserShare(intent: RetailShareIntent): Promise<void> {
   if (intent.channel === "copy") {
@@ -35,13 +72,19 @@ async function handleBrowserShare(intent: RetailShareIntent): Promise<void> {
   }
 
   if (intent.channel === "download-qr") {
-    const blob = new Blob([RETAIL_QR_SVG], { type: "image/svg+xml" });
-    const url = URL.createObjectURL(blob);
+    // A real, scannable picture of exactly the link being shared (2026-09-25: this saved a
+    // decorative QR that could not be scanned). Navy on white, for any screen or print.
+    const QRCode = (await import("qrcode")).default;
+    const dataUrl = await QRCode.toDataURL(intent.url, {
+      width: 800,
+      margin: 2,
+      errorCorrectionLevel: "M",
+      color: { dark: "#040D6D", light: "#FFFFFF" },
+    });
     const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `${intent.kind}-qr.svg`;
+    anchor.href = dataUrl;
+    anchor.download = `${intent.kind}-qr.png`;
     anchor.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
     return;
   }
 
@@ -66,14 +109,8 @@ export default function MerchantTerminalMobile() {
   const [successNotif, setSuccessNotif] = useState<{ id: string; message: string; amount?: string } | null>(null);
   const prevTransactionStatusRef = useRef<string | null>(null);
 
-  // Gap 12: the private per-payment share-link overlay, shown after a
-  // successful board-less create (see handleLiveSend below).
-  const [shareLink, setShareLink] = useState<{ item: string; amount: string; paymentUrl: string; qrCodeUrl: string } | null>(null);
-  const [copiedShareLink, setCopiedShareLink] = useState(false);
-  // The current board-less sale's own link, for the share screen and its QR pop-up. It
-  // outlives the overlay above and goes when that sale is paid or cancelled. The server
-  // gives it once, at creation (only its hash is kept), so it is held here.
-  const [saleLink, setSaleLink] = useState<{ paymentUrl: string; qrCodeUrl: string } | null>(null);
+  // The cash sale last recorded here, for the success screen and its receipt link.
+  const [liveReceipt, setLiveReceipt] = useState<RetailReceipt | null>(null);
 
   const [tapToPayStatus, setTapToPayStatus] = useState<"idle" | "waiting" | "processing" | "completed" | "failed">("idle");
   const [tapToPayApproved, setTapToPayApproved] = useState<boolean | null>(null);
@@ -130,6 +167,10 @@ export default function MerchantTerminalMobile() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const merchantId = getCurrentMerchantId();
+  const [saleLinks, setSaleLinks] = useState<Record<string, SaleLink>>(() => readSaleLinks(merchantId));
+  useEffect(() => {
+    writeSaleLinks(merchantId, saleLinks);
+  }, [merchantId, saleLinks]);
 
   const { data: merchant } = useQuery({
     queryKey: ["/api/merchants", merchantId, "profile"],
@@ -174,7 +215,7 @@ export default function MerchantTerminalMobile() {
     enabled: !!merchantId,
   });
 
-  const { data: allTransactions = [] } = useQuery({
+  const { data: allTransactions = [], isSuccess: transactionsLoaded } = useQuery({
     queryKey: ["/api/merchants", merchantId, "transactions"],
     queryFn: async () => {
       const authToken = localStorage.getItem("authToken");
@@ -187,6 +228,22 @@ export default function MerchantTerminalMobile() {
     refetchInterval: 5000,
     enabled: !!merchantId,
   });
+
+  // Forget a remembered link once its sale is no longer open.
+  useEffect(() => {
+    if (!transactionsLoaded) return;
+    setSaleLinks((prev) => {
+      let next = prev;
+      for (const id of Object.keys(prev)) {
+        const tx = (allTransactions as any[]).find((t: any) => String(t.id) === id);
+        if (tx && !OPEN_SALE_STATUSES.has(tx.status)) {
+          if (next === prev) next = { ...prev };
+          delete next[id];
+        }
+      }
+      return next;
+    });
+  }, [transactionsLoaded, allTransactions]);
 
   useEffect(() => {
     if ((taptStones as any[]).length > 0 && selectedStoneId === null) {
@@ -231,8 +288,6 @@ export default function MerchantTerminalMobile() {
         ? parseFloat(activeTransaction.price).toFixed(2)
         : undefined;
       setSuccessNotif({ id: `success-${Date.now()}`, message: "Payment Received", amount });
-      setShareLink(null);
-      setSaleLink(null);
       queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "transactions"] });
     }
     prevTransactionStatusRef.current = status;
@@ -308,7 +363,6 @@ export default function MerchantTerminalMobile() {
       return r.json();
     },
     onSuccess: () => {
-      setSaleLink(null);
       queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "active-transaction"] });
       queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "transactions"] });
     },
@@ -421,24 +475,64 @@ export default function MerchantTerminalMobile() {
 
   const liveState: RetailTerminalState = { items: [], pending: null, sent };
 
+  // What the share page may offer, newest first (owner decision 2026-09-25): open sales with a
+  // link this phone can give. A board sale's is its board's page; a board-less sale's is its own,
+  // if this phone made it. Never the business-wide /pay/<merchant>, retired the same day.
+  const liveShareSales: RetailShareSale[] = (allTransactions as any[])
+    .filter((tx: any) => OPEN_SALE_STATUSES.has(tx.status))
+    .sort((a: any, b: any) =>
+      (new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) || (Number(b.id) - Number(a.id)))
+    .flatMap((tx: any): RetailShareSale[] => {
+      const base = { id: tx.id, name: tx.itemName, amount: Math.round(parseFloat(tx.price) * 100) };
+      if (tx.taptStoneId != null) {
+        return [{
+          ...base,
+          payLink: `${window.location.origin}/pay/${merchantId}/stone/${tx.taptStoneId}`,
+          qrElement: <QRCodeDisplay merchantId={merchantId} stoneId={tx.taptStoneId} />,
+        }];
+      }
+      const link = saleLinks[String(tx.id)];
+      if (!link) return [];
+      return [{
+        ...base,
+        payLink: link.paymentUrl,
+        qrElement: <QRCodeDisplay paymentUrl={link.paymentUrl} qrCodeUrl={link.qrCodeUrl} />,
+      }];
+    });
+
+  // A cash sale is recorded before the view shows success (2026-09-25: it never was). A billing
+  // 402 is the banner's alone (R1-T9); any other failure says why. Either way the view is told.
+  const handleCashSale = async (draft: RetailSaleDraft) => {
+    setLiveReceipt(null);
+    try {
+      const r = await apiRequest("POST", "/api/transactions/cash-sale", {
+        merchantId,
+        itemName: draft.name,
+        price: (draft.amount / 100).toFixed(2),
+      });
+      const { transaction } = await r.json();
+      queryClient.setQueryData<any[]>(
+        ["/api/merchants", merchantId, "transactions"],
+        (prev: any[] = []) => (prev.some((t: any) => t.id === transaction.id) ? prev : [transaction, ...prev]),
+      );
+      setLiveReceipt({
+        name: typeof transaction?.itemName === "string" ? transaction.itemName : draft.name,
+        amount: Math.round(parseFloat(transaction?.price) * 100),
+        url: `${window.location.origin}/receipt/${transaction.id}`,
+      });
+    } catch (error) {
+      if (!isBillingCardRequired(error)) {
+        toast({ title: "Error", description: apiErrorMessage(error, "Failed to record cash sale"), variant: "destructive" });
+      }
+      throw error;
+    }
+  };
+
   const liveStones = (taptStones as any[]).map((s: any) => ({
     id: s.id,
     name: s.name || `Board #${s.stoneNumber}`,
     stoneNumber: s.stoneNumber,
   }));
-
-  // What the share screen and its QR pop-up hand a customer: a board's own page, or
-  // without a board this sale's own link. Never the business-wide /pay/<merchant>, retired
-  // on 2026-09-25; with neither, there is nothing to share yet.
-  const livePayLink = selectedStoneId
-    ? `${window.location.origin}/pay/${merchantId}/stone/${selectedStoneId}`
-    : saleLink?.paymentUrl ?? null;
-
-  const qrElement = selectedStoneId ? (
-    <QRCodeDisplay merchantId={merchantId} stoneId={selectedStoneId} />
-  ) : saleLink?.qrCodeUrl ? (
-    <QRCodeDisplay paymentUrl={saleLink.paymentUrl} qrCodeUrl={saleLink.qrCodeUrl} />
-  ) : null;
 
   const handleLiveSend = async (
     draft: RetailSaleDraft,
@@ -463,31 +557,18 @@ export default function MerchantTerminalMobile() {
         return exists ? prev : [newTx, ...prev];
       }
     );
-    if (!boardId) {
-      const paymentUrl = typeof newTx?.paymentUrl === "string" ? newTx.paymentUrl : "";
-      const qrCodeUrl = typeof newTx?.qrCodeUrl === "string" ? newTx.qrCodeUrl : "";
-      setShareLink({
-        item: typeof newTx?.itemName === "string" ? newTx.itemName : draft.name,
-        amount: typeof newTx?.price === "string" ? newTx.price : (draft.amount / 100).toFixed(2),
-        paymentUrl,
-        qrCodeUrl,
-      });
-      setSaleLink(paymentUrl ? { paymentUrl, qrCodeUrl } : null);
+    // A board-less sale's own link is given once, now: remember it for the share page, which
+    // the view opens next with this sale chosen. A board sale shares its board's page.
+    if (!boardId && newTx?.id != null && typeof newTx?.paymentUrl === "string" && newTx.paymentUrl) {
+      const link: SaleLink = {
+        paymentUrl: newTx.paymentUrl,
+        qrCodeUrl: typeof newTx?.qrCodeUrl === "string" ? newTx.qrCodeUrl : "",
+        savedAt: Date.now(),
+      };
+      setSaleLinks((prev) => ({ ...prev, [String(newTx.id)]: link }));
     }
     if (options.paywave) {
       startTapToPayPayment(newTx);
-    }
-  };
-
-  // Gap 12: copy handler for the private per-payment share-link overlay.
-  const copyShareLinkToClipboard = async (url: string) => {
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopiedShareLink(true);
-      toast({ title: "Link Copied!", description: "Payment link has been copied to clipboard" });
-      setTimeout(() => setCopiedShareLink(false), 2000);
-    } catch (error) {
-      toast({ title: "Copy Failed", description: "Unable to copy payment link to clipboard", variant: "destructive" });
     }
   };
 
@@ -534,6 +615,7 @@ export default function MerchantTerminalMobile() {
         onCreateSplit={handleCreateSale}
         onCancel={handleLiveCancel}
         onShare={handleBrowserShare}
+        onCashSale={handleCashSale}
         onRefund={handleRefund}
         onOpenReceipt={(transaction) => setLocation(`/receipt/${transaction.id}`)}
         onBoardSelect={(stoneId: number) => setSelectedStoneId(stoneId)}
@@ -542,8 +624,8 @@ export default function MerchantTerminalMobile() {
         onStoneRename={(stoneId: number, name: string) => renameStoneMutation.mutateAsync({ stoneId, name })}
         onStoneDelete={(stoneId: number) => deleteStoneMutation.mutateAsync(stoneId)}
         liveStones={liveStones}
-        livePayLink={livePayLink}
-        qrElement={qrElement}
+        liveShareSales={liveShareSales}
+        liveReceipt={liveReceipt}
         showPaywave={false}
         successNotification={successNotif}
       />
@@ -647,77 +729,6 @@ export default function MerchantTerminalMobile() {
         )}
       </AnimatePresence>
 
-      {/* Gap 12: private per-payment share-link overlay, an independent
-          sibling to the Tap-to-Pay overlay above (same framer-motion/
-          fixed-inset-0/X-close-button idiom). See the accompanying evidence
-          doc for the latent-landmine note re: this overlay vs. Tap-to-Pay
-          when showPaywave is ever turned on for this screen. */}
-      <AnimatePresence>
-        {shareLink && (
-          <motion.div
-            className="fixed inset-0 z-[998] flex items-center justify-center p-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            style={{ backgroundColor: "#060D1F" }}
-            data-testid="share-link-overlay"
-          >
-            <button
-              onClick={() => setShareLink(null)}
-              className="absolute top-6 right-6 w-8 h-8 rounded-full flex items-center justify-center"
-              style={{ background: "rgba(255,255,255,0.08)" }}
-              data-testid="close-share-link"
-            >
-              <X className="h-4 w-4 text-white/60" />
-            </button>
-            <motion.div
-              className="rounded-3xl p-8 max-w-sm w-full mx-6 text-center space-y-4"
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              style={{
-                background: `linear-gradient(135deg, ${BRAND}14, ${BRAND}08)`,
-                border: `1px solid ${BRAND}40`,
-                boxShadow: `0 25px 50px rgba(0,0,0,0.6), 0 0 60px ${BRAND}18`,
-              }}
-            >
-              <div>
-                <p className="text-white text-base font-medium">{shareLink.item}</p>
-                <p className="text-3xl font-bold" style={{ color: BRAND }}>
-                  ${(parseFloat(shareLink.amount) || 0).toFixed(2)}
-                </p>
-              </div>
-              <div className="w-40 h-40 mx-auto bg-white/90 rounded-xl p-2">
-                <QRCodeDisplay paymentUrl={shareLink.paymentUrl} qrCodeUrl={shareLink.qrCodeUrl} />
-              </div>
-              <div
-                className="rounded-lg p-3 text-xs text-white break-all"
-                style={{ background: "rgba(255,255,255,0.06)" }}
-                data-testid="share-link-url"
-              >
-                {shareLink.paymentUrl}
-              </div>
-              <button
-                onClick={() => copyShareLinkToClipboard(shareLink.paymentUrl)}
-                className="w-full py-3 rounded-2xl text-sm font-medium flex items-center justify-center gap-2"
-                style={{ background: `${BRAND}18`, border: `1px solid ${BRAND}40`, color: BRAND }}
-                data-testid="copy-share-link"
-              >
-                {copiedShareLink ? (
-                  <>
-                    <Check className="w-4 h-4" />
-                    Copied!
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-4 h-4" />
-                    Copy Payment Link
-                  </>
-                )}
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

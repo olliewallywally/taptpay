@@ -591,18 +591,46 @@ function CashEntry({ go, onCommitCash }) {
   );
 }
 
-function SharePayment({ state, go, toast, onShare, onExpandQR, onConfirmPayment, livePayLink, qrElement, isLive = false }) {
+/* Owner decision 2026-09-25: the live share page chooses which sale to share, from a dropdown
+   at the top of its blue section. */
+function SaleSelect({ sales, value, onChoose }) {
+  return (
+    <div style={{ position: 'relative', alignSelf: 'stretch', marginBottom: 14 }}>
+      <select
+        aria-label="sale to share"
+        value={value == null ? '' : String(value)}
+        onChange={e => onChoose(e.target.value)}
+        style={{
+          width: '100%', minHeight: 44, appearance: 'none', WebkitAppearance: 'none',
+          background: 'transparent', color: BLUE, border: '1px solid rgba(88,171,255,0.5)', borderRadius: 999,
+          padding: '10px 42px 10px 18px', fontFamily: 'inherit', fontWeight: 600, fontSize: 15, cursor: 'pointer',
+        }}
+      >
+        {sales.map(sale => (
+          <option key={sale.id} value={String(sale.id)} style={{ color: NAVY }}>{`${sale.name} · ${fmt(sale.amount)}`}</option>
+        ))}
+      </select>
+      <span aria-hidden="true" style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%) rotate(90deg)', color: BLUE, pointerEvents: 'none', display: 'flex' }}>
+        <Ic.ChevR sz={16} />
+      </span>
+    </div>
+  );
+}
+
+function SharePayment({ state, go, toast, onShare, onExpandQR, onConfirmPayment, isLive = false, shareSales = [], shareSale = null, onChooseSale }) {
   const total = state.pending?.amount || state.items.reduce((s, i) => s + i.amount, 0) || 0;
-  // Live: the link the terminal hands over, a board's page or this sale's own link. With
-  // neither there is nothing to share (2026-09-25: the business-wide no-board address is
-  // retired); the demo link is the landing demo's alone.
-  const payLink = livePayLink || (isLive ? null : 'https://pay.taptpay.com/p/demo-abc123');
+  // Live: the chosen sale's own link (a board sale's is its board's page). With none there is
+  // nothing to share (2026-09-25: the business-wide no-board address is retired); the demo link
+  // is the landing demo's alone.
+  const payLink = isLive ? (shareSale?.payLink ?? null) : 'https://pay.taptpay.com/p/demo-abc123';
+  const amountCents = isLive ? (shareSale?.amount ?? 0) : (state.pending?.amount || total);
+  const label = isLive ? (shareSale?.name ?? 'payment') : (state.pending?.name || 'payment');
   const share = (channel, successMessage) => requestShare(onShare, {
     kind: 'payment',
     channel,
     url: payLink,
-    amountCents: state.pending?.amount || total,
-    label: state.pending?.name || 'payment',
+    amountCents,
+    label,
   }, toast, successMessage);
 
   const handleConfirm = onConfirmPayment || (() => { toast('payment confirmed'); go('cash'); });
@@ -612,9 +640,9 @@ function SharePayment({ state, go, toast, onShare, onExpandQR, onConfirmPayment,
       <div className="stagger tp-hero" style={{ background: OFFW, color: NAVY, display: 'flex', flexDirection: 'column' }}>
         <SubHead onCancel={() => go('cancel')} onCommit={handleConfirm} demoScope="retail-share" />
         <div style={{ flex: 1, padding: '8px 28px 18px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center' }}>
-          <Amount value={fmt(state.pending?.amount || total)} authoredSize={76} />
+          <Amount value={fmt(amountCents)} authoredSize={76} />
           <div style={{ marginTop: 16, fontWeight: 500, fontSize: 18, lineHeight: 1.4 }}>
-            {state.pending?.name || 'payment'}
+            {label}
           </div>
         </div>
         <div style={{ height: 52 }} />
@@ -622,9 +650,14 @@ function SharePayment({ state, go, toast, onShare, onExpandQR, onConfirmPayment,
       <div className="stagger tp-panel" style={{ background: NAVY }}>
         <div className="tp-panel-body" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%' }}>
         {payLink ? (<>
+        {isLive && shareSales.length > 0 && (
+          <SaleSelect sales={shareSales} value={shareSale?.id} onChoose={onChooseSale} />
+        )}
         <div style={{ position: 'relative' }}>
           <div className="tp-qr-card">
-            <Ic.QRBig sz={150} />
+            {isLive && shareSale?.qrElement
+              ? <div style={{ width: 150, height: 150, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{shareSale.qrElement}</div>
+              : <Ic.QRBig sz={150} />}
           </div>
           <button className="tp-qr-expand" onClick={onExpandQR} aria-label="expand QR code">
             <Ic.Expand sz={14} />
@@ -652,15 +685,18 @@ function SharePayment({ state, go, toast, onShare, onExpandQR, onConfirmPayment,
   );
 }
 
-function CashSuccess({ state, go, setState, toast, onShare }) {
-  const total = state.pending?.amount || state.items.reduce((s, i) => s + i.amount, 0) || 0;
+function CashSuccess({ state, go, setState, toast, onShare, isLive = false, receipt = null }) {
+  // Live: the cash sale as recorded, and its own receipt link (2026-09-25; live use had shown
+  // $0.00 and shared the demo address). The demo keeps its demo receipt.
+  const total = isLive ? (receipt?.amount ?? 0) : (state.pending?.amount || state.items.reduce((s, i) => s + i.amount, 0) || 0);
+  const receiptUrl = isLive ? (receipt?.url ?? null) : 'https://pay.taptpay.com/p/demo-abc123';
   const clear = () => { setState(s => ({ ...s, items: [], pending: null })); go('home-pop'); };
   const share = (channel, successMessage) => requestShare(onShare, {
     kind: 'receipt',
     channel,
-    url: 'https://pay.taptpay.com/p/demo-abc123',
+    url: receiptUrl,
     amountCents: total,
-    label: state.pending?.name || 'cash payment',
+    label: (isLive ? receipt?.name : state.pending?.name) || 'cash payment',
   }, toast, successMessage);
 
   return (
@@ -678,6 +714,7 @@ function CashSuccess({ state, go, setState, toast, onShare }) {
         <div style={{ color: BLUE, fontWeight: 900, fontSize: 46, letterSpacing: '-0.04em' }}>success</div>
         <div className="tp-success-check tp-pulse" style={{ marginTop: 10 }}><Ic.Check sz={40} sw={3.2} /></div>
         <div style={{ flex: 1 }} />
+        {receiptUrl && (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, alignSelf: 'stretch' }}>
           <button className="tp-cta" style={{ minWidth: 180 }} onClick={() => share('copy', 'receipt link copied')}>copy receipt link</button>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: '8px 20px', borderRadius: 999, border: `1px solid rgba(88,171,255,0.5)`, minWidth: 180 }}>
@@ -688,6 +725,7 @@ function CashSuccess({ state, go, setState, toast, onShare }) {
             <button className="tp-share-btn" onClick={() => share('email', null)}><Ic.Mail sz={20} c={BLUE} /></button>
           </div>
         </div>
+        )}
         </div>
       </div>
     </div>
@@ -928,8 +966,8 @@ export default function RetailTerminalViewCore({
   onStoneRename       = null,
   onStoneDelete       = null,
   liveStones          = null,
-  livePayLink         = null,
-  qrElement           = null,
+  liveShareSales      = null,
+  liveReceipt         = null,
   // R0-T5: Tap to Pay is disabled server-side (FEATURE_TAP_TO_PAY) and has no
   // provider-authoritative implementation, so the control defaults off — the
   // plan's rule is that until there is real proof, capability is false. The
@@ -950,6 +988,24 @@ export default function RetailTerminalViewCore({
   /* True while a live sale is being created: a second tap on send then would
      create a second sale (R1-T9). A ref, so it holds before the next render. */
   const creatingSaleRef = useRef(false);
+  /* Likewise while a live cash sale is being recorded. */
+  const recordingCashRef = useRef(false);
+
+  /* The live share page's dropdown (owner decision 2026-09-25). A sale newly sent from here — an
+     id never seen before at the top of the list — becomes the one shown; a sale chosen by hand
+     stays chosen until then; if the chosen sale leaves the list (paid or cancelled), the latest
+     is shown. */
+  const shareSales = isLive ? (liveShareSales ?? []) : [];
+  const [chosenShareId, setChosenShareId] = useState(null);
+  const seenShareIds = useRef(null);
+  if (seenShareIds.current === null) seenShareIds.current = new Set(shareSales.map(sale => String(sale.id)));
+  const shareIdsKey = shareSales.map(sale => String(sale.id)).join('|');
+  useEffect(() => {
+    const newest = shareSales[0] ? String(shareSales[0].id) : null;
+    if (newest !== null && !seenShareIds.current.has(newest)) setChosenShareId(newest);
+    for (const sale of shareSales) seenShareIds.current.add(String(sale.id));
+  }, [shareIdsKey]);
+  const shareSale = shareSales.find(sale => String(sale.id) === chosenShareId) ?? shareSales[0] ?? null;
 
   const effectivePending = isLive ? (localDraft ?? liveState?.pending ?? null) : demoState.pending;
   const state    = isLive ? { ...liveState, pending: effectivePending } : demoState;
@@ -1094,6 +1150,13 @@ export default function RetailTerminalViewCore({
       try {
         await create?.(localDraft, { paywave: paywaveOn, existing: false });
         setLocalDraft(null);
+        // Sent: the share page opens with this sale chosen (owner decision 2026-09-25).
+        if (!paywaveOn) {
+          triggerConveyor('home', 'up');
+          setContentKey(k => k + 1);
+          setScreen('share');
+          setDockRaw('terminal');
+        }
       } catch {
         /* draft preserved — error shown by parent */
       } finally {
@@ -1133,9 +1196,20 @@ export default function RetailTerminalViewCore({
   };
 
   /* Cash entry commit → success screen */
-  const handleCashCommit = ({ name, amount }) => {
+  const handleCashCommit = async ({ name, amount }) => {
     if (isLive) {
-      onCashSale?.({ name, amount });
+      // Recorded before success shows, and once however often confirm is tapped (R1-T9's
+      // no-double-submit rule). A failure keeps what was typed; the parent says why. With no
+      // way to record it, nothing happens (live use had shown success and recorded nothing).
+      if (!onCashSale || recordingCashRef.current) return;
+      recordingCashRef.current = true;
+      try {
+        await onCashSale({ name, amount });
+      } catch {
+        return;
+      } finally {
+        recordingCashRef.current = false;
+      }
     } else {
       setState(s => ({ ...s, pending: { id: 'i' + Date.now(), name, amount } }));
     }
@@ -1160,9 +1234,9 @@ export default function RetailTerminalViewCore({
     if (id === 'split')   return <SplitPayment state={state} go={go} onCommitSplit={handleSplitCommit} />;
     if (id === 'stock')   return <ChooseStock  state={state} go={go} onCommitStock={handleStockCommit} />;
     if (id === 'details') return <EnterDetails state={state} go={go} onCommitDetails={handleDetailsCommit} initialAmount={keypadCents} />;
-    if (id === 'share')   return <SharePayment state={state} go={go} toast={toast} onShare={onShare} onExpandQR={() => setShowQRModal(true)} onConfirmPayment={handleShareConfirm} livePayLink={livePayLink} qrElement={qrElement} isLive={isLive} />;
+    if (id === 'share')   return <SharePayment state={state} go={go} toast={toast} onShare={onShare} onExpandQR={() => setShowQRModal(true)} onConfirmPayment={handleShareConfirm} isLive={isLive} shareSales={shareSales} shareSale={shareSale} onChooseSale={setChosenShareId} />;
     if (id === 'cash')         return <CashEntry   go={go} onCommitCash={handleCashCommit} />;
-    if (id === 'cash-success') return <CashSuccess state={state} go={go} setState={setState} toast={toast} onShare={onShare} />;
+    if (id === 'cash-success') return <CashSuccess state={state} go={go} setState={setState} toast={toast} onShare={onShare} isLive={isLive} receipt={liveReceipt} />;
     return null;
   };
 
@@ -1259,7 +1333,7 @@ export default function RetailTerminalViewCore({
         />
       )}
 
-      {showQRModal && <QRModal onClose={() => setShowQRModal(false)} qrElement={qrElement} payLink={livePayLink} isLive={isLive} />}
+      {showQRModal && <QRModal onClose={() => setShowQRModal(false)} qrElement={isLive ? shareSale?.qrElement ?? null : null} payLink={isLive ? shareSale?.payLink ?? null : null} isLive={isLive} />}
 
       <div className={`tp-toast${toastMsg ? ' show' : ''}`}>{toastMsg}</div>
 
