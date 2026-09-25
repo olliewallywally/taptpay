@@ -70,6 +70,10 @@ export default function MerchantTerminalMobile() {
   // successful board-less create (see handleLiveSend below).
   const [shareLink, setShareLink] = useState<{ item: string; amount: string; paymentUrl: string; qrCodeUrl: string } | null>(null);
   const [copiedShareLink, setCopiedShareLink] = useState(false);
+  // The current board-less sale's own link, for the share screen and its QR pop-up. It
+  // outlives the overlay above and goes when that sale is paid or cancelled. The server
+  // gives it once, at creation (only its hash is kept), so it is held here.
+  const [saleLink, setSaleLink] = useState<{ paymentUrl: string; qrCodeUrl: string } | null>(null);
 
   const [tapToPayStatus, setTapToPayStatus] = useState<"idle" | "waiting" | "processing" | "completed" | "failed">("idle");
   const [tapToPayApproved, setTapToPayApproved] = useState<boolean | null>(null);
@@ -142,7 +146,12 @@ export default function MerchantTerminalMobile() {
   const { data: activeTransaction } = useQuery({
     queryKey: ["/api/merchants", merchantId, "active-transaction"],
     queryFn: async () => {
-      const r = await fetch(`/api/merchants/${merchantId}/active-transaction`);
+      // Signed in: this business's newest open sale, a board-less sale with its own link
+      // included. The anonymous read of this address was retired on 2026-09-25.
+      const authToken = localStorage.getItem("authToken");
+      const r = await fetch(`/api/merchants/${merchantId}/active-transaction`, {
+        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+      });
       if (!r.ok) throw new Error("Failed to fetch active transaction");
       return r.json();
     },
@@ -223,6 +232,7 @@ export default function MerchantTerminalMobile() {
         : undefined;
       setSuccessNotif({ id: `success-${Date.now()}`, message: "Payment Received", amount });
       setShareLink(null);
+      setSaleLink(null);
       queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "transactions"] });
     }
     prevTransactionStatusRef.current = status;
@@ -298,6 +308,7 @@ export default function MerchantTerminalMobile() {
       return r.json();
     },
     onSuccess: () => {
+      setSaleLink(null);
       queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "active-transaction"] });
       queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "transactions"] });
     },
@@ -416,14 +427,18 @@ export default function MerchantTerminalMobile() {
     stoneNumber: s.stoneNumber,
   }));
 
-  const livePayLink = `${window.location.origin}/pay/${merchantId}${selectedStoneId ? `/stone/${selectedStoneId}` : ""}`;
+  // What the share screen and its QR pop-up hand a customer: a board's own page, or
+  // without a board this sale's own link. Never the business-wide /pay/<merchant>, retired
+  // on 2026-09-25; with neither, there is nothing to share yet.
+  const livePayLink = selectedStoneId
+    ? `${window.location.origin}/pay/${merchantId}/stone/${selectedStoneId}`
+    : saleLink?.paymentUrl ?? null;
 
-  const qrElement = (
-    <QRCodeDisplay
-      merchantId={merchantId}
-      stoneId={selectedStoneId ?? undefined}
-    />
-  );
+  const qrElement = selectedStoneId ? (
+    <QRCodeDisplay merchantId={merchantId} stoneId={selectedStoneId} />
+  ) : saleLink?.qrCodeUrl ? (
+    <QRCodeDisplay paymentUrl={saleLink.paymentUrl} qrCodeUrl={saleLink.qrCodeUrl} />
+  ) : null;
 
   const handleLiveSend = async (
     draft: RetailSaleDraft,
@@ -449,12 +464,15 @@ export default function MerchantTerminalMobile() {
       }
     );
     if (!boardId) {
+      const paymentUrl = typeof newTx?.paymentUrl === "string" ? newTx.paymentUrl : "";
+      const qrCodeUrl = typeof newTx?.qrCodeUrl === "string" ? newTx.qrCodeUrl : "";
       setShareLink({
         item: typeof newTx?.itemName === "string" ? newTx.itemName : draft.name,
         amount: typeof newTx?.price === "string" ? newTx.price : (draft.amount / 100).toFixed(2),
-        paymentUrl: typeof newTx?.paymentUrl === "string" ? newTx.paymentUrl : "",
-        qrCodeUrl: typeof newTx?.qrCodeUrl === "string" ? newTx.qrCodeUrl : "",
+        paymentUrl,
+        qrCodeUrl,
       });
+      setSaleLink(paymentUrl ? { paymentUrl, qrCodeUrl } : null);
     }
     if (options.paywave) {
       startTapToPayPayment(newTx);

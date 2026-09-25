@@ -129,4 +129,40 @@ describe("RetailTerminalView safety boundary", () => {
     );
     await act(async () => outcomes[1].resolve());
   });
+
+  /* Owner decision 2026-09-25: without a board a sale has its own private link, and the
+     business-wide no-board address is retired. In live use the share screen offers the link
+     it is given, or says there is none; the demo link is the landing demo's alone. */
+  it("in live use with no link, the share screen offers nothing to share, never a demo link", async () => {
+    const onShare = jest.fn();
+    render(<RetailTerminalView liveState={existingState} livePayLink={null} onShare={onShare} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "share" }));
+
+    expect(await screen.findByText("no payment link to share yet")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "copy link" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "expand QR code" })).toBeNull();
+    expect(document.body.innerHTML).not.toContain("demo-abc123");
+    expect(onShare).not.toHaveBeenCalled();
+  });
+
+  it("in live use with a sale's link, copy shares exactly that link", async () => {
+    const onShare = jest.fn();
+    render(
+      <RetailTerminalView
+        liveState={existingState}
+        livePayLink="https://pay.example/pay/t/sale-token"
+        onShare={onShare}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "share" }));
+    fireEvent.click(await screen.findByRole("button", { name: "copy link" }));
+
+    await waitFor(() =>
+      expect(onShare).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: "payment", channel: "copy", url: "https://pay.example/pay/t/sale-token" }),
+      ),
+    );
+  });
 });

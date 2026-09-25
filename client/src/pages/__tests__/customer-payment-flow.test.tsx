@@ -1,14 +1,14 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import CustomerPayment from "@/pages/customer-payment";
+import { sseClient } from "@/lib/sse-client";
 
 /**
- * Gap 12 Option C — customer-payment.tsx must never auto-navigate into a
- * checkout it isn't sure belongs to this customer.
- *
- * docs/decisions/2026-09-13-gap12-anonymous-sse-addressing-options.md,
- * "Option C — Keep merchant-wide, but fail closed on ambiguity and narrow
- * the payload".
+ * Owner decision 2026-09-25 (docs/decisions/2026-09-25-no-board-rework-402-and-batch-owner-answers.md):
+ * with a payment board, the board's own page, unchanged; without one, every sale has its own
+ * private link. The business-wide no-board page (`/pay/:merchantId`) no longer waits for "the
+ * business's current sale" (gap 12's leak, and Option C's "can't tell which sale is yours"
+ * state with it): it tells the customer to ask for their sale's link, and reads no sale at all.
  */
 
 let mockParams: Record<string, string> = {};
@@ -42,23 +42,11 @@ function emit(type: string, message: any) {
   });
 }
 
-/** Fires several SSE messages inside a single React commit — models the
- * guard's actual target: an `ambiguous` transition landing in the same
- * update as a `currentTransaction` change, so the redirect effect must see
- * both together rather than acting on one before the other is applied. */
-function emitBatch(...events: Array<[string, any]>) {
-  act(() => {
-    for (const [type, message] of events) {
-      for (const cb of listeners[type] || []) cb(message);
-    }
-  });
-}
-
-function jsonResponse(status: number, body: unknown, headers: Record<string, string> = {}) {
+function jsonResponse(status: number, body: unknown) {
   return {
     ok: status >= 200 && status < 300,
     status,
-    headers: { get: (name: string) => headers[name.toLowerCase()] ?? headers[name] ?? null },
+    headers: { get: () => null },
     json: async () => body,
   };
 }
@@ -70,111 +58,96 @@ function renderWithQuery(ui: React.ReactElement) {
   return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
 }
 
-describe("customer-payment — gap 12 Option C ambiguity handling", () => {
+const fetchMock = global.fetch as jest.Mock;
+const requestedUrls = () => fetchMock.mock.calls.map(([url]) => String(url));
+
+beforeEach(() => {
+  mockSetLocation.mockReset();
+  listeners = {};
+  jest.clearAllMocks();
+  fetchMock.mockReset();
+});
+
+describe("customer-payment — the business-wide no-board page is retired", () => {
   beforeEach(() => {
     mockParams = { merchantId: "1" };
-    mockSetLocation.mockReset();
-    listeners = {};
-    (global.fetch as jest.Mock).mockReset();
-    (global.fetch as jest.Mock).mockImplementation(async (url: string) => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url === "/api/merchants/1") return jsonResponse(200, { customLogoUrl: "/uploads/logos/shop.png" });
       if (url.startsWith("/api/merchants/1/active-transaction")) {
-        return jsonResponse(200, null);
-      }
-      if (url === "/api/merchants/1") {
-        return jsonResponse(200, {});
+        return jsonResponse(410, { code: "NO_BOARD_ADDRESS_RETIRED" });
       }
       throw new Error(`unexpected fetch: ${url}`);
     });
   });
 
-  test("REST: X-Legacy-No-Board-Ambiguous header shows the ask-staff state and never redirects", async () => {
-    (global.fetch as jest.Mock).mockImplementation(async (url: string) => {
-      if (url.startsWith("/api/merchants/1/active-transaction")) {
-        return jsonResponse(200, null, { "x-legacy-no-board-ambiguous": "true" });
-      }
-      return jsonResponse(200, {});
-    });
-
+  test("tells the customer to ask for their sale's own link, with the business's logo", async () => {
     renderWithQuery(<CustomerPayment />);
 
-    expect(await screen.findByText("We can't tell which sale is yours")).toBeInTheDocument();
-    expect(screen.getByText("Please ask a staff member for help")).toBeInTheDocument();
-    expect(mockSetLocation).not.toHaveBeenCalled();
+    expect(await screen.findByText("Ask for your payment link")).toBeInTheDocument();
+    expect(
+      screen.getByText("Each sale now has its own payment link. Ask the business to show you the QR code for your sale."),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByAltText("merchant logo")).toHaveAttribute("src", "/uploads/logos/shop.png"));
+    expect(screen.queryByText("Waiting for Payment")).not.toBeInTheDocument();
   });
 
-  test("REST: no ambiguous header behaves exactly as before — a pending transaction still redirects", async () => {
-    (global.fetch as jest.Mock).mockImplementation(async (url: string) => {
-      if (url.startsWith("/api/merchants/1/active-transaction")) {
-        return jsonResponse(200, {
-          id: 42,
-          status: "pending",
-          taptStoneId: null,
-          splitEnabled: false,
-          isSplit: false,
-        });
-      }
-      return jsonResponse(200, {});
+  test("reads no sale and opens no live feed, and never moves the customer on", async () => {
+    renderWithQuery(<CustomerPayment />);
+    await screen.findByText("Ask for your payment link");
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+
+    expect(requestedUrls().filter((url) => url.includes("active-transaction"))).toEqual([]);
+    expect(sseClient.connectCustomer).not.toHaveBeenCalled();
+    expect(sseClient.subscribe).not.toHaveBeenCalled();
+    expect(mockSetLocation).not.toHaveBeenCalled();
+  });
+});
+
+describe("customer-payment — a board's page is unchanged", () => {
+  beforeEach(() => {
+    mockParams = { merchantId: "1", stoneId: "3" };
+  });
+
+  test("waits on its board's sale, then takes the customer to checkout", async () => {
+    let boardSale: unknown = null;
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url === "/api/merchants/1") return jsonResponse(200, {});
+      if (url === "/api/merchants/1/active-transaction?stoneId=3") return jsonResponse(200, boardSale);
+      throw new Error(`unexpected fetch: ${url}`);
     });
 
     renderWithQuery(<CustomerPayment />);
+    expect(await screen.findByText("Waiting for Payment")).toBeInTheDocument();
+    expect(sseClient.connectCustomer).toHaveBeenCalledWith(1, 3);
+
+    boardSale = { id: 42, status: "pending", taptStoneId: 3, splitEnabled: false, isSplit: false };
+    emit("transaction_updated", { addressingMode: "board", stoneId: 3, transaction: boardSale });
 
     await waitFor(() => expect(mockSetLocation).toHaveBeenCalledWith("/checkout/42"));
-    expect(screen.queryByText("We can't tell which sale is yours")).not.toBeInTheDocument();
   });
 
-  test("SSE: a legacy_no_board_ambiguous message shows the ask-staff state and blocks a pending redirect already in flight", async () => {
-    renderWithQuery(<CustomerPayment />);
+  test("ignores an update that isn't for its board", async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url === "/api/merchants/1") return jsonResponse(200, {});
+      if (url === "/api/merchants/1/active-transaction?stoneId=3") return jsonResponse(200, null);
+      throw new Error(`unexpected fetch: ${url}`);
+    });
 
-    // Let the initial (unambiguous, null-body) poll settle into the waiting state.
-    await screen.findByText("Waiting for Payment");
-
-    // A transaction and an ambiguity signal land in the same update — the
-    // redirect effect must see `ambiguous` before it ever acts on
-    // `currentTransaction`, not the other way around.
-    emitBatch(
-      ["transaction_updated", {
-        addressingMode: "legacy-no-board",
-        transaction: { id: 7, status: "pending", taptStoneId: null, splitEnabled: false, isSplit: false },
-      }],
-      ["legacy_no_board_ambiguous", {}],
-    );
-
-    await screen.findByText("We can't tell which sale is yours");
-    expect(mockSetLocation).not.toHaveBeenCalled();
-  });
-
-  test("SSE: a normal transaction_updated event after an ambiguous signal clears ambiguity and redirects normally", async () => {
     renderWithQuery(<CustomerPayment />);
     await screen.findByText("Waiting for Payment");
-
-    emit("legacy_no_board_ambiguous", {});
-    await screen.findByText("We can't tell which sale is yours");
 
     emit("transaction_updated", {
-      addressingMode: "legacy-no-board",
-      transaction: { id: 9, status: "pending", taptStoneId: null, splitEnabled: false, isSplit: false },
+      addressingMode: "board",
+      stoneId: 4,
+      transaction: { id: 7, status: "pending", taptStoneId: 4, splitEnabled: false, isSplit: false },
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
     });
 
-    await waitFor(() => expect(mockSetLocation).toHaveBeenCalledWith("/checkout/9"));
-    expect(screen.queryByText("We can't tell which sale is yours")).not.toBeInTheDocument();
-  });
-
-  test("a board-scoped customer never enters the ambiguous state, even if an ambiguous SSE message is (defensively) received", async () => {
-    mockParams = { merchantId: "1", stoneId: "3" };
-    (global.fetch as jest.Mock).mockImplementation(async (url: string) => {
-      if (url.startsWith("/api/merchants/1/active-transaction")) {
-        expect(url).toContain("stoneId=3");
-        return jsonResponse(200, null, { "x-legacy-no-board-ambiguous": "true" }); // server would never send this for a board request; defensive check
-      }
-      return jsonResponse(200, {});
-    });
-
-    renderWithQuery(<CustomerPayment />);
-    await screen.findByText("Waiting for Payment");
-
-    emit("legacy_no_board_ambiguous", {});
-
-    expect(screen.queryByText("We can't tell which sale is yours")).not.toBeInTheDocument();
     expect(mockSetLocation).not.toHaveBeenCalled();
+    expect(screen.getByText("Waiting for Payment")).toBeInTheDocument();
   });
 });

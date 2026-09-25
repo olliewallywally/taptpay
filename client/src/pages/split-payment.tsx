@@ -80,7 +80,9 @@ export default function SplitPayment({
   }, [transaction]);
 
   useEffect(() => {
-    if (isTokenSource || !transaction?.merchantId) return;
+    // Only a board's sale has a public feed; the business-wide no-board feed was
+    // retired (2026-09-25), so a no-board split follows the 3 s read above.
+    if (isTokenSource || !transaction?.merchantId || transaction.taptStoneId == null) return;
     sseClient.connectCustomer(transaction.merchantId, transaction.taptStoneId);
     const handleUpdate = (message: any) => {
       if (message.transaction?.id === txnId) {

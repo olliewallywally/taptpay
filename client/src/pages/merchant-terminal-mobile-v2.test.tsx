@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { NotificationProvider } from "@/components/notification-system";
 import { BILLING_CARD_REQUIRED_EVENT } from "@/lib/queryClient";
@@ -29,7 +29,10 @@ jest.mock("@/features/terminal/retail/RetailTerminalView", () => {
           "data-testid": "retail-terminal-view-stub",
           "data-render-count": renderCount.current,
           "data-live-stones-count": props.liveStones?.length ?? 0,
+          // What the view's share screen and QR pop-up would hand a customer.
+          "data-live-pay-link": props.livePayLink ?? "",
         },
+        React.createElement("div", { "data-testid": "stub-qr" }, props.qrElement ?? null),
         React.createElement(
           "button",
           { onClick: () => props.onBoardSelect?.(props.liveStones?.[0]?.id) },
@@ -192,7 +195,7 @@ describe("merchant-terminal-mobile-v2 per-payment link migration (gap 12)", () =
     expect(screen.getByTestId("share-link-url")).toHaveTextContent(
       "https://private.example/sale-1",
     );
-    expect(screen.getByAltText("Payment QR Code")).toHaveAttribute(
+    expect(within(screen.getByTestId("share-link-overlay")).getByAltText("Payment QR Code")).toHaveAttribute(
       "src",
       "https://private.example/sale-1/qr",
     );
@@ -371,5 +374,89 @@ describe("a billing 402 on the phone retail terminal (R1-T9)", () => {
     expect(banners).toBe(1);
     expect(screen.queryByText("Payment Declined")).not.toBeInTheDocument();
     expect(mockToast).not.toHaveBeenCalled();
+  });
+});
+
+/*
+ * Owner decision 2026-09-25 (server/no-board-address.ts): without a payment board every sale
+ * has its own private link, and the business-wide no-board address is retired. The terminal
+ * reads its current sale signed in (the anonymous read is gone, and never saw its per-payment
+ * sales), and its share screen and QR pop-up carry the sale's own link, never /pay/<merchant>.
+ */
+describe("the phone terminal without the business-wide no-board address", () => {
+  const liveLink = () => screen.getByTestId("retail-terminal-view-stub").getAttribute("data-live-pay-link");
+  const stubQr = () => within(screen.getByTestId("stub-qr"));
+
+  afterEach(() => {
+    localStorage.removeItem("authToken");
+  });
+
+  it("reads its current sale signed in", async () => {
+    localStorage.setItem("authToken", "tok-1");
+    renderTerminal();
+    await screen.findByTestId("retail-terminal-view-stub");
+
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.some(([url]) => String(url) === "/api/merchants/1/active-transaction")).toBe(true),
+    );
+    const [, init] = fetchMock.mock.calls.find(([url]) => String(url) === "/api/merchants/1/active-transaction")!;
+    expect(new Headers((init as RequestInit | undefined)?.headers).get("Authorization")).toBe("Bearer tok-1");
+  });
+
+  it("with no board, shares the sale's own link and QR, even after its pop-up is closed, and never the business-wide address", async () => {
+    renderTerminal();
+    await screen.findByTestId("retail-terminal-view-stub");
+
+    // No sale yet: nothing to share, rather than the retired /pay/<merchant>.
+    expect(liveLink()).toBe("");
+    expect(stubQr().queryByAltText("Payment QR Code")).toBeNull();
+
+    fireEvent.click(screen.getByText("create sale"));
+    await screen.findByTestId("share-link-overlay");
+    await waitFor(() => expect(liveLink()).toBe("https://private.example/sale-1"));
+    expect(stubQr().getByAltText("Payment QR Code")).toHaveAttribute("src", "https://private.example/sale-1/qr");
+
+    fireEvent.click(screen.getByTestId("close-share-link"));
+    await waitFor(() => expect(screen.queryByTestId("share-link-overlay")).not.toBeInTheDocument());
+    expect(liveLink()).toBe("https://private.example/sale-1");
+    expect(stubQr().getByAltText("Payment QR Code")).toHaveAttribute("src", "https://private.example/sale-1/qr");
+
+    expect(document.body.innerHTML).not.toContain("/api/merchants/1/qr");
+    expect(document.body.innerHTML).not.toMatch(/\/pay\/1(?:["/]|$)/);
+  });
+
+  it("with a board, shares that board's own page and QR", async () => {
+    taptStonesFixture = [{ id: 42, name: "Counter", stoneNumber: 1 }];
+    renderTerminal();
+    await screen.findByTestId("retail-terminal-view-stub");
+
+    await waitFor(() => expect(liveLink()).toBe(`${window.location.origin}/pay/1/stone/42`));
+    expect(stubQr().getByAltText("Payment QR Code")).toHaveAttribute("src", "/api/merchants/1/stone/42/qr");
+  });
+
+  it("drops the sale's link once the sale is paid", async () => {
+    const { queryClient } = renderTerminal();
+    await screen.findByTestId("retail-terminal-view-stub");
+
+    fireEvent.click(screen.getByText("create sale"));
+    await waitFor(() => expect(liveLink()).toBe("https://private.example/sale-1"));
+
+    const renderCountBefore = Number(
+      screen.getByTestId("retail-terminal-view-stub").getAttribute("data-render-count"),
+    );
+    queryClient.setQueryData(["/api/merchants", 1, "active-transaction"], {
+      id: 1, status: "pending", price: "5.00", itemName: "Coffee",
+    });
+    await waitFor(() =>
+      expect(
+        Number(screen.getByTestId("retail-terminal-view-stub").getAttribute("data-render-count")),
+      ).toBeGreaterThan(renderCountBefore),
+    );
+    queryClient.setQueryData(["/api/merchants", 1, "active-transaction"], {
+      id: 1, status: "completed", price: "5.00", itemName: "Coffee",
+    });
+
+    await waitFor(() => expect(liveLink()).toBe(""));
+    expect(stubQr().queryByAltText("Payment QR Code")).toBeNull();
   });
 });

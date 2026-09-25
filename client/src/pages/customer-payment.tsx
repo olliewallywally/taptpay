@@ -3,7 +3,7 @@ import { useParams, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { sseClient } from "@/lib/sse-client";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { CheckCircle, XCircle, Loader2, QrCode } from "lucide-react";
 import taptLogo from "@assets/IMG_6592_1755070818452.png";
 
 function redirectToRealBrowser() {
@@ -36,52 +36,101 @@ function redirectToRealBrowser() {
   return false;
 }
 
-export default function CustomerPayment() {
-  const { merchantId, stoneId } = useParams<{ merchantId: string; stoneId?: string }>();
-  const [, setLocation] = useLocation();
-  const [currentTransaction, setCurrentTransaction] = useState<any>(null);
-  const [paymentStatus, setPaymentStatus] = useState<"loading" | "redirecting" | "success" | "error">("loading");
-  // Gap 12 Option C: set when the merchant currently has 2+ concurrent
-  // candidate stoneless (no-board) sales open and the server refuses to
-  // guess which one is this customer's — see
-  // docs/decisions/2026-09-13-gap12-anonymous-sse-addressing-options.md
-  // "Option C". Only ever set for the no-board flow (stoneNumber is falsy);
-  // a board-scoped customer never enters this state.
-  const [ambiguous, setAmbiguous] = useState(false);
-  const hasRedirected = useRef(false);
-
-  // Immediately redirect to Chrome/Safari if opened in an in-app browser
-  useEffect(() => { redirectToRealBrowser(); }, []);
-
-  const id = merchantId ? parseInt(merchantId) : null;
-  const stoneNumber = stoneId ? parseInt(stoneId) : null;
-
-  const { data: merchant } = useQuery({
+function useMerchantBrand(id: number) {
+  return useQuery({
     queryKey: ["/api/merchants", id],
     queryFn: async () => {
       const response = await fetch(`/api/merchants/${id}`);
       if (!response.ok) throw new Error("Failed to fetch merchant");
       return response.json();
     },
-    enabled: !!id,
   });
+}
+
+function MerchantLogo({ customLogoUrl }: { customLogoUrl?: string | null }) {
+  return (
+    <div className="text-center mb-8">
+      <img
+        src={customLogoUrl || taptLogo}
+        alt="merchant logo"
+        className="h-12 sm:h-14 mx-auto object-contain"
+        style={
+          customLogoUrl
+            ? {}
+            : { filter: "brightness(0) saturate(100%) invert(78%) sepia(96%) saturate(2453%) hue-rotate(131deg) brightness(97%) contrast(101%)" }
+        }
+      />
+    </div>
+  );
+}
+
+export default function CustomerPayment() {
+  const { merchantId, stoneId } = useParams<{ merchantId: string; stoneId?: string }>();
+  const id = merchantId ? parseInt(merchantId) : null;
+  const stoneNumber = stoneId ? parseInt(stoneId) : null;
+
+  if (!id) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-200">
+        <div className="text-center space-y-4 bg-white rounded-2xl p-8">
+          <h2 className="text-2xl font-bold text-red-600">Invalid Payment Link</h2>
+          <p className="text-gray-600">Please use a valid payment link from your merchant.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Owner decision 2026-09-25 (docs/decisions/2026-09-25-no-board-rework-402-and-batch-owner-answers.md):
+  // without a payment board, every sale has its own private link (/pay/t/<token>). This
+  // business-wide address no longer waits for "the business's current sale" — that let anyone
+  // watch a business's no-board sales (gap 12) — so it reads no sale and opens no feed.
+  if (!stoneNumber) return <NoBoardNotice merchantId={id} />;
+
+  return <BoardPayment merchantId={id} stoneNumber={stoneNumber} />;
+}
+
+function NoBoardNotice({ merchantId }: { merchantId: number }) {
+  const { data: merchant } = useMerchantBrand(merchantId);
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="w-full max-w-sm md:max-w-md">
+        <div className="rounded-[48px] overflow-hidden shadow-2xl">
+          <div className="bg-[#0055FF] px-8 pt-8 pb-20 rounded-b-[48px]">
+            <MerchantLogo customLogoUrl={merchant?.customLogoUrl} />
+            <div className="text-center">
+              <QrCode className="w-8 h-8 text-[#00E5CC] mx-auto mb-4" />
+              <h2 className="text-xl font-bold text-white mb-2">Ask for your payment link</h2>
+              <p className="text-white/70">
+                Each sale now has its own payment link. Ask the business to show you the QR code for your sale.
+              </p>
+            </div>
+          </div>
+          <div className="bg-[#00E5CC] px-8 py-4 -mt-4" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** A payment board's customer page: waits for that board's current sale. */
+function BoardPayment({ merchantId: id, stoneNumber }: { merchantId: number; stoneNumber: number }) {
+  const [, setLocation] = useLocation();
+  const [currentTransaction, setCurrentTransaction] = useState<any>(null);
+  const [paymentStatus, setPaymentStatus] = useState<"loading" | "redirecting" | "success" | "error">("loading");
+  const hasRedirected = useRef(false);
+
+  // Immediately redirect to Chrome/Safari if opened in an in-app browser
+  useEffect(() => { redirectToRealBrowser(); }, []);
+
+  const { data: merchant } = useMerchantBrand(id);
 
   const { data: activeTransaction, isLoading } = useQuery({
     queryKey: ["/api/merchants", id, "active-transaction", stoneNumber],
     queryFn: async () => {
-      const url = stoneNumber
-        ? `/api/merchants/${id}/active-transaction?stoneId=${stoneNumber}`
-        : `/api/merchants/${id}/active-transaction`;
-      const response = await fetch(url, { headers: { "Cache-Control": "no-cache" } });
+      const response = await fetch(`/api/merchants/${id}/active-transaction?stoneId=${stoneNumber}`, {
+        headers: { "Cache-Control": "no-cache" },
+      });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      // Gap 12 Option C: the no-stoneId (no-board) branch signals "2+
-      // concurrent candidate sales, refusing to guess" via this header while
-      // keeping the JSON body null — byte-identical to today's "no active
-      // transaction" response for the staff terminal screens that also poll
-      // this route and don't look for it. A board-scoped customer
-      // (stoneNumber set) is never ambiguous — that branch is unaffected.
-      const isAmbiguous = !stoneNumber && response.headers.get("X-Legacy-No-Board-Ambiguous") === "true";
-      setAmbiguous(isAmbiguous);
       return response.json();
     },
     staleTime: 500,
@@ -93,17 +142,11 @@ export default function CustomerPayment() {
   });
 
   useEffect(() => {
-    if (!id) return;
     sseClient.connectCustomer(id, stoneNumber);
 
     const handleTransactionUpdate = (message: any) => {
-      const expectedMode = stoneNumber ? "board" : "legacy-no-board";
-      if (message.addressingMode !== expectedMode) return;
-      if (stoneNumber && (message.stoneId !== stoneNumber || message.transaction.taptStoneId !== stoneNumber)) return;
-      if (!stoneNumber && message.transaction.taptStoneId !== null) return;
-      // A normal, resolved event means the merchant's sale is unambiguous
-      // again (or always was, for a board-scoped customer).
-      setAmbiguous(false);
+      if (message.addressingMode !== "board") return;
+      if (message.stoneId !== stoneNumber || message.transaction.taptStoneId !== stoneNumber) return;
       setCurrentTransaction(message.transaction);
       queryClient.setQueryData(["/api/merchants", id, "active-transaction", stoneNumber], message.transaction);
 
@@ -115,19 +158,9 @@ export default function CustomerPayment() {
       }
     };
 
-    // Gap 12 Option C: the no-board audience alone can receive this — see
-    // server/sse-broker.ts's broadcastLegacyNoBoardAmbiguous. A board-scoped
-    // customer (stoneNumber set) never subscribes to this state.
-    const handleAmbiguous = (_message: any) => {
-      if (stoneNumber) return;
-      setAmbiguous(true);
-    };
-
     sseClient.subscribe("transaction_updated", handleTransactionUpdate);
-    sseClient.subscribe("legacy_no_board_ambiguous", handleAmbiguous);
     return () => {
       sseClient.unsubscribe("transaction_updated", handleTransactionUpdate);
-      sseClient.unsubscribe("legacy_no_board_ambiguous", handleAmbiguous);
       sseClient.disconnect();
     };
   }, [id, stoneNumber]);
@@ -141,11 +174,6 @@ export default function CustomerPayment() {
 
   // Route customer to the right page as soon as a transaction appears
   useEffect(() => {
-    // Gap 12 Option C: never auto-navigate into a checkout we aren't sure
-    // belongs to this customer. This also closes the specific race where
-    // `currentTransaction` still holds a stale single transaction from
-    // before ambiguity arose.
-    if (ambiguous) return;
     if (!currentTransaction || hasRedirected.current) return;
     if (currentTransaction.status !== "pending") return;
 
@@ -159,7 +187,7 @@ export default function CustomerPayment() {
 
     // → Branded checkout page (Google Pay / Apple Pay / card details)
     setLocation(`/checkout/${currentTransaction.id}`);
-  }, [currentTransaction, ambiguous]);
+  }, [currentTransaction]);
 
   const handleRetry = () => {
     hasRedirected.current = false;
@@ -167,54 +195,7 @@ export default function CustomerPayment() {
     queryClient.invalidateQueries({ queryKey: ["/api/merchants", id, "active-transaction", stoneNumber] });
   };
 
-  const logo = (
-    <div className="text-center mb-8">
-      <img
-        src={merchant?.customLogoUrl || taptLogo}
-        alt="merchant logo"
-        className="h-12 sm:h-14 mx-auto object-contain"
-        style={
-          merchant?.customLogoUrl
-            ? {}
-            : { filter: "brightness(0) saturate(100%) invert(78%) sepia(96%) saturate(2453%) hue-rotate(131deg) brightness(97%) contrast(101%)" }
-        }
-      />
-    </div>
-  );
-
-  if (!id) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-200">
-        <div className="text-center space-y-4 bg-white rounded-2xl p-8">
-          <h2 className="text-2xl font-bold text-red-600">Invalid Payment Link</h2>
-          <p className="text-gray-600">Please use a valid payment link from your merchant.</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Gap 12 Option C: 2+ concurrent stoneless sales are open for this
-  // merchant and the server refuses to guess which one is this customer's.
-  // Takes precedence over the loading/waiting branch below.
-  if (ambiguous) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="w-full max-w-sm md:max-w-md">
-          <div className="rounded-[48px] overflow-hidden shadow-2xl">
-            <div className="bg-[#0055FF] px-8 pt-8 pb-20 rounded-b-[48px]">
-              {logo}
-              <div className="text-center">
-                <Loader2 className="w-8 h-8 text-[#00E5CC] animate-spin mx-auto mb-4" />
-                <h2 className="text-xl font-bold text-white mb-2">We can't tell which sale is yours</h2>
-                <p className="text-white/70">Please ask a staff member for help</p>
-              </div>
-            </div>
-            <div className="bg-[#00E5CC] px-8 py-4 -mt-4" />
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const logo = <MerchantLogo customLogoUrl={merchant?.customLogoUrl} />;
 
   // Waiting for a transaction to be created by the merchant
   if (isLoading || (!currentTransaction && paymentStatus === "loading")) {

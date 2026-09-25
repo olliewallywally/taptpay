@@ -591,9 +591,12 @@ function CashEntry({ go, onCommitCash }) {
   );
 }
 
-function SharePayment({ state, go, toast, onShare, onExpandQR, onConfirmPayment, livePayLink, qrElement }) {
+function SharePayment({ state, go, toast, onShare, onExpandQR, onConfirmPayment, livePayLink, qrElement, isLive = false }) {
   const total = state.pending?.amount || state.items.reduce((s, i) => s + i.amount, 0) || 0;
-  const payLink = livePayLink || 'https://pay.taptpay.com/p/demo-abc123';
+  // Live: the link the terminal hands over, a board's page or this sale's own link. With
+  // neither there is nothing to share (2026-09-25: the business-wide no-board address is
+  // retired); the demo link is the landing demo's alone.
+  const payLink = livePayLink || (isLive ? null : 'https://pay.taptpay.com/p/demo-abc123');
   const share = (channel, successMessage) => requestShare(onShare, {
     kind: 'payment',
     channel,
@@ -618,6 +621,7 @@ function SharePayment({ state, go, toast, onShare, onExpandQR, onConfirmPayment,
       </div>
       <div className="stagger tp-panel" style={{ background: NAVY }}>
         <div className="tp-panel-body" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%' }}>
+        {payLink ? (<>
         <div style={{ position: 'relative' }}>
           <div className="tp-qr-card">
             <Ic.QRBig sz={150} />
@@ -637,6 +641,11 @@ function SharePayment({ state, go, toast, onShare, onExpandQR, onConfirmPayment,
             <button className="tp-share-btn" onClick={() => share('email', null)} aria-label="share via email"><Ic.Mail sz={20} c={BLUE} /></button>
           </div>
         </div>
+        </>) : (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: BLUE, fontWeight: 600, fontSize: 15, textAlign: 'center' }}>
+            no payment link to share yet
+          </div>
+        )}
         </div>
       </div>
     </div>
@@ -861,8 +870,8 @@ function BoardsModal({ onClose, toast, stones, selectedStoneId, onStoneSelect, o
   );
 }
 
-function QRModal({ onClose, qrElement, payLink }) {
-  const displayLink = payLink || 'https://pay.taptpay.com/p/demo-abc123';
+function QRModal({ onClose, qrElement, payLink, isLive = false }) {
+  const displayLink = payLink || (isLive ? '' : 'https://pay.taptpay.com/p/demo-abc123');
   return (
     <div className="tp-qr-modal" onClick={onClose}>
       <div className="tp-qr-modal-inner" onClick={e => e.stopPropagation()}>
@@ -1151,7 +1160,7 @@ export default function RetailTerminalViewCore({
     if (id === 'split')   return <SplitPayment state={state} go={go} onCommitSplit={handleSplitCommit} />;
     if (id === 'stock')   return <ChooseStock  state={state} go={go} onCommitStock={handleStockCommit} />;
     if (id === 'details') return <EnterDetails state={state} go={go} onCommitDetails={handleDetailsCommit} initialAmount={keypadCents} />;
-    if (id === 'share')   return <SharePayment state={state} go={go} toast={toast} onShare={onShare} onExpandQR={() => setShowQRModal(true)} onConfirmPayment={handleShareConfirm} livePayLink={livePayLink} qrElement={qrElement} />;
+    if (id === 'share')   return <SharePayment state={state} go={go} toast={toast} onShare={onShare} onExpandQR={() => setShowQRModal(true)} onConfirmPayment={handleShareConfirm} livePayLink={livePayLink} qrElement={qrElement} isLive={isLive} />;
     if (id === 'cash')         return <CashEntry   go={go} onCommitCash={handleCashCommit} />;
     if (id === 'cash-success') return <CashSuccess state={state} go={go} setState={setState} toast={toast} onShare={onShare} />;
     return null;
@@ -1250,7 +1259,7 @@ export default function RetailTerminalViewCore({
         />
       )}
 
-      {showQRModal && <QRModal onClose={() => setShowQRModal(false)} qrElement={qrElement} payLink={livePayLink} />}
+      {showQRModal && <QRModal onClose={() => setShowQRModal(false)} qrElement={qrElement} payLink={livePayLink} isLive={isLive} />}
 
       <div className={`tp-toast${toastMsg ? ' show' : ''}`}>{toastMsg}</div>
 
