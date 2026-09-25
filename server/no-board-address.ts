@@ -19,3 +19,12 @@ export const NO_BOARD_SALE_NEEDS_OWN_LINK = {
   code: "NO_BOARD_SALE_NEEDS_OWN_LINK",
   message: "A sale without a payment board gets its own payment link. Reload TaptPay and try again.",
 } as const;
+
+/**
+ * The page a phone opens from a business's old no-board NFC tag (`/nfc/:merchantId`): the
+ * customer notice, with no script and no link onward — there is no business-wide page left
+ * to send them to.
+ */
+export function noBoardAddressRetiredHtml(): string {
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TaptPay</title><style>body{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#000a36;font-family:system-ui,sans-serif;color:#fff;text-align:center;padding:24px}h1{font-size:20px;margin:0 0 8px}p{opacity:.7;font-size:15px;max-width:320px;margin:0 auto}</style></head><body><main><h1>Ask for your payment link</h1><p>Each sale now has its own payment link. Ask the business to show you the QR code for your sale.</p></main></body></html>`;
+}

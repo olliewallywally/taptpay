@@ -50,23 +50,25 @@ describe("R1-T6 — bounded query values reject garbage and default only when ab
     });
   });
 
-  describe("GET /api/merchants/:id/qr — size", () => {
+  // The business-wide /api/merchants/:id/qr was retired on 2026-09-25 (410; see
+  // no-board-standing-links-retired.test.ts). A board's QR parses `size` the same way.
+  describe("GET /api/merchants/:id/stone/:stoneId/qr — size", () => {
     test("absent size still renders, garbage size is refused", async () => {
       const { app } = await createTestApp();
       const owner = await createOwnerPrincipal();
+      const board = await storage.createNextTaptStone(owner.merchantId);
+      const path = `/api/merchants/${owner.merchantId}/stone/${board.id}/qr`;
 
-      const ok = await request(app).get(`/api/merchants/${owner.merchantId}/qr`).set(bearer(owner));
+      const ok = await request(app).get(path).set(bearer(owner));
       expect(ok.status).toBe(200);
 
       for (const raw of ["abc", "0", "-1", "1.5"]) {
-        const bad = await request(app)
-          .get(`/api/merchants/${owner.merchantId}/qr`).query({ size: raw }).set(bearer(owner));
+        const bad = await request(app).get(path).query({ size: raw }).set(bearer(owner));
         expect({ raw, status: bad.status }).toEqual({ raw, status: 400 });
         expect(bad.body.message).toBe("Invalid size");
       }
 
-      const repeated = await request(app)
-        .get(`/api/merchants/${owner.merchantId}/qr?size=200&size=300`).set(bearer(owner));
+      const repeated = await request(app).get(`${path}?size=200&size=300`).set(bearer(owner));
       expect(repeated.status).toBe(400);
     });
   });

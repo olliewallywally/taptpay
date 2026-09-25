@@ -103,6 +103,8 @@ export function publicMerchantBrandDto(merchant: MerchantInput) {
   };
 }
 
+// No merchant projection carries the row's stored qrCodeUrl/paymentUrl: they hold the
+// business-wide no-board address, retired on 2026-09-25 (server/no-board-address.ts).
 export function ownerMerchantDto(merchant: MerchantInput) {
   return {
     id: merchant.id,
@@ -113,8 +115,6 @@ export function ownerMerchantDto(merchant: MerchantInput) {
     phone: merchant.phone,
     address: merchant.address,
     status: merchant.status,
-    qrCodeUrl: merchant.qrCodeUrl,
-    paymentUrl: merchant.paymentUrl,
     director: merchant.director,
     nzbn: merchant.nzbn,
     contactEmail: merchant.contactEmail,
@@ -162,8 +162,6 @@ export function memberMerchantSettingsDto(merchant: MerchantInput) {
     phone: merchant.contactPhone ?? merchant.phone,
     address: merchant.businessAddress ?? merchant.address,
     status: merchant.status,
-    qrCodeUrl: merchant.qrCodeUrl,
-    paymentUrl: merchant.paymentUrl,
     director: merchant.director,
     nzbn: merchant.nzbn,
     contactEmail: merchant.contactEmail,
@@ -198,8 +196,6 @@ export function adminMerchantDto(merchant: MerchantInput) {
     businessType: merchant.businessType,
     phone: merchant.phone,
     address: merchant.address,
-    qrCodeUrl: merchant.qrCodeUrl,
-    paymentUrl: merchant.paymentUrl,
     director: merchant.director,
     contactEmail: merchant.contactEmail,
     contactPhone: merchant.contactPhone,

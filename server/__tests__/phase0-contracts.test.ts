@@ -142,8 +142,8 @@ describe("Phase 0 request and response contracts", () => {
       "businessAddress", "businessDescription", "businessName", "businessType",
       "contactEmail", "contactPhone", "createdAt", "dailyGoal",
       "director", "email", "emailVerified", "estimatedAnnualTurnover", "gstNumber",
-      "gstRegistered", "id", "name", "nzbn", "onboardingCompleted", "paymentUrl",
-      "phone", "qrCodeUrl", "rentReminderDelayDays", "rentReminderEnabled",
+      "gstRegistered", "id", "name", "nzbn", "onboardingCompleted",
+      "phone", "rentReminderDelayDays", "rentReminderEnabled",
       "rentReminderIntervalDays", "rentReminderMaxCount", "status", "themeId",
       "tradeGstMode", "tradeRemindersEnabled", "tutorialAutoEnabled",
       "tutorialGeneration", "updatedAt", "websiteUrl", "windcaveApiConfigured",
@@ -154,6 +154,8 @@ describe("Phase 0 request and response contracts", () => {
       "bankAccountNumber", "bankName", "bankBranch", "accountHolderName", "ourRate",
       // Retired with per-transaction pricing — these must not creep back in.
       "currentProviderRate",
+      // The row's stored business-wide no-board address, retired 2026-09-25.
+      "paymentUrl", "qrCodeUrl",
     ]) {
       expect(owner).not.toHaveProperty(forbidden);
       expect(admin).not.toHaveProperty(forbidden);

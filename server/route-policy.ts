@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/routes.ts @ da90d1a11d48858ee7a37997a7b316134875d2f6 on 2026-09-25.
+ * scripts/generate-route-policy.ts from server/routes.ts @ f5ef0d11b9987453e56b7cd1bfb410f9e13421cf on 2026-09-25.
  *
  * 223 registrations (93 GET, 91 POST, 3 PATCH, 5 ALL, 22 PUT, 9 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -72,7 +72,7 @@ export interface RoutePolicyEntry {
 export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
   "GET /robots.txt": {"method":"GET","path":"/robots.txt","principal":"public","markers":[]},
   "GET /nfc/:merchantId/stone/:stoneId": {"method":"GET","path":"/nfc/:merchantId/stone/:stoneId","principal":"public","markers":["generatePaymentUrl("]},
-  "GET /nfc/:merchantId": {"method":"GET","path":"/nfc/:merchantId","principal":"public","markers":["generatePaymentUrl("]},
+  "GET /nfc/:merchantId": {"method":"GET","path":"/nfc/:merchantId","principal":"public","markers":[]},
   "GET /.well-known/apple-developer-merchantid-domain-association": {"method":"GET","path":"/.well-known/apple-developer-merchantid-domain-association","principal":"public","markers":[]},
   "GET /sitemap.xml": {"method":"GET","path":"/sitemap.xml","principal":"admin","markers":["authenticateToken","checkMerchantOwnership","checkAccountOwnership","isAccountOwner","req.user?.role !== \"admin\"","req.user.role === 'admin'","authenticateAdmin"]},
   "GET /api/auth/google": {"method":"GET","path":"/api/auth/google","principal":"public","markers":[]},
@@ -91,10 +91,10 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
   "POST /api/tutorial/restart": {"method":"POST","path":"/api/tutorial/restart","principal":"merchant-user","markers":["authenticateToken","req.user?.role === \"admin\""]},
   "POST /api/merchants/:id/onboarding": {"method":"POST","path":"/api/merchants/:id/onboarding","principal":"merchant-user","markers":["authenticateToken","checkAccountOwnership"]},
   "GET /api/admin/auth/me": {"method":"GET","path":"/api/admin/auth/me","principal":"admin","markers":["authenticateAdmin"]},
-  "GET /api/merchants/:id/qr": {"method":"GET","path":"/api/merchants/:id/qr","principal":"public","markers":["generatePaymentUrl("]},
+  "GET /api/merchants/:id/qr": {"method":"GET","path":"/api/merchants/:id/qr","principal":"public","markers":[]},
   "GET /api/merchants/:id/stone/:stoneId/qr": {"method":"GET","path":"/api/merchants/:id/stone/:stoneId/qr","principal":"public","markers":[]},
-  "GET /api/merchants/:id": {"method":"GET","path":"/api/merchants/:id","principal":"public","markers":["publicMerchantBrandDto(","generatePaymentUrl("]},
-  "GET /api/merchants/:id/profile": {"method":"GET","path":"/api/merchants/:id/profile","principal":"merchant-user","markers":["authenticateToken","checkMerchantOwnership","isAccountOwner","generatePaymentUrl("]},
+  "GET /api/merchants/:id": {"method":"GET","path":"/api/merchants/:id","principal":"public","markers":["publicMerchantBrandDto("]},
+  "GET /api/merchants/:id/profile": {"method":"GET","path":"/api/merchants/:id/profile","principal":"merchant-user","markers":["authenticateToken","checkMerchantOwnership","isAccountOwner"]},
   "GET /api/pay/t/:token": {"method":"GET","path":"/api/pay/t/:token","principal":"public","markers":["resolvePaymentToken("]},
   "GET /api/pay/t/:token/qr": {"method":"GET","path":"/api/pay/t/:token/qr","principal":"public","markers":["resolvePaymentToken("]},
   "POST /api/pay/t/:token/split": {"method":"POST","path":"/api/pay/t/:token/split","principal":"public","markers":["resolvePaymentToken(","loadTokenReceipt("]},
@@ -107,13 +107,13 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
   "GET /api/pay/return/:state": {"method":"GET","path":"/api/pay/return/:state","principal":"public","markers":["paymentAttempts.resolveReturnState("]},
   "ALL /api/pay/notification/:state": {"method":"ALL","path":"/api/pay/notification/:state","principal":"provider-webhook","markers":[]},
   "GET /api/merchants/:id/active-transaction": {"method":"GET","path":"/api/merchants/:id/active-transaction","principal":"merchant-user","markers":["authenticateToken","checkMerchantOwnership","publicTransactionDto(","generatePaymentUrl("]},
-  "POST /api/transactions": {"method":"POST","path":"/api/transactions","principal":"merchant-user","markers":["authenticateToken","checkMerchantOwnership","generatePaymentUrl("]},
+  "POST /api/transactions": {"method":"POST","path":"/api/transactions","principal":"merchant-user","markers":["authenticateToken","checkMerchantOwnership"]},
   "POST /api/transactions/cash-sale": {"method":"POST","path":"/api/transactions/cash-sale","principal":"merchant-user","markers":["authenticateToken","checkMerchantOwnership"]},
   "POST /api/transactions/tap-to-pay": {"method":"POST","path":"/api/transactions/tap-to-pay","principal":"merchant-user","markers":["authenticateToken","checkMerchantOwnership"]},
-  "POST /api/transactions/:id/split": {"method":"POST","path":"/api/transactions/:id/split","principal":"public","markers":["isTokenAddressedTransaction(","publicTransactionDto(","generatePaymentUrl("]},
+  "POST /api/transactions/:id/split": {"method":"POST","path":"/api/transactions/:id/split","principal":"public","markers":["isTokenAddressedTransaction(","publicTransactionDto("]},
   "PATCH /api/transactions/:id/split-enabled": {"method":"PATCH","path":"/api/transactions/:id/split-enabled","principal":"merchant-user","markers":["authenticateToken"]},
   "GET /api/split-payments/:id": {"method":"GET","path":"/api/split-payments/:id","principal":"public","markers":["isTokenAddressedTransaction("]},
-  "POST /api/transactions/:id/cancel": {"method":"POST","path":"/api/transactions/:id/cancel","principal":"merchant-user","markers":["authenticateToken","checkMerchantOwnership","generatePaymentUrl("]},
+  "POST /api/transactions/:id/cancel": {"method":"POST","path":"/api/transactions/:id/cancel","principal":"merchant-user","markers":["authenticateToken","checkMerchantOwnership"]},
   "POST /api/merchants/:merchantId/nfc-pay": {"method":"POST","path":"/api/merchants/:merchantId/nfc-pay","principal":"merchant-user","markers":["authenticateToken","checkMerchantOwnership"]},
   "GET /api/nfc/capabilities": {"method":"GET","path":"/api/nfc/capabilities","principal":"public","markers":[]},
   "POST /api/transactions/:id/pay": {"method":"POST","path":"/api/transactions/:id/pay","principal":"public","markers":["isTokenAddressedTransaction("]},
@@ -159,7 +159,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
   "GET /api/admin/ga4-metrics": {"method":"GET","path":"/api/admin/ga4-metrics","principal":"admin","markers":["authenticateAdmin"]},
   "POST /api/admin/merchants": {"method":"POST","path":"/api/admin/merchants","principal":"admin","markers":["authenticateAdmin"]},
   "PUT /api/admin/merchants/:id": {"method":"PUT","path":"/api/admin/merchants/:id","principal":"admin","markers":["authenticateAdmin"]},
-  "POST /api/merchants/:id/test-payment-link": {"method":"POST","path":"/api/merchants/:id/test-payment-link","principal":"admin","markers":["authenticateAdmin","generatePaymentUrl("]},
+  "POST /api/merchants/:id/test-payment-link": {"method":"POST","path":"/api/merchants/:id/test-payment-link","principal":"admin","markers":["authenticateAdmin"]},
   "GET /api/admin/merchants": {"method":"GET","path":"/api/admin/merchants","principal":"admin","markers":["authenticateAdmin"]},
   "GET /api/admin/merchants/:id": {"method":"GET","path":"/api/admin/merchants/:id","principal":"admin","markers":["authenticateAdmin"]},
   "DELETE /api/admin/merchants/:id": {"method":"DELETE","path":"/api/admin/merchants/:id","principal":"admin","markers":["authenticateAdmin"]},
@@ -174,7 +174,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
   "POST /api/info-pack-leads": {"method":"POST","path":"/api/info-pack-leads","principal":"public","markers":[]},
   "POST /api/merchants/signup": {"method":"POST","path":"/api/merchants/signup","principal":"public","markers":[]},
   "PUT /api/merchants/:id/business-details": {"method":"PUT","path":"/api/merchants/:id/business-details","principal":"merchant-user","markers":["authenticateToken","checkAccountOwnership"]},
-  "POST /api/admin/merchants/signup": {"method":"POST","path":"/api/admin/merchants/signup","principal":"admin","markers":["authenticateAdmin","generatePaymentUrl("]},
+  "POST /api/admin/merchants/signup": {"method":"POST","path":"/api/admin/merchants/signup","principal":"admin","markers":["authenticateAdmin"]},
   "GET /api/merchants/:id/events": {"method":"GET","path":"/api/merchants/:id/events","principal":"merchant-user","markers":["authenticateToken","checkMerchantOwnership"]},
   "GET /api/push/capabilities": {"method":"GET","path":"/api/push/capabilities","principal":"public","markers":[]},
   "GET /api/push/vapid-key": {"method":"GET","path":"/api/push/vapid-key","principal":"public","markers":[]},

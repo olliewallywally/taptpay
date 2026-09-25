@@ -46,7 +46,7 @@ describe("subscription and team route authorization", () => {
     const profile = handler("get", "/api/merchants/:id/profile");
     expect(profile).toContain("checkMerchantOwnership(req, merchantId)");
     expect(profile).toContain("isAccountOwner(req.user)");
-    expect(profile).toContain("memberMerchantSettingsDto(withUrls)");
+    expect(profile).toContain("memberMerchantSettingsDto(merchant)");
   });
 
   test("general merchant updates cannot change the login email", () => {

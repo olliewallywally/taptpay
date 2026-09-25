@@ -28,7 +28,7 @@ import { generateReceiptPdf } from "./pdf-generator";
 import { generateQuotePdf } from "./trades-quote-pdf";
 import { generateBusinessReportPdf } from "./report-generator";
 import { computeQuoteTotals } from "@shared/trades-gst";
-import { getBaseUrl, generatePaymentUrl, generateQrCodeUrl, generateStonePaymentUrl, generateNfcTagUrl } from "./url-utils";
+import { getBaseUrl, generatePaymentUrl, generateQrCodeUrl, generateStonePaymentUrl, boardSaleUrls } from "./url-utils";
 import { sendEmail, sendTeamInviteEmail } from "./email-service";
 import QRCode from "qrcode";
 import { z } from "zod";
@@ -71,7 +71,7 @@ import {
 } from "./http-contracts";
 import { PLAN_LIST, planIdSchema } from "@shared/plans";
 import { sseBroker, type SseAudience } from "./sse-broker";
-import { NO_BOARD_ADDRESS_RETIRED, NO_BOARD_SALE_NEEDS_OWN_LINK } from "./no-board-address";
+import { NO_BOARD_ADDRESS_RETIRED, NO_BOARD_SALE_NEEDS_OWN_LINK, noBoardAddressRetiredHtml } from "./no-board-address";
 import {
   createRetailTransaction,
   PaymentCredentialCollisionError,
@@ -450,14 +450,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     res.type("text/html").send(nfcRedirectHtml(payUrl, intentUrl));
   });
 
+  // A business's no-board NFC tag pointed at the business-wide page, retired on 2026-09-25
+  // (server/no-board-address.ts): 410 with the customer notice, and no redirect.
   app.get("/nfc/:merchantId", (req, res) => {
     const merchantId = strictPositiveIntegerParam(req.params.merchantId);
     if (merchantId === null) return res.status(400).json({ message: "Invalid merchantId" });
-    const payUrl = generatePaymentUrl(merchantId, undefined, req);
-    const host = payUrl.replace(/^https?:\/\//, "");
-    const intentUrl = `intent://${host}#Intent;scheme=https;package=com.android.chrome;end`;
     res.setHeader("Cache-Control", "no-store");
-    res.type("text/html").send(nfcRedirectHtml(payUrl, intentUrl));
+    res.status(410).type("text/html").send(noBoardAddressRetiredHtml());
   });
 
   app.get("/.well-known/apple-developer-merchantid-domain-association", (_req, res) => {
@@ -1281,49 +1280,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     });
   });
 
-  // Generate QR code for merchant
-  app.get("/api/merchants/:id/qr", async (req, res) => {
-    try {
-      const merchantId = strictPositiveIntegerParam(req.params.id);
-      if (merchantId === null) return res.status(400).json({ message: "Invalid id" });
-      const merchant = await storage.getMerchant(merchantId);
-      
-      if (!merchant) {
-        return res.status(404).json({ message: "Merchant not found" });
-      }
-
-      // Get size parameter (default to 400, allow up to 1000 for downloads)
-      const size = strictBoundedIntegerQueryParam(req.query.size, { fallback: 400, max: 1000 });
-      if (size === null) return res.status(400).json({ message: "Invalid size" });
-      const isDownload = req.query.download === 'true';
-
-      // Set response headers for PNG image - STATIC QR per merchant
-      res.setHeader('Content-Type', 'image/png');
-      res.setHeader('Cache-Control', 'public, max-age=2592000'); // Cache for 30 days - QR never changes per merchant
-      res.setHeader('ETag', `"merchant-qr-v2-${merchantId}"`); // v2 = cyan transparent style
-      
-      if (isDownload) {
-        res.setHeader('Content-Disposition', `attachment; filename="tapt-payment-qr-merchant-${merchantId}.png"`);
-      }
-      
-      // Generate QR code with current payment URL
-      const currentPaymentUrl = generatePaymentUrl(merchantId, undefined, req);
-      const qrBuffer = await QRCode.toBuffer(currentPaymentUrl, {
-        type: 'png',
-        width: size,
-        margin: 2,
-        color: {
-          dark: '#00E5CC',
-          light: '#00000000'
-        },
-        errorCorrectionLevel: 'L',
-      });
-      
-      res.send(qrBuffer);
-    } catch (error) {
-      console.error("QR code generation error:", error);
-      res.status(500).json({ message: "Failed to generate QR code" });
-    }
+  // The business-wide no-board QR image, retired on 2026-09-25 (server/no-board-address.ts):
+  // a printable QR now comes from a board (below), or from a sale's own link.
+  app.get("/api/merchants/:id/qr", (req, res) => {
+    const merchantId = strictPositiveIntegerParam(req.params.id);
+    if (merchantId === null) return res.status(400).json({ message: "Invalid id" });
+    res.status(410).json(NO_BOARD_ADDRESS_RETIRED);
   });
 
   // Generate QR code for specific tapt stone
@@ -1384,18 +1346,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(404).json({ message: "Merchant not found" });
       }
       
-      // Ensure URLs are always current for this environment
-      const currentPaymentUrl = generatePaymentUrl(id, undefined, req);
-      const currentQrCodeUrl = generateQrCodeUrl(id, undefined, req);
-      
-      // Return merchant with current URLs
-      const merchantWithCurrentUrls = {
-        ...merchant,
-        paymentUrl: currentPaymentUrl,
-        qrCodeUrl: currentQrCodeUrl
-      };
-      
-      res.json(publicMerchantBrandDto(merchantWithCurrentUrls));
+      res.json(publicMerchantBrandDto(merchant));
     } catch (error) {
       res.status(500).json({ message: "Failed to get merchant" });
     }
@@ -1414,15 +1365,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const merchant = await storage.getMerchant(merchantId);
       if (!merchant) return res.status(404).json({ message: "Merchant not found" });
 
-      const withUrls = {
-        ...merchant,
-        paymentUrl: generatePaymentUrl(merchantId, undefined, req),
-        qrCodeUrl: generateQrCodeUrl(merchantId, undefined, req),
-      };
       res.json(
         isAccountOwner(req.user)
-          ? ownerMerchantDto(withUrls)
-          : memberMerchantSettingsDto(withUrls),
+          ? ownerMerchantDto(merchant)
+          : memberMerchantSettingsDto(merchant),
       );
     } catch (error) {
       res.status(500).json({ message: "Failed to get merchant profile" });
@@ -2399,18 +2345,17 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       // The bearer token is disclosed exactly once, in this authenticated create
       // response. A board sale keeps its board's stable shared URL.
-      const paymentUrl = rawToken
-        ? `${getBaseUrl(req)}/pay/t/${rawToken}`
-        : generatePaymentUrl(transaction.merchantId!, transaction.taptStoneId, req);
-      const qrCodeUrl = rawToken
-        ? `${getBaseUrl(req)}/api/pay/t/${rawToken}/qr`
-        : generateQrCodeUrl(transaction.merchantId!, transaction.taptStoneId, req);
+      const saleUrls = rawToken
+        ? {
+            paymentUrl: `${getBaseUrl(req)}/pay/t/${rawToken}`,
+            qrCodeUrl: `${getBaseUrl(req)}/api/pay/t/${rawToken}/qr`,
+          }
+        : boardSaleUrls(transaction.merchantId!, transaction.taptStoneId, req);
       
       // Add URLs to transaction object
       const transactionWithUrls = {
         ...transaction,
-        paymentUrl,
-        qrCodeUrl,
+        ...saleUrls,
       };
       
       broadcastToStone(transaction.merchantId!, transaction.taptStoneId, { 
@@ -2658,14 +2603,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(404).json({ message: "Transaction not found" });
       }
 
-      // Add payment URL and QR code URL
-      const paymentUrl = generatePaymentUrl(updatedTransaction.merchantId!, undefined, req);
-      const qrCodeUrl = generateQrCodeUrl(updatedTransaction.merchantId!, undefined, req);
-      
+      // A board sale's board address; a no-board sale has none to give here.
       const transactionWithUrls = {
         ...updatedTransaction,
-        paymentUrl,
-        qrCodeUrl,
+        ...boardSaleUrls(updatedTransaction.merchantId!, updatedTransaction.taptStoneId, req),
       };
 
       // Notify connected clients about the split
@@ -2777,14 +2718,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(500).json({ message: "Transaction cancellation was not persisted" });
       }
       
-      // Add payment URL and QR code URL
-      const paymentUrl = generatePaymentUrl(transaction.merchantId!, undefined, req);
-      const qrCodeUrl = generateQrCodeUrl(transaction.merchantId!, undefined, req);
-      
+      // A board sale's board address; a no-board sale has none to give here.
       const transactionWithUrls = {
         ...updatedTransaction,
-        paymentUrl,
-        qrCodeUrl,
+        ...boardSaleUrls(transaction.merchantId!, transaction.taptStoneId, req),
       };
 
       // Notify connected clients about the cancellation
@@ -4912,44 +4849,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   });
 
   // Test payment link endpoint
-  app.post("/api/merchants/:id/test-payment-link", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
-    try {
-      const merchantId = strictPositiveIntegerParam(req.params.id);
-      if (merchantId === null) return res.status(400).json({ message: "Invalid id" });
-      const merchant = await storage.getMerchant(merchantId);
-      
-      if (!merchant) {
-        return res.status(404).json({ message: "Merchant not found" });
-      }
-
-      // Test the payment URL by making a simple HTTP request
-      const paymentUrl = generatePaymentUrl(merchantId, undefined, req);
-      const qrCodeUrl = generateQrCodeUrl(merchantId, undefined, req);
-      
-      try {
-        // Simple connectivity test
-        const testResults = {
-          paymentUrl: { url: paymentUrl, status: 'active' },
-          qrCodeUrl: { url: qrCodeUrl, status: 'active' },
-          merchant: { id: merchantId, status: 'active' }
-        };
-
-        res.json({
-          status: 'active',
-          message: 'All payment links are operational',
-          results: testResults
-        });
-      } catch (testError) {
-        res.json({
-          status: 'error',
-          message: 'Payment link connectivity issues detected',
-          error: testError
-        });
-      }
-    } catch (error) {
-      console.error("Error testing payment links:", error);
-      res.status(500).json({ message: "Failed to test payment links" });
-    }
+  // Reported the business-wide no-board link "operational" without testing anything. That
+  // address was retired on 2026-09-25 (server/no-board-address.ts); no live screen calls this.
+  app.post("/api/merchants/:id/test-payment-link", authenticateAdmin, (req: AuthenticatedRequest, res) => {
+    const merchantId = strictPositiveIntegerParam(req.params.id);
+    if (merchantId === null) return res.status(400).json({ message: "Invalid id" });
+    res.status(410).json(NO_BOARD_ADDRESS_RETIRED);
   });
 
   // Get all merchants for admin
@@ -5627,11 +5532,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // Hash the password
       const passwordHash = await bcrypt.hash(password, 12);
 
-      // Generate URLs for the merchant
-      const tempMerchantId = Date.now(); // Temporary ID for URL generation
-      const paymentUrl = generatePaymentUrl(tempMerchantId);
-      const qrCodeUrl = generateQrCodeUrl(tempMerchantId);
-
       // Generate proper URLs with actual merchant ID after creation
       const merchant = await storage.createMerchantWithPassword({
         ...merchantData,
@@ -5642,10 +5542,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // Do not report a usable account until the real owner identity exists.
       await createUser(normalizedEmail, password, merchant.id);
 
-      // Update with proper URLs now that we have the merchant ID
-      const actualPaymentUrl = generatePaymentUrl(merchant.id);
-      const actualQrCodeUrl = generateQrCodeUrl(merchant.id);
-      
       await storage.updateMerchantDetails(merchant.id, {
         businessName: merchant.businessName,
         contactEmail: merchant.email,

@@ -32,24 +32,21 @@ export function getBaseUrl(req?: any): string {
   return 'http://localhost:5000';
 }
 
-export function generatePaymentUrl(merchantId: number, stoneId?: number | null, req?: any): string {
-  const baseUrl = getBaseUrl(req);
-  if (stoneId) {
-    // Ensure stoneId is converted to number to prevent [object Object] in URL
-    const stoneIdNumber = typeof stoneId === 'number' ? stoneId : parseInt(String(stoneId));
-    return `${baseUrl}/pay/${merchantId}/stone/${stoneIdNumber}`;
-  }
-  return `${baseUrl}/pay/${merchantId}`;
+/**
+ * A payment board's customer page. There is no business-wide no-board address: it was
+ * retired on 2026-09-25 (server/no-board-address.ts), and a sale without a board has its
+ * own link, given once when the sale is made. So a board is required.
+ */
+export function generatePaymentUrl(merchantId: number, stoneId: number, req?: any): string {
+  return generateStonePaymentUrl(merchantId, stoneId, req);
 }
 
-export function generateQrCodeUrl(merchantId: number, stoneId?: number | null, req?: any): string {
+/** A payment board's QR image (see generatePaymentUrl). */
+export function generateQrCodeUrl(merchantId: number, stoneId: number, req?: any): string {
   const baseUrl = getBaseUrl(req);
-  if (stoneId) {
-    // Ensure stoneId is converted to number to prevent [object Object] in URL
-    const stoneIdNumber = typeof stoneId === 'number' ? stoneId : parseInt(String(stoneId));
-    return `${baseUrl}/api/merchants/${merchantId}/stone/${stoneIdNumber}/qr`;
-  }
-  return `${baseUrl}/api/merchants/${merchantId}/qr`;
+  // Ensure stoneId is converted to number to prevent [object Object] in URL
+  const stoneIdNumber = typeof stoneId === 'number' ? stoneId : parseInt(String(stoneId));
+  return `${baseUrl}/api/merchants/${merchantId}/stone/${stoneIdNumber}/qr`;
 }
 
 export function generateStonePaymentUrl(merchantId: number, stoneId: number, req?: any): string {
@@ -60,15 +57,17 @@ export function generateStonePaymentUrl(merchantId: number, stoneId: number, req
 }
 
 /**
- * Generates the URL to programme into a physical NFC tag.
- * Hits a server-side redirect that sends Android users to Chrome via
- * intent:// and iOS users straight to the HTTPS pay URL.
+ * A board sale's address, its board's page and QR image; none for a sale without a board,
+ * whose own link can't be rebuilt (only its hash is kept).
  */
-export function generateNfcTagUrl(merchantId: number, stoneId?: number | null, req?: any): string {
-  const baseUrl = getBaseUrl(req);
-  if (stoneId) {
-    const stoneIdNumber = typeof stoneId === 'number' ? stoneId : parseInt(String(stoneId));
-    return `${baseUrl}/nfc/${merchantId}/stone/${stoneIdNumber}`;
-  }
-  return `${baseUrl}/nfc/${merchantId}`;
+export function boardSaleUrls(
+  merchantId: number,
+  stoneId: number | null | undefined,
+  req?: any,
+): { paymentUrl?: string; qrCodeUrl?: string } {
+  if (stoneId == null) return {};
+  return {
+    paymentUrl: generatePaymentUrl(merchantId, stoneId, req),
+    qrCodeUrl: generateQrCodeUrl(merchantId, stoneId, req),
+  };
 }

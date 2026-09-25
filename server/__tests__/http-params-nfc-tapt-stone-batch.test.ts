@@ -73,11 +73,14 @@ describe("R1-T6 — /nfc, /api/tapt-stones, active-transaction stoneId", () => {
       expect(response.status).toBe(400);
     });
 
-    it("a real merchantId still redirects", async () => {
+    // The business-wide no-board page this redirected to was retired on 2026-09-25
+    // (no-board-standing-links-retired.test.ts): a real merchantId gets the notice, 410.
+    it("a real merchantId gets the retired-address notice, not a redirect", async () => {
       const { app } = await createTestApp();
       const owner = await createOwnerPrincipal();
       const response = await request(app).get(`/nfc/${owner.merchantId}`);
-      expect(response.status).toBe(200);
+      expect(response.status).toBe(410);
+      expect(response.text).toContain("Ask for your payment link");
       expect(response.text).not.toContain("NaN");
     });
   });
@@ -180,12 +183,15 @@ describe("R1-T6 — /nfc, /api/tapt-stones, active-transaction stoneId", () => {
   // The tracker's gap 6 reverses it: present-but-invalid is refused, not
   // silently defaulted. Old assertions quoted in
   // docs/evidence/remediation-v2-2/r1/R1-T6-bounded-query-values-2026-09-11.md.
-  describe("GET /api/merchants/:id/qr — size", () => {
+  // The business-wide /api/merchants/:id/qr was retired on 2026-09-25 (410); a board's QR
+  // parses `size` the same way (no-board-standing-links-retired.test.ts).
+  describe("GET /api/merchants/:id/stone/:stoneId/qr — size", () => {
     it("a negative size is refused rather than relying on the qrcode library to ignore it", async () => {
       const { app } = await createTestApp();
       const owner = await createOwnerPrincipal();
+      const stoneId = await createStoneFor(owner.merchantId, owner.token);
 
-      const response = await request(app).get(`/api/merchants/${owner.merchantId}/qr?size=-100`);
+      const response = await request(app).get(`/api/merchants/${owner.merchantId}/stone/${stoneId}/qr?size=-100`);
       expect(response.status).toBe(400);
       expect(response.body.message).toBe("Invalid size");
     });

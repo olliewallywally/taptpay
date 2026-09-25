@@ -269,6 +269,10 @@ export const PUBLIC_PATH_ALLOWLIST: Record<string, string> = {
     "Apple Pay domain-verification file Apple's own servers must fetch unauthenticated",
   "GET /api/merchants/:id/stone/:stoneId/qr":
     "printable per-stone payment QR PNG (stone.paymentUrl, already public); no PII",
+  "GET /api/merchants/:id/qr":
+    "retired business-wide no-board QR (owner decision 2026-09-25): validates the id, then a constant 410 NO_BOARD_ADDRESS_RETIRED tombstone; reads nothing",
+  "GET /nfc/:merchantId":
+    "retired business-wide no-board NFC tag address (owner decision 2026-09-25): validates the id, then a constant 410 notice page with no script or onward link; reads nothing",
   "GET /api/merchants/:id/email-status":
     "boolean-only lookup for the pre-session /business-details soft gate; leading '// Public' comment is misattributed by sliceHandlerBodies to the preceding registration",
   "GET /api/payments/digital-wallet/config":
