@@ -15,6 +15,7 @@ import {
   type LedgerRow,
   type MigrationClient,
 } from "../migrate";
+import { startSilentDatabase } from "./support/silent-database";
 
 function fakeClient(ledger: LedgerRow[] = []) {
   const calls: string[] = [];
@@ -100,11 +101,16 @@ describe("migration runner hardening", () => {
   });
 
   test("production-style startup checks fail closed when the database cannot be inspected", async () => {
-    await expect(reportPendingMigrations({
-      connectionString: "postgres://u:p@192.0.2.1:5432/none?sslmode=disable",
-      connectionTimeoutMs: 100,
-      failOnIssues: true,
-      log: () => undefined,
-    })).rejects.toBeDefined();
+    const silent = await startSilentDatabase();
+    try {
+      await expect(reportPendingMigrations({
+        connectionString: silent.connectionString,
+        connectionTimeoutMs: 100,
+        failOnIssues: true,
+        log: () => undefined,
+      })).rejects.toBeDefined();
+    } finally {
+      await silent.close();
+    }
   }, 20_000);
 });

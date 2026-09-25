@@ -1,10 +1,8 @@
-import express from "express";
 import { config } from "./config";
 import fs from "fs";
 import path from "path";
-import helmet from "helmet";
-import compression from "compression";
 import { spawnSync } from "child_process";
+import { createApp } from "./app";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { seedDatabase } from "./seed";
@@ -15,82 +13,13 @@ import {
   setupGracefulShutdown, 
   getPortConflictHelp 
 } from "./port-manager";
-import { createRequestLogger } from "./request-log";
 import { createGlobalErrorHandler } from "./http-error-handler";
 
-const app = express();
-
-// ============================================
-// SECURITY HEADERS - Payment Processor Grade
-// ============================================
 const isProduction = config.isProduction;
 
-// Security headers - CSP enabled in production, disabled in dev for Replit webview compatibility
-app.use(helmet({
-  contentSecurityPolicy: isProduction ? {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "https://pay.google.com", "https://applepay.cdn-apple.com", "https://uat.windcave.com", "https://sec.windcave.com"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      imgSrc: ["'self'", "data:", "blob:", "https:"],
-      connectSrc: ["'self'", "https://uat.windcave.com", "https://sec.windcave.com", "https://pay.google.com"],
-      frameSrc: ["'self'", "https://sec.windcave.com", "https://uat.windcave.com", "https://pay.google.com"],
-      objectSrc: ["'none'"],
-      baseUri: ["'self'"],
-      formAction: ["'self'"],
-      upgradeInsecureRequests: [],
-    },
-  } : false,
-  frameguard: isProduction ? { action: 'deny' } : false,
-  hidePoweredBy: true,
-  hsts: isProduction ? {
-    maxAge: 31536000,
-    includeSubDomains: true,
-    preload: true,
-  } : false,
-  noSniff: true,
-  xssFilter: true,
-  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
-  dnsPrefetchControl: { allow: false },
-  crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
-}));
-
-// Gzip compression for all responses — skips already-compressed assets and
-// very small payloads (< 1 KB) where compression overhead outweighs savings.
-app.use(compression({ threshold: 1024 }));
-
-// Bearer-addressed payment pages must not leak their URL through browser
-// referrers or shared caches. This runs before Vite/static fallback, so the HTML
-// document receives the policy before any checkout script is loaded.
-app.use((req, res, next) => {
-  if (
-    req.path === "/accept-invite" ||
-    /^\/(?:pay|split|checkout|receipt)\/t\//.test(req.path) ||
-    /^\/pay\/return\//.test(req.path) ||
-    /^\/api\/pay\/(?:t|return)\//.test(req.path)
-  ) {
-    res.set({
-      "Cache-Control": "private, no-store",
-      Pragma: "no-cache",
-      "Referrer-Policy": "no-referrer",
-    });
-  }
-  next();
-});
-
-// Skip JSON parsing for webhook routes to preserve raw body for signature verification
-app.use((req, res, next) => {
-  if (req.path === '/api/windcave/notification') {
-    next();
-  } else {
-    express.json()(req, res, next);
-  }
-});
-
-app.use(express.urlencoded({ extended: false }));
-
-app.use(createRequestLogger(log));
+// Security headers, compression, bearer-page caching, body parsing and the
+// request log: the same app the server tests build (server/app.ts).
+const app = createApp({ writeRequestLog: log });
 
 (async () => {
   for (const diagnostic of config.diagnostics) {

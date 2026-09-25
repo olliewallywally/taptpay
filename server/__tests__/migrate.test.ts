@@ -33,6 +33,7 @@ import {
   type LedgerRow,
   type MigrationClient,
 } from "../migrate";
+import { startSilentDatabase } from "./support/silent-database";
 
 // The real migration set, in the order it must be applied. `0010a` deliberately
 // sits between `0010_` and `0011` — it documents that it must run before 0011.
@@ -771,14 +772,18 @@ describe("startup check", () => {
 
   test("never throws when the database is unreachable", async () => {
     const log = jest.fn();
-    await expect(
-      reportPendingMigrations({
-        // Reserved TEST-NET-1 address: guaranteed not to answer.
-        connectionString: "postgres://u:p@192.0.2.1:5432/none?sslmode=disable",
-        connectionTimeoutMs: 250,
-        log,
-      }),
-    ).resolves.toBeUndefined();
+    const silent = await startSilentDatabase();
+    try {
+      await expect(
+        reportPendingMigrations({
+          connectionString: silent.connectionString,
+          connectionTimeoutMs: 250,
+          log,
+        }),
+      ).resolves.toBeUndefined();
+    } finally {
+      await silent.close();
+    }
     expect(log).toHaveBeenCalled();
     expect(String(log.mock.calls[0][0])).toMatch(/non-fatal|skipped/);
   }, 20_000);

@@ -1,18 +1,25 @@
 /**
  * R1-T1 — no-live-system HTTP test harness.
  *
- * Builds the real Express app (the same `registerRoutes` + error handler
- * production runs) with no network listener, no Vite, no migrations, no
- * seeding, no cron and no real provider client — see server/index.ts for
- * everything this intentionally leaves out of its bootstrap IIFE.
+ * Builds the app production serves — `createApp` (server/app.ts: security
+ * headers, compression, bearer-page caching, body parsing, the request log),
+ * the real `registerRoutes` and the global error handler — with no network
+ * listener, no Vite, no migrations, no seeding, no cron and no real provider
+ * client. See server/index.ts for everything its bootstrap adds on top. The
+ * server tests' no-network guard (./no-network.ts) fails any test that reaches
+ * off this machine anyway.
  *
  * MUST be imported only from a test file that imported "./test-env" first
  * (for its side effect) — that module deletes DATABASE_URL and sets the rest
  * of the deterministic test environment before config.ts/storage.ts load.
  */
 import crypto from "crypto";
-import express, { type Express } from "express";
-import type { Server as HttpServer } from "http";
+import type { Express } from "express";
+import http, { type IncomingHttpHeaders, type Server as HttpServer } from "http";
+import type { AddressInfo } from "net";
+import type { Readable } from "stream";
+import zlib from "zlib";
+import { createApp } from "../../app";
 import { registerRoutes } from "../../routes";
 import { createGlobalErrorHandler } from "../../http-error-handler";
 import { storage as liveStorage } from "../../storage";
@@ -24,6 +31,8 @@ import type { Merchant } from "@shared/schema";
 export interface TestApp {
   app: Express;
   httpServer: HttpServer;
+  /** Every line the request log wrote, oldest first; emptied by resetTestStorage(). */
+  requestLog: string[];
 }
 
 let cached: TestApp | null = null;
@@ -43,26 +52,19 @@ export async function createTestApp(): Promise<TestApp> {
     );
   }
 
-  const app = express();
-
-  // Mirrors server/index.ts's one deliberate exception to global JSON parsing
-  // (Windcave notification needs the raw body for future signature checks).
-  app.use((req, res, next) => {
-    if (req.path === "/api/windcave/notification") return next();
-    express.json()(req, res, next);
-  });
-  app.use(express.urlencoded({ extended: false }));
-
+  const requestLog: string[] = [];
+  const app = createApp({ writeRequestLog: (line) => requestLog.push(line) });
   const httpServer = await registerRoutes(app);
   app.use(createGlobalErrorHandler());
 
-  cached = { app, httpServer };
+  cached = { app, httpServer, requestLog };
   return cached;
 }
 
 /** Clears all merchant/user/transaction state between tests. Real reset, not a fresh app. */
 export function resetTestStorage(): void {
   liveStorage.clearAllMerchants?.();
+  cached?.requestLog.splice(0);
 }
 
 export const storage = liveStorage;
@@ -195,4 +197,117 @@ export function mintPaymentCredential(): { rawToken: string; tokenHash: string }
  */
 export function apiKeyHeader(rawKey = "harness-ecommerce-api-key"): Record<string, string> {
   return { Authorization: `Bearer ${rawKey}` };
+}
+
+/**
+ * The provider-notification principal: Windcave's notification call, which
+ * carries no user session — a GET with `?sessionid=` (Windcave's pseudo code
+ * v1.5; the route accepts every method). Send it with
+ * `request(app)[n.method](n.path)`.
+ */
+export function providerNotification({ sessionId }: { sessionId: string }): { method: "get"; path: string } {
+  return { method: "get", path: `/api/windcave/notification?sessionid=${encodeURIComponent(sessionId)}` };
+}
+
+/**
+ * Fakes the clock (`Date`) only. Every timer stays real, so HTTP, bcrypt and
+ * supertest keep working (the set-up auth-throttle.test.ts uses). Always
+ * `restore()`, in a finally or an afterEach.
+ */
+export function useFakeClock(now: Date): { advance(ms: number): void; restore(): void } {
+  jest.useFakeTimers({
+    now,
+    doNotFake: [
+      "hrtime", "nextTick", "performance", "queueMicrotask", "requestAnimationFrame", "cancelAnimationFrame",
+      "requestIdleCallback", "cancelIdleCallback", "setImmediate", "clearImmediate", "setInterval",
+      "clearInterval", "setTimeout", "clearTimeout",
+    ],
+  });
+  return {
+    advance: (ms) => jest.setSystemTime(Date.now() + ms),
+    restore: () => jest.useRealTimers(),
+  };
+}
+
+export interface EventStream {
+  status: number;
+  headers: IncomingHttpHeaders;
+  /** The next `data:` event, parsed as JSON; rejects if none arrives in time. */
+  nextEvent(timeoutMs?: number): Promise<unknown>;
+  close(): Promise<void>;
+}
+
+/**
+ * Opens a live event stream (SSE) on a loopback listener and reads it the way
+ * a browser does: decompressing a gzip, deflate or brotli body, one `data:`
+ * event at a time. (supertest cannot read a response that never ends.)
+ */
+export async function openEventStream(
+  app: Express,
+  path: string,
+  headers: Record<string, string> = {},
+): Promise<EventStream> {
+  const server = http.createServer(app);
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address() as AddressInfo;
+
+  const response = await new Promise<http.IncomingMessage>((resolve, reject) => {
+    http.get({ host: "127.0.0.1", port, path, headers }, resolve).on("error", reject);
+  });
+
+  const decoders: Record<string, () => zlib.Gunzip | zlib.Inflate | zlib.BrotliDecompress> = {
+    gzip: () => zlib.createGunzip(),
+    deflate: () => zlib.createInflate(),
+    br: () => zlib.createBrotliDecompress(),
+  };
+  const decoder = decoders[String(response.headers["content-encoding"] ?? "")];
+  const body: Readable = decoder ? response.pipe(decoder()) : response;
+
+  const events: unknown[] = [];
+  const waiting: Array<(event: unknown) => void> = [];
+  let buffered = "";
+  body.setEncoding("utf8");
+  body.on("data", (chunk: string) => {
+    buffered += chunk;
+    let end: number;
+    while ((end = buffered.indexOf("\n\n")) !== -1) {
+      const frame = buffered.slice(0, end);
+      buffered = buffered.slice(end + 2);
+      const data = frame
+        .split("\n")
+        .filter((line) => line.startsWith("data:"))
+        .map((line) => line.slice(5).trimStart())
+        .join("\n");
+      if (!data) continue;
+      const event = JSON.parse(data);
+      const waiter = waiting.shift();
+      if (waiter) waiter(event);
+      else events.push(event);
+    }
+  });
+  body.on("error", () => {}); // the stream is torn down on close()
+
+  return {
+    status: response.statusCode ?? 0,
+    headers: response.headers,
+    nextEvent(timeoutMs = 1_000) {
+      if (events.length > 0) return Promise.resolve(events.shift());
+      return new Promise((resolve, reject) => {
+        const deliver = (event: unknown) => {
+          clearTimeout(timer);
+          resolve(event);
+        };
+        const timer = setTimeout(() => {
+          waiting.splice(waiting.indexOf(deliver), 1);
+          reject(new Error(`no event on ${path} within ${timeoutMs} ms`));
+        }, timeoutMs);
+        waiting.push(deliver);
+      });
+    },
+    async close() {
+      response.destroy();
+      server.closeAllConnections();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    },
+  };
 }

@@ -24,7 +24,13 @@ module.exports = {
   moduleNameMapper: {
     '^@shared/(.*)$': '<rootDir>/shared/$1',
   },
-  setupFiles: ['<rootDir>/server/__tests__/support/clear-ambient-credentials.ts'],
+  setupFiles: [
+    '<rootDir>/server/__tests__/support/clear-ambient-credentials.ts',
+    // R1-T1: refuse and record any connection off this machine...
+    '<rootDir>/server/__tests__/support/no-network.ts',
+  ],
+  // ...and fail the test that made it.
+  setupFilesAfterEnv: ['<rootDir>/server/__tests__/support/no-network-after-env.ts'],
   clearMocks: true,
   restoreMocks: true,
   testTimeout: 15_000,
