@@ -238,6 +238,15 @@ function RequestsHome({ invoices, tenants, outstanding, outstandingExpenses = 0,
               <path d="M18 15l-6-6-6 6"/>
             </svg>
           </button>
+          {/* Batch send and rent automations (owner, 2026-09-25: "bring it back"). Their
+              bar item gave way to "bill" in June, and the bar fits four items from
+              320px up, so the entry sits by the rent requests it drives. Chip style. */}
+          <button className="tap-target" type="button" onClick={() => go?.('batch', 'up')}
+            aria-label="batch send and schedules" data-demo-id="property-home-batch"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0, padding: '6px 12px', borderRadius: 999, border: '1.5px solid rgba(4,13,109,0.25)', cursor: 'pointer', fontFamily: 'Outfit, system-ui', fontWeight: 700, fontSize: 11, letterSpacing: '0.04em', textTransform: 'uppercase', background: 'transparent', color: NAVY, WebkitTapHighlightColor: 'transparent' }}>
+            <Ic.People sz={14} c={NAVY} />
+            batch
+          </button>
         </div>
         {/* Status filter chips — deep-linkable from the dashboard */}
         <div className="tp-home-stack-filters" style={{ display: 'flex', gap: 6, marginBottom: 9, overflowX: 'auto', scrollbarWidth: 'none' as any, WebkitOverflowScrolling: 'touch' }}>
@@ -1369,7 +1378,10 @@ export function PropertyTerminalView(props: PropertyTerminalViewProps) {
   };
 
   const feedExpanded = props.screen === 'home' && props.feedOpen;
-  const subbarVisible = props.screen !== 'success' && !feedExpanded;
+  // Batch is not one of the bar's modes (it is opened from the home's rent-requests
+  // header) and its tabs sit where the feature-screen bar floats: shown there, the
+  // bar covered the tabs' lower 9–16px at 320–430 wide. Like success, it goes.
+  const subbarVisible = props.screen !== 'success' && props.screen !== 'batch' && !feedExpanded;
   const subbarActiveIdx = SCREEN_TO_SUBBAR[props.screen] ?? -1;
   const fabVisible = props.screen === 'home' && !feedExpanded;
   const sendVisible = props.screen === 'home' && !feedExpanded && !!props.selectedTenant;
