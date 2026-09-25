@@ -27,6 +27,11 @@ function timeAgo(dateStr: string | Date): string {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
+function authHeaders(): Record<string, string> {
+  const authToken = localStorage.getItem("authToken");
+  return authToken ? { Authorization: `Bearer ${authToken}` } : {};
+}
+
 export default function PaymentStack() {
   return <MerchantGate redirect="document">{(merchantId) => <PaymentStackPage merchantId={merchantId} />}</MerchantGate>;
 }
@@ -40,7 +45,8 @@ function PaymentStackPage({ merchantId }: { merchantId: number }) {
   const { data: allTransactions = [], isLoading } = useQuery<Transaction[]>({
     queryKey: ["/api/merchants", merchantId, "transactions"],
     queryFn: async () => {
-      const r = await fetch(`/api/merchants/${merchantId}/transactions`);
+      // Both reads are signed in (authenticateToken reads only this header).
+      const r = await fetch(`/api/merchants/${merchantId}/transactions`, { headers: authHeaders() });
       if (!r.ok) throw new Error("Failed to fetch transactions");
       return r.json();
     },
@@ -50,7 +56,7 @@ function PaymentStackPage({ merchantId }: { merchantId: number }) {
   const { data: taptStones = [] } = useQuery({
     queryKey: ["/api/merchants", merchantId, "tapt-stones"],
     queryFn: async () => {
-      const r = await fetch(`/api/merchants/${merchantId}/tapt-stones`);
+      const r = await fetch(`/api/merchants/${merchantId}/tapt-stones`, { headers: authHeaders() });
       if (!r.ok) throw new Error();
       return r.json();
     },
