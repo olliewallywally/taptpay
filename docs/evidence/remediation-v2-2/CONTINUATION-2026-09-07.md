@@ -283,17 +283,53 @@ The work itself:
   - **Owner question (gap 12):** customers' no-board page receives live events again, and with
     them the residual you accepted in September. Nothing changes for an attacker. Keep this, or
     keep live updates off for that page until per-transaction addressing closes the residual?
+- **Owner answers (2026-09-25 07:13 UTC)**
+  ([decision](../../decisions/2026-09-25-no-board-rework-402-and-batch-owner-answers.md)):
+  no-board payments should work "like the other verticals" (a rework, item 1); tell the business
+  about a quote refused for billing (2a), give the customer the customer wording (2b), bring the
+  phone batch/schedules entry back (2c); "fix and move to the next phase".
+  - **2a + 2b `e70dc724`, 2c `da90d1a1`, local, awaiting independent review.** The session that
+    made them stopped at 07:38 on the weekly usage limit (its JSONL ends with the limit message,
+    then `turn_duration`), before recording them here or answering the owner. Resumed ~10:40;
+    both commits checked against their messages; baseline re-run at `da90d1a1`: `tsc` clean,
+    server 83/1,466, all green.
+- **The no-board rework (item 1): `09df766f`, `f5ef0d11`, `a2634ef3`, `a703847b`, `5c2cdb27`,
+  local, awaiting independent review** ([evidence](r1/R1-no-board-rework-2026-09-25.md),
+  [working notes](r1/WORKING-2026-09-25-no-board-rework.md)).
+  - **Gap 12 is closed by retirement (Option A), not narrowed.** The business-wide no-board
+    address is gone end to end:
+    - its anonymous feed and "current sale" read answer 410 `NO_BOARD_ADDRESS_RETIRED`, and so
+      do its QR image and its NFC tag (a notice page);
+    - a board-less sale is always per-payment (a shared one is 400);
+    - no response or live screen hands the address out.
+    Boards are unchanged. The route inventory's one suspected gap is resolved (0 suspected, 0
+    unclassified).
+  - The phone terminal now reads its current sale signed in. The anonymous read never saw its
+    per-payment sales, so "Payment Received" missed its chime on any payment over 30 s. Its
+    share screen and QR pop-up carry the sale's own link, never `/pay/<merchant>`. The customer
+    notice, the board builder (a board's QR; no "Main Payment Link"), the Payment Stack's Copy Link
+    and the admin page follow.
+  - **Found and fixed on the way (`a2634ef3`):** the phone Payment Stack had sent no
+    Authorization since `c7220cea` (2026-05-12), so it could not load its sales.
+  - Tests first everywhere (red counts in the evidence); mutations 40/40; `tsc` clean; server
+    84/1,472; client 92/779; real Chromium 21/21 on a production build (9/21 on `da90d1a1`).
+  - **Left as the owner's (his standing instruction):** the "Customer Payment Page" button and its
+    tutorial step (settings redesign §2). They now open the no-board notice.
+  - **Owner questions:** that button; a "new link" button for re-sharing a board-less sale after a
+    reload; two pre-existing faults found (the phone share screen's "download QR" saves an
+    unscannable picture; the cash-sale "copy receipt link" copies the demo address).
 
 **Next:** R1-T2's remaining parts (C10: the per-route fields, and every `app.use` and mounted
 router, which now include `server/app.ts`), then R1-T3's runtime matrix, both on the audited
-harness. Open for the owner:
-- the gap-12 question above;
-- the two 402 questions (a refused acceptance the business never hears of; the public quote
-  route's 402 body);
-- the unreachable phone batch/schedules screen.
+harness. Also for R1-T2: `POST /api/board-builder/submit` is public with no rate limit (it emails
+a supplied PDF to the owner's inbox). Open for the owner: the three questions of the no-board
+rework (above). Release of the rework: when production has no pending shared no-board sale
+(count-only check once production is reopened), with `FEATURE_NEW_RETAIL_PAYMENTS` on.
 
 The phase B live check waits for the owner to set `ADMIN_PASSWORD_HASH`.
 Independent reviews owed (each evidence file ends with its brief):
+- the no-board rework (`da90d1a1..5c2cdb27`) and the owner-answer fixes 2a–2c
+  (`aba7b2be..da90d1a1`);
 - R1-T1 (`03c4663b..05195728`) and the live-updates fix (`05195728..3fac8ac8`);
 - gap 13, R1-T8;
 - R1-T4 A (`ed847cda..a9426330`), D (`46cdc475..44a5cfc2`), the D follow-ups (`6abc2a03..b714efda`);
@@ -1087,7 +1123,12 @@ backup, deployment or restore checks.
    live Windcave credentials in this environment; both wallet routes and
    this flow are currently inert wherever Windcave is unconfigured), but it
    must not be lost before R3 scoping.
-12. **PARTIALLY CLOSED 2026-09-16 — the payment-correctness defect (a) is
+12. **CLOSED BY RETIREMENT 2026-09-25 (owner decision; `09df766f..5c2cdb27`, local, awaiting
+   independent review; [evidence](r1/R1-no-board-rework-2026-09-25.md)).** The business-wide
+   no-board address is retired end to end: its anonymous feed and "current sale" read answer 410,
+   a board-less sale is always per-payment, and nothing hands the address out, so both the leak
+   and the residual below are gone rather than narrowed. The history below is kept as written.
+   **Was: PARTIALLY CLOSED 2026-09-16 — the payment-correctness defect (a) is
    closed; the confidentiality leak is not.** Both approved pieces of the
    memo's recommended fix landed and were independently re-verified this
    session: fail-closed-on-ambiguity, commit `72230602`
@@ -1232,7 +1273,7 @@ may proceed where the plan allows it. Code lanes remain gated by their dependenc
 | R0-H4 | Review access logs and scan history | 578 | Owner/professional/provider | **CLOSED 2026-09-14 on owner attestation** — no suspicious access found ([record](../../decisions/2026-09-14-r0-h4-access-log-review-disposition.md)); same caveat as R0-H3, no agent here has hosting/log access to independently re-verify. |
 | R0-H5 | Classify tracked uploads and local dumps | 585 | Owner/professional/provider | **CLOSED 2026-09-14** — the three tracked `uploads/invoices/` entries (2 dev-fixture PNGs, 1 zero-byte glob artifact) were content-inspected, confirmed unreferenced anywhere in the repo and unreproducible by current code, and `git rm`'d per explicit owner instruction ([record](../../decisions/2026-09-14-r0-h5-tracked-uploads-deletion.md)). The historical "41 tracked, 38 ignored" figure remains unsourced — flagged as an open curiosity, not a known gap. |
 | R1-T1 | No-live-system HTTP test harness | 610 | Engineering | **AUDIT CODE-COMPLETE 2026-09-25 (`05195728`; local), awaiting independent review** ([evidence](r1/R1-T1-harness-audit-2026-09-25.md)): every server test fails if it reaches off the machine (the guard caught two that dialled `192.0.2.1`); the harness builds production's app (`server/app.ts`, shared with `index.ts`); `providerNotification`, `useFakeClock`, `openEventStream`; the public payment bearer is exercised; red first 21 of 24, mutations 30/30, server 81/1,456. Found by it and fixed: live updates never reached a browser (`3fac8ac8`, [evidence](r1/R1-live-updates-compression-2026-09-25.md)). Was: Harness implemented early; audit all transport/clock/SSE/push injection and no-network proof — **unblocked 2026-09-21** (R0 exit established). `165fd605` already made the server harness clear single-key email and SMS credentials. |
-| R1-T2 | Checked-in route policy inventory | 622 | Engineering | PARTIAL: [classifier extended and regenerated 2026-09-12/13](r1/R1-T2-classifier-extension-2026-09-12.md) — 218 registrations, **0 unclassified** (was 96/97), 8 principal categories (added `admin`/`public`/`provider-webhook`/`unauthenticated-suspect`), full server regression unchanged at 52/52 suites, 1019/1019 tests. **Found a new gap in the process — see gap 12, now partially closed 2026-09-16** (commits `72230602`, `8666dafc` — payment-correctness defect fixed, confidentiality leak still open). Required per-route fields (capabilityGate, entitlementGate, idempotencyScope, storageMethods, successDto, errorDisclosure) and all-method/use/mounted-router coverage remain incomplete; 0-unclassified is a labeling improvement, not the completed task. |
+| R1-T2 | Checked-in route policy inventory | 622 | Engineering | PARTIAL: [classifier extended and regenerated 2026-09-12/13](r1/R1-T2-classifier-extension-2026-09-12.md) — 218 registrations, **0 unclassified** (was 96/97), 8 principal categories (added `admin`/`public`/`provider-webhook`/`unauthenticated-suspect`), full server regression unchanged at 52/52 suites, 1019/1019 tests. **Found a new gap in the process — see gap 12, partially closed 2026-09-16** (commits `72230602`, `8666dafc` — payment-correctness defect fixed, confidentiality leak still open), **closed by retirement 2026-09-25** (owner decision; `09df766f..5c2cdb27`, local, awaiting review; [evidence](r1/R1-no-board-rework-2026-09-25.md)): the anonymous no-board feed and read are gone, and the inventory has 0 suspected gaps (223 registrations, 0 unclassified). Required per-route fields (capabilityGate, entitlementGate, idempotencyScope, storageMethods, successDto, errorDisclosure) and all-method/use/mounted-router coverage remain incomplete; 0-unclassified is a labeling improvement, not the completed task. |
 | R1-T3 | Explicit role and tenant matrix | 639 | Engineering | PARTIAL: owner defaults fixed; full principal/tenant matrix and runtime coverage open. **The password-path contract is corrected (2026-09-11)** — [evidence](r1/R1-T3-password-path-contract-2026-09-11.md): a cross-tenant path id now returns 403 with both accounts' passwords provably unchanged, red run captured first, route policy regenerated. The route was not moved because its only caller builds the URL from the caller's own JWT. **Tenant-scoping domain audit (2026-09-13): Transactions & Refunds** ([evidence](r1/R1-T3-transactions-refunds-tenant-scoping-2026-09-13.md)), **Boards & Stock** ([evidence](r1/R1-T3-boards-stock-tenant-scoping-2026-09-13.md)), **Property** ([evidence](r1/R1-T3-property-tenant-scoping-2026-09-13.md)), and **Trades** ([evidence](r1/R1-T3-trades-tenant-scoping-2026-09-13.md)) were each independently investigated with a live two-merchant runtime probe — all four found already correctly tenant-scoped today, no code change needed. **Settings/Uploads/Exports — completed 2026-09-14** ([evidence](r1/R1-T3-settings-uploads-exports-tenant-scoping-2026-09-14.md)): unlike the four no-gap-found siblings, this domain found and fixed three real upload-handling bugs (UPL-1 auth-before-multer ordering, UPL-2 missing magic-byte check, UPL-5 filename-extension confusion), closed two test-coverage gaps (UPL-6/UPL-7, 7 new cross-tenant tests, no source change), landed a narrow `nosniff` mitigation (UPL-3), and escalated one structural gap rather than fixing it same-day — `uploaded_files` has no tenant column and its public serve route has zero authorization (gap list item 13, decision memo pending Oliver). **Update 2026-09-19:** Oliver chose Option C on 2026-09-14 and it is now implemented — migration `0023` applied to the development database only, not production; see gap list item 13. **All five R1-T3 tenant-scoping domains are now investigated.** Note what the five results do and do not establish: they show the *compared* merchantId is JWT-derived rather than attacker-controllable at each site, not that the storage layer has been migrated to tenant-scoped methods as §8.5 prefers; that refactor remains open. |
 | R1-H1 | Accept the device baseline commit before R1 client changes | 651 | Owner/professional/provider | **CLOSED 2026-09-14** — Oliver accepted the [auth/onboarding visual baseline](r1/R1-H1-auth-onboarding-baseline-2026-09-12.md) ("Looks good", [record](../../decisions/2026-09-14-r1-h1-visual-baseline-acceptance.md)). This lifts gap-list item 8 (client work gated) for tasks blocked only on this sign-off. |
 | R1-T4 | OAuth rebuild, session storage and shared security primitives | 660 | Engineering | **CONFIRM-WITH-PASSWORD AND ADMIN SIGN-IN CODE-COMPLETE 2026-09-23 (`ff16abfe`, `2a935b02`; local), awaiting independent review** ([evidence](r1/R1-T4-admin-sign-in-and-confirm-password-2026-09-23.md), [decision](../../decisions/2026-09-23-r1-t4-confirm-with-password-owner-answers.md)): confirming a sign-up's email needs the password chosen at sign-up; `npm run admin:password` and a case-blind admin email; the owner must set `ADMIN_PASSWORD_HASH`. **PHASE B CODE-COMPLETE 2026-09-23 (`ce3c13de`; local), awaiting independent review and the owner's live check** ([evidence](r1/R1-T4-phase-B-trusted-proxy-2026-09-23.md)): `TRUST_PROXY_HOPS` (off by default), per-address limits for sign-in, forgot-password and the Google callback. **ACCOUNT-DISCOVERY FOLLOW-UPS CODE-COMPLETE 2026-09-23 (`8fdb63e0`; local), awaiting independent review** ([evidence](r1/R1-T4-account-discovery-2026-09-23.md)): sign-up, the confirmation resend and forgot-password answer every address alike, after the same wait. **PHASE C FOLLOW-UPS CODE-COMPLETE 2026-09-23 (`f6c62f50`; local), awaiting independent review** ([evidence](r1/R1-T4-password-rule-and-sign-in-timing-2026-09-23.md), [decision](../../decisions/2026-09-23-r1-t4-phase-c-owner-answers.md)): one password rule (8+, a capital, a number or symbol) wherever a password is set; every sign-in spends one full check's work, so its time no longer tells which emails have logins. **PHASE C CODE-COMPLETE 2026-09-22 (`e60e90c0`; local), awaiting independent review** ([evidence](r1/R1-T4-phase-C-throttling-2026-09-22.md)): attempts counted in `auth_throttle` and slowed down, never locked; known devices counted on their own; forgot-password and change-password limited; address-keyed limits moved to phase B. **PHASES A and D CODE-COMPLETE 2026-09-22 (`a9426330`, `44a5cfc2`; local), awaiting independent review** ([D evidence](r1/R1-T4-phase-D-sessions-2026-09-22.md)). **D follow-ups code-complete the same day (`50a469e7` password change; `36a320d6` push subscriptions per login; `b714efda` disabling a teammate stops their notifications; local). Migration 0029 applied to the development database only (08:04 UTC, owner decision)** ([evidence](r1/R1-T4-phase-D-follow-ups-2026-09-22.md), [decision](../../decisions/2026-09-22-r1-t4-phase-d-owner-answers.md)). Phase A: ([evidence](r1/R1-T4-phase-A-google-sign-in-2026-09-22.md)); 0024–0028 applied to dev only. Earlier the same day: **PHASE A IN PROGRESS.** Owner answers 2026-09-21 ([decision](../../decisions/2026-09-21-r1-t4-t9-owner-answers.md)): A–D now, E designed separately; Google joins an existing merchant only on a verified email; slow repeated attempts down instead of locking. Schema 0026–0028 committed (`662371ba`, originally `7ba8bc7d`), applied nowhere; phase A server side is a local WIP commit, not pushed ([working notes](r1/WORKING-2026-09-21-r1-t4-t9-progress.md)). Was: **PLAN WRITTEN 2026-09-21, awaiting owner answers Q1–Q5** ([plan](../../PLAN-2026-09-21-r1-t4-sign-in-security.md)). Found: the Google sign-in token (1-hour JWT) is in the `/login?token=` address while GA4 runs — probe with a local gtag stub, nothing sent — so each Google sign-in has sent a working token to the GA property; no `state`/nonce/PKCE; `email_verified` unchecked and existing merchants linked by email; no early session cancel (password reset leaves stolen tokens valid) and an hourly sign-out; no `trust proxy`, so the per-IP login throttle may be one bucket for everyone. Proposed phases A (stop the leak: one-time code + state + PKCE) → B proxy → C shared throttling → D session cancel → E full session rebuild. Was: **UNBLOCKED 2026-09-21** (R0 exit established; R1-H1 accepted 2026-09-14); follows R1-T1's audit (plan C11 after C09). OAuth/session/reset/CORS/distributed-abuse work remains — not started. |

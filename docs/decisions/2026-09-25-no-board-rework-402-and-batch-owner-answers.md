@@ -28,6 +28,16 @@ Asked in the report on R1-T1 and the live-updates fix (`3fac8ac8`;
   off, a no-board sale has no link to use, just as property and trades have none with invoice
   payments off.
 
+## Status
+
+- 2a, 2b: `e70dc724`. 2c: `da90d1a1`.
+- Item 1: `09df766f..5c2cdb27`
+  ([evidence](../evidence/remediation-v2-2/r1/R1-no-board-rework-2026-09-25.md)). One part was not
+  carried out as first written: the "Customer Payment Page" button and its tutorial step are
+  exempt by the owner's own instruction (settings redesign §2). They are unchanged and now open the
+  no-board notice; what they should do is put back to the owner.
+- All local, awaiting the plan §21.1 review.
+
 ## What this authorizes
 
 Code, tests and documents on `remediation/r1-continuation-20260907`. It does not authorize

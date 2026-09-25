@@ -1,0 +1,23 @@
+FAIL  customer 320: notice shown
+FAIL  customer 320: no sale read, no feed  — http://127.0.0.1:5199/api/merchants/999999/active-transaction http://127.0.0.1:5199/api/merchants/999999/events
+PASS  customer 320: no sideways scroll
+FAIL  customer 320: no page errors  — customer-320 console: EventSource's response has a MIME type ("application/json") that is not "text/event-stream". Aborting the connection.
+FAIL  customer 390: notice shown
+FAIL  customer 390: no sale read, no feed  — http://127.0.0.1:5199/api/merchants/999999/active-transaction http://127.0.0.1:5199/api/merchants/999999/events
+PASS  customer 390: no sideways scroll
+FAIL  customer 390: no page errors  — customer-390 console: EventSource's response has a MIME type ("application/json") that is not "text/event-stream". Aborting the connection.
+PASS  board page: waits for its sale
+PASS  board page: reads its board's sale
+PASS  board page: no page errors
+FAIL  terminal 320: current sale read signed in  — authorization: none
+FAIL  terminal 320: share screen says there is no link yet
+FAIL  terminal 320: no copy button, no demo link
+PASS  terminal 320: never the business-wide address
+PASS  terminal 320: no page errors
+FAIL  terminal 390: current sale read signed in  — authorization: none
+FAIL  terminal 390: share screen says there is no link yet
+FAIL  terminal 390: no copy button, no demo link
+PASS  terminal 390: never the business-wide address
+PASS  terminal 390: no page errors
+
+9/21 passed
