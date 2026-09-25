@@ -173,6 +173,42 @@ export async function sendSubscriptionPaymentFailedEmail(params: {
   });
 }
 
+/**
+ * A customer tried to accept one of the business's quotes while its subscription needed
+ * attention, and was told to contact the business (owner decision 2026-09-25, 2a).
+ */
+export async function sendQuoteAcceptanceBlockedEmail(params: {
+  to: string;
+  businessName: string;
+  clientName: string;
+  total: string;
+  billingUrl: string;
+}): Promise<boolean> {
+  const clientName = escapeHtml(params.clientName);
+  const businessName = escapeHtml(params.businessName);
+  const total = escapeHtml(params.total);
+  const billingUrl = escapeHtml(params.billingUrl);
+
+  return await sendEmail({
+    to: params.to,
+    from: "noreply@taptpay.co.nz",
+    subject: "A customer tried to accept your quote",
+    text: [
+      `${params.clientName} tried to accept your quote for ${params.total}, but it couldn't be accepted online because ${params.businessName}'s TaptPay subscription needs attention.`,
+      `Sort it out in Billing: ${params.billingUrl}`,
+      "Then ask them to accept the quote again.",
+    ].join("\n\n"),
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#06102f">
+        <h2>A customer tried to accept your quote</h2>
+        <p><strong>${clientName}</strong> tried to accept your quote for <strong>${total}</strong>, but it couldn't be accepted online because ${businessName}'s TaptPay subscription needs attention.</p>
+        <p><a href="${billingUrl}">Sort it out in Billing</a>: ${billingUrl}</p>
+        <p>Then ask them to accept the quote again.</p>
+      </div>
+    `,
+  });
+}
+
 export async function sendPasswordResetEmail(email: string, resetToken: string, baseUrl?: string): Promise<boolean> {
   const safeBaseUrl = baseUrl || 'https://taptpay.co.nz';
   const resetUrl = `${safeBaseUrl}/reset-password?token=${resetToken}`;

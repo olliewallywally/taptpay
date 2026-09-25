@@ -42,6 +42,7 @@ import { resendInvoiceEmail } from "./property-cron";
 import { INVOICE_DOCUMENT_FOLDER, isInvoiceDocumentName, isPublicUploadFolder, parseInvoiceDocumentRef } from "./upload-policy";
 import { INVOICE_DOCUMENT_EXTENSIONS } from "./invoice-document-security";
 import { resendTradeInvoice, sendTradePaymentInvoice, sendTradeQuote } from "./trades-delivery";
+import { QUOTE_ACCEPTANCE_UNAVAILABLE, tellBusinessQuoteAcceptanceBlocked } from "./quote-acceptance-notice";
 import { sendGstInvoices, extractEmails } from "./gst-invoice";
 import {
   BILLING_CARD_REQUIRED,
@@ -8834,7 +8835,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         await storage.createJobEvent({ merchantId: quote.merchantId, clientProfileId: quote.clientProfileId, quoteId: quote.id, eventType: "quote_declined" });
         return res.json({ quote: declined, depositInvoice: null });
       }
-      if (!(await requireBillingCard(quote.merchantId, res))) return;
+      // Owner decision 2026-09-25 (2a, 2b): the business's billing message is not the
+      // customer's to read. The customer is told to contact the business, and the
+      // business is told by email that a customer was turned away.
+      if (!billingCardIsReady(await storage.getOrCreateSubscription(quote.merchantId))) {
+        await tellBusinessQuoteAcceptanceBlocked(quote, getBaseUrl(req));
+        return res.status(402).json(QUOTE_ACCEPTANCE_UNAVAILABLE);
+      }
       const accepted = await storage.updateQuote(quote.id, { status: "accepted", acceptedAt: new Date() });
       await storage.createJobEvent({ merchantId: quote.merchantId, clientProfileId: quote.clientProfileId, quoteId: quote.id, eventType: "quote_accepted" });
       // Deposit enabled → auto-issue the deposit invoice so the checkout shows it immediately.
