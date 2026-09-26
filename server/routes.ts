@@ -2595,15 +2595,22 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const transactionId = strictPositiveIntegerParam(req.params.id);
       if (transactionId === null) return res.status(400).json({ message: "Invalid id" });
-      const { totalSplits } = req.body;
-
-      if (!totalSplits || totalSplits < 2 || totalSplits > 10) {
+      // The per-payment link's rule: a whole number of shares from 2 to 10, nothing else.
+      const validation = z.object({
+        totalSplits: z.number().int().min(2).max(10),
+      }).strict().safeParse(req.body);
+      if (!validation.success) {
         return res.status(400).json({ message: "Total splits must be between 2 and 10" });
       }
+      const { totalSplits } = validation.data;
 
       const transaction = await storage.getTransaction(transactionId);
       if (!transaction || isTokenAddressedTransaction(transaction)) {
         return res.status(404).json({ message: "Transaction not found" });
+      }
+      // Splitting is the business's choice for each sale (PATCH …/split-enabled).
+      if (!transaction.splitEnabled) {
+        return res.status(409).json({ message: "This payment cannot be split" });
       }
 
       const updatedTransaction = await storage.createBillSplit(transactionId, totalSplits);
@@ -4348,7 +4355,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       let transaction: any = null;
 
       if (txnIdParam) {
-        transaction = await storage.getTransaction(parseInt(txnIdParam));
+        // Strictly, as every other id: a malformed one finds nothing.
+        const txnId = strictPositiveIntegerQueryParam(txnIdParam);
+        transaction = txnId === null ? null : await storage.getTransaction(txnId);
       } else if (sessionId) {
         transaction = await storage.getTransactionByWindcaveSessionId(sessionId);
       }

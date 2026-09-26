@@ -81,7 +81,8 @@ describe("R1-T6 — transactions/refunds identifier batch", () => {
     it("a real pending transaction splits successfully", async () => {
       const { app } = await createTestApp();
       const owner = await createOwnerPrincipal();
-      const txn = await pendingTransaction(owner.merchantId);
+      // Splitting must be allowed for the sale (numbered-split-policy.test.ts).
+      const txn = await pendingTransaction(owner.merchantId, { splitEnabled: true });
 
       const response = await request(app)
         .post(`/api/transactions/${txn.id}/split`)
