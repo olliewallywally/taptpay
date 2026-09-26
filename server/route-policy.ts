@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 12bc7d784a6953bee1593f8dd6e0bdfe0cbb5ef9 on 2026-09-26.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ a394cae3f252b34a4884cdbb951cd0ed0a76ead6 on 2026-09-26.
  *
  * 223 registrations (93 GET, 91 POST, 3 PATCH, 5 ALL, 22 PUT, 9 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -2663,6 +2663,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       middleware: ["express.json(…)"],
       storageMethods: ["createJobEvent","getInvoiceRentRequestByWhatsappMessageId","getJobInvoiceByWhatsappMessageId","logTransactionEvent","updateInvoiceRentRequest","updateJobInvoice"],
       statuses: [200],
+      helpers: ["presentedSecretMatches"],
     },
   },
   "PUT /api/merchants/:merchantId/sector": {

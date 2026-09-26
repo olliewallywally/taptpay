@@ -119,6 +119,15 @@ function authorizeCronRequest(req: express.Request, res: express.Response): bool
   return true;
 }
 
+// A shared secret a caller presents in a header, compared in constant time.
+// With no secret configured nobody matches: a webhook without its key fails closed.
+function presentedSecretMatches(presented: unknown, expected: string | undefined): boolean {
+  if (!expected || typeof presented !== "string") return false;
+  const presentedBuf = Buffer.from(presented);
+  const expectedBuf = Buffer.from(expected);
+  return presentedBuf.length === expectedBuf.length && crypto.timingSafeEqual(presentedBuf, expectedBuf);
+}
+
 async function requireBillingCard(merchantId: number, res: any): Promise<boolean> {
   const subscription = await storage.getOrCreateSubscription(merchantId);
   if (billingCardIsReady(subscription)) return true;
@@ -6301,6 +6310,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     const startTime = Date.now();
     
     try {
+      // The key's permission first, then the body (P2.2's order: role before body).
+      if (!req.apiKey.permissions.includes('create_transactions')) {
+        return res.status(403).json({ error: 'Insufficient permissions' });
+      }
       const validation = apiV1CreateTransactionSchema.safeParse(req.body);
       if (!validation.success) {
         await storage.logApiRequest({
@@ -6319,10 +6332,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
       const { amount, currency, item_name, webhook_url } = validation.data;
 
-      // Check permissions
-      if (!req.apiKey.permissions.includes('create_transactions')) {
-        return res.status(403).json({ error: 'Insufficient permissions' });
-      }
       if (!(await requireBillingCard(req.apiKey.merchantId, res))) return;
       if (!config.features.newRetailPayments) {
         return res.status(503).json({ error: "Per-payment links are not enabled yet" });
@@ -6422,8 +6431,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
 
       const transaction = await storage.getTransaction(transactionId);
-      
-      if (!transaction) {
+
+      // Another merchant's sale is answered exactly as a missing one, so a key
+      // cannot tell which sale numbers exist (P2.2).
+      if (!transaction || transaction.merchantId !== req.apiKey.merchantId) {
         await storage.logApiRequest({
           apiKeyId: req.apiKey.id,
           merchantId: req.apiKey.merchantId,
@@ -6433,11 +6444,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           responseTime: Date.now() - startTime
         });
         return res.status(404).json({ error: 'Transaction not found' });
-      }
-
-      // Verify access to this merchant's transactions
-      if (transaction.merchantId !== req.apiKey.merchantId) {
-        return res.status(403).json({ error: 'Access denied' });
       }
 
       await storage.logApiRequest({
@@ -8265,12 +8271,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.post("/api/webhooks/whatsapp", express.json(), async (req, res) => {
     res.status(200).send("OK"); // respond immediately so Evolution doesn't retry
     try {
-      if (config.whatsapp.apiKey) {
-        const incoming = req.headers["apikey"] as string | undefined;
-        if (incoming !== config.whatsapp.apiKey) {
-          console.warn("[WA_WEBHOOK] rejected — bad apikey");
-          return;
-        }
+      // Only a caller presenting EVOLUTION_API_KEY is believed, and with no key
+      // configured nobody is (it used to accept everyone then).
+      if (!presentedSecretMatches(req.headers["apikey"], config.whatsapp.apiKey)) {
+        console.warn("[WA_WEBHOOK] rejected — missing or wrong apikey");
+        return;
       }
       const { event, data } = req.body ?? {};
       if (event !== "messages.update") return; // only care about delivery status
