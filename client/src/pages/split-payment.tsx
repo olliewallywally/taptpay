@@ -118,14 +118,10 @@ export default function SplitPayment({
       ? parseFloat(txn.splitAmount) * completedSplits
       : 0;
   const remaining = totalAmount - totalPaid;
-  const configuredSplitAmount = parseFloat(txn?.splitAmount || '0');
-  const subsequentShare = isSplitSetup
-    ? isTokenSource
-      ? currentTokenPaymentAmount(txn)
-      : configuredSplitAmount
-        ? configuredSplitAmount.toFixed(2)
-        : undefined
-    : undefined;
+  // Exactly the share the server charges next — whole cents rounded down, the
+  // remainder on the last share — for a board sale as for a payment link
+  // (owner decision 2026-09-26: each person pays exactly their share).
+  const subsequentShare = isSplitSetup ? currentTokenPaymentAmount(txn) : undefined;
 
   const handlePay = async ({ amount, splitCount }: SplitPaymentSelection) => {
     if (!txn) return;
@@ -225,8 +221,8 @@ export default function SplitPayment({
         closed: tokenClosed,
         processing: isProcessing,
         paymentInProgress: tokenInProgress,
-        allowCustomAmount: !isTokenSource,
-        truncateEqualShares: isTokenSource,
+        allowCustomAmount: false,
+        truncateEqualShares: true,
         error: splitError,
         loading: isLoading,
         notFound: !isLoading && !txn,

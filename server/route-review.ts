@@ -115,7 +115,7 @@ const NUMBERED_SALE_FINDING =
 const CHECK_RATE_LIMIT =
   "checkRateLimit (100 a minute per visitor address, counted in this server process only; until TRUST_PROXY_HOPS is set every visitor shares one address — R1-T4 phase B)";
 const SPLIT_SHARE_FINDING =
-  "A split share is marked paid whatever amount the provider charged: with the pay route's customer-chosen amount, every share of a $100 sale can be paid with $0.01 and the sale shows fully paid (shown in the harness 2026-09-26). The custom amount is a product decision put to the owner; the amount check itself is R2/R3 (plan lines 870, 1511).";
+  "A split share is marked paid without comparing what the provider charged with the share. Until 2026-09-26 the pay route let the customer choose the amount, so every share of a $100 sale could be paid with $0.01 and the sale showed fully paid (shown in the harness); the owner chose exact shares only, and the pay route now opens every session for exactly what is owed. What remains is one session settling twice (gap 11's replay; the read-then-write settlement, R3/C20); the amount check itself is R2/R3 (plan lines 870, 1511).";
 const GAP11_REPLAY_FINDING =
   "Gap 11 (known, escalated 2026-09-13): the finaliser re-settles on every call with the bound session, and after a share it resets the session to pending, so one approved session can complete the next share too. Closed by moving onto the payment_attempts engine (C3).";
 
@@ -648,7 +648,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
   "POST /api/transactions/:id/pay": {
     branches: [{ principal: "public", tenant: "number", tenantRule: NUMBER_TENANT_RULE }],
     input:
-      "id: strictPositiveIntegerParam; body: paymentRequestSchema (merchantId, stoneId, paymentMethod, cardLast4, amount — all optional; a merchantId or stoneId given must match the sale); amount: parsed with parseFloat, any positive figure up to what is left (finding)",
+      "id: strictPositiveIntegerParam; body: paymentRequestSchema (merchantId, stoneId, paymentMethod, cardLast4, amount — all optional; a merchantId or stoneId given must match the sale); amount: never charged — what is owed (the next share, or the whole price) is; an amount given must equal it to the cent, or 400 before any provider session (owner decision 2026-09-26)",
     capability: "isWindcaveConfigured() (503 PAYMENT_PROVIDER_UNAVAILABLE while unconfigured)",
     entitlement: null,
     idempotency:
@@ -662,11 +662,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       replay: "each call opens another provider session for the same sale",
       rate: CHECK_RATE_LIMIT,
     },
-    findings: [
-      NUMBERED_SALE_FINDING,
-      "For a split sale the customer may name their own amount (any positive figure up to what is left, parsed with parseFloat), and the share it pays is then counted as fully paid. " +
-        SPLIT_SHARE_FINDING,
-    ],
+    findings: [NUMBERED_SALE_FINDING],
   },
 
   "POST /api/transactions/:id/hosted-fields-complete": {

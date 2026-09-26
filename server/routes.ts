@@ -2949,6 +2949,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.json({ status: 'completed', message: 'Transaction already completed' });
       }
 
+      // The customer pays exactly what is owed: the next share of a split bill, or
+      // the whole price (owner decision 2026-09-26), as a per-payment link's
+      // customer does. An amount that differs is refused before any provider
+      // session exists; it used to be charged, and its share counted as paid.
       let paymentAmount = transaction.price;
       let currentSplit: any = null;
 
@@ -2957,20 +2961,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         if (!currentSplit) {
           return res.status(400).json({ message: "All splits have been paid" });
         }
-        if (requestAmount) {
-          const customAmt = parseFloat(requestAmount);
-          if (isNaN(customAmt) || customAmt <= 0) {
-            return res.status(400).json({ message: "Invalid custom amount" });
-          }
-          const totalPaid = (transaction.completedSplits || 0) * parseFloat(currentSplit.amount);
-          const remaining = parseFloat(transaction.price) - totalPaid;
-          if (customAmt > remaining + 0.01) {
-            return res.status(400).json({ message: "Custom amount exceeds remaining balance" });
-          }
-          paymentAmount = requestAmount;
-        } else {
-          paymentAmount = currentSplit.amount;
-        }
+        paymentAmount = currentSplit.amount;
+      }
+      if (
+        requestAmount !== undefined &&
+        Number(requestAmount).toFixed(2) !== Number(paymentAmount).toFixed(2)
+      ) {
+        return res.status(400).json({ message: "Payment amount does not match the outstanding share" });
       }
 
       // Build Windcave session

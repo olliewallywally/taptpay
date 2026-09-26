@@ -1,4 +1,4 @@
-# R1-T2 route inventory — generated 2026-09-26 @ `5e0982810dd09e805d1c59356134a44e029e1fb0`
+# R1-T2 route inventory — generated 2026-09-26 @ `cee1276a2a7323a9b9ecd73566b7762678820206`
 
 Regenerate with `npx tsx scripts/generate-route-policy.ts`. This table is
 evidence for the SHA named above, not a timeless constant — see
@@ -30,13 +30,12 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 - **POST /api/transactions/:id/split:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
 - **GET /api/split-payments/:id:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
 - **POST /api/transactions/:id/pay:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
-- **POST /api/transactions/:id/pay:** For a split sale the customer may name their own amount (any positive figure up to what is left, parsed with parseFloat), and the share it pays is then counted as fully paid. A split share is marked paid whatever amount the provider charged: with the pay route's customer-chosen amount, every share of a $100 sale can be paid with $0.01 and the sale shows fully paid (shown in the harness 2026-09-26). The custom amount is a product decision put to the owner; the amount check itself is R2/R3 (plan lines 870, 1511).
 - **POST /api/transactions/:id/hosted-fields-complete:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
 - **POST /api/transactions/:id/hosted-fields-complete:** Gap 11 (known, escalated 2026-09-13): the finaliser re-settles on every call with the bound session, and after a share it resets the session to pending, so one approved session can complete the next share too. Closed by moving onto the payment_attempts engine (C3).
-- **POST /api/transactions/:id/hosted-fields-complete:** A split share is marked paid whatever amount the provider charged: with the pay route's customer-chosen amount, every share of a $100 sale can be paid with $0.01 and the sale shows fully paid (shown in the harness 2026-09-26). The custom amount is a product decision put to the owner; the amount check itself is R2/R3 (plan lines 870, 1511).
+- **POST /api/transactions/:id/hosted-fields-complete:** A split share is marked paid without comparing what the provider charged with the share. Until 2026-09-26 the pay route let the customer choose the amount, so every share of a $100 sale could be paid with $0.01 and the sale showed fully paid (shown in the harness); the owner chose exact shares only, and the pay route now opens every session for exactly what is owed. What remains is one session settling twice (gap 11's replay; the read-then-write settlement, R3/C20); the amount check itself is R2/R3 (plan lines 870, 1511).
 - **POST /api/transactions/:id/googlepay-complete:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
 - **POST /api/transactions/:id/googlepay-complete:** Gap 11 (known, escalated 2026-09-13): the finaliser re-settles on every call with the bound session, and after a share it resets the session to pending, so one approved session can complete the next share too. Closed by moving onto the payment_attempts engine (C3).
-- **POST /api/transactions/:id/googlepay-complete:** A split share is marked paid whatever amount the provider charged: with the pay route's customer-chosen amount, every share of a $100 sale can be paid with $0.01 and the sale shows fully paid (shown in the harness 2026-09-26). The custom amount is a product decision put to the owner; the amount check itself is R2/R3 (plan lines 870, 1511).
+- **POST /api/transactions/:id/googlepay-complete:** A split share is marked paid without comparing what the provider charged with the share. Until 2026-09-26 the pay route let the customer choose the amount, so every share of a $100 sale could be paid with $0.01 and the sale showed fully paid (shown in the harness); the owner chose exact shares only, and the pay route now opens every session for exactly what is owed. What remains is one session settling twice (gap 11's replay; the read-then-write settlement, R3/C20); the amount check itself is R2/R3 (plan lines 870, 1511).
 - **GET /api/transactions/:id:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it. With no rate limit, counting through the numbers lists every such sale of every business: item, price, time, business and board.
 - **POST /api/transactions/:id/receipt-pdf:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
 - **GET /api/transactions/:id/receipt-qr:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
@@ -94,182 +93,182 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 | POST | `/api/merchants/:merchantId/nfc-pay` | 2762 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
 | GET | `/api/nfc/capabilities` | 2852 | public (heuristic) | — |
 | POST | `/api/transactions/:id/pay` | 2866 | public | isTokenAddressedTransaction( |
-| GET | `/api/windcave/env` | 3121 | public (heuristic) | — |
-| POST | `/api/transactions/:id/hosted-fields-complete` | 3135 | public | isTokenAddressedTransaction( |
-| POST | `/api/transactions/:id/googlepay-complete` | 3173 | public | isTokenAddressedTransaction( |
-| GET | `/api/transactions/:id` | 3246 | public | isTokenAddressedTransaction(, publicTransactionDto( |
-| POST | `/api/transactions/:id/receipt-pdf` | 3267 | public | isTokenAddressedTransaction( |
-| GET | `/api/transactions/:id/receipt-qr` | 3328 | public | isTokenAddressedTransaction( |
-| GET | `/api/merchants/:id/analytics` | 3370 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| GET | `/api/merchants/:id/revenue-over-time` | 3385 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| GET | `/api/merchants/:id/analytics/export` | 3411 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| GET | `/api/merchants/:id/export/csv` | 3432 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| GET | `/api/merchants/:id/export/pdf` | 3498 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| POST | `/api/admin/merchants/:id/verify` | 3538 | admin (heuristic) | authenticateAdmin |
-| POST | `/api/admin/merchants/:id/set-active` | 3583 | admin (heuristic) | authenticateAdmin |
-| GET | `/api/admin/merchants/:id/transactions` | 3601 | admin (heuristic) | authenticateAdmin |
-| PATCH | `/api/admin/merchants/:id/windcave-merchant-id` | 3614 | admin (heuristic) | authenticateAdmin |
-| POST | `/api/admin/merchants/:id/activate` | 3630 | admin (heuristic) | authenticateAdmin, storage.verifyMerchant( |
-| PUT | `/api/merchants/:id/rates` | 3681 | merchant-user (heuristic) | authenticateToken |
-| PUT | `/api/merchants/:id/details` | 3688 | merchant-user (heuristic) | authenticateToken, checkAccountOwnership |
-| PUT | `/api/merchants/:id/change-password` | 3714 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| PUT | `/api/merchants/:id/bank-account` | 3796 | merchant-user (heuristic) | authenticateToken |
-| PUT | `/api/merchants/:id/theme` | 3800 | merchant-user (heuristic) | authenticateToken, checkAccountOwnership |
-| PUT | `/api/merchants/:id/daily-goal` | 3828 | merchant-user (heuristic) | authenticateToken, checkAccountOwnership |
-| PUT | `/api/merchants/:id` | 3861 | merchant-user (heuristic) | authenticateToken, checkAccountOwnership |
-| POST | `/api/merchants/:id/logo` | 3935 | merchant-user (heuristic) | authenticateToken, checkAccountOwnership |
-| DELETE | `/api/merchants/:id/logo` | 3990 | merchant-user (heuristic) | authenticateToken, checkAccountOwnership |
-| GET | `/api/merchants/:id/transactions` | 4033 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| GET | `/api/merchants/:id/tapt-stones` | 4050 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| POST | `/api/merchants/:id/tapt-stones` | 4066 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership, generatePaymentUrl( |
-| PUT | `/api/merchants/:merchantId/tapt-stones/:stoneId` | 4117 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| DELETE | `/api/merchants/:merchantId/tapt-stones/:stoneId` | 4152 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| GET | `/api/tapt-stones/:id` | 4186 | public (heuristic) | — |
-| GET | `/api/admin/subscription-revenue` | 4204 | admin (heuristic) | authenticateAdmin |
-| ALL | `/api/windcave/notification` | 4215 | provider | — |
-| GET | `/api/windcave/callback` | 4337 | public | isTokenAddressedTransaction( |
-| GET | `/api/windcave/status` | 4532 | public (heuristic) | — |
-| GET | `/api/admin/analytics` | 4545 | admin (heuristic) | authenticateAdmin |
-| GET | `/api/admin/revenue-over-time` | 4618 | admin (heuristic) | authenticateAdmin |
-| GET | `/api/admin/payment-method-breakdown` | 4654 | admin (heuristic) | authenticateAdmin |
-| GET | `/api/admin/ga4-detailed` | 4691 | admin (heuristic) | authenticateAdmin |
-| GET | `/api/admin/ga4-metrics` | 4756 | admin (heuristic) | authenticateAdmin |
-| POST | `/api/admin/merchants` | 4833 | admin (heuristic) | authenticateAdmin |
-| PUT | `/api/admin/merchants/:id` | 4844 | admin (heuristic) | authenticateAdmin |
-| POST | `/api/merchants/:id/test-payment-link` | 4872 | admin (heuristic) | authenticateAdmin |
-| GET | `/api/admin/merchants` | 4879 | admin (heuristic) | authenticateAdmin |
-| GET | `/api/admin/merchants/:id` | 4889 | admin (heuristic) | authenticateAdmin |
-| DELETE | `/api/admin/merchants/:id` | 4905 | admin (heuristic) | authenticateAdmin |
-| POST | `/api/admin/clear-merchants` | 4929 | admin (heuristic) | authenticateAdmin |
-| POST | `/api/admin/resend-verification` | 4960 | admin (heuristic) | authenticateAdmin |
-| POST | `/api/admin/test-email` | 5018 | admin (heuristic) | authenticateAdmin |
-| GET | `/api/admin/email-status` | 5041 | admin (heuristic) | authenticateAdmin |
-| POST | `/api/merchants/verify` | 5068 | public (heuristic) | storage.verifyMerchant( |
-| GET | `/api/merchants/:id/email-status` | 5119 | public (heuristic) | — |
-| POST | `/api/auth/confirm-email` | 5142 | public (heuristic) | getMerchantByToken( |
-| POST | `/api/auth/resend-confirmation` | 5269 | public (heuristic) | — |
-| POST | `/api/info-pack-leads` | 5306 | public (heuristic) | — |
-| POST | `/api/merchants/signup` | 5359 | public (heuristic) | — |
-| PUT | `/api/merchants/:id/business-details` | 5461 | merchant-user (heuristic) | authenticateToken, checkAccountOwnership |
-| POST | `/api/admin/merchants/signup` | 5527 | admin (heuristic) | authenticateAdmin |
-| GET | `/api/merchants/:id/events` | 5590 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| GET | `/api/push/capabilities` | 5666 | public (heuristic) | — |
-| GET | `/api/push/vapid-key` | 5690 | public (heuristic) | — |
-| POST | `/api/push/subscribe` | 5700 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/push/unsubscribe` | 5737 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/push/native-subscribe` | 5764 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/push/native-unsubscribe` | 5798 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/push/status` | 5832 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/push/preferences` | 5856 | merchant-user (heuristic) | authenticateToken |
-| PUT | `/api/push/preferences` | 5870 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/merchants/:id/clear-transactions` | 5896 | merchant-user (heuristic) | authenticateToken, checkAccountOwnership, req.user?.role === "admin" |
-| POST | `/api/transactions/:transactionId/refunds` | 5916 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| GET | `/api/transactions/:transactionId/refunds` | 6054 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/merchants/:merchantId/refunds` | 6084 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/refunds/:refundId` | 6105 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/admin/api-keys` | 6139 | admin (heuristic) | authenticateAdmin |
-| POST | `/api/admin/api-keys` | 6143 | admin (heuristic) | authenticateAdmin |
-| POST | `/api/admin/api-keys/:keyId/revoke` | 6147 | admin (heuristic) | authenticateAdmin |
-| GET | `/api/admin/api-metrics` | 6153 | admin (heuristic) | authenticateAdmin |
-| GET | `/api/admin/api-usage` | 6157 | admin (heuristic) | authenticateAdmin |
-| GET | `/api/merchants/:merchantId/stock-items` | 6166 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/merchants/:merchantId/stock-items` | 6185 | merchant-user (heuristic) | authenticateToken |
-| PUT | `/api/merchants/:merchantId/stock-items/:itemId` | 6213 | merchant-user (heuristic) | authenticateToken |
-| DELETE | `/api/merchants/:merchantId/stock-items/:itemId` | 6250 | api-key (heuristic) | authenticateToken, authenticateApiKey, requireEcommerceApi |
-| POST | `/api/v1/transactions` | 6318 | api-key | authenticateApiKey, requireEcommerceApi, publicTransactionDto( |
-| GET | `/api/v1/transactions/:id` | 6430 | api-key | authenticateApiKey, requireEcommerceApi |
-| POST | `/api/payments/apple-pay/validate` | 6503 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/payments/apple-pay/process` | 6508 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/payments/google-pay/process` | 6513 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/payments/digital-wallet/config` | 6518 | public (heuristic) | — |
-| GET | `/api/subscription` | 6553 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| PUT | `/api/subscription/plan` | 6576 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/subscription/cancel` | 6639 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/subscription/resume` | 6682 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/team` | 6713 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| POST | `/api/team/invite` | 6734 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| POST | `/api/team/:userId/resend` | 6795 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| DELETE | `/api/team/:userId/invite` | 6877 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| PUT | `/api/team/:userId/status` | 6897 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| DELETE | `/api/team/:userId` | 6945 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| POST | `/api/team/accept-invite` | 6977 | public (heuristic) | getUserByInviteToken( |
-| GET | `/api/subscription/billing-history` | 7013 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| GET | `/api/billing/card` | 7043 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| POST | `/api/billing/card/session` | 7072 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| POST | `/api/billing/card/confirm` | 7118 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| ALL | `/api/billing/card/notification` | 7209 | provider | billingCardCallback |
-| GET | `/api/billing/card/callback` | 7219 | public | billingCardCallback |
-| POST | `/api/billing/card/callback` | 7220 | public | billingCardCallback |
-| DELETE | `/api/billing/card` | 7223 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| POST | `/api/board-builder/submit` | 7243 | public (heuristic) | — |
-| GET | `/uploads/:folder/:name` | 7283 | public (heuristic) | getCheckoutInvoiceByToken( |
-| GET | `/api/property/tenants` | 7499 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/property/tenants` | 7510 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/property/tenants/:id` | 7524 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| PUT | `/api/property/tenants/:id` | 7535 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| POST | `/api/property/tenants/:id/archive` | 7551 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| POST | `/api/property/tenants/:id/unarchive` | 7564 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| GET | `/api/property/tenants/:id/events` | 7577 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| GET | `/api/property/schedules` | 7593 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/property/tenants/:tenantId/schedules` | 7601 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| POST | `/api/property/tenants/:tenantId/schedules` | 7612 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| PUT | `/api/property/schedules/:id` | 7630 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| DELETE | `/api/property/schedules/:id` | 7649 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| GET | `/api/property/invoices` | 7664 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/property/invoices/document` | 7694 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/invoice-documents/:name` | 7740 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/property/invoices` | 7769 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| POST | `/api/property/invoices/:id/resend` | 7811 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| GET | `/api/property/invoices/:id` | 7826 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| POST | `/api/property/invoices/:id/void` | 7837 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| POST | `/api/property/invoices/:id/mark-paid-external` | 7851 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| GET | `/api/checkout/resolve/:token` | 7871 | public (heuristic) | getCheckoutInvoiceByToken( |
-| GET | `/api/checkout/document/:token` | 7957 | public (heuristic) | getCheckoutInvoiceByToken( |
-| POST | `/api/checkout/:token/split` | 7981 | public (heuristic) | getCheckoutInvoiceByToken( |
-| POST | `/api/checkout/pay` | 7997 | public (heuristic) | getCheckoutInvoiceByToken( |
-| POST | `/api/checkout/:token/session` | 8059 | public (heuristic) | getCheckoutInvoiceByToken( |
-| POST | `/api/checkout/:token/hosted-fields-complete` | 8132 | public (heuristic) | getCheckoutInvoiceByToken( |
-| POST | `/api/checkout/:token/googlepay-complete` | 8163 | public (heuristic) | getCheckoutInvoiceByToken( |
-| GET | `/api/checkout/callback` | 8216 | public (heuristic) | getCheckoutInvoiceByToken( |
-| ALL | `/api/windcave/rent-notification` | 8243 | provider | — |
-| ALL | `/api/windcave/trades-notification` | 8260 | provider | — |
-| POST | `/api/webhooks/whatsapp` | 8280 | provider | req.headers["apikey"] |
-| PUT | `/api/merchants/:merchantId/sector` | 8316 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| GET | `/api/property/reminder-settings` | 8341 | merchant-user (heuristic) | authenticateToken |
-| PUT | `/api/property/reminder-settings` | 8351 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/reminder-settings` | 8368 | merchant-user (heuristic) | authenticateToken |
-| PUT | `/api/trades/reminder-settings` | 8378 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/gst-settings` | 8391 | merchant-user (heuristic) | authenticateToken |
-| PUT | `/api/trades/gst-settings` | 8407 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/clients` | 8424 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/clients` | 8432 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/clients/:id` | 8442 | merchant-user (heuristic) | authenticateToken |
-| PUT | `/api/trades/clients/:id` | 8451 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/clients/:id/archive` | 8462 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/clients/:id/unarchive` | 8471 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/clients/:id/promote` | 8481 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/clients/:id/events` | 8491 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/quotes` | 8501 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/quotes` | 8508 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/quotes/:id` | 8585 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/quotes/:id/pdf` | 8612 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/quotes/token/:token/pdf` | 8625 | public (heuristic) | getQuoteByToken( |
-| POST | `/api/trades/quotes/:id/resend` | 8636 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/quotes/token/:token` | 8652 | public (heuristic) | getQuoteByToken( |
-| POST | `/api/trades/quotes/token/:token/respond` | 8697 | public (heuristic) | getQuoteByToken( |
-| GET | `/api/trades/invoices` | 8746 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/invoices` | 8756 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/invoices/:id/resend` | 8808 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/invoices/:id/send-balance` | 8821 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/invoices/:id/mark-paid-external` | 8858 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/invoices/:id/complete` | 8875 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/invoices/:id/void` | 8892 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/schedules` | 8902 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/schedules` | 8909 | merchant-user (heuristic) | authenticateToken |
-| PUT | `/api/trades/schedules/:id` | 8927 | merchant-user (heuristic) | authenticateToken |
-| DELETE | `/api/trades/schedules/:id` | 8940 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/internal/cron/status` | 8954 | cron | authorizeCronRequest |
-| POST | `/api/internal/cron` | 8964 | cron | authorizeCronRequest |
+| GET | `/api/windcave/env` | 3118 | public (heuristic) | — |
+| POST | `/api/transactions/:id/hosted-fields-complete` | 3132 | public | isTokenAddressedTransaction( |
+| POST | `/api/transactions/:id/googlepay-complete` | 3170 | public | isTokenAddressedTransaction( |
+| GET | `/api/transactions/:id` | 3243 | public | isTokenAddressedTransaction(, publicTransactionDto( |
+| POST | `/api/transactions/:id/receipt-pdf` | 3264 | public | isTokenAddressedTransaction( |
+| GET | `/api/transactions/:id/receipt-qr` | 3325 | public | isTokenAddressedTransaction( |
+| GET | `/api/merchants/:id/analytics` | 3367 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/merchants/:id/revenue-over-time` | 3382 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/merchants/:id/analytics/export` | 3408 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/merchants/:id/export/csv` | 3429 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/merchants/:id/export/pdf` | 3495 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| POST | `/api/admin/merchants/:id/verify` | 3535 | admin (heuristic) | authenticateAdmin |
+| POST | `/api/admin/merchants/:id/set-active` | 3580 | admin (heuristic) | authenticateAdmin |
+| GET | `/api/admin/merchants/:id/transactions` | 3598 | admin (heuristic) | authenticateAdmin |
+| PATCH | `/api/admin/merchants/:id/windcave-merchant-id` | 3611 | admin (heuristic) | authenticateAdmin |
+| POST | `/api/admin/merchants/:id/activate` | 3627 | admin (heuristic) | authenticateAdmin, storage.verifyMerchant( |
+| PUT | `/api/merchants/:id/rates` | 3678 | merchant-user (heuristic) | authenticateToken |
+| PUT | `/api/merchants/:id/details` | 3685 | merchant-user (heuristic) | authenticateToken, checkAccountOwnership |
+| PUT | `/api/merchants/:id/change-password` | 3711 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| PUT | `/api/merchants/:id/bank-account` | 3793 | merchant-user (heuristic) | authenticateToken |
+| PUT | `/api/merchants/:id/theme` | 3797 | merchant-user (heuristic) | authenticateToken, checkAccountOwnership |
+| PUT | `/api/merchants/:id/daily-goal` | 3825 | merchant-user (heuristic) | authenticateToken, checkAccountOwnership |
+| PUT | `/api/merchants/:id` | 3858 | merchant-user (heuristic) | authenticateToken, checkAccountOwnership |
+| POST | `/api/merchants/:id/logo` | 3932 | merchant-user (heuristic) | authenticateToken, checkAccountOwnership |
+| DELETE | `/api/merchants/:id/logo` | 3987 | merchant-user (heuristic) | authenticateToken, checkAccountOwnership |
+| GET | `/api/merchants/:id/transactions` | 4030 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/merchants/:id/tapt-stones` | 4047 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| POST | `/api/merchants/:id/tapt-stones` | 4063 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership, generatePaymentUrl( |
+| PUT | `/api/merchants/:merchantId/tapt-stones/:stoneId` | 4114 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| DELETE | `/api/merchants/:merchantId/tapt-stones/:stoneId` | 4149 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/tapt-stones/:id` | 4183 | public (heuristic) | — |
+| GET | `/api/admin/subscription-revenue` | 4201 | admin (heuristic) | authenticateAdmin |
+| ALL | `/api/windcave/notification` | 4212 | provider | — |
+| GET | `/api/windcave/callback` | 4334 | public | isTokenAddressedTransaction( |
+| GET | `/api/windcave/status` | 4529 | public (heuristic) | — |
+| GET | `/api/admin/analytics` | 4542 | admin (heuristic) | authenticateAdmin |
+| GET | `/api/admin/revenue-over-time` | 4615 | admin (heuristic) | authenticateAdmin |
+| GET | `/api/admin/payment-method-breakdown` | 4651 | admin (heuristic) | authenticateAdmin |
+| GET | `/api/admin/ga4-detailed` | 4688 | admin (heuristic) | authenticateAdmin |
+| GET | `/api/admin/ga4-metrics` | 4753 | admin (heuristic) | authenticateAdmin |
+| POST | `/api/admin/merchants` | 4830 | admin (heuristic) | authenticateAdmin |
+| PUT | `/api/admin/merchants/:id` | 4841 | admin (heuristic) | authenticateAdmin |
+| POST | `/api/merchants/:id/test-payment-link` | 4869 | admin (heuristic) | authenticateAdmin |
+| GET | `/api/admin/merchants` | 4876 | admin (heuristic) | authenticateAdmin |
+| GET | `/api/admin/merchants/:id` | 4886 | admin (heuristic) | authenticateAdmin |
+| DELETE | `/api/admin/merchants/:id` | 4902 | admin (heuristic) | authenticateAdmin |
+| POST | `/api/admin/clear-merchants` | 4926 | admin (heuristic) | authenticateAdmin |
+| POST | `/api/admin/resend-verification` | 4957 | admin (heuristic) | authenticateAdmin |
+| POST | `/api/admin/test-email` | 5015 | admin (heuristic) | authenticateAdmin |
+| GET | `/api/admin/email-status` | 5038 | admin (heuristic) | authenticateAdmin |
+| POST | `/api/merchants/verify` | 5065 | public (heuristic) | storage.verifyMerchant( |
+| GET | `/api/merchants/:id/email-status` | 5116 | public (heuristic) | — |
+| POST | `/api/auth/confirm-email` | 5139 | public (heuristic) | getMerchantByToken( |
+| POST | `/api/auth/resend-confirmation` | 5266 | public (heuristic) | — |
+| POST | `/api/info-pack-leads` | 5303 | public (heuristic) | — |
+| POST | `/api/merchants/signup` | 5356 | public (heuristic) | — |
+| PUT | `/api/merchants/:id/business-details` | 5458 | merchant-user (heuristic) | authenticateToken, checkAccountOwnership |
+| POST | `/api/admin/merchants/signup` | 5524 | admin (heuristic) | authenticateAdmin |
+| GET | `/api/merchants/:id/events` | 5587 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/push/capabilities` | 5663 | public (heuristic) | — |
+| GET | `/api/push/vapid-key` | 5687 | public (heuristic) | — |
+| POST | `/api/push/subscribe` | 5697 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/push/unsubscribe` | 5734 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/push/native-subscribe` | 5761 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/push/native-unsubscribe` | 5795 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/push/status` | 5829 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/push/preferences` | 5853 | merchant-user (heuristic) | authenticateToken |
+| PUT | `/api/push/preferences` | 5867 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/merchants/:id/clear-transactions` | 5893 | merchant-user (heuristic) | authenticateToken, checkAccountOwnership, req.user?.role === "admin" |
+| POST | `/api/transactions/:transactionId/refunds` | 5913 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| GET | `/api/transactions/:transactionId/refunds` | 6051 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/merchants/:merchantId/refunds` | 6081 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/refunds/:refundId` | 6102 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/admin/api-keys` | 6136 | admin (heuristic) | authenticateAdmin |
+| POST | `/api/admin/api-keys` | 6140 | admin (heuristic) | authenticateAdmin |
+| POST | `/api/admin/api-keys/:keyId/revoke` | 6144 | admin (heuristic) | authenticateAdmin |
+| GET | `/api/admin/api-metrics` | 6150 | admin (heuristic) | authenticateAdmin |
+| GET | `/api/admin/api-usage` | 6154 | admin (heuristic) | authenticateAdmin |
+| GET | `/api/merchants/:merchantId/stock-items` | 6163 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/merchants/:merchantId/stock-items` | 6182 | merchant-user (heuristic) | authenticateToken |
+| PUT | `/api/merchants/:merchantId/stock-items/:itemId` | 6210 | merchant-user (heuristic) | authenticateToken |
+| DELETE | `/api/merchants/:merchantId/stock-items/:itemId` | 6247 | api-key (heuristic) | authenticateToken, authenticateApiKey, requireEcommerceApi |
+| POST | `/api/v1/transactions` | 6315 | api-key | authenticateApiKey, requireEcommerceApi, publicTransactionDto( |
+| GET | `/api/v1/transactions/:id` | 6427 | api-key | authenticateApiKey, requireEcommerceApi |
+| POST | `/api/payments/apple-pay/validate` | 6500 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/payments/apple-pay/process` | 6505 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/payments/google-pay/process` | 6510 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/payments/digital-wallet/config` | 6515 | public (heuristic) | — |
+| GET | `/api/subscription` | 6550 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| PUT | `/api/subscription/plan` | 6573 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/subscription/cancel` | 6636 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/subscription/resume` | 6679 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/team` | 6710 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| POST | `/api/team/invite` | 6731 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| POST | `/api/team/:userId/resend` | 6792 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| DELETE | `/api/team/:userId/invite` | 6874 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| PUT | `/api/team/:userId/status` | 6894 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| DELETE | `/api/team/:userId` | 6942 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| POST | `/api/team/accept-invite` | 6974 | public (heuristic) | getUserByInviteToken( |
+| GET | `/api/subscription/billing-history` | 7010 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| GET | `/api/billing/card` | 7040 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| POST | `/api/billing/card/session` | 7069 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| POST | `/api/billing/card/confirm` | 7115 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| ALL | `/api/billing/card/notification` | 7206 | provider | billingCardCallback |
+| GET | `/api/billing/card/callback` | 7216 | public | billingCardCallback |
+| POST | `/api/billing/card/callback` | 7217 | public | billingCardCallback |
+| DELETE | `/api/billing/card` | 7220 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| POST | `/api/board-builder/submit` | 7240 | public (heuristic) | — |
+| GET | `/uploads/:folder/:name` | 7280 | public (heuristic) | getCheckoutInvoiceByToken( |
+| GET | `/api/property/tenants` | 7496 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/property/tenants` | 7507 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/property/tenants/:id` | 7521 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| PUT | `/api/property/tenants/:id` | 7532 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| POST | `/api/property/tenants/:id/archive` | 7548 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| POST | `/api/property/tenants/:id/unarchive` | 7561 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/property/tenants/:id/events` | 7574 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/property/schedules` | 7590 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/property/tenants/:tenantId/schedules` | 7598 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| POST | `/api/property/tenants/:tenantId/schedules` | 7609 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| PUT | `/api/property/schedules/:id` | 7627 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| DELETE | `/api/property/schedules/:id` | 7646 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/property/invoices` | 7661 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/property/invoices/document` | 7691 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/invoice-documents/:name` | 7737 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/property/invoices` | 7766 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| POST | `/api/property/invoices/:id/resend` | 7808 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/property/invoices/:id` | 7823 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| POST | `/api/property/invoices/:id/void` | 7834 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| POST | `/api/property/invoices/:id/mark-paid-external` | 7848 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/checkout/resolve/:token` | 7868 | public (heuristic) | getCheckoutInvoiceByToken( |
+| GET | `/api/checkout/document/:token` | 7954 | public (heuristic) | getCheckoutInvoiceByToken( |
+| POST | `/api/checkout/:token/split` | 7978 | public (heuristic) | getCheckoutInvoiceByToken( |
+| POST | `/api/checkout/pay` | 7994 | public (heuristic) | getCheckoutInvoiceByToken( |
+| POST | `/api/checkout/:token/session` | 8056 | public (heuristic) | getCheckoutInvoiceByToken( |
+| POST | `/api/checkout/:token/hosted-fields-complete` | 8129 | public (heuristic) | getCheckoutInvoiceByToken( |
+| POST | `/api/checkout/:token/googlepay-complete` | 8160 | public (heuristic) | getCheckoutInvoiceByToken( |
+| GET | `/api/checkout/callback` | 8213 | public (heuristic) | getCheckoutInvoiceByToken( |
+| ALL | `/api/windcave/rent-notification` | 8240 | provider | — |
+| ALL | `/api/windcave/trades-notification` | 8257 | provider | — |
+| POST | `/api/webhooks/whatsapp` | 8277 | provider | req.headers["apikey"] |
+| PUT | `/api/merchants/:merchantId/sector` | 8313 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/property/reminder-settings` | 8338 | merchant-user (heuristic) | authenticateToken |
+| PUT | `/api/property/reminder-settings` | 8348 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/reminder-settings` | 8365 | merchant-user (heuristic) | authenticateToken |
+| PUT | `/api/trades/reminder-settings` | 8375 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/gst-settings` | 8388 | merchant-user (heuristic) | authenticateToken |
+| PUT | `/api/trades/gst-settings` | 8404 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/clients` | 8421 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/clients` | 8429 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/clients/:id` | 8439 | merchant-user (heuristic) | authenticateToken |
+| PUT | `/api/trades/clients/:id` | 8448 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/clients/:id/archive` | 8459 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/clients/:id/unarchive` | 8468 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/clients/:id/promote` | 8478 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/clients/:id/events` | 8488 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/quotes` | 8498 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/quotes` | 8505 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/quotes/:id` | 8582 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/quotes/:id/pdf` | 8609 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/quotes/token/:token/pdf` | 8622 | public (heuristic) | getQuoteByToken( |
+| POST | `/api/trades/quotes/:id/resend` | 8633 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/quotes/token/:token` | 8649 | public (heuristic) | getQuoteByToken( |
+| POST | `/api/trades/quotes/token/:token/respond` | 8694 | public (heuristic) | getQuoteByToken( |
+| GET | `/api/trades/invoices` | 8743 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/invoices` | 8753 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/invoices/:id/resend` | 8805 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/invoices/:id/send-balance` | 8818 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/invoices/:id/mark-paid-external` | 8855 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/invoices/:id/complete` | 8872 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/invoices/:id/void` | 8889 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/schedules` | 8899 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/schedules` | 8906 | merchant-user (heuristic) | authenticateToken |
+| PUT | `/api/trades/schedules/:id` | 8924 | merchant-user (heuristic) | authenticateToken |
+| DELETE | `/api/trades/schedules/:id` | 8937 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/internal/cron/status` | 8951 | cron | authorizeCronRequest |
+| POST | `/api/internal/cron` | 8961 | cron | authorizeCronRequest |
 
 ## Per-route facts
 
@@ -941,7 +940,7 @@ Review pending.
 Reviewed policy:
 
 - **Who:** public. **Tenant (number):** the sale's sequential number selects it, for any business; only a sale with its own link (isTokenAddressedTransaction) is hidden (404)
-- **Input:** id: strictPositiveIntegerParam; body: paymentRequestSchema (merchantId, stoneId, paymentMethod, cardLast4, amount — all optional; a merchantId or stoneId given must match the sale); amount: parsed with parseFloat, any positive figure up to what is left (finding)
+- **Input:** id: strictPositiveIntegerParam; body: paymentRequestSchema (merchantId, stoneId, paymentMethod, cardLast4, amount — all optional; a merchantId or stoneId given must match the sale); amount: never charged — what is owed (the next share, or the whole price) is; an amount given must equal it to the cent, or 400 before any provider session (owner decision 2026-09-26)
 - **Capability gate:** isWindcaveConfigured() (503 PAYMENT_PROVIDER_UNAVAILABLE while unconfigured)
 - **Idempotency:** a completed or processing sale is refused (409); otherwise every call creates a new provider session and binds it to the sale, replacing the last one
 - **Side effects:** creates a payment session with the provider (createWindcaveSession); when the provider reports the session already complete, settles the sale (live update and push)
@@ -951,7 +950,6 @@ Reviewed policy:
 - **Replay:** each call opens another provider session for the same sale
 - **Rate:** checkRateLimit (100 a minute per visitor address, counted in this server process only; until TRUST_PROXY_HOPS is set every visitor shares one address — R1-T4 phase B)
 - **Finding:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
-- **Finding:** For a split sale the customer may name their own amount (any positive figure up to what is left, parsed with parseFloat), and the share it pays is then counted as fully paid. A split share is marked paid whatever amount the provider charged: with the pay route's customer-chosen amount, every share of a $100 sale can be paid with $0.01 and the sale shows fully paid (shown in the harness 2026-09-26). The custom amount is a product decision put to the owner; the amount check itself is R2/R3 (plan lines 870, 1511).
 
 ### GET `/api/windcave/env`
 
@@ -984,7 +982,7 @@ Reviewed policy:
 - **Rate:** none — no limit
 - **Finding:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
 - **Finding:** Gap 11 (known, escalated 2026-09-13): the finaliser re-settles on every call with the bound session, and after a share it resets the session to pending, so one approved session can complete the next share too. Closed by moving onto the payment_attempts engine (C3).
-- **Finding:** A split share is marked paid whatever amount the provider charged: with the pay route's customer-chosen amount, every share of a $100 sale can be paid with $0.01 and the sale shows fully paid (shown in the harness 2026-09-26). The custom amount is a product decision put to the owner; the amount check itself is R2/R3 (plan lines 870, 1511).
+- **Finding:** A split share is marked paid without comparing what the provider charged with the share. Until 2026-09-26 the pay route let the customer choose the amount, so every share of a $100 sale could be paid with $0.01 and the sale showed fully paid (shown in the harness); the owner chose exact shares only, and the pay route now opens every session for exactly what is owed. What remains is one session settling twice (gap 11's replay; the read-then-write settlement, R3/C20); the amount check itself is R2/R3 (plan lines 870, 1511).
 
 ### POST `/api/transactions/:id/googlepay-complete`
 
@@ -1011,7 +1009,7 @@ Reviewed policy:
 - **Rate:** none — no limit
 - **Finding:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
 - **Finding:** Gap 11 (known, escalated 2026-09-13): the finaliser re-settles on every call with the bound session, and after a share it resets the session to pending, so one approved session can complete the next share too. Closed by moving onto the payment_attempts engine (C3).
-- **Finding:** A split share is marked paid whatever amount the provider charged: with the pay route's customer-chosen amount, every share of a $100 sale can be paid with $0.01 and the sale shows fully paid (shown in the harness 2026-09-26). The custom amount is a product decision put to the owner; the amount check itself is R2/R3 (plan lines 870, 1511).
+- **Finding:** A split share is marked paid without comparing what the provider charged with the share. Until 2026-09-26 the pay route let the customer choose the amount, so every share of a $100 sale could be paid with $0.01 and the sale showed fully paid (shown in the harness); the owner chose exact shares only, and the pay route now opens every session for exactly what is owed. What remains is one session settling twice (gap 11's replay; the read-then-write settlement, R3/C20); the amount check itself is R2/R3 (plan lines 870, 1511).
 
 ### GET `/api/transactions/:id`
 
