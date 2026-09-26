@@ -532,36 +532,31 @@ export async function requestPasswordReset(email: string, baseUrl?: string): Pro
 /**
  * The login whose password was reset, or null. The reset also ends every session
  * of that login (R1-T4 phase D); the caller closes its live streams.
+ *
+ * A storage fault is thrown, never answered as null: null tells the user the link
+ * is bad, and a good link must not be called expired because the database did not
+ * answer (C10 route review, 2026-09-26). The route answers a fault with 500.
  */
 export async function resetPassword(
   token: string,
   newPassword: string,
 ): Promise<{ userId: number; merchantId: number } | null> {
-  try {
-    const { storage } = await import('./storage');
-    const tokenHash = hashResetToken(token);
-    const now = new Date();
-    const candidate = await storage.getUserByResetToken(tokenHash);
-    if (!candidate || !resetEligible(candidate, now)) return null;
+  const { storage } = await import('./storage');
+  const tokenHash = hashResetToken(token);
+  const now = new Date();
+  const candidate = await storage.getUserByResetToken(tokenHash);
+  if (!candidate || !resetEligible(candidate, now)) return null;
 
-    const hashedPassword = await bcrypt.hash(newPassword, 12);
-    const updated = await storage.resetUserPasswordByToken(tokenHash, hashedPassword, now);
-    if (!updated || !isMerchantUserRole(updated.role) || updated.status !== 'active') return null;
-    if (!isPositiveInteger(updated.id) || !isPositiveInteger(updated.merchantId)) return null;
-    return { userId: updated.id, merchantId: updated.merchantId };
-  } catch (error) {
-    console.error('Failed to reset password:', error);
-    return null;
-  }
+  const hashedPassword = await bcrypt.hash(newPassword, 12);
+  const updated = await storage.resetUserPasswordByToken(tokenHash, hashedPassword, now);
+  if (!updated || !isMerchantUserRole(updated.role) || updated.status !== 'active') return null;
+  if (!isPositiveInteger(updated.id) || !isPositiveInteger(updated.merchantId)) return null;
+  return { userId: updated.id, merchantId: updated.merchantId };
 }
 
+/** Whether a reset link is live. A storage fault is thrown, never answered false (see resetPassword). */
 export async function validateResetToken(token: string): Promise<boolean> {
-  try {
-    const { storage } = await import('./storage');
-    const user = await storage.getUserByResetToken(hashResetToken(token));
-    return !!user && resetEligible(user, new Date());
-  } catch (error) {
-    console.error('Failed to validate reset token:', error);
-  }
-  return false;
+  const { storage } = await import('./storage');
+  const user = await storage.getUserByResetToken(hashResetToken(token));
+  return !!user && resetEligible(user, new Date());
 }
