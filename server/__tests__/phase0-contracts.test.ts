@@ -127,9 +127,11 @@ describe("Phase 0 request and response contracts", () => {
   });
 
   test("merchant projections are positive allowlists", () => {
+    // Public by a sequential number: only what the customer pages show. The contact email
+    // is the sign-in address unless changed, and name is the account holder's (2026-09-26).
     expect(Object.keys(publicMerchantBrandDto(merchant)).sort()).toEqual([
-      "businessAddress", "businessName", "contactEmail", "contactPhone",
-      "customLogoUrl", "gstNumber", "id", "name", "nzbn", "themeId",
+      "businessAddress", "businessName", "contactPhone",
+      "customLogoUrl", "gstNumber", "id", "nzbn", "themeId",
     ]);
     expect(Object.keys(adminMerchantSummaryDto(merchant)).sort()).toEqual([
       "businessName", "createdAt", "director", "email", "id", "name", "nzbn", "status",

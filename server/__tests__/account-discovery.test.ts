@@ -191,6 +191,56 @@ describe("resending the confirmation link never says whether an address has an a
   });
 });
 
+describe("the public business read never lists sign-in addresses", () => {
+  // GET /api/merchants/:id is public and asked by a sequential number, so counting through the
+  // numbers reads every business. Sign-up (and the admin's create) sets the contact email to the
+  // sign-in address, so that field listed every account's address, and its holder's name.
+  it("gives no business's sign-in address, nor its holder's name, to anyone asking by number", async () => {
+    const { app } = await createTestApp();
+    const waiting = randomEmail("waiting");
+    await signUp(app, waiting);
+    const [application] = await applicationsFor(waiting);
+    const owner = await createOwnerPrincipal({ name: "Morgan Reid" });
+
+    for (const [id, email, holder] of [
+      [application.id, waiting, "Jamie Smith"],
+      [owner.merchantId, owner.user.email, "Morgan Reid"],
+    ] as const) {
+      const res = await request(app).get(`/api/merchants/${id}`);
+      expect(res.status).toBe(200);
+      expect(res.body).not.toHaveProperty("contactEmail");
+      expect(res.body).not.toHaveProperty("name");
+      expect(JSON.stringify(res.body)).not.toContain(email);
+      expect(JSON.stringify(res.body)).not.toContain(holder);
+    }
+  });
+
+  it("still gives the customer pages what they show: the business's name, logo and receipt details", async () => {
+    const { app } = await createTestApp();
+    const owner = await createOwnerPrincipal({ businessName: "Kōwhai Café" });
+    await storage.updateMerchant(owner.merchantId, {
+      contactEmail: owner.user.email,
+      contactPhone: "09 555 0199",
+      businessAddress: "2 Kōwhai Lane, Auckland",
+      gstNumber: "123-456-789",
+      nzbn: "9429041234567",
+    });
+
+    const res = await request(app).get(`/api/merchants/${owner.merchantId}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      id: owner.merchantId,
+      businessName: "Kōwhai Café",
+      businessAddress: "2 Kōwhai Lane, Auckland",
+      contactPhone: "09 555 0199",
+      gstNumber: "123-456-789",
+      nzbn: "9429041234567",
+    });
+    expect(res.body).toHaveProperty("customLogoUrl");
+  });
+});
+
 describe("forgot password takes as long whether or not the address has a login", () => {
   it("never answers sooner than a second, and only the login is sent a link", async () => {
     const { app } = await createTestApp();

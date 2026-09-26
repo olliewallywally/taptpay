@@ -88,13 +88,15 @@ export function teamMemberDto(user: User) {
   };
 }
 
+// Anyone can ask for this by a business's sequential number (GET /api/merchants/:id), so it
+// carries only what the customer pages show: the name and logo, and the receipt's business
+// details. Never the contact email, which sign-up sets to the sign-in address, nor the
+// account holder's name.
 export function publicMerchantBrandDto(merchant: MerchantInput) {
   return {
     id: merchant.id,
-    name: merchant.name,
     businessName: merchant.businessName,
     businessAddress: merchant.businessAddress,
-    contactEmail: merchant.contactEmail,
     contactPhone: merchant.contactPhone,
     gstNumber: merchant.gstNumber,
     nzbn: merchant.nzbn,
