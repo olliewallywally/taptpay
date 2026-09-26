@@ -14,7 +14,7 @@ import {
 } from "./storage";
 import { TUTORIAL_PAGE_KEYS, isTutorialPageKey } from "@shared/tutorial";
 import { inviteTeamMemberSchema, acceptInviteSchema, retailTransactionCreateRequestSchema, updateMerchantDetailsSchema, updateThemeSchema, updateDailyGoalSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, changePasswordSchema, newPasswordSchema, createRefundSchema, insertRefundSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema, pushNotificationPreferencesSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createClientProfileSchema, updateClientProfileSchema, createQuoteSchema, acceptQuoteSchema, createJobInvoiceSchema, markJobPaidExternalSchema, createJobScheduleSchema, updateJobScheduleSchema, updateTradeReminderSettingsSchema, updateTradeGstSettingsSchema } from "@shared/schema";
-import { windcaveService, isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, getWindcaveEnv, submitGooglePayToken, createAttendedSession, submitTapToPayToken, createCardStorageSession, queryStoredCardSession, chargeStoredCard } from "./windcave";
+import { isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, getWindcaveEnv, submitGooglePayToken, createAttendedSession, submitTapToPayToken, createCardStorageSession, queryStoredCardSession, chargeStoredCard } from "./windcave";
 import { authenticateUser, checkPasswordEvenly, passwordCheckBudget, generateToken, authenticateToken, createUser, issueTokenForUserId, tokenForUserRow, isAccountOwner, requestPasswordReset, resetPassword, validateResetToken, type AuthenticatedRequest, logSecurityEvent, syncVerifiedMerchants } from "./auth";
 import {
   HANDOFF_CODE_TTL_MS, clearSignInCookie, googleVerifiedEmail, handoffCodeHash, newHandoffCode, readCookie,
@@ -4178,24 +4178,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // (Removed unauthenticated legacy DELETE /api/tapt-stones/:id — it let anyone
   // delete any merchant's stone by id. Clients use the authenticated, ownership-checked
   // /api/merchants/:merchantId/tapt-stones/:stoneId route.)
-
-  // Get specific tapt stone details
-  app.get("/api/tapt-stones/:id", async (req, res) => {
-    try {
-      const stoneId = strictPositiveIntegerParam(req.params.id);
-      if (stoneId === null) return res.status(400).json({ message: "Invalid id" });
-      const stone = await storage.getTaptStone(stoneId);
-      
-      if (!stone || !stone.isActive) {
-        return res.status(404).json({ message: "Tapt stone not found" });
-      }
-      
-      res.json(stone);
-    } catch (error) {
-      console.error("Error fetching tapt stone:", error);
-      res.status(500).json({ message: "Failed to get tapt stone" });
-    }
-  });
+  // (Removed GET /api/tapt-stones/:id, owner decision 2026-09-26: nothing called it, and
+  // counting through its sequential ids listed every board of every business.)
 
   // Subscription revenue analytics (admin only)
   app.get("/api/admin/subscription-revenue", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
@@ -4525,18 +4509,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  // Check Windcave configuration status
-  app.get("/api/windcave/status", (req, res) => {
-    const configured = isWindcaveConfigured();
-    res.json({
-      configured,
-      mode: configured ? "live" : "disabled",
-      message: configured
-        ? "Windcave API is configured (UAT)."
-        : "Payments are disabled. Configure WINDCAVE_USERNAME and WINDCAVE_API_KEY to enable live payments.",
-      endpoint: config.windcave.endpoint || "",
-    });
-  });
+  // (Removed GET /api/windcave/status, owner decision 2026-09-26: nothing called it, and it
+  // told anyone whether payments were on, the provider's endpoint and its setting names.)
 
   // Admin Analytics endpoint
   app.get("/api/admin/analytics", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
@@ -6511,36 +6485,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     return res.status(503).json({ code: "DIGITAL_WALLET_DISABLED", message: "Digital wallet payments are unavailable" });
   });
 
-  // Digital wallet configuration endpoint
-  app.get("/api/payments/digital-wallet/config", async (req, res) => {
-    try {
-      const userAgent = req.headers['user-agent'] || '';
-      const isIOS = /iPhone|iPad|iPod/.test(userAgent);
-      const isAndroid = /Android/.test(userAgent);
-      const isChrome = /Chrome/.test(userAgent) && /Google Inc/.test(req.headers['user-agent'] || '');
-
-      const walletConfig = {
-        applePaySupported: isIOS,
-        googlePaySupported: isAndroid && isChrome,
-        paymentRequestSupported: !!globalThis.PaymentRequest,
-        environment: windcaveService.isConfigured() ? "production" : "test",
-        merchantId: config.wallets.applePayMerchantId,
-        merchantName: "Tapt Payment",
-        supportedNetworks: ["visa", "mastercard", "amex", "eftpos"],
-        countryCode: "NZ",
-        currencyCode: "NZD",
-        googlePayGateway: {
-          gateway: "windcave",
-          gatewayMerchantId: config.windcave.merchantId || "test-merchant"
-        }
-      };
-
-      res.json(walletConfig);
-    } catch (error) {
-      console.error("Digital wallet config error:", error);
-      res.status(500).json({ error: "Failed to get digital wallet configuration" });
-    }
-  });
+  // (Removed GET /api/payments/digital-wallet/config, owner decision 2026-09-26: nothing called
+  // it, the wallet payment routes above are retired, and it guessed the device from the
+  // User-Agent and gave out the platform's provider account id.)
 
   // ============================================================================
   // SUBSCRIPTION ROUTES

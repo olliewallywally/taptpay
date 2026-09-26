@@ -76,14 +76,8 @@ describe("R0-T5 callback containment", () => {
     expect(JSON.stringify(response.body)).not.toMatch(/Apple Pay|Google Pay|tap your card/i);
   });
 
-  test("disabled provider status is truthful", async () => {
-    const { app } = await createTestApp();
-    const response = await request(app).get("/api/windcave/status");
-    expect(response.status).toBe(200);
-    expect(response.body.configured).toBe(false);
-    expect(response.body.mode).toBe("disabled");
-    expect(response.body.message).not.toMatch(/simulation|ready/i);
-  });
+  // "Disabled provider status is truthful" tested GET /api/windcave/status, removed on 2026-09-26
+  // (owner decision; c10-batch-3-retired-routes.test.ts): nothing called it.
 
   test("browser cancellation does not mutate a pending payment while provider is disabled", async () => {
     const { app } = await createTestApp();

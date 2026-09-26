@@ -9,8 +9,8 @@ import { bearer, createOwnerPrincipal, createTestApp, resetTestStorage } from ".
  *  - the two unauthenticated /nfc/* physical-tag redirect routes now 400 on a
  *    garbage merchantId/stoneId instead of building a payment URL containing
  *    the literal string "NaN";
- *  - GET /api/tapt-stones/:id now 400s on a garbage id instead of querying
- *    storage with NaN;
+ *  - GET /api/tapt-stones/:id 400'd on a garbage id instead of querying storage
+ *    with NaN (the route was removed on 2026-09-26: c10-batch-3-retired-routes.test.ts);
  *  - GET /api/merchants/:id/active-transaction's optional ?stoneId query
  *    param stays optional (omitted entirely: still works) but now 400s on a
  *    present-but-garbage value instead of silently becoming NaN and falling
@@ -82,33 +82,6 @@ describe("R1-T6 — /nfc, /api/tapt-stones, active-transaction stoneId", () => {
       expect(response.status).toBe(410);
       expect(response.text).toContain("Ask for your payment link");
       expect(response.text).not.toContain("NaN");
-    });
-  });
-
-  describe("GET /api/tapt-stones/:id", () => {
-    it.each(["abc", "1abc", "1.5", "-1", "0", "+1", "1e3"])(
-      "id=%s returns 400, not a lookup with NaN",
-      async (garbage) => {
-        const { app } = await createTestApp();
-        const response = await request(app).get(`/api/tapt-stones/${encodeURIComponent(garbage)}`);
-        expect(response.status).toBe(400);
-      },
-    );
-
-    it("a real, active stone id returns 200", async () => {
-      const { app } = await createTestApp();
-      const owner = await createOwnerPrincipal();
-      const stoneId = await createStoneFor(owner.merchantId, owner.token);
-
-      const response = await request(app).get(`/api/tapt-stones/${stoneId}`);
-      expect(response.status).toBe(200);
-      expect(response.body.id).toBe(stoneId);
-    });
-
-    it("an unknown-but-well-formed id 404s rather than 400", async () => {
-      const { app } = await createTestApp();
-      const response = await request(app).get("/api/tapt-stones/999999");
-      expect(response.status).toBe(404);
     });
   });
 

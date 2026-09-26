@@ -449,17 +449,12 @@ export const PUBLIC_PATH_ALLOWLIST: Record<string, string> = {
     "retired business-wide no-board NFC tag address (owner decision 2026-09-25): validates the id, then a constant 410 notice page with no script or onward link; reads nothing",
   "GET /api/merchants/:id/email-status":
     "boolean-only lookup for the pre-session /business-details soft gate; leading '// Public' comment is misattributed by sliceHandlerBodies to the preceding registration",
-  "GET /api/payments/digital-wallet/config":
-    "static Apple/Google Pay capability booleans + publishable merchant ids, no secret",
   "GET /api/push/capabilities": "static VAPID/APNs-configured booleans, no secret",
   "GET /api/push/vapid-key": "Web Push VAPID PUBLIC key — not a secret by the standard's own design",
   "GET /api/windcave/env": "publishable Apple/Google Pay merchant ids for the unauthenticated checkout page",
-  "GET /api/windcave/status": "diagnostic booleans + non-secret API base URL",
   "GET /uploads/:folder/:name":
     "public by design for merchant logos only (shown to customers on hosted checkout pages); PUBLIC_UPLOAD_FOLDERS in upload-policy.ts is an allowlist checked before the database or disk is consulted, so any other folder — invoice documents in particular — is a 404. Invoice documents are served by GET /api/invoice-documents/:name (authenticated, tenant-scoped) and GET /api/checkout/document/:token (checkout-token). Gap 13, Option C",
   "GET /api/nfc/capabilities": "static tap-to-pay capability booleans, no secret",
-  "GET /api/tapt-stones/:id":
-    "raw row has no sensitive fields (id/merchantId/name/stoneNumber/qrCodeUrl/paymentUrl/isActive/timestamps) — paymentUrl/qrCodeUrl are already the public payment link",
   "GET /api/auth/google": "OAuth consent-redirect initiation; necessarily pre-session",
   "GET /api/auth/google/callback":
     "OAuth callback that issues the one-time sign-in handoff code (R1-T4 phase A); necessarily pre-session",

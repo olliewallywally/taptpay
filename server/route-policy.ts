@@ -1,8 +1,8 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ ae82a31c8fd87ab969b73237e9ea5b3b9933f4b3 on 2026-09-26.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 4ac759d1af8005342af899326c6fab87814c9c71 on 2026-09-26.
  *
- * 223 registrations (93 GET, 91 POST, 3 PATCH, 5 ALL, 22 PUT, 9 DELETE) on this SHA — evidence for THIS commit, not a timeless
+ * 220 registrations (90 GET, 91 POST, 3 PATCH, 5 ALL, 22 PUT, 9 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
  * live count on every run rather than trusting this comment.
  *
@@ -1176,17 +1176,6 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       statuses: [200,400,401,403,404,500,503],
     },
   },
-  "GET /api/tapt-stones/:id": {
-    method: "GET",
-    path: "/api/tapt-stones/:id",
-    principal: "public",
-    markers: [],
-    facts: {
-      params: ["id: strictPositiveIntegerParam"],
-      storageMethods: ["getTaptStone"],
-      statuses: [200,400,404,500],
-    },
-  },
   "GET /api/admin/subscription-revenue": {
     method: "GET",
     path: "/api/admin/subscription-revenue",
@@ -1230,16 +1219,6 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       statuses: [302,400,404],
       capabilityGates: ["isWindcaveConfigured"],
       helpers: ["broadcastToStone"],
-    },
-  },
-  "GET /api/windcave/status": {
-    method: "GET",
-    path: "/api/windcave/status",
-    principal: "public",
-    markers: [],
-    facts: {
-      statuses: [200],
-      capabilityGates: ["isWindcaveConfigured"],
     },
   },
   "GET /api/admin/analytics": {
@@ -1939,16 +1918,6 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       middleware: ["authenticateToken"],
       statuses: [401,403,503],
-    },
-  },
-  "GET /api/payments/digital-wallet/config": {
-    method: "GET",
-    path: "/api/payments/digital-wallet/config",
-    principal: "public",
-    markers: [],
-    facts: {
-      statuses: [200,500],
-      capabilityGates: ["windcaveService.isConfigured"],
     },
   },
   "GET /api/subscription": {

@@ -178,8 +178,6 @@ const BOARD_PAGE_RULE =
   "a board's customer page: the board (stoneId) must belong to the business in the path, and only that board's open sale is shown, never a sale with its own link";
 const SIGNED_IN_BUSINESS_RULE =
   "checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business";
-const NO_CALLER_CHECKED =
-  "No screen or app calls it: searched 2026-09-26 across the tracked files (the iOS app loads the live site), only the local audit sweeps, tests and this inventory name it";
 
 function tokenRate(family: string, perMinute: number): string {
   return (
@@ -1683,32 +1681,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     ],
   },
 
-  "GET /api/tapt-stones/:id": {
-    branches: [
-      {
-        principal: "public",
-        tenant: "number",
-        tenantRule: "the board's sequential number selects it, for any business; a removed (inactive) board is 404",
-      },
-    ],
-    input: "id: strictPositiveIntegerParam (400 otherwise)",
-    capability: null,
-    entitlement: null,
-    idempotency: "read-only",
-    sideEffects: null,
-    successDto:
-      "the whole board row, not a projection: id, business number, name, board number, stored page and QR addresses, whether active, and when made and changed",
-    errorDisclosure: ["fixed"],
-    controls: {
-      authenticity: "anyone with a board's number: numbers are sequential",
-      replay: "read-only",
-      rate: "none — no limit",
-    },
-    findings: [
-      `${NO_CALLER_CHECKED}. Counting through board numbers lists every active board of every business with its business number: all that a board's public page and open sale need (GET /api/merchants/:id/active-transaction). Earlier passes kept it as public by design (R1-T6 2026-09-06, R1-T3 2026-09-13), but nothing uses it: retire it, put to the owner 2026-09-26.`,
-    ],
-  },
-
   "GET /api/nfc/capabilities": {
     branches: [{ principal: "public", tenant: "none", tenantRule: "none: the platform's own settings" }],
     input: "nothing (the User-Agent is no longer read: R0-T5)",
@@ -1736,38 +1708,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       "{ env, applePayMerchantId, googlePayMerchantId, googlePayEnv }: what the checkout page's card fields and wallet buttons need, all of which reaches the browser anyway",
     errorDisclosure: ["fixed"],
     controls: CONFIGURATION_CONTROLS,
-  },
-
-  "GET /api/windcave/status": {
-    branches: [{ principal: "public", tenant: "none", tenantRule: "none: the platform's own settings" }],
-    input: "nothing",
-    capability: "reports isWindcaveConfigured()",
-    entitlement: null,
-    idempotency: "read-only",
-    sideEffects: null,
-    successDto:
-      "{ configured, mode, message, endpoint }: whether the provider is set up, a message naming the settings that switch payments on (it says 'UAT' whatever the endpoint), and the provider endpoint's address",
-    errorDisclosure: ["fixed"],
-    controls: CONFIGURATION_CONTROLS,
-    findings: [
-      `${NO_CALLER_CHECKED}. It tells anyone whether payments are on, which provider endpoint is used and the names of the settings behind them, and its message says 'UAT' on the live endpoint too. Retire it: put to the owner 2026-09-26.`,
-    ],
-  },
-
-  "GET /api/payments/digital-wallet/config": {
-    branches: [{ principal: "public", tenant: "none", tenantRule: "none: the platform's own settings" }],
-    input: "the User-Agent, only to guess the device for the two 'supported' flags (not validated)",
-    capability: "reports windcaveService.isConfigured() as environment 'production' or 'test'",
-    entitlement: null,
-    idempotency: "read-only",
-    sideEffects: null,
-    successDto:
-      "{ applePaySupported, googlePaySupported, paymentRequestSupported (always false: it is read on the server), environment, merchantId (Apple Pay's), merchantName, supportedNetworks, countryCode, currencyCode, googlePayGateway: { gateway, gatewayMerchantId: the platform's provider account id } }",
-    errorDisclosure: ["fixed"],
-    controls: CONFIGURATION_CONTROLS,
-    findings: [
-      `${NO_CALLER_CHECKED}, and the wallet payment routes it describes answer 503 (retired). It guesses the device from the User-Agent, the fabricated capability R0-T5 removed from GET /api/nfc/capabilities. Retire it: put to the owner 2026-09-26.`,
-    ],
   },
 
   "GET /api/push/capabilities": {
