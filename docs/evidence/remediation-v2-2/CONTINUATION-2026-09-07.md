@@ -374,18 +374,45 @@ The work itself:
   - The session crashed (container restart 03:08 UTC) before committing. Resumed from its
     transcript and re-verified: `tsc` clean, server 94/1,706, client 96/799, mutations 14/14.
     Local, awaiting independent review.
+- **Pushed on the owner's word (2026-09-26): `93aa6a0a..30c9d8cb`**, a fast-forward of 78 commits;
+  the repository is still private, and the push carried no agent folders and no secrets.
+- **C10 continued (2026-09-26): batch 3a `567e1cfa`, `8fb4d341`; batch 3b `ba1b6742`, `6f887234`;
+  local, awaiting independent review** ([working notes](r1/WORKING-2026-09-26-r1-t2-c10.md)).
+  56 of 223 routes are reviewed; 167 are pending.
+  - Batch 3a, invoice checkout and quote links (11 routes). **Fixed, `567e1cfa`: any approved card
+    payment on the platform (a $1 purchase anywhere) could mark someone's unpaid single-payment rent
+    or trades invoice paid.** It is R1-T7's hole on the invoice routes. Also: the provider session
+    id goes into the provider's address as one encoded segment, and the split count is strict.
+  - Batch 3b, the sign-in entry points (14 routes). **Fixed, `ba1b6742`: a database fault made a
+    good password-reset link look expired.** The extractor now recognises the sign-in checks and
+    every email sender. Two tenant kinds, `credentials` and `mailbox`, each come with a rule.
+  - Mutations 11/11 and 18/18; server 97/1,737; `tsc` clean. At the resume, batch 3a was
+    re-verified independently: the suites as recorded, and its 11 mutations re-run, 11/11.
+  - For the owner, to be asked with batch 3c's questions:
+    - split invoices accept any approved session per share: each opened session needs a record
+      (an interim migration, or wait for R3);
+    - retire `POST /api/checkout/pay` and `POST /api/merchants/verify`: nothing calls them, and the
+      second gets around the 2026-09-23 rule;
+    - retire the old `/business-details` page with `GET /api/merchants/:id/email-status`, or
+      require sign-in;
+    - the reset page calls a failed check an expired link.
+  - Recorded for later phases: the sign-up confirmation token is unhashed and never expires; admin
+    sign-in shows which address is the admin's while `ADMIN_PASSWORD_HASH` is unset; sign-up's only
+    limit is a count shared with the board page's 3-second feed and numbered pay.
 
-**Next:** R1-T2's review, batch 3 (public static and config routes, the sign-in entry points),
-then the signed-in families; 192 routes are pending. Then R1-T3's runtime matrix, on the audited
-harness. Also for R1-T2: `POST /api/board-builder/submit` is public with no rate limit (it emails
-a supplied PDF to the owner's inbox). Open for the owner: the card-free dev write (above). The
+**Next:** R1-T2's review, batch 3c (the 20 pending routes with no sign-in middleware), then the
+batch 3 owner questions together, then the signed-in families; 167 routes are pending. Then
+R1-T3's runtime matrix, on the audited harness. Also for R1-T2: `POST /api/board-builder/submit` is
+public with no rate limit (it emails a supplied PDF to the owner's inbox), and its PDF may not fit
+the 100 KB request limit (to check in 3c). Open for the owner: the card-free dev write (above). The
 no-board rework's questions are all answered. Release of the rework: when production has no pending
 shared no-board sale (count-only check once production is reopened), with
 `FEATURE_NEW_RETAIL_PAYMENTS` on.
 
 The phase B live check waits for the owner to set `ADMIN_PASSWORD_HASH`.
 Independent reviews owed (each evidence file ends with its brief):
-- C10 so far (`2ec9d78f..cee1276a`) and the 2026-09-26 owner answers (`cee1276a..a419f948`);
+- C10 so far (`2ec9d78f..cee1276a`), the 2026-09-26 owner answers (`cee1276a..a419f948`), and
+  C10's batch 3 so far (`30c9d8cb..6f887234`);
 - the no-board rework (`da90d1a1..5c2cdb27`), its follow-up (`7051e25e..1fb41d14`), and the
   owner-answer fixes 2a–2c (`aba7b2be..da90d1a1`);
 - R1-T1 (`03c4663b..05195728`) and the live-updates fix (`05195728..3fac8ac8`);
