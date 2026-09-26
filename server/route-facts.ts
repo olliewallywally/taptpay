@@ -143,7 +143,9 @@ const SIDE_EFFECT_PREFIXES: Array<[string, string]> = [
  */
 const EMAIL_SENDER = /^(re)?send\w*Email$/;
 
-const CAPABILITY_CALLS = new Set(["isWindcaveConfigured", "requireEcommerceApi"]);
+const CAPABILITY_CALLS = new Set(["isWindcaveConfigured", "requireEcommerceApi", "windcaveService.isConfigured"]);
+/** Calls under a side-effect prefix that only read this server's configuration. */
+const CONFIGURATION_READS = new Set(["windcaveService.isConfigured"]);
 const ENTITLEMENT_NAMES = new Set(["requireBillingCard", "billingCardIsReady", "BILLING_CARD_REQUIRED"]);
 
 const RESPONSE_NAMES = new Set(["res", "_res", "response"]);
@@ -462,7 +464,7 @@ class FactCollector {
     }
     // Recorded even inside a check followed quietly: it is how that check compares.
     if (calleeName === "timingSafeEqual") this.authChecks.add(`constant-time comparison: ${callee}`);
-    const effect =
+    const effect = CONFIGURATION_READS.has(callee) ? undefined :
       SIDE_EFFECT_CALLS[callee] ??
       SIDE_EFFECT_PREFIXES.find(([prefix]) => callee.startsWith(prefix))?.[1] ??
       (EMAIL_SENDER.test(calleeName) ? "email" : undefined);

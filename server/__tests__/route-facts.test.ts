@@ -339,6 +339,18 @@ describe("R1-T2 route facts, read from each handler's syntax tree (C10)", () => 
     ]);
   });
 
+  it("reads the provider service's configuration check as a capability, not a call to the provider", () => {
+    const source = `
+      export function wire(app: Express) {
+        app.get("/wallet", (req, res) => {
+          res.json({ environment: windcaveService.isConfigured() ? "production" : "test" });
+        });
+      }`;
+    const facts = extractRouteFacts(source, "server/wire.ts").get("GET /wallet");
+    expect(facts?.sideEffects).toEqual([]);
+    expect(facts?.capabilityGates).toEqual(["windcaveService.isConfigured"]);
+  });
+
   it("reads a handler passed by name", () => {
     expect(factsFor("GET /api/billing/card/callback")).toMatchObject({
       middleware: [],

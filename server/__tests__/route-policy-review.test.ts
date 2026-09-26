@@ -44,6 +44,7 @@ const UNAUTHENTICATED: ReadonlyArray<ReviewedBranch["principal"]> = [
 ];
 
 const OWNER_CHECKS = ["checkAccountOwnership", "isAccountOwner"];
+/** Both admit the validated platform admin for any business (server/routes.ts). */
 const MERCHANT_OWNERSHIP_CHECKS = ["checkMerchantOwnership", "checkAccountOwnership"];
 
 function factsOf(key: string): RouteFacts {
@@ -53,6 +54,9 @@ function factsOf(key: string): RouteFacts {
 const has = (list: string[], names: string[]) => names.some((name) => list.includes(name));
 const comparesMerchant = (facts: RouteFacts) =>
   facts.authChecks.some((check) => check.startsWith("compares ") && /merchantId/.test(check));
+/** The route compares the caller's role with "admin": to admit the admin, or to refuse it. */
+const comparesAdminRole = (facts: RouteFacts) =>
+  facts.authChecks.some((check) => check.startsWith("compares ") && /\brole\b/.test(check) && /["']admin["']/.test(check));
 
 /** Every way one review disagrees with its route's facts, in words. */
 function problemsWith(key: string, review: RouteReview): string[] {
@@ -75,8 +79,15 @@ function problemsWith(key: string, review: RouteReview): string[] {
         if (branch.roles && !branch.roles.includes("member") && !has(facts.authChecks, OWNER_CHECKS)) {
           say(`${label} is owner-only, but the route calls neither checkAccountOwnership nor isAccountOwner`);
         }
-        if (branch.platformAdmin && !facts.authChecks.includes("isValidatedPlatformAdmin")) {
-          say(`${label} admits the platform admin, but the route never calls isValidatedPlatformAdmin`);
+        if (
+          branch.platformAdmin &&
+          !has(facts.authChecks, ["isValidatedPlatformAdmin", ...MERCHANT_OWNERSHIP_CHECKS]) &&
+          !comparesAdminRole(facts)
+        ) {
+          say(`${label} admits the platform admin, but the route has no check that admits it`);
+        }
+        if (!branch.platformAdmin && has(facts.authChecks, MERCHANT_OWNERSHIP_CHECKS) && !comparesAdminRole(facts)) {
+          say(`${label} calls an ownership check that admits the platform admin, but does not say the admin is admitted`);
         }
         break;
       case "platform-admin":
@@ -237,7 +248,9 @@ describe("R1-T2 / R1-T3 — every route's reviewed policy holds against its hand
 
   describe("the rules themselves", () => {
     const base: RouteReview = {
-      branches: [{ principal: "merchant", roles: ["owner"], tenant: "path-merchant", tenantRule: "path id is the session's merchant" }],
+      branches: [
+        { principal: "merchant", roles: ["owner"], platformAdmin: true, tenant: "path-merchant", tenantRule: "path id is the session's merchant" },
+      ],
       input: "id: strict",
       capability: null,
       entitlement: null,
@@ -250,6 +263,25 @@ describe("R1-T2 / R1-T3 — every route's reviewed policy holds against its hand
 
     it("accept a review that matches its route", () => {
       expect(problemsWith(theme, base)).toEqual([]);
+    });
+
+    it("accept the platform admin admitted through the ownership check, and refuse silence about it", () => {
+      // checkMerchantOwnership and checkAccountOwnership let the validated platform
+      // admin through for any business, so a review must say the admin is admitted.
+      expect(problemsWith(theme, base)).toEqual([]);
+      const silent: RouteReview = { ...base, branches: [{ ...base.branches[0], platformAdmin: undefined }] };
+      expect(problemsWith(theme, silent).join("\n")).toContain(
+        "calls an ownership check that admits the platform admin, but does not say the admin is admitted",
+      );
+    });
+
+    it("accept silence about the platform admin on a route that compares the role to refuse it", () => {
+      const clear = "POST /api/merchants/:id/clear-transactions";
+      const review: RouteReview = {
+        ...base,
+        branches: [{ principal: "merchant", roles: ["owner"], tenant: "path-merchant", tenantRule: "the owner's own business; the admin is refused" }],
+      };
+      expect(problemsWith(clear, review).join("\n")).not.toContain("platform admin");
     });
 
     it("refuse an unauthenticated principal for a signed-in route's branch without controls", () => {

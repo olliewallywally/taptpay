@@ -1,4 +1,4 @@
-# R1-T2 route inventory — generated 2026-09-26 @ `ba1b67420938280ffd620205358cfbb06b595a6e`
+# R1-T2 route inventory — generated 2026-09-26 @ `ae82a31c8fd87ab969b73237e9ea5b3b9933f4b3`
 
 Regenerate with `npx tsx scripts/generate-route-policy.ts`. This table is
 evidence for the SHA named above, not a timeless constant — see
@@ -14,7 +14,7 @@ necessarily a bug): **0**.
 
 ## Review
 
-56 of 223 routes reviewed (server/route-review.ts); 167 pending.
+76 of 223 routes reviewed (server/route-review.ts); 147 pending.
 A reviewed route's principal below is the review's; a pending one's is the heuristic, marked "(heuristic)".
 
 ### Open findings
@@ -67,16 +67,29 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 - **POST /api/merchants/verify:** Computes a bcrypt hash (cost 12) for any well-formed request before the token is looked up, with no limit: anyone can load the server's processor with it.
 - **POST /api/merchants/verify:** The sign-up confirmation token is stored as it was sent, not hashed (reset and invite tokens keep only a SHA-256), and never expires: anyone who can read the merchants table holds every waiting application's link. Here the link alone confirms nothing (the password chosen at sign-up is asked for), but POST /api/merchants/verify still accepts it with a new password.
 - **GET /api/merchants/:id/email-status:** Public and addressed by a guessable sequential number: anyone can count through the merchants and learn which numbers exist and which have confirmed their email. Its only caller is the old /business-details page, which takes the number from its own address (?id=) and which nothing links to any more (sign-up no longer hands out the number). Retire both, or require the session: put to the owner 2026-09-26.
+- **GET /.well-known/apple-developer-merchantid-domain-association:** Were the file ever missing, sendFile's error would reach the global handler, which passes a 4xx error's own message on: a 404 naming the server's absolute path (shown with express's sendFile and the same pass-through, 2026-09-26). The file is in the repository, so only a broken deploy shows it; the pass-through itself belongs to the logs and redaction phase.
+- **GET /api/merchants/:id:** Fixed 2026-09-26 (ae82a31c): it also gave the contact email, which sign-up and the admin's create set to the sign-in address (the settings screens cannot change it), and the account holder's name, so counting through the numbers listed every account's sign-in address and holder, against the owner's 2026-09-23 rule that no door says whether an address has an account. No customer page showed either.
+- **GET /api/merchants/:id:** Still public by a guessable sequential number, with no limit: counting lists every business, pending applications included, with its business name, address and contact phone (set from the sign-up phone), GST number and NZBN. The customer pages that ask (a board's page, checkout, split, result and receipt pages) each already hold a sale, so they could be given these details with it instead: put to the owner 2026-09-26.
+- **GET /api/merchants/:id/active-transaction:** A board's page gets 403 for a board that is not the business's or does not exist, and still gets a removed (inactive) board's open sale; the same board's stream answers 404 for all three. P2.2 asks for the tenant-safe 404 (R1-T3).
+- **GET /api/merchants/:id/active-transaction:** Each poll from a board's page logs the visitor's address: every 3 seconds for every open board page (the logs and redaction phase).
+- **GET /api/merchants/:id/events:** Nothing limits how many streams anyone holds open: each keeps a connection and a subscriber in this process's memory, so one script can hold thousands on any board's public stream (R1-T4 phase B's address limits, once TRUST_PROXY_HOPS is set).
+- **GET /api/tapt-stones/:id:** No screen or app calls it: searched 2026-09-26 across the tracked files (the iOS app loads the live site), only the local audit sweeps, tests and this inventory name it. Counting through board numbers lists every active board of every business with its business number: all that a board's public page and open sale need (GET /api/merchants/:id/active-transaction). Earlier passes kept it as public by design (R1-T6 2026-09-06, R1-T3 2026-09-13), but nothing uses it: retire it, put to the owner 2026-09-26.
+- **GET /api/nfc/capabilities:** Only pages mounted nowhere ask for it (merchant-terminal.tsx, merchant-terminal-mobile.tsx; the stale bundles under client/public/app too). Retire it with them (dead code, R8).
+- **GET /api/windcave/status:** No screen or app calls it: searched 2026-09-26 across the tracked files (the iOS app loads the live site), only the local audit sweeps, tests and this inventory name it. It tells anyone whether payments are on, which provider endpoint is used and the names of the settings behind them, and its message says 'UAT' on the live endpoint too. Retire it: put to the owner 2026-09-26.
+- **GET /api/payments/digital-wallet/config:** No screen or app calls it: searched 2026-09-26 across the tracked files (the iOS app loads the live site), only the local audit sweeps, tests and this inventory name it, and the wallet payment routes it describes answer 503 (retired). It guesses the device from the User-Agent, the fabricated capability R0-T5 removed from GET /api/nfc/capabilities. Retire it: put to the owner 2026-09-26.
+- **POST /api/info-pack-leads:** Answers with the lead's sequential number, which the page never reads: it tells anyone how many leads there have been. A 201 with no number would do.
+- **POST /api/board-builder/submit:** The page's own request never gets through. The PDF it makes is 7.1 MB, 9.5 MB as the JSON it sends (both layouts), and the server takes at most 100 KB of JSON, so every Send to Print is refused with 413 and the page shows 'Failed to generate PDF'. Measured 2026-09-26 in Chromium on the production build (scripts/measure-board-builder-submit-browser.mjs), and the 413 shown in the harness. The limit is express.json()'s default, unchanged since the builder shipped (5c6d2356, 2026-03-18): it has never worked.
+- **POST /api/board-builder/submit:** Public with no limit, while its only page needs sign-in: anyone can have the server email the print inbox any file under 100 KB, as any business, as often as they like. Put to the owner 2026-09-26: make Send to Print work for signed-in businesses (the business and board from the session, a larger limit on this route only, a send limit, a smaller PDF), or retire it.
 
 ## Routes
 
 | Method | Path | Line | Principal | Markers |
 |---|---|---:|---|---|
-| GET | `/robots.txt` | 431 | public (heuristic) | — |
-| GET | `/nfc/:merchantId/stone/:stoneId` | 450 | public (heuristic) | generatePaymentUrl( |
-| GET | `/nfc/:merchantId` | 464 | public (heuristic) | — |
-| GET | `/.well-known/apple-developer-merchantid-domain-association` | 471 | public (heuristic) | — |
-| GET | `/sitemap.xml` | 486 | admin (heuristic) | authenticateToken, checkMerchantOwnership, checkAccountOwnership, isAccountOwner, req.user?.role !== "admin", req.user.role === 'admin', authenticateAdmin |
+| GET | `/robots.txt` | 431 | public | — |
+| GET | `/nfc/:merchantId/stone/:stoneId` | 450 | public | generatePaymentUrl( |
+| GET | `/nfc/:merchantId` | 464 | public | — |
+| GET | `/.well-known/apple-developer-merchantid-domain-association` | 471 | public | — |
+| GET | `/sitemap.xml` | 486 | public | authenticateToken, checkMerchantOwnership, checkAccountOwnership, isAccountOwner, req.user?.role !== "admin", req.user.role === 'admin', authenticateAdmin |
 | GET | `/api/auth/google` | 569 | public | — |
 | GET | `/api/auth/google/callback` | 590 | public | — |
 | POST | `/api/auth/google/session` | 739 | public-bearer | — |
@@ -93,9 +106,9 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 | POST | `/api/tutorial/restart` | 1179 | merchant-user (heuristic) | authenticateToken, req.user?.role === "admin" |
 | POST | `/api/merchants/:id/onboarding` | 1200 | merchant-user (heuristic) | authenticateToken, checkAccountOwnership |
 | GET | `/api/admin/auth/me` | 1281 | admin (heuristic) | authenticateAdmin |
-| GET | `/api/merchants/:id/qr` | 1294 | public (heuristic) | — |
-| GET | `/api/merchants/:id/stone/:stoneId/qr` | 1301 | public (heuristic) | — |
-| GET | `/api/merchants/:id` | 1349 | public (heuristic) | publicMerchantBrandDto( |
+| GET | `/api/merchants/:id/qr` | 1294 | public | — |
+| GET | `/api/merchants/:id/stone/:stoneId/qr` | 1301 | public | — |
+| GET | `/api/merchants/:id` | 1349 | public | publicMerchantBrandDto( |
 | GET | `/api/merchants/:id/profile` | 1367 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership, isAccountOwner |
 | GET | `/api/pay/t/:token` | 1389 | public-bearer | resolvePaymentToken( |
 | GET | `/api/pay/t/:token/qr` | 1416 | public-bearer | resolvePaymentToken( |
@@ -108,7 +121,7 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 | POST | `/api/pay/t/:token/googlepay-complete` | 2012 | public-bearer | prepareTokenCompletion(, paymentAttempts.resolveReturnState( |
 | GET | `/api/pay/return/:state` | 2143 | public-bearer | paymentAttempts.resolveReturnState( |
 | ALL | `/api/pay/notification/:state` | 2177 | provider | — |
-| GET | `/api/merchants/:id/active-transaction` | 2194 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership, publicTransactionDto(, generatePaymentUrl( |
+| GET | `/api/merchants/:id/active-transaction` | 2194 | merchant / public | authenticateToken, checkMerchantOwnership, publicTransactionDto(, generatePaymentUrl( |
 | POST | `/api/transactions` | 2311 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
 | POST | `/api/transactions/cash-sale` | 2392 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
 | POST | `/api/transactions/tap-to-pay` | 2452 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
@@ -117,9 +130,9 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 | GET | `/api/split-payments/:id` | 2690 | public | isTokenAddressedTransaction( |
 | POST | `/api/transactions/:id/cancel` | 2709 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
 | POST | `/api/merchants/:merchantId/nfc-pay` | 2762 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| GET | `/api/nfc/capabilities` | 2852 | public (heuristic) | — |
+| GET | `/api/nfc/capabilities` | 2852 | public | — |
 | POST | `/api/transactions/:id/pay` | 2866 | public | isTokenAddressedTransaction( |
-| GET | `/api/windcave/env` | 3118 | public (heuristic) | — |
+| GET | `/api/windcave/env` | 3118 | public | — |
 | POST | `/api/transactions/:id/hosted-fields-complete` | 3132 | public | isTokenAddressedTransaction( |
 | POST | `/api/transactions/:id/googlepay-complete` | 3170 | public | isTokenAddressedTransaction( |
 | GET | `/api/transactions/:id` | 3243 | public | isTokenAddressedTransaction(, publicTransactionDto( |
@@ -149,11 +162,11 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 | POST | `/api/merchants/:id/tapt-stones` | 4063 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership, generatePaymentUrl( |
 | PUT | `/api/merchants/:merchantId/tapt-stones/:stoneId` | 4114 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
 | DELETE | `/api/merchants/:merchantId/tapt-stones/:stoneId` | 4149 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| GET | `/api/tapt-stones/:id` | 4183 | public (heuristic) | — |
+| GET | `/api/tapt-stones/:id` | 4183 | public | — |
 | GET | `/api/admin/subscription-revenue` | 4201 | admin (heuristic) | authenticateAdmin |
 | ALL | `/api/windcave/notification` | 4212 | provider | — |
 | GET | `/api/windcave/callback` | 4334 | public | isTokenAddressedTransaction( |
-| GET | `/api/windcave/status` | 4529 | public (heuristic) | — |
+| GET | `/api/windcave/status` | 4529 | public | — |
 | GET | `/api/admin/analytics` | 4542 | admin (heuristic) | authenticateAdmin |
 | GET | `/api/admin/revenue-over-time` | 4615 | admin (heuristic) | authenticateAdmin |
 | GET | `/api/admin/payment-method-breakdown` | 4651 | admin (heuristic) | authenticateAdmin |
@@ -173,13 +186,13 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 | GET | `/api/merchants/:id/email-status` | 5116 | public | — |
 | POST | `/api/auth/confirm-email` | 5139 | public-bearer | getMerchantByToken( |
 | POST | `/api/auth/resend-confirmation` | 5266 | public | — |
-| POST | `/api/info-pack-leads` | 5303 | public (heuristic) | — |
+| POST | `/api/info-pack-leads` | 5303 | public | — |
 | POST | `/api/merchants/signup` | 5356 | public | — |
 | PUT | `/api/merchants/:id/business-details` | 5458 | merchant-user (heuristic) | authenticateToken, checkAccountOwnership |
 | POST | `/api/admin/merchants/signup` | 5524 | admin (heuristic) | authenticateAdmin |
-| GET | `/api/merchants/:id/events` | 5587 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| GET | `/api/push/capabilities` | 5663 | public (heuristic) | — |
-| GET | `/api/push/vapid-key` | 5687 | public (heuristic) | — |
+| GET | `/api/merchants/:id/events` | 5587 | merchant / public | authenticateToken, checkMerchantOwnership |
+| GET | `/api/push/capabilities` | 5663 | public | — |
+| GET | `/api/push/vapid-key` | 5687 | public | — |
 | POST | `/api/push/subscribe` | 5697 | merchant-user (heuristic) | authenticateToken |
 | POST | `/api/push/unsubscribe` | 5734 | merchant-user (heuristic) | authenticateToken |
 | POST | `/api/push/native-subscribe` | 5761 | merchant-user (heuristic) | authenticateToken |
@@ -206,7 +219,7 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 | POST | `/api/payments/apple-pay/validate` | 6500 | merchant-user (heuristic) | authenticateToken |
 | POST | `/api/payments/apple-pay/process` | 6505 | merchant-user (heuristic) | authenticateToken |
 | POST | `/api/payments/google-pay/process` | 6510 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/payments/digital-wallet/config` | 6515 | public (heuristic) | — |
+| GET | `/api/payments/digital-wallet/config` | 6515 | public | — |
 | GET | `/api/subscription` | 6550 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
 | PUT | `/api/subscription/plan` | 6573 | merchant-user (heuristic) | authenticateToken |
 | POST | `/api/subscription/cancel` | 6636 | merchant-user (heuristic) | authenticateToken |
@@ -226,8 +239,8 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 | GET | `/api/billing/card/callback` | 7216 | public | billingCardCallback |
 | POST | `/api/billing/card/callback` | 7217 | public | billingCardCallback |
 | DELETE | `/api/billing/card` | 7220 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| POST | `/api/board-builder/submit` | 7240 | public (heuristic) | — |
-| GET | `/uploads/:folder/:name` | 7280 | public (heuristic) | getCheckoutInvoiceByToken( |
+| POST | `/api/board-builder/submit` | 7240 | public | — |
+| GET | `/uploads/:folder/:name` | 7280 | public | getCheckoutInvoiceByToken( |
 | GET | `/api/property/tenants` | 7496 | merchant-user (heuristic) | authenticateToken |
 | POST | `/api/property/tenants` | 7507 | merchant-user (heuristic) | authenticateToken |
 | GET | `/api/property/tenants/:id` | 7521 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
@@ -310,7 +323,16 @@ are classified by name). Facts, not judgments.
 
 - statuses: `200`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public. **Tenant (none):** none: one fixed text for every caller
+- **Input:** nothing
+- **Idempotency:** read-only
+- **Success:** text/plain crawler rules: the signed-in screens, /nfc, /admin and /api/ disallowed, and the sitemap's address
+- **Error disclosure:** fixed
+- **Authenticity:** none needed: the same fixed content for every caller
+- **Replay:** read-only
+- **Rate:** none — no limit; nothing is looked up
 
 ### GET `/nfc/:merchantId/stone/:stoneId`
 
@@ -318,26 +340,63 @@ Review pending.
 - statuses: `200`, `400`
 - helpers: `nfcRedirectHtml`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public. **Tenant (none):** none: nothing is read; the page only points to the board's customer page for the two numbers given (generatePaymentUrl), whether or not that board exists, and that page holds the board to its business
+- **Input:** merchantId, stoneId: strictPositiveIntegerParam (400 otherwise)
+- **Idempotency:** read-only
+- **Success:** a small HTML page, not stored by caches, that opens the board's page /pay/<business>/stone/<board>: Android in-app browsers through an intent:// address into Chrome, every other browser directly; the address starts with the configured public origin (the request's Host only in development)
+- **Error disclosure:** fixed
+- **Authenticity:** none needed: the page carries only the board page's address, built from the numbers in its own
+- **Replay:** read-only
+- **Rate:** none — no limit; nothing is read
 
 ### GET `/nfc/:merchantId`
 
 - params: `merchantId: strictPositiveIntegerParam`
 - statuses: `400`, `410`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public. **Tenant (none):** none: the business-wide no-board address was retired on 2026-09-25 (server/no-board-address.ts); every well-formed number gets the same 410 notice, and nothing is read
+- **Input:** merchantId: strictPositiveIntegerParam (400 otherwise)
+- **Idempotency:** read-only
+- **Success:** none: 410 with the 'Ask for your payment link' page (noBoardAddressRetiredHtml), not stored by caches
+- **Error disclosure:** fixed
+- **Authenticity:** none needed: the same notice for every number
+- **Replay:** read-only
+- **Rate:** none — no limit; nothing is read
 
 ### GET `/.well-known/apple-developer-merchantid-domain-association`
 
 - statuses: `200`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public. **Tenant (none):** none: Apple Pay's domain verification file, the same for every caller
+- **Input:** nothing
+- **Idempotency:** read-only
+- **Success:** the file client/public/.well-known/apple-developer-merchantid-domain-association, labelled application/json
+- **Error disclosure:** fixed
+- **Authenticity:** none needed: a verification file Apple fetches, the same for every caller
+- **Replay:** read-only
+- **Rate:** none — no limit; one file from disk
+- **Finding:** Were the file ever missing, sendFile's error would reach the global handler, which passes a 4xx error's own message on: a 404 naming the server's absolute path (shown with express's sendFile and the same pass-through, 2026-09-26). The file is in the repository, so only a broken deploy shows it; the pass-through itself belongs to the logs and redaction phase.
 
 ### GET `/sitemap.xml`
 
 - statuses: `200`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public. **Tenant (none):** none: a fixed list of the five public pages (the old line-slice classifier called it admin, from its neighbour's text)
+- **Input:** nothing
+- **Idempotency:** read-only
+- **Success:** application/xml sitemap of /, /signup, /login, /terms and /privacy on taptpay.com, dated today
+- **Error disclosure:** fixed
+- **Authenticity:** none needed: the same fixed content for every caller
+- **Replay:** read-only
+- **Rate:** none — no limit; nothing is looked up
 
 ### GET `/api/auth/google`
 
@@ -594,7 +653,16 @@ Review pending.
 - params: `id: strictPositiveIntegerParam`
 - statuses: `400`, `410`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public. **Tenant (none):** none: the business-wide no-board address was retired on 2026-09-25 (server/no-board-address.ts); every well-formed number gets the same 410 notice, and nothing is read
+- **Input:** id: strictPositiveIntegerParam (400 otherwise)
+- **Idempotency:** read-only
+- **Success:** none: 410 NO_BOARD_ADDRESS_RETIRED; a board's QR is GET /api/merchants/:id/stone/:stoneId/qr, a sale's comes with its own link
+- **Error disclosure:** fixed
+- **Authenticity:** none needed: the same notice for every number
+- **Replay:** read-only
+- **Rate:** none — no limit; nothing is read
 
 ### GET `/api/merchants/:id/stone/:stoneId/qr`
 
@@ -604,7 +672,16 @@ Review pending.
 - storageMethods: `getTaptStone`
 - statuses: `200`, `400`, `404`, `500`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public. **Tenant (board):** the board must exist and belong to the business in the path (getTaptStone; 404 otherwise, the same for both); a board's printed QR is public by design
+- **Input:** id, stoneId: strictPositiveIntegerParam; size: strictBoundedIntegerQueryParam (400 pixels when absent, at most 1000; a malformed size is refused with 400); download: only the exact text 'true' asks for an attachment
+- **Idempotency:** read-only
+- **Success:** a PNG QR code of the board's page address (/pay/<business>/stone/<board>), cached publicly for 30 days
+- **Error disclosure:** fixed
+- **Authenticity:** none: a board's printed QR is public by design; both numbers are sequential, so anyone can make any board's QR by counting
+- **Replay:** read-only
+- **Rate:** none — no limit
 
 ### GET `/api/merchants/:id`
 
@@ -613,7 +690,18 @@ Review pending.
 - statuses: `200`, `400`, `404`, `500`
 - dtos: `publicMerchantBrandDto`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public. **Tenant (number):** the business's sequential number selects it, any business in any state, pending applications included: anyone can read any business's public details by counting
+- **Input:** id: strictPositiveIntegerParam (400 otherwise)
+- **Idempotency:** read-only
+- **Success:** publicMerchantBrandDto: id, business name, business address, contact phone, GST number, NZBN, logo address and theme; since 2026-09-26 never the contact email or the account holder's name
+- **Error disclosure:** fixed
+- **Authenticity:** anyone with a business's number: numbers are sequential
+- **Replay:** read-only
+- **Rate:** none — no limit
+- **Finding:** Fixed 2026-09-26 (ae82a31c): it also gave the contact email, which sign-up and the admin's create set to the sign-in address (the settings screens cannot change it), and the account holder's name, so counting through the numbers listed every account's sign-in address and holder, against the owner's 2026-09-23 rule that no door says whether an address has an account. No customer page showed either.
+- **Finding:** Still public by a guessable sequential number, with no limit: counting lists every business, pending applications included, with its business name, address and contact phone (set from the sign-up phone), GST number and NZBN. The customer pages that ask (a board's page, checkout, split, result and receipt pages) each already hold a sale, so they could be given these details with it instead: put to the owner 2026-09-26.
 
 ### GET `/api/merchants/:id/profile`
 
@@ -895,7 +983,19 @@ Reviewed policy:
 - rateLimits: `checkRateLimit`
 - helpers: `checkRateLimit`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member, platform admin) — an Authorization header is sent. **Tenant (path-merchant):** checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business; its newest open sale on any board, or on the board asked for, including a sale with its own link
+- **Who:** public — no Authorization header, with a stoneId (without one: 410 NO_BOARD_ADDRESS_RETIRED). **Tenant (board):** a board's customer page: the board (stoneId) must belong to the business in the path, and only that board's open sale is shown, never a sale with its own link; a board that is not the business's, or does not exist, is 403
+- **Input:** id: strictPositiveIntegerParam; stoneId: strictPositiveIntegerQueryParam when present (400 otherwise)
+- **Idempotency:** read-only
+- **Success:** the open sale or null, not cached: to the business, ownerTransactionDto; to the board's page, publicTransactionDto; each with the board's page and QR addresses for a board sale
+- **Error disclosure:** fixed
+- **Authenticity:** none: a board's page is public by design (owner 2026-09-25: with a board, its own page and stream are unchanged); the business and board numbers are both sequential, so anyone can follow any board's open sale, its item and price, by counting
+- **Replay:** read-only
+- **Rate:** the board's page: checkRateLimit (100 a minute per visitor address, counted in this server process only; until TRUST_PROXY_HOPS is set every visitor shares one address — R1-T4 phase B), which each open board page spends every 3 seconds and sign-up and numbered pay share; the signed-in branch: none
+- **Finding:** A board's page gets 403 for a board that is not the business's or does not exist, and still gets a removed (inactive) board's open sale; the same board's stream answers 404 for all three. P2.2 asks for the tenant-safe 404 (R1-T3).
+- **Finding:** Each poll from a board's page logs the visitor's address: every 3 seconds for every open board page (the logs and redaction phase).
 
 ### POST `/api/transactions`
 
@@ -1034,7 +1134,18 @@ Review pending.
 - statuses: `200`
 - capabilityGates: `config.features.tapToPay`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public. **Tenant (none):** none: the platform's own settings
+- **Input:** nothing (the User-Agent is no longer read: R0-T5)
+- **Capability gate:** reports config.features.tapToPay (Tap to Pay's switch) and nothing else; the wallets always report false, their routes being retired
+- **Idempotency:** read-only
+- **Success:** { nfcSupported, applePay, googlePay, samsungPay, contactlessCard, webNFC, recommendations }
+- **Error disclosure:** fixed
+- **Authenticity:** none needed: the platform's own settings, none of them secret
+- **Replay:** read-only
+- **Rate:** none — no limit; nothing is looked up
+- **Finding:** Only pages mounted nowhere ask for it (merchant-terminal.tsx, merchant-terminal-mobile.tsx; the stale bundles under client/public/app too). Retire it with them (dead code, R8).
 
 ### POST `/api/transactions/:id/pay`
 
@@ -1067,7 +1178,16 @@ Reviewed policy:
 
 - statuses: `200`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public. **Tenant (none):** none: the platform's own payment settings
+- **Input:** nothing
+- **Idempotency:** read-only
+- **Success:** { env, applePayMerchantId, googlePayMerchantId, googlePayEnv }: what the checkout page's card fields and wallet buttons need, all of which reaches the browser anyway
+- **Error disclosure:** fixed
+- **Authenticity:** none needed: the platform's own settings, none of them secret
+- **Replay:** read-only
+- **Rate:** none — no limit; nothing is looked up
 
 ### POST `/api/transactions/:id/hosted-fields-complete`
 
@@ -1462,7 +1582,17 @@ Review pending.
 - storageMethods: `getTaptStone`
 - statuses: `200`, `400`, `404`, `500`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public. **Tenant (number):** the board's sequential number selects it, for any business; a removed (inactive) board is 404
+- **Input:** id: strictPositiveIntegerParam (400 otherwise)
+- **Idempotency:** read-only
+- **Success:** the whole board row, not a projection: id, business number, name, board number, stored page and QR addresses, whether active, and when made and changed
+- **Error disclosure:** fixed
+- **Authenticity:** anyone with a board's number: numbers are sequential
+- **Replay:** read-only
+- **Rate:** none — no limit
+- **Finding:** No screen or app calls it: searched 2026-09-26 across the tracked files (the iOS app loads the live site), only the local audit sweeps, tests and this inventory name it. Counting through board numbers lists every active board of every business with its business number: all that a board's public page and open sale need (GET /api/merchants/:id/active-transaction). Earlier passes kept it as public by design (R1-T6 2026-09-06, R1-T3 2026-09-13), but nothing uses it: retire it, put to the owner 2026-09-26.
 
 ### GET `/api/admin/subscription-revenue`
 
@@ -1531,7 +1661,18 @@ Reviewed policy:
 - statuses: `200`
 - capabilityGates: `isWindcaveConfigured`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public. **Tenant (none):** none: the platform's own settings
+- **Input:** nothing
+- **Capability gate:** reports isWindcaveConfigured()
+- **Idempotency:** read-only
+- **Success:** { configured, mode, message, endpoint }: whether the provider is set up, a message naming the settings that switch payments on (it says 'UAT' whatever the endpoint), and the provider endpoint's address
+- **Error disclosure:** fixed
+- **Authenticity:** none needed: the platform's own settings, none of them secret
+- **Replay:** read-only
+- **Rate:** none — no limit; nothing is looked up
+- **Finding:** No screen or app calls it: searched 2026-09-26 across the tracked files (the iOS app loads the live site), only the local audit sweeps, tests and this inventory name it. It tells anyone whether payments are on, which provider endpoint is used and the names of the settings behind them, and its message says 'UAT' on the live endpoint too. Retire it: put to the owner 2026-09-26.
 
 ### GET `/api/admin/analytics`
 
@@ -1797,7 +1938,18 @@ Reviewed policy:
 - rateLimits: `checkResendRateLimit`, `resendRateLimitMap.get`, `resendRateLimitMap.set`
 - helpers: `checkResendRateLimit`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public. **Tenant (none):** none: a new sales lead for the platform itself (a name and an address), tied to no business
+- **Input:** body: createInfoPackLeadSchema (a name of 1 to 100 characters and an email address; 400 with the first issue and the issues)
+- **Idempotency:** none: every request stores another lead and notifies again
+- **Side effects:** emails the lead's name and address to the platform admin's address (sendEmail, not waited for)
+- **Success:** 201 { id }: the new lead's sequential number
+- **Error disclosure:** input-issues
+- **Authenticity:** none needed: a lead is only what someone typed, and only the platform's own inbox is emailed
+- **Replay:** each replay stores another lead and emails the admin again, within the limit
+- **Rate:** checkResendRateLimit: 5 per 10 minutes per visitor address, counted in this server process only; until TRUST_PROXY_HOPS is set every visitor may share one address, so a sixth request in ten minutes from anyone refuses everyone (R1-T4 phase B)
+- **Finding:** Answers with the lead's sequential number, which the page never reads: it tells anyone how many leads there have been. A 201 with no number would do.
 
 ### POST `/api/merchants/signup`
 
@@ -1856,19 +2008,49 @@ Review pending.
 - sideEffects: `live update: sseBroker.subscribe`
 - statuses: `200`, `400`, `401`, `403`, `404`, `410`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member, platform admin) — an Authorization header is sent. **Tenant (path-merchant):** checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business, labelled admin on its stream; every live event of the business
+- **Who:** public — no Authorization header, with a stoneId (without one: 410 NO_BOARD_ADDRESS_RETIRED). **Tenant (board):** a board's customer page: the board (stoneId) must belong to the business in the path, and only that board's open sale is shown, never a sale with its own link; the board must also be active, and anything else is 404 (sse-broker.ts sends a board's stream only its own board's events)
+- **Input:** id: strictPositiveIntegerParam; stoneId: strictPositiveIntegerQueryParam (400 otherwise); a token in the query is refused (400: credentials go in the Authorization header)
+- **Idempotency:** each request opens another stream; closing it unsubscribes
+- **Side effects:** subscribes the connection to the business's live updates (sseBroker.subscribe): the business's own view (its sales and refunds) or the board's (publicTransactionDto of that board's sales)
+- **Success:** text/event-stream, not cached: a 'connected' event, then the audience's events
+- **Error disclosure:** fixed
+- **Authenticity:** none: a board's page is public by design (owner 2026-09-25: with a board, its own page and stream are unchanged); the business and board numbers are both sequential, so anyone can follow any board's open sale, its item and price, by counting
+- **Replay:** each replay opens another stream
+- **Rate:** none — no limit on requests, nor on the streams one visitor holds open
+- **Finding:** Nothing limits how many streams anyone holds open: each keeps a connection and a subscriber in this process's memory, so one script can hold thousands on any board's public stream (R1-T4 phase B's address limits, once TRUST_PROXY_HOPS is set).
 
 ### GET `/api/push/capabilities`
 
 - statuses: `200`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public. **Tenant (none):** none: the platform's own settings
+- **Input:** nothing
+- **Idempotency:** read-only
+- **Success:** { webPush: { available, reason }, nativePush: { available, reason, bundleId } }: whether each way of sending notifications is set up, and the iOS app's bundle id (public in the App Store)
+- **Error disclosure:** fixed
+- **Authenticity:** none needed: the platform's own settings, none of them secret
+- **Replay:** read-only
+- **Rate:** none — no limit; nothing is looked up
 
 ### GET `/api/push/vapid-key`
 
 - statuses: `200`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public. **Tenant (none):** none: the platform's own settings
+- **Input:** nothing
+- **Idempotency:** read-only
+- **Success:** { publicKey }: the web-push public key a browser needs to subscribe, public by design; 503 while web push is not set up
+- **Error disclosure:** fixed
+- **Authenticity:** none needed: the platform's own settings, none of them secret
+- **Replay:** read-only
+- **Rate:** none — no limit; nothing is looked up
 
 ### POST `/api/push/subscribe`
 
@@ -2157,10 +2339,21 @@ Review pending.
 
 ### GET `/api/payments/digital-wallet/config`
 
-- sideEffects: `provider: windcaveService.isConfigured`
 - statuses: `200`, `500`
+- capabilityGates: `windcaveService.isConfigured`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public. **Tenant (none):** none: the platform's own settings
+- **Input:** the User-Agent, only to guess the device for the two 'supported' flags (not validated)
+- **Capability gate:** reports windcaveService.isConfigured() as environment 'production' or 'test'
+- **Idempotency:** read-only
+- **Success:** { applePaySupported, googlePaySupported, paymentRequestSupported (always false: it is read on the server), environment, merchantId (Apple Pay's), merchantName, supportedNetworks, countryCode, currencyCode, googlePayGateway: { gateway, gatewayMerchantId: the platform's provider account id } }
+- **Error disclosure:** fixed
+- **Authenticity:** none needed: the platform's own settings, none of them secret
+- **Replay:** read-only
+- **Rate:** none — no limit; nothing is looked up
+- **Finding:** No screen or app calls it: searched 2026-09-26 across the tracked files (the iOS app loads the live site), only the local audit sweeps, tests and this inventory name it, and the wallet payment routes it describes answer 503 (retired). It guesses the device from the User-Agent, the fabricated capability R0-T5 removed from GET /api/nfc/capabilities. Retire it: put to the owner 2026-09-26.
 
 ### GET `/api/subscription`
 
@@ -2404,7 +2597,19 @@ Review pending.
 - sideEffects: `email: sendBoardBuilderEmail`
 - statuses: `200`, `400`, `500`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public. **Tenant (none):** none: the business, board and sender are whatever the body says; nothing is looked up or held to an account, though the only page that sends it needs sign-in
+- **Input:** body read without a schema: pdf, submitterName and submitterEmail must be present (400 otherwise); businessName, stoneId and layout are free text with defaults; nothing checks that pdf is a PDF. The JSON parser's 100 KB limit applies first (413)
+- **Idempotency:** none: every request sends another email
+- **Side effects:** emails the PDF as an attachment, with the names given, to the fixed print inbox (sendBoardBuilderEmail: Resend, else SMTP)
+- **Success:** { message: 'Board submitted successfully' }
+- **Error disclosure:** fixed
+- **Authenticity:** none: anyone can send, under any business's name
+- **Replay:** every replay sends another email with its attachment
+- **Rate:** none — no limit
+- **Finding:** The page's own request never gets through. The PDF it makes is 7.1 MB, 9.5 MB as the JSON it sends (both layouts), and the server takes at most 100 KB of JSON, so every Send to Print is refused with 413 and the page shows 'Failed to generate PDF'. Measured 2026-09-26 in Chromium on the production build (scripts/measure-board-builder-submit-browser.mjs), and the 413 shown in the harness. The limit is express.json()'s default, unchanged since the builder shipped (5c6d2356, 2026-03-18): it has never worked.
+- **Finding:** Public with no limit, while its only page needs sign-in: anyone can have the server email the print inbox any file under 100 KB, as any business, as often as they like. Put to the owner 2026-09-26: make Send to Print work for signed-in businesses (the business and board from the session, a larger limit on this route only, a send limit, a smaller PDF), or retire it.
 
 ### GET `/uploads/:folder/:name`
 
@@ -2413,7 +2618,17 @@ Review pending.
 - sideEffects: `file system: fs.existsSync`
 - statuses: `200`, `400`, `404`, `500`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public. **Tenant (none):** none by design: only the logos folder is public (PUBLIC_UPLOAD_FOLDERS, server/upload-policy.ts), checked before the database or the disk; any other folder, invoice documents in particular, is 404 like a missing file (gap 13, Option C, owner 2026-09-14)
+- **Input:** folder: must be in PUBLIC_UPLOAD_FOLDERS (404 otherwise); name: refused if it contains '..' (400), then looked up as <folder>/<name>; both are read raw, as an allowlist key and a lookup key
+- **Idempotency:** read-only
+- **Side effects:** a legacy logo the database lacks is read from the uploads folder on disk (fs.existsSync, then sendFile)
+- **Success:** the logo's bytes with its stored type and nosniff (a database copy is cached publicly for 5 minutes)
+- **Error disclosure:** fixed
+- **Authenticity:** none: logos are shown to customers on the payment pages, so anyone with a logo's address may fetch it
+- **Replay:** read-only
+- **Rate:** none — no limit
 
 ### GET `/api/property/tenants`
 

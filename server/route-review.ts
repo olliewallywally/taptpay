@@ -154,6 +154,33 @@ const ONE_TIME_TOKEN_RATE =
 const CONFIRMATION_TOKEN_FINDING =
   "The sign-up confirmation token is stored as it was sent, not hashed (reset and invite tokens keep only a SHA-256), and never expires: anyone who can read the merchants table holds every waiting application's link. Here the link alone confirms nothing (the password chosen at sign-up is asked for), but POST /api/merchants/verify still accepts it with a new password.";
 
+// ── Public pages, configuration and boards ──
+const FIXED_CONTENT_CONTROLS: UnauthenticatedControls = {
+  authenticity: "none needed: the same fixed content for every caller",
+  replay: "read-only",
+  rate: "none — no limit; nothing is looked up",
+};
+const CONFIGURATION_CONTROLS: UnauthenticatedControls = {
+  authenticity: "none needed: the platform's own settings, none of them secret",
+  replay: "read-only",
+  rate: "none — no limit; nothing is looked up",
+};
+const RETIRED_NO_BOARD_RULE =
+  "none: the business-wide no-board address was retired on 2026-09-25 (server/no-board-address.ts); every well-formed number gets the same 410 notice, and nothing is read";
+const RETIRED_NO_BOARD_CONTROLS: UnauthenticatedControls = {
+  authenticity: "none needed: the same notice for every number",
+  replay: "read-only",
+  rate: "none — no limit; nothing is read",
+};
+const BOARD_PAGE_AUTHENTICITY =
+  "none: a board's page is public by design (owner 2026-09-25: with a board, its own page and stream are unchanged); the business and board numbers are both sequential, so anyone can follow any board's open sale, its item and price, by counting";
+const BOARD_PAGE_RULE =
+  "a board's customer page: the board (stoneId) must belong to the business in the path, and only that board's open sale is shown, never a sale with its own link";
+const SIGNED_IN_BUSINESS_RULE =
+  "checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business";
+const NO_CALLER_CHECKED =
+  "No screen or app calls it: searched 2026-09-26 across the tracked files (the iOS app loads the live site), only the local audit sweeps, tests and this inventory name it";
+
 function tokenRate(family: string, perMinute: number): string {
   return (
     `requirePaymentTokenRateLimit (the ${family} family: ${perMinute} a minute per visitor address, counted in ` +
@@ -1427,20 +1454,435 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       "Public and addressed by a guessable sequential number: anyone can count through the merchants and learn which numbers exist and which have confirmed their email. Its only caller is the old /business-details page, which takes the number from its own address (?id=) and which nothing links to any more (sign-up no longer hands out the number). Retire both, or require the session: put to the owner 2026-09-26.",
     ],
   },
+
+  // ── Batch 3c (2026-09-26): public pages, configuration and boards ──
+  "GET /robots.txt": {
+    branches: [{ principal: "public", tenant: "none", tenantRule: "none: one fixed text for every caller" }],
+    input: "nothing",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto:
+      "text/plain crawler rules: the signed-in screens, /nfc, /admin and /api/ disallowed, and the sitemap's address",
+    errorDisclosure: ["fixed"],
+    controls: FIXED_CONTENT_CONTROLS,
+  },
+
+  "GET /sitemap.xml": {
+    branches: [
+      {
+        principal: "public",
+        tenant: "none",
+        tenantRule:
+          "none: a fixed list of the five public pages (the old line-slice classifier called it admin, from its neighbour's text)",
+      },
+    ],
+    input: "nothing",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto: "application/xml sitemap of /, /signup, /login, /terms and /privacy on taptpay.com, dated today",
+    errorDisclosure: ["fixed"],
+    controls: FIXED_CONTENT_CONTROLS,
+  },
+
+  "GET /.well-known/apple-developer-merchantid-domain-association": {
+    branches: [
+      { principal: "public", tenant: "none", tenantRule: "none: Apple Pay's domain verification file, the same for every caller" },
+    ],
+    input: "nothing",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto: "the file client/public/.well-known/apple-developer-merchantid-domain-association, labelled application/json",
+    errorDisclosure: ["fixed"],
+    controls: {
+      authenticity: "none needed: a verification file Apple fetches, the same for every caller",
+      replay: "read-only",
+      rate: "none — no limit; one file from disk",
+    },
+    findings: [
+      "Were the file ever missing, sendFile's error would reach the global handler, which passes a 4xx error's own message on: a 404 naming the server's absolute path (shown with express's sendFile and the same pass-through, 2026-09-26). The file is in the repository, so only a broken deploy shows it; the pass-through itself belongs to the logs and redaction phase.",
+    ],
+  },
+
+  "GET /nfc/:merchantId/stone/:stoneId": {
+    branches: [
+      {
+        principal: "public",
+        tenant: "none",
+        tenantRule:
+          "none: nothing is read; the page only points to the board's customer page for the two numbers given (generatePaymentUrl), whether or not that board exists, and that page holds the board to its business",
+      },
+    ],
+    input: "merchantId, stoneId: strictPositiveIntegerParam (400 otherwise)",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto:
+      "a small HTML page, not stored by caches, that opens the board's page /pay/<business>/stone/<board>: Android in-app browsers through an intent:// address into Chrome, every other browser directly; the address starts with the configured public origin (the request's Host only in development)",
+    errorDisclosure: ["fixed"],
+    controls: {
+      authenticity: "none needed: the page carries only the board page's address, built from the numbers in its own",
+      replay: "read-only",
+      rate: "none — no limit; nothing is read",
+    },
+  },
+
+  "GET /nfc/:merchantId": {
+    branches: [{ principal: "public", tenant: "none", tenantRule: RETIRED_NO_BOARD_RULE }],
+    input: "merchantId: strictPositiveIntegerParam (400 otherwise)",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto: "none: 410 with the 'Ask for your payment link' page (noBoardAddressRetiredHtml), not stored by caches",
+    errorDisclosure: ["fixed"],
+    controls: RETIRED_NO_BOARD_CONTROLS,
+  },
+
+  "GET /api/merchants/:id/qr": {
+    branches: [{ principal: "public", tenant: "none", tenantRule: RETIRED_NO_BOARD_RULE }],
+    input: "id: strictPositiveIntegerParam (400 otherwise)",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto:
+      "none: 410 NO_BOARD_ADDRESS_RETIRED; a board's QR is GET /api/merchants/:id/stone/:stoneId/qr, a sale's comes with its own link",
+    errorDisclosure: ["fixed"],
+    controls: RETIRED_NO_BOARD_CONTROLS,
+  },
+
+  "GET /api/merchants/:id/stone/:stoneId/qr": {
+    branches: [
+      {
+        principal: "public",
+        tenant: "board",
+        tenantRule:
+          "the board must exist and belong to the business in the path (getTaptStone; 404 otherwise, the same for both); a board's printed QR is public by design",
+      },
+    ],
+    input:
+      "id, stoneId: strictPositiveIntegerParam; size: strictBoundedIntegerQueryParam (400 pixels when absent, at most 1000; a malformed size is refused with 400); download: only the exact text 'true' asks for an attachment",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto: "a PNG QR code of the board's page address (/pay/<business>/stone/<board>), cached publicly for 30 days",
+    errorDisclosure: ["fixed"],
+    controls: {
+      authenticity:
+        "none: a board's printed QR is public by design; both numbers are sequential, so anyone can make any board's QR by counting",
+      replay: "read-only",
+      rate: "none — no limit",
+    },
+  },
+
+  "GET /api/merchants/:id": {
+    branches: [
+      {
+        principal: "public",
+        tenant: "number",
+        tenantRule:
+          "the business's sequential number selects it, any business in any state, pending applications included: anyone can read any business's public details by counting",
+      },
+    ],
+    input: "id: strictPositiveIntegerParam (400 otherwise)",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto:
+      "publicMerchantBrandDto: id, business name, business address, contact phone, GST number, NZBN, logo address and theme; since 2026-09-26 never the contact email or the account holder's name",
+    errorDisclosure: ["fixed"],
+    controls: {
+      authenticity: "anyone with a business's number: numbers are sequential",
+      replay: "read-only",
+      rate: "none — no limit",
+    },
+    findings: [
+      "Fixed 2026-09-26 (ae82a31c): it also gave the contact email, which sign-up and the admin's create set to the sign-in address (the settings screens cannot change it), and the account holder's name, so counting through the numbers listed every account's sign-in address and holder, against the owner's 2026-09-23 rule that no door says whether an address has an account. No customer page showed either.",
+      "Still public by a guessable sequential number, with no limit: counting lists every business, pending applications included, with its business name, address and contact phone (set from the sign-up phone), GST number and NZBN. The customer pages that ask (a board's page, checkout, split, result and receipt pages) each already hold a sale, so they could be given these details with it instead: put to the owner 2026-09-26.",
+    ],
+  },
+
+  "GET /api/merchants/:id/active-transaction": {
+    branches: [
+      {
+        principal: "merchant",
+        when: "an Authorization header is sent",
+        roles: ["owner", "member"],
+        platformAdmin: true,
+        tenant: "path-merchant",
+        tenantRule: `${SIGNED_IN_BUSINESS_RULE}; its newest open sale on any board, or on the board asked for, including a sale with its own link`,
+      },
+      {
+        principal: "public",
+        when: "no Authorization header, with a stoneId (without one: 410 NO_BOARD_ADDRESS_RETIRED)",
+        tenant: "board",
+        tenantRule: `${BOARD_PAGE_RULE}; a board that is not the business's, or does not exist, is 403`,
+      },
+    ],
+    input: "id: strictPositiveIntegerParam; stoneId: strictPositiveIntegerQueryParam when present (400 otherwise)",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto:
+      "the open sale or null, not cached: to the business, ownerTransactionDto; to the board's page, publicTransactionDto; each with the board's page and QR addresses for a board sale",
+    errorDisclosure: ["fixed"],
+    controls: {
+      authenticity: BOARD_PAGE_AUTHENTICITY,
+      replay: "read-only",
+      rate: `the board's page: ${CHECK_RATE_LIMIT}, which each open board page spends every 3 seconds and sign-up and numbered pay share; the signed-in branch: none`,
+    },
+    findings: [
+      "A board's page gets 403 for a board that is not the business's or does not exist, and still gets a removed (inactive) board's open sale; the same board's stream answers 404 for all three. P2.2 asks for the tenant-safe 404 (R1-T3).",
+      "Each poll from a board's page logs the visitor's address: every 3 seconds for every open board page (the logs and redaction phase).",
+    ],
+  },
+
+  "GET /api/merchants/:id/events": {
+    branches: [
+      {
+        principal: "merchant",
+        when: "an Authorization header is sent",
+        roles: ["owner", "member"],
+        platformAdmin: true,
+        tenant: "path-merchant",
+        tenantRule: `${SIGNED_IN_BUSINESS_RULE}, labelled admin on its stream; every live event of the business`,
+      },
+      {
+        principal: "public",
+        when: "no Authorization header, with a stoneId (without one: 410 NO_BOARD_ADDRESS_RETIRED)",
+        tenant: "board",
+        tenantRule: `${BOARD_PAGE_RULE}; the board must also be active, and anything else is 404 (sse-broker.ts sends a board's stream only its own board's events)`,
+      },
+    ],
+    input:
+      "id: strictPositiveIntegerParam; stoneId: strictPositiveIntegerQueryParam (400 otherwise); a token in the query is refused (400: credentials go in the Authorization header)",
+    capability: null,
+    entitlement: null,
+    idempotency: "each request opens another stream; closing it unsubscribes",
+    sideEffects:
+      "subscribes the connection to the business's live updates (sseBroker.subscribe): the business's own view (its sales and refunds) or the board's (publicTransactionDto of that board's sales)",
+    successDto: "text/event-stream, not cached: a 'connected' event, then the audience's events",
+    errorDisclosure: ["fixed"],
+    controls: {
+      authenticity: BOARD_PAGE_AUTHENTICITY,
+      replay: "each replay opens another stream",
+      rate: "none — no limit on requests, nor on the streams one visitor holds open",
+    },
+    findings: [
+      "Nothing limits how many streams anyone holds open: each keeps a connection and a subscriber in this process's memory, so one script can hold thousands on any board's public stream (R1-T4 phase B's address limits, once TRUST_PROXY_HOPS is set).",
+    ],
+  },
+
+  "GET /api/tapt-stones/:id": {
+    branches: [
+      {
+        principal: "public",
+        tenant: "number",
+        tenantRule: "the board's sequential number selects it, for any business; a removed (inactive) board is 404",
+      },
+    ],
+    input: "id: strictPositiveIntegerParam (400 otherwise)",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto:
+      "the whole board row, not a projection: id, business number, name, board number, stored page and QR addresses, whether active, and when made and changed",
+    errorDisclosure: ["fixed"],
+    controls: {
+      authenticity: "anyone with a board's number: numbers are sequential",
+      replay: "read-only",
+      rate: "none — no limit",
+    },
+    findings: [
+      `${NO_CALLER_CHECKED}. Counting through board numbers lists every active board of every business with its business number: all that a board's public page and open sale need (GET /api/merchants/:id/active-transaction). Earlier passes kept it as public by design (R1-T6 2026-09-06, R1-T3 2026-09-13), but nothing uses it: retire it, put to the owner 2026-09-26.`,
+    ],
+  },
+
+  "GET /api/nfc/capabilities": {
+    branches: [{ principal: "public", tenant: "none", tenantRule: "none: the platform's own settings" }],
+    input: "nothing (the User-Agent is no longer read: R0-T5)",
+    capability:
+      "reports config.features.tapToPay (Tap to Pay's switch) and nothing else; the wallets always report false, their routes being retired",
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto: "{ nfcSupported, applePay, googlePay, samsungPay, contactlessCard, webNFC, recommendations }",
+    errorDisclosure: ["fixed"],
+    controls: CONFIGURATION_CONTROLS,
+    findings: [
+      "Only pages mounted nowhere ask for it (merchant-terminal.tsx, merchant-terminal-mobile.tsx; the stale bundles under client/public/app too). Retire it with them (dead code, R8).",
+    ],
+  },
+
+  "GET /api/windcave/env": {
+    branches: [{ principal: "public", tenant: "none", tenantRule: "none: the platform's own payment settings" }],
+    input: "nothing",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto:
+      "{ env, applePayMerchantId, googlePayMerchantId, googlePayEnv }: what the checkout page's card fields and wallet buttons need, all of which reaches the browser anyway",
+    errorDisclosure: ["fixed"],
+    controls: CONFIGURATION_CONTROLS,
+  },
+
+  "GET /api/windcave/status": {
+    branches: [{ principal: "public", tenant: "none", tenantRule: "none: the platform's own settings" }],
+    input: "nothing",
+    capability: "reports isWindcaveConfigured()",
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto:
+      "{ configured, mode, message, endpoint }: whether the provider is set up, a message naming the settings that switch payments on (it says 'UAT' whatever the endpoint), and the provider endpoint's address",
+    errorDisclosure: ["fixed"],
+    controls: CONFIGURATION_CONTROLS,
+    findings: [
+      `${NO_CALLER_CHECKED}. It tells anyone whether payments are on, which provider endpoint is used and the names of the settings behind them, and its message says 'UAT' on the live endpoint too. Retire it: put to the owner 2026-09-26.`,
+    ],
+  },
+
+  "GET /api/payments/digital-wallet/config": {
+    branches: [{ principal: "public", tenant: "none", tenantRule: "none: the platform's own settings" }],
+    input: "the User-Agent, only to guess the device for the two 'supported' flags (not validated)",
+    capability: "reports windcaveService.isConfigured() as environment 'production' or 'test'",
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto:
+      "{ applePaySupported, googlePaySupported, paymentRequestSupported (always false: it is read on the server), environment, merchantId (Apple Pay's), merchantName, supportedNetworks, countryCode, currencyCode, googlePayGateway: { gateway, gatewayMerchantId: the platform's provider account id } }",
+    errorDisclosure: ["fixed"],
+    controls: CONFIGURATION_CONTROLS,
+    findings: [
+      `${NO_CALLER_CHECKED}, and the wallet payment routes it describes answer 503 (retired). It guesses the device from the User-Agent, the fabricated capability R0-T5 removed from GET /api/nfc/capabilities. Retire it: put to the owner 2026-09-26.`,
+    ],
+  },
+
+  "GET /api/push/capabilities": {
+    branches: [{ principal: "public", tenant: "none", tenantRule: "none: the platform's own settings" }],
+    input: "nothing",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto:
+      "{ webPush: { available, reason }, nativePush: { available, reason, bundleId } }: whether each way of sending notifications is set up, and the iOS app's bundle id (public in the App Store)",
+    errorDisclosure: ["fixed"],
+    controls: CONFIGURATION_CONTROLS,
+  },
+
+  "GET /api/push/vapid-key": {
+    branches: [{ principal: "public", tenant: "none", tenantRule: "none: the platform's own settings" }],
+    input: "nothing",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto:
+      "{ publicKey }: the web-push public key a browser needs to subscribe, public by design; 503 while web push is not set up",
+    errorDisclosure: ["fixed"],
+    controls: CONFIGURATION_CONTROLS,
+  },
+
+  "GET /uploads/:folder/:name": {
+    branches: [
+      {
+        principal: "public",
+        tenant: "none",
+        tenantRule:
+          "none by design: only the logos folder is public (PUBLIC_UPLOAD_FOLDERS, server/upload-policy.ts), checked before the database or the disk; any other folder, invoice documents in particular, is 404 like a missing file (gap 13, Option C, owner 2026-09-14)",
+      },
+    ],
+    input:
+      "folder: must be in PUBLIC_UPLOAD_FOLDERS (404 otherwise); name: refused if it contains '..' (400), then looked up as <folder>/<name>; both are read raw, as an allowlist key and a lookup key",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: "a legacy logo the database lacks is read from the uploads folder on disk (fs.existsSync, then sendFile)",
+    successDto: "the logo's bytes with its stored type and nosniff (a database copy is cached publicly for 5 minutes)",
+    errorDisclosure: ["fixed"],
+    controls: {
+      authenticity: "none: logos are shown to customers on the payment pages, so anyone with a logo's address may fetch it",
+      replay: "read-only",
+      rate: "none — no limit",
+    },
+  },
+
+  "POST /api/info-pack-leads": {
+    branches: [
+      {
+        principal: "public",
+        tenant: "none",
+        tenantRule: "none: a new sales lead for the platform itself (a name and an address), tied to no business",
+      },
+    ],
+    input: "body: createInfoPackLeadSchema (a name of 1 to 100 characters and an email address; 400 with the first issue and the issues)",
+    capability: null,
+    entitlement: null,
+    idempotency: "none: every request stores another lead and notifies again",
+    sideEffects: "emails the lead's name and address to the platform admin's address (sendEmail, not waited for)",
+    successDto: "201 { id }: the new lead's sequential number",
+    errorDisclosure: ["input-issues"],
+    controls: {
+      authenticity: "none needed: a lead is only what someone typed, and only the platform's own inbox is emailed",
+      replay: "each replay stores another lead and emails the admin again, within the limit",
+      rate:
+        "checkResendRateLimit: 5 per 10 minutes per visitor address, counted in this server process only; until TRUST_PROXY_HOPS is set every visitor may share one address, so a sixth request in ten minutes from anyone refuses everyone (R1-T4 phase B)",
+    },
+    findings: [
+      "Answers with the lead's sequential number, which the page never reads: it tells anyone how many leads there have been. A 201 with no number would do.",
+    ],
+  },
+
+  "POST /api/board-builder/submit": {
+    branches: [
+      {
+        principal: "public",
+        tenant: "none",
+        tenantRule:
+          "none: the business, board and sender are whatever the body says; nothing is looked up or held to an account, though the only page that sends it needs sign-in",
+      },
+    ],
+    input:
+      "body read without a schema: pdf, submitterName and submitterEmail must be present (400 otherwise); businessName, stoneId and layout are free text with defaults; nothing checks that pdf is a PDF. The JSON parser's 100 KB limit applies first (413)",
+    capability: null,
+    entitlement: null,
+    idempotency: "none: every request sends another email",
+    sideEffects:
+      "emails the PDF as an attachment, with the names given, to the fixed print inbox (sendBoardBuilderEmail: Resend, else SMTP)",
+    successDto: "{ message: 'Board submitted successfully' }",
+    errorDisclosure: ["fixed"],
+    controls: {
+      authenticity: "none: anyone can send, under any business's name",
+      replay: "every replay sends another email with its attachment",
+      rate: "none — no limit",
+    },
+    findings: [
+      "The page's own request never gets through. The PDF it makes is 7.1 MB, 9.5 MB as the JSON it sends (both layouts), and the server takes at most 100 KB of JSON, so every Send to Print is refused with 413 and the page shows 'Failed to generate PDF'. Measured 2026-09-26 in Chromium on the production build (scripts/measure-board-builder-submit-browser.mjs), and the 413 shown in the harness. The limit is express.json()'s default, unchanged since the builder shipped (5c6d2356, 2026-03-18): it has never worked.",
+      "Public with no limit, while its only page needs sign-in: anyone can have the server email the print inbox any file under 100 KB, as any business, as often as they like. Put to the owner 2026-09-26: make Send to Print work for signed-in businesses (the business and board from the session, a larger limit on this route only, a send limit, a smaller PDF), or retire it.",
+    ],
+  },
 };
 
 /**
  * Routes not reviewed yet. May only shrink: PENDING_CEILING is lowered by
  * every batch, so a route cannot be added here instead of being reviewed.
  */
-export const PENDING_CEILING = 167;
+export const PENDING_CEILING = 147;
 
 export const REVIEW_PENDING: readonly string[] = [
-  "GET /robots.txt",
-  "GET /nfc/:merchantId/stone/:stoneId",
-  "GET /nfc/:merchantId",
-  "GET /.well-known/apple-developer-merchantid-domain-association",
-  "GET /sitemap.xml",
   "POST /api/auth/sign-out-everywhere",
   "GET /api/admin/request-origin",
   "GET /api/auth/me",
@@ -1449,19 +1891,13 @@ export const REVIEW_PENDING: readonly string[] = [
   "POST /api/tutorial/restart",
   "POST /api/merchants/:id/onboarding",
   "GET /api/admin/auth/me",
-  "GET /api/merchants/:id/qr",
-  "GET /api/merchants/:id/stone/:stoneId/qr",
-  "GET /api/merchants/:id",
   "GET /api/merchants/:id/profile",
-  "GET /api/merchants/:id/active-transaction",
   "POST /api/transactions",
   "POST /api/transactions/cash-sale",
   "POST /api/transactions/tap-to-pay",
   "PATCH /api/transactions/:id/split-enabled",
   "POST /api/transactions/:id/cancel",
   "POST /api/merchants/:merchantId/nfc-pay",
-  "GET /api/nfc/capabilities",
-  "GET /api/windcave/env",
   "GET /api/merchants/:id/analytics",
   "GET /api/merchants/:id/revenue-over-time",
   "GET /api/merchants/:id/analytics/export",
@@ -1486,9 +1922,7 @@ export const REVIEW_PENDING: readonly string[] = [
   "POST /api/merchants/:id/tapt-stones",
   "PUT /api/merchants/:merchantId/tapt-stones/:stoneId",
   "DELETE /api/merchants/:merchantId/tapt-stones/:stoneId",
-  "GET /api/tapt-stones/:id",
   "GET /api/admin/subscription-revenue",
-  "GET /api/windcave/status",
   "GET /api/admin/analytics",
   "GET /api/admin/revenue-over-time",
   "GET /api/admin/payment-method-breakdown",
@@ -1504,12 +1938,8 @@ export const REVIEW_PENDING: readonly string[] = [
   "POST /api/admin/resend-verification",
   "POST /api/admin/test-email",
   "GET /api/admin/email-status",
-  "POST /api/info-pack-leads",
   "PUT /api/merchants/:id/business-details",
   "POST /api/admin/merchants/signup",
-  "GET /api/merchants/:id/events",
-  "GET /api/push/capabilities",
-  "GET /api/push/vapid-key",
   "POST /api/push/subscribe",
   "POST /api/push/unsubscribe",
   "POST /api/push/native-subscribe",
@@ -1534,7 +1964,6 @@ export const REVIEW_PENDING: readonly string[] = [
   "POST /api/payments/apple-pay/validate",
   "POST /api/payments/apple-pay/process",
   "POST /api/payments/google-pay/process",
-  "GET /api/payments/digital-wallet/config",
   "GET /api/subscription",
   "PUT /api/subscription/plan",
   "POST /api/subscription/cancel",
@@ -1550,8 +1979,6 @@ export const REVIEW_PENDING: readonly string[] = [
   "POST /api/billing/card/session",
   "POST /api/billing/card/confirm",
   "DELETE /api/billing/card",
-  "POST /api/board-builder/submit",
-  "GET /uploads/:folder/:name",
   "GET /api/property/tenants",
   "POST /api/property/tenants",
   "GET /api/property/tenants/:id",

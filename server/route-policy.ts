@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ ba1b67420938280ffd620205358cfbb06b595a6e on 2026-09-26.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ ae82a31c8fd87ab969b73237e9ea5b3b9933f4b3 on 2026-09-26.
  *
  * 223 registrations (93 GET, 91 POST, 3 PATCH, 5 ALL, 22 PUT, 9 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -1947,8 +1947,8 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     principal: "public",
     markers: [],
     facts: {
-      sideEffects: ["provider: windcaveService.isConfigured"],
       statuses: [200,500],
+      capabilityGates: ["windcaveService.isConfigured"],
     },
   },
   "GET /api/subscription": {
