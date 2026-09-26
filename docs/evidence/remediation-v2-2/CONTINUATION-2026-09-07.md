@@ -477,9 +477,25 @@ The work itself:
   - **`51feb200`: verify and set-active accept only what the business page offers** (409 otherwise,
     nothing changed). Red 2/4, mutations 4/4.
   - Server 103/1,775, client 102/822, `tsc` clean.
+- **C10 continued (2026-09-26): batch 5, the account (27 routes): `fa41de52` (fixes), `737018b0`
+  (27 reviews); local, awaiting independent review**
+  ([working notes](r1/WORKING-2026-09-26-r1-t2-c10.md)). 113 of 203 routes are reviewed; 90 are
+  pending.
+  - **Fixed, `fa41de52`:** removing a teammate now stops the business's unattributed devices, as
+    disabling does (the 2026-09-22 question assumed removal already did; at release every existing
+    subscription is unattributed). Turning notifications off no longer answers success when the
+    database failed. Plan, cancel and resume use `isAccountOwner` (same behaviour).
+  - **Found: push endpoints are stored as sent and POSTed to on every payment** (web-push goes wherever
+    the endpoint says): any signed-in login can point the server at an address of its choosing, TLS
+    only. And the notification switches are the business's: a teammate silences the owner's phone.
+  - The extractor follows a helper handed over by name, so the plan change and the card confirmation
+    show the stored-card charge. Each review says what happens to the platform admin (probed for all
+    27 with the admin, a teammate and the owner).
+  - Mutations 13/13. Server 104/1,786, `tsc` clean.
+  - For the owner (asked 2026-09-26): accept only the browser push services; per-login switches.
 
-**Next:** R1-T2's review of the signed-in merchant families; 117 routes are pending (batch 5: the
-account, 27 routes). Then R1-T3's runtime matrix, on the audited harness.
+**Next:** the batch 5 owner questions, then R1-T2's review of the signed-in merchant families; 90
+routes are pending. Then R1-T3's runtime matrix, on the audited harness.
 Open for the owner: 0030 in dev (above); the card-free dev write (above). The
 no-board rework's questions are all answered. Release of the rework: when production has no pending
 shared no-board sale (count-only check once production is reopened), with
@@ -488,8 +504,9 @@ shared no-board sale (count-only check once production is reopened), with
 The phase B live check waits for the owner to set `ADMIN_PASSWORD_HASH`.
 Independent reviews owed (each evidence file ends with its brief):
 - C10 so far (`2ec9d78f..cee1276a`), the 2026-09-26 owner answers (`cee1276a..a419f948`),
-  C10's batch 3 (`30c9d8cb..d0d5495b`) and its owner answers (`4ac759d1..1a77530e`), and batch 4
-  (`198a8265..4ed2e145`) and its owner answers (`867ef275..51feb200`);
+  C10's batch 3 (`30c9d8cb..d0d5495b`) and its owner answers (`4ac759d1..1a77530e`), batch 4
+  (`198a8265..4ed2e145`) and its owner answers (`867ef275..51feb200`), and batch 5
+  (`c1889ca3..737018b0`);
 - the no-board rework (`da90d1a1..5c2cdb27`), its follow-up (`7051e25e..1fb41d14`), and the
   owner-answer fixes 2a–2c (`aba7b2be..da90d1a1`);
 - R1-T1 (`03c4663b..05195728`) and the live-updates fix (`05195728..3fac8ac8`);
