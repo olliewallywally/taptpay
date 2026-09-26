@@ -3660,9 +3660,15 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (merchant.status === 'verified') {
         return res.status(400).json({ message: "Merchant already verified" });
       }
+      // The application is found by its own sign-up token, so there must be one: asked for
+      // '' (none), verifyMerchant would set the password of whichever business held an empty
+      // token, not this one (C10 batch 4).
+      if (!merchant.verificationToken) {
+        return res.status(409).json({ message: "This business has no waiting application to activate" });
+      }
 
       const passwordHash = await bcrypt.hash(checked.data, 12);
-      const updatedMerchant = await storage.verifyMerchant(merchant.verificationToken || '', passwordHash);
+      const updatedMerchant = await storage.verifyMerchant(merchant.verificationToken, passwordHash);
 
       if (!updatedMerchant) {
         return res.status(500).json({ message: "Failed to activate merchant" });
