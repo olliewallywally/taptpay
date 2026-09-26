@@ -1,4 +1,4 @@
-# R1-T2 route inventory — generated 2026-09-26 @ `198a8265c22834b0d4903116dc1e2279ab7cca55`
+# R1-T2 route inventory — generated 2026-09-26 @ `8c40d0670e4e18b820217fde9fb8c8925c4dfadd`
 
 Regenerate with `npx tsx scripts/generate-route-policy.ts`. This table is
 evidence for the SHA named above, not a timeless constant — see
@@ -14,7 +14,7 @@ necessarily a bug): **0**.
 
 ## Review
 
-70 of 216 routes reviewed (server/route-review.ts); 146 pending.
+99 of 216 routes reviewed (server/route-review.ts); 117 pending.
 A reviewed route's principal below is the review's; a pending one's is the heuristic, marked "(heuristic)".
 
 ### Open findings
@@ -61,6 +61,26 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 - **GET /api/merchants/:id/events:** Nothing limits how many streams anyone holds open: each keeps a connection and a subscriber in this process's memory, so one script can hold thousands on any board's public stream (R1-T4 phase B's address limits, once TRUST_PROXY_HOPS is set).
 - **GET /api/nfc/capabilities:** Only pages mounted nowhere ask for it (merchant-terminal.tsx, merchant-terminal-mobile.tsx; the stale bundles under client/public/app too). Retire it with them (dead code, R8).
 - **POST /api/info-pack-leads:** Answers with the lead's sequential number, which the page never reads: it tells anyone how many leads there have been. A 201 with no number would do.
+- **POST /api/admin/merchants/:id/verify:** The business page offers Verify only for a waiting application, but the route takes any state but verified: an active business is set back to verified (both can sign in; the admin's lists then count it as not active). Unlike the emailed confirmation (confirmMerchantEmail), it leaves the email marked unconfirmed (emailVerified false) and the sign-up link usable. Put to the owner 2026-09-26: accept only what the page offers.
+- **POST /api/admin/merchants/:id/set-active:** The business page offers Activate only for a verified business ("once Windcave onboarding is done"), but the route takes any state: a waiting application whose email was never confirmed becomes active, and sign-in accepts active. Admin-only and not offered by the page. Put to the owner 2026-09-26: accept only what the page offers (verified to active).
+- **PATCH /api/admin/merchants/:id/windcave-merchant-id:** The provider merchant id is stored as sent, with no check of its type or form: a number, an object or a stray space is saved as it came, and only the provider notices. A strict schema (a trimmed string of the provider's form, or null) is plan §8.4's rule.
+- **POST /api/admin/merchants/:id/activate:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26). The admin chooses the business's password, so the admin knows it. It is today the only way in for an application made before sign-up took a password: the confirm page sends those to support (NO_PASSWORD_CHOSEN), and Verify refuses them, naming this route. Retire it, or keep it as support's path until an emailed set-password link replaces it: put to the owner 2026-09-26.
+- **GET /api/admin/subscription-revenue:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26) (only the unmounted admin-revenue page did); the overview gets the same figures from GET /api/admin/analytics. Retire it: put to the owner 2026-09-26.
+- **GET /api/admin/analytics:** Reads every business's sales one business at a time (getAllMerchants, then getTransactionsByMerchant for each): the time grows with the platform. Fine today; for the performance phase.
+- **GET /api/admin/analytics:** A business whose figures fail to load is listed with zero sales and zero revenue, as if it had none (R1-T9's rule, for the admin's screens too).
+- **GET /api/admin/revenue-over-time:** Reads every business's sales one business at a time (getAllMerchants, then getTransactionsByMerchant for each): the time grows with the platform. Fine today; for the performance phase.
+- **GET /api/admin/payment-method-breakdown:** Reads every business's sales one business at a time (getAllMerchants, then getTransactionsByMerchant for each): the time grows with the platform. Fine today; for the performance phase.
+- **GET /api/admin/ga4-detailed:** Answers a failure with Google Analytics' own error text (error?.message), to the platform admin only. Minor: a fixed message and a server-side log would do.
+- **GET /api/admin/ga4-metrics:** Answers a failure with Google Analytics' own error text (error?.message), to the platform admin only. Minor: a fixed message and a server-side log would do.
+- **POST /api/admin/merchants:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26); it only answers 410. Retire it: put to the owner 2026-09-26.
+- **POST /api/admin/merchants/signup:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26) (the create-merchant page is declared but routed nowhere). The admin chooses the new owner's password. Retire it, or put its page back: put to the owner 2026-09-26.
+- **PUT /api/admin/merchants/:id:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26) (only the unmounted admin-merchant pages did). Its body has no schema: fields left out are passed on as undefined (the database keeps them; the in-memory storage used by tests clears them), and none is checked as an email or a length. Retire it: put to the owner 2026-09-26.
+- **DELETE /api/admin/merchants/:id:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26). It cannot delete any business the app has made: each has a subscription row, and an owner login once it has a password, and neither key cascades. The database refuses, everything is rolled back, and the answer is 500 "Failed to delete merchant" (shown on PostgreSQL 16 with scripts/verify-admin-business-delete-postgres.ts; only a bare business row is deleted, with its sales). Made to work as written, it would delete a business and every sale with no screen, no confirmation and no record. Retire it: put to the owner 2026-09-26.
+- **POST /api/admin/clear-merchants:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26). A debugging leftover: three email addresses, the owner's among them, are written into the code; it deletes those businesses from the in-memory storage only, and it answers with the addresses. Retire it: put to the owner 2026-09-26.
+- **POST /api/admin/test-email:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26). A failure answers with the caught error itself ({ error }), whatever the email provider put in it, to the platform admin only. Minor. Keep it (with a fixed message) or retire it, with the email status: put to the owner 2026-09-26.
+- **GET /api/admin/email-status:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26); a diagnostic, useful by hand. Keep or retire: put to the owner 2026-09-26.
+- **GET /api/admin/api-keys:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26); it only answers 404, as do the other four API-key and usage routes. Retire them until the ecommerce API's administration is built: put to the owner 2026-09-26.
+- **POST /api/merchants/:id/test-payment-link:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26); it only answers 410. Retire it: put to the owner 2026-09-26.
 
 ## Routes
 
@@ -79,14 +99,14 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 | POST | `/api/auth/forgot-password` | 866 | public | requestPasswordReset( |
 | POST | `/api/auth/reset-password` | 906 | public-bearer | resetPassword( |
 | GET | `/api/auth/validate-reset-token/:token` | 946 | public-bearer | validateResetToken( |
-| GET | `/api/admin/request-origin` | 965 | admin (heuristic) | authenticateAdmin |
+| GET | `/api/admin/request-origin` | 965 | platform-admin | authenticateAdmin |
 | POST | `/api/admin/auth/login` | 985 | public | — |
 | GET | `/api/auth/me` | 1073 | merchant-user (heuristic) | authenticateToken |
 | GET | `/api/tutorial/state` | 1114 | merchant-user (heuristic) | authenticateToken, req.user?.role === "admin" |
 | PATCH | `/api/tutorial/pages/:pageKey` | 1144 | merchant-user (heuristic) | authenticateToken, req.user?.role === "admin" |
 | POST | `/api/tutorial/restart` | 1181 | merchant-user (heuristic) | authenticateToken, req.user?.role === "admin" |
 | POST | `/api/merchants/:id/onboarding` | 1202 | merchant-user (heuristic) | authenticateToken, checkAccountOwnership |
-| GET | `/api/admin/auth/me` | 1283 | admin (heuristic) | authenticateAdmin |
+| GET | `/api/admin/auth/me` | 1283 | platform-admin | authenticateAdmin |
 | GET | `/api/merchants/:id/qr` | 1296 | public | — |
 | GET | `/api/merchants/:id/stone/:stoneId/qr` | 1303 | public | — |
 | GET | `/api/merchants/:id/stone/:stoneId/brand` | 1356 | public | publicBoardBrandDto( |
@@ -124,11 +144,11 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 | GET | `/api/merchants/:id/analytics/export` | 3421 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
 | GET | `/api/merchants/:id/export/csv` | 3442 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
 | GET | `/api/merchants/:id/export/pdf` | 3508 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| POST | `/api/admin/merchants/:id/verify` | 3548 | admin (heuristic) | authenticateAdmin |
-| POST | `/api/admin/merchants/:id/set-active` | 3593 | admin (heuristic) | authenticateAdmin |
-| GET | `/api/admin/merchants/:id/transactions` | 3611 | admin (heuristic) | authenticateAdmin |
-| PATCH | `/api/admin/merchants/:id/windcave-merchant-id` | 3624 | admin (heuristic) | authenticateAdmin |
-| POST | `/api/admin/merchants/:id/activate` | 3640 | admin (heuristic) | authenticateAdmin, storage.verifyMerchant( |
+| POST | `/api/admin/merchants/:id/verify` | 3548 | platform-admin | authenticateAdmin |
+| POST | `/api/admin/merchants/:id/set-active` | 3593 | platform-admin | authenticateAdmin |
+| GET | `/api/admin/merchants/:id/transactions` | 3611 | platform-admin | authenticateAdmin |
+| PATCH | `/api/admin/merchants/:id/windcave-merchant-id` | 3624 | platform-admin | authenticateAdmin |
+| POST | `/api/admin/merchants/:id/activate` | 3640 | platform-admin | authenticateAdmin, storage.verifyMerchant( |
 | PUT | `/api/merchants/:id/rates` | 3697 | merchant-user (heuristic) | authenticateToken |
 | PUT | `/api/merchants/:id/details` | 3704 | merchant-user (heuristic) | authenticateToken, checkAccountOwnership |
 | PUT | `/api/merchants/:id/change-password` | 3730 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
@@ -143,29 +163,29 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 | POST | `/api/merchants/:id/tapt-stones` | 4082 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership, generatePaymentUrl( |
 | PUT | `/api/merchants/:merchantId/tapt-stones/:stoneId` | 4133 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
 | DELETE | `/api/merchants/:merchantId/tapt-stones/:stoneId` | 4168 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| GET | `/api/admin/subscription-revenue` | 4204 | admin (heuristic) | authenticateAdmin |
+| GET | `/api/admin/subscription-revenue` | 4204 | platform-admin | authenticateAdmin |
 | ALL | `/api/windcave/notification` | 4215 | provider | — |
 | GET | `/api/windcave/callback` | 4337 | public | isTokenAddressedTransaction( |
-| GET | `/api/admin/analytics` | 4535 | admin (heuristic) | authenticateAdmin |
-| GET | `/api/admin/revenue-over-time` | 4608 | admin (heuristic) | authenticateAdmin |
-| GET | `/api/admin/payment-method-breakdown` | 4644 | admin (heuristic) | authenticateAdmin |
-| GET | `/api/admin/ga4-detailed` | 4681 | admin (heuristic) | authenticateAdmin |
-| GET | `/api/admin/ga4-metrics` | 4746 | admin (heuristic) | authenticateAdmin |
-| POST | `/api/admin/merchants` | 4823 | admin (heuristic) | authenticateAdmin |
-| PUT | `/api/admin/merchants/:id` | 4834 | admin (heuristic) | authenticateAdmin |
-| POST | `/api/merchants/:id/test-payment-link` | 4862 | admin (heuristic) | authenticateAdmin |
-| GET | `/api/admin/merchants` | 4869 | admin (heuristic) | authenticateAdmin |
-| GET | `/api/admin/merchants/:id` | 4879 | admin (heuristic) | authenticateAdmin |
-| DELETE | `/api/admin/merchants/:id` | 4895 | admin (heuristic) | authenticateAdmin |
-| POST | `/api/admin/clear-merchants` | 4919 | admin (heuristic) | authenticateAdmin |
-| POST | `/api/admin/resend-verification` | 4950 | admin (heuristic) | authenticateAdmin |
-| POST | `/api/admin/test-email` | 5008 | admin (heuristic) | authenticateAdmin |
-| GET | `/api/admin/email-status` | 5031 | admin (heuristic) | authenticateAdmin |
+| GET | `/api/admin/analytics` | 4535 | platform-admin | authenticateAdmin |
+| GET | `/api/admin/revenue-over-time` | 4608 | platform-admin | authenticateAdmin |
+| GET | `/api/admin/payment-method-breakdown` | 4644 | platform-admin | authenticateAdmin |
+| GET | `/api/admin/ga4-detailed` | 4681 | platform-admin | authenticateAdmin |
+| GET | `/api/admin/ga4-metrics` | 4746 | platform-admin | authenticateAdmin |
+| POST | `/api/admin/merchants` | 4823 | platform-admin | authenticateAdmin |
+| PUT | `/api/admin/merchants/:id` | 4834 | platform-admin | authenticateAdmin |
+| POST | `/api/merchants/:id/test-payment-link` | 4862 | platform-admin | authenticateAdmin |
+| GET | `/api/admin/merchants` | 4869 | platform-admin | authenticateAdmin |
+| GET | `/api/admin/merchants/:id` | 4879 | platform-admin | authenticateAdmin |
+| DELETE | `/api/admin/merchants/:id` | 4895 | platform-admin | authenticateAdmin |
+| POST | `/api/admin/clear-merchants` | 4919 | platform-admin | authenticateAdmin |
+| POST | `/api/admin/resend-verification` | 4950 | platform-admin | authenticateAdmin |
+| POST | `/api/admin/test-email` | 5008 | platform-admin | authenticateAdmin |
+| GET | `/api/admin/email-status` | 5031 | platform-admin | authenticateAdmin |
 | POST | `/api/auth/confirm-email` | 5068 | public-bearer | getMerchantByToken( |
 | POST | `/api/auth/resend-confirmation` | 5195 | public | — |
 | POST | `/api/info-pack-leads` | 5225 | public | — |
 | POST | `/api/merchants/signup` | 5278 | public | — |
-| POST | `/api/admin/merchants/signup` | 5383 | admin (heuristic) | authenticateAdmin |
+| POST | `/api/admin/merchants/signup` | 5383 | platform-admin | authenticateAdmin |
 | GET | `/api/merchants/:id/events` | 5446 | merchant / public | authenticateToken, checkMerchantOwnership |
 | GET | `/api/push/capabilities` | 5522 | public | — |
 | GET | `/api/push/vapid-key` | 5546 | public | — |
@@ -181,11 +201,11 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 | GET | `/api/transactions/:transactionId/refunds` | 5910 | merchant-user (heuristic) | authenticateToken |
 | GET | `/api/merchants/:merchantId/refunds` | 5940 | merchant-user (heuristic) | authenticateToken |
 | GET | `/api/refunds/:refundId` | 5961 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/admin/api-keys` | 5995 | admin (heuristic) | authenticateAdmin |
-| POST | `/api/admin/api-keys` | 5999 | admin (heuristic) | authenticateAdmin |
-| POST | `/api/admin/api-keys/:keyId/revoke` | 6003 | admin (heuristic) | authenticateAdmin |
-| GET | `/api/admin/api-metrics` | 6009 | admin (heuristic) | authenticateAdmin |
-| GET | `/api/admin/api-usage` | 6013 | admin (heuristic) | authenticateAdmin |
+| GET | `/api/admin/api-keys` | 5995 | platform-admin | authenticateAdmin |
+| POST | `/api/admin/api-keys` | 5999 | platform-admin | authenticateAdmin |
+| POST | `/api/admin/api-keys/:keyId/revoke` | 6003 | platform-admin | authenticateAdmin |
+| GET | `/api/admin/api-metrics` | 6009 | platform-admin | authenticateAdmin |
+| GET | `/api/admin/api-usage` | 6013 | platform-admin | authenticateAdmin |
 | GET | `/api/merchants/:merchantId/stock-items` | 6022 | merchant-user (heuristic) | authenticateToken |
 | POST | `/api/merchants/:merchantId/stock-items` | 6041 | merchant-user (heuristic) | authenticateToken |
 | PUT | `/api/merchants/:merchantId/stock-items/:itemId` | 6069 | merchant-user (heuristic) | authenticateToken |
@@ -534,7 +554,14 @@ Reviewed policy:
 - statuses: `200`, `401`, `403`, `503`
 - helpers: `authenticateAdmin`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** platform-admin. **Tenant (none):** none: the admin's own session or request; no business's data
+- **Input:** nothing but the request itself: its forwarded-for header and connection address, only shown back
+- **Idempotency:** read-only
+- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
+- **Success:** not cached: TRUST_PROXY_HOPS and whether address limits are on, the address Express takes, the protocol and host, the forwarded-for chain, the connection address, and the address each hops value would take (for the owner's phase B check)
+- **Error disclosure:** fixed
 
 ### POST `/api/admin/auth/login`
 
@@ -620,7 +647,14 @@ Review pending.
 - statuses: `200`, `401`, `403`, `503`
 - helpers: `authenticateAdmin`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** platform-admin. **Tenant (none):** none: the admin's own session or request; no business's data
+- **Input:** nothing
+- **Idempotency:** read-only
+- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
+- **Success:** { user: { id, email, merchantId: 0, role: 'admin' } }: the admin app's session check
+- **Error disclosure:** fixed
 
 ### GET `/api/merchants/:id/qr`
 
@@ -1340,7 +1374,15 @@ Review pending.
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 - helpers: `authenticateAdmin`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** platform-admin. **Tenant (any-merchant):** any business, by the number in the path: the validated platform admin (authenticateAdmin: the admin role, merchant scope 0 and the configured admin email) acts across businesses
+- **Input:** id: strictPositiveIntegerParam (400 otherwise); no body
+- **Idempotency:** marks the business verified (updateMerchantStatus) and makes any missing owner login (syncVerifiedMerchants); again is 400 (already verified); a business with no password set is 400
+- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
+- **Success:** { message, merchant: { id, name, businessName, email, status } }
+- **Error disclosure:** fixed
+- **Finding:** The business page offers Verify only for a waiting application, but the route takes any state but verified: an active business is set back to verified (both can sign in; the admin's lists then count it as not active). Unlike the emailed confirmation (confirmMerchantEmail), it leaves the email marked unconfirmed (emailVerified false) and the sign-up link usable. Put to the owner 2026-09-26: accept only what the page offers.
 
 ### POST `/api/admin/merchants/:id/set-active`
 
@@ -1352,7 +1394,15 @@ Review pending.
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 - helpers: `authenticateAdmin`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** platform-admin. **Tenant (any-merchant):** any business, by the number in the path: the validated platform admin (authenticateAdmin: the admin role, merchant scope 0 and the configured admin email) acts across businesses
+- **Input:** id: strictPositiveIntegerParam (400 otherwise); no body
+- **Idempotency:** sets the business active from any other state; again is 400
+- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
+- **Success:** { message, merchant: { id, status } }
+- **Error disclosure:** fixed
+- **Finding:** The business page offers Activate only for a verified business ("once Windcave onboarding is done"), but the route takes any state: a waiting application whose email was never confirmed becomes active, and sign-in accepts active. Admin-only and not offered by the page. Put to the owner 2026-09-26: accept only what the page offers (verified to active).
 
 ### GET `/api/admin/merchants/:id/transactions`
 
@@ -1362,9 +1412,17 @@ Review pending.
 - storageMethods: `getTransactionsByMerchant`
 - sideEffects: `audit log: logSecurityEvent`
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
+- dtos: `adminTransactionDto`
 - helpers: `authenticateAdmin`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** platform-admin. **Tenant (any-merchant):** any business, by the number in the path: the validated platform admin (authenticateAdmin: the admin role, merchant scope 0 and the configured admin email) acts across businesses
+- **Input:** id: strictPositiveIntegerParam (400 otherwise); an unknown business gets an empty list
+- **Idempotency:** read-only
+- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
+- **Success:** every sale of the business, adminTransactionDto each, all at once (no paging)
+- **Error disclosure:** fixed
 
 ### PATCH `/api/admin/merchants/:id/windcave-merchant-id`
 
@@ -1377,7 +1435,15 @@ Review pending.
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 - helpers: `authenticateAdmin`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** platform-admin. **Tenant (any-merchant):** any business, by the number in the path: the validated platform admin (authenticateAdmin: the admin role, merchant scope 0 and the configured admin email) acts across businesses
+- **Input:** id: strictPositiveIntegerParam (400 otherwise); body read without a schema: windcaveMerchantId, stored as sent (any falsy value clears it)
+- **Idempotency:** sets the business's provider merchant id; the same value again changes nothing
+- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
+- **Success:** { message }
+- **Error disclosure:** fixed
+- **Finding:** The provider merchant id is stored as sent, with no check of its type or form: a number, an object or a stray space is saved as it came, and only the provider notices. A strict schema (a trimmed string of the provider's form, or null) is plan §8.4's rule.
 
 ### POST `/api/admin/merchants/:id/activate`
 
@@ -1391,7 +1457,15 @@ Review pending.
 - errorTextInResponse: `checked.error.issues`
 - helpers: `authenticateAdmin`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** platform-admin. **Tenant (any-merchant):** any business, by the number in the path: the validated platform admin (authenticateAdmin: the admin role, merchant scope 0 and the configured admin email) acts across businesses
+- **Input:** id: strictPositiveIntegerParam (400 otherwise); body read without a schema: password, held to the one password rule (newPasswordSchema; 400 with its first issue)
+- **Idempotency:** one-time: sets the waiting application's password, marks it verified and clears its token (verifyMerchant, by that token); a business with no waiting application is 409 (since 2026-09-26), a verified one 400
+- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
+- **Success:** { message, merchant: { id, name, businessName, email, status } }
+- **Error disclosure:** input-issues
+- **Finding:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26). The admin chooses the business's password, so the admin knows it. It is today the only way in for an application made before sign-up took a password: the confirm page sends those to support (NO_PASSWORD_CHOSEN), and Verify refuses them, naming this route. Retire it, or keep it as support's path until an emailed set-password link replaces it: put to the owner 2026-09-26.
 
 ### PUT `/api/merchants/:id/rates`
 
@@ -1504,6 +1578,7 @@ Review pending.
 - authChecks: `checkMerchantOwnership`
 - storageMethods: `getTransactionsByMerchant`
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
+- dtos: `ownerTransactionDto`
 
 Review pending.
 
@@ -1558,7 +1633,15 @@ Review pending.
 - statuses: `200`, `401`, `403`, `500`, `503`
 - helpers: `authenticateAdmin`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** platform-admin. **Tenant (any-merchant):** every business at once: the validated platform admin (authenticateAdmin) sees the whole platform
+- **Input:** nothing
+- **Idempotency:** read-only
+- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
+- **Success:** the platform's subscription revenue (getSubscriptionRevenue): monthly recurring revenue, paying subscriptions, all subscriptions, a breakdown by plan, and how many are past due, suspended and cancelling
+- **Error disclosure:** fixed
+- **Finding:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26) (only the unmounted admin-revenue page did); the overview gets the same figures from GET /api/admin/analytics. Retire it: put to the owner 2026-09-26.
 
 ### ALL `/api/windcave/notification`
 
@@ -1620,7 +1703,16 @@ Reviewed policy:
 - statuses: `200`, `401`, `403`, `500`, `503`
 - helpers: `authenticateAdmin`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** platform-admin. **Tenant (any-merchant):** every business at once: the validated platform admin (authenticateAdmin) sees the whole platform
+- **Input:** nothing
+- **Idempotency:** read-only
+- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
+- **Success:** platform totals (businesses, active ones, sales, revenue, monthly recurring revenue, paying subscriptions) and, per business, its id, name, business name, sales count and revenue, status and last sale
+- **Error disclosure:** fixed
+- **Finding:** Reads every business's sales one business at a time (getAllMerchants, then getTransactionsByMerchant for each): the time grows with the platform. Fine today; for the performance phase.
+- **Finding:** A business whose figures fail to load is listed with zero sales and zero revenue, as if it had none (R1-T9's rule, for the admin's screens too).
 
 ### GET `/api/admin/revenue-over-time`
 
@@ -1631,7 +1723,15 @@ Review pending.
 - statuses: `200`, `401`, `403`, `500`, `503`
 - helpers: `authenticateAdmin`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** platform-admin. **Tenant (any-merchant):** every business at once: the validated platform admin (authenticateAdmin) sees the whole platform
+- **Input:** nothing
+- **Idempotency:** read-only
+- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
+- **Success:** for each of the last 7 days (today and the 6 before, by UTC date): the platform's revenue and sales count, from completed sales
+- **Error disclosure:** fixed
+- **Finding:** Reads every business's sales one business at a time (getAllMerchants, then getTransactionsByMerchant for each): the time grows with the platform. Fine today; for the performance phase.
 
 ### GET `/api/admin/payment-method-breakdown`
 
@@ -1642,7 +1742,15 @@ Review pending.
 - statuses: `200`, `401`, `403`, `500`, `503`
 - helpers: `authenticateAdmin`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** platform-admin. **Tenant (any-merchant):** every business at once: the validated platform admin (authenticateAdmin) sees the whole platform
+- **Input:** nothing
+- **Idempotency:** read-only
+- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
+- **Success:** per payment method of the platform's completed sales: its name, how many sales used it, and a chart colour; most used first
+- **Error disclosure:** fixed
+- **Finding:** Reads every business's sales one business at a time (getAllMerchants, then getTransactionsByMerchant for each): the time grows with the platform. Fine today; for the performance phase.
 
 ### GET `/api/admin/ga4-detailed`
 
@@ -1654,7 +1762,15 @@ Review pending.
 - errorTextInResponse: `error?.message`
 - helpers: `authenticateAdmin`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** platform-admin. **Tenant (none):** none: the website's own visitor figures from Google Analytics; no business's data
+- **Input:** range: read raw, then mapped to one of four start dates (14d, 30d, all; anything else is the last 7 days)
+- **Idempotency:** read-only
+- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
+- **Success:** { configured: false } until Google Analytics is set up; otherwise daily users, sessions and page views, users by country, new and returning users
+- **Error disclosure:** provider-text
+- **Finding:** Answers a failure with Google Analytics' own error text (error?.message), to the platform admin only. Minor: a fixed message and a server-side log would do.
 
 ### GET `/api/admin/ga4-metrics`
 
@@ -1665,7 +1781,15 @@ Review pending.
 - errorTextInResponse: `error?.message`
 - helpers: `authenticateAdmin`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** platform-admin. **Tenant (none):** none: the website's own visitor figures from Google Analytics; no business's data
+- **Input:** nothing
+- **Idempotency:** read-only
+- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
+- **Success:** { configured: false } until Google Analytics is set up; otherwise the last 7 days' sessions, users, page views, bounce rate and more
+- **Error disclosure:** provider-text
+- **Finding:** Answers a failure with Google Analytics' own error text (error?.message), to the platform admin only. Minor: a fixed message and a server-side log would do.
 
 ### POST `/api/admin/merchants`
 
@@ -1675,7 +1799,15 @@ Review pending.
 - statuses: `401`, `403`, `410`, `503`
 - helpers: `authenticateAdmin`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** platform-admin. **Tenant (none):** none: a retired stub; nothing is read or written
+- **Input:** nothing is read
+- **Idempotency:** none needed: always the same answer
+- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
+- **Success:** none: 410, pointing to POST /api/admin/merchants/signup
+- **Error disclosure:** fixed
+- **Finding:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26); it only answers 410. Retire it: put to the owner 2026-09-26.
 
 ### PUT `/api/admin/merchants/:id`
 
@@ -1688,7 +1820,15 @@ Review pending.
 - dtos: `adminMerchantDto`
 - helpers: `authenticateAdmin`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** platform-admin. **Tenant (any-merchant):** any business, by the number in the path: the validated platform admin (authenticateAdmin: the admin role, merchant scope 0 and the configured admin email) acts across businesses
+- **Input:** id: strictPositiveIntegerParam (400 otherwise); body read without a schema: businessName, contactEmail, contactPhone, businessAddress, each stored as sent when any one is present
+- **Idempotency:** sets the business's contact details; the same values again change nothing
+- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
+- **Success:** adminMerchantDto of the business afterwards; an unknown business is 404, found only after the write was tried
+- **Error disclosure:** fixed
+- **Finding:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26) (only the unmounted admin-merchant pages did). Its body has no schema: fields left out are passed on as undefined (the database keeps them; the in-memory storage used by tests clears them), and none is checked as an email or a length. Retire it: put to the owner 2026-09-26.
 
 ### POST `/api/merchants/:id/test-payment-link`
 
@@ -1699,7 +1839,15 @@ Review pending.
 - statuses: `400`, `401`, `403`, `410`, `503`
 - helpers: `authenticateAdmin`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** platform-admin. **Tenant (none):** none: the business-wide no-board address was retired on 2026-09-25 (server/no-board-address.ts); every well-formed number gets the same 410 notice, and nothing is read
+- **Input:** id: strictPositiveIntegerParam (400 otherwise)
+- **Idempotency:** none needed: always the same answer
+- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
+- **Success:** none: 410 NO_BOARD_ADDRESS_RETIRED (it tested the retired business-wide no-board link)
+- **Error disclosure:** fixed
+- **Finding:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26); it only answers 410. Retire it: put to the owner 2026-09-26.
 
 ### GET `/api/admin/merchants`
 
@@ -1708,9 +1856,17 @@ Review pending.
 - storageMethods: `getAllMerchants`
 - sideEffects: `audit log: logSecurityEvent`
 - statuses: `200`, `401`, `403`, `500`, `503`
+- dtos: `adminMerchantSummaryDto`
 - helpers: `authenticateAdmin`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** platform-admin. **Tenant (any-merchant):** every business at once: the validated platform admin (authenticateAdmin) sees the whole platform
+- **Input:** nothing
+- **Idempotency:** read-only
+- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
+- **Success:** every business, adminMerchantSummaryDto each: id, name, business name, email, director, NZBN, status and when made
+- **Error disclosure:** fixed
 
 ### GET `/api/admin/merchants/:id`
 
@@ -1723,7 +1879,14 @@ Review pending.
 - dtos: `adminMerchantDto`
 - helpers: `authenticateAdmin`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** platform-admin. **Tenant (any-merchant):** any business, by the number in the path: the validated platform admin (authenticateAdmin: the admin role, merchant scope 0 and the configured admin email) acts across businesses
+- **Input:** id: strictPositiveIntegerParam (400 otherwise)
+- **Idempotency:** read-only
+- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
+- **Success:** adminMerchantDto: the business's account and settings, never its password hash, tokens or bank details
+- **Error disclosure:** fixed
 
 ### DELETE `/api/admin/merchants/:id`
 
@@ -1735,7 +1898,15 @@ Review pending.
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 - helpers: `authenticateAdmin`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** platform-admin. **Tenant (any-merchant):** any business, by the number in the path: the validated platform admin (authenticateAdmin: the admin role, merchant scope 0 and the configured admin email) acts across businesses
+- **Input:** id: strictPositiveIntegerParam (400 otherwise)
+- **Idempotency:** tries to delete the business's sales and then the business, in one transaction (deleteMerchant); the database refuses any business another row still points at, and then nothing changes (500)
+- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
+- **Success:** { message }
+- **Error disclosure:** fixed
+- **Finding:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26). It cannot delete any business the app has made: each has a subscription row, and an owner login once it has a password, and neither key cascades. The database refuses, everything is rolled back, and the answer is 500 "Failed to delete merchant" (shown on PostgreSQL 16 with scripts/verify-admin-business-delete-postgres.ts; only a bare business row is deleted, with its sales). Made to work as written, it would delete a business and every sale with no screen, no confirmation and no record. Retire it: put to the owner 2026-09-26.
 
 ### POST `/api/admin/clear-merchants`
 
@@ -1746,7 +1917,15 @@ Review pending.
 - statuses: `200`, `401`, `403`, `500`, `503`
 - helpers: `authenticateAdmin`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** platform-admin. **Tenant (none):** none in practice: three businesses named by email in the code; with the database storage nothing is deleted
+- **Input:** nothing is read
+- **Idempotency:** with the in-memory storage, deletes those three businesses if present; with the database, nothing
+- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
+- **Success:** { message: 'Cleared <n> problematic merchants', clearedEmails: the three addresses in the code }
+- **Error disclosure:** fixed
+- **Finding:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26). A debugging leftover: three email addresses, the owner's among them, are written into the code; it deletes those businesses from the in-memory storage only, and it answers with the addresses. Retire it: put to the owner 2026-09-26.
 
 ### POST `/api/admin/resend-verification`
 
@@ -1758,7 +1937,14 @@ Review pending.
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 - helpers: `authenticateAdmin`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** platform-admin. **Tenant (any-merchant):** the business the email names (getMerchantByEmail): only one still waiting to be confirmed, with its token, is sent its link again (404, or 400 otherwise)
+- **Input:** body read without a schema: email, trimmed and lower-cased by the look-up (getMerchantByEmail); anything but a string is a 500
+- **Idempotency:** each call sends the same link again; the token is not replaced
+- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged); emails the business its confirmation link again (sendMerchantVerificationEmail)
+- **Success:** { message, merchant: { id, name, businessName, email, status } }
+- **Error disclosure:** fixed
 
 ### POST `/api/admin/test-email`
 
@@ -1766,9 +1952,18 @@ Review pending.
 - authChecks: `authenticateToken`, `compares req.user?.role !== "admin"`
 - sideEffects: `audit log: logSecurityEvent`, `email: sendEmail`
 - statuses: `200`, `401`, `403`, `500`, `503`
+- errorTextInResponse: `error`
 - helpers: `authenticateAdmin`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** platform-admin. **Tenant (none):** none: a test email to the admin's own address
+- **Input:** nothing
+- **Idempotency:** none: each call sends another test email
+- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged); emails the admin's own address (sendEmail)
+- **Success:** { success: true, message }
+- **Error disclosure:** provider-text
+- **Finding:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26). A failure answers with the caught error itself ({ error }), whatever the email provider put in it, to the platform admin only. Minor. Keep it (with a fixed message) or retire it, with the email status: put to the owner 2026-09-26.
 
 ### GET `/api/admin/email-status`
 
@@ -1778,7 +1973,15 @@ Review pending.
 - statuses: `200`, `401`, `403`, `500`, `503`
 - helpers: `authenticateAdmin`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** platform-admin. **Tenant (none):** none: the platform's email set-up
+- **Input:** nothing
+- **Idempotency:** read-only
+- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
+- **Success:** which email providers are set up, the environment, the from address, whether admin notices are set up and whether mail will be delivered
+- **Error disclosure:** fixed
+- **Finding:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26); a diagnostic, useful by hand. Keep or retire: put to the owner 2026-09-26.
 
 ### POST `/api/auth/confirm-email`
 
@@ -1881,7 +2084,15 @@ Reviewed policy:
 - errorTextInResponse: `validation.error.issues`
 - helpers: `authenticateAdmin`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** platform-admin. **Tenant (any-merchant):** a new business, made by the admin: its email must be in use by no business and no login (409)
+- **Input:** body: createMerchantSchema, including a password held to the one password rule (400 with the first issue and the issues)
+- **Idempotency:** none: each new email makes one more business, verified, with an owner login
+- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
+- **Success:** { message, merchant: { id, name, businessName, email, status: 'verified' } }
+- **Error disclosure:** input-issues
+- **Finding:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26) (the create-merchant page is declared but routed nowhere). The admin chooses the new owner's password. Retire it, or put its page back: put to the owner 2026-09-26.
 
 ### GET `/api/merchants/:id/events`
 
@@ -2063,7 +2274,15 @@ Review pending.
 - statuses: `401`, `403`, `404`, `503`
 - helpers: `authenticateAdmin`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** platform-admin. **Tenant (none):** none: the ecommerce API's administration is not built; nothing is read
+- **Input:** nothing
+- **Idempotency:** none needed: always the same answer
+- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
+- **Success:** none: 404 'Ecommerce API is unavailable'
+- **Error disclosure:** fixed
+- **Finding:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26); it only answers 404, as do the other four API-key and usage routes. Retire them until the ecommerce API's administration is built: put to the owner 2026-09-26.
 
 ### POST `/api/admin/api-keys`
 
@@ -2073,7 +2292,14 @@ Review pending.
 - statuses: `401`, `403`, `404`, `503`
 - helpers: `authenticateAdmin`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** platform-admin. **Tenant (none):** none: the ecommerce API's administration is not built; nothing is read or written
+- **Input:** nothing is read
+- **Idempotency:** none needed: always the same answer
+- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
+- **Success:** none: 404 'Ecommerce API is unavailable'
+- **Error disclosure:** fixed
 
 ### POST `/api/admin/api-keys/:keyId/revoke`
 
@@ -2084,7 +2310,14 @@ Review pending.
 - statuses: `400`, `401`, `403`, `404`, `503`
 - helpers: `authenticateAdmin`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** platform-admin. **Tenant (none):** none: the ecommerce API's administration is not built; nothing is read or written
+- **Input:** keyId: strictPositiveIntegerParam (400 otherwise), then not used
+- **Idempotency:** none needed: always the same answer
+- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
+- **Success:** none: 404 'Ecommerce API is unavailable'
+- **Error disclosure:** fixed
 
 ### GET `/api/admin/api-metrics`
 
@@ -2094,7 +2327,14 @@ Review pending.
 - statuses: `401`, `403`, `404`, `503`
 - helpers: `authenticateAdmin`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** platform-admin. **Tenant (none):** none: the ecommerce API's administration is not built; nothing is read
+- **Input:** nothing
+- **Idempotency:** none needed: always the same answer
+- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
+- **Success:** none: 404 'Ecommerce API is unavailable'
+- **Error disclosure:** fixed
 
 ### GET `/api/admin/api-usage`
 
@@ -2104,7 +2344,14 @@ Review pending.
 - statuses: `401`, `403`, `404`, `503`
 - helpers: `authenticateAdmin`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** platform-admin. **Tenant (none):** none: the ecommerce API's administration is not built; nothing is read
+- **Input:** nothing
+- **Idempotency:** none needed: always the same answer
+- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
+- **Success:** none: 404 'Ecommerce API is unavailable'
+- **Error disclosure:** fixed
 
 ### GET `/api/merchants/:merchantId/stock-items`
 
@@ -2269,6 +2516,7 @@ Review pending.
 - authChecks: `isAccountOwner`
 - storageMethods: `countSeatsInUse`, `getOrCreateSubscription`, `getTeamMembers`
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
+- dtos: `teamMemberDto`
 
 Review pending.
 
@@ -2362,6 +2610,7 @@ Reviewed policy:
 - authChecks: `isAccountOwner`
 - storageMethods: `getBillingHistory`
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
+- dtos: `billingHistoryDto`
 
 Review pending.
 

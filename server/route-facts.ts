@@ -458,6 +458,10 @@ class FactCollector {
     }
 
     if (calleeName.endsWith("Dto")) this.dtos.add(calleeName);
+    // A projection handed over by name, as in `rows.map(adminMerchantSummaryDto)`.
+    for (const argument of node.arguments) {
+      if (ts.isIdentifier(argument) && argument.text.endsWith("Dto")) this.dtos.add(argument.text);
+    }
 
     if (AUTH_CHECK_CALLS.has(callee) || AUTH_CHECK_CALLS.has(calleeName)) {
       this.authChecks.add(AUTH_CHECK_CALLS.has(callee) ? callee : calleeName);
@@ -526,6 +530,18 @@ class FactCollector {
           this.errorText.add(this.text(node));
           return;
         }
+      }
+      // A caught error put whole into the body: `{ error: error }`, `{ err }`.
+      if (ts.isPropertyAssignment(node)) {
+        const value = unwrap(node.initializer);
+        if (ts.isIdentifier(value) && ERROR_NAMES.test(value.text)) {
+          this.errorText.add(value.text);
+          return;
+        }
+      }
+      if (ts.isShorthandPropertyAssignment(node) && ERROR_NAMES.test(node.name.text)) {
+        this.errorText.add(node.name.text);
+        return;
       }
       if (
         ts.isCallExpression(node) &&

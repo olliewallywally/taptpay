@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 198a8265c22834b0d4903116dc1e2279ab7cca55 on 2026-09-26.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 8c40d0670e4e18b820217fde9fb8c8925c4dfadd on 2026-09-26.
  *
  * 216 registrations (89 GET, 89 POST, 3 PATCH, 5 ALL, 21 PUT, 9 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -943,6 +943,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       storageMethods: ["getTransactionsByMerchant"],
       sideEffects: ["audit log: logSecurityEvent"],
       statuses: [200,400,401,403,500,503],
+      dtos: ["adminTransactionDto"],
       helpers: ["authenticateAdmin"],
     },
   },
@@ -1121,6 +1122,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       authChecks: ["checkMerchantOwnership"],
       storageMethods: ["getTransactionsByMerchant"],
       statuses: [200,400,401,403,500,503],
+      dtos: ["ownerTransactionDto"],
     },
   },
   "GET /api/merchants/:id/tapt-stones": {
@@ -1347,6 +1349,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       storageMethods: ["getAllMerchants"],
       sideEffects: ["audit log: logSecurityEvent"],
       statuses: [200,401,403,500,503],
+      dtos: ["adminMerchantSummaryDto"],
       helpers: ["authenticateAdmin"],
     },
   },
@@ -1420,6 +1423,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       authChecks: ["authenticateToken","compares req.user?.role !== \"admin\""],
       sideEffects: ["audit log: logSecurityEvent","email: sendEmail"],
       statuses: [200,401,403,500,503],
+      errorTextInResponse: ["error"],
       helpers: ["authenticateAdmin"],
     },
   },
@@ -1946,6 +1950,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       authChecks: ["isAccountOwner"],
       storageMethods: ["countSeatsInUse","getOrCreateSubscription","getTeamMembers"],
       statuses: [200,400,401,403,500,503],
+      dtos: ["teamMemberDto"],
     },
   },
   "POST /api/team/invite": {
@@ -2050,6 +2055,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       authChecks: ["isAccountOwner"],
       storageMethods: ["getBillingHistory"],
       statuses: [200,400,401,403,500,503],
+      dtos: ["billingHistoryDto"],
     },
   },
   "GET /api/billing/card": {

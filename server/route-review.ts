@@ -175,6 +175,19 @@ const BOARD_PAGE_RULE =
 const SIGNED_IN_BUSINESS_RULE =
   "checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business";
 
+// ── The platform admin (batch 4) ──
+const ADMIN_AUDIT =
+  "an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)";
+const ADMIN_ANY_BUSINESS =
+  "any business, by the number in the path: the validated platform admin (authenticateAdmin: the admin role, merchant scope 0 and the configured admin email) acts across businesses";
+const ADMIN_EVERY_BUSINESS =
+  "every business at once: the validated platform admin (authenticateAdmin) sees the whole platform";
+const ADMIN_OWN = "none: the admin's own session or request; no business's data";
+const NO_ADMIN_SCREEN =
+  "No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26)";
+const ADMIN_EACH_BUSINESS_FINDING =
+  "Reads every business's sales one business at a time (getAllMerchants, then getTransactionsByMerchant for each): the time grows with the platform. Fine today; for the performance phase.";
+
 function tokenRate(family: string, perMinute: number): string {
   return (
     `requirePaymentTokenRateLimit (the ${family} family: ${perMinute} a minute per visitor address, counted in ` +
@@ -1714,23 +1727,404 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     successDto: "{ message: 'Board submitted successfully' }; 502 when the email could not be sent",
     errorDisclosure: ["input-issues"],
   },
+
+  // ── Batch 4 (2026-09-26): the platform admin ──
+  "GET /api/admin/request-origin": {
+    branches: [{ principal: "platform-admin", tenant: "none", tenantRule: ADMIN_OWN }],
+    input: "nothing but the request itself: its forwarded-for header and connection address, only shown back",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: ADMIN_AUDIT,
+    successDto:
+      "not cached: TRUST_PROXY_HOPS and whether address limits are on, the address Express takes, the protocol and host, the forwarded-for chain, the connection address, and the address each hops value would take (for the owner's phase B check)",
+    errorDisclosure: ["fixed"],
+  },
+
+  "GET /api/admin/auth/me": {
+    branches: [{ principal: "platform-admin", tenant: "none", tenantRule: ADMIN_OWN }],
+    input: "nothing",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: ADMIN_AUDIT,
+    successDto: "{ user: { id, email, merchantId: 0, role: 'admin' } }: the admin app's session check",
+    errorDisclosure: ["fixed"],
+  },
+
+  "GET /api/admin/merchants": {
+    branches: [{ principal: "platform-admin", tenant: "any-merchant", tenantRule: ADMIN_EVERY_BUSINESS }],
+    input: "nothing",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: ADMIN_AUDIT,
+    successDto: "every business, adminMerchantSummaryDto each: id, name, business name, email, director, NZBN, status and when made",
+    errorDisclosure: ["fixed"],
+  },
+
+  "GET /api/admin/merchants/:id": {
+    branches: [{ principal: "platform-admin", tenant: "any-merchant", tenantRule: ADMIN_ANY_BUSINESS }],
+    input: "id: strictPositiveIntegerParam (400 otherwise)",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: ADMIN_AUDIT,
+    successDto: "adminMerchantDto: the business's account and settings, never its password hash, tokens or bank details",
+    errorDisclosure: ["fixed"],
+  },
+
+  "GET /api/admin/merchants/:id/transactions": {
+    branches: [{ principal: "platform-admin", tenant: "any-merchant", tenantRule: ADMIN_ANY_BUSINESS }],
+    input: "id: strictPositiveIntegerParam (400 otherwise); an unknown business gets an empty list",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: ADMIN_AUDIT,
+    successDto: "every sale of the business, adminTransactionDto each, all at once (no paging)",
+    errorDisclosure: ["fixed"],
+  },
+
+  "POST /api/admin/merchants/:id/verify": {
+    branches: [{ principal: "platform-admin", tenant: "any-merchant", tenantRule: ADMIN_ANY_BUSINESS }],
+    input: "id: strictPositiveIntegerParam (400 otherwise); no body",
+    capability: null,
+    entitlement: null,
+    idempotency: "marks the business verified (updateMerchantStatus) and makes any missing owner login (syncVerifiedMerchants); again is 400 (already verified); a business with no password set is 400",
+    sideEffects: ADMIN_AUDIT,
+    successDto: "{ message, merchant: { id, name, businessName, email, status } }",
+    errorDisclosure: ["fixed"],
+    findings: [
+      "The business page offers Verify only for a waiting application, but the route takes any state but verified: an active business is set back to verified (both can sign in; the admin's lists then count it as not active). Unlike the emailed confirmation (confirmMerchantEmail), it leaves the email marked unconfirmed (emailVerified false) and the sign-up link usable. Put to the owner 2026-09-26: accept only what the page offers.",
+    ],
+  },
+
+  "POST /api/admin/merchants/:id/set-active": {
+    branches: [{ principal: "platform-admin", tenant: "any-merchant", tenantRule: ADMIN_ANY_BUSINESS }],
+    input: "id: strictPositiveIntegerParam (400 otherwise); no body",
+    capability: null,
+    entitlement: null,
+    idempotency: "sets the business active from any other state; again is 400",
+    sideEffects: ADMIN_AUDIT,
+    successDto: "{ message, merchant: { id, status } }",
+    errorDisclosure: ["fixed"],
+    findings: [
+      "The business page offers Activate only for a verified business (\"once Windcave onboarding is done\"), but the route takes any state: a waiting application whose email was never confirmed becomes active, and sign-in accepts active. Admin-only and not offered by the page. Put to the owner 2026-09-26: accept only what the page offers (verified to active).",
+    ],
+  },
+
+  "PATCH /api/admin/merchants/:id/windcave-merchant-id": {
+    branches: [{ principal: "platform-admin", tenant: "any-merchant", tenantRule: ADMIN_ANY_BUSINESS }],
+    input: "id: strictPositiveIntegerParam (400 otherwise); body read without a schema: windcaveMerchantId, stored as sent (any falsy value clears it)",
+    capability: null,
+    entitlement: null,
+    idempotency: "sets the business's provider merchant id; the same value again changes nothing",
+    sideEffects: ADMIN_AUDIT,
+    successDto: "{ message }",
+    errorDisclosure: ["fixed"],
+    findings: [
+      "The provider merchant id is stored as sent, with no check of its type or form: a number, an object or a stray space is saved as it came, and only the provider notices. A strict schema (a trimmed string of the provider's form, or null) is plan §8.4's rule.",
+    ],
+  },
+
+  "POST /api/admin/merchants/:id/activate": {
+    branches: [{ principal: "platform-admin", tenant: "any-merchant", tenantRule: ADMIN_ANY_BUSINESS }],
+    input:
+      "id: strictPositiveIntegerParam (400 otherwise); body read without a schema: password, held to the one password rule (newPasswordSchema; 400 with its first issue)",
+    capability: null,
+    entitlement: null,
+    idempotency:
+      "one-time: sets the waiting application's password, marks it verified and clears its token (verifyMerchant, by that token); a business with no waiting application is 409 (since 2026-09-26), a verified one 400",
+    sideEffects: ADMIN_AUDIT,
+    successDto: "{ message, merchant: { id, name, businessName, email, status } }",
+    errorDisclosure: ["input-issues"],
+    findings: [
+      `${NO_ADMIN_SCREEN}. The admin chooses the business's password, so the admin knows it. It is today the only way in for an application made before sign-up took a password: the confirm page sends those to support (NO_PASSWORD_CHOSEN), and Verify refuses them, naming this route. Retire it, or keep it as support's path until an emailed set-password link replaces it: put to the owner 2026-09-26.`,
+    ],
+  },
+
+  "GET /api/admin/subscription-revenue": {
+    branches: [{ principal: "platform-admin", tenant: "any-merchant", tenantRule: ADMIN_EVERY_BUSINESS }],
+    input: "nothing",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: ADMIN_AUDIT,
+    successDto:
+      "the platform's subscription revenue (getSubscriptionRevenue): monthly recurring revenue, paying subscriptions, all subscriptions, a breakdown by plan, and how many are past due, suspended and cancelling",
+    errorDisclosure: ["fixed"],
+    findings: [`${NO_ADMIN_SCREEN} (only the unmounted admin-revenue page did); the overview gets the same figures from GET /api/admin/analytics. Retire it: put to the owner 2026-09-26.`],
+  },
+
+  "GET /api/admin/analytics": {
+    branches: [{ principal: "platform-admin", tenant: "any-merchant", tenantRule: ADMIN_EVERY_BUSINESS }],
+    input: "nothing",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: ADMIN_AUDIT,
+    successDto:
+      "platform totals (businesses, active ones, sales, revenue, monthly recurring revenue, paying subscriptions) and, per business, its id, name, business name, sales count and revenue, status and last sale",
+    errorDisclosure: ["fixed"],
+    findings: [
+      ADMIN_EACH_BUSINESS_FINDING,
+      "A business whose figures fail to load is listed with zero sales and zero revenue, as if it had none (R1-T9's rule, for the admin's screens too).",
+    ],
+  },
+
+  "GET /api/admin/revenue-over-time": {
+    branches: [{ principal: "platform-admin", tenant: "any-merchant", tenantRule: ADMIN_EVERY_BUSINESS }],
+    input: "nothing",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: ADMIN_AUDIT,
+    successDto: "for each of the last 7 days (today and the 6 before, by UTC date): the platform's revenue and sales count, from completed sales",
+    errorDisclosure: ["fixed"],
+    findings: [ADMIN_EACH_BUSINESS_FINDING],
+  },
+
+  "GET /api/admin/payment-method-breakdown": {
+    branches: [{ principal: "platform-admin", tenant: "any-merchant", tenantRule: ADMIN_EVERY_BUSINESS }],
+    input: "nothing",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: ADMIN_AUDIT,
+    successDto: "per payment method of the platform's completed sales: its name, how many sales used it, and a chart colour; most used first",
+    errorDisclosure: ["fixed"],
+    findings: [ADMIN_EACH_BUSINESS_FINDING],
+  },
+
+  "GET /api/admin/ga4-detailed": {
+    branches: [{ principal: "platform-admin", tenant: "none", tenantRule: "none: the website's own visitor figures from Google Analytics; no business's data" }],
+    input: "range: read raw, then mapped to one of four start dates (14d, 30d, all; anything else is the last 7 days)",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: ADMIN_AUDIT,
+    successDto: "{ configured: false } until Google Analytics is set up; otherwise daily users, sessions and page views, users by country, new and returning users",
+    errorDisclosure: ["provider-text"],
+    findings: [
+      "Answers a failure with Google Analytics' own error text (error?.message), to the platform admin only. Minor: a fixed message and a server-side log would do.",
+    ],
+  },
+
+  "GET /api/admin/ga4-metrics": {
+    branches: [{ principal: "platform-admin", tenant: "none", tenantRule: "none: the website's own visitor figures from Google Analytics; no business's data" }],
+    input: "nothing",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: ADMIN_AUDIT,
+    successDto: "{ configured: false } until Google Analytics is set up; otherwise the last 7 days' sessions, users, page views, bounce rate and more",
+    errorDisclosure: ["provider-text"],
+    findings: [
+      "Answers a failure with Google Analytics' own error text (error?.message), to the platform admin only. Minor: a fixed message and a server-side log would do.",
+    ],
+  },
+
+  "POST /api/admin/merchants": {
+    branches: [{ principal: "platform-admin", tenant: "none", tenantRule: "none: a retired stub; nothing is read or written" }],
+    input: "nothing is read",
+    capability: null,
+    entitlement: null,
+    idempotency: "none needed: always the same answer",
+    sideEffects: ADMIN_AUDIT,
+    successDto: "none: 410, pointing to POST /api/admin/merchants/signup",
+    errorDisclosure: ["fixed"],
+    findings: [`${NO_ADMIN_SCREEN}; it only answers 410. Retire it: put to the owner 2026-09-26.`],
+  },
+
+  "POST /api/admin/merchants/signup": {
+    branches: [{ principal: "platform-admin", tenant: "any-merchant", tenantRule: "a new business, made by the admin: its email must be in use by no business and no login (409)" }],
+    input: "body: createMerchantSchema, including a password held to the one password rule (400 with the first issue and the issues)",
+    capability: null,
+    entitlement: null,
+    idempotency: "none: each new email makes one more business, verified, with an owner login",
+    sideEffects: ADMIN_AUDIT,
+    successDto: "{ message, merchant: { id, name, businessName, email, status: 'verified' } }",
+    errorDisclosure: ["input-issues"],
+    findings: [
+      `${NO_ADMIN_SCREEN} (the create-merchant page is declared but routed nowhere). The admin chooses the new owner's password. Retire it, or put its page back: put to the owner 2026-09-26.`,
+    ],
+  },
+
+  "PUT /api/admin/merchants/:id": {
+    branches: [{ principal: "platform-admin", tenant: "any-merchant", tenantRule: ADMIN_ANY_BUSINESS }],
+    input:
+      "id: strictPositiveIntegerParam (400 otherwise); body read without a schema: businessName, contactEmail, contactPhone, businessAddress, each stored as sent when any one is present",
+    capability: null,
+    entitlement: null,
+    idempotency: "sets the business's contact details; the same values again change nothing",
+    sideEffects: ADMIN_AUDIT,
+    successDto: "adminMerchantDto of the business afterwards; an unknown business is 404, found only after the write was tried",
+    errorDisclosure: ["fixed"],
+    findings: [
+      `${NO_ADMIN_SCREEN} (only the unmounted admin-merchant pages did). Its body has no schema: fields left out are passed on as undefined (the database keeps them; the in-memory storage used by tests clears them), and none is checked as an email or a length. Retire it: put to the owner 2026-09-26.`,
+    ],
+  },
+
+  "DELETE /api/admin/merchants/:id": {
+    branches: [{ principal: "platform-admin", tenant: "any-merchant", tenantRule: ADMIN_ANY_BUSINESS }],
+    input: "id: strictPositiveIntegerParam (400 otherwise)",
+    capability: null,
+    entitlement: null,
+    idempotency:
+      "tries to delete the business's sales and then the business, in one transaction (deleteMerchant); the database refuses any business another row still points at, and then nothing changes (500)",
+    sideEffects: ADMIN_AUDIT,
+    successDto: "{ message }",
+    errorDisclosure: ["fixed"],
+    findings: [
+      `${NO_ADMIN_SCREEN}. It cannot delete any business the app has made: each has a subscription row, and an owner login once it has a password, and neither key cascades. The database refuses, everything is rolled back, and the answer is 500 "Failed to delete merchant" (shown on PostgreSQL 16 with scripts/verify-admin-business-delete-postgres.ts; only a bare business row is deleted, with its sales). Made to work as written, it would delete a business and every sale with no screen, no confirmation and no record. Retire it: put to the owner 2026-09-26.`,
+    ],
+  },
+
+  "POST /api/admin/clear-merchants": {
+    branches: [
+      {
+        principal: "platform-admin",
+        tenant: "none",
+        tenantRule: "none in practice: three businesses named by email in the code; with the database storage nothing is deleted",
+      },
+    ],
+    input: "nothing is read",
+    capability: null,
+    entitlement: null,
+    idempotency: "with the in-memory storage, deletes those three businesses if present; with the database, nothing",
+    sideEffects: ADMIN_AUDIT,
+    successDto: "{ message: 'Cleared <n> problematic merchants', clearedEmails: the three addresses in the code }",
+    errorDisclosure: ["fixed"],
+    findings: [
+      `${NO_ADMIN_SCREEN}. A debugging leftover: three email addresses, the owner's among them, are written into the code; it deletes those businesses from the in-memory storage only, and it answers with the addresses. Retire it: put to the owner 2026-09-26.`,
+    ],
+  },
+
+  "POST /api/admin/resend-verification": {
+    branches: [
+      {
+        principal: "platform-admin",
+        tenant: "any-merchant",
+        tenantRule: "the business the email names (getMerchantByEmail): only one still waiting to be confirmed, with its token, is sent its link again (404, or 400 otherwise)",
+      },
+    ],
+    input: "body read without a schema: email, trimmed and lower-cased by the look-up (getMerchantByEmail); anything but a string is a 500",
+    capability: null,
+    entitlement: null,
+    idempotency: "each call sends the same link again; the token is not replaced",
+    sideEffects: `${ADMIN_AUDIT}; emails the business its confirmation link again (sendMerchantVerificationEmail)`,
+    successDto: "{ message, merchant: { id, name, businessName, email, status } }",
+    errorDisclosure: ["fixed"],
+  },
+
+  "POST /api/admin/test-email": {
+    branches: [{ principal: "platform-admin", tenant: "none", tenantRule: "none: a test email to the admin's own address" }],
+    input: "nothing",
+    capability: null,
+    entitlement: null,
+    idempotency: "none: each call sends another test email",
+    sideEffects: `${ADMIN_AUDIT}; emails the admin's own address (sendEmail)`,
+    successDto: "{ success: true, message }",
+    errorDisclosure: ["provider-text"],
+    findings: [
+      `${NO_ADMIN_SCREEN}. A failure answers with the caught error itself ({ error }), whatever the email provider put in it, to the platform admin only. Minor. Keep it (with a fixed message) or retire it, with the email status: put to the owner 2026-09-26.`,
+    ],
+  },
+
+  "GET /api/admin/email-status": {
+    branches: [{ principal: "platform-admin", tenant: "none", tenantRule: "none: the platform's email set-up" }],
+    input: "nothing",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: ADMIN_AUDIT,
+    successDto: "which email providers are set up, the environment, the from address, whether admin notices are set up and whether mail will be delivered",
+    errorDisclosure: ["fixed"],
+    findings: [`${NO_ADMIN_SCREEN}; a diagnostic, useful by hand. Keep or retire: put to the owner 2026-09-26.`],
+  },
+
+  "GET /api/admin/api-keys": {
+    branches: [{ principal: "platform-admin", tenant: "none", tenantRule: "none: the ecommerce API's administration is not built; nothing is read" }],
+    input: "nothing",
+    capability: null,
+    entitlement: null,
+    idempotency: "none needed: always the same answer",
+    sideEffects: ADMIN_AUDIT,
+    successDto: "none: 404 'Ecommerce API is unavailable'",
+    errorDisclosure: ["fixed"],
+    findings: [`${NO_ADMIN_SCREEN}; it only answers 404, as do the other four API-key and usage routes. Retire them until the ecommerce API's administration is built: put to the owner 2026-09-26.`],
+  },
+
+  "POST /api/admin/api-keys": {
+    branches: [{ principal: "platform-admin", tenant: "none", tenantRule: "none: the ecommerce API's administration is not built; nothing is read or written" }],
+    input: "nothing is read",
+    capability: null,
+    entitlement: null,
+    idempotency: "none needed: always the same answer",
+    sideEffects: ADMIN_AUDIT,
+    successDto: "none: 404 'Ecommerce API is unavailable'",
+    errorDisclosure: ["fixed"],
+  },
+
+  "POST /api/admin/api-keys/:keyId/revoke": {
+    branches: [{ principal: "platform-admin", tenant: "none", tenantRule: "none: the ecommerce API's administration is not built; nothing is read or written" }],
+    input: "keyId: strictPositiveIntegerParam (400 otherwise), then not used",
+    capability: null,
+    entitlement: null,
+    idempotency: "none needed: always the same answer",
+    sideEffects: ADMIN_AUDIT,
+    successDto: "none: 404 'Ecommerce API is unavailable'",
+    errorDisclosure: ["fixed"],
+  },
+
+  "GET /api/admin/api-metrics": {
+    branches: [{ principal: "platform-admin", tenant: "none", tenantRule: "none: the ecommerce API's administration is not built; nothing is read" }],
+    input: "nothing",
+    capability: null,
+    entitlement: null,
+    idempotency: "none needed: always the same answer",
+    sideEffects: ADMIN_AUDIT,
+    successDto: "none: 404 'Ecommerce API is unavailable'",
+    errorDisclosure: ["fixed"],
+  },
+
+  "GET /api/admin/api-usage": {
+    branches: [{ principal: "platform-admin", tenant: "none", tenantRule: "none: the ecommerce API's administration is not built; nothing is read" }],
+    input: "nothing",
+    capability: null,
+    entitlement: null,
+    idempotency: "none needed: always the same answer",
+    sideEffects: ADMIN_AUDIT,
+    successDto: "none: 404 'Ecommerce API is unavailable'",
+    errorDisclosure: ["fixed"],
+  },
+
+  "POST /api/merchants/:id/test-payment-link": {
+    branches: [{ principal: "platform-admin", tenant: "none", tenantRule: RETIRED_NO_BOARD_RULE }],
+    input: "id: strictPositiveIntegerParam (400 otherwise)",
+    capability: null,
+    entitlement: null,
+    idempotency: "none needed: always the same answer",
+    sideEffects: ADMIN_AUDIT,
+    successDto: "none: 410 NO_BOARD_ADDRESS_RETIRED (it tested the retired business-wide no-board link)",
+    errorDisclosure: ["fixed"],
+    findings: [`${NO_ADMIN_SCREEN}; it only answers 410. Retire it: put to the owner 2026-09-26.`],
+  },
 };
 
 /**
  * Routes not reviewed yet. May only shrink: PENDING_CEILING is lowered by
  * every batch, so a route cannot be added here instead of being reviewed.
  */
-export const PENDING_CEILING = 146;
+export const PENDING_CEILING = 117;
 
 export const REVIEW_PENDING: readonly string[] = [
   "POST /api/auth/sign-out-everywhere",
-  "GET /api/admin/request-origin",
   "GET /api/auth/me",
   "GET /api/tutorial/state",
   "PATCH /api/tutorial/pages/:pageKey",
   "POST /api/tutorial/restart",
   "POST /api/merchants/:id/onboarding",
-  "GET /api/admin/auth/me",
   "GET /api/merchants/:id/profile",
   "POST /api/transactions",
   "POST /api/transactions/cash-sale",
@@ -1743,11 +2137,6 @@ export const REVIEW_PENDING: readonly string[] = [
   "GET /api/merchants/:id/analytics/export",
   "GET /api/merchants/:id/export/csv",
   "GET /api/merchants/:id/export/pdf",
-  "POST /api/admin/merchants/:id/verify",
-  "POST /api/admin/merchants/:id/set-active",
-  "GET /api/admin/merchants/:id/transactions",
-  "PATCH /api/admin/merchants/:id/windcave-merchant-id",
-  "POST /api/admin/merchants/:id/activate",
   "PUT /api/merchants/:id/rates",
   "PUT /api/merchants/:id/details",
   "PUT /api/merchants/:id/change-password",
@@ -1762,23 +2151,6 @@ export const REVIEW_PENDING: readonly string[] = [
   "POST /api/merchants/:id/tapt-stones",
   "PUT /api/merchants/:merchantId/tapt-stones/:stoneId",
   "DELETE /api/merchants/:merchantId/tapt-stones/:stoneId",
-  "GET /api/admin/subscription-revenue",
-  "GET /api/admin/analytics",
-  "GET /api/admin/revenue-over-time",
-  "GET /api/admin/payment-method-breakdown",
-  "GET /api/admin/ga4-detailed",
-  "GET /api/admin/ga4-metrics",
-  "POST /api/admin/merchants",
-  "PUT /api/admin/merchants/:id",
-  "POST /api/merchants/:id/test-payment-link",
-  "GET /api/admin/merchants",
-  "GET /api/admin/merchants/:id",
-  "DELETE /api/admin/merchants/:id",
-  "POST /api/admin/clear-merchants",
-  "POST /api/admin/resend-verification",
-  "POST /api/admin/test-email",
-  "GET /api/admin/email-status",
-  "POST /api/admin/merchants/signup",
   "POST /api/push/subscribe",
   "POST /api/push/unsubscribe",
   "POST /api/push/native-subscribe",
@@ -1791,11 +2163,6 @@ export const REVIEW_PENDING: readonly string[] = [
   "GET /api/transactions/:transactionId/refunds",
   "GET /api/merchants/:merchantId/refunds",
   "GET /api/refunds/:refundId",
-  "GET /api/admin/api-keys",
-  "POST /api/admin/api-keys",
-  "POST /api/admin/api-keys/:keyId/revoke",
-  "GET /api/admin/api-metrics",
-  "GET /api/admin/api-usage",
   "GET /api/merchants/:merchantId/stock-items",
   "POST /api/merchants/:merchantId/stock-items",
   "PUT /api/merchants/:merchantId/stock-items/:itemId",

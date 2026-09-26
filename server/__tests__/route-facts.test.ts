@@ -351,6 +351,37 @@ describe("R1-T2 route facts, read from each handler's syntax tree (C10)", () => 
     expect(facts?.capabilityGates).toEqual(["windcaveService.isConfigured"]);
   });
 
+  it("reads a response projection passed by name, as to .map", () => {
+    const source = `
+      export function wire(app: Express) {
+        app.get("/list", async (req, res) => {
+          const rows = await storage.getAllMerchants();
+          res.json(rows.map(adminMerchantSummaryDto));
+        });
+      }`;
+    const facts = extractRouteFacts(source, "server/wire.ts").get("GET /list");
+    expect(facts?.dtos).toEqual(["adminMerchantSummaryDto"]);
+  });
+
+  it("reads a caught error put whole into a response", () => {
+    const source = `
+      export function wire(app: Express) {
+        app.post("/a", async (req, res) => {
+          try { await sendEmail({}); } catch (error) { res.status(500).json({ success: false, error: error }); }
+        });
+        app.post("/b", async (req, res) => {
+          try { await sendEmail({}); } catch (err) { res.status(500).json({ err }); }
+        });
+        app.post("/c", async (req, res) => {
+          res.status(500).json({ error: "Failed to send" });
+        });
+      }`;
+    const facts = extractRouteFacts(source, "server/wire.ts");
+    expect(facts.get("POST /a")?.errorTextInResponse).toEqual(["error"]);
+    expect(facts.get("POST /b")?.errorTextInResponse).toEqual(["err"]);
+    expect(facts.get("POST /c")?.errorTextInResponse).toEqual([]);
+  });
+
   it("reads a handler passed by name", () => {
     expect(factsFor("GET /api/billing/card/callback")).toMatchObject({
       middleware: [],

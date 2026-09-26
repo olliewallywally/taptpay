@@ -162,6 +162,11 @@ function problemsWith(key: string, review: RouteReview): string[] {
     if (!branch.tenantRule.trim()) say(`${label} has no tenant rule`);
   }
 
+  // authenticateAdmin lets nobody but the validated platform admin through.
+  if (facts.middleware.includes("authenticateAdmin") && review.branches.some((branch) => branch.principal !== "platform-admin")) {
+    say("sits behind authenticateAdmin, so every branch must be the platform admin");
+  }
+
   // Every caller without a session: authenticity, replay and rate, stated.
   const unauthenticated = review.branches.some((branch) => UNAUTHENTICATED.includes(branch.principal));
   if (unauthenticated && !review.controls) say("serves a caller without a session but states no controls");
@@ -282,6 +287,20 @@ describe("R1-T2 / R1-T3 — every route's reviewed policy holds against its hand
         branches: [{ principal: "merchant", roles: ["owner"], tenant: "path-merchant", tenantRule: "the owner's own business; the admin is refused" }],
       };
       expect(problemsWith(clear, review).join("\n")).not.toContain("platform admin");
+    });
+
+    it("refuse any principal but the platform admin on a route behind authenticateAdmin", () => {
+      const list = "GET /api/admin/merchants";
+      const asMerchant: RouteReview = {
+        ...base,
+        branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: "the session's own business" }],
+        successDto: "adminMerchantSummaryDto",
+        sideEffects: "an audit log line",
+        errorDisclosure: ["fixed"],
+        input: "nothing",
+      };
+      expect(problemsWith(list, asMerchant).join("\n")).toContain("sits behind authenticateAdmin, so every branch must be the platform admin");
+      expect(problemsWith(list, ROUTE_REVIEW[list])).toEqual([]);
     });
 
     it("refuse an unauthenticated principal for a signed-in route's branch without controls", () => {
