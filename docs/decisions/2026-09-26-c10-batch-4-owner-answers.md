@@ -43,3 +43,16 @@ All from batch 4's reviews (`4ed2e145`, `server/route-review.ts`) and the workin
   mounted nowhere that called the removed routes are dead code already; removing them was not asked.
 - Keeping activate records the owner's reason in its review: support's path for old applications
   until an emailed set-password link replaces it (not built; for the account-security work).
+
+## Outcome (same day, local commits, not pushed)
+
+- 1–3, **`8aad300b`**: 13 routes removed (203 remain). The 11 of answer 1; the admin sign-up
+  (answer 2; `createMerchantSchema` is no longer imported by the routes); the test email (answer 3).
+  The three email addresses written into clear-merchants are gone from the code with it. Activate
+  and the email status stay, and their reviews record why. The pages mounted nowhere that called
+  the removed routes are left as they were.
+- 4, **`51feb200`**: verify accepts only a waiting application, set-active only a verified business;
+  any other state is 409 and changes nothing ("already verified" and "already active" stay 400).
+  Two older parameter tests had used exactly the refused transitions as fixtures; they now use the
+  states the page offers.
+- Both tests first, with mutations (5/5 and 4/4). Server 103/1,775; `tsc` clean.
