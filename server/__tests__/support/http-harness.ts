@@ -67,6 +67,28 @@ export function resetTestStorage(): void {
 
 export const storage = liveStorage;
 
+/**
+ * Every own property of the storage instance, with Maps rendered as sorted
+ * entries. Includes the private id counters, so an insert that was rolled back
+ * after bumping a counter is still visible as a change. Compare one taken
+ * before a request with one taken after to prove the request wrote nothing.
+ */
+export function storageSnapshot(): string {
+  const target = liveStorage as unknown as Record<string, unknown>;
+  const state: Record<string, unknown> = {};
+  for (const key of Object.keys(target)) {
+    const value = target[key];
+    if (value instanceof Map) {
+      state[key] = [...value.entries()]
+        .map(([k, v]) => [String(k), v] as const)
+        .sort((a, b) => a[0].localeCompare(b[0]));
+    } else if (typeof value !== "function") {
+      state[key] = value;
+    }
+  }
+  return JSON.stringify(state);
+}
+
 function randomEmail(label: string): string {
   return `${label}.${crypto.randomBytes(4).toString("hex")}@harness.test`;
 }

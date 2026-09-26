@@ -1,4 +1,4 @@
-# R1-T2 route inventory — generated 2026-09-25 @ `f5ef0d11b9987453e56b7cd1bfb410f9e13421cf`
+# R1-T2 route inventory — generated 2026-09-26 @ `2ec9d78fc56054428baf23d9a5544161ecefd557`
 
 Regenerate with `npx tsx scripts/generate-route-policy.ts`. This table is
 evidence for the SHA named above, not a timeless constant — see

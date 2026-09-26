@@ -13,16 +13,16 @@ import {
   detectGateMarkers,
   detectProviderWebhookMarkers,
   detectPublicMarkers,
-  extractSourceInventoryFromFile,
+  extractRegistrationInventory,
   isNotificationWebhookRegistration,
   PUBLIC_PATH_ALLOWLIST,
+  REGISTRATION_FILES,
   registrationKey,
   sliceHandlerBodies,
   SUSPECTED_GAP_ROUTES,
   type RouteRegistration,
 } from "../server/route-inventory";
 
-const ROUTES_FILE = path.join(process.cwd(), "server", "routes.ts");
 const POLICY_FILE = path.join(process.cwd(), "server", "route-policy.ts");
 const TABLE_FILE = path.join(
   process.cwd(),
@@ -91,14 +91,21 @@ function main() {
   const sha = execSync("git rev-parse HEAD", { cwd: process.cwd() }).toString().trim();
   const generatedAt = new Date().toISOString().slice(0, 10);
 
-  const inventory = extractSourceInventoryFromFile(ROUTES_FILE);
-  const sourceText = fs.readFileSync(ROUTES_FILE, "utf8");
-  const bodies = sliceHandlerBodies(sourceText, inventory.registrations);
+  // Every file that registers on the app (server/route-inventory.ts,
+  // REGISTRATION_FILES); today every route is in server/routes.ts.
+  const inventory = extractRegistrationInventory();
+  const registrations: Array<RouteRegistration & { file: string; body: string }> = REGISTRATION_FILES.flatMap((file) => {
+    const sourceText = fs.readFileSync(path.join(process.cwd(), file), "utf8");
+    const fileRegistrations = inventory[file].registrations;
+    const bodies = sliceHandlerBodies(sourceText, fileRegistrations);
+    return fileRegistrations.map((reg, i) => ({ ...reg, file, body: bodies[i] }));
+  });
 
-  const rows = inventory.registrations.map((reg: RouteRegistration, i: number) => {
-    const gateMarkers = detectGateMarkers(bodies[i]);
-    const publicMarkers = detectPublicMarkers(bodies[i]);
-    const webhookMarkers = detectProviderWebhookMarkers(bodies[i]);
+  const rows = registrations.map((reg) => {
+    const { body, ...registration } = reg;
+    const gateMarkers = detectGateMarkers(body);
+    const publicMarkers = detectPublicMarkers(body);
+    const webhookMarkers = detectProviderWebhookMarkers(body);
     // All detected literal markers, surfaced together for human review —
     // see route-inventory.ts for which list each one came from and what it
     // means. A "public"/"provider-webhook" row with an empty markers array
@@ -106,7 +113,7 @@ function main() {
     // instead of a text marker; see the per-route justification there.
     const markers = [...gateMarkers, ...publicMarkers, ...webhookMarkers];
     const principal = classifyPrincipal(reg.method, reg.path, gateMarkers, publicMarkers, webhookMarkers);
-    return { ...reg, markers, principal };
+    return { ...registration, markers, principal };
   });
 
   const byMethod: Record<string, number> = {};
@@ -114,7 +121,7 @@ function main() {
 
   const policySource = `/**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/routes.ts @ ${sha} on ${generatedAt}.
+ * scripts/generate-route-policy.ts from ${REGISTRATION_FILES.join(", ")} @ ${sha} on ${generatedAt}.
  *
  * ${rows.length} registrations (${Object.entries(byMethod)
     .map(([m, c]) => `${c} ${m}`)
@@ -122,8 +129,9 @@ function main() {
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
  * live count on every run rather than trusting this comment.
  *
- * What this file asserts: every registration in server/routes.ts has an
+ * What this file asserts: every route registration in those files has an
  * entry here (the completeness gate route-policy-inventory.test.ts enforces).
+ * Middleware registrations (app.use) are policed in server/middleware-policy.ts.
  * \`principal\` is a best-effort heuristic from text-marker matches and two
  * small curated allowlists (see server/route-inventory.ts), not a security
  * review — "merchant-user" does not yet distinguish owner/member/admin.
@@ -244,7 +252,7 @@ ${gapSection}
 ${rows
   .map(
     (r) =>
-      `| ${r.method} | \`${r.path}\` | ${r.line} | ${r.principal} | ${r.markers.join(", ") || "—"} |`,
+      `| ${r.method} | \`${r.path}\` | ${r.file === "server/routes.ts" ? r.line : `${r.file}:${r.line}`} | ${r.principal} | ${r.markers.join(", ") || "—"} |`,
   )
   .join("\n")}
 `;

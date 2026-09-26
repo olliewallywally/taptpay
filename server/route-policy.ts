@@ -1,13 +1,14 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/routes.ts @ f5ef0d11b9987453e56b7cd1bfb410f9e13421cf on 2026-09-25.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 2ec9d78fc56054428baf23d9a5544161ecefd557 on 2026-09-26.
  *
  * 223 registrations (93 GET, 91 POST, 3 PATCH, 5 ALL, 22 PUT, 9 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
  * live count on every run rather than trusting this comment.
  *
- * What this file asserts: every registration in server/routes.ts has an
+ * What this file asserts: every route registration in those files has an
  * entry here (the completeness gate route-policy-inventory.test.ts enforces).
+ * Middleware registrations (app.use) are policed in server/middleware-policy.ts.
  * `principal` is a best-effort heuristic from text-marker matches and two
  * small curated allowlists (see server/route-inventory.ts), not a security
  * review — "merchant-user" does not yet distinguish owner/member/admin.

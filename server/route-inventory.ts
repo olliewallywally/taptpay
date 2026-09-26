@@ -17,6 +17,7 @@
  */
 import * as ts from "typescript";
 import fs from "fs";
+import path from "path";
 
 export type HttpRegistrationMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "ALL";
 
@@ -32,6 +33,13 @@ export interface MiddlewareUse {
   path: string | null;
   /** true when the argument looks like a mounted Router (an Identifier, not an inline function). */
   looksLikeMountedRouter: boolean;
+  /**
+   * What is mounted, as the middleware policy names it: a call as
+   * `callee(…)` (`helmet(…)`, `express.static(…)`), a reference as written
+   * (`vite.middlewares`, `extraRouter`), an inline function as
+   * "inline function"; several arguments are joined with ", ".
+   */
+  mounts: string;
   line: number;
 }
 
@@ -50,15 +58,88 @@ const ROUTE_METHODS: Record<string, HttpRegistrationMethod> = {
 };
 
 /**
- * @param appIdentifier the local variable name the app/router is bound to —
- * "app" for server/routes.ts's `registerRoutes(app: Express)`.
+ * Type names that make a parameter an Express app or router
+ * (`registerRoutes(app: Express)`, `serveStatic(app: Express)`).
+ */
+const EXPRESS_TYPE_NAMES = new Set([
+  "Express",
+  "Application",
+  "Router",
+  "IRouter",
+  "express.Express",
+  "express.Application",
+  "express.Router",
+  "express.IRouter",
+]);
+
+/**
+ * Calls whose result is an Express app or router: `express()`,
+ * `express.Router()`, `Router()`, and server/app.ts's `createApp(…)`, which
+ * server/index.ts serves.
+ */
+const EXPRESS_FACTORY_CALLS = new Set(["express", "express.Router", "Router", "createApp"]);
+
+/**
+ * The local names bound to an Express app or router in one file: variables
+ * initialised by an Express factory call, and parameters typed as an Express
+ * app or router. Registrations are read only on these names, so an unrelated
+ * `.use(…)` (a Map, a plugin system) is never mistaken for middleware.
+ */
+export function findExpressBindings(sourceFile: ts.SourceFile): Set<string> {
+  const names = new Set<string>();
+  function visit(node: ts.Node) {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer &&
+      ts.isCallExpression(node.initializer) &&
+      EXPRESS_FACTORY_CALLS.has(node.initializer.expression.getText(sourceFile))
+    ) {
+      names.add(node.name.text);
+    }
+    if (
+      ts.isParameter(node) &&
+      ts.isIdentifier(node.name) &&
+      node.type &&
+      EXPRESS_TYPE_NAMES.has(node.type.getText(sourceFile))
+    ) {
+      names.add(node.name.text);
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(sourceFile);
+  return names;
+}
+
+/** How the middleware policy names what one `use` argument mounts. */
+function describeMount(node: ts.Expression, sourceFile: ts.SourceFile): string {
+  if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) return "inline function";
+  if (ts.isCallExpression(node)) return `${node.expression.getText(sourceFile)}(…)`;
+  return node.getText(sourceFile);
+}
+
+/**
+ * Names this codebase gives an Express app or router by convention. Read as
+ * bindings in every file even when findExpressBindings() cannot see where the
+ * value came from (`const app = buildApp()`), so such a file still shows up
+ * in discoverRegistrationFiles() instead of slipping past it.
+ */
+const CONVENTIONAL_BINDINGS = ["app", "router"];
+
+/**
+ * @param appIdentifier the local name the app/router is bound to. Omitted,
+ * every Express binding findExpressBindings() finds in the file is read,
+ * plus the conventional names.
  */
 export function extractSourceInventory(
   sourceText: string,
   fileName: string,
-  appIdentifier = "app",
+  appIdentifier?: string,
 ): SourceInventory {
   const sourceFile = ts.createSourceFile(fileName, sourceText, ts.ScriptTarget.ES2022, true, ts.ScriptKind.TS);
+  const bindings = appIdentifier
+    ? new Set([appIdentifier])
+    : new Set([...findExpressBindings(sourceFile), ...CONVENTIONAL_BINDINGS]);
   const registrations: RouteRegistration[] = [];
   const uses: MiddlewareUse[] = [];
 
@@ -71,26 +152,25 @@ export function extractSourceInventory(
       ts.isCallExpression(node) &&
       ts.isPropertyAccessExpression(node.expression) &&
       ts.isIdentifier(node.expression.expression) &&
-      node.expression.expression.text === appIdentifier
+      bindings.has(node.expression.expression.text)
     ) {
       const prop = node.expression.name.text;
       const firstArg = node.arguments[0];
 
       if (prop in ROUTE_METHODS) {
-        if (firstArg && ts.isStringLiteralLike(firstArg)) {
+        // `app.get("env")` (one argument) reads a setting; a route has a handler.
+        if (firstArg && ts.isStringLiteralLike(firstArg) && node.arguments.length >= 2) {
           registrations.push({ method: ROUTE_METHODS[prop], path: firstArg.text, line: lineOf(node) });
         }
       } else if (prop === "use") {
-        if (firstArg && ts.isStringLiteralLike(firstArg)) {
-          const second = node.arguments[1];
-          uses.push({
-            path: firstArg.text,
-            looksLikeMountedRouter: !!second && ts.isIdentifier(second),
-            line: lineOf(node),
-          });
-        } else {
-          uses.push({ path: null, looksLikeMountedRouter: false, line: lineOf(node) });
-        }
+        const pathArg = firstArg && ts.isStringLiteralLike(firstArg) ? firstArg : null;
+        const mounted = pathArg ? node.arguments.slice(1) : [...node.arguments];
+        uses.push({
+          path: pathArg ? pathArg.text : null,
+          looksLikeMountedRouter: !!pathArg && mounted.length > 0 && ts.isIdentifier(mounted[0]),
+          mounts: mounted.map((arg) => describeMount(arg, sourceFile)).join(", "),
+          line: lineOf(node),
+        });
       }
     }
     ts.forEachChild(node, visit);
@@ -100,8 +180,102 @@ export function extractSourceInventory(
   return { registrations, uses };
 }
 
-export function extractSourceInventoryFromFile(filePath: string, appIdentifier = "app"): SourceInventory {
+export function extractSourceInventoryFromFile(filePath: string, appIdentifier?: string): SourceInventory {
   return extractSourceInventory(fs.readFileSync(filePath, "utf8"), filePath, appIdentifier);
+}
+
+/**
+ * Every file that registers a route or middleware on the app production
+ * serves, repo-relative, in the order the app is assembled: the pipeline
+ * (createApp), the routes, then what server/index.ts adds after them and the
+ * Vite/static serving it calls. route-policy-inventory.test.ts proves no other
+ * server file registers anything (discoverRegistrationFiles).
+ */
+export const REGISTRATION_FILES = [
+  "server/app.ts",
+  "server/routes.ts",
+  "server/index.ts",
+  "server/vite.ts",
+] as const;
+
+export type RegistrationFile = (typeof REGISTRATION_FILES)[number];
+
+/** The source inventory of every registration file, keyed by its repo-relative path. */
+export function extractRegistrationInventory(repoRoot = process.cwd()): Record<RegistrationFile, SourceInventory> {
+  const inventory = {} as Record<RegistrationFile, SourceInventory>;
+  for (const file of REGISTRATION_FILES) {
+    inventory[file] = extractSourceInventoryFromFile(path.join(repoRoot, file));
+  }
+  return inventory;
+}
+
+function listTypeScriptFiles(dir: string): string[] {
+  const found: string[] = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (entry.name === "__tests__" || entry.name === "node_modules") continue;
+      found.push(...listTypeScriptFiles(full));
+    } else if (/\.tsx?$/.test(entry.name) && !/\.(test|spec)\.tsx?$/.test(entry.name) && !entry.name.endsWith(".d.ts")) {
+      found.push(full);
+    }
+  }
+  return found;
+}
+
+/**
+ * Every non-test TypeScript file under server/ that registers a route or
+ * middleware on an Express app or router binding, repo-relative and sorted.
+ */
+export function discoverRegistrationFiles(repoRoot = process.cwd()): string[] {
+  return listTypeScriptFiles(path.join(repoRoot, "server"))
+    .filter((file) => {
+      const inventory = extractSourceInventoryFromFile(file);
+      return inventory.registrations.length > 0 || inventory.uses.length > 0;
+    })
+    .map((file) => path.relative(repoRoot, file).split(path.sep).join("/"))
+    .sort();
+}
+
+/**
+ * Compares each file's `use` registrations, in order, with its middleware
+ * policy, and describes every difference: a registration the policy does not
+ * list (a new middleware or a mounted router), a listed one that is gone, or
+ * one that moved. Empty when they agree.
+ */
+export function middlewarePolicyDiff(
+  inventory: Record<string, SourceInventory>,
+  policy: Record<string, ReadonlyArray<{ path: string | null; mounts: string }>>,
+): string[] {
+  const problems: string[] = [];
+  const describe = (entry: { path: string | null; mounts: string }) =>
+    `"${entry.mounts}" on ${entry.path === null ? "every path" : `"${entry.path}"`}`;
+
+  for (const file of Object.keys(policy)) {
+    if (!(file in inventory)) problems.push(`${file}: has a middleware policy but is not an inventoried registration file`);
+  }
+  for (const [file, { uses }] of Object.entries(inventory)) {
+    const listed = policy[file];
+    if (!listed) {
+      if (uses.length > 0) problems.push(`${file}: registers middleware but has no middleware policy`);
+      continue;
+    }
+    const length = Math.max(uses.length, listed.length);
+    for (let i = 0; i < length; i++) {
+      const found = uses[i];
+      const expected = listed[i];
+      if (found && !expected) {
+        problems.push(`${file}:${found.line}: use #${i + 1} ${describe(found)} has no middleware policy entry`);
+      } else if (!found && expected) {
+        problems.push(`${file}: policy entry #${i + 1} ${describe(expected)} is no longer registered`);
+      } else if (found && expected && (found.path !== expected.path || found.mounts !== expected.mounts)) {
+        problems.push(
+          `${file}:${found.line}: use #${i + 1} is ${describe(found)}, but its policy entry is ${describe(expected)}`,
+        );
+      }
+    }
+  }
+  return problems;
 }
 
 export function registrationKey(method: string, path: string): string {

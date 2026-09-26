@@ -12,6 +12,7 @@ import {
   createTestApp,
   resetTestStorage,
   storage,
+  storageSnapshot,
 } from "./support/http-harness";
 
 /**
@@ -24,27 +25,6 @@ import {
  * the real router and compare a complete snapshot of storage before and after,
  * so a write nobody thought to assert on is still caught.
  */
-
-/**
- * Every own property of the storage instance, with Maps rendered as sorted
- * entries. Includes the private id counters, so an insert that was rolled back
- * after bumping a counter is still visible as a change.
- */
-function storageSnapshot(): string {
-  const target = storage as unknown as Record<string, unknown>;
-  const state: Record<string, unknown> = {};
-  for (const key of Object.keys(target)) {
-    const value = target[key];
-    if (value instanceof Map) {
-      state[key] = [...value.entries()]
-        .map(([k, v]) => [String(k), v] as const)
-        .sort((a, b) => a[0].localeCompare(b[0]));
-    } else if (typeof value !== "function") {
-      state[key] = value;
-    }
-  }
-  return JSON.stringify(state);
-}
 
 /**
  * Requests that must never succeed and must never change anything.
