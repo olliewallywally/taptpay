@@ -1,8 +1,8 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 8c40d0670e4e18b820217fde9fb8c8925c4dfadd on 2026-09-26.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 4d2794a0411a5743744253d3286ac10f7b085aed on 2026-09-26.
  *
- * 216 registrations (89 GET, 89 POST, 3 PATCH, 5 ALL, 21 PUT, 9 DELETE) on this SHA — evidence for THIS commit, not a timeless
+ * 203 registrations (85 GET, 82 POST, 3 PATCH, 5 ALL, 20 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
  * live count on every run rather than trusting this comment.
  *
@@ -1179,20 +1179,6 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       statuses: [200,400,401,403,404,500,503],
     },
   },
-  "GET /api/admin/subscription-revenue": {
-    method: "GET",
-    path: "/api/admin/subscription-revenue",
-    principal: "admin",
-    markers: ["authenticateAdmin"],
-    facts: {
-      middleware: ["authenticateAdmin"],
-      authChecks: ["authenticateToken","compares req.user?.role !== \"admin\""],
-      storageMethods: ["getSubscriptionRevenue"],
-      sideEffects: ["audit log: logSecurityEvent"],
-      statuses: [200,401,403,500,503],
-      helpers: ["authenticateAdmin"],
-    },
-  },
   "ALL /api/windcave/notification": {
     method: "ALL",
     path: "/api/windcave/notification",
@@ -1295,49 +1281,6 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       helpers: ["authenticateAdmin"],
     },
   },
-  "POST /api/admin/merchants": {
-    method: "POST",
-    path: "/api/admin/merchants",
-    principal: "admin",
-    markers: ["authenticateAdmin"],
-    facts: {
-      middleware: ["authenticateAdmin"],
-      authChecks: ["authenticateToken","compares req.user?.role !== \"admin\""],
-      sideEffects: ["audit log: logSecurityEvent"],
-      statuses: [401,403,410,503],
-      helpers: ["authenticateAdmin"],
-    },
-  },
-  "PUT /api/admin/merchants/:id": {
-    method: "PUT",
-    path: "/api/admin/merchants/:id",
-    principal: "admin",
-    markers: ["authenticateAdmin"],
-    facts: {
-      middleware: ["authenticateAdmin"],
-      params: ["id: strictPositiveIntegerParam"],
-      authChecks: ["authenticateToken","compares req.user?.role !== \"admin\""],
-      storageMethods: ["getMerchant","updateMerchantDetails"],
-      sideEffects: ["audit log: logSecurityEvent"],
-      statuses: [200,400,401,403,404,500,503],
-      dtos: ["adminMerchantDto"],
-      helpers: ["authenticateAdmin"],
-    },
-  },
-  "POST /api/merchants/:id/test-payment-link": {
-    method: "POST",
-    path: "/api/merchants/:id/test-payment-link",
-    principal: "admin",
-    markers: ["authenticateAdmin"],
-    facts: {
-      middleware: ["authenticateAdmin"],
-      params: ["id: strictPositiveIntegerParam"],
-      authChecks: ["authenticateToken","compares req.user?.role !== \"admin\""],
-      sideEffects: ["audit log: logSecurityEvent"],
-      statuses: [400,401,403,410,503],
-      helpers: ["authenticateAdmin"],
-    },
-  },
   "GET /api/admin/merchants": {
     method: "GET",
     path: "/api/admin/merchants",
@@ -1369,35 +1312,6 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       helpers: ["authenticateAdmin"],
     },
   },
-  "DELETE /api/admin/merchants/:id": {
-    method: "DELETE",
-    path: "/api/admin/merchants/:id",
-    principal: "admin",
-    markers: ["authenticateAdmin"],
-    facts: {
-      middleware: ["authenticateAdmin"],
-      params: ["id: strictPositiveIntegerParam"],
-      authChecks: ["authenticateToken","compares req.user?.role !== \"admin\""],
-      storageMethods: ["deleteMerchant","getMerchant"],
-      sideEffects: ["audit log: logSecurityEvent"],
-      statuses: [200,400,401,403,404,500,503],
-      helpers: ["authenticateAdmin"],
-    },
-  },
-  "POST /api/admin/clear-merchants": {
-    method: "POST",
-    path: "/api/admin/clear-merchants",
-    principal: "admin",
-    markers: ["authenticateAdmin"],
-    facts: {
-      middleware: ["authenticateAdmin"],
-      authChecks: ["authenticateToken","compares req.user?.role !== \"admin\""],
-      storageMethods: ["getMerchantByEmail"],
-      sideEffects: ["audit log: logSecurityEvent"],
-      statuses: [200,401,403,500,503],
-      helpers: ["authenticateAdmin"],
-    },
-  },
   "POST /api/admin/resend-verification": {
     method: "POST",
     path: "/api/admin/resend-verification",
@@ -1410,20 +1324,6 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       storageMethods: ["getMerchantByEmail"],
       sideEffects: ["audit log: logSecurityEvent","email: sendMerchantVerificationEmail"],
       statuses: [200,400,401,403,404,500,503],
-      helpers: ["authenticateAdmin"],
-    },
-  },
-  "POST /api/admin/test-email": {
-    method: "POST",
-    path: "/api/admin/test-email",
-    principal: "admin",
-    markers: ["authenticateAdmin"],
-    facts: {
-      middleware: ["authenticateAdmin"],
-      authChecks: ["authenticateToken","compares req.user?.role !== \"admin\""],
-      sideEffects: ["audit log: logSecurityEvent","email: sendEmail"],
-      statuses: [200,401,403,500,503],
-      errorTextInResponse: ["error"],
       helpers: ["authenticateAdmin"],
     },
   },
@@ -1497,22 +1397,6 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       errorTextInResponse: ["validation.error.issues"],
       rateLimits: ["checkRateLimit"],
       helpers: ["checkRateLimit","replyToSignup"],
-    },
-  },
-  "POST /api/admin/merchants/signup": {
-    method: "POST",
-    path: "/api/admin/merchants/signup",
-    principal: "admin",
-    markers: ["authenticateAdmin"],
-    facts: {
-      middleware: ["authenticateAdmin"],
-      body: ["schema: createMerchantSchema"],
-      authChecks: ["authenticateToken","compares req.user?.role !== \"admin\""],
-      storageMethods: ["createMerchantWithPassword","getMerchantByEmail","getUserByEmail","updateMerchantDetails"],
-      sideEffects: ["audit log: logSecurityEvent"],
-      statuses: [200,400,401,403,409,500,503],
-      errorTextInResponse: ["validation.error.issues"],
-      helpers: ["authenticateAdmin"],
     },
   },
   "GET /api/merchants/:id/events": {
@@ -1700,72 +1584,6 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       authChecks: ["compares refund.merchantId !== merchantId","compares req.user?.role !== 'admin'"],
       storageMethods: ["getRefund"],
       statuses: [200,400,401,403,404,500,503],
-    },
-  },
-  "GET /api/admin/api-keys": {
-    method: "GET",
-    path: "/api/admin/api-keys",
-    principal: "admin",
-    markers: ["authenticateAdmin"],
-    facts: {
-      middleware: ["authenticateAdmin"],
-      authChecks: ["authenticateToken","compares req.user?.role !== \"admin\""],
-      sideEffects: ["audit log: logSecurityEvent"],
-      statuses: [401,403,404,503],
-      helpers: ["authenticateAdmin"],
-    },
-  },
-  "POST /api/admin/api-keys": {
-    method: "POST",
-    path: "/api/admin/api-keys",
-    principal: "admin",
-    markers: ["authenticateAdmin"],
-    facts: {
-      middleware: ["authenticateAdmin"],
-      authChecks: ["authenticateToken","compares req.user?.role !== \"admin\""],
-      sideEffects: ["audit log: logSecurityEvent"],
-      statuses: [401,403,404,503],
-      helpers: ["authenticateAdmin"],
-    },
-  },
-  "POST /api/admin/api-keys/:keyId/revoke": {
-    method: "POST",
-    path: "/api/admin/api-keys/:keyId/revoke",
-    principal: "admin",
-    markers: ["authenticateAdmin"],
-    facts: {
-      middleware: ["authenticateAdmin"],
-      params: ["keyId: strictPositiveIntegerParam"],
-      authChecks: ["authenticateToken","compares req.user?.role !== \"admin\""],
-      sideEffects: ["audit log: logSecurityEvent"],
-      statuses: [400,401,403,404,503],
-      helpers: ["authenticateAdmin"],
-    },
-  },
-  "GET /api/admin/api-metrics": {
-    method: "GET",
-    path: "/api/admin/api-metrics",
-    principal: "admin",
-    markers: ["authenticateAdmin"],
-    facts: {
-      middleware: ["authenticateAdmin"],
-      authChecks: ["authenticateToken","compares req.user?.role !== \"admin\""],
-      sideEffects: ["audit log: logSecurityEvent"],
-      statuses: [401,403,404,503],
-      helpers: ["authenticateAdmin"],
-    },
-  },
-  "GET /api/admin/api-usage": {
-    method: "GET",
-    path: "/api/admin/api-usage",
-    principal: "admin",
-    markers: ["authenticateAdmin"],
-    facts: {
-      middleware: ["authenticateAdmin"],
-      authChecks: ["authenticateToken","compares req.user?.role !== \"admin\""],
-      sideEffects: ["audit log: logSecurityEvent"],
-      statuses: [401,403,404,503],
-      helpers: ["authenticateAdmin"],
     },
   },
   "GET /api/merchants/:merchantId/stock-items": {

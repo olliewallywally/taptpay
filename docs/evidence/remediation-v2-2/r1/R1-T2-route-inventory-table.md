@@ -1,12 +1,12 @@
-# R1-T2 route inventory — generated 2026-09-26 @ `8c40d0670e4e18b820217fde9fb8c8925c4dfadd`
+# R1-T2 route inventory — generated 2026-09-26 @ `4d2794a0411a5743744253d3286ac10f7b085aed`
 
 Regenerate with `npx tsx scripts/generate-route-policy.ts`. This table is
 evidence for the SHA named above, not a timeless constant — see
 docs/evidence/remediation-v2-2/r1/ for the task record.
 
-Total registrations: **216** (89 GET, 89 POST, 3 PATCH, 5 ALL, 21 PUT, 9 DELETE).
+Total registrations: **203** (85 GET, 82 POST, 3 PATCH, 5 ALL, 20 PUT, 8 DELETE).
 
-By principal: **public**: 56, **admin**: 30, **merchant-user**: 119, **provider-webhook**: 6, **api-key**: 3, **cron**: 2.
+By principal: **public**: 56, **admin**: 17, **merchant-user**: 119, **provider-webhook**: 6, **api-key**: 3, **cron**: 2.
 
 Unclassified (no known gate marker, no known public-design marker, and no
 curated allowlist entry found near the handler — needs a human read, not
@@ -14,7 +14,7 @@ necessarily a bug): **0**.
 
 ## Review
 
-99 of 216 routes reviewed (server/route-review.ts); 117 pending.
+86 of 203 routes reviewed (server/route-review.ts); 117 pending.
 A reviewed route's principal below is the review's; a pending one's is the heuristic, marked "(heuristic)".
 
 ### Open findings
@@ -64,23 +64,14 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 - **POST /api/admin/merchants/:id/verify:** The business page offers Verify only for a waiting application, but the route takes any state but verified: an active business is set back to verified (both can sign in; the admin's lists then count it as not active). Unlike the emailed confirmation (confirmMerchantEmail), it leaves the email marked unconfirmed (emailVerified false) and the sign-up link usable. Put to the owner 2026-09-26: accept only what the page offers.
 - **POST /api/admin/merchants/:id/set-active:** The business page offers Activate only for a verified business ("once Windcave onboarding is done"), but the route takes any state: a waiting application whose email was never confirmed becomes active, and sign-in accepts active. Admin-only and not offered by the page. Put to the owner 2026-09-26: accept only what the page offers (verified to active).
 - **PATCH /api/admin/merchants/:id/windcave-merchant-id:** The provider merchant id is stored as sent, with no check of its type or form: a number, an object or a stray space is saved as it came, and only the provider notices. A strict schema (a trimmed string of the provider's form, or null) is plan §8.4's rule.
-- **POST /api/admin/merchants/:id/activate:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26). The admin chooses the business's password, so the admin knows it. It is today the only way in for an application made before sign-up took a password: the confirm page sends those to support (NO_PASSWORD_CHOSEN), and Verify refuses them, naming this route. Retire it, or keep it as support's path until an emailed set-password link replaces it: put to the owner 2026-09-26.
-- **GET /api/admin/subscription-revenue:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26) (only the unmounted admin-revenue page did); the overview gets the same figures from GET /api/admin/analytics. Retire it: put to the owner 2026-09-26.
+- **POST /api/admin/merchants/:id/activate:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26). The admin chooses the business's password, so the admin knows it. It is today the only way in for an application made before sign-up took a password: the confirm page sends those to support (NO_PASSWORD_CHOSEN), and Verify refuses them, naming this route. Kept by the owner's decision (2026-09-26) as support's path until an emailed set-password link replaces it (the account-security work).
 - **GET /api/admin/analytics:** Reads every business's sales one business at a time (getAllMerchants, then getTransactionsByMerchant for each): the time grows with the platform. Fine today; for the performance phase.
 - **GET /api/admin/analytics:** A business whose figures fail to load is listed with zero sales and zero revenue, as if it had none (R1-T9's rule, for the admin's screens too).
 - **GET /api/admin/revenue-over-time:** Reads every business's sales one business at a time (getAllMerchants, then getTransactionsByMerchant for each): the time grows with the platform. Fine today; for the performance phase.
 - **GET /api/admin/payment-method-breakdown:** Reads every business's sales one business at a time (getAllMerchants, then getTransactionsByMerchant for each): the time grows with the platform. Fine today; for the performance phase.
 - **GET /api/admin/ga4-detailed:** Answers a failure with Google Analytics' own error text (error?.message), to the platform admin only. Minor: a fixed message and a server-side log would do.
 - **GET /api/admin/ga4-metrics:** Answers a failure with Google Analytics' own error text (error?.message), to the platform admin only. Minor: a fixed message and a server-side log would do.
-- **POST /api/admin/merchants:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26); it only answers 410. Retire it: put to the owner 2026-09-26.
-- **POST /api/admin/merchants/signup:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26) (the create-merchant page is declared but routed nowhere). The admin chooses the new owner's password. Retire it, or put its page back: put to the owner 2026-09-26.
-- **PUT /api/admin/merchants/:id:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26) (only the unmounted admin-merchant pages did). Its body has no schema: fields left out are passed on as undefined (the database keeps them; the in-memory storage used by tests clears them), and none is checked as an email or a length. Retire it: put to the owner 2026-09-26.
-- **DELETE /api/admin/merchants/:id:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26). It cannot delete any business the app has made: each has a subscription row, and an owner login once it has a password, and neither key cascades. The database refuses, everything is rolled back, and the answer is 500 "Failed to delete merchant" (shown on PostgreSQL 16 with scripts/verify-admin-business-delete-postgres.ts; only a bare business row is deleted, with its sales). Made to work as written, it would delete a business and every sale with no screen, no confirmation and no record. Retire it: put to the owner 2026-09-26.
-- **POST /api/admin/clear-merchants:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26). A debugging leftover: three email addresses, the owner's among them, are written into the code; it deletes those businesses from the in-memory storage only, and it answers with the addresses. Retire it: put to the owner 2026-09-26.
-- **POST /api/admin/test-email:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26). A failure answers with the caught error itself ({ error }), whatever the email provider put in it, to the platform admin only. Minor. Keep it (with a fixed message) or retire it, with the email status: put to the owner 2026-09-26.
-- **GET /api/admin/email-status:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26); a diagnostic, useful by hand. Keep or retire: put to the owner 2026-09-26.
-- **GET /api/admin/api-keys:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26); it only answers 404, as do the other four API-key and usage routes. Retire them until the ecommerce API's administration is built: put to the owner 2026-09-26.
-- **POST /api/merchants/:id/test-payment-link:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26); it only answers 410. Retire it: put to the owner 2026-09-26.
+- **GET /api/admin/email-status:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26); a diagnostic, useful by hand. Kept by the owner's decision (2026-09-26).
 
 ## Routes
 
@@ -163,145 +154,132 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 | POST | `/api/merchants/:id/tapt-stones` | 4082 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership, generatePaymentUrl( |
 | PUT | `/api/merchants/:merchantId/tapt-stones/:stoneId` | 4133 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
 | DELETE | `/api/merchants/:merchantId/tapt-stones/:stoneId` | 4168 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| GET | `/api/admin/subscription-revenue` | 4204 | platform-admin | authenticateAdmin |
-| ALL | `/api/windcave/notification` | 4215 | provider | — |
-| GET | `/api/windcave/callback` | 4337 | public | isTokenAddressedTransaction( |
-| GET | `/api/admin/analytics` | 4535 | platform-admin | authenticateAdmin |
-| GET | `/api/admin/revenue-over-time` | 4608 | platform-admin | authenticateAdmin |
-| GET | `/api/admin/payment-method-breakdown` | 4644 | platform-admin | authenticateAdmin |
-| GET | `/api/admin/ga4-detailed` | 4681 | platform-admin | authenticateAdmin |
-| GET | `/api/admin/ga4-metrics` | 4746 | platform-admin | authenticateAdmin |
-| POST | `/api/admin/merchants` | 4823 | platform-admin | authenticateAdmin |
-| PUT | `/api/admin/merchants/:id` | 4834 | platform-admin | authenticateAdmin |
-| POST | `/api/merchants/:id/test-payment-link` | 4862 | platform-admin | authenticateAdmin |
-| GET | `/api/admin/merchants` | 4869 | platform-admin | authenticateAdmin |
-| GET | `/api/admin/merchants/:id` | 4879 | platform-admin | authenticateAdmin |
-| DELETE | `/api/admin/merchants/:id` | 4895 | platform-admin | authenticateAdmin |
-| POST | `/api/admin/clear-merchants` | 4919 | platform-admin | authenticateAdmin |
-| POST | `/api/admin/resend-verification` | 4950 | platform-admin | authenticateAdmin |
-| POST | `/api/admin/test-email` | 5008 | platform-admin | authenticateAdmin |
-| GET | `/api/admin/email-status` | 5031 | platform-admin | authenticateAdmin |
-| POST | `/api/auth/confirm-email` | 5068 | public-bearer | getMerchantByToken( |
-| POST | `/api/auth/resend-confirmation` | 5195 | public | — |
-| POST | `/api/info-pack-leads` | 5225 | public | — |
-| POST | `/api/merchants/signup` | 5278 | public | — |
-| POST | `/api/admin/merchants/signup` | 5383 | platform-admin | authenticateAdmin |
-| GET | `/api/merchants/:id/events` | 5446 | merchant / public | authenticateToken, checkMerchantOwnership |
-| GET | `/api/push/capabilities` | 5522 | public | — |
-| GET | `/api/push/vapid-key` | 5546 | public | — |
-| POST | `/api/push/subscribe` | 5556 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/push/unsubscribe` | 5593 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/push/native-subscribe` | 5620 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/push/native-unsubscribe` | 5654 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/push/status` | 5688 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/push/preferences` | 5712 | merchant-user (heuristic) | authenticateToken |
-| PUT | `/api/push/preferences` | 5726 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/merchants/:id/clear-transactions` | 5752 | merchant-user (heuristic) | authenticateToken, checkAccountOwnership, req.user?.role === "admin" |
-| POST | `/api/transactions/:transactionId/refunds` | 5772 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| GET | `/api/transactions/:transactionId/refunds` | 5910 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/merchants/:merchantId/refunds` | 5940 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/refunds/:refundId` | 5961 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/admin/api-keys` | 5995 | platform-admin | authenticateAdmin |
-| POST | `/api/admin/api-keys` | 5999 | platform-admin | authenticateAdmin |
-| POST | `/api/admin/api-keys/:keyId/revoke` | 6003 | platform-admin | authenticateAdmin |
-| GET | `/api/admin/api-metrics` | 6009 | platform-admin | authenticateAdmin |
-| GET | `/api/admin/api-usage` | 6013 | platform-admin | authenticateAdmin |
-| GET | `/api/merchants/:merchantId/stock-items` | 6022 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/merchants/:merchantId/stock-items` | 6041 | merchant-user (heuristic) | authenticateToken |
-| PUT | `/api/merchants/:merchantId/stock-items/:itemId` | 6069 | merchant-user (heuristic) | authenticateToken |
-| DELETE | `/api/merchants/:merchantId/stock-items/:itemId` | 6106 | api-key (heuristic) | authenticateToken, authenticateApiKey, requireEcommerceApi |
-| POST | `/api/v1/transactions` | 6174 | api-key | authenticateApiKey, requireEcommerceApi, publicTransactionDto( |
-| GET | `/api/v1/transactions/:id` | 6286 | api-key | authenticateApiKey, requireEcommerceApi |
-| POST | `/api/payments/apple-pay/validate` | 6359 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/payments/apple-pay/process` | 6364 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/payments/google-pay/process` | 6369 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/subscription` | 6382 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| PUT | `/api/subscription/plan` | 6405 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/subscription/cancel` | 6468 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/subscription/resume` | 6511 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/team` | 6542 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| POST | `/api/team/invite` | 6563 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| POST | `/api/team/:userId/resend` | 6624 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| DELETE | `/api/team/:userId/invite` | 6706 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| PUT | `/api/team/:userId/status` | 6726 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| DELETE | `/api/team/:userId` | 6774 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| POST | `/api/team/accept-invite` | 6806 | public-bearer | getUserByInviteToken( |
-| GET | `/api/subscription/billing-history` | 6842 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| GET | `/api/billing/card` | 6872 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| POST | `/api/billing/card/session` | 6901 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| POST | `/api/billing/card/confirm` | 6947 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| ALL | `/api/billing/card/notification` | 7038 | provider | billingCardCallback |
-| GET | `/api/billing/card/callback` | 7048 | public | billingCardCallback |
-| POST | `/api/billing/card/callback` | 7049 | public | billingCardCallback |
-| DELETE | `/api/billing/card` | 7052 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| POST | `/api/board-builder/submit` | 7077 | merchant | authenticateToken |
-| GET | `/uploads/:folder/:name` | 7142 | public | getCheckoutInvoiceByToken( |
-| GET | `/api/property/tenants` | 7407 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/property/tenants` | 7418 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/property/tenants/:id` | 7432 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| PUT | `/api/property/tenants/:id` | 7443 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| POST | `/api/property/tenants/:id/archive` | 7459 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| POST | `/api/property/tenants/:id/unarchive` | 7472 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| GET | `/api/property/tenants/:id/events` | 7485 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| GET | `/api/property/schedules` | 7501 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/property/tenants/:tenantId/schedules` | 7509 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| POST | `/api/property/tenants/:tenantId/schedules` | 7520 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| PUT | `/api/property/schedules/:id` | 7538 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| DELETE | `/api/property/schedules/:id` | 7557 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| GET | `/api/property/invoices` | 7572 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/property/invoices/document` | 7602 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/invoice-documents/:name` | 7648 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/property/invoices` | 7677 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| POST | `/api/property/invoices/:id/resend` | 7719 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| GET | `/api/property/invoices/:id` | 7734 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| POST | `/api/property/invoices/:id/void` | 7745 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| POST | `/api/property/invoices/:id/mark-paid-external` | 7759 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| GET | `/api/checkout/resolve/:token` | 7779 | public-bearer | getCheckoutInvoiceByToken( |
-| GET | `/api/checkout/document/:token` | 7865 | public-bearer | getCheckoutInvoiceByToken( |
-| POST | `/api/checkout/:token/split` | 7889 | public-bearer | getCheckoutInvoiceByToken( |
-| POST | `/api/checkout/:token/session` | 7920 | public-bearer | getCheckoutInvoiceByToken( |
-| POST | `/api/checkout/:token/hosted-fields-complete` | 7998 | public-bearer | getCheckoutInvoiceByToken( |
-| POST | `/api/checkout/:token/googlepay-complete` | 8034 | public-bearer | getCheckoutInvoiceByToken( |
-| GET | `/api/checkout/callback` | 8092 | public-bearer | getCheckoutInvoiceByToken( |
-| ALL | `/api/windcave/rent-notification` | 8119 | provider | — |
-| ALL | `/api/windcave/trades-notification` | 8141 | provider | — |
-| POST | `/api/webhooks/whatsapp` | 8166 | provider | req.headers["apikey"] |
-| PUT | `/api/merchants/:merchantId/sector` | 8202 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| GET | `/api/property/reminder-settings` | 8227 | merchant-user (heuristic) | authenticateToken |
-| PUT | `/api/property/reminder-settings` | 8237 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/reminder-settings` | 8254 | merchant-user (heuristic) | authenticateToken |
-| PUT | `/api/trades/reminder-settings` | 8264 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/gst-settings` | 8277 | merchant-user (heuristic) | authenticateToken |
-| PUT | `/api/trades/gst-settings` | 8293 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/clients` | 8310 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/clients` | 8318 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/clients/:id` | 8328 | merchant-user (heuristic) | authenticateToken |
-| PUT | `/api/trades/clients/:id` | 8337 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/clients/:id/archive` | 8348 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/clients/:id/unarchive` | 8357 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/clients/:id/promote` | 8367 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/clients/:id/events` | 8377 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/quotes` | 8387 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/quotes` | 8394 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/quotes/:id` | 8471 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/quotes/:id/pdf` | 8498 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/quotes/token/:token/pdf` | 8511 | public-bearer | getQuoteByToken( |
-| POST | `/api/trades/quotes/:id/resend` | 8522 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/quotes/token/:token` | 8538 | public-bearer | getQuoteByToken( |
-| POST | `/api/trades/quotes/token/:token/respond` | 8583 | public-bearer | getQuoteByToken( |
-| GET | `/api/trades/invoices` | 8632 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/invoices` | 8642 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/invoices/:id/resend` | 8694 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/invoices/:id/send-balance` | 8707 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/invoices/:id/mark-paid-external` | 8744 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/invoices/:id/complete` | 8761 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/invoices/:id/void` | 8778 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/schedules` | 8788 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/schedules` | 8795 | merchant-user (heuristic) | authenticateToken |
-| PUT | `/api/trades/schedules/:id` | 8813 | merchant-user (heuristic) | authenticateToken |
-| DELETE | `/api/trades/schedules/:id` | 8826 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/internal/cron/status` | 8840 | cron | authorizeCronRequest |
-| POST | `/api/internal/cron` | 8850 | cron | authorizeCronRequest |
+| ALL | `/api/windcave/notification` | 4208 | provider | — |
+| GET | `/api/windcave/callback` | 4330 | public | isTokenAddressedTransaction( |
+| GET | `/api/admin/analytics` | 4528 | platform-admin | authenticateAdmin |
+| GET | `/api/admin/revenue-over-time` | 4601 | platform-admin | authenticateAdmin |
+| GET | `/api/admin/payment-method-breakdown` | 4637 | platform-admin | authenticateAdmin |
+| GET | `/api/admin/ga4-detailed` | 4674 | platform-admin | authenticateAdmin |
+| GET | `/api/admin/ga4-metrics` | 4739 | platform-admin | authenticateAdmin |
+| GET | `/api/admin/merchants` | 4826 | platform-admin | authenticateAdmin |
+| GET | `/api/admin/merchants/:id` | 4836 | platform-admin | authenticateAdmin |
+| POST | `/api/admin/resend-verification` | 4859 | platform-admin | authenticateAdmin |
+| GET | `/api/admin/email-status` | 4919 | platform-admin | authenticateAdmin |
+| POST | `/api/auth/confirm-email` | 4956 | public-bearer | getMerchantByToken( |
+| POST | `/api/auth/resend-confirmation` | 5083 | public | — |
+| POST | `/api/info-pack-leads` | 5113 | public | — |
+| POST | `/api/merchants/signup` | 5166 | public | — |
+| GET | `/api/merchants/:id/events` | 5277 | merchant / public | authenticateToken, checkMerchantOwnership |
+| GET | `/api/push/capabilities` | 5353 | public | — |
+| GET | `/api/push/vapid-key` | 5377 | public | — |
+| POST | `/api/push/subscribe` | 5387 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/push/unsubscribe` | 5424 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/push/native-subscribe` | 5451 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/push/native-unsubscribe` | 5485 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/push/status` | 5519 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/push/preferences` | 5543 | merchant-user (heuristic) | authenticateToken |
+| PUT | `/api/push/preferences` | 5557 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/merchants/:id/clear-transactions` | 5583 | merchant-user (heuristic) | authenticateToken, checkAccountOwnership, req.user?.role === "admin" |
+| POST | `/api/transactions/:transactionId/refunds` | 5603 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| GET | `/api/transactions/:transactionId/refunds` | 5741 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/merchants/:merchantId/refunds` | 5771 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/refunds/:refundId` | 5792 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/merchants/:merchantId/stock-items` | 5830 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/merchants/:merchantId/stock-items` | 5849 | merchant-user (heuristic) | authenticateToken |
+| PUT | `/api/merchants/:merchantId/stock-items/:itemId` | 5877 | merchant-user (heuristic) | authenticateToken |
+| DELETE | `/api/merchants/:merchantId/stock-items/:itemId` | 5914 | api-key (heuristic) | authenticateToken, authenticateApiKey, requireEcommerceApi |
+| POST | `/api/v1/transactions` | 5982 | api-key | authenticateApiKey, requireEcommerceApi, publicTransactionDto( |
+| GET | `/api/v1/transactions/:id` | 6094 | api-key | authenticateApiKey, requireEcommerceApi |
+| POST | `/api/payments/apple-pay/validate` | 6167 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/payments/apple-pay/process` | 6172 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/payments/google-pay/process` | 6177 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/subscription` | 6190 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| PUT | `/api/subscription/plan` | 6213 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/subscription/cancel` | 6276 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/subscription/resume` | 6319 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/team` | 6350 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| POST | `/api/team/invite` | 6371 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| POST | `/api/team/:userId/resend` | 6432 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| DELETE | `/api/team/:userId/invite` | 6514 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| PUT | `/api/team/:userId/status` | 6534 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| DELETE | `/api/team/:userId` | 6582 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| POST | `/api/team/accept-invite` | 6614 | public-bearer | getUserByInviteToken( |
+| GET | `/api/subscription/billing-history` | 6650 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| GET | `/api/billing/card` | 6680 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| POST | `/api/billing/card/session` | 6709 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| POST | `/api/billing/card/confirm` | 6755 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| ALL | `/api/billing/card/notification` | 6846 | provider | billingCardCallback |
+| GET | `/api/billing/card/callback` | 6856 | public | billingCardCallback |
+| POST | `/api/billing/card/callback` | 6857 | public | billingCardCallback |
+| DELETE | `/api/billing/card` | 6860 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| POST | `/api/board-builder/submit` | 6885 | merchant | authenticateToken |
+| GET | `/uploads/:folder/:name` | 6950 | public | getCheckoutInvoiceByToken( |
+| GET | `/api/property/tenants` | 7215 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/property/tenants` | 7226 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/property/tenants/:id` | 7240 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| PUT | `/api/property/tenants/:id` | 7251 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| POST | `/api/property/tenants/:id/archive` | 7267 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| POST | `/api/property/tenants/:id/unarchive` | 7280 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/property/tenants/:id/events` | 7293 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/property/schedules` | 7309 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/property/tenants/:tenantId/schedules` | 7317 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| POST | `/api/property/tenants/:tenantId/schedules` | 7328 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| PUT | `/api/property/schedules/:id` | 7346 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| DELETE | `/api/property/schedules/:id` | 7365 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/property/invoices` | 7380 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/property/invoices/document` | 7410 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/invoice-documents/:name` | 7456 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/property/invoices` | 7485 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| POST | `/api/property/invoices/:id/resend` | 7527 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/property/invoices/:id` | 7542 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| POST | `/api/property/invoices/:id/void` | 7553 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| POST | `/api/property/invoices/:id/mark-paid-external` | 7567 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/checkout/resolve/:token` | 7587 | public-bearer | getCheckoutInvoiceByToken( |
+| GET | `/api/checkout/document/:token` | 7673 | public-bearer | getCheckoutInvoiceByToken( |
+| POST | `/api/checkout/:token/split` | 7697 | public-bearer | getCheckoutInvoiceByToken( |
+| POST | `/api/checkout/:token/session` | 7728 | public-bearer | getCheckoutInvoiceByToken( |
+| POST | `/api/checkout/:token/hosted-fields-complete` | 7806 | public-bearer | getCheckoutInvoiceByToken( |
+| POST | `/api/checkout/:token/googlepay-complete` | 7842 | public-bearer | getCheckoutInvoiceByToken( |
+| GET | `/api/checkout/callback` | 7900 | public-bearer | getCheckoutInvoiceByToken( |
+| ALL | `/api/windcave/rent-notification` | 7927 | provider | — |
+| ALL | `/api/windcave/trades-notification` | 7949 | provider | — |
+| POST | `/api/webhooks/whatsapp` | 7974 | provider | req.headers["apikey"] |
+| PUT | `/api/merchants/:merchantId/sector` | 8010 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/property/reminder-settings` | 8035 | merchant-user (heuristic) | authenticateToken |
+| PUT | `/api/property/reminder-settings` | 8045 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/reminder-settings` | 8062 | merchant-user (heuristic) | authenticateToken |
+| PUT | `/api/trades/reminder-settings` | 8072 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/gst-settings` | 8085 | merchant-user (heuristic) | authenticateToken |
+| PUT | `/api/trades/gst-settings` | 8101 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/clients` | 8118 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/clients` | 8126 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/clients/:id` | 8136 | merchant-user (heuristic) | authenticateToken |
+| PUT | `/api/trades/clients/:id` | 8145 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/clients/:id/archive` | 8156 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/clients/:id/unarchive` | 8165 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/clients/:id/promote` | 8175 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/clients/:id/events` | 8185 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/quotes` | 8195 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/quotes` | 8202 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/quotes/:id` | 8279 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/quotes/:id/pdf` | 8306 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/quotes/token/:token/pdf` | 8319 | public-bearer | getQuoteByToken( |
+| POST | `/api/trades/quotes/:id/resend` | 8330 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/quotes/token/:token` | 8346 | public-bearer | getQuoteByToken( |
+| POST | `/api/trades/quotes/token/:token/respond` | 8391 | public-bearer | getQuoteByToken( |
+| GET | `/api/trades/invoices` | 8440 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/invoices` | 8450 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/invoices/:id/resend` | 8502 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/invoices/:id/send-balance` | 8515 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/invoices/:id/mark-paid-external` | 8552 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/invoices/:id/complete` | 8569 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/invoices/:id/void` | 8586 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/schedules` | 8596 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/schedules` | 8603 | merchant-user (heuristic) | authenticateToken |
+| PUT | `/api/trades/schedules/:id` | 8621 | merchant-user (heuristic) | authenticateToken |
+| DELETE | `/api/trades/schedules/:id` | 8634 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/internal/cron/status` | 8648 | cron | authorizeCronRequest |
+| POST | `/api/internal/cron` | 8658 | cron | authorizeCronRequest |
 
 ## Per-route facts
 
@@ -1465,7 +1443,7 @@ Reviewed policy:
 - **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
 - **Success:** { message, merchant: { id, name, businessName, email, status } }
 - **Error disclosure:** input-issues
-- **Finding:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26). The admin chooses the business's password, so the admin knows it. It is today the only way in for an application made before sign-up took a password: the confirm page sends those to support (NO_PASSWORD_CHOSEN), and Verify refuses them, naming this route. Retire it, or keep it as support's path until an emailed set-password link replaces it: put to the owner 2026-09-26.
+- **Finding:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26). The admin chooses the business's password, so the admin knows it. It is today the only way in for an application made before sign-up took a password: the confirm page sends those to support (NO_PASSWORD_CHOSEN), and Verify refuses them, naming this route. Kept by the owner's decision (2026-09-26) as support's path until an emailed set-password link replaces it (the account-security work).
 
 ### PUT `/api/merchants/:id/rates`
 
@@ -1624,25 +1602,6 @@ Review pending.
 
 Review pending.
 
-### GET `/api/admin/subscription-revenue`
-
-- middleware: `authenticateAdmin`
-- authChecks: `authenticateToken`, `compares req.user?.role !== "admin"`
-- storageMethods: `getSubscriptionRevenue`
-- sideEffects: `audit log: logSecurityEvent`
-- statuses: `200`, `401`, `403`, `500`, `503`
-- helpers: `authenticateAdmin`
-
-Reviewed policy:
-
-- **Who:** platform-admin. **Tenant (any-merchant):** every business at once: the validated platform admin (authenticateAdmin) sees the whole platform
-- **Input:** nothing
-- **Idempotency:** read-only
-- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
-- **Success:** the platform's subscription revenue (getSubscriptionRevenue): monthly recurring revenue, paying subscriptions, all subscriptions, a breakdown by plan, and how many are past due, suspended and cancelling
-- **Error disclosure:** fixed
-- **Finding:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26) (only the unmounted admin-revenue page did); the overview gets the same figures from GET /api/admin/analytics. Retire it: put to the owner 2026-09-26.
-
 ### ALL `/api/windcave/notification`
 
 - middleware: `express.urlencoded(…)`, `express.json(…)`
@@ -1791,64 +1750,6 @@ Reviewed policy:
 - **Error disclosure:** provider-text
 - **Finding:** Answers a failure with Google Analytics' own error text (error?.message), to the platform admin only. Minor: a fixed message and a server-side log would do.
 
-### POST `/api/admin/merchants`
-
-- middleware: `authenticateAdmin`
-- authChecks: `authenticateToken`, `compares req.user?.role !== "admin"`
-- sideEffects: `audit log: logSecurityEvent`
-- statuses: `401`, `403`, `410`, `503`
-- helpers: `authenticateAdmin`
-
-Reviewed policy:
-
-- **Who:** platform-admin. **Tenant (none):** none: a retired stub; nothing is read or written
-- **Input:** nothing is read
-- **Idempotency:** none needed: always the same answer
-- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
-- **Success:** none: 410, pointing to POST /api/admin/merchants/signup
-- **Error disclosure:** fixed
-- **Finding:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26); it only answers 410. Retire it: put to the owner 2026-09-26.
-
-### PUT `/api/admin/merchants/:id`
-
-- middleware: `authenticateAdmin`
-- params: `id: strictPositiveIntegerParam`
-- authChecks: `authenticateToken`, `compares req.user?.role !== "admin"`
-- storageMethods: `getMerchant`, `updateMerchantDetails`
-- sideEffects: `audit log: logSecurityEvent`
-- statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
-- dtos: `adminMerchantDto`
-- helpers: `authenticateAdmin`
-
-Reviewed policy:
-
-- **Who:** platform-admin. **Tenant (any-merchant):** any business, by the number in the path: the validated platform admin (authenticateAdmin: the admin role, merchant scope 0 and the configured admin email) acts across businesses
-- **Input:** id: strictPositiveIntegerParam (400 otherwise); body read without a schema: businessName, contactEmail, contactPhone, businessAddress, each stored as sent when any one is present
-- **Idempotency:** sets the business's contact details; the same values again change nothing
-- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
-- **Success:** adminMerchantDto of the business afterwards; an unknown business is 404, found only after the write was tried
-- **Error disclosure:** fixed
-- **Finding:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26) (only the unmounted admin-merchant pages did). Its body has no schema: fields left out are passed on as undefined (the database keeps them; the in-memory storage used by tests clears them), and none is checked as an email or a length. Retire it: put to the owner 2026-09-26.
-
-### POST `/api/merchants/:id/test-payment-link`
-
-- middleware: `authenticateAdmin`
-- params: `id: strictPositiveIntegerParam`
-- authChecks: `authenticateToken`, `compares req.user?.role !== "admin"`
-- sideEffects: `audit log: logSecurityEvent`
-- statuses: `400`, `401`, `403`, `410`, `503`
-- helpers: `authenticateAdmin`
-
-Reviewed policy:
-
-- **Who:** platform-admin. **Tenant (none):** none: the business-wide no-board address was retired on 2026-09-25 (server/no-board-address.ts); every well-formed number gets the same 410 notice, and nothing is read
-- **Input:** id: strictPositiveIntegerParam (400 otherwise)
-- **Idempotency:** none needed: always the same answer
-- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
-- **Success:** none: 410 NO_BOARD_ADDRESS_RETIRED (it tested the retired business-wide no-board link)
-- **Error disclosure:** fixed
-- **Finding:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26); it only answers 410. Retire it: put to the owner 2026-09-26.
-
 ### GET `/api/admin/merchants`
 
 - middleware: `authenticateAdmin`
@@ -1888,45 +1789,6 @@ Reviewed policy:
 - **Success:** adminMerchantDto: the business's account and settings, never its password hash, tokens or bank details
 - **Error disclosure:** fixed
 
-### DELETE `/api/admin/merchants/:id`
-
-- middleware: `authenticateAdmin`
-- params: `id: strictPositiveIntegerParam`
-- authChecks: `authenticateToken`, `compares req.user?.role !== "admin"`
-- storageMethods: `deleteMerchant`, `getMerchant`
-- sideEffects: `audit log: logSecurityEvent`
-- statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
-- helpers: `authenticateAdmin`
-
-Reviewed policy:
-
-- **Who:** platform-admin. **Tenant (any-merchant):** any business, by the number in the path: the validated platform admin (authenticateAdmin: the admin role, merchant scope 0 and the configured admin email) acts across businesses
-- **Input:** id: strictPositiveIntegerParam (400 otherwise)
-- **Idempotency:** tries to delete the business's sales and then the business, in one transaction (deleteMerchant); the database refuses any business another row still points at, and then nothing changes (500)
-- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
-- **Success:** { message }
-- **Error disclosure:** fixed
-- **Finding:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26). It cannot delete any business the app has made: each has a subscription row, and an owner login once it has a password, and neither key cascades. The database refuses, everything is rolled back, and the answer is 500 "Failed to delete merchant" (shown on PostgreSQL 16 with scripts/verify-admin-business-delete-postgres.ts; only a bare business row is deleted, with its sales). Made to work as written, it would delete a business and every sale with no screen, no confirmation and no record. Retire it: put to the owner 2026-09-26.
-
-### POST `/api/admin/clear-merchants`
-
-- middleware: `authenticateAdmin`
-- authChecks: `authenticateToken`, `compares req.user?.role !== "admin"`
-- storageMethods: `getMerchantByEmail`
-- sideEffects: `audit log: logSecurityEvent`
-- statuses: `200`, `401`, `403`, `500`, `503`
-- helpers: `authenticateAdmin`
-
-Reviewed policy:
-
-- **Who:** platform-admin. **Tenant (none):** none in practice: three businesses named by email in the code; with the database storage nothing is deleted
-- **Input:** nothing is read
-- **Idempotency:** with the in-memory storage, deletes those three businesses if present; with the database, nothing
-- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
-- **Success:** { message: 'Cleared <n> problematic merchants', clearedEmails: the three addresses in the code }
-- **Error disclosure:** fixed
-- **Finding:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26). A debugging leftover: three email addresses, the owner's among them, are written into the code; it deletes those businesses from the in-memory storage only, and it answers with the addresses. Retire it: put to the owner 2026-09-26.
-
 ### POST `/api/admin/resend-verification`
 
 - middleware: `authenticateAdmin`
@@ -1946,25 +1808,6 @@ Reviewed policy:
 - **Success:** { message, merchant: { id, name, businessName, email, status } }
 - **Error disclosure:** fixed
 
-### POST `/api/admin/test-email`
-
-- middleware: `authenticateAdmin`
-- authChecks: `authenticateToken`, `compares req.user?.role !== "admin"`
-- sideEffects: `audit log: logSecurityEvent`, `email: sendEmail`
-- statuses: `200`, `401`, `403`, `500`, `503`
-- errorTextInResponse: `error`
-- helpers: `authenticateAdmin`
-
-Reviewed policy:
-
-- **Who:** platform-admin. **Tenant (none):** none: a test email to the admin's own address
-- **Input:** nothing
-- **Idempotency:** none: each call sends another test email
-- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged); emails the admin's own address (sendEmail)
-- **Success:** { success: true, message }
-- **Error disclosure:** provider-text
-- **Finding:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26). A failure answers with the caught error itself ({ error }), whatever the email provider put in it, to the platform admin only. Minor. Keep it (with a fixed message) or retire it, with the email status: put to the owner 2026-09-26.
-
 ### GET `/api/admin/email-status`
 
 - middleware: `authenticateAdmin`
@@ -1981,7 +1824,7 @@ Reviewed policy:
 - **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
 - **Success:** which email providers are set up, the environment, the from address, whether admin notices are set up and whether mail will be delivered
 - **Error disclosure:** fixed
-- **Finding:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26); a diagnostic, useful by hand. Keep or retire: put to the owner 2026-09-26.
+- **Finding:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26); a diagnostic, useful by hand. Kept by the owner's decision (2026-09-26).
 
 ### POST `/api/auth/confirm-email`
 
@@ -2072,27 +1915,6 @@ Reviewed policy:
 - **Replay:** for an address in use, a replay sends a note, within its limit; it creates nothing
 - **Rate:** checkRateLimit (100 a minute per visitor address, counted in this server process only; until TRUST_PROXY_HOPS is set every visitor shares one address — R1-T4 phase B); that count is shared with the board page's feed and the numbered pay route
 - **Finding:** The only limit on new applications is checkRateLimit, 100 a minute per visitor address in this process only. Until TRUST_PROXY_HOPS is set, visitors may all count as the proxy's address, and the same count serves GET /api/merchants/:id/active-transaction (which each open board page asks every 3 seconds) and POST /api/transactions/:id/pay: five open board pages can use it up, refusing sign-ups and board payments, and a run of sign-ups can refuse board customers. Each new address costs a bcrypt hash, a merchant row and an email.
-
-### POST `/api/admin/merchants/signup`
-
-- middleware: `authenticateAdmin`
-- body: `schema: createMerchantSchema`
-- authChecks: `authenticateToken`, `compares req.user?.role !== "admin"`
-- storageMethods: `createMerchantWithPassword`, `getMerchantByEmail`, `getUserByEmail`, `updateMerchantDetails`
-- sideEffects: `audit log: logSecurityEvent`
-- statuses: `200`, `400`, `401`, `403`, `409`, `500`, `503`
-- errorTextInResponse: `validation.error.issues`
-- helpers: `authenticateAdmin`
-
-Reviewed policy:
-
-- **Who:** platform-admin. **Tenant (any-merchant):** a new business, made by the admin: its email must be in use by no business and no login (409)
-- **Input:** body: createMerchantSchema, including a password held to the one password rule (400 with the first issue and the issues)
-- **Idempotency:** none: each new email makes one more business, verified, with an owner login
-- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
-- **Success:** { message, merchant: { id, name, businessName, email, status: 'verified' } }
-- **Error disclosure:** input-issues
-- **Finding:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26) (the create-merchant page is declared but routed nowhere). The admin chooses the new owner's password. Retire it, or put its page back: put to the owner 2026-09-26.
 
 ### GET `/api/merchants/:id/events`
 
@@ -2265,93 +2087,6 @@ Review pending.
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
 Review pending.
-
-### GET `/api/admin/api-keys`
-
-- middleware: `authenticateAdmin`
-- authChecks: `authenticateToken`, `compares req.user?.role !== "admin"`
-- sideEffects: `audit log: logSecurityEvent`
-- statuses: `401`, `403`, `404`, `503`
-- helpers: `authenticateAdmin`
-
-Reviewed policy:
-
-- **Who:** platform-admin. **Tenant (none):** none: the ecommerce API's administration is not built; nothing is read
-- **Input:** nothing
-- **Idempotency:** none needed: always the same answer
-- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
-- **Success:** none: 404 'Ecommerce API is unavailable'
-- **Error disclosure:** fixed
-- **Finding:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26); it only answers 404, as do the other four API-key and usage routes. Retire them until the ecommerce API's administration is built: put to the owner 2026-09-26.
-
-### POST `/api/admin/api-keys`
-
-- middleware: `authenticateAdmin`
-- authChecks: `authenticateToken`, `compares req.user?.role !== "admin"`
-- sideEffects: `audit log: logSecurityEvent`
-- statuses: `401`, `403`, `404`, `503`
-- helpers: `authenticateAdmin`
-
-Reviewed policy:
-
-- **Who:** platform-admin. **Tenant (none):** none: the ecommerce API's administration is not built; nothing is read or written
-- **Input:** nothing is read
-- **Idempotency:** none needed: always the same answer
-- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
-- **Success:** none: 404 'Ecommerce API is unavailable'
-- **Error disclosure:** fixed
-
-### POST `/api/admin/api-keys/:keyId/revoke`
-
-- middleware: `authenticateAdmin`
-- params: `keyId: strictPositiveIntegerParam`
-- authChecks: `authenticateToken`, `compares req.user?.role !== "admin"`
-- sideEffects: `audit log: logSecurityEvent`
-- statuses: `400`, `401`, `403`, `404`, `503`
-- helpers: `authenticateAdmin`
-
-Reviewed policy:
-
-- **Who:** platform-admin. **Tenant (none):** none: the ecommerce API's administration is not built; nothing is read or written
-- **Input:** keyId: strictPositiveIntegerParam (400 otherwise), then not used
-- **Idempotency:** none needed: always the same answer
-- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
-- **Success:** none: 404 'Ecommerce API is unavailable'
-- **Error disclosure:** fixed
-
-### GET `/api/admin/api-metrics`
-
-- middleware: `authenticateAdmin`
-- authChecks: `authenticateToken`, `compares req.user?.role !== "admin"`
-- sideEffects: `audit log: logSecurityEvent`
-- statuses: `401`, `403`, `404`, `503`
-- helpers: `authenticateAdmin`
-
-Reviewed policy:
-
-- **Who:** platform-admin. **Tenant (none):** none: the ecommerce API's administration is not built; nothing is read
-- **Input:** nothing
-- **Idempotency:** none needed: always the same answer
-- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
-- **Success:** none: 404 'Ecommerce API is unavailable'
-- **Error disclosure:** fixed
-
-### GET `/api/admin/api-usage`
-
-- middleware: `authenticateAdmin`
-- authChecks: `authenticateToken`, `compares req.user?.role !== "admin"`
-- sideEffects: `audit log: logSecurityEvent`
-- statuses: `401`, `403`, `404`, `503`
-- helpers: `authenticateAdmin`
-
-Reviewed policy:
-
-- **Who:** platform-admin. **Tenant (none):** none: the ecommerce API's administration is not built; nothing is read
-- **Input:** nothing
-- **Idempotency:** none needed: always the same answer
-- **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
-- **Success:** none: 404 'Ecommerce API is unavailable'
-- **Error disclosure:** fixed
 
 ### GET `/api/merchants/:merchantId/stock-items`
 

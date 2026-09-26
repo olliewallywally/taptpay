@@ -1839,21 +1839,8 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     successDto: "{ message, merchant: { id, name, businessName, email, status } }",
     errorDisclosure: ["input-issues"],
     findings: [
-      `${NO_ADMIN_SCREEN}. The admin chooses the business's password, so the admin knows it. It is today the only way in for an application made before sign-up took a password: the confirm page sends those to support (NO_PASSWORD_CHOSEN), and Verify refuses them, naming this route. Retire it, or keep it as support's path until an emailed set-password link replaces it: put to the owner 2026-09-26.`,
+      `${NO_ADMIN_SCREEN}. The admin chooses the business's password, so the admin knows it. It is today the only way in for an application made before sign-up took a password: the confirm page sends those to support (NO_PASSWORD_CHOSEN), and Verify refuses them, naming this route. Kept by the owner's decision (2026-09-26) as support's path until an emailed set-password link replaces it (the account-security work).`,
     ],
-  },
-
-  "GET /api/admin/subscription-revenue": {
-    branches: [{ principal: "platform-admin", tenant: "any-merchant", tenantRule: ADMIN_EVERY_BUSINESS }],
-    input: "nothing",
-    capability: null,
-    entitlement: null,
-    idempotency: "read-only",
-    sideEffects: ADMIN_AUDIT,
-    successDto:
-      "the platform's subscription revenue (getSubscriptionRevenue): monthly recurring revenue, paying subscriptions, all subscriptions, a breakdown by plan, and how many are past due, suspended and cancelling",
-    errorDisclosure: ["fixed"],
-    findings: [`${NO_ADMIN_SCREEN} (only the unmounted admin-revenue page did); the overview gets the same figures from GET /api/admin/analytics. Retire it: put to the owner 2026-09-26.`],
   },
 
   "GET /api/admin/analytics": {
@@ -1924,82 +1911,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     ],
   },
 
-  "POST /api/admin/merchants": {
-    branches: [{ principal: "platform-admin", tenant: "none", tenantRule: "none: a retired stub; nothing is read or written" }],
-    input: "nothing is read",
-    capability: null,
-    entitlement: null,
-    idempotency: "none needed: always the same answer",
-    sideEffects: ADMIN_AUDIT,
-    successDto: "none: 410, pointing to POST /api/admin/merchants/signup",
-    errorDisclosure: ["fixed"],
-    findings: [`${NO_ADMIN_SCREEN}; it only answers 410. Retire it: put to the owner 2026-09-26.`],
-  },
-
-  "POST /api/admin/merchants/signup": {
-    branches: [{ principal: "platform-admin", tenant: "any-merchant", tenantRule: "a new business, made by the admin: its email must be in use by no business and no login (409)" }],
-    input: "body: createMerchantSchema, including a password held to the one password rule (400 with the first issue and the issues)",
-    capability: null,
-    entitlement: null,
-    idempotency: "none: each new email makes one more business, verified, with an owner login",
-    sideEffects: ADMIN_AUDIT,
-    successDto: "{ message, merchant: { id, name, businessName, email, status: 'verified' } }",
-    errorDisclosure: ["input-issues"],
-    findings: [
-      `${NO_ADMIN_SCREEN} (the create-merchant page is declared but routed nowhere). The admin chooses the new owner's password. Retire it, or put its page back: put to the owner 2026-09-26.`,
-    ],
-  },
-
-  "PUT /api/admin/merchants/:id": {
-    branches: [{ principal: "platform-admin", tenant: "any-merchant", tenantRule: ADMIN_ANY_BUSINESS }],
-    input:
-      "id: strictPositiveIntegerParam (400 otherwise); body read without a schema: businessName, contactEmail, contactPhone, businessAddress, each stored as sent when any one is present",
-    capability: null,
-    entitlement: null,
-    idempotency: "sets the business's contact details; the same values again change nothing",
-    sideEffects: ADMIN_AUDIT,
-    successDto: "adminMerchantDto of the business afterwards; an unknown business is 404, found only after the write was tried",
-    errorDisclosure: ["fixed"],
-    findings: [
-      `${NO_ADMIN_SCREEN} (only the unmounted admin-merchant pages did). Its body has no schema: fields left out are passed on as undefined (the database keeps them; the in-memory storage used by tests clears them), and none is checked as an email or a length. Retire it: put to the owner 2026-09-26.`,
-    ],
-  },
-
-  "DELETE /api/admin/merchants/:id": {
-    branches: [{ principal: "platform-admin", tenant: "any-merchant", tenantRule: ADMIN_ANY_BUSINESS }],
-    input: "id: strictPositiveIntegerParam (400 otherwise)",
-    capability: null,
-    entitlement: null,
-    idempotency:
-      "tries to delete the business's sales and then the business, in one transaction (deleteMerchant); the database refuses any business another row still points at, and then nothing changes (500)",
-    sideEffects: ADMIN_AUDIT,
-    successDto: "{ message }",
-    errorDisclosure: ["fixed"],
-    findings: [
-      `${NO_ADMIN_SCREEN}. It cannot delete any business the app has made: each has a subscription row, and an owner login once it has a password, and neither key cascades. The database refuses, everything is rolled back, and the answer is 500 "Failed to delete merchant" (shown on PostgreSQL 16 with scripts/verify-admin-business-delete-postgres.ts; only a bare business row is deleted, with its sales). Made to work as written, it would delete a business and every sale with no screen, no confirmation and no record. Retire it: put to the owner 2026-09-26.`,
-    ],
-  },
-
-  "POST /api/admin/clear-merchants": {
-    branches: [
-      {
-        principal: "platform-admin",
-        tenant: "none",
-        tenantRule: "none in practice: three businesses named by email in the code; with the database storage nothing is deleted",
-      },
-    ],
-    input: "nothing is read",
-    capability: null,
-    entitlement: null,
-    idempotency: "with the in-memory storage, deletes those three businesses if present; with the database, nothing",
-    sideEffects: ADMIN_AUDIT,
-    successDto: "{ message: 'Cleared <n> problematic merchants', clearedEmails: the three addresses in the code }",
-    errorDisclosure: ["fixed"],
-    findings: [
-      `${NO_ADMIN_SCREEN}. A debugging leftover: three email addresses, the owner's among them, are written into the code; it deletes those businesses from the in-memory storage only, and it answers with the addresses. Retire it: put to the owner 2026-09-26.`,
-    ],
-  },
-
   "POST /api/admin/resend-verification": {
     branches: [
       {
@@ -2017,20 +1928,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     errorDisclosure: ["fixed"],
   },
 
-  "POST /api/admin/test-email": {
-    branches: [{ principal: "platform-admin", tenant: "none", tenantRule: "none: a test email to the admin's own address" }],
-    input: "nothing",
-    capability: null,
-    entitlement: null,
-    idempotency: "none: each call sends another test email",
-    sideEffects: `${ADMIN_AUDIT}; emails the admin's own address (sendEmail)`,
-    successDto: "{ success: true, message }",
-    errorDisclosure: ["provider-text"],
-    findings: [
-      `${NO_ADMIN_SCREEN}. A failure answers with the caught error itself ({ error }), whatever the email provider put in it, to the platform admin only. Minor. Keep it (with a fixed message) or retire it, with the email status: put to the owner 2026-09-26.`,
-    ],
-  },
-
   "GET /api/admin/email-status": {
     branches: [{ principal: "platform-admin", tenant: "none", tenantRule: "none: the platform's email set-up" }],
     input: "nothing",
@@ -2040,75 +1937,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: ADMIN_AUDIT,
     successDto: "which email providers are set up, the environment, the from address, whether admin notices are set up and whether mail will be delivered",
     errorDisclosure: ["fixed"],
-    findings: [`${NO_ADMIN_SCREEN}; a diagnostic, useful by hand. Keep or retire: put to the owner 2026-09-26.`],
-  },
-
-  "GET /api/admin/api-keys": {
-    branches: [{ principal: "platform-admin", tenant: "none", tenantRule: "none: the ecommerce API's administration is not built; nothing is read" }],
-    input: "nothing",
-    capability: null,
-    entitlement: null,
-    idempotency: "none needed: always the same answer",
-    sideEffects: ADMIN_AUDIT,
-    successDto: "none: 404 'Ecommerce API is unavailable'",
-    errorDisclosure: ["fixed"],
-    findings: [`${NO_ADMIN_SCREEN}; it only answers 404, as do the other four API-key and usage routes. Retire them until the ecommerce API's administration is built: put to the owner 2026-09-26.`],
-  },
-
-  "POST /api/admin/api-keys": {
-    branches: [{ principal: "platform-admin", tenant: "none", tenantRule: "none: the ecommerce API's administration is not built; nothing is read or written" }],
-    input: "nothing is read",
-    capability: null,
-    entitlement: null,
-    idempotency: "none needed: always the same answer",
-    sideEffects: ADMIN_AUDIT,
-    successDto: "none: 404 'Ecommerce API is unavailable'",
-    errorDisclosure: ["fixed"],
-  },
-
-  "POST /api/admin/api-keys/:keyId/revoke": {
-    branches: [{ principal: "platform-admin", tenant: "none", tenantRule: "none: the ecommerce API's administration is not built; nothing is read or written" }],
-    input: "keyId: strictPositiveIntegerParam (400 otherwise), then not used",
-    capability: null,
-    entitlement: null,
-    idempotency: "none needed: always the same answer",
-    sideEffects: ADMIN_AUDIT,
-    successDto: "none: 404 'Ecommerce API is unavailable'",
-    errorDisclosure: ["fixed"],
-  },
-
-  "GET /api/admin/api-metrics": {
-    branches: [{ principal: "platform-admin", tenant: "none", tenantRule: "none: the ecommerce API's administration is not built; nothing is read" }],
-    input: "nothing",
-    capability: null,
-    entitlement: null,
-    idempotency: "none needed: always the same answer",
-    sideEffects: ADMIN_AUDIT,
-    successDto: "none: 404 'Ecommerce API is unavailable'",
-    errorDisclosure: ["fixed"],
-  },
-
-  "GET /api/admin/api-usage": {
-    branches: [{ principal: "platform-admin", tenant: "none", tenantRule: "none: the ecommerce API's administration is not built; nothing is read" }],
-    input: "nothing",
-    capability: null,
-    entitlement: null,
-    idempotency: "none needed: always the same answer",
-    sideEffects: ADMIN_AUDIT,
-    successDto: "none: 404 'Ecommerce API is unavailable'",
-    errorDisclosure: ["fixed"],
-  },
-
-  "POST /api/merchants/:id/test-payment-link": {
-    branches: [{ principal: "platform-admin", tenant: "none", tenantRule: RETIRED_NO_BOARD_RULE }],
-    input: "id: strictPositiveIntegerParam (400 otherwise)",
-    capability: null,
-    entitlement: null,
-    idempotency: "none needed: always the same answer",
-    sideEffects: ADMIN_AUDIT,
-    successDto: "none: 410 NO_BOARD_ADDRESS_RETIRED (it tested the retired business-wide no-board link)",
-    errorDisclosure: ["fixed"],
-    findings: [`${NO_ADMIN_SCREEN}; it only answers 410. Retire it: put to the owner 2026-09-26.`],
+    findings: [`${NO_ADMIN_SCREEN}; a diagnostic, useful by hand. Kept by the owner's decision (2026-09-26).`],
   },
 };
 

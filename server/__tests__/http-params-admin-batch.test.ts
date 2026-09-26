@@ -16,7 +16,8 @@ import type { TransactionStorageInput } from "../storage";
  * remaining `parseInt(req.params.*)` site scoped to `/api/admin`: the five
  * `/api/admin/merchants/:id/*` sub-routes (verify, set-active, transactions,
  * windcave-merchant-id, activate), the three plain `/api/admin/merchants/:id`
- * CRUD routes (PUT/GET/DELETE), and `/api/admin/api-keys/:keyId/revoke`. See
+ * CRUD routes (PUT/GET/DELETE), and `/api/admin/api-keys/:keyId/revoke`
+ * (PUT, DELETE and revoke removed 2026-09-26, owner decision, C10 batch 4). See
  * the evidence doc for the full site list and judgment calls (the revoke
  * "real id" test settling for MemStorage's always-true stub, and why
  * `activate`'s happy path is proven indirectly rather than end-to-end).
@@ -240,44 +241,8 @@ describe("R1-T6 — /api/admin identifier batch", () => {
     });
   });
 
-  describe("PUT /api/admin/merchants/:id", () => {
-    it.each(GARBAGE_IDS)("id=%s returns 400", async (garbage) => {
-      const { app } = await createTestApp();
-      const admin = createAdminPrincipal();
-
-      const response = await request(app)
-        .put(`/api/admin/merchants/${encodeURIComponent(garbage)}`)
-        .set(bearer(admin))
-        .send({ businessName: "New Name Ltd" });
-      expect(response.status).toBe(400);
-      expect(response.body.message).toBe("Invalid id");
-    });
-
-    it("a well-formed but unknown id 404s rather than 400", async () => {
-      const { app } = await createTestApp();
-      const admin = createAdminPrincipal();
-
-      const response = await request(app)
-        .put("/api/admin/merchants/999999")
-        .set(bearer(admin))
-        .send({ businessName: "New Name Ltd" });
-      expect(response.status).toBe(404);
-    });
-
-    it("updates a real merchant's business details", async () => {
-      const { app } = await createTestApp();
-      const admin = createAdminPrincipal();
-      const owner = await createOwnerPrincipal();
-
-      const response = await request(app)
-        .put(`/api/admin/merchants/${owner.merchantId}`)
-        .set(bearer(admin))
-        .send({ businessName: "Updated Business Name Ltd" });
-      expect(response.status).toBe(200);
-      expect(response.body.id).toBe(owner.merchantId);
-      expect(response.body.businessName).toBe("Updated Business Name Ltd");
-    });
-  });
+  // PUT and DELETE /api/admin/merchants/:id and POST /api/admin/api-keys/:keyId/revoke were
+  // removed on 2026-09-26 (owner decision, C10 batch 4): c10-batch-4-retired-routes.test.ts.
 
   describe("GET /api/admin/merchants/:id", () => {
     it.each(GARBAGE_IDS)("id=%s returns 400", async (garbage) => {
@@ -312,71 +277,4 @@ describe("R1-T6 — /api/admin identifier batch", () => {
     });
   });
 
-  describe("DELETE /api/admin/merchants/:id", () => {
-    it.each(GARBAGE_IDS)("id=%s returns 400", async (garbage) => {
-      const { app } = await createTestApp();
-      const admin = createAdminPrincipal();
-
-      const response = await request(app)
-        .delete(`/api/admin/merchants/${encodeURIComponent(garbage)}`)
-        .set(bearer(admin));
-      expect(response.status).toBe(400);
-      expect(response.body.message).toBe("Invalid id");
-    });
-
-    it("a well-formed but unknown id 404s rather than 400", async () => {
-      const { app } = await createTestApp();
-      const admin = createAdminPrincipal();
-
-      const response = await request(app).delete("/api/admin/merchants/999999").set(bearer(admin));
-      expect(response.status).toBe(404);
-    });
-
-    it("deletes a real merchant, which then 404s on re-fetch", async () => {
-      const { app } = await createTestApp();
-      const admin = createAdminPrincipal();
-      const throwaway = await storage.createMerchant({
-        name: "Throwaway Co",
-        businessName: "Throwaway Co Ltd",
-        email: `throwaway.${Date.now()}@harness.test`,
-      } as any);
-
-      const deleteResponse = await request(app)
-        .delete(`/api/admin/merchants/${throwaway.id}`)
-        .set(bearer(admin));
-      expect(deleteResponse.status).toBe(200);
-
-      const refetch = await request(app)
-        .get(`/api/admin/merchants/${throwaway.id}`)
-        .set(bearer(admin));
-      expect(refetch.status).toBe(404);
-    });
-  });
-
-  describe("POST /api/admin/api-keys/:keyId/revoke", () => {
-    it.each(GARBAGE_IDS)("keyId=%s returns 400", async (garbage) => {
-      const { app } = await createTestApp();
-      const admin = createAdminPrincipal();
-
-      const response = await request(app)
-        .post(`/api/admin/api-keys/${encodeURIComponent(garbage)}/revoke`)
-        .set(bearer(admin));
-      expect(response.status).toBe(400);
-      expect(response.body.message).toBe("Invalid keyId");
-    });
-
-    it(
-      "a well-formed keyId reaches the unavailable ecommerce tombstone",
-      async () => {
-        const { app } = await createTestApp();
-        const admin = createAdminPrincipal();
-
-        const response = await request(app)
-          .post("/api/admin/api-keys/1/revoke")
-          .set(bearer(admin));
-        expect(response.status).toBe(404);
-        expect(response.body.success).not.toBe(true);
-      },
-    );
-  });
 });

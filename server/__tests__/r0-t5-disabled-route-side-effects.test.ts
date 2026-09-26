@@ -6,7 +6,6 @@ import * as push from "../push";
 import { sseBroker } from "../sse-broker";
 import {
   apiKeyHeader,
-  createAdminPrincipal,
   bearer,
   createOwnerPrincipal,
   createTestApp,
@@ -143,34 +142,8 @@ describe("R0-T5 — disabled surfaces refuse and change nothing", () => {
     expect(storageSnapshot()).not.toBe(before);
   });
 
-  test.each([
-    ["get", "/api/admin/api-keys"],
-    ["post", "/api/admin/api-keys"],
-    ["post", "/api/admin/api-keys/1/revoke"],
-    ["get", "/api/admin/api-metrics"],
-    ["get", "/api/admin/api-usage"],
-  ] as const)("admin %s %s rejects concurrent retries without storage access", async (method, path) => {
-    const { app } = await createTestApp();
-    const before = storageSnapshot();
-    const spies = [
-      jest.spyOn(storage, "createApiKey"),
-      jest.spyOn(storage, "revokeApiKey"),
-      jest.spyOn(storage, "getApiMetrics"),
-      jest.spyOn(storage, "getApiUsageData"),
-    ];
-    const admin = createAdminPrincipal();
-    const fireAdmin = () => request(app)[method](path).set(bearer(admin))
-      .send({ keyName: "Synthetic key", environment: "sandbox" });
-    for (let retry = 0; retry < 2; retry++) {
-      const responses = await Promise.all([fireAdmin(), fireAdmin()]);
-      for (const response of responses) {
-        expect(response.status).toBe(404);
-        expect(response.body.success).not.toBe(true);
-      }
-    }
-    for (const spy of spies) expect(spy).not.toHaveBeenCalled();
-    expect(storageSnapshot()).toBe(before);
-  });
+  // The five admin API-key and usage stubs were removed on 2026-09-26 (owner decision, C10
+  // batch 4): c10-batch-4-retired-routes.test.ts holds them to "registered nowhere".
 
   test("the e-commerce API surface is closed to a presented key", async () => {
     const { app } = await createTestApp();

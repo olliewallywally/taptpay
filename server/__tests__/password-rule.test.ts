@@ -188,18 +188,8 @@ describe("every route that sets a password applies the rule and says it", () => 
     expect((await accept("Password!")).status).toBe(200);
   });
 
-  it("an account an admin creates", async () => {
-    const { app } = await createTestApp();
-    const admin = createAdminPrincipal();
-    const create = (password: string) => request(app).post("/api/admin/merchants/signup").set(bearer(admin))
-      .send({ ...ADMIN_CREATED, email: randomEmail("admin-made"), password, confirmPassword: password });
-
-    const refused = await create("password1");
-    expect(refused.status).toBe(400);
-    expect(refused.body.message).toBe(RULE);
-
-    expect((await create("Password!")).status).toBe(200);
-  });
+  // "An account an admin creates" tested POST /api/admin/merchants/signup, removed on
+  // 2026-09-26 (owner decision, C10 batch 4): businesses sign up themselves.
 
   // "Email verification, which used to take any password at all" tested POST
   // /api/merchants/verify, removed on 2026-09-26 (owner decision): nothing called it.

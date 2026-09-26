@@ -13,7 +13,7 @@ import {
   subscriptionCardSessionState,
 } from "./storage";
 import { TUTORIAL_PAGE_KEYS, isTutorialPageKey } from "@shared/tutorial";
-import { inviteTeamMemberSchema, acceptInviteSchema, retailTransactionCreateRequestSchema, updateMerchantDetailsSchema, updateThemeSchema, updateDailyGoalSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, changePasswordSchema, newPasswordSchema, createRefundSchema, insertRefundSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, pushNotificationPreferencesSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createClientProfileSchema, updateClientProfileSchema, createQuoteSchema, acceptQuoteSchema, createJobInvoiceSchema, markJobPaidExternalSchema, createJobScheduleSchema, updateJobScheduleSchema, updateTradeReminderSettingsSchema, updateTradeGstSettingsSchema } from "@shared/schema";
+import { inviteTeamMemberSchema, acceptInviteSchema, retailTransactionCreateRequestSchema, updateMerchantDetailsSchema, updateThemeSchema, updateDailyGoalSchema, forgotPasswordSchema, resetPasswordSchema, changePasswordSchema, newPasswordSchema, createRefundSchema, insertRefundSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, pushNotificationPreferencesSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createClientProfileSchema, updateClientProfileSchema, createQuoteSchema, acceptQuoteSchema, createJobInvoiceSchema, markJobPaidExternalSchema, createJobScheduleSchema, updateJobScheduleSchema, updateTradeReminderSettingsSchema, updateTradeGstSettingsSchema } from "@shared/schema";
 import { isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, getWindcaveEnv, submitGooglePayToken, createAttendedSession, submitTapToPayToken, createCardStorageSession, queryStoredCardSession, chargeStoredCard } from "./windcave";
 import { authenticateUser, checkPasswordEvenly, passwordCheckBudget, generateToken, authenticateToken, createUser, issueTokenForUserId, tokenForUserRow, isAccountOwner, requestPasswordReset, resetPassword, validateResetToken, type AuthenticatedRequest, logSecurityEvent, syncVerifiedMerchants } from "./auth";
 import {
@@ -4200,15 +4200,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // (Removed GET /api/tapt-stones/:id, owner decision 2026-09-26: nothing called it, and
   // counting through its sequential ids listed every board of every business.)
 
-  // Subscription revenue analytics (admin only)
-  app.get("/api/admin/subscription-revenue", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
-    try {
-      res.json(await storage.getSubscriptionRevenue());
-    } catch (error) {
-      console.error("Error fetching subscription revenue:", error);
-      res.status(500).json({ message: "Failed to fetch subscription revenue" });
-    }
-  });
+  // (Removed GET /api/admin/subscription-revenue, owner decision 2026-09-26: no screen called it;
+  // the overview gets the same figures from GET /api/admin/analytics.)
 
   // Windcave notification — Windcave sends GET with ?sessionid=XXX in the URL (per pseudo code v1.5)
   // Also handles POST for compatibility with other Windcave configurations
@@ -4819,51 +4812,15 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  // Legacy create merchant endpoint - deprecated, use /api/admin/merchants/signup instead  
-  app.post("/api/admin/merchants", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
-    res.status(410).json({ 
-      message: "This endpoint is deprecated. Please use /api/admin/merchants/signup for new merchant creation." 
-    });
-  });
+  // (Removed POST /api/admin/merchants, owner decision 2026-09-26: a stub answering 410 since the
+  // older POST /api/admin/merchants-old was removed; that one used a hardcoded admin email check and
+  // created merchants with a literal "tempPassword". The admin sign-up it pointed to is removed too.)
 
-  // (Removed legacy POST /api/admin/merchants-old — it used a hardcoded admin email
-  // check and created merchants with a literal "tempPassword". Superseded by
-  // POST /api/admin/merchants/signup.)
+  // (Removed PUT /api/admin/merchants/:id, owner decision 2026-09-26: no screen called it, and it
+  // stored the contact details it was sent with no schema.)
 
-  // Admin merchant management endpoints
-  app.put("/api/admin/merchants/:id", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
-    try {
-      const merchantId = strictPositiveIntegerParam(req.params.id);
-      if (merchantId === null) return res.status(400).json({ message: "Invalid id" });
-      const updates = req.body;
-
-      // Update different aspects of merchant data based on what's provided
-      if (updates.businessName || updates.contactEmail || updates.contactPhone || updates.businessAddress) {
-        await storage.updateMerchantDetails(merchantId, {
-          businessName: updates.businessName,
-          contactEmail: updates.contactEmail,
-          contactPhone: updates.contactPhone,
-          businessAddress: updates.businessAddress,
-        });
-      }
-
-      const updatedMerchant = await storage.getMerchant(merchantId);
-      if (!updatedMerchant) return res.status(404).json({ message: "Merchant not found" });
-      res.json(adminMerchantDto(updatedMerchant));
-    } catch (error) {
-      console.error("Error updating merchant:", error);
-      res.status(500).json({ message: "Failed to update merchant" });
-    }
-  });
-
-  // Test payment link endpoint
-  // Reported the business-wide no-board link "operational" without testing anything. That
-  // address was retired on 2026-09-25 (server/no-board-address.ts); no live screen calls this.
-  app.post("/api/merchants/:id/test-payment-link", authenticateAdmin, (req: AuthenticatedRequest, res) => {
-    const merchantId = strictPositiveIntegerParam(req.params.id);
-    if (merchantId === null) return res.status(400).json({ message: "Invalid id" });
-    res.status(410).json(NO_BOARD_ADDRESS_RETIRED);
-  });
+  // (Removed POST /api/merchants/:id/test-payment-link, owner decision 2026-09-26: it answered
+  // 410 for the business-wide no-board link retired on 2026-09-25, and no screen called it.)
 
   // Get all merchants for admin
   app.get("/api/admin/merchants", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
@@ -4891,60 +4848,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  // Delete merchant (admin only)
-  app.delete("/api/admin/merchants/:id", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
-    try {
-      const merchantId = strictPositiveIntegerParam(req.params.id);
-      if (merchantId === null) return res.status(400).json({ message: "Invalid id" });
+  // (Removed DELETE /api/admin/merchants/:id, owner decision 2026-09-26: no screen called it,
+  // and the database refused every business the app makes (its subscription row and owner login
+  // point at it), so it could only answer 500: scripts/verify-admin-business-delete-postgres.ts.)
 
-      // Check if merchant exists
-      const merchant = await storage.getMerchant(merchantId);
-      if (!merchant) {
-        return res.status(404).json({ message: "Merchant not found" });
-      }
-
-      const deleted = await storage.deleteMerchant(merchantId);
-      if (!deleted) {
-        return res.status(500).json({ message: "Failed to delete merchant" });
-      }
-
-      res.json({ message: "Merchant deleted successfully" });
-    } catch (error) {
-      console.error("Error deleting merchant:", error);
-      res.status(500).json({ message: "Failed to delete merchant" });
-    }
-  });
-
-  // Clear problematic merchants endpoint
-  app.post("/api/admin/clear-merchants", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
-    try {
-      const problemEmails = [
-        'oliverleonard.professional@gmail.com',
-        'dmizedzn@gmail.com', 
-        'oliverharryleonard@gmail.com'
-      ];
-      
-      let clearedCount = 0;
-      for (const email of problemEmails) {
-        const merchant = await storage.getMerchantByEmail(email);
-        if (merchant) {
-          // For MemStorage, we need to manually remove from the map
-          if ('merchants' in storage) {
-            (storage as any).merchants.delete(merchant.id);
-            clearedCount++;
-          }
-        }
-      }
-      
-      res.json({ 
-        message: `Cleared ${clearedCount} problematic merchants`,
-        clearedEmails: problemEmails
-      });
-    } catch (error) {
-      console.error("Clear merchants error:", error);
-      res.status(500).json({ message: "Failed to clear merchants" });
-    }
-  });
+  // (Removed POST /api/admin/clear-merchants, owner decision 2026-09-26: a debugging leftover
+  // with three email addresses written in; it deleted from the in-memory storage only.)
 
   // Resend verification email endpoint
   app.post("/api/admin/resend-verification", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
@@ -5002,29 +4911,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  // (Removed a duplicate POST /api/admin/clear-merchants handler here — it was dead
-  // code shadowed by the earlier registration of the same route.)
-
-  app.post("/api/admin/test-email", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
-    try {
-      const testEmail = await sendEmail({
-        to: req.user?.email || 'test@example.com',
-        from: config.email.fromEmail,
-        subject: 'TaptPay Email Test',
-        text: 'This is a test email to verify the Resend email configuration.',
-        html: '<h2>TaptPay Email Test</h2><p>This is a test email to verify the Resend email configuration.</p>'
-      });
-
-      if (testEmail) {
-        res.json({ success: true, message: 'Test email sent successfully' });
-      } else {
-        res.status(500).json({ success: false, message: 'Failed to send test email' });
-      }
-    } catch (error) {
-      console.error('Test email error:', error);
-      res.status(500).json({ success: false, message: 'Failed to send test email', error: error });
-    }
-  });
+  // (Removed POST /api/admin/test-email, owner decision 2026-09-26: no screen called it, and a
+  // failure answered with the email provider's own error. The email status below stays.)
 
   // Email configuration diagnostics — confirms at a glance whether auto-emails
   // (verification, admin notifications) can actually be delivered in this env.
@@ -5379,65 +5267,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // (Removed PUT /api/merchants/:id/business-details, owner decision 2026-09-26: only the
   // old /business-details page saved through it, and that page is removed.)
 
-  // Create merchant signup (admin version)
-  app.post("/api/admin/merchants/signup", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
-    try {
-
-      const validation = createMerchantSchema.safeParse(req.body);
-      if (!validation.success) {
-        return res.status(400).json({
-          message: validation.error.issues[0]?.message ?? "Invalid input",
-          errors: validation.error.issues,
-        });
-      }
-
-      const { password, confirmPassword, ...merchantData } = validation.data;
-
-      const normalizedEmail = merchantData.email.trim().toLowerCase();
-      const [existingMerchant, existingLogin] = await Promise.all([
-        storage.getMerchantByEmail(normalizedEmail),
-        storage.getUserByEmail(normalizedEmail),
-      ]);
-      if (existingMerchant || existingLogin) {
-        return res.status(409).json({ message: "Email already registered" });
-      }
-      merchantData.email = normalizedEmail;
-
-      // Hash the password
-      const passwordHash = await bcrypt.hash(password, 12);
-
-      // Generate proper URLs with actual merchant ID after creation
-      const merchant = await storage.createMerchantWithPassword({
-        ...merchantData,
-        qrCodeUrl: `temp`, // Will be updated after creation
-        paymentUrl: `temp` // Will be updated after creation
-      }, passwordHash);
-
-      // Do not report a usable account until the real owner identity exists.
-      await createUser(normalizedEmail, password, merchant.id);
-
-      await storage.updateMerchantDetails(merchant.id, {
-        businessName: merchant.businessName,
-        contactEmail: merchant.email,
-        contactPhone: merchant.phone || '',
-        businessAddress: merchant.address || ''
-      });
-
-      res.json({ 
-        message: "Merchant created successfully and is ready to use.",
-        merchant: {
-          id: merchant.id,
-          name: merchant.name,
-          businessName: merchant.businessName,
-          email: merchant.email,
-          status: 'verified'
-        }
-      });
-    } catch (error) {
-      console.error("Error creating merchant:", error);
-      res.status(500).json({ message: "Failed to create merchant" });
-    }
-  });
+  // (Removed POST /api/admin/merchants/signup, owner decision 2026-09-26: the admin chose the new
+  // owner's password, and no screen called it. Businesses sign up themselves.)
 
   // (Removed legacy POST /api/verify-merchant — superseded by the signup +
   // /api/auth/confirm-email flow. Nothing navigated to its /verify-merchant page.)
@@ -5986,33 +5817,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  // =============================================================================
-  // ADMIN API MANAGEMENT ROUTES
-  // =============================================================================
-
-  // Ecommerce administration is unavailable until its real implementation
-  // passes review. Never advertise fabricated keys, usage or revoke success.
-  app.get("/api/admin/api-keys", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
-    return res.status(404).json({ message: "Ecommerce API is unavailable" });
-  });
-
-  app.post("/api/admin/api-keys", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
-    return res.status(404).json({ message: "Ecommerce API is unavailable" });
-  });
-
-  app.post("/api/admin/api-keys/:keyId/revoke", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
-    const keyId = strictPositiveIntegerParam(req.params.keyId);
-    if (keyId === null) return res.status(400).json({ message: "Invalid keyId" });
-    return res.status(404).json({ message: "Ecommerce API is unavailable" });
-  });
-
-  app.get("/api/admin/api-metrics", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
-    return res.status(404).json({ message: "Ecommerce API is unavailable" });
-  });
-
-  app.get("/api/admin/api-usage", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
-    return res.status(404).json({ message: "Ecommerce API is unavailable" });
-  });
+  // (Removed the five admin API-key and usage routes, GET and POST /api/admin/api-keys,
+  // POST /api/admin/api-keys/:keyId/revoke, GET /api/admin/api-metrics and GET /api/admin/api-usage,
+  // owner decision 2026-09-26: the ecommerce API's administration was never built, so each only
+  // answered 404, and no screen called them.)
 
   // =============================================================================
   // STOCK MANAGEMENT ENDPOINTS

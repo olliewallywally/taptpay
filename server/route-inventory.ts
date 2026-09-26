@@ -307,7 +307,8 @@ export const KNOWN_GATE_MARKERS = [
   // real, strict gate (server/routes.ts ~line 430 — wraps authenticateToken,
   // then requires role==="admin", merchantId===0, and an exact
   // config.admin.email match) used as the literal middleware argument on
-  // every /api/admin/* route plus POST /api/merchants/:id/test-payment-link.
+  // every /api/admin/* route but the sign-in (and on POST
+  // /api/merchants/:id/test-payment-link until its removal on 2026-09-26).
   // It was previously invisible to this list, so every route gated ONLY by
   // it fell through to "unclassified" despite being the most tightly gated
   // routes in the file.

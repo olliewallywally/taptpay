@@ -165,16 +165,6 @@ describe("no response hands out the business-wide address", () => {
     expect(JSON.stringify(response.body)).not.toMatch(businessWide(owner.merchantId));
   });
 
-  it("retires the admin 'test payment link' check (410), which reported the address as working", async () => {
-    const { app } = await createTestApp();
-    const owner = await createOwnerPrincipal();
-
-    const response = await request(app)
-      .post(`/api/merchants/${owner.merchantId}/test-payment-link`)
-      .set(bearer(createAdminPrincipal()))
-      .send({});
-
-    expect(response.status).toBe(410);
-    expect(response.body).toEqual({ code: "NO_BOARD_ADDRESS_RETIRED", message: expect.stringContaining("own payment link") });
-  });
+  // The admin 'test payment link' check (410 since 2026-09-25) was removed on 2026-09-26 (owner
+  // decision, C10 batch 4): c10-batch-4-retired-routes.test.ts.
 });

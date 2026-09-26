@@ -161,7 +161,8 @@ describe("admin and SSE token provenance", () => {
         middleware: expect.stringContaining("authenticateAdmin"),
       });
     }
-    expect(handler("post", "/api/merchants/:id/test-payment-link")).toContain("authenticateAdmin");
+    // POST /api/merchants/:id/test-payment-link, the one guarded route outside /api/admin, was
+    // removed on 2026-09-26 (owner decision, C10 batch 4).
   });
 
   test("authenticated SSE uses live user resolution and records its users-row audience", () => {
@@ -174,9 +175,9 @@ describe("admin and SSE token provenance", () => {
 });
 
 describe("signup identity collisions", () => {
+  // POST /api/admin/merchants/signup was removed on 2026-09-26 (owner decision, C10 batch 4).
   test.each([
     ["post", "/api/merchants/signup"],
-    ["post", "/api/admin/merchants/signup"],
   ] as const)("%s %s checks the global login namespace", (method, route) => {
     expect(handler(method, route)).toContain("storage.getUserByEmail(normalizedEmail)");
   });
@@ -188,9 +189,8 @@ describe("signup identity collisions", () => {
     expect(signup).not.toContain("updateMerchantPasswordHash");
   });
 
-  test("Google and admin creation use the atomic password-backed path", () => {
+  test("Google creation uses the atomic password-backed path", () => {
     expect(handler("get", "/api/auth/google/callback")).toContain("createMerchantWithPassword(");
-    expect(handler("post", "/api/admin/merchants/signup")).toContain("createMerchantWithPassword(");
   });
 });
 
