@@ -1,6 +1,7 @@
 import { Resend } from 'resend';
 import nodemailer from 'nodemailer';
 import { config } from './config';
+import { boardPrintEmail, type BoardPrintOrder } from "./board-print";
 
 interface EmailParams {
   to: string;
@@ -267,31 +268,15 @@ function escHtml(s: string | null | undefined): string {
     .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
-export async function sendBoardBuilderEmail(params: {
-  pdfBase64: string;
-  businessName: string;
-  submitterName: string;
-  submitterEmail: string;
-  stoneId: string;
-  layout: string;
-}): Promise<boolean> {
+/**
+ * A board's print request, to TaptPay's print inbox. The route (POST /api/board-builder/submit)
+ * checks the sign-in, the board and the PDF first, and fills in the business and board from their
+ * records (owner decision 2026-09-26); server/board-print.ts builds the email.
+ */
+export async function sendBoardBuilderEmail(order: BoardPrintOrder): Promise<boolean> {
   const PRINT_TARGET = 'oliverleonard@taptpay.co.nz';
   const from = EMAIL_CONFIG.resend.fromEmail;
-
-  const subject = `New Payment Board — ${params.businessName} (${params.layout})`;
-  const html = `
-    <h2>Payment Board Print Request</h2>
-    <table style="border-collapse:collapse;width:100%;max-width:480px;">
-      <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">Business</td><td style="padding:6px 0;font-weight:600;">${escHtml(params.businessName)}</td></tr>
-      <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">Submitted by</td><td style="padding:6px 0;">${escHtml(params.submitterName)} &lt;${escHtml(params.submitterEmail)}&gt;</td></tr>
-      <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">Layout</td><td style="padding:6px 0;">${escHtml(params.layout)}</td></tr>
-      <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">Stone / QR</td><td style="padding:6px 0;">${params.stoneId === 'main' ? 'Main Payment Link' : `Stone ID ${escHtml(params.stoneId)}`}</td></tr>
-    </table>
-    <p style="margin-top:16px;color:#374151;">The payment board PDF is attached to this email.</p>
-    <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
-    <p style="color:#9ca3af;font-size:12px;">Sent via TaptPay Board Builder</p>
-  `;
-  const filename = `payment-board-${params.businessName.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}.pdf`;
+  const email = boardPrintEmail(order);
 
   // Try Resend first (supports attachments natively)
   if (resendClient) {
@@ -299,13 +284,10 @@ export async function sendBoardBuilderEmail(params: {
       const { error } = await resendClient.emails.send({
         to: PRINT_TARGET,
         from,
-        subject,
-        html,
-        text: `Payment Board Print Request from ${params.businessName} submitted by ${params.submitterName}.`,
-        attachments: [{
-          filename,
-          content: Buffer.from(params.pdfBase64, 'base64'),
-        }],
+        subject: email.subject,
+        html: email.html,
+        text: email.text,
+        attachments: [{ filename: email.filename, content: email.attachment }],
       });
       if (!error) {
         console.log('✅ Board builder email sent via Resend');
@@ -324,13 +306,9 @@ export async function sendBoardBuilderEmail(params: {
       await transporter.sendMail({
         from,
         to: PRINT_TARGET,
-        subject,
-        html,
-        attachments: [{
-          filename,
-          content: Buffer.from(params.pdfBase64, 'base64'),
-          contentType: 'application/pdf',
-        }],
+        subject: email.subject,
+        html: email.html,
+        attachments: [{ filename: email.filename, content: email.attachment, contentType: 'application/pdf' }],
       });
       console.log('✅ Board builder email sent via SMTP');
       return true;
@@ -339,7 +317,7 @@ export async function sendBoardBuilderEmail(params: {
     }
   }
 
-  console.log('[SIMULATED] Board builder email to', PRINT_TARGET, 'for', params.businessName);
+  console.log('[SIMULATED] Board builder email to', PRINT_TARGET, 'for', order.businessName);
   return true;
 }
 

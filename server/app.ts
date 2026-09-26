@@ -3,6 +3,7 @@ import helmet from "helmet";
 import compression from "compression";
 import { config } from "./config";
 import { createRequestLogger } from "./request-log";
+import { BOARD_PRINT_PATH } from "./board-print";
 
 /**
  * The HTTP pipeline every request passes through before the routes: security
@@ -85,9 +86,11 @@ export function createApp(options: { writeRequestLog: (line: string) => void }):
     next();
   });
 
-  // Skip JSON parsing for webhook routes to preserve raw body for signature verification
+  // Skip JSON parsing for webhook routes to preserve raw body for signature verification,
+  // and for the board builder's Send to Print, which parses its own larger body only once the
+  // sign-in is checked (server/board-print.ts; owner decision 2026-09-26).
   app.use((req, res, next) => {
-    if (req.path === '/api/windcave/notification') {
+    if (req.path === '/api/windcave/notification' || req.path === BOARD_PRINT_PATH) {
       next();
     } else {
       express.json()(req, res, next);

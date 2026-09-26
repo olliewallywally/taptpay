@@ -67,6 +67,14 @@ export const ADDRESS_GOOGLE_POLICY: AuthThrottlePolicy = Object.freeze({
   free: 20, firstWaitMs: 30_000, maxWaitMs: 15 * MINUTE, forgetAfterMs: 60 * MINUTE,
 });
 
+/**
+ * Boards a business sends to print (owner decision 2026-09-26: "a few sends an hour"): three
+ * never wait, then waits from 10 minutes doubling to an hour; every send counts.
+ */
+export const BOARD_PRINT_POLICY: AuthThrottlePolicy = Object.freeze({
+  free: 3, firstWaitMs: 10 * MINUTE, maxWaitMs: 60 * MINUTE, forgetAfterMs: 2 * 60 * MINUTE,
+});
+
 /** Rows untouched this long are deleted: no policy counts them any more. */
 export const AUTH_THROTTLE_RECLAIM_AFTER_MS = 24 * 60 * MINUTE;
 
@@ -226,6 +234,11 @@ export function confirmEmailBucket(token: string): AuthThrottleBucket {
   return { key: `confirm-email:${bucketKeyHmac("confirm-email", token)}`, policy: SIGN_IN_POLICY };
 }
 
+/** Boards one business sends to print. */
+export function boardPrintBucket(merchantId: number): AuthThrottleBucket {
+  return { key: `board-print:${bucketKeyHmac("board-print", String(merchantId))}`, policy: BOARD_PRINT_POLICY };
+}
+
 /** Sign-ups naming an address that already has an account: each would mail it a note. */
 export function signupNoticeBucket(email: string): AuthThrottleBucket {
   return { key: `signup-notice:${bucketKeyHmac("signup-notice", normalizeThrottleEmail(email))}`, policy: PASSWORD_RESET_POLICY };
@@ -255,10 +268,13 @@ export function waitInWords(seconds: number): string {
 }
 
 /** The 429 body. The same for every email, with a login or without. */
-export function tooManyAttempts(retryAfterMs: number, what: "sign-in" | "password-reset" | "confirmation-resend") {
+export type TooManyWhat = "sign-in" | "password-reset" | "confirmation-resend" | "board-print";
+
+export function tooManyAttempts(retryAfterMs: number, what: TooManyWhat) {
   const seconds = retryAfterSeconds(retryAfterMs);
   const subject = what === "password-reset" ? "Too many password reset requests"
     : what === "confirmation-resend" ? "Too many confirmation emails requested"
+    : what === "board-print" ? "Too many boards sent to print"
     : "Too many attempts";
   return {
     retryAfterSeconds: seconds,

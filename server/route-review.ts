@@ -1521,7 +1521,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       rate: "none — no limit",
     },
     findings: [
-      "Fixed 2026-09-26 (ae82a31c): it also gave the contact email, which sign-up and the admin's create set to the sign-in address (the settings screens cannot change it), and the account holder's name, so counting through the numbers listed every account's sign-in address and holder, against the owner's 2026-09-23 rule that no door says whether an address has an account. No customer page showed either.",
       "Still public by a guessable sequential number, with no limit: counting lists every business, pending applications included, with its business name, address and contact phone (set from the sign-up phone), GST number and NZBN. The customer pages that ask (a board's page, checkout, split, result and receipt pages) each already hold a sale, so they could be given these details with it instead: put to the owner 2026-09-26.",
     ],
   },
@@ -1706,30 +1705,22 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
   "POST /api/board-builder/submit": {
     branches: [
       {
-        principal: "public",
-        tenant: "none",
+        principal: "merchant",
+        roles: ["owner", "member"],
+        tenant: "session",
         tenantRule:
-          "none: the business, board and sender are whatever the body says; nothing is looked up or held to an account, though the only page that sends it needs sign-in",
+          "the session's own business, from its record (owner decision 2026-09-26): the body names no business, and its board (stoneId) must be one of that business's active boards (404 otherwise, the same for a missing one); the platform admin, with no business, is refused (403)",
       },
     ],
     input:
-      "body read without a schema: pdf, submitterName and submitterEmail must be present (400 otherwise); businessName, stoneId and layout are free text with defaults; nothing checks that pdf is a PDF. The JSON parser's 100 KB limit applies first (413)",
+      "body: boardPrintRequestSchema, strict (400 with the first issue and the issues): a base64 PDF of at most 2 MB that must start %PDF- (decodeBoardPrintPdf), the board's number, one of the two layouts, the sender's name and email. Parsed only after authenticateToken, up to 3 MB (BOARD_PRINT_JSON_LIMIT; 413 above it); the pipeline's 100 KB parser skips this route (server/app.ts)",
     capability: null,
     entitlement: null,
-    idempotency: "none: every request sends another email",
+    idempotency: "none: every accepted request sends another email, within the limit",
     sideEffects:
-      "emails the PDF as an attachment, with the names given, to the fixed print inbox (sendBoardBuilderEmail: Resend, else SMTP)",
-    successDto: "{ message: 'Board submitted successfully' }",
-    errorDisclosure: ["fixed"],
-    controls: {
-      authenticity: "none: anyone can send, under any business's name",
-      replay: "every replay sends another email with its attachment",
-      rate: "none — no limit",
-    },
-    findings: [
-      "The page's own request never gets through. The PDF it makes is 7.1 MB, 9.5 MB as the JSON it sends (both layouts), and the server takes at most 100 KB of JSON, so every Send to Print is refused with 413 and the page shows 'Failed to generate PDF'. Measured 2026-09-26 in Chromium on the production build (scripts/measure-board-builder-submit-browser.mjs), and the 413 shown in the harness. The limit is express.json()'s default, unchanged since the builder shipped (5c6d2356, 2026-03-18): it has never worked.",
-      "Public with no limit, while its only page needs sign-in: anyone can have the server email the print inbox any file under 100 KB, as any business, as often as they like. Put to the owner 2026-09-26: make Send to Print work for signed-in businesses (the business and board from the session, a larger limit on this route only, a send limit, a smaller PDF), or retire it.",
-    ],
+      "emails the PDF as an attachment, with the business's and board's names from their records, to the fixed print inbox (sendBoardBuilderEmail, built by server/board-print.ts); a failed send gives its count back",
+    successDto: "{ message: 'Board submitted successfully' }; 502 when the email could not be sent",
+    errorDisclosure: ["input-issues"],
   },
 };
 

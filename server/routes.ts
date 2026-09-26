@@ -20,7 +20,8 @@ import {
   HANDOFF_CODE_TTL_MS, clearSignInCookie, googleVerifiedEmail, handoffCodeHash, newHandoffCode, readCookie,
   signInCookies, startGoogleSignIn, verifyGoogleSignInState,
 } from "./google-sign-in";
-import { type SignInRealm, confirmEmailBucket, confirmationResendBucket, googleCallbackAddressBucket, normalizeThrottleEmail, passwordChangeBucket, passwordResetAddressBucket, passwordResetBucket, signInAccountBucket, signInAddressBucket, signInDeviceKeyPrefix, signupNoticeBucket, tooManyAttempts } from "./auth-throttle";
+import { type SignInRealm, type TooManyWhat, boardPrintBucket, confirmEmailBucket, confirmationResendBucket, googleCallbackAddressBucket, normalizeThrottleEmail, passwordChangeBucket, passwordResetAddressBucket, passwordResetBucket, signInAccountBucket, signInAddressBucket, signInDeviceKeyPrefix, signupNoticeBucket, tooManyAttempts } from "./auth-throttle";
+import { BOARD_PRINT_JSON_LIMIT, boardPrintRequestSchema, decodeBoardPrintPdf } from "./board-print";
 import { clientAddressForLimits } from "./client-address";
 import { ACCOUNT_EMAIL_REPLY_FLOOR_MS, SIGN_UP_REPLY_FLOOR_MS, replyNoSoonerThan, replyStart } from "./even-reply";
 import { deviceKnowsEmail, markSignInDevice, readSignInDevice, signInBucketFor, signInDeviceCookie, type SignInDevice } from "./sign-in-device";
@@ -789,7 +790,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   const merchantDeviceCookie = signInDeviceCookie("merchant", getBaseUrl());
   const adminDeviceCookie = signInDeviceCookie("admin", getBaseUrl());
   const refuseTooManyAttempts = (
-    res: express.Response, retryAfterMs: number, what: "sign-in" | "password-reset" | "confirmation-resend",
+    res: express.Response, retryAfterMs: number, what: TooManyWhat,
   ) => {
     const refusal = tooManyAttempts(retryAfterMs, what);
     res.set("Retry-After", String(refusal.retryAfterSeconds));
@@ -7049,32 +7050,62 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  // Board Builder: submit PDF for printing (public endpoint)
-  app.post("/api/board-builder/submit", async (req, res) => {
-    try {
-      const { pdf, businessName, submitterName, submitterEmail, stoneId, layout } = req.body;
-      if (!pdf || !submitterName || !submitterEmail) {
-        return res.status(400).json({ message: "Missing required fields: pdf, submitterName, submitterEmail" });
-      }
-      const { sendBoardBuilderEmail } = await import('./email-service-multi');
-      const sent = await sendBoardBuilderEmail({
-        pdfBase64: pdf,
-        businessName: businessName || "Business",
-        submitterName,
-        submitterEmail,
-        stoneId: stoneId || "main",
-        layout: layout || "A4 Portrait",
-      });
-      if (sent) {
+  // Board Builder: send a board's PDF to TaptPay's print inbox. Owner decision 2026-09-26
+  // (docs/decisions/2026-09-26-c10-batch-3-owner-answers.md, answer 2): signed-in businesses
+  // only, the business and board from the sign-in, a larger body on this route alone, a few
+  // sends an hour. The pipeline leaves this body alone (server/app.ts), so it is read only
+  // after the sign-in is checked. It was public with no limit, and its page's 9.5 MB request
+  // always met the 100 KB JSON limit.
+  app.post(
+    "/api/board-builder/submit", // BOARD_PRINT_PATH, which the pipeline's JSON parser skips
+    authenticateToken,
+    express.json({ limit: BOARD_PRINT_JSON_LIMIT }),
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const merchantId = req.user?.merchantId;
+        if (!merchantId) return res.status(403).json({ message: "Only a business can send a board to print" });
+        const validation = boardPrintRequestSchema.safeParse(req.body);
+        if (!validation.success) {
+          return res.status(400).json({
+            message: validation.error.issues[0]?.message ?? "Invalid board",
+            errors: validation.error.issues,
+          });
+        }
+        const pdf = decodeBoardPrintPdf(validation.data.pdf);
+        if (!pdf) return res.status(400).json({ message: "The board must be a PDF of at most 2 MB" });
+
+        const stone = await storage.getTaptStone(validation.data.stoneId);
+        if (!stone || !stone.isActive || stone.merchantId !== merchantId) {
+          return res.status(404).json({ message: "Payment board not found" });
+        }
+        const merchant = await storage.getMerchant(merchantId);
+        if (!merchant) return res.status(404).json({ message: "Merchant not found" });
+
+        const bucket = boardPrintBucket(merchantId);
+        const slot = await storage.takeAuthThrottleSlot([bucket], new Date());
+        if (!slot.allowed) return refuseTooManyAttempts(res, slot.retryAfterMs, "board-print");
+
+        const { sendBoardBuilderEmail } = await import('./email-service-multi');
+        const sent = await sendBoardBuilderEmail({
+          pdf,
+          businessName: merchant.businessName,
+          board: `${stone.name} (board ${stone.stoneNumber})`,
+          layout: validation.data.layout,
+          submitterName: validation.data.submitterName,
+          submitterEmail: validation.data.submitterEmail,
+        });
+        if (!sent) {
+          // Not the business's doing: this send does not count against it.
+          await storage.settleAuthThrottle([bucket], "void", new Date());
+          return res.status(502).json({ message: "The board could not be sent. Please try again." });
+        }
         res.json({ message: "Board submitted successfully" });
-      } else {
-        res.status(500).json({ message: "Failed to send email" });
+      } catch (error) {
+        console.error("Board builder submit error:", error);
+        res.status(500).json({ message: "Failed to process board submission" });
       }
-    } catch (error) {
-      console.error("Board builder submit error:", error);
-      res.status(500).json({ message: "Failed to process board submission" });
-    }
-  });
+    },
+  );
 
   // Serve PUBLIC uploads (merchant logos) from the uploaded_files table (durable
   // across deploys), with a local-disk fallback for any legacy file that predates

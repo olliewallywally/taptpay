@@ -69,10 +69,12 @@ export const MIDDLEWARE_POLICY: Record<RegistrationFile, readonly MiddlewarePoli
       mounts: "inline function",
       when: "always",
       runtimeName: "<anonymous>",
-      purpose: "JSON request bodies, except on /api/windcave/notification.",
+      purpose: "JSON request bodies, except on /api/windcave/notification and /api/board-builder/submit.",
       security:
         "express.json() with its default 100 KB limit. The Windcave notification route parses its own " +
-        "(urlencoded and JSON) and trusts none of it: it only re-queries the provider.",
+        "(urlencoded and JSON) and trusts none of it: it only re-queries the provider. The board builder's " +
+        "Send to Print parses its own, up to 3 MB, only after authenticateToken (server/board-print.ts), so " +
+        "no one signed out can make the server read a large body.",
     },
     {
       path: null,

@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 6fd8eeeade360a9db00752c97333af9479860ac1 on 2026-09-26.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 9d8b9fab17477d78a58efdbe3149b9b1237f5a92 on 2026-09-26.
  *
  * 216 registrations (89 GET, 89 POST, 3 PATCH, 5 ALL, 21 PUT, 9 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -2140,12 +2140,18 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
   "POST /api/board-builder/submit": {
     method: "POST",
     path: "/api/board-builder/submit",
-    principal: "public",
-    markers: [],
+    principal: "merchant-user",
+    markers: ["authenticateToken"],
     facts: {
-      body: ["fields: businessName, layout, pdf, stoneId, submitterEmail, submitterName"],
+      middleware: ["authenticateToken","express.json(…)"],
+      body: ["schema: boardPrintRequestSchema"],
+      authChecks: ["compares stone.merchantId !== merchantId"],
+      storageMethods: ["getMerchant","getTaptStone","settleAuthThrottle","takeAuthThrottleSlot"],
       sideEffects: ["email: sendBoardBuilderEmail"],
-      statuses: [200,400,500],
+      statuses: [200,400,401,403,404,429,500,502,503],
+      errorTextInResponse: ["validation.error.issues"],
+      rateLimits: ["refuseTooManyAttempts","tooManyAttempts"],
+      helpers: ["refuseTooManyAttempts"],
     },
   },
   "GET /uploads/:folder/:name": {

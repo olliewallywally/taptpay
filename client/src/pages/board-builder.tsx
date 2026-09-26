@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { getCurrentMerchantId } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
+import { apiErrorMessage } from "@/lib/api-error";
 import {
   ArrowLeft, Upload, Palette, Type, QrCode, Image as ImageIcon,
   Layout, CheckCircle, Loader2, ChevronDown
@@ -114,6 +115,25 @@ function hexToIconFilter(hex: string): string {
     const bri = Math.round(l * 200); // 50% lightness = 100% brightness
     return `sepia(1) hue-rotate(${rot}deg) saturate(${sat}%) brightness(${Math.max(bri, 15)}%)`;
   } catch { return ""; }
+}
+
+/** The largest PDF the print route takes (BOARD_PRINT_PDF_MAX_BYTES, server/board-print.ts). */
+const PRINT_PDF_MAX_BYTES = 2 * 1024 * 1024;
+const JPEG_QUALITIES = [0.92, 0.85, 0.75, 0.6];
+
+/** The board as a one-page PDF in base64, at the best JPEG quality that fits; null if none does. */
+function boardPdfBase64(
+  canvas: HTMLCanvasElement,
+  orientation: "landscape" | "portrait",
+  dim: { mmW: number; mmH: number },
+): string | null {
+  for (const quality of JPEG_QUALITIES) {
+    const pdf = new jsPDF({ orientation, unit: "mm", format: [dim.mmW, dim.mmH] });
+    pdf.addImage(canvas.toDataURL("image/jpeg", quality), "JPEG", 0, 0, dim.mmW, dim.mmH);
+    const base64 = pdf.output("datauristring").split(",")[1];
+    if ((base64.length * 3) / 4 <= PRINT_PDF_MAX_BYTES) return base64;
+  }
+  return null;
 }
 
 function buildModifiedSvg(opts: BuildSvgOpts): string {
@@ -508,44 +528,42 @@ export default function BoardBuilder() {
       await document.fonts.ready;
       await new Promise<void>((resolve) => setTimeout(resolve, 150));
 
-      // Capture with html2canvas at 2× resolution
+      // Capture with html2canvas at 2× resolution, on white: the board is painted edge to edge,
+      // so white only shows where the design leaves the paper clear. JPEG, not PNG: a PNG made a
+      // 7 MB PDF that no send could carry.
       const { default: html2canvas } = await import("html2canvas");
       const canvas = await html2canvas(captureEl, {
         scale: 2,
         useCORS: true,
         allowTaint: true,
-        backgroundColor: null,
+        backgroundColor: "#ffffff",
         logging: false,
         width: dim.pxW,
         height: dim.pxH,
       });
 
-      const imgData = canvas.toDataURL("image/png");
       const orientation = dim.mmW > dim.mmH ? "landscape" : "portrait";
-      const pdf = new jsPDF({ orientation, unit: "mm", format: [dim.mmW, dim.mmH] });
-      pdf.addImage(imgData, "PNG", 0, 0, dim.mmW, dim.mmH);
-      const pdfBase64 = pdf.output("datauristring").split(",")[1];
+      const pdfBase64 = boardPdfBase64(canvas, orientation, dim);
+      if (!pdfBase64) throw new Error("This board is too detailed to send. Try a smaller background image.");
 
-      const response = await apiRequest("POST", "/api/board-builder/submit", {
+      // The business comes from the sign-in; the board is one of its own (server/board-print.ts).
+      await apiRequest("POST", "/api/board-builder/submit", {
         pdf: pdfBase64,
-        businessName: businessName || "Business",
+        stoneId: Number(selectedStoneId),
+        layout: dim.label,
         submitterName,
         submitterEmail,
-        stoneId: selectedStoneId,
-        layout: dim.label,
       });
-
-      if (!response.ok) {
-        const err = (await response.json()) as { message?: string };
-        throw new Error(err.message ?? "Submission failed");
-      }
 
       setSubmitted(true);
       toast({ title: "Sent! We'll get your board printed and in touch soon." });
     } catch (error: unknown) {
-      console.error("PDF generation error:", error);
-      const message = error instanceof Error ? error.message : "Unknown error";
-      toast({ title: "Failed to generate PDF", description: message, variant: "destructive" });
+      console.error("Board send error:", error);
+      toast({
+        title: "Couldn't send your board",
+        description: apiErrorMessage(error, "Please try again."),
+        variant: "destructive",
+      });
     } finally {
       setIsSubmitting(false);
     }
