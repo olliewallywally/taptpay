@@ -441,7 +441,7 @@ The work itself:
     it**; the count locks once one is; GST copies go only to payers who paid; notifications find
     split shares. Found and fixed with it: after a split was chosen, the page's ready Apple Pay
     session still charged the whole invoice. PostgreSQL verifier 7/7; CI fingerprint re-recorded.
-  - Server 101/1,768, client 102/821→822, `tsc` clean. Mutations 3, 7, 2, 10, 9 of 10 (one
+  - Server 101/1,768, client 102/822, `tsc` clean. Mutations 3, 7, 2, 10, 9 of 10 (one
     one-frame flicker not catchable in jsdom) and 9.
   - **Open for the owner: apply 0030 to the development database** (the safety check denies it to
     the agent). Until then, in dev only, split checkouts and rent GST copies fail. Production is
