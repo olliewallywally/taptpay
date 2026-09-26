@@ -69,13 +69,23 @@ describe("R1-T6 — /api/admin identifier batch", () => {
     it("verifies a real, not-yet-verified merchant with a password already set", async () => {
       const { app } = await createTestApp();
       const admin = createAdminPrincipal();
-      // createOwnerPrincipal's merchant is activated ("active") with a real
-      // passwordHash (set by createUser) — never "verified" — so this is a
-      // legitimate not-yet-verified target for the handler's own checks.
-      const owner = await createOwnerPrincipal();
+      // A waiting application that chose its password at sign-up. (This used
+      // createOwnerPrincipal's active business until 2026-09-26, when verify
+      // stopped setting an active business back to verified: owner decision,
+      // C10 batch 4.)
+      const waiting = await storage.createMerchantWithSignup({
+        name: "Waiting Co",
+        businessName: "Waiting Co Ltd",
+        businessType: "retail",
+        email: `waiting.${Date.now()}@harness.test`,
+        phone: "021 555 0100",
+        address: "1 Waiting Street, Auckland",
+        verificationToken: `waiting-${Date.now()}`,
+        passwordHash: "synthetic-password-hash",
+      } as any);
 
       const response = await request(app)
-        .post(`/api/admin/merchants/${owner.merchantId}/verify`)
+        .post(`/api/admin/merchants/${waiting.id}/verify`)
         .set(bearer(admin));
       expect(response.status).toBe(200);
       expect(response.body.merchant.status).toBe("verified");
@@ -104,17 +114,21 @@ describe("R1-T6 — /api/admin identifier batch", () => {
       expect(response.status).toBe(404);
     });
 
-    it("activates a real, freshly created (pending) merchant", async () => {
+    it("activates a real, verified merchant", async () => {
       const { app } = await createTestApp();
       const admin = createAdminPrincipal();
-      const pending = await storage.createMerchant({
-        name: "Pending Co",
-        businessName: "Pending Co Ltd",
-        email: `pending.${Date.now()}@harness.test`,
+      // A verified business. (This used a freshly created pending one until
+      // 2026-09-26, when set-active stopped activating an application whose
+      // email was never confirmed: owner decision, C10 batch 4.)
+      const created = await storage.createMerchant({
+        name: "Verified Co",
+        businessName: "Verified Co Ltd",
+        email: `verified.${Date.now()}@harness.test`,
       } as any);
+      await storage.updateMerchantStatus(created.id, "verified");
 
       const response = await request(app)
-        .post(`/api/admin/merchants/${pending.id}/set-active`)
+        .post(`/api/admin/merchants/${created.id}/set-active`)
         .set(bearer(admin));
       expect(response.status).toBe(200);
       expect(response.body.merchant.status).toBe("active");

@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 4d2794a0411a5743744253d3286ac10f7b085aed on 2026-09-26.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 8aad300b0e3722929a330062a8199bb948d5bd57 on 2026-09-26.
  *
  * 203 registrations (85 GET, 82 POST, 3 PATCH, 5 ALL, 20 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -912,7 +912,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       authChecks: ["authenticateToken","compares req.user?.role !== \"admin\""],
       storageMethods: ["getMerchant","updateMerchantStatus"],
       sideEffects: ["audit log: logSecurityEvent"],
-      statuses: [200,400,401,403,404,500,503],
+      statuses: [200,400,401,403,404,409,500,503],
       helpers: ["authenticateAdmin"],
     },
   },
@@ -927,7 +927,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       authChecks: ["authenticateToken","compares req.user?.role !== \"admin\""],
       storageMethods: ["getMerchant","updateMerchantStatus"],
       sideEffects: ["audit log: logSecurityEvent"],
-      statuses: [200,400,401,403,404,500,503],
+      statuses: [200,400,401,403,404,409,500,503],
       helpers: ["authenticateAdmin"],
     },
   },

@@ -1790,12 +1790,13 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     input: "id: strictPositiveIntegerParam (400 otherwise); no body",
     capability: null,
     entitlement: null,
-    idempotency: "marks the business verified (updateMerchantStatus) and makes any missing owner login (syncVerifiedMerchants); again is 400 (already verified); a business with no password set is 400",
+    idempotency:
+      "marks a waiting application verified (updateMerchantStatus) and makes any missing owner login (syncVerifiedMerchants); again is 400 (already verified), any other state 409 (only what the business page offers, since 2026-09-26); an application with no password set is 400",
     sideEffects: ADMIN_AUDIT,
     successDto: "{ message, merchant: { id, name, businessName, email, status } }",
     errorDisclosure: ["fixed"],
     findings: [
-      "The business page offers Verify only for a waiting application, but the route takes any state but verified: an active business is set back to verified (both can sign in; the admin's lists then count it as not active). Unlike the emailed confirmation (confirmMerchantEmail), it leaves the email marked unconfirmed (emailVerified false) and the sign-up link usable. Put to the owner 2026-09-26: accept only what the page offers.",
+      "Unlike the emailed confirmation (confirmMerchantEmail), it leaves the email marked unconfirmed (emailVerified false) and the sign-up link usable. Minor; for the account-security work.",
     ],
   },
 
@@ -1804,13 +1805,10 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     input: "id: strictPositiveIntegerParam (400 otherwise); no body",
     capability: null,
     entitlement: null,
-    idempotency: "sets the business active from any other state; again is 400",
+    idempotency: "sets a verified business active; again is 400, any other state 409 (only what the business page offers, since 2026-09-26)",
     sideEffects: ADMIN_AUDIT,
     successDto: "{ message, merchant: { id, status } }",
     errorDisclosure: ["fixed"],
-    findings: [
-      "The business page offers Activate only for a verified business (\"once Windcave onboarding is done\"), but the route takes any state: a waiting application whose email was never confirmed becomes active, and sign-in accepts active. Admin-only and not offered by the page. Put to the owner 2026-09-26: accept only what the page offers (verified to active).",
-    ],
   },
 
   "PATCH /api/admin/merchants/:id/windcave-merchant-id": {

@@ -3558,6 +3558,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (merchant.status === 'verified') {
         return res.status(400).json({ message: "Merchant is already verified" });
       }
+      // The business page offers Verify only for a waiting application (owner decision
+      // 2026-09-26, C10 batch 4): an active business is never set back to verified.
+      if (merchant.status !== 'pending') {
+        return res.status(409).json({ message: "Only a waiting application can be verified" });
+      }
 
       if (!merchant.passwordHash) {
         return res.status(400).json({ message: "Merchant has not set a password yet. Resend the verification email first, or use the activate endpoint with a password." });
@@ -3597,6 +3602,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const merchant = await storage.getMerchant(merchantId);
       if (!merchant) return res.status(404).json({ message: "Merchant not found" });
       if (merchant.status === 'active') return res.status(400).json({ message: "Merchant is already active" });
+      // The business page offers Activate Account only for a verified business (owner decision
+      // 2026-09-26, C10 batch 4): an application is never made active before it is confirmed.
+      if (merchant.status !== 'verified') {
+        return res.status(409).json({ message: "Only a verified business can be activated" });
+      }
 
       const updated = await storage.updateMerchantStatus(merchantId, 'active');
       if (!updated) return res.status(500).json({ message: "Failed to activate merchant" });

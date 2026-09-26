@@ -3,7 +3,7 @@ import "./support/test-env";
 import crypto from "crypto";
 import request from "supertest";
 import {
-  bearer, createAdminPrincipal, createOwnerPrincipal, createTestApp, resetTestStorage, storage,
+  bearer, createAdminPrincipal, createOwnerPrincipal, createTestApp, resetTestStorage, storage, storageSnapshot,
 } from "./support/http-harness";
 
 /**
@@ -56,5 +56,67 @@ describe("activating a business with a password (admin)", () => {
     expect(res.status).toBe(200);
     expect(res.body.merchant).toMatchObject({ id: waiting.id, status: "verified" });
     expect(await storage.getMerchant(waiting.id)).toMatchObject({ status: "verified", verificationToken: null });
+  });
+});
+
+/**
+ * Owner decision 2026-09-26 (docs/decisions/2026-09-26-c10-batch-4-owner-answers.md, answer 4):
+ * the business page (client/src/pages/admin/MerchantDetail.tsx) shows Verify only for a waiting
+ * application and Activate Account only for a verified business, and the routes now accept only
+ * that. Before, verify took any state but verified (an active business was set back to verified)
+ * and set-active any state but active (an application whose email was never confirmed became
+ * active, and sign-in accepts active).
+ */
+describe("verify and set-active accept only what the business page offers", () => {
+  const waitingApplication = () => storage.createMerchantWithSignup({
+    name: "Waiting Owner", businessName: "Waiting Ltd", businessType: "retail",
+    email: `waiting.${crypto.randomBytes(4).toString("hex")}@harness.test`,
+    phone: "021 555 0100", address: "1 Waiting Street, Auckland",
+    verificationToken: crypto.randomBytes(32).toString("hex"), passwordHash: "synthetic-password-hash",
+  } as any);
+
+  it("verify refuses an active business, and changes nothing", async () => {
+    const { app } = await createTestApp();
+    const active = await createOwnerPrincipal();
+    const before = storageSnapshot();
+
+    const res = await request(app).post(`/api/admin/merchants/${active.merchantId}/verify`).set(bearer(createAdminPrincipal()));
+
+    expect(res.status).toBe(409);
+    expect(res.body).toEqual({ message: "Only a waiting application can be verified" });
+    expect(storageSnapshot()).toBe(before);
+  });
+
+  it("verify still verifies a waiting application that chose a password", async () => {
+    const { app } = await createTestApp();
+    const waiting = await waitingApplication();
+
+    const res = await request(app).post(`/api/admin/merchants/${waiting.id}/verify`).set(bearer(createAdminPrincipal()));
+
+    expect(res.status).toBe(200);
+    expect(await storage.getMerchant(waiting.id)).toMatchObject({ status: "verified" });
+  });
+
+  it("set-active refuses a waiting application, and changes nothing", async () => {
+    const { app } = await createTestApp();
+    const waiting = await waitingApplication();
+    const before = storageSnapshot();
+
+    const res = await request(app).post(`/api/admin/merchants/${waiting.id}/set-active`).set(bearer(createAdminPrincipal()));
+
+    expect(res.status).toBe(409);
+    expect(res.body).toEqual({ message: "Only a verified business can be activated" });
+    expect(storageSnapshot()).toBe(before);
+  });
+
+  it("set-active still activates a verified business", async () => {
+    const { app } = await createTestApp();
+    const verified = await waitingApplication();
+    await storage.updateMerchantStatus(verified.id, "verified");
+
+    const res = await request(app).post(`/api/admin/merchants/${verified.id}/set-active`).set(bearer(createAdminPrincipal()));
+
+    expect(res.status).toBe(200);
+    expect(await storage.getMerchant(verified.id)).toMatchObject({ status: "active" });
   });
 });
