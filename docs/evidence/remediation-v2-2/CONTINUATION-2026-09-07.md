@@ -399,12 +399,33 @@ The work itself:
   - Recorded for later phases: the sign-up confirmation token is unhashed and never expires; admin
     sign-in shows which address is the admin's while `ADMIN_PASSWORD_HASH` is unset; sign-up's only
     limit is a count shared with the board page's 3-second feed and numbered pay.
+- **C10 continued (2026-09-26): batch 3c `ae82a31c`, `d0d5495b`; local, awaiting independent review**
+  ([working notes](r1/WORKING-2026-09-26-r1-t2-c10.md)). 76 of 223 routes are reviewed; 147 are
+  pending.
+  - **Fixed, `ae82a31c`: anyone could list every business's sign-in email address and its account
+    holder's name** by counting through business numbers on the public business read
+    (`GET /api/merchants/:id`), pending applications included. Sign-up sets the contact email to the
+    sign-in address, and the read gave both. No customer page used either; both are gone from it.
+  - Batch 3c, public pages, configuration and boards (20 routes). The extractor reads the provider's
+    configuration check as a capability; a rule makes a review say when the platform admin is let
+    through a business's ownership check.
+  - **Found: the board builder's Send to Print has never worked.** The page sends about 9.5 MB and the
+    server accepts 100 KB, so every send is refused (measured in Chromium on the production build).
+    The route is also open to anyone, with no limit, and emails the print inbox what it is sent.
+  - Mutations 18/18; server 97/1,742; `tsc` clean. The measurement was re-run on a fresh build
+    (the same bytes), and the refusal re-checked in the harness.
+  - For the owner, with batches 3a and 3b's questions: Send to Print (make it work for signed-in
+    businesses, or retire it); the public business read (give customer pages the business details
+    with the sale they hold, or keep the read); retiring three public routes nothing calls
+    (`GET /api/tapt-stones/:id`, `GET /api/windcave/status`,
+    `GET /api/payments/digital-wallet/config`).
+  - Recorded for later phases: a board's page gets 403 where its stream gets 404 (P2.2, R1-T3); no
+    limit on open streams (R1-T4 phase B); each board-page poll logs the visitor's address (logs);
+    the lead form's answer gives the lead count.
 
-**Next:** R1-T2's review, batch 3c (the 20 pending routes with no sign-in middleware), then the
-batch 3 owner questions together, then the signed-in families; 167 routes are pending. Then
-R1-T3's runtime matrix, on the audited harness. Also for R1-T2: `POST /api/board-builder/submit` is
-public with no rate limit (it emails a supplied PDF to the owner's inbox), and its PDF may not fit
-the 100 KB request limit (to check in 3c). Open for the owner: the card-free dev write (above). The
+**Next:** the batch 3 owner questions (3a, 3b and 3c together), then R1-T2's review of the
+signed-in families; 147 routes are pending. Then R1-T3's runtime matrix, on the audited harness.
+Open for the owner: the card-free dev write (above). The
 no-board rework's questions are all answered. Release of the rework: when production has no pending
 shared no-board sale (count-only check once production is reopened), with
 `FEATURE_NEW_RETAIL_PAYMENTS` on.
@@ -412,7 +433,7 @@ shared no-board sale (count-only check once production is reopened), with
 The phase B live check waits for the owner to set `ADMIN_PASSWORD_HASH`.
 Independent reviews owed (each evidence file ends with its brief):
 - C10 so far (`2ec9d78f..cee1276a`), the 2026-09-26 owner answers (`cee1276a..a419f948`), and
-  C10's batch 3 so far (`30c9d8cb..6f887234`);
+  C10's batch 3 (`30c9d8cb..d0d5495b`);
 - the no-board rework (`da90d1a1..5c2cdb27`), its follow-up (`7051e25e..1fb41d14`), and the
   owner-answer fixes 2a–2c (`aba7b2be..da90d1a1`);
 - R1-T1 (`03c4663b..05195728`) and the live-updates fix (`05195728..3fac8ac8`);
