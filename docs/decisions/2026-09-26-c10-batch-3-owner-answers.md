@@ -36,3 +36,24 @@ entry points) and 3c (public pages, configuration and boards).
   is a separate data change that the owner approves or runs (the auto-mode safety check denies such
   writes, 2026-09-25 and 2026-09-26); production is untouched.
 - Removing a route also removes its review entry and regenerates the route policy.
+
+## Outcome (same day, local commits, not pushed)
+
+- 4, the three unused public look-ups: **`6fd8eeea`**.
+- 4, the unused sign-up and invoice routes and the old business-details page: **`8fac4b34`**. It
+  also removed what only that page used: its save route (`PUT /api/merchants/:id/business-details`)
+  and resending a confirmation link by account number (check-email's `?id=` links predate
+  2026-09-23).
+- 4, the reset page: **`9d8b9fab`** ("We couldn't check this link" / "Please try again.").
+- 2, Send to Print: **`29f13ffd`** (signed in, business and board from the records, ≤ 3 MB read
+  after sign-in, PDF ≤ 2 MB, 3 sends free then waits of 10 → 60 minutes; the page's send went from
+  9,473,632 to 150,278 bytes).
+- 3, business details with the sale: **`12aecb03`** (the by-number read removed; a board's page reads
+  its board's name and logo; payment links drop the holder's name and contact email).
+- 1, split-invoice sessions: **`1a77530e`**, migration **0030**. Found while building it and fixed
+  with it: the checkout page kept its ready Apple Pay / Google Pay session after a split was chosen,
+  so Apple Pay charged the whole invoice while showing a share. Still for R3: sessions opened at once
+  can leave up to a cent per share unpaid.
+- **Not done: applying 0030 to the development database** — the owner's to run (the auto-mode safety
+  check denies such writes). Until then, in dev only, split invoice checkouts and rent GST copies
+  fail. Production is closed, and 0030 must be applied there before this code is released.

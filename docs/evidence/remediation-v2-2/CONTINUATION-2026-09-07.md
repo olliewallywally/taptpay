@@ -423,9 +423,33 @@ The work itself:
     limit on open streams (R1-T4 phase B); each board-page poll logs the visitor's address (logs);
     the lead form's answer gives the lead count.
 
-**Next:** the batch 3 owner questions (3a, 3b and 3c together), then R1-T2's review of the
-signed-in families; 147 routes are pending. Then R1-T3's runtime matrix, on the audited harness.
-Open for the owner: the card-free dev write (above). The
+- **Owner answers to batch 3 (2026-09-26), all recommendations**
+  ([decision](../../decisions/2026-09-26-c10-batch-3-owner-answers.md)), each built tests first,
+  local, awaiting independent review:
+  - **`6fd8eeea`, `8fac4b34`**: removed routes nothing called — three public look-ups (the board
+    row by number, the provider status, the wallet settings); `POST /api/merchants/verify`;
+    `POST /api/checkout/pay`; the old `/business-details` page with its email-status look-up, its
+    save route and resending by account number. 216 routes.
+  - **`9d8b9fab`**: the reset page tells "we couldn't check this link" from an expired one.
+  - **`29f13ffd`: Send to Print works**, signed in only: the business and board from their records,
+    a strict body with a PDF of at most 2 MB, read (up to 3 MB) only after sign-in, three sends free
+    then waits of 10 to 60 minutes. The page's send went from 9.5 MB to 150 KB (Chromium).
+  - **`12aecb03`**: the by-number business read is removed; each customer page gets the business's
+    details with its sale, link or invoice, a board's page from its board; payment links no longer
+    carry the holder's name or sign-in address.
+  - **`1a77530e`, migration 0030: a split invoice's share is paid only by a session opened for
+    it**; the count locks once one is; GST copies go only to payers who paid; notifications find
+    split shares. Found and fixed with it: after a split was chosen, the page's ready Apple Pay
+    session still charged the whole invoice. PostgreSQL verifier 7/7; CI fingerprint re-recorded.
+  - Server 101/1,768, client 102/821→822, `tsc` clean. Mutations 3, 7, 2, 10, 9 of 10 (one
+    one-frame flicker not catchable in jsdom) and 9.
+  - **Open for the owner: apply 0030 to the development database** (the safety check denies it to
+    the agent). Until then, in dev only, split checkouts and rent GST copies fail. Production is
+    closed; 0030 goes before this code at release.
+
+**Next:** the independent reviews owed, then R1-T2's review of the signed-in families; 146 routes
+are pending. Then R1-T3's runtime matrix, on the audited harness.
+Open for the owner: 0030 in dev (above); the card-free dev write (above). The
 no-board rework's questions are all answered. Release of the rework: when production has no pending
 shared no-board sale (count-only check once production is reopened), with
 `FEATURE_NEW_RETAIL_PAYMENTS` on.
@@ -433,7 +457,7 @@ shared no-board sale (count-only check once production is reopened), with
 The phase B live check waits for the owner to set `ADMIN_PASSWORD_HASH`.
 Independent reviews owed (each evidence file ends with its brief):
 - C10 so far (`2ec9d78f..cee1276a`), the 2026-09-26 owner answers (`cee1276a..a419f948`), and
-  C10's batch 3 (`30c9d8cb..d0d5495b`);
+  C10's batch 3 (`30c9d8cb..d0d5495b`) and its owner answers (`4ac759d1..1a77530e`);
 - the no-board rework (`da90d1a1..5c2cdb27`), its follow-up (`7051e25e..1fb41d14`), and the
   owner-answer fixes 2a–2c (`aba7b2be..da90d1a1`);
 - R1-T1 (`03c4663b..05195728`) and the live-updates fix (`05195728..3fac8ac8`);
