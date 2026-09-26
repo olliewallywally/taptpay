@@ -375,10 +375,15 @@ class FactCollector {
     const right = this.text(node.right);
     const tenantish = (text: string) => /(^|\.|\?\.)(merchantId|userId|ownerId)$/.test(text);
     const roleish = (text: string) => /(^|\.|\?\.)role$/.test(text);
+    // A request value compared with a configured secret (a webhook's shared key).
+    const secretish = (text: string) => /^(config\.|process\.env)/.test(text) && /secret|key|token|pass/i.test(text);
     const tenantComparison =
       (tenantish(left) && !this.isNullishOrLiteral(node.right)) ||
       (tenantish(right) && !this.isNullishOrLiteral(node.left));
-    if (tenantComparison || roleish(left) || roleish(right)) {
+    const secretComparison =
+      (secretish(left) && !this.isNullishOrLiteral(node.right)) ||
+      (secretish(right) && !this.isNullishOrLiteral(node.left));
+    if (tenantComparison || secretComparison || roleish(left) || roleish(right)) {
       this.authChecks.add(`compares ${this.text(node)}`);
     }
   }
@@ -400,6 +405,12 @@ class FactCollector {
       if (chain.rooted && (method === "status" || method === "sendStatus")) {
         const code = node.arguments[0];
         if (code && ts.isNumericLiteral(code)) this.statuses.add(Number(code.text));
+        // `res.status(ok ? 200 : 207)`: both.
+        if (code && ts.isConditionalExpression(code)) {
+          for (const branch of [code.whenTrue, code.whenFalse]) {
+            if (ts.isNumericLiteral(branch)) this.statuses.add(Number(branch.text));
+          }
+        }
       }
       if (chain.rooted && method === "redirect") {
         const code = node.arguments[0];
@@ -437,6 +448,8 @@ class FactCollector {
     if (AUTH_CHECK_CALLS.has(callee) || AUTH_CHECK_CALLS.has(calleeName)) {
       this.authChecks.add(AUTH_CHECK_CALLS.has(callee) ? callee : calleeName);
     }
+    // Recorded even inside a check followed quietly: it is how that check compares.
+    if (calleeName === "timingSafeEqual") this.authChecks.add(`constant-time comparison: ${callee}`);
     const effect = SIDE_EFFECT_CALLS[callee] ?? SIDE_EFFECT_PREFIXES.find(([prefix]) => callee.startsWith(prefix))?.[1];
     if (effect) this.sideEffects.add(`${effect}: ${callee}`);
     if (CAPABILITY_CALLS.has(callee)) this.capabilityGates.add(callee);

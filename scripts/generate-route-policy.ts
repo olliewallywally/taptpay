@@ -23,6 +23,7 @@ import {
   type RouteRegistration,
 } from "../server/route-inventory";
 import { compactFacts, currentRouteFacts, type RecordedRouteFacts } from "../server/route-facts";
+import { REVIEW_PENDING, ROUTE_REVIEW, type RouteReview } from "../server/route-review";
 
 const POLICY_FILE = path.join(process.cwd(), "server", "route-policy.ts");
 const TABLE_FILE = path.join(
@@ -108,12 +109,48 @@ function renderPolicyEntry(r: {
   ].join("\n");
 }
 
-/** The documentation's per-route facts: one short section per route. */
+/** A route's reviewed policy (server/route-review.ts), as documentation lines. */
+function renderReview(review: RouteReview): string[] {
+  const lines = ["", "Reviewed policy:", ""];
+  for (const branch of review.branches) {
+    const who = [
+      branch.principal,
+      branch.roles ? `(${branch.roles.join(", ")}${branch.platformAdmin ? ", platform admin" : ""})` : "",
+      branch.when ? `— ${branch.when}` : "",
+    ].filter(Boolean).join(" ");
+    lines.push(`- **Who:** ${who}. **Tenant (${branch.tenant}):** ${branch.tenantRule}`);
+  }
+  lines.push(`- **Input:** ${review.input}`);
+  if (review.capability) lines.push(`- **Capability gate:** ${review.capability}`);
+  if (review.entitlement) lines.push(`- **Entitlement gate:** ${review.entitlement}`);
+  lines.push(`- **Idempotency:** ${review.idempotency}`);
+  if (review.sideEffects) lines.push(`- **Side effects:** ${review.sideEffects}`);
+  lines.push(`- **Success:** ${review.successDto}`);
+  lines.push(`- **Error disclosure:** ${review.errorDisclosure.join(", ")}`);
+  if (review.controls) {
+    lines.push(
+      `- **Authenticity:** ${review.controls.authenticity}`,
+      `- **Replay:** ${review.controls.replay}`,
+      `- **Rate:** ${review.controls.rate}`,
+    );
+  }
+  for (const finding of review.findings ?? []) lines.push(`- **Finding:** ${finding}`);
+  return lines;
+}
+
+/** The documentation's per-route facts and review: one short section per route. */
 function renderFactsSection(r: { method: string; path: string; facts: RecordedRouteFacts }): string {
   const lines = Object.entries(r.facts).map(
     ([field, values]) => `- ${field}: ${(values as Array<string | number>).map((v) => `\`${v}\``).join(", ")}`,
   );
-  return [`### ${r.method} \`${r.path}\``, "", ...(lines.length > 0 ? lines : ["- (no facts: a static answer)"]), ""].join("\n");
+  const review = ROUTE_REVIEW[`${r.method} ${r.path}`];
+  return [
+    `### ${r.method} \`${r.path}\``,
+    "",
+    ...(lines.length > 0 ? lines : ["- (no facts: a static answer)"]),
+    ...(review ? renderReview(review) : ["", "Review pending."]),
+    "",
+  ].join("\n");
 }
 
 function main() {
@@ -281,13 +318,29 @@ Unclassified (no known gate marker, no known public-design marker, and no
 curated allowlist entry found near the handler — needs a human read, not
 necessarily a bug): **${unclassified.length}**.
 ${gapSection}
-| Method | Path | Line | Principal (heuristic) | Markers |
+## Review
+
+${Object.keys(ROUTE_REVIEW).length} of ${rows.length} routes reviewed (server/route-review.ts); ${REVIEW_PENDING.length} pending.
+A reviewed route's principal below is the review's; a pending one's is the heuristic, marked "(heuristic)".
+
+### Open findings
+
+${Object.entries(ROUTE_REVIEW)
+  .flatMap(([key, review]) => (review.findings ?? []).map((finding) => `- **${key}:** ${finding}`))
+  .join("\n") || "None."}
+
+## Routes
+
+| Method | Path | Line | Principal | Markers |
 |---|---|---:|---|---|
 ${rows
-  .map(
-    (r) =>
-      `| ${r.method} | \`${r.path}\` | ${r.file === "server/routes.ts" ? r.line : `${r.file}:${r.line}`} | ${r.principal} | ${r.markers.join(", ") || "—"} |`,
-  )
+  .map((r) => {
+    const review = ROUTE_REVIEW[`${r.method} ${r.path}`];
+    const principal = review
+      ? [...new Set(review.branches.map((branch) => branch.principal))].join(" / ")
+      : `${r.principal} (heuristic)`;
+    return `| ${r.method} | \`${r.path}\` | ${r.file === "server/routes.ts" ? r.line : `${r.file}:${r.line}`} | ${principal} | ${r.markers.join(", ") || "—"} |`;
+  })
   .join("\n")}
 
 ## Per-route facts

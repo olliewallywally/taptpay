@@ -95,6 +95,31 @@ export async function registerRoutes(app: Express) {
   app.get("/robots.txt", (_req, res) => {
     res.type("text/plain").send("User-agent: *");
   });
+
+  app.post("/api/webhooks/relay", async (req, res) => {
+    res.status(200).send("OK");
+    if (config.relay.apiKey) {
+      const incoming = req.headers["apikey"] as string | undefined;
+      if (incoming !== config.relay.apiKey) return;
+    }
+    await storage.recordRelay(req.body.id);
+  });
+
+  function authorizeCronRequest(req: any, res: any): boolean {
+    const provided = Buffer.from(String(req.headers["x-cron-secret"] ?? ""));
+    const secret = Buffer.from(config.cronSecret);
+    if (provided.length !== secret.length || !crypto.timingSafeEqual(provided, secret)) {
+      res.status(401).json({ message: "Unauthorized" });
+      return false;
+    }
+    return true;
+  }
+
+  app.post("/api/internal/cron", async (req, res) => {
+    if (!authorizeCronRequest(req, res)) return;
+    const ok = await runPasses();
+    res.status(ok ? 202 : 207).json({ started: true });
+  });
 }
 `;
 
@@ -113,6 +138,8 @@ describe("R1-T2 route facts, read from each handler's syntax tree (C10)", () => 
       "GET /api/pay/t/:token/receipt",
       "GET /api/billing/card/callback",
       "GET /robots.txt",
+      "POST /api/webhooks/relay",
+      "POST /api/internal/cron",
     ]);
   });
 
@@ -240,6 +267,19 @@ describe("R1-T2 route facts, read from each handler's syntax tree (C10)", () => 
       "(error as Error).message",
       "String((error as any))",
     ]);
+  });
+
+  it("reads a shared secret compared with a configured value, and a constant-time comparison inside a check", () => {
+    expect(factsFor("POST /api/webhooks/relay")).toMatchObject({
+      authChecks: ["compares incoming !== config.relay.apiKey"],
+      body: ["fields: id"],
+      storageMethods: ["recordRelay"],
+      statuses: [200],
+    });
+    expect(factsFor("POST /api/internal/cron")).toMatchObject({
+      authChecks: ["authorizeCronRequest", "constant-time comparison: crypto.timingSafeEqual"],
+      statuses: [202, 207, 401],
+    });
   });
 
   it("reads a handler passed by name", () => {

@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ a394cae3f252b34a4884cdbb951cd0ed0a76ead6 on 2026-09-26.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ c85501ad6559f3d511f115396456482f672bf9a1 on 2026-09-26.
  *
  * 223 registrations (93 GET, 91 POST, 3 PATCH, 5 ALL, 22 PUT, 9 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -1883,7 +1883,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       middleware: ["requireEcommerceApi","authenticateApiKey"],
       body: ["schema: apiV1CreateTransactionSchema"],
       storageMethods: ["createWebhookDelivery","getApiKeyByKey","getOrCreateSubscription","logApiRequest","updateApiKeyLastUsed"],
-      statuses: [200,400,401,402,403,404,503],
+      statuses: [200,400,401,402,403,404,500,503],
       dtos: ["publicTransactionDto"],
       errorTextInResponse: ["validation.error.errors"],
       capabilityGates: ["config.features.ecommerceApi","config.features.newRetailPayments","requireEcommerceApi"],
@@ -2661,6 +2661,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     markers: ["req.headers[\"apikey\"]"],
     facts: {
       middleware: ["express.json(…)"],
+      authChecks: ["constant-time comparison: crypto.timingSafeEqual"],
       storageMethods: ["createJobEvent","getInvoiceRentRequestByWhatsappMessageId","getJobInvoiceByWhatsappMessageId","logTransactionEvent","updateInvoiceRentRequest","updateJobInvoice"],
       statuses: [200],
       helpers: ["presentedSecretMatches"],
@@ -3133,7 +3134,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     principal: "cron",
     markers: ["authorizeCronRequest"],
     facts: {
-      authChecks: ["authorizeCronRequest"],
+      authChecks: ["authorizeCronRequest","constant-time comparison: crypto.timingSafeEqual"],
       statuses: [200,401,503],
     },
   },
@@ -3143,8 +3144,8 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     principal: "cron",
     markers: ["authorizeCronRequest"],
     facts: {
-      authChecks: ["authorizeCronRequest"],
-      statuses: [401,409,500,503],
+      authChecks: ["authorizeCronRequest","constant-time comparison: crypto.timingSafeEqual"],
+      statuses: [200,207,401,409,500,503],
       helpers: ["runPass"],
     },
   },

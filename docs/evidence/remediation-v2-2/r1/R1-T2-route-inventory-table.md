@@ -1,4 +1,4 @@
-# R1-T2 route inventory — generated 2026-09-26 @ `a394cae3f252b34a4884cdbb951cd0ed0a76ead6`
+# R1-T2 route inventory — generated 2026-09-26 @ `c85501ad6559f3d511f115396456482f672bf9a1`
 
 Regenerate with `npx tsx scripts/generate-route-policy.ts`. This table is
 evidence for the SHA named above, not a timeless constant — see
@@ -12,229 +12,246 @@ Unclassified (no known gate marker, no known public-design marker, and no
 curated allowlist entry found near the handler — needs a human read, not
 necessarily a bug): **0**.
 
-| Method | Path | Line | Principal (heuristic) | Markers |
+## Review
+
+12 of 223 routes reviewed (server/route-review.ts); 211 pending.
+A reviewed route's principal below is the review's; a pending one's is the heuristic, marked "(heuristic)".
+
+### Open findings
+
+- **ALL /api/windcave/notification:** pending → processing is a read then a write, not an atomic claim: two simultaneous notifications for one session can both query the provider and both settle it (a second count increment, a second push). Plan 22.7 / R3 (C20) owns the single atomic finaliser.
+- **ALL /api/windcave/notification:** Logs the raw query (with the session id), and the query and body when no session id is found, to the server log.
+- **POST /api/v1/transactions:** webhook_url from the caller is stored as a webhook delivery row. Nothing delivers those rows today; any future delivery worker must restrict destinations (server-side request forgery).
+- **POST /api/v1/transactions:** No rate limit and no idempotency key on an API that creates payment links (behind FEATURE_ECOMMERCE_API, off by default; plan 15.5 decides the API's future).
+- **ALL /api/windcave/rent-notification:** finalizeRentInvoice marks a single (unsplit) payment paid after a plain read: this notification and the browser's return arriving together can both record it, logging Payment_Received twice and sending the GST invoice twice. Plan 22.7 / R3 (C20).
+- **ALL /api/windcave/trades-notification:** finalizeTradeInvoice marks a single payment paid after a plain read: a notification and the browser's return arriving together can both record it and send the payment invoice twice. Plan 22.7 / R3 (C20).
+- **POST /api/internal/cron:** Overlapping runs are refused only within one server process (the in-memory cronRunning flag): two instances can run the passes at once. Plan 13.3 (durable cron leases).
+
+## Routes
+
+| Method | Path | Line | Principal | Markers |
 |---|---|---:|---|---|
-| GET | `/robots.txt` | 431 | public | — |
-| GET | `/nfc/:merchantId/stone/:stoneId` | 450 | public | generatePaymentUrl( |
-| GET | `/nfc/:merchantId` | 464 | public | — |
-| GET | `/.well-known/apple-developer-merchantid-domain-association` | 471 | public | — |
-| GET | `/sitemap.xml` | 486 | admin | authenticateToken, checkMerchantOwnership, checkAccountOwnership, isAccountOwner, req.user?.role !== "admin", req.user.role === 'admin', authenticateAdmin |
-| GET | `/api/auth/google` | 569 | public | — |
-| GET | `/api/auth/google/callback` | 590 | public | — |
-| POST | `/api/auth/google/session` | 739 | public | — |
-| POST | `/api/auth/sign-out-everywhere` | 762 | merchant-user | authenticateToken |
-| POST | `/api/auth/login` | 807 | public | — |
-| POST | `/api/auth/forgot-password` | 864 | public | requestPasswordReset( |
-| POST | `/api/auth/reset-password` | 904 | public | resetPassword( |
-| GET | `/api/auth/validate-reset-token/:token` | 944 | public | validateResetToken( |
-| GET | `/api/admin/request-origin` | 963 | admin | authenticateAdmin |
-| POST | `/api/admin/auth/login` | 983 | public | — |
-| GET | `/api/auth/me` | 1071 | merchant-user | authenticateToken |
-| GET | `/api/tutorial/state` | 1112 | merchant-user | authenticateToken, req.user?.role === "admin" |
-| PATCH | `/api/tutorial/pages/:pageKey` | 1142 | merchant-user | authenticateToken, req.user?.role === "admin" |
-| POST | `/api/tutorial/restart` | 1179 | merchant-user | authenticateToken, req.user?.role === "admin" |
-| POST | `/api/merchants/:id/onboarding` | 1200 | merchant-user | authenticateToken, checkAccountOwnership |
-| GET | `/api/admin/auth/me` | 1281 | admin | authenticateAdmin |
-| GET | `/api/merchants/:id/qr` | 1294 | public | — |
-| GET | `/api/merchants/:id/stone/:stoneId/qr` | 1301 | public | — |
-| GET | `/api/merchants/:id` | 1349 | public | publicMerchantBrandDto( |
-| GET | `/api/merchants/:id/profile` | 1367 | merchant-user | authenticateToken, checkMerchantOwnership, isAccountOwner |
-| GET | `/api/pay/t/:token` | 1389 | public | resolvePaymentToken( |
-| GET | `/api/pay/t/:token/qr` | 1416 | public | resolvePaymentToken( |
-| POST | `/api/pay/t/:token/split` | 1444 | public | resolvePaymentToken(, loadTokenReceipt( |
-| GET | `/api/pay/t/:token/receipt` | 1541 | public | loadTokenReceipt( |
-| POST | `/api/pay/t/:token/receipt-pdf` | 1554 | public | loadTokenReceipt( |
-| GET | `/api/pay/t/:token/receipt-qr` | 1584 | public | loadTokenReceipt( |
-| POST | `/api/pay/t/:token/session` | 1660 | public | resolvePaymentToken(, prepareTokenCompletion( |
-| POST | `/api/pay/t/:token/hosted-fields-complete` | 1960 | public | prepareTokenCompletion( |
-| POST | `/api/pay/t/:token/googlepay-complete` | 2012 | public | prepareTokenCompletion(, paymentAttempts.resolveReturnState( |
-| GET | `/api/pay/return/:state` | 2143 | public | paymentAttempts.resolveReturnState( |
-| ALL | `/api/pay/notification/:state` | 2177 | provider-webhook | — |
-| GET | `/api/merchants/:id/active-transaction` | 2194 | merchant-user | authenticateToken, checkMerchantOwnership, publicTransactionDto(, generatePaymentUrl( |
-| POST | `/api/transactions` | 2311 | merchant-user | authenticateToken, checkMerchantOwnership |
-| POST | `/api/transactions/cash-sale` | 2392 | merchant-user | authenticateToken, checkMerchantOwnership |
-| POST | `/api/transactions/tap-to-pay` | 2452 | merchant-user | authenticateToken, checkMerchantOwnership |
-| POST | `/api/transactions/:id/split` | 2594 | public | isTokenAddressedTransaction(, publicTransactionDto( |
-| PATCH | `/api/transactions/:id/split-enabled` | 2638 | merchant-user | authenticateToken |
-| GET | `/api/split-payments/:id` | 2683 | public | isTokenAddressedTransaction( |
-| POST | `/api/transactions/:id/cancel` | 2702 | merchant-user | authenticateToken, checkMerchantOwnership |
-| POST | `/api/merchants/:merchantId/nfc-pay` | 2755 | merchant-user | authenticateToken, checkMerchantOwnership |
-| GET | `/api/nfc/capabilities` | 2845 | public | — |
-| POST | `/api/transactions/:id/pay` | 2859 | public | isTokenAddressedTransaction( |
-| GET | `/api/windcave/env` | 3114 | public | — |
-| POST | `/api/transactions/:id/hosted-fields-complete` | 3128 | public | isTokenAddressedTransaction( |
-| POST | `/api/transactions/:id/googlepay-complete` | 3166 | public | isTokenAddressedTransaction( |
-| GET | `/api/transactions/:id` | 3239 | public | isTokenAddressedTransaction(, publicTransactionDto( |
-| POST | `/api/transactions/:id/receipt-pdf` | 3260 | public | isTokenAddressedTransaction( |
-| GET | `/api/transactions/:id/receipt-qr` | 3321 | public | isTokenAddressedTransaction( |
-| GET | `/api/merchants/:id/analytics` | 3363 | merchant-user | authenticateToken, checkMerchantOwnership |
-| GET | `/api/merchants/:id/revenue-over-time` | 3378 | merchant-user | authenticateToken, checkMerchantOwnership |
-| GET | `/api/merchants/:id/analytics/export` | 3404 | merchant-user | authenticateToken, checkMerchantOwnership |
-| GET | `/api/merchants/:id/export/csv` | 3425 | merchant-user | authenticateToken, checkMerchantOwnership |
-| GET | `/api/merchants/:id/export/pdf` | 3491 | merchant-user | authenticateToken, checkMerchantOwnership |
-| POST | `/api/admin/merchants/:id/verify` | 3531 | admin | authenticateAdmin |
-| POST | `/api/admin/merchants/:id/set-active` | 3576 | admin | authenticateAdmin |
-| GET | `/api/admin/merchants/:id/transactions` | 3594 | admin | authenticateAdmin |
-| PATCH | `/api/admin/merchants/:id/windcave-merchant-id` | 3607 | admin | authenticateAdmin |
-| POST | `/api/admin/merchants/:id/activate` | 3623 | admin | authenticateAdmin, storage.verifyMerchant( |
-| PUT | `/api/merchants/:id/rates` | 3674 | merchant-user | authenticateToken |
-| PUT | `/api/merchants/:id/details` | 3681 | merchant-user | authenticateToken, checkAccountOwnership |
-| PUT | `/api/merchants/:id/change-password` | 3707 | merchant-user | authenticateToken, checkMerchantOwnership |
-| PUT | `/api/merchants/:id/bank-account` | 3789 | merchant-user | authenticateToken |
-| PUT | `/api/merchants/:id/theme` | 3793 | merchant-user | authenticateToken, checkAccountOwnership |
-| PUT | `/api/merchants/:id/daily-goal` | 3821 | merchant-user | authenticateToken, checkAccountOwnership |
-| PUT | `/api/merchants/:id` | 3854 | merchant-user | authenticateToken, checkAccountOwnership |
-| POST | `/api/merchants/:id/logo` | 3928 | merchant-user | authenticateToken, checkAccountOwnership |
-| DELETE | `/api/merchants/:id/logo` | 3983 | merchant-user | authenticateToken, checkAccountOwnership |
-| GET | `/api/merchants/:id/transactions` | 4026 | merchant-user | authenticateToken, checkMerchantOwnership |
-| GET | `/api/merchants/:id/tapt-stones` | 4043 | merchant-user | authenticateToken, checkMerchantOwnership |
-| POST | `/api/merchants/:id/tapt-stones` | 4059 | merchant-user | authenticateToken, checkMerchantOwnership, generatePaymentUrl( |
-| PUT | `/api/merchants/:merchantId/tapt-stones/:stoneId` | 4110 | merchant-user | authenticateToken, checkMerchantOwnership |
-| DELETE | `/api/merchants/:merchantId/tapt-stones/:stoneId` | 4145 | merchant-user | authenticateToken, checkMerchantOwnership |
-| GET | `/api/tapt-stones/:id` | 4179 | public | — |
-| GET | `/api/admin/subscription-revenue` | 4197 | admin | authenticateAdmin |
-| ALL | `/api/windcave/notification` | 4208 | provider-webhook | — |
-| GET | `/api/windcave/callback` | 4330 | public | isTokenAddressedTransaction( |
-| GET | `/api/windcave/status` | 4523 | public | — |
-| GET | `/api/admin/analytics` | 4536 | admin | authenticateAdmin |
-| GET | `/api/admin/revenue-over-time` | 4609 | admin | authenticateAdmin |
-| GET | `/api/admin/payment-method-breakdown` | 4645 | admin | authenticateAdmin |
-| GET | `/api/admin/ga4-detailed` | 4682 | admin | authenticateAdmin |
-| GET | `/api/admin/ga4-metrics` | 4747 | admin | authenticateAdmin |
-| POST | `/api/admin/merchants` | 4824 | admin | authenticateAdmin |
-| PUT | `/api/admin/merchants/:id` | 4835 | admin | authenticateAdmin |
-| POST | `/api/merchants/:id/test-payment-link` | 4863 | admin | authenticateAdmin |
-| GET | `/api/admin/merchants` | 4870 | admin | authenticateAdmin |
-| GET | `/api/admin/merchants/:id` | 4880 | admin | authenticateAdmin |
-| DELETE | `/api/admin/merchants/:id` | 4896 | admin | authenticateAdmin |
-| POST | `/api/admin/clear-merchants` | 4920 | admin | authenticateAdmin |
-| POST | `/api/admin/resend-verification` | 4951 | admin | authenticateAdmin |
-| POST | `/api/admin/test-email` | 5009 | admin | authenticateAdmin |
-| GET | `/api/admin/email-status` | 5032 | admin | authenticateAdmin |
-| POST | `/api/merchants/verify` | 5059 | public | storage.verifyMerchant( |
-| GET | `/api/merchants/:id/email-status` | 5110 | public | — |
-| POST | `/api/auth/confirm-email` | 5133 | public | getMerchantByToken( |
-| POST | `/api/auth/resend-confirmation` | 5260 | public | — |
-| POST | `/api/info-pack-leads` | 5297 | public | — |
-| POST | `/api/merchants/signup` | 5350 | public | — |
-| PUT | `/api/merchants/:id/business-details` | 5452 | merchant-user | authenticateToken, checkAccountOwnership |
-| POST | `/api/admin/merchants/signup` | 5518 | admin | authenticateAdmin |
-| GET | `/api/merchants/:id/events` | 5581 | merchant-user | authenticateToken, checkMerchantOwnership |
-| GET | `/api/push/capabilities` | 5657 | public | — |
-| GET | `/api/push/vapid-key` | 5681 | public | — |
-| POST | `/api/push/subscribe` | 5691 | merchant-user | authenticateToken |
-| POST | `/api/push/unsubscribe` | 5728 | merchant-user | authenticateToken |
-| POST | `/api/push/native-subscribe` | 5755 | merchant-user | authenticateToken |
-| POST | `/api/push/native-unsubscribe` | 5789 | merchant-user | authenticateToken |
-| GET | `/api/push/status` | 5823 | merchant-user | authenticateToken |
-| GET | `/api/push/preferences` | 5847 | merchant-user | authenticateToken |
-| PUT | `/api/push/preferences` | 5861 | merchant-user | authenticateToken |
-| POST | `/api/merchants/:id/clear-transactions` | 5887 | merchant-user | authenticateToken, checkAccountOwnership, req.user?.role === "admin" |
-| POST | `/api/transactions/:transactionId/refunds` | 5907 | merchant-user | authenticateToken, isAccountOwner |
-| GET | `/api/transactions/:transactionId/refunds` | 6045 | merchant-user | authenticateToken |
-| GET | `/api/merchants/:merchantId/refunds` | 6075 | merchant-user | authenticateToken |
-| GET | `/api/refunds/:refundId` | 6096 | merchant-user | authenticateToken |
-| GET | `/api/admin/api-keys` | 6130 | admin | authenticateAdmin |
-| POST | `/api/admin/api-keys` | 6134 | admin | authenticateAdmin |
-| POST | `/api/admin/api-keys/:keyId/revoke` | 6138 | admin | authenticateAdmin |
-| GET | `/api/admin/api-metrics` | 6144 | admin | authenticateAdmin |
-| GET | `/api/admin/api-usage` | 6148 | admin | authenticateAdmin |
-| GET | `/api/merchants/:merchantId/stock-items` | 6157 | merchant-user | authenticateToken |
-| POST | `/api/merchants/:merchantId/stock-items` | 6176 | merchant-user | authenticateToken |
-| PUT | `/api/merchants/:merchantId/stock-items/:itemId` | 6204 | merchant-user | authenticateToken |
-| DELETE | `/api/merchants/:merchantId/stock-items/:itemId` | 6241 | api-key | authenticateToken, authenticateApiKey, requireEcommerceApi |
+| GET | `/robots.txt` | 431 | public (heuristic) | — |
+| GET | `/nfc/:merchantId/stone/:stoneId` | 450 | public (heuristic) | generatePaymentUrl( |
+| GET | `/nfc/:merchantId` | 464 | public (heuristic) | — |
+| GET | `/.well-known/apple-developer-merchantid-domain-association` | 471 | public (heuristic) | — |
+| GET | `/sitemap.xml` | 486 | admin (heuristic) | authenticateToken, checkMerchantOwnership, checkAccountOwnership, isAccountOwner, req.user?.role !== "admin", req.user.role === 'admin', authenticateAdmin |
+| GET | `/api/auth/google` | 569 | public (heuristic) | — |
+| GET | `/api/auth/google/callback` | 590 | public (heuristic) | — |
+| POST | `/api/auth/google/session` | 739 | public (heuristic) | — |
+| POST | `/api/auth/sign-out-everywhere` | 762 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/auth/login` | 807 | public (heuristic) | — |
+| POST | `/api/auth/forgot-password` | 864 | public (heuristic) | requestPasswordReset( |
+| POST | `/api/auth/reset-password` | 904 | public (heuristic) | resetPassword( |
+| GET | `/api/auth/validate-reset-token/:token` | 944 | public (heuristic) | validateResetToken( |
+| GET | `/api/admin/request-origin` | 963 | admin (heuristic) | authenticateAdmin |
+| POST | `/api/admin/auth/login` | 983 | public (heuristic) | — |
+| GET | `/api/auth/me` | 1071 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/tutorial/state` | 1112 | merchant-user (heuristic) | authenticateToken, req.user?.role === "admin" |
+| PATCH | `/api/tutorial/pages/:pageKey` | 1142 | merchant-user (heuristic) | authenticateToken, req.user?.role === "admin" |
+| POST | `/api/tutorial/restart` | 1179 | merchant-user (heuristic) | authenticateToken, req.user?.role === "admin" |
+| POST | `/api/merchants/:id/onboarding` | 1200 | merchant-user (heuristic) | authenticateToken, checkAccountOwnership |
+| GET | `/api/admin/auth/me` | 1281 | admin (heuristic) | authenticateAdmin |
+| GET | `/api/merchants/:id/qr` | 1294 | public (heuristic) | — |
+| GET | `/api/merchants/:id/stone/:stoneId/qr` | 1301 | public (heuristic) | — |
+| GET | `/api/merchants/:id` | 1349 | public (heuristic) | publicMerchantBrandDto( |
+| GET | `/api/merchants/:id/profile` | 1367 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership, isAccountOwner |
+| GET | `/api/pay/t/:token` | 1389 | public (heuristic) | resolvePaymentToken( |
+| GET | `/api/pay/t/:token/qr` | 1416 | public (heuristic) | resolvePaymentToken( |
+| POST | `/api/pay/t/:token/split` | 1444 | public (heuristic) | resolvePaymentToken(, loadTokenReceipt( |
+| GET | `/api/pay/t/:token/receipt` | 1541 | public (heuristic) | loadTokenReceipt( |
+| POST | `/api/pay/t/:token/receipt-pdf` | 1554 | public (heuristic) | loadTokenReceipt( |
+| GET | `/api/pay/t/:token/receipt-qr` | 1584 | public (heuristic) | loadTokenReceipt( |
+| POST | `/api/pay/t/:token/session` | 1660 | public (heuristic) | resolvePaymentToken(, prepareTokenCompletion( |
+| POST | `/api/pay/t/:token/hosted-fields-complete` | 1960 | public (heuristic) | prepareTokenCompletion( |
+| POST | `/api/pay/t/:token/googlepay-complete` | 2012 | public (heuristic) | prepareTokenCompletion(, paymentAttempts.resolveReturnState( |
+| GET | `/api/pay/return/:state` | 2143 | public (heuristic) | paymentAttempts.resolveReturnState( |
+| ALL | `/api/pay/notification/:state` | 2177 | provider | — |
+| GET | `/api/merchants/:id/active-transaction` | 2194 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership, publicTransactionDto(, generatePaymentUrl( |
+| POST | `/api/transactions` | 2311 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| POST | `/api/transactions/cash-sale` | 2392 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| POST | `/api/transactions/tap-to-pay` | 2452 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| POST | `/api/transactions/:id/split` | 2594 | public (heuristic) | isTokenAddressedTransaction(, publicTransactionDto( |
+| PATCH | `/api/transactions/:id/split-enabled` | 2638 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/split-payments/:id` | 2683 | public (heuristic) | isTokenAddressedTransaction( |
+| POST | `/api/transactions/:id/cancel` | 2702 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| POST | `/api/merchants/:merchantId/nfc-pay` | 2755 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/nfc/capabilities` | 2845 | public (heuristic) | — |
+| POST | `/api/transactions/:id/pay` | 2859 | public (heuristic) | isTokenAddressedTransaction( |
+| GET | `/api/windcave/env` | 3114 | public (heuristic) | — |
+| POST | `/api/transactions/:id/hosted-fields-complete` | 3128 | public (heuristic) | isTokenAddressedTransaction( |
+| POST | `/api/transactions/:id/googlepay-complete` | 3166 | public (heuristic) | isTokenAddressedTransaction( |
+| GET | `/api/transactions/:id` | 3239 | public (heuristic) | isTokenAddressedTransaction(, publicTransactionDto( |
+| POST | `/api/transactions/:id/receipt-pdf` | 3260 | public (heuristic) | isTokenAddressedTransaction( |
+| GET | `/api/transactions/:id/receipt-qr` | 3321 | public (heuristic) | isTokenAddressedTransaction( |
+| GET | `/api/merchants/:id/analytics` | 3363 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/merchants/:id/revenue-over-time` | 3378 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/merchants/:id/analytics/export` | 3404 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/merchants/:id/export/csv` | 3425 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/merchants/:id/export/pdf` | 3491 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| POST | `/api/admin/merchants/:id/verify` | 3531 | admin (heuristic) | authenticateAdmin |
+| POST | `/api/admin/merchants/:id/set-active` | 3576 | admin (heuristic) | authenticateAdmin |
+| GET | `/api/admin/merchants/:id/transactions` | 3594 | admin (heuristic) | authenticateAdmin |
+| PATCH | `/api/admin/merchants/:id/windcave-merchant-id` | 3607 | admin (heuristic) | authenticateAdmin |
+| POST | `/api/admin/merchants/:id/activate` | 3623 | admin (heuristic) | authenticateAdmin, storage.verifyMerchant( |
+| PUT | `/api/merchants/:id/rates` | 3674 | merchant-user (heuristic) | authenticateToken |
+| PUT | `/api/merchants/:id/details` | 3681 | merchant-user (heuristic) | authenticateToken, checkAccountOwnership |
+| PUT | `/api/merchants/:id/change-password` | 3707 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| PUT | `/api/merchants/:id/bank-account` | 3789 | merchant-user (heuristic) | authenticateToken |
+| PUT | `/api/merchants/:id/theme` | 3793 | merchant-user (heuristic) | authenticateToken, checkAccountOwnership |
+| PUT | `/api/merchants/:id/daily-goal` | 3821 | merchant-user (heuristic) | authenticateToken, checkAccountOwnership |
+| PUT | `/api/merchants/:id` | 3854 | merchant-user (heuristic) | authenticateToken, checkAccountOwnership |
+| POST | `/api/merchants/:id/logo` | 3928 | merchant-user (heuristic) | authenticateToken, checkAccountOwnership |
+| DELETE | `/api/merchants/:id/logo` | 3983 | merchant-user (heuristic) | authenticateToken, checkAccountOwnership |
+| GET | `/api/merchants/:id/transactions` | 4026 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/merchants/:id/tapt-stones` | 4043 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| POST | `/api/merchants/:id/tapt-stones` | 4059 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership, generatePaymentUrl( |
+| PUT | `/api/merchants/:merchantId/tapt-stones/:stoneId` | 4110 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| DELETE | `/api/merchants/:merchantId/tapt-stones/:stoneId` | 4145 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/tapt-stones/:id` | 4179 | public (heuristic) | — |
+| GET | `/api/admin/subscription-revenue` | 4197 | admin (heuristic) | authenticateAdmin |
+| ALL | `/api/windcave/notification` | 4208 | provider | — |
+| GET | `/api/windcave/callback` | 4330 | public (heuristic) | isTokenAddressedTransaction( |
+| GET | `/api/windcave/status` | 4523 | public (heuristic) | — |
+| GET | `/api/admin/analytics` | 4536 | admin (heuristic) | authenticateAdmin |
+| GET | `/api/admin/revenue-over-time` | 4609 | admin (heuristic) | authenticateAdmin |
+| GET | `/api/admin/payment-method-breakdown` | 4645 | admin (heuristic) | authenticateAdmin |
+| GET | `/api/admin/ga4-detailed` | 4682 | admin (heuristic) | authenticateAdmin |
+| GET | `/api/admin/ga4-metrics` | 4747 | admin (heuristic) | authenticateAdmin |
+| POST | `/api/admin/merchants` | 4824 | admin (heuristic) | authenticateAdmin |
+| PUT | `/api/admin/merchants/:id` | 4835 | admin (heuristic) | authenticateAdmin |
+| POST | `/api/merchants/:id/test-payment-link` | 4863 | admin (heuristic) | authenticateAdmin |
+| GET | `/api/admin/merchants` | 4870 | admin (heuristic) | authenticateAdmin |
+| GET | `/api/admin/merchants/:id` | 4880 | admin (heuristic) | authenticateAdmin |
+| DELETE | `/api/admin/merchants/:id` | 4896 | admin (heuristic) | authenticateAdmin |
+| POST | `/api/admin/clear-merchants` | 4920 | admin (heuristic) | authenticateAdmin |
+| POST | `/api/admin/resend-verification` | 4951 | admin (heuristic) | authenticateAdmin |
+| POST | `/api/admin/test-email` | 5009 | admin (heuristic) | authenticateAdmin |
+| GET | `/api/admin/email-status` | 5032 | admin (heuristic) | authenticateAdmin |
+| POST | `/api/merchants/verify` | 5059 | public (heuristic) | storage.verifyMerchant( |
+| GET | `/api/merchants/:id/email-status` | 5110 | public (heuristic) | — |
+| POST | `/api/auth/confirm-email` | 5133 | public (heuristic) | getMerchantByToken( |
+| POST | `/api/auth/resend-confirmation` | 5260 | public (heuristic) | — |
+| POST | `/api/info-pack-leads` | 5297 | public (heuristic) | — |
+| POST | `/api/merchants/signup` | 5350 | public (heuristic) | — |
+| PUT | `/api/merchants/:id/business-details` | 5452 | merchant-user (heuristic) | authenticateToken, checkAccountOwnership |
+| POST | `/api/admin/merchants/signup` | 5518 | admin (heuristic) | authenticateAdmin |
+| GET | `/api/merchants/:id/events` | 5581 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/push/capabilities` | 5657 | public (heuristic) | — |
+| GET | `/api/push/vapid-key` | 5681 | public (heuristic) | — |
+| POST | `/api/push/subscribe` | 5691 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/push/unsubscribe` | 5728 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/push/native-subscribe` | 5755 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/push/native-unsubscribe` | 5789 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/push/status` | 5823 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/push/preferences` | 5847 | merchant-user (heuristic) | authenticateToken |
+| PUT | `/api/push/preferences` | 5861 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/merchants/:id/clear-transactions` | 5887 | merchant-user (heuristic) | authenticateToken, checkAccountOwnership, req.user?.role === "admin" |
+| POST | `/api/transactions/:transactionId/refunds` | 5907 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| GET | `/api/transactions/:transactionId/refunds` | 6045 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/merchants/:merchantId/refunds` | 6075 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/refunds/:refundId` | 6096 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/admin/api-keys` | 6130 | admin (heuristic) | authenticateAdmin |
+| POST | `/api/admin/api-keys` | 6134 | admin (heuristic) | authenticateAdmin |
+| POST | `/api/admin/api-keys/:keyId/revoke` | 6138 | admin (heuristic) | authenticateAdmin |
+| GET | `/api/admin/api-metrics` | 6144 | admin (heuristic) | authenticateAdmin |
+| GET | `/api/admin/api-usage` | 6148 | admin (heuristic) | authenticateAdmin |
+| GET | `/api/merchants/:merchantId/stock-items` | 6157 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/merchants/:merchantId/stock-items` | 6176 | merchant-user (heuristic) | authenticateToken |
+| PUT | `/api/merchants/:merchantId/stock-items/:itemId` | 6204 | merchant-user (heuristic) | authenticateToken |
+| DELETE | `/api/merchants/:merchantId/stock-items/:itemId` | 6241 | api-key (heuristic) | authenticateToken, authenticateApiKey, requireEcommerceApi |
 | POST | `/api/v1/transactions` | 6309 | api-key | authenticateApiKey, requireEcommerceApi, publicTransactionDto( |
 | GET | `/api/v1/transactions/:id` | 6421 | api-key | authenticateApiKey, requireEcommerceApi |
-| POST | `/api/payments/apple-pay/validate` | 6494 | merchant-user | authenticateToken |
-| POST | `/api/payments/apple-pay/process` | 6499 | merchant-user | authenticateToken |
-| POST | `/api/payments/google-pay/process` | 6504 | merchant-user | authenticateToken |
-| GET | `/api/payments/digital-wallet/config` | 6509 | public | — |
-| GET | `/api/subscription` | 6544 | merchant-user | authenticateToken, isAccountOwner |
-| PUT | `/api/subscription/plan` | 6567 | merchant-user | authenticateToken |
-| POST | `/api/subscription/cancel` | 6630 | merchant-user | authenticateToken |
-| POST | `/api/subscription/resume` | 6673 | merchant-user | authenticateToken |
-| GET | `/api/team` | 6704 | merchant-user | authenticateToken, isAccountOwner |
-| POST | `/api/team/invite` | 6725 | merchant-user | authenticateToken, isAccountOwner |
-| POST | `/api/team/:userId/resend` | 6786 | merchant-user | authenticateToken, isAccountOwner |
-| DELETE | `/api/team/:userId/invite` | 6868 | merchant-user | authenticateToken, isAccountOwner |
-| PUT | `/api/team/:userId/status` | 6888 | merchant-user | authenticateToken, isAccountOwner |
-| DELETE | `/api/team/:userId` | 6936 | merchant-user | authenticateToken, isAccountOwner |
-| POST | `/api/team/accept-invite` | 6968 | public | getUserByInviteToken( |
-| GET | `/api/subscription/billing-history` | 7004 | merchant-user | authenticateToken, isAccountOwner |
-| GET | `/api/billing/card` | 7034 | merchant-user | authenticateToken, isAccountOwner |
-| POST | `/api/billing/card/session` | 7063 | merchant-user | authenticateToken, isAccountOwner |
-| POST | `/api/billing/card/confirm` | 7109 | merchant-user | authenticateToken, isAccountOwner |
-| ALL | `/api/billing/card/notification` | 7200 | provider-webhook | billingCardCallback |
+| POST | `/api/payments/apple-pay/validate` | 6494 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/payments/apple-pay/process` | 6499 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/payments/google-pay/process` | 6504 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/payments/digital-wallet/config` | 6509 | public (heuristic) | — |
+| GET | `/api/subscription` | 6544 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| PUT | `/api/subscription/plan` | 6567 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/subscription/cancel` | 6630 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/subscription/resume` | 6673 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/team` | 6704 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| POST | `/api/team/invite` | 6725 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| POST | `/api/team/:userId/resend` | 6786 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| DELETE | `/api/team/:userId/invite` | 6868 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| PUT | `/api/team/:userId/status` | 6888 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| DELETE | `/api/team/:userId` | 6936 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| POST | `/api/team/accept-invite` | 6968 | public (heuristic) | getUserByInviteToken( |
+| GET | `/api/subscription/billing-history` | 7004 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| GET | `/api/billing/card` | 7034 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| POST | `/api/billing/card/session` | 7063 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| POST | `/api/billing/card/confirm` | 7109 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| ALL | `/api/billing/card/notification` | 7200 | provider | billingCardCallback |
 | GET | `/api/billing/card/callback` | 7210 | public | billingCardCallback |
 | POST | `/api/billing/card/callback` | 7211 | public | billingCardCallback |
-| DELETE | `/api/billing/card` | 7214 | merchant-user | authenticateToken, isAccountOwner |
-| POST | `/api/board-builder/submit` | 7234 | public | — |
-| GET | `/uploads/:folder/:name` | 7274 | public | getCheckoutInvoiceByToken( |
-| GET | `/api/property/tenants` | 7490 | merchant-user | authenticateToken |
-| POST | `/api/property/tenants` | 7501 | merchant-user | authenticateToken |
-| GET | `/api/property/tenants/:id` | 7515 | merchant-user | authenticateToken, checkMerchantOwnership |
-| PUT | `/api/property/tenants/:id` | 7526 | merchant-user | authenticateToken, checkMerchantOwnership |
-| POST | `/api/property/tenants/:id/archive` | 7542 | merchant-user | authenticateToken, checkMerchantOwnership |
-| POST | `/api/property/tenants/:id/unarchive` | 7555 | merchant-user | authenticateToken, checkMerchantOwnership |
-| GET | `/api/property/tenants/:id/events` | 7568 | merchant-user | authenticateToken, checkMerchantOwnership |
-| GET | `/api/property/schedules` | 7584 | merchant-user | authenticateToken |
-| GET | `/api/property/tenants/:tenantId/schedules` | 7592 | merchant-user | authenticateToken, checkMerchantOwnership |
-| POST | `/api/property/tenants/:tenantId/schedules` | 7603 | merchant-user | authenticateToken, checkMerchantOwnership |
-| PUT | `/api/property/schedules/:id` | 7621 | merchant-user | authenticateToken, checkMerchantOwnership |
-| DELETE | `/api/property/schedules/:id` | 7640 | merchant-user | authenticateToken, checkMerchantOwnership |
-| GET | `/api/property/invoices` | 7655 | merchant-user | authenticateToken |
-| POST | `/api/property/invoices/document` | 7685 | merchant-user | authenticateToken |
-| GET | `/api/invoice-documents/:name` | 7731 | merchant-user | authenticateToken |
-| POST | `/api/property/invoices` | 7760 | merchant-user | authenticateToken, checkMerchantOwnership |
-| POST | `/api/property/invoices/:id/resend` | 7802 | merchant-user | authenticateToken, checkMerchantOwnership |
-| GET | `/api/property/invoices/:id` | 7817 | merchant-user | authenticateToken, checkMerchantOwnership |
-| POST | `/api/property/invoices/:id/void` | 7828 | merchant-user | authenticateToken, checkMerchantOwnership |
-| POST | `/api/property/invoices/:id/mark-paid-external` | 7842 | merchant-user | authenticateToken, checkMerchantOwnership |
-| GET | `/api/checkout/resolve/:token` | 7862 | public | getCheckoutInvoiceByToken( |
-| GET | `/api/checkout/document/:token` | 7948 | public | getCheckoutInvoiceByToken( |
-| POST | `/api/checkout/:token/split` | 7972 | public | getCheckoutInvoiceByToken( |
-| POST | `/api/checkout/pay` | 7988 | public | getCheckoutInvoiceByToken( |
-| POST | `/api/checkout/:token/session` | 8050 | public | getCheckoutInvoiceByToken( |
-| POST | `/api/checkout/:token/hosted-fields-complete` | 8123 | public | getCheckoutInvoiceByToken( |
-| POST | `/api/checkout/:token/googlepay-complete` | 8154 | public | getCheckoutInvoiceByToken( |
-| GET | `/api/checkout/callback` | 8207 | public | getCheckoutInvoiceByToken( |
-| ALL | `/api/windcave/rent-notification` | 8234 | provider-webhook | — |
-| ALL | `/api/windcave/trades-notification` | 8251 | provider-webhook | — |
-| POST | `/api/webhooks/whatsapp` | 8271 | provider-webhook | req.headers["apikey"] |
-| PUT | `/api/merchants/:merchantId/sector` | 8307 | merchant-user | authenticateToken, checkMerchantOwnership |
-| GET | `/api/property/reminder-settings` | 8332 | merchant-user | authenticateToken |
-| PUT | `/api/property/reminder-settings` | 8342 | merchant-user | authenticateToken |
-| GET | `/api/trades/reminder-settings` | 8359 | merchant-user | authenticateToken |
-| PUT | `/api/trades/reminder-settings` | 8369 | merchant-user | authenticateToken |
-| GET | `/api/trades/gst-settings` | 8382 | merchant-user | authenticateToken |
-| PUT | `/api/trades/gst-settings` | 8398 | merchant-user | authenticateToken |
-| GET | `/api/trades/clients` | 8415 | merchant-user | authenticateToken |
-| POST | `/api/trades/clients` | 8423 | merchant-user | authenticateToken |
-| GET | `/api/trades/clients/:id` | 8433 | merchant-user | authenticateToken |
-| PUT | `/api/trades/clients/:id` | 8442 | merchant-user | authenticateToken |
-| POST | `/api/trades/clients/:id/archive` | 8453 | merchant-user | authenticateToken |
-| POST | `/api/trades/clients/:id/unarchive` | 8462 | merchant-user | authenticateToken |
-| POST | `/api/trades/clients/:id/promote` | 8472 | merchant-user | authenticateToken |
-| GET | `/api/trades/clients/:id/events` | 8482 | merchant-user | authenticateToken |
-| GET | `/api/trades/quotes` | 8492 | merchant-user | authenticateToken |
-| POST | `/api/trades/quotes` | 8499 | merchant-user | authenticateToken |
-| GET | `/api/trades/quotes/:id` | 8576 | merchant-user | authenticateToken |
-| GET | `/api/trades/quotes/:id/pdf` | 8603 | merchant-user | authenticateToken |
-| GET | `/api/trades/quotes/token/:token/pdf` | 8616 | public | getQuoteByToken( |
-| POST | `/api/trades/quotes/:id/resend` | 8627 | merchant-user | authenticateToken |
-| GET | `/api/trades/quotes/token/:token` | 8643 | public | getQuoteByToken( |
-| POST | `/api/trades/quotes/token/:token/respond` | 8688 | public | getQuoteByToken( |
-| GET | `/api/trades/invoices` | 8737 | merchant-user | authenticateToken |
-| POST | `/api/trades/invoices` | 8747 | merchant-user | authenticateToken |
-| POST | `/api/trades/invoices/:id/resend` | 8799 | merchant-user | authenticateToken |
-| POST | `/api/trades/invoices/:id/send-balance` | 8812 | merchant-user | authenticateToken |
-| POST | `/api/trades/invoices/:id/mark-paid-external` | 8849 | merchant-user | authenticateToken |
-| POST | `/api/trades/invoices/:id/complete` | 8866 | merchant-user | authenticateToken |
-| POST | `/api/trades/invoices/:id/void` | 8883 | merchant-user | authenticateToken |
-| GET | `/api/trades/schedules` | 8893 | merchant-user | authenticateToken |
-| POST | `/api/trades/schedules` | 8900 | merchant-user | authenticateToken |
-| PUT | `/api/trades/schedules/:id` | 8918 | merchant-user | authenticateToken |
-| DELETE | `/api/trades/schedules/:id` | 8931 | merchant-user | authenticateToken |
+| DELETE | `/api/billing/card` | 7214 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| POST | `/api/board-builder/submit` | 7234 | public (heuristic) | — |
+| GET | `/uploads/:folder/:name` | 7274 | public (heuristic) | getCheckoutInvoiceByToken( |
+| GET | `/api/property/tenants` | 7490 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/property/tenants` | 7501 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/property/tenants/:id` | 7515 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| PUT | `/api/property/tenants/:id` | 7526 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| POST | `/api/property/tenants/:id/archive` | 7542 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| POST | `/api/property/tenants/:id/unarchive` | 7555 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/property/tenants/:id/events` | 7568 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/property/schedules` | 7584 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/property/tenants/:tenantId/schedules` | 7592 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| POST | `/api/property/tenants/:tenantId/schedules` | 7603 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| PUT | `/api/property/schedules/:id` | 7621 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| DELETE | `/api/property/schedules/:id` | 7640 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/property/invoices` | 7655 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/property/invoices/document` | 7685 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/invoice-documents/:name` | 7731 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/property/invoices` | 7760 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| POST | `/api/property/invoices/:id/resend` | 7802 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/property/invoices/:id` | 7817 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| POST | `/api/property/invoices/:id/void` | 7828 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| POST | `/api/property/invoices/:id/mark-paid-external` | 7842 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/checkout/resolve/:token` | 7862 | public (heuristic) | getCheckoutInvoiceByToken( |
+| GET | `/api/checkout/document/:token` | 7948 | public (heuristic) | getCheckoutInvoiceByToken( |
+| POST | `/api/checkout/:token/split` | 7972 | public (heuristic) | getCheckoutInvoiceByToken( |
+| POST | `/api/checkout/pay` | 7988 | public (heuristic) | getCheckoutInvoiceByToken( |
+| POST | `/api/checkout/:token/session` | 8050 | public (heuristic) | getCheckoutInvoiceByToken( |
+| POST | `/api/checkout/:token/hosted-fields-complete` | 8123 | public (heuristic) | getCheckoutInvoiceByToken( |
+| POST | `/api/checkout/:token/googlepay-complete` | 8154 | public (heuristic) | getCheckoutInvoiceByToken( |
+| GET | `/api/checkout/callback` | 8207 | public (heuristic) | getCheckoutInvoiceByToken( |
+| ALL | `/api/windcave/rent-notification` | 8234 | provider | — |
+| ALL | `/api/windcave/trades-notification` | 8251 | provider | — |
+| POST | `/api/webhooks/whatsapp` | 8271 | provider | req.headers["apikey"] |
+| PUT | `/api/merchants/:merchantId/sector` | 8307 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/property/reminder-settings` | 8332 | merchant-user (heuristic) | authenticateToken |
+| PUT | `/api/property/reminder-settings` | 8342 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/reminder-settings` | 8359 | merchant-user (heuristic) | authenticateToken |
+| PUT | `/api/trades/reminder-settings` | 8369 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/gst-settings` | 8382 | merchant-user (heuristic) | authenticateToken |
+| PUT | `/api/trades/gst-settings` | 8398 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/clients` | 8415 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/clients` | 8423 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/clients/:id` | 8433 | merchant-user (heuristic) | authenticateToken |
+| PUT | `/api/trades/clients/:id` | 8442 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/clients/:id/archive` | 8453 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/clients/:id/unarchive` | 8462 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/clients/:id/promote` | 8472 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/clients/:id/events` | 8482 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/quotes` | 8492 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/quotes` | 8499 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/quotes/:id` | 8576 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/quotes/:id/pdf` | 8603 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/quotes/token/:token/pdf` | 8616 | public (heuristic) | getQuoteByToken( |
+| POST | `/api/trades/quotes/:id/resend` | 8627 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/quotes/token/:token` | 8643 | public (heuristic) | getQuoteByToken( |
+| POST | `/api/trades/quotes/token/:token/respond` | 8688 | public (heuristic) | getQuoteByToken( |
+| GET | `/api/trades/invoices` | 8737 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/invoices` | 8747 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/invoices/:id/resend` | 8799 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/invoices/:id/send-balance` | 8812 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/invoices/:id/mark-paid-external` | 8849 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/invoices/:id/complete` | 8866 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/invoices/:id/void` | 8883 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/schedules` | 8893 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/schedules` | 8900 | merchant-user (heuristic) | authenticateToken |
+| PUT | `/api/trades/schedules/:id` | 8918 | merchant-user (heuristic) | authenticateToken |
+| DELETE | `/api/trades/schedules/:id` | 8931 | merchant-user (heuristic) | authenticateToken |
 | GET | `/api/internal/cron/status` | 8945 | cron | authorizeCronRequest |
 | POST | `/api/internal/cron` | 8955 | cron | authorizeCronRequest |
 
@@ -252,29 +269,41 @@ are classified by name). Facts, not judgments.
 
 - statuses: `200`
 
+Review pending.
+
 ### GET `/nfc/:merchantId/stone/:stoneId`
 
 - params: `merchantId: strictPositiveIntegerParam`, `stoneId: strictPositiveIntegerParam`
 - statuses: `200`, `400`
 - helpers: `nfcRedirectHtml`
 
+Review pending.
+
 ### GET `/nfc/:merchantId`
 
 - params: `merchantId: strictPositiveIntegerParam`
 - statuses: `400`, `410`
 
+Review pending.
+
 ### GET `/.well-known/apple-developer-merchantid-domain-association`
 
 - statuses: `200`
+
+Review pending.
 
 ### GET `/sitemap.xml`
 
 - statuses: `200`
 
+Review pending.
+
 ### GET `/api/auth/google`
 
 - statuses: `302`
 - helpers: `googleSignInError`
+
+Review pending.
 
 ### GET `/api/auth/google/callback`
 
@@ -286,11 +315,15 @@ are classified by name). Facts, not judgments.
 - rateLimits: `tooManyAttempts`
 - helpers: `googleSignInError`
 
+Review pending.
+
 ### POST `/api/auth/google/session`
 
 - storageMethods: `consumeAuthHandoffCode`
 - statuses: `200`, `401`, `403`, `500`
 - helpers: `expired`
+
+Review pending.
 
 ### POST `/api/auth/sign-out-everywhere`
 
@@ -299,6 +332,8 @@ are classified by name). Facts, not judgments.
 - storageMethods: `advanceUserSessionVersion`, `deactivatePushSubscriptionsForLogin`
 - sideEffects: `live update: sseBroker.disconnectUser`
 - statuses: `204`, `401`, `403`, `404`, `500`, `503`
+
+Review pending.
 
 ### POST `/api/auth/login`
 
@@ -310,6 +345,8 @@ are classified by name). Facts, not judgments.
 - rateLimits: `refuseTooManyAttempts`, `tooManyAttempts`
 - helpers: `refuseTooManyAttempts`, `signInAddressBuckets`
 
+Review pending.
+
 ### POST `/api/auth/forgot-password`
 
 - body: `schema: forgotPasswordSchema`
@@ -320,6 +357,8 @@ are classified by name). Facts, not judgments.
 - rateLimits: `refuseTooManyAttempts`, `tooManyAttempts`
 - helpers: `refuseTooManyAttempts`
 
+Review pending.
+
 ### POST `/api/auth/reset-password`
 
 - body: `schema: resetPasswordSchema`
@@ -329,11 +368,15 @@ are classified by name). Facts, not judgments.
 - statuses: `200`, `400`, `500`
 - errorTextInResponse: `validation.error.errors`, `validation.error.issues`
 
+Review pending.
+
 ### GET `/api/auth/validate-reset-token/:token`
 
 - params: `token: raw`
 - authChecks: `validateResetToken`
 - statuses: `200`, `500`
+
+Review pending.
 
 ### GET `/api/admin/request-origin`
 
@@ -342,6 +385,8 @@ are classified by name). Facts, not judgments.
 - sideEffects: `audit log: logSecurityEvent`
 - statuses: `200`, `401`, `403`, `503`
 - helpers: `authenticateAdmin`
+
+Review pending.
 
 ### POST `/api/admin/auth/login`
 
@@ -353,6 +398,8 @@ are classified by name). Facts, not judgments.
 - rateLimits: `refuseTooManyAttempts`, `tooManyAttempts`
 - helpers: `refuseTooManyAttempts`, `signInAddressBuckets`
 
+Review pending.
+
 ### GET `/api/auth/me`
 
 - middleware: `authenticateToken`
@@ -360,12 +407,16 @@ are classified by name). Facts, not judgments.
 - statuses: `200`, `401`, `403`, `500`, `503`
 - entitlementGates: `billingCardIsReady`
 
+Review pending.
+
 ### GET `/api/tutorial/state`
 
 - middleware: `authenticateToken`
 - authChecks: `compares req.user?.role === "admin"`
 - storageMethods: `getMerchant`, `getMerchantTutorialProgress`
 - statuses: `200`, `401`, `403`, `404`, `500`, `503`
+
+Review pending.
 
 ### PATCH `/api/tutorial/pages/:pageKey`
 
@@ -377,12 +428,16 @@ are classified by name). Facts, not judgments.
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
 - errorTextInResponse: `parsed.error.errors`
 
+Review pending.
+
 ### POST `/api/tutorial/restart`
 
 - middleware: `authenticateToken`
 - authChecks: `compares req.user?.role === "admin"`
 - storageMethods: `restartMerchantTutorial`
 - statuses: `200`, `401`, `403`, `404`, `500`, `503`
+
+Review pending.
 
 ### POST `/api/merchants/:id/onboarding`
 
@@ -395,6 +450,8 @@ are classified by name). Facts, not judgments.
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 - helpers: `escHtml`
 
+Review pending.
+
 ### GET `/api/admin/auth/me`
 
 - middleware: `authenticateAdmin`
@@ -403,10 +460,14 @@ are classified by name). Facts, not judgments.
 - statuses: `200`, `401`, `403`, `503`
 - helpers: `authenticateAdmin`
 
+Review pending.
+
 ### GET `/api/merchants/:id/qr`
 
 - params: `id: strictPositiveIntegerParam`
 - statuses: `400`, `410`
+
+Review pending.
 
 ### GET `/api/merchants/:id/stone/:stoneId/qr`
 
@@ -416,12 +477,16 @@ are classified by name). Facts, not judgments.
 - storageMethods: `getTaptStone`
 - statuses: `200`, `400`, `404`, `500`
 
+Review pending.
+
 ### GET `/api/merchants/:id`
 
 - params: `id: strictPositiveIntegerParam`
 - storageMethods: `getMerchant`
 - statuses: `200`, `400`, `404`, `500`
 - dtos: `publicMerchantBrandDto`
+
+Review pending.
 
 ### GET `/api/merchants/:id/profile`
 
@@ -431,6 +496,8 @@ are classified by name). Facts, not judgments.
 - storageMethods: `getMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 - dtos: `memberMerchantSettingsDto`, `ownerMerchantDto`
+
+Review pending.
 
 ### GET `/api/pay/t/:token`
 
@@ -442,6 +509,8 @@ are classified by name). Facts, not judgments.
 - rateLimits: `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
 - helpers: `requirePaymentTokenRateLimit`, `setPaymentTokenHeaders`
 
+Review pending.
+
 ### GET `/api/pay/t/:token/qr`
 
 - params: `token: raw`
@@ -450,6 +519,8 @@ are classified by name). Facts, not judgments.
 - statuses: `200`, `400`, `404`, `429`, `500`
 - rateLimits: `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
 - helpers: `requirePaymentTokenRateLimit`, `setPaymentTokenHeaders`
+
+Review pending.
 
 ### POST `/api/pay/t/:token/split`
 
@@ -464,6 +535,8 @@ are classified by name). Facts, not judgments.
 - rateLimits: `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
 - helpers: `broadcastToStone`, `requirePaymentTokenRateLimit`, `setPaymentTokenHeaders`
 
+Review pending.
+
 ### GET `/api/pay/t/:token/receipt`
 
 - params: `token: raw`
@@ -475,6 +548,8 @@ are classified by name). Facts, not judgments.
 - rateLimits: `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
 - helpers: `requirePaymentTokenRateLimit`, `sendTokenReceiptError`, `setPaymentTokenHeaders`
 
+Review pending.
+
 ### POST `/api/pay/t/:token/receipt-pdf`
 
 - params: `token: raw`
@@ -485,6 +560,8 @@ are classified by name). Facts, not judgments.
 - rateLimits: `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
 - helpers: `requirePaymentTokenRateLimit`, `sendTokenReceiptError`, `setPaymentTokenHeaders`
 
+Review pending.
+
 ### GET `/api/pay/t/:token/receipt-qr`
 
 - params: `token: raw`
@@ -494,6 +571,8 @@ are classified by name). Facts, not judgments.
 - statuses: `200`, `400`, `404`, `409`, `429`, `500`
 - rateLimits: `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
 - helpers: `requirePaymentTokenRateLimit`, `sendTokenReceiptError`, `setPaymentTokenHeaders`
+
+Review pending.
 
 ### POST `/api/pay/t/:token/session`
 
@@ -508,6 +587,8 @@ are classified by name). Facts, not judgments.
 - idempotency: `claim`, `claimFinalization`
 - helpers: `broadcastToStone`, `cacheTokenAttemptSession`, `persistTokenOutcome`, `reconcileExpiredTokenAttempt`, `requirePaymentTokenRateLimit`, `setPaymentTokenHeaders`, `tokenAttemptOutcome`
 
+Review pending.
+
 ### POST `/api/pay/t/:token/hosted-fields-complete`
 
 - params: `token: raw`
@@ -519,6 +600,8 @@ are classified by name). Facts, not judgments.
 - rateLimits: `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
 - idempotency: `claimFinalization`
 - helpers: `broadcastToStone`, `persistTokenOutcome`, `requirePaymentTokenRateLimit`, `setPaymentTokenHeaders`, `tokenAttemptOutcome`
+
+Review pending.
 
 ### POST `/api/pay/t/:token/googlepay-complete`
 
@@ -532,6 +615,8 @@ are classified by name). Facts, not judgments.
 - idempotency: `claimFinalization`
 - helpers: `assertWindcaveUrl`, `broadcastToStone`, `persistTokenOutcome`, `requirePaymentTokenRateLimit`, `setPaymentTokenHeaders`, `tokenAttemptOutcome`
 
+Review pending.
+
 ### GET `/api/pay/return/:state`
 
 - params: `state: raw`
@@ -543,6 +628,8 @@ are classified by name). Facts, not judgments.
 - rateLimits: `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
 - idempotency: `claimFinalization`
 - helpers: `broadcastToStone`, `persistTokenOutcome`, `reconcileTokenReturnState`, `requirePaymentTokenRateLimit`, `setPaymentTokenHeaders`, `tokenAttemptOutcome`
+
+Review pending.
 
 ### ALL `/api/pay/notification/:state`
 
@@ -557,6 +644,19 @@ are classified by name). Facts, not judgments.
 - idempotency: `claimFinalization`
 - helpers: `broadcastToStone`, `persistTokenOutcome`, `reconcileTokenReturnState`, `requirePaymentTokenRateLimit`, `setPaymentTokenHeaders`
 
+Reviewed policy:
+
+- **Who:** provider. **Tenant (token):** the return state (HMAC-derived, one per payment attempt) selects one attempt through paymentAttempts.resolveReturnState; an unknown state does nothing
+- **Input:** state: an opaque return state, only resolved by its hash; result (query or body): read only to label a provider-declined outcome as cancelled rather than declined
+- **Capability gate:** isWindcaveConfigured(): with no provider configured the attempt stays pending
+- **Idempotency:** paymentAttempts.claimFinalization claims the attempt before the provider is queried; a terminal or conflicting attempt is left alone, so repeated or concurrent notifications settle it once
+- **Side effects:** queries the provider for the attempt's session; on settlement, a live update and a push to the business (persistTokenOutcome, broadcastToStone)
+- **Success:** 200 "OK" at once, before any work; nothing else is returned
+- **Error disclosure:** fixed
+- **Authenticity:** none needed: the call only prompts a re-read, and the outcome comes from querying the provider, never from the request
+- **Replay:** harmless: a settled attempt is terminal and the claim is atomic
+- **Rate:** requirePaymentTokenRateLimit (the completion family, per visitor address)
+
 ### GET `/api/merchants/:id/active-transaction`
 
 - params: `id: strictPositiveIntegerParam`
@@ -567,6 +667,8 @@ are classified by name). Facts, not judgments.
 - dtos: `ownerTransactionDto`, `publicTransactionDto`
 - rateLimits: `checkRateLimit`
 - helpers: `checkRateLimit`
+
+Review pending.
 
 ### POST `/api/transactions`
 
@@ -582,6 +684,8 @@ are classified by name). Facts, not judgments.
 - entitlementGates: `BILLING_CARD_REQUIRED`, `billingCardIsReady`, `requireBillingCard`
 - helpers: `broadcastToStone`, `requireBillingCard`
 
+Review pending.
+
 ### POST `/api/transactions/cash-sale`
 
 - middleware: `authenticateToken`
@@ -593,6 +697,8 @@ are classified by name). Facts, not judgments.
 - dtos: `ownerTransactionDto`
 - entitlementGates: `BILLING_CARD_REQUIRED`, `billingCardIsReady`, `requireBillingCard`
 - helpers: `broadcastToStone`, `requireBillingCard`
+
+Review pending.
 
 ### POST `/api/transactions/tap-to-pay`
 
@@ -606,6 +712,8 @@ are classified by name). Facts, not judgments.
 - entitlementGates: `BILLING_CARD_REQUIRED`, `billingCardIsReady`, `requireBillingCard`
 - helpers: `broadcastToStone`, `requireBillingCard`
 
+Review pending.
+
 ### POST `/api/transactions/:id/split`
 
 - params: `id: strictPositiveIntegerParam`
@@ -617,6 +725,8 @@ are classified by name). Facts, not judgments.
 - dtos: `publicTransactionDto`
 - errorTextInResponse: `error.message`
 - helpers: `broadcastToStone`
+
+Review pending.
 
 ### PATCH `/api/transactions/:id/split-enabled`
 
@@ -630,6 +740,8 @@ are classified by name). Facts, not judgments.
 - dtos: `ownerTransactionDto`
 - helpers: `broadcastToStone`
 
+Review pending.
+
 ### GET `/api/split-payments/:id`
 
 - params: `id: strictPositiveIntegerParam`
@@ -637,6 +749,8 @@ are classified by name). Facts, not judgments.
 - storageMethods: `getSplitPaymentById`, `getTransaction`
 - statuses: `200`, `400`, `404`, `500`
 - dtos: `publicSplitPaymentDto`
+
+Review pending.
 
 ### POST `/api/transactions/:id/cancel`
 
@@ -648,6 +762,8 @@ are classified by name). Facts, not judgments.
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 - dtos: `ownerTransactionDto`
 - helpers: `broadcastToStone`
+
+Review pending.
 
 ### POST `/api/merchants/:merchantId/nfc-pay`
 
@@ -663,10 +779,14 @@ are classified by name). Facts, not judgments.
 - entitlementGates: `BILLING_CARD_REQUIRED`, `billingCardIsReady`, `requireBillingCard`
 - helpers: `broadcastToStone`, `requireBillingCard`
 
+Review pending.
+
 ### GET `/api/nfc/capabilities`
 
 - statuses: `200`
 - capabilityGates: `config.features.tapToPay`
+
+Review pending.
 
 ### POST `/api/transactions/:id/pay`
 
@@ -681,9 +801,13 @@ are classified by name). Facts, not judgments.
 - rateLimits: `checkRateLimit`
 - helpers: `broadcastToStone`, `checkRateLimit`
 
+Review pending.
+
 ### GET `/api/windcave/env`
 
 - statuses: `200`
+
+Review pending.
 
 ### POST `/api/transactions/:id/hosted-fields-complete`
 
@@ -696,6 +820,8 @@ are classified by name). Facts, not judgments.
 - capabilityGates: `isWindcaveConfigured`
 - helpers: `broadcastToStone`, `finaliseHostedPayment`
 
+Review pending.
+
 ### POST `/api/transactions/:id/googlepay-complete`
 
 - params: `id: strictPositiveIntegerParam`
@@ -707,6 +833,8 @@ are classified by name). Facts, not judgments.
 - capabilityGates: `isWindcaveConfigured`
 - helpers: `assertWindcaveUrl`, `broadcastToStone`, `finaliseHostedPayment`
 
+Review pending.
+
 ### GET `/api/transactions/:id`
 
 - params: `id: strictPositiveIntegerParam`
@@ -714,6 +842,8 @@ are classified by name). Facts, not judgments.
 - storageMethods: `getTransaction`
 - statuses: `200`, `400`, `404`, `500`
 - dtos: `publicTransactionDto`
+
+Review pending.
 
 ### POST `/api/transactions/:id/receipt-pdf`
 
@@ -723,6 +853,8 @@ are classified by name). Facts, not judgments.
 - storageMethods: `getMerchant`, `getSplitPaymentById`, `getSplitPaymentsByTransaction`, `getTransaction`
 - statuses: `200`, `400`, `404`, `500`
 
+Review pending.
+
 ### GET `/api/transactions/:id/receipt-qr`
 
 - params: `id: strictPositiveIntegerParam`
@@ -731,6 +863,8 @@ are classified by name). Facts, not judgments.
 - storageMethods: `getTransaction`
 - statuses: `200`, `400`, `404`, `500`
 
+Review pending.
+
 ### GET `/api/merchants/:id/analytics`
 
 - middleware: `authenticateToken`
@@ -738,6 +872,8 @@ are classified by name). Facts, not judgments.
 - authChecks: `checkMerchantOwnership`
 - storageMethods: `getMerchantAnalytics`
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
+
+Review pending.
 
 ### GET `/api/merchants/:id/revenue-over-time`
 
@@ -748,6 +884,8 @@ are classified by name). Facts, not judgments.
 - storageMethods: `getRevenueOverTime`
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
 
+Review pending.
+
 ### GET `/api/merchants/:id/analytics/export`
 
 - middleware: `authenticateToken`
@@ -756,6 +894,8 @@ are classified by name). Facts, not judgments.
 - authChecks: `checkMerchantOwnership`
 - storageMethods: `getMerchantAnalyticsWithDateRange`
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
+
+Review pending.
 
 ### GET `/api/merchants/:id/export/csv`
 
@@ -766,6 +906,8 @@ are classified by name). Facts, not judgments.
 - storageMethods: `getTransactionsByMerchantWithDateRange`
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
 
+Review pending.
+
 ### GET `/api/merchants/:id/export/pdf`
 
 - middleware: `authenticateToken`
@@ -774,6 +916,8 @@ are classified by name). Facts, not judgments.
 - authChecks: `checkMerchantOwnership`
 - storageMethods: `getMerchant`, `getMerchantAnalyticsWithDateRange`, `getTransactionsByMerchantWithDateRange`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
+
+Review pending.
 
 ### POST `/api/admin/merchants/:id/verify`
 
@@ -785,6 +929,8 @@ are classified by name). Facts, not judgments.
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 - helpers: `authenticateAdmin`
 
+Review pending.
+
 ### POST `/api/admin/merchants/:id/set-active`
 
 - middleware: `authenticateAdmin`
@@ -794,6 +940,8 @@ are classified by name). Facts, not judgments.
 - sideEffects: `audit log: logSecurityEvent`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 - helpers: `authenticateAdmin`
+
+Review pending.
 
 ### GET `/api/admin/merchants/:id/transactions`
 
@@ -805,6 +953,8 @@ are classified by name). Facts, not judgments.
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
 - helpers: `authenticateAdmin`
 
+Review pending.
+
 ### PATCH `/api/admin/merchants/:id/windcave-merchant-id`
 
 - middleware: `authenticateAdmin`
@@ -815,6 +965,8 @@ are classified by name). Facts, not judgments.
 - sideEffects: `audit log: logSecurityEvent`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 - helpers: `authenticateAdmin`
+
+Review pending.
 
 ### POST `/api/admin/merchants/:id/activate`
 
@@ -828,10 +980,14 @@ are classified by name). Facts, not judgments.
 - errorTextInResponse: `checked.error.issues`
 - helpers: `authenticateAdmin`
 
+Review pending.
+
 ### PUT `/api/merchants/:id/rates`
 
 - middleware: `authenticateToken`
 - statuses: `401`, `403`, `410`, `503`
+
+Review pending.
 
 ### PUT `/api/merchants/:id/details`
 
@@ -843,6 +999,8 @@ are classified by name). Facts, not judgments.
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 - dtos: `ownerMerchantDto`
 - errorTextInResponse: `validation.error.errors`
+
+Review pending.
 
 ### PUT `/api/merchants/:id/change-password`
 
@@ -857,10 +1015,14 @@ are classified by name). Facts, not judgments.
 - rateLimits: `refuseTooManyAttempts`, `tooManyAttempts`
 - helpers: `refuseTooManyAttempts`
 
+Review pending.
+
 ### PUT `/api/merchants/:id/bank-account`
 
 - middleware: `authenticateToken`
 - statuses: `401`, `403`, `410`, `503`
+
+Review pending.
 
 ### PUT `/api/merchants/:id/theme`
 
@@ -873,6 +1035,8 @@ are classified by name). Facts, not judgments.
 - dtos: `ownerMerchantDto`
 - errorTextInResponse: `validation.error.errors`
 
+Review pending.
+
 ### PUT `/api/merchants/:id/daily-goal`
 
 - middleware: `authenticateToken`
@@ -883,6 +1047,8 @@ are classified by name). Facts, not judgments.
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 - dtos: `ownerMerchantDto`
 - errorTextInResponse: `validation.error.errors`
+
+Review pending.
 
 ### PUT `/api/merchants/:id`
 
@@ -895,6 +1061,8 @@ are classified by name). Facts, not judgments.
 - dtos: `ownerMerchantDto`
 - errorTextInResponse: `parseResult.error.errors`
 
+Review pending.
+
 ### POST `/api/merchants/:id/logo`
 
 - middleware: `authenticateToken`, `requireLogoOwnership`, `logoUpload.single(…)`
@@ -905,6 +1073,8 @@ are classified by name). Facts, not judgments.
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 - helpers: `requireLogoOwnership`, `saveUploadedFile`
 
+Review pending.
+
 ### DELETE `/api/merchants/:id/logo`
 
 - middleware: `authenticateToken`
@@ -914,6 +1084,8 @@ are classified by name). Facts, not judgments.
 - sideEffects: `file system: fs.existsSync`, `file system: fs.unlinkSync`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
+Review pending.
+
 ### GET `/api/merchants/:id/transactions`
 
 - middleware: `authenticateToken`
@@ -922,6 +1094,8 @@ are classified by name). Facts, not judgments.
 - storageMethods: `getTransactionsByMerchant`
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
 
+Review pending.
+
 ### GET `/api/merchants/:id/tapt-stones`
 
 - middleware: `authenticateToken`
@@ -929,6 +1103,8 @@ are classified by name). Facts, not judgments.
 - authChecks: `checkMerchantOwnership`
 - storageMethods: `getTaptStonesByMerchant`
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
+
+Review pending.
 
 ### POST `/api/merchants/:id/tapt-stones`
 
@@ -939,6 +1115,8 @@ are classified by name). Facts, not judgments.
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
 - errorTextInResponse: `error.message`
 
+Review pending.
+
 ### PUT `/api/merchants/:merchantId/tapt-stones/:stoneId`
 
 - middleware: `authenticateToken`
@@ -948,6 +1126,8 @@ are classified by name). Facts, not judgments.
 - storageMethods: `getTaptStone`, `updateTaptStone`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
+Review pending.
+
 ### DELETE `/api/merchants/:merchantId/tapt-stones/:stoneId`
 
 - middleware: `authenticateToken`
@@ -956,11 +1136,15 @@ are classified by name). Facts, not judgments.
 - storageMethods: `deleteTaptStone`, `getTaptStone`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
+Review pending.
+
 ### GET `/api/tapt-stones/:id`
 
 - params: `id: strictPositiveIntegerParam`
 - storageMethods: `getTaptStone`
 - statuses: `200`, `400`, `404`, `500`
+
+Review pending.
 
 ### GET `/api/admin/subscription-revenue`
 
@@ -970,6 +1154,8 @@ are classified by name). Facts, not judgments.
 - sideEffects: `audit log: logSecurityEvent`
 - statuses: `200`, `401`, `403`, `500`, `503`
 - helpers: `authenticateAdmin`
+
+Review pending.
 
 ### ALL `/api/windcave/notification`
 
@@ -982,6 +1168,21 @@ are classified by name). Facts, not judgments.
 - capabilityGates: `isWindcaveConfigured`
 - helpers: `broadcastToStone`
 
+Reviewed policy:
+
+- **Who:** provider. **Tenant (provider-session):** the provider's session id selects the one sale created with it (storage.getTransactionByWindcaveSessionId); an unknown id does nothing
+- **Input:** sessionId / sessionid (query or body): an opaque provider session id, used only to find the sale and to query the provider; the rest of the body is ignored
+- **Capability gate:** isWindcaveConfigured(): unconfigured, the notification is ignored before any write
+- **Idempotency:** only a sale whose session is still pending is processed, but pending → processing is a read then a write, not a claim (finding)
+- **Side effects:** queries the provider; settles the sale or its next split share, counts the sale on the business, and sends the business a live update and a push
+- **Success:** 200 "OK" at once, before any work; nothing else is returned
+- **Error disclosure:** fixed
+- **Authenticity:** none needed from the caller: the outcome comes from querying the provider with the stored session id
+- **Replay:** a settled session is skipped (no longer pending); two simultaneous duplicates can both pass the read
+- **Rate:** none — anyone can make the server query the provider about a pending session whose id they hold; the ids are unguessable provider session ids
+- **Finding:** pending → processing is a read then a write, not an atomic claim: two simultaneous notifications for one session can both query the provider and both settle it (a second count increment, a second push). Plan 22.7 / R3 (C20) owns the single atomic finaliser.
+- **Finding:** Logs the raw query (with the session id), and the query and body when no session id is found, to the server log.
+
 ### GET `/api/windcave/callback`
 
 - query: `result: raw`, `sessionId: raw`, `sessionid: raw`, `transactionId: raw`
@@ -992,10 +1193,14 @@ are classified by name). Facts, not judgments.
 - capabilityGates: `isWindcaveConfigured`
 - helpers: `broadcastToStone`
 
+Review pending.
+
 ### GET `/api/windcave/status`
 
 - statuses: `200`
 - capabilityGates: `isWindcaveConfigured`
+
+Review pending.
 
 ### GET `/api/admin/analytics`
 
@@ -1006,6 +1211,8 @@ are classified by name). Facts, not judgments.
 - statuses: `200`, `401`, `403`, `500`, `503`
 - helpers: `authenticateAdmin`
 
+Review pending.
+
 ### GET `/api/admin/revenue-over-time`
 
 - middleware: `authenticateAdmin`
@@ -1015,6 +1222,8 @@ are classified by name). Facts, not judgments.
 - statuses: `200`, `401`, `403`, `500`, `503`
 - helpers: `authenticateAdmin`
 
+Review pending.
+
 ### GET `/api/admin/payment-method-breakdown`
 
 - middleware: `authenticateAdmin`
@@ -1023,6 +1232,8 @@ are classified by name). Facts, not judgments.
 - sideEffects: `audit log: logSecurityEvent`
 - statuses: `200`, `401`, `403`, `500`, `503`
 - helpers: `authenticateAdmin`
+
+Review pending.
 
 ### GET `/api/admin/ga4-detailed`
 
@@ -1034,6 +1245,8 @@ are classified by name). Facts, not judgments.
 - errorTextInResponse: `error?.message`
 - helpers: `authenticateAdmin`
 
+Review pending.
+
 ### GET `/api/admin/ga4-metrics`
 
 - middleware: `authenticateAdmin`
@@ -1043,6 +1256,8 @@ are classified by name). Facts, not judgments.
 - errorTextInResponse: `error?.message`
 - helpers: `authenticateAdmin`
 
+Review pending.
+
 ### POST `/api/admin/merchants`
 
 - middleware: `authenticateAdmin`
@@ -1050,6 +1265,8 @@ are classified by name). Facts, not judgments.
 - sideEffects: `audit log: logSecurityEvent`
 - statuses: `401`, `403`, `410`, `503`
 - helpers: `authenticateAdmin`
+
+Review pending.
 
 ### PUT `/api/admin/merchants/:id`
 
@@ -1062,6 +1279,8 @@ are classified by name). Facts, not judgments.
 - dtos: `adminMerchantDto`
 - helpers: `authenticateAdmin`
 
+Review pending.
+
 ### POST `/api/merchants/:id/test-payment-link`
 
 - middleware: `authenticateAdmin`
@@ -1071,6 +1290,8 @@ are classified by name). Facts, not judgments.
 - statuses: `400`, `401`, `403`, `410`, `503`
 - helpers: `authenticateAdmin`
 
+Review pending.
+
 ### GET `/api/admin/merchants`
 
 - middleware: `authenticateAdmin`
@@ -1079,6 +1300,8 @@ are classified by name). Facts, not judgments.
 - sideEffects: `audit log: logSecurityEvent`
 - statuses: `200`, `401`, `403`, `500`, `503`
 - helpers: `authenticateAdmin`
+
+Review pending.
 
 ### GET `/api/admin/merchants/:id`
 
@@ -1091,6 +1314,8 @@ are classified by name). Facts, not judgments.
 - dtos: `adminMerchantDto`
 - helpers: `authenticateAdmin`
 
+Review pending.
+
 ### DELETE `/api/admin/merchants/:id`
 
 - middleware: `authenticateAdmin`
@@ -1101,6 +1326,8 @@ are classified by name). Facts, not judgments.
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 - helpers: `authenticateAdmin`
 
+Review pending.
+
 ### POST `/api/admin/clear-merchants`
 
 - middleware: `authenticateAdmin`
@@ -1109,6 +1336,8 @@ are classified by name). Facts, not judgments.
 - sideEffects: `audit log: logSecurityEvent`
 - statuses: `200`, `401`, `403`, `500`, `503`
 - helpers: `authenticateAdmin`
+
+Review pending.
 
 ### POST `/api/admin/resend-verification`
 
@@ -1120,6 +1349,8 @@ are classified by name). Facts, not judgments.
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 - helpers: `authenticateAdmin`
 
+Review pending.
+
 ### POST `/api/admin/test-email`
 
 - middleware: `authenticateAdmin`
@@ -1127,6 +1358,8 @@ are classified by name). Facts, not judgments.
 - sideEffects: `audit log: logSecurityEvent`, `email: sendEmail`
 - statuses: `200`, `401`, `403`, `500`, `503`
 - helpers: `authenticateAdmin`
+
+Review pending.
 
 ### GET `/api/admin/email-status`
 
@@ -1136,6 +1369,8 @@ are classified by name). Facts, not judgments.
 - statuses: `200`, `401`, `403`, `500`, `503`
 - helpers: `authenticateAdmin`
 
+Review pending.
+
 ### POST `/api/merchants/verify`
 
 - body: `fields: password, token`
@@ -1143,11 +1378,15 @@ are classified by name). Facts, not judgments.
 - statuses: `200`, `400`, `500`
 - errorTextInResponse: `checked.error.issues`
 
+Review pending.
+
 ### GET `/api/merchants/:id/email-status`
 
 - params: `id: strictPositiveIntegerParam`
 - storageMethods: `getMerchant`
 - statuses: `200`, `400`, `404`, `500`
+
+Review pending.
 
 ### POST `/api/auth/confirm-email`
 
@@ -1159,6 +1398,8 @@ are classified by name). Facts, not judgments.
 - rateLimits: `refuseTooManyAttempts`, `tooManyAttempts`
 - helpers: `escHtml`, `refuseTooManyAttempts`
 
+Review pending.
+
 ### POST `/api/auth/resend-confirmation`
 
 - body: `fields: email, merchantId`
@@ -1166,6 +1407,8 @@ are classified by name). Facts, not judgments.
 - statuses: `200`, `400`, `429`, `500`
 - rateLimits: `refuseTooManyAttempts`, `tooManyAttempts`
 - helpers: `refuseTooManyAttempts`
+
+Review pending.
 
 ### POST `/api/info-pack-leads`
 
@@ -1177,6 +1420,8 @@ are classified by name). Facts, not judgments.
 - rateLimits: `checkResendRateLimit`, `resendRateLimitMap.get`, `resendRateLimitMap.set`
 - helpers: `checkResendRateLimit`
 
+Review pending.
+
 ### POST `/api/merchants/signup`
 
 - body: `schema: publicSignupSchema`
@@ -1187,6 +1432,8 @@ are classified by name). Facts, not judgments.
 - rateLimits: `checkRateLimit`
 - helpers: `checkRateLimit`, `replyToSignup`
 
+Review pending.
+
 ### PUT `/api/merchants/:id/business-details`
 
 - middleware: `authenticateToken`
@@ -1196,6 +1443,8 @@ are classified by name). Facts, not judgments.
 - storageMethods: `getMerchant`, `updateMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 - errorTextInResponse: `validation.error.issues`
+
+Review pending.
 
 ### POST `/api/admin/merchants/signup`
 
@@ -1208,6 +1457,8 @@ are classified by name). Facts, not judgments.
 - errorTextInResponse: `validation.error.issues`
 - helpers: `authenticateAdmin`
 
+Review pending.
+
 ### GET `/api/merchants/:id/events`
 
 - params: `id: strictPositiveIntegerParam`
@@ -1217,13 +1468,19 @@ are classified by name). Facts, not judgments.
 - sideEffects: `live update: sseBroker.subscribe`
 - statuses: `200`, `400`, `401`, `403`, `404`, `410`, `500`, `503`
 
+Review pending.
+
 ### GET `/api/push/capabilities`
 
 - statuses: `200`
 
+Review pending.
+
 ### GET `/api/push/vapid-key`
 
 - statuses: `200`, `503`
+
+Review pending.
 
 ### POST `/api/push/subscribe`
 
@@ -1233,12 +1490,16 @@ are classified by name). Facts, not judgments.
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
 - dtos: `pushNotificationPreferencesDto`
 
+Review pending.
+
 ### POST `/api/push/unsubscribe`
 
 - middleware: `authenticateToken`
 - body: `fields: endpoint`
 - storageMethods: `deactivatePushSubscriptionByEndpoint`, `getPushSubscriptionsByMerchant`
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
+
+Review pending.
 
 ### POST `/api/push/native-subscribe`
 
@@ -1248,11 +1509,15 @@ are classified by name). Facts, not judgments.
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
 - dtos: `pushNotificationPreferencesDto`
 
+Review pending.
+
 ### POST `/api/push/native-unsubscribe`
 
 - middleware: `authenticateToken`
 - storageMethods: `deactivateNativePushSubscriptionsForLogin`, `deactivatePushSubscriptionByEndpoint`, `getPushSubscriptionsByMerchant`
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
+
+Review pending.
 
 ### GET `/api/push/status`
 
@@ -1261,12 +1526,16 @@ are classified by name). Facts, not judgments.
 - statuses: `200`, `401`, `403`, `500`, `503`
 - dtos: `pushNotificationPreferencesDto`
 
+Review pending.
+
 ### GET `/api/push/preferences`
 
 - middleware: `authenticateToken`
 - storageMethods: `getPushNotificationPreferences`
 - statuses: `200`, `401`, `403`, `500`, `503`
 - dtos: `pushNotificationPreferencesDto`
+
+Review pending.
 
 ### PUT `/api/push/preferences`
 
@@ -1277,12 +1546,16 @@ are classified by name). Facts, not judgments.
 - dtos: `pushNotificationPreferencesDto`
 - errorTextInResponse: `parsed.error.errors`
 
+Review pending.
+
 ### POST `/api/merchants/:id/clear-transactions`
 
 - middleware: `authenticateToken`
 - params: `id: strictPositiveIntegerParam`
 - authChecks: `checkAccountOwnership`, `checkMerchantOwnership`, `compares req.user?.role === "admin"`, `isAccountOwner`
 - statuses: `400`, `401`, `403`, `410`, `503`
+
+Review pending.
 
 ### POST `/api/transactions/:transactionId/refunds`
 
@@ -1296,6 +1569,8 @@ are classified by name). Facts, not judgments.
 - capabilityGates: `config.features.refundInitiation`, `isWindcaveConfigured`
 - helpers: `broadcastToStone`
 
+Review pending.
+
 ### GET `/api/transactions/:transactionId/refunds`
 
 - middleware: `authenticateToken`
@@ -1303,6 +1578,8 @@ are classified by name). Facts, not judgments.
 - authChecks: `compares transaction.merchantId !== merchantId`
 - storageMethods: `getRefundsByTransaction`, `getTransaction`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
+
+Review pending.
 
 ### GET `/api/merchants/:merchantId/refunds`
 
@@ -1312,6 +1589,8 @@ are classified by name). Facts, not judgments.
 - storageMethods: `getRefundsByMerchant`
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
 
+Review pending.
+
 ### GET `/api/refunds/:refundId`
 
 - middleware: `authenticateToken`
@@ -1319,6 +1598,8 @@ are classified by name). Facts, not judgments.
 - authChecks: `compares refund.merchantId !== merchantId`, `compares req.user?.role !== 'admin'`
 - storageMethods: `getRefund`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
+
+Review pending.
 
 ### GET `/api/admin/api-keys`
 
@@ -1328,6 +1609,8 @@ are classified by name). Facts, not judgments.
 - statuses: `401`, `403`, `404`, `503`
 - helpers: `authenticateAdmin`
 
+Review pending.
+
 ### POST `/api/admin/api-keys`
 
 - middleware: `authenticateAdmin`
@@ -1335,6 +1618,8 @@ are classified by name). Facts, not judgments.
 - sideEffects: `audit log: logSecurityEvent`
 - statuses: `401`, `403`, `404`, `503`
 - helpers: `authenticateAdmin`
+
+Review pending.
 
 ### POST `/api/admin/api-keys/:keyId/revoke`
 
@@ -1345,6 +1630,8 @@ are classified by name). Facts, not judgments.
 - statuses: `400`, `401`, `403`, `404`, `503`
 - helpers: `authenticateAdmin`
 
+Review pending.
+
 ### GET `/api/admin/api-metrics`
 
 - middleware: `authenticateAdmin`
@@ -1352,6 +1639,8 @@ are classified by name). Facts, not judgments.
 - sideEffects: `audit log: logSecurityEvent`
 - statuses: `401`, `403`, `404`, `503`
 - helpers: `authenticateAdmin`
+
+Review pending.
 
 ### GET `/api/admin/api-usage`
 
@@ -1361,6 +1650,8 @@ are classified by name). Facts, not judgments.
 - statuses: `401`, `403`, `404`, `503`
 - helpers: `authenticateAdmin`
 
+Review pending.
+
 ### GET `/api/merchants/:merchantId/stock-items`
 
 - middleware: `authenticateToken`
@@ -1368,6 +1659,8 @@ are classified by name). Facts, not judgments.
 - authChecks: `compares req.user?.merchantId !== merchantId`, `compares req.user?.role !== 'admin'`
 - storageMethods: `getStockItemsByMerchant`
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
+
+Review pending.
 
 ### POST `/api/merchants/:merchantId/stock-items`
 
@@ -1379,6 +1672,8 @@ are classified by name). Facts, not judgments.
 - statuses: `201`, `400`, `401`, `403`, `500`, `503`
 - errorTextInResponse: `error.errors`
 
+Review pending.
+
 ### PUT `/api/merchants/:merchantId/stock-items/:itemId`
 
 - middleware: `authenticateToken`
@@ -1389,6 +1684,8 @@ are classified by name). Facts, not judgments.
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 - errorTextInResponse: `error.errors`
 
+Review pending.
+
 ### DELETE `/api/merchants/:merchantId/stock-items/:itemId`
 
 - middleware: `authenticateToken`
@@ -1397,17 +1694,35 @@ are classified by name). Facts, not judgments.
 - storageMethods: `deleteStockItem`, `getStockItem`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
+Review pending.
+
 ### POST `/api/v1/transactions`
 
 - middleware: `requireEcommerceApi`, `authenticateApiKey`
 - body: `schema: apiV1CreateTransactionSchema`
 - storageMethods: `createWebhookDelivery`, `getApiKeyByKey`, `getOrCreateSubscription`, `logApiRequest`, `updateApiKeyLastUsed`
-- statuses: `200`, `400`, `401`, `402`, `403`, `404`, `503`
+- statuses: `200`, `400`, `401`, `402`, `403`, `404`, `500`, `503`
 - dtos: `publicTransactionDto`
 - errorTextInResponse: `validation.error.errors`
 - capabilityGates: `config.features.ecommerceApi`, `config.features.newRetailPayments`, `requireEcommerceApi`
 - entitlementGates: `BILLING_CARD_REQUIRED`, `billingCardIsReady`, `requireBillingCard`
 - helpers: `authenticateApiKey`, `requireBillingCard`, `requireEcommerceApi`
+
+Reviewed policy:
+
+- **Who:** api-key. **Tenant (key):** the sale is created for the API key's own merchant (req.apiKey.merchantId); no merchant id is read from the request
+- **Input:** the key's create_transactions permission is checked first (403), then the body: apiV1CreateTransactionSchema (amount, currency, item_name, and webhook_url as a URL of at most 2048 characters)
+- **Capability gate:** requireEcommerceApi (FEATURE_ECOMMERCE_API, off by default: 404) and config.features.newRetailPayments (503 while per-payment links are off)
+- **Entitlement gate:** requireBillingCard: 402 BILLING_CARD_REQUIRED without a paid plan
+- **Idempotency:** none: every call creates another sale and another payment link (no idempotency key)
+- **Side effects:** creates a per-payment sale (createRetailTransaction, server/retail-transaction-service.ts), writes an API log row, and records a webhook delivery row that nothing sends
+- **Success:** fields listed one by one: id, amount, currency, item_name, status, payment_url, qr_code_url (the payment link's raw token, given once), created_at; publicTransactionDto is only the stored webhook payload
+- **Error disclosure:** input-issues
+- **Authenticity:** a Bearer API key found with storage.getApiKeyByKey and active; create_transactions permission
+- **Replay:** a replayed request creates another sale
+- **Rate:** none — no per-key or per-address limit
+- **Finding:** webhook_url from the caller is stored as a webhook delivery row. Nothing delivers those rows today; any future delivery worker must restrict destinations (server-side request forgery).
+- **Finding:** No rate limit and no idempotency key on an API that creates payment links (behind FEATURE_ECOMMERCE_API, off by default; plan 15.5 decides the API's future).
 
 ### GET `/api/v1/transactions/:id`
 
@@ -1419,25 +1734,45 @@ are classified by name). Facts, not judgments.
 - capabilityGates: `config.features.ecommerceApi`, `requireEcommerceApi`
 - helpers: `authenticateApiKey`, `requireEcommerceApi`
 
+Reviewed policy:
+
+- **Who:** api-key. **Tenant (resource):** storage.getTransaction(id), then the sale's merchant must equal the key's merchant; another merchant's sale answers the same 404 as a missing one
+- **Input:** id: strictPositiveIntegerParam (400 otherwise); the raw id is only echoed into the error log row
+- **Capability gate:** requireEcommerceApi (FEATURE_ECOMMERCE_API, off by default: 404)
+- **Idempotency:** read-only (it writes an API log row)
+- **Success:** fields listed one by one: id, amount, currency, item_name, status, created_at, windcave_transaction_id
+- **Error disclosure:** fixed
+- **Authenticity:** a Bearer API key found with storage.getApiKeyByKey and active; read_transactions permission
+- **Replay:** read-only
+- **Rate:** none — no per-key or per-address limit
+
 ### POST `/api/payments/apple-pay/validate`
 
 - middleware: `authenticateToken`
 - statuses: `401`, `403`, `404`, `503`
+
+Review pending.
 
 ### POST `/api/payments/apple-pay/process`
 
 - middleware: `authenticateToken`
 - statuses: `401`, `403`, `503`
 
+Review pending.
+
 ### POST `/api/payments/google-pay/process`
 
 - middleware: `authenticateToken`
 - statuses: `401`, `403`, `503`
 
+Review pending.
+
 ### GET `/api/payments/digital-wallet/config`
 
 - sideEffects: `provider: windcaveService.isConfigured`
 - statuses: `200`, `500`
+
+Review pending.
 
 ### GET `/api/subscription`
 
@@ -1446,6 +1781,8 @@ are classified by name). Facts, not judgments.
 - storageMethods: `countSeatsInUse`, `getOrCreateSubscription`
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
 - dtos: `subscriptionDto`
+
+Review pending.
 
 ### PUT `/api/subscription/plan`
 
@@ -1456,6 +1793,8 @@ are classified by name). Facts, not judgments.
 - statuses: `200`, `400`, `401`, `402`, `403`, `404`, `409`, `422`, `500`, `502`, `503`
 - dtos: `subscriptionDto`
 
+Review pending.
+
 ### POST `/api/subscription/cancel`
 
 - middleware: `authenticateToken`
@@ -1465,6 +1804,8 @@ are classified by name). Facts, not judgments.
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
 - dtos: `subscriptionDto`
 
+Review pending.
+
 ### POST `/api/subscription/resume`
 
 - middleware: `authenticateToken`
@@ -1473,12 +1814,16 @@ are classified by name). Facts, not judgments.
 - statuses: `200`, `400`, `401`, `403`, `409`, `500`, `503`
 - dtos: `subscriptionDto`
 
+Review pending.
+
 ### GET `/api/team`
 
 - middleware: `authenticateToken`
 - authChecks: `isAccountOwner`
 - storageMethods: `countSeatsInUse`, `getOrCreateSubscription`, `getTeamMembers`
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
+
+Review pending.
 
 ### POST `/api/team/invite`
 
@@ -1490,6 +1835,8 @@ are classified by name). Facts, not judgments.
 - statuses: `201`, `400`, `401`, `403`, `409`, `500`, `502`, `503`
 - dtos: `teamMemberDto`
 - errorTextInResponse: `parsed.error.errors`
+
+Review pending.
 
 ### POST `/api/team/:userId/resend`
 
@@ -1503,6 +1850,8 @@ are classified by name). Facts, not judgments.
 - rateLimits: `checkResendRateLimit`, `resendRateLimitMap.get`, `resendRateLimitMap.set`
 - helpers: `checkResendRateLimit`
 
+Review pending.
+
 ### DELETE `/api/team/:userId/invite`
 
 - middleware: `authenticateToken`
@@ -1510,6 +1859,8 @@ are classified by name). Facts, not judgments.
 - authChecks: `isAccountOwner`
 - storageMethods: `revokeTeamInvite`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
+
+Review pending.
 
 ### PUT `/api/team/:userId/status`
 
@@ -1522,6 +1873,8 @@ are classified by name). Facts, not judgments.
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
 - dtos: `teamMemberDto`
 
+Review pending.
+
 ### DELETE `/api/team/:userId`
 
 - middleware: `authenticateToken`
@@ -1530,6 +1883,8 @@ are classified by name). Facts, not judgments.
 - storageMethods: `getUserById`, `removeTeamMember`
 - sideEffects: `live update: sseBroker.disconnectUser`
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
+
+Review pending.
 
 ### POST `/api/team/accept-invite`
 
@@ -1541,6 +1896,8 @@ are classified by name). Facts, not judgments.
 - errorTextInResponse: `parsed.error.errors`, `parsed.error.issues`
 - helpers: `invalid`
 
+Review pending.
+
 ### GET `/api/subscription/billing-history`
 
 - middleware: `authenticateToken`
@@ -1549,12 +1906,16 @@ are classified by name). Facts, not judgments.
 - storageMethods: `getBillingHistory`
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
 
+Review pending.
+
 ### GET `/api/billing/card`
 
 - middleware: `authenticateToken`
 - authChecks: `isAccountOwner`
 - storageMethods: `getMerchant`, `getOrCreateSubscription`
 - statuses: `200`, `401`, `403`, `404`, `500`, `503`
+
+Review pending.
 
 ### POST `/api/billing/card/session`
 
@@ -1564,6 +1925,8 @@ are classified by name). Facts, not judgments.
 - sideEffects: `provider: createCardStorageSession`
 - statuses: `200`, `401`, `403`, `404`, `500`, `502`, `503`
 - capabilityGates: `isWindcaveConfigured`
+
+Review pending.
 
 ### POST `/api/billing/card/confirm`
 
@@ -1575,9 +1938,22 @@ are classified by name). Facts, not judgments.
 - statuses: `200`, `202`, `400`, `401`, `403`, `404`, `409`, `422`, `500`, `502`, `503`
 - dtos: `subscriptionDto`
 
+Review pending.
+
 ### ALL `/api/billing/card/notification`
 
 - statuses: `200`
+
+Reviewed policy:
+
+- **Who:** provider. **Tenant (none):** reads nothing and writes nothing
+- **Input:** nothing is read
+- **Idempotency:** does nothing
+- **Success:** 200 "OK"
+- **Error disclosure:** fixed
+- **Authenticity:** none needed: the call does nothing. A stored card is saved only when the signed-in owner's browser confirms it (POST /api/billing/card/confirm), which re-reads the session from the provider
+- **Replay:** harmless
+- **Rate:** none — there is nothing to limit
 
 ### GET `/api/billing/card/callback`
 
@@ -1586,12 +1962,34 @@ are classified by name). Facts, not judgments.
 - statuses: `302`
 - helpers: `billingCardCallback`, `safeBillingCardCallbackResult`
 
+Reviewed policy:
+
+- **Who:** public. **Tenant (none):** reads nothing; sends the browser back to billing settings
+- **Input:** result (query or body): reduced by safeBillingCardCallbackResult to approved, declined, cancelled or unknown before it enters the redirect
+- **Idempotency:** does nothing
+- **Success:** 302 to /settings?section=billing&card=<one of the four results>
+- **Error disclosure:** fixed
+- **Authenticity:** anyone: the redirect carries only one of four fixed words, and the settings page then asks the server, signed in, to confirm the card
+- **Replay:** harmless
+- **Rate:** none — there is nothing to limit
+
 ### POST `/api/billing/card/callback`
 
 - query: `result: raw`
 - body: `fields: result`
 - statuses: `302`
 - helpers: `billingCardCallback`, `safeBillingCardCallbackResult`
+
+Reviewed policy:
+
+- **Who:** public. **Tenant (none):** reads nothing; sends the browser back to billing settings
+- **Input:** result (query or body): reduced by safeBillingCardCallbackResult to approved, declined, cancelled or unknown before it enters the redirect
+- **Idempotency:** does nothing
+- **Success:** 302 to /settings?section=billing&card=<one of the four results>
+- **Error disclosure:** fixed
+- **Authenticity:** anyone: the redirect carries only one of four fixed words, and the settings page then asks the server, signed in, to confirm the card
+- **Replay:** harmless
+- **Rate:** none — there is nothing to limit
 
 ### DELETE `/api/billing/card`
 
@@ -1600,10 +1998,14 @@ are classified by name). Facts, not judgments.
 - storageMethods: `removeSubscriptionCard`
 - statuses: `200`, `401`, `403`, `409`, `500`, `503`
 
+Review pending.
+
 ### POST `/api/board-builder/submit`
 
 - body: `fields: businessName, layout, pdf, stoneId, submitterEmail, submitterName`
 - statuses: `200`, `400`, `500`
+
+Review pending.
 
 ### GET `/uploads/:folder/:name`
 
@@ -1612,12 +2014,16 @@ are classified by name). Facts, not judgments.
 - sideEffects: `file system: fs.existsSync`
 - statuses: `200`, `400`, `404`, `500`
 
+Review pending.
+
 ### GET `/api/property/tenants`
 
 - middleware: `authenticateToken`
 - query: `includeArchived: raw`, `search: raw`
 - storageMethods: `getTenantProfilesByMerchant`
 - statuses: `200`, `401`, `403`, `500`, `503`
+
+Review pending.
 
 ### POST `/api/property/tenants`
 
@@ -1626,6 +2032,8 @@ are classified by name). Facts, not judgments.
 - storageMethods: `createTenantProfile`, `logTransactionEvent`
 - statuses: `201`, `400`, `401`, `403`, `500`, `503`
 
+Review pending.
+
 ### GET `/api/property/tenants/:id`
 
 - middleware: `authenticateToken`
@@ -1633,6 +2041,8 @@ are classified by name). Facts, not judgments.
 - authChecks: `checkMerchantOwnership`
 - storageMethods: `getTenantProfile`
 - statuses: `200`, `401`, `403`, `404`, `500`, `503`
+
+Review pending.
 
 ### PUT `/api/property/tenants/:id`
 
@@ -1643,6 +2053,8 @@ are classified by name). Facts, not judgments.
 - storageMethods: `getTenantProfile`, `updateTenantProfile`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
+Review pending.
+
 ### POST `/api/property/tenants/:id/archive`
 
 - middleware: `authenticateToken`
@@ -1651,6 +2063,8 @@ are classified by name). Facts, not judgments.
 - storageMethods: `archiveTenantProfile`, `getTenantProfile`, `logTransactionEvent`
 - statuses: `200`, `401`, `403`, `404`, `500`, `503`
 
+Review pending.
+
 ### POST `/api/property/tenants/:id/unarchive`
 
 - middleware: `authenticateToken`
@@ -1658,6 +2072,8 @@ are classified by name). Facts, not judgments.
 - authChecks: `checkMerchantOwnership`
 - storageMethods: `getTenantProfile`, `logTransactionEvent`, `unarchiveTenantProfile`
 - statuses: `200`, `401`, `403`, `404`, `500`, `503`
+
+Review pending.
 
 ### GET `/api/property/tenants/:id/events`
 
@@ -1668,11 +2084,15 @@ are classified by name). Facts, not judgments.
 - storageMethods: `getTenantProfile`, `getTransactionEventsByTenant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
+Review pending.
+
 ### GET `/api/property/schedules`
 
 - middleware: `authenticateToken`
 - storageMethods: `getActiveSchedulesByMerchant`
 - statuses: `200`, `401`, `403`, `500`, `503`
+
+Review pending.
 
 ### GET `/api/property/tenants/:tenantId/schedules`
 
@@ -1681,6 +2101,8 @@ are classified by name). Facts, not judgments.
 - authChecks: `checkMerchantOwnership`
 - storageMethods: `getActiveSchedulesByTenant`, `getTenantProfile`
 - statuses: `200`, `401`, `403`, `404`, `500`, `503`
+
+Review pending.
 
 ### POST `/api/property/tenants/:tenantId/schedules`
 
@@ -1692,6 +2114,8 @@ are classified by name). Facts, not judgments.
 - entitlementGates: `BILLING_CARD_REQUIRED`, `billingCardIsReady`, `requireBillingCard`
 - helpers: `requireBillingCard`
 
+Review pending.
+
 ### PUT `/api/property/schedules/:id`
 
 - middleware: `authenticateToken`
@@ -1701,6 +2125,8 @@ are classified by name). Facts, not judgments.
 - storageMethods: `getActiveSchedule`, `logTransactionEvent`, `updateActiveSchedule`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
+Review pending.
+
 ### DELETE `/api/property/schedules/:id`
 
 - middleware: `authenticateToken`
@@ -1709,12 +2135,16 @@ are classified by name). Facts, not judgments.
 - storageMethods: `getActiveSchedule`, `logTransactionEvent`, `terminateActiveSchedule`
 - statuses: `200`, `401`, `403`, `404`, `500`, `503`
 
+Review pending.
+
 ### GET `/api/property/invoices`
 
 - middleware: `authenticateToken`
 - query: `status: raw`, `tenantProfileId: raw`
 - storageMethods: `getInvoiceRentRequestsByMerchant`, `getTenantProfile`
 - statuses: `200`, `401`, `403`, `500`, `503`
+
+Review pending.
 
 ### POST `/api/property/invoices/document`
 
@@ -1723,6 +2153,8 @@ are classified by name). Facts, not judgments.
 - storageMethods: `saveUploadedFile`
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
 - helpers: `saveUploadedFile`
+
+Review pending.
 
 ### GET `/api/invoice-documents/:name`
 
@@ -1733,6 +2165,8 @@ are classified by name). Facts, not judgments.
 - sideEffects: `audit log: logSecurityEvent`
 - statuses: `200`, `401`, `403`, `404`, `500`, `503`
 - helpers: `sendPrivateDocument`
+
+Review pending.
 
 ### POST `/api/property/invoices`
 
@@ -1745,6 +2179,8 @@ are classified by name). Facts, not judgments.
 - entitlementGates: `BILLING_CARD_REQUIRED`, `billingCardIsReady`, `requireBillingCard`
 - helpers: `generateInvoiceToken`, `requireBillingCard`, `requireOwnedInvoiceDocument`
 
+Review pending.
+
 ### POST `/api/property/invoices/:id/resend`
 
 - middleware: `authenticateToken`
@@ -1756,6 +2192,8 @@ are classified by name). Facts, not judgments.
 - entitlementGates: `BILLING_CARD_REQUIRED`, `billingCardIsReady`, `requireBillingCard`
 - helpers: `requireBillingCard`
 
+Review pending.
+
 ### GET `/api/property/invoices/:id`
 
 - middleware: `authenticateToken`
@@ -1764,6 +2202,8 @@ are classified by name). Facts, not judgments.
 - storageMethods: `getInvoiceRentRequest`
 - statuses: `200`, `401`, `403`, `404`, `500`, `503`
 
+Review pending.
+
 ### POST `/api/property/invoices/:id/void`
 
 - middleware: `authenticateToken`
@@ -1771,6 +2211,8 @@ are classified by name). Facts, not judgments.
 - authChecks: `checkMerchantOwnership`
 - storageMethods: `getInvoiceRentRequest`, `logTransactionEvent`, `updateInvoiceRentRequest`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
+
+Review pending.
 
 ### POST `/api/property/invoices/:id/mark-paid-external`
 
@@ -1781,6 +2223,8 @@ are classified by name). Facts, not judgments.
 - storageMethods: `getInvoiceRentRequest`, `logTransactionEvent`, `updateInvoiceRentRequest`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
+Review pending.
+
 ### GET `/api/checkout/resolve/:token`
 
 - params: `token: raw`
@@ -1790,6 +2234,8 @@ are classified by name). Facts, not judgments.
 - rateLimits: `tokenRateLimit`
 - helpers: `getCheckoutParty`, `invoiceHasCheckoutDocument`, `tokenRateLimit`
 
+Review pending.
+
 ### GET `/api/checkout/document/:token`
 
 - params: `token: raw`
@@ -1797,6 +2243,8 @@ are classified by name). Facts, not judgments.
 - storageMethods: `consumeInvoiceDocumentReadLimit`, `getInvoiceRentRequestByToken`, `getJobInvoiceByToken`, `getUploadedFileForMerchant`
 - statuses: `200`, `404`, `410`, `429`, `500`, `503`
 - helpers: `sendPrivateDocument`
+
+Review pending.
 
 ### POST `/api/checkout/:token/split`
 
@@ -1807,6 +2255,8 @@ are classified by name). Facts, not judgments.
 - statuses: `200`, `400`, `404`, `409`, `429`, `500`
 - rateLimits: `tokenRateLimit`
 - helpers: `tokenRateLimit`, `updateCheckoutInvoice`
+
+Review pending.
 
 ### POST `/api/checkout/pay`
 
@@ -1819,6 +2269,8 @@ are classified by name). Facts, not judgments.
 - rateLimits: `tokenRateLimit`
 - idempotency: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`
 - helpers: `finalizeCheckoutInvoice`, `finalizeRentInvoice`, `finalizeTradeInvoice`, `getCheckoutParty`, `sendRentGstInvoices`, `tokenRateLimit`, `updateCheckoutInvoice`
+
+Review pending.
 
 ### POST `/api/checkout/:token/session`
 
@@ -1833,6 +2285,8 @@ are classified by name). Facts, not judgments.
 - idempotency: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`
 - helpers: `finalizeCheckoutInvoice`, `finalizeRentInvoice`, `finalizeTradeInvoice`, `getCheckoutParty`, `sendRentGstInvoices`, `tokenRateLimit`, `updateCheckoutInvoice`
 
+Review pending.
+
 ### POST `/api/checkout/:token/hosted-fields-complete`
 
 - params: `token: raw`
@@ -1844,6 +2298,8 @@ are classified by name). Facts, not judgments.
 - capabilityGates: `isWindcaveConfigured`
 - idempotency: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`
 - helpers: `finalizeCheckoutInvoice`, `finalizeRentInvoice`, `finalizeTradeInvoice`, `sendRentGstInvoices`
+
+Review pending.
 
 ### POST `/api/checkout/:token/googlepay-complete`
 
@@ -1857,6 +2313,8 @@ are classified by name). Facts, not judgments.
 - idempotency: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`
 - helpers: `assertWindcaveUrl`, `finalizeCheckoutInvoice`, `finalizeRentInvoice`, `finalizeTradeInvoice`, `sendRentGstInvoices`
 
+Review pending.
+
 ### GET `/api/checkout/callback`
 
 - query: `result: raw`, `token: raw`
@@ -1867,6 +2325,8 @@ are classified by name). Facts, not judgments.
 - capabilityGates: `isWindcaveConfigured`
 - idempotency: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`
 - helpers: `finalizeCheckoutInvoice`, `finalizeRentInvoice`, `finalizeTradeInvoice`, `sendRentGstInvoices`
+
+Review pending.
 
 ### ALL `/api/windcave/rent-notification`
 
@@ -1880,6 +2340,20 @@ are classified by name). Facts, not judgments.
 - idempotency: `atomicClaimSplitShare`
 - helpers: `finalizeRentInvoice`, `sendRentGstInvoices`
 
+Reviewed policy:
+
+- **Who:** provider. **Tenant (provider-session):** the provider's session id selects the one rent invoice created with it (storage.getInvoiceRentRequestByWindcaveSessionId); an unknown id does nothing
+- **Input:** sessionId / sessionid (query or body): an opaque provider session id; nothing else is read
+- **Capability gate:** isWindcaveConfigured(): unconfigured, the notification is ignored
+- **Idempotency:** a settled invoice (paid, paid externally, voided) is skipped; a split share is claimed atomically per session (storage.atomicClaimSplitShare), but a single payment is marked paid by a read then a write (finding)
+- **Side effects:** queries the provider; when paid, emails the GST invoice (sendRentGstInvoices → sendGstInvoices)
+- **Success:** 200 "OK" at once, before any work; nothing else is returned
+- **Error disclosure:** fixed
+- **Authenticity:** none needed from the caller: the outcome comes from querying the provider with the stored session id
+- **Replay:** a settled invoice is skipped; two simultaneous duplicates of a single payment can both pass the read
+- **Rate:** none — any caller can prompt a provider query for a pending session whose id they hold
+- **Finding:** finalizeRentInvoice marks a single (unsplit) payment paid after a plain read: this notification and the browser's return arriving together can both record it, logging Payment_Received twice and sending the GST invoice twice. Plan 22.7 / R3 (C20).
+
 ### ALL `/api/windcave/trades-notification`
 
 - middleware: `express.urlencoded(…)`, `express.json(…)`
@@ -1892,12 +2366,38 @@ are classified by name). Facts, not judgments.
 - idempotency: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`
 - helpers: `finalizeCheckoutInvoice`, `finalizeRentInvoice`, `finalizeTradeInvoice`, `sendRentGstInvoices`
 
+Reviewed policy:
+
+- **Who:** provider. **Tenant (provider-session):** the provider's session id selects the one job invoice created with it (storage.getJobInvoiceByWindcaveSessionId); an unknown id does nothing
+- **Input:** sessionId / sessionid (query or body): an opaque provider session id; nothing else is read
+- **Capability gate:** isWindcaveConfigured(): unconfigured, the notification is ignored
+- **Idempotency:** a settled invoice is skipped; a split share is claimed atomically per session (storage.atomicClaimJobSplitShare), but a single payment is marked paid by a read then a write (finding)
+- **Side effects:** queries the provider; when paid, sends the payment invoice (sendTradePaymentInvoice: email or SMS). The facts also list the rent path's GST email, which finalizeCheckoutInvoice can call, but this route always passes a trades invoice
+- **Success:** 200 "OK" at once, before any work; nothing else is returned
+- **Error disclosure:** fixed
+- **Authenticity:** none needed from the caller: the outcome comes from querying the provider with the stored session id
+- **Replay:** a settled invoice is skipped; two simultaneous duplicates of a single payment can both pass the read
+- **Rate:** none — any caller can prompt a provider query for a pending session whose id they hold
+- **Finding:** finalizeTradeInvoice marks a single payment paid after a plain read: a notification and the browser's return arriving together can both record it and send the payment invoice twice. Plan 22.7 / R3 (C20).
+
 ### POST `/api/webhooks/whatsapp`
 
 - middleware: `express.json(…)`
+- authChecks: `constant-time comparison: crypto.timingSafeEqual`
 - storageMethods: `createJobEvent`, `getInvoiceRentRequestByWhatsappMessageId`, `getJobInvoiceByWhatsappMessageId`, `logTransactionEvent`, `updateInvoiceRentRequest`, `updateJobInvoice`
 - statuses: `200`
 - helpers: `presentedSecretMatches`
+
+Reviewed policy:
+
+- **Who:** provider. **Tenant (provider-session):** the WhatsApp message id selects the property or trades invoice that sent it (getInvoiceRentRequestByWhatsappMessageId / getJobInvoiceByWhatsappMessageId); an unknown id does nothing
+- **Input:** body: event and data read without a schema; only event 'messages.update' is used, and from each update only key.id and update.status
+- **Idempotency:** the delivered time is stamped once (only while unset); every status is appended as an event, so a replay adds duplicate events
+- **Success:** 200 "OK" at once, before any work; nothing else is returned
+- **Error disclosure:** fixed
+- **Authenticity:** the apikey header must equal EVOLUTION_API_KEY, compared in constant time (presentedSecretMatches); with no key configured nobody is believed (it failed open until 2026-09-26)
+- **Replay:** a caller with the key can replay a status: it adds a duplicate event; the delivered time is set once
+- **Rate:** none — no limit
 
 ### PUT `/api/merchants/:merchantId/sector`
 
@@ -1908,12 +2408,16 @@ are classified by name). Facts, not judgments.
 - storageMethods: `updateMerchant`
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
 
+Review pending.
+
 ### GET `/api/property/reminder-settings`
 
 - middleware: `authenticateToken`
 - storageMethods: `getMerchant`
 - statuses: `200`, `401`, `403`, `404`, `500`, `503`
 - helpers: `reminderSettingsOf`
+
+Review pending.
 
 ### PUT `/api/property/reminder-settings`
 
@@ -1923,11 +2427,15 @@ are classified by name). Facts, not judgments.
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
 - helpers: `reminderSettingsOf`
 
+Review pending.
+
 ### GET `/api/trades/reminder-settings`
 
 - middleware: `authenticateToken`
 - storageMethods: `getMerchant`
 - statuses: `200`, `401`, `403`, `404`, `500`, `503`
+
+Review pending.
 
 ### PUT `/api/trades/reminder-settings`
 
@@ -1936,11 +2444,15 @@ are classified by name). Facts, not judgments.
 - storageMethods: `updateMerchant`
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
 
+Review pending.
+
 ### GET `/api/trades/gst-settings`
 
 - middleware: `authenticateToken`
 - storageMethods: `getMerchant`
 - statuses: `200`, `401`, `403`, `404`, `500`, `503`
+
+Review pending.
 
 ### PUT `/api/trades/gst-settings`
 
@@ -1949,11 +2461,15 @@ are classified by name). Facts, not judgments.
 - storageMethods: `updateMerchant`
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
 
+Review pending.
+
 ### GET `/api/trades/clients`
 
 - middleware: `authenticateToken`
 - storageMethods: `getClientProfilesByMerchant`
 - statuses: `200`, `401`, `403`, `500`, `503`
+
+Review pending.
 
 ### POST `/api/trades/clients`
 
@@ -1963,6 +2479,8 @@ are classified by name). Facts, not judgments.
 - statuses: `201`, `400`, `401`, `403`, `500`, `503`
 - errorTextInResponse: `parsed.error.errors`
 
+Review pending.
+
 ### GET `/api/trades/clients/:id`
 
 - middleware: `authenticateToken`
@@ -1970,6 +2488,8 @@ are classified by name). Facts, not judgments.
 - authChecks: `compares row.merchantId !== merchantId`
 - storageMethods: `getClientProfile`
 - statuses: `200`, `401`, `403`, `404`, `500`, `503`
+
+Review pending.
 
 ### PUT `/api/trades/clients/:id`
 
@@ -1981,6 +2501,8 @@ are classified by name). Facts, not judgments.
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 - errorTextInResponse: `parsed.error.errors`
 
+Review pending.
+
 ### POST `/api/trades/clients/:id/archive`
 
 - middleware: `authenticateToken`
@@ -1988,6 +2510,8 @@ are classified by name). Facts, not judgments.
 - authChecks: `compares existing.merchantId !== merchantId`
 - storageMethods: `archiveClientProfile`, `getClientProfile`
 - statuses: `200`, `401`, `403`, `404`, `500`, `503`
+
+Review pending.
 
 ### POST `/api/trades/clients/:id/unarchive`
 
@@ -1997,6 +2521,8 @@ are classified by name). Facts, not judgments.
 - storageMethods: `getClientProfile`, `unarchiveClientProfile`
 - statuses: `200`, `401`, `403`, `404`, `500`, `503`
 
+Review pending.
+
 ### POST `/api/trades/clients/:id/promote`
 
 - middleware: `authenticateToken`
@@ -2004,6 +2530,8 @@ are classified by name). Facts, not judgments.
 - authChecks: `compares existing.merchantId !== merchantId`
 - storageMethods: `getClientProfile`, `updateClientProfile`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
+
+Review pending.
 
 ### GET `/api/trades/clients/:id/events`
 
@@ -2013,12 +2541,16 @@ are classified by name). Facts, not judgments.
 - storageMethods: `getClientProfile`, `getJobEventsByClient`
 - statuses: `200`, `401`, `403`, `404`, `500`, `503`
 
+Review pending.
+
 ### GET `/api/trades/quotes`
 
 - middleware: `authenticateToken`
 - query: `status: raw`
 - storageMethods: `getQuotesByMerchant`
 - statuses: `200`, `401`, `403`, `500`, `503`
+
+Review pending.
 
 ### POST `/api/trades/quotes`
 
@@ -2032,6 +2564,8 @@ are classified by name). Facts, not judgments.
 - entitlementGates: `BILLING_CARD_REQUIRED`, `billingCardIsReady`, `requireBillingCard`
 - helpers: `generateInvoiceToken`, `requireBillingCard`, `requireOwnedInvoiceDocument`
 
+Review pending.
+
 ### GET `/api/trades/quotes/:id`
 
 - middleware: `authenticateToken`
@@ -2039,6 +2573,8 @@ are classified by name). Facts, not judgments.
 - authChecks: `compares row.merchantId !== merchantId`
 - storageMethods: `getQuote`
 - statuses: `200`, `401`, `403`, `404`, `500`, `503`
+
+Review pending.
 
 ### GET `/api/trades/quotes/:id/pdf`
 
@@ -2049,6 +2585,8 @@ are classified by name). Facts, not judgments.
 - statuses: `200`, `401`, `403`, `404`, `500`, `503`
 - helpers: `streamQuotePdf`
 
+Review pending.
+
 ### GET `/api/trades/quotes/token/:token/pdf`
 
 - params: `token: raw`
@@ -2056,6 +2594,8 @@ are classified by name). Facts, not judgments.
 - storageMethods: `getClientProfile`, `getMerchant`, `getQuoteByToken`
 - statuses: `200`, `404`, `500`
 - helpers: `streamQuotePdf`
+
+Review pending.
 
 ### POST `/api/trades/quotes/:id/resend`
 
@@ -2068,12 +2608,16 @@ are classified by name). Facts, not judgments.
 - entitlementGates: `BILLING_CARD_REQUIRED`, `billingCardIsReady`, `requireBillingCard`
 - helpers: `requireBillingCard`
 
+Review pending.
+
 ### GET `/api/trades/quotes/token/:token`
 
 - params: `token: raw`
 - authChecks: `storage.getQuoteByToken`
 - storageMethods: `createJobEvent`, `getClientProfile`, `getJobInvoicesByQuote`, `getMerchant`, `getQuoteByToken`, `updateQuote`
 - statuses: `200`, `404`, `500`
+
+Review pending.
 
 ### POST `/api/trades/quotes/token/:token/respond`
 
@@ -2087,12 +2631,16 @@ are classified by name). Facts, not judgments.
 - entitlementGates: `billingCardIsReady`
 - helpers: `generateInvoiceToken`
 
+Review pending.
+
 ### GET `/api/trades/invoices`
 
 - middleware: `authenticateToken`
 - query: `clientProfileId: raw`, `status: raw`
 - storageMethods: `getJobInvoicesByMerchant`
 - statuses: `200`, `401`, `403`, `500`, `503`
+
+Review pending.
 
 ### POST `/api/trades/invoices`
 
@@ -2106,6 +2654,8 @@ are classified by name). Facts, not judgments.
 - entitlementGates: `BILLING_CARD_REQUIRED`, `billingCardIsReady`, `requireBillingCard`
 - helpers: `generateInvoiceToken`, `requireBillingCard`, `requireOwnedInvoiceDocument`
 
+Review pending.
+
 ### POST `/api/trades/invoices/:id/resend`
 
 - middleware: `authenticateToken`
@@ -2116,6 +2666,8 @@ are classified by name). Facts, not judgments.
 - statuses: `200`, `401`, `402`, `403`, `404`, `500`, `502`, `503`
 - entitlementGates: `BILLING_CARD_REQUIRED`, `billingCardIsReady`, `requireBillingCard`
 - helpers: `requireBillingCard`
+
+Review pending.
 
 ### POST `/api/trades/invoices/:id/send-balance`
 
@@ -2128,6 +2680,8 @@ are classified by name). Facts, not judgments.
 - entitlementGates: `BILLING_CARD_REQUIRED`, `billingCardIsReady`, `requireBillingCard`
 - helpers: `generateInvoiceToken`, `requireBillingCard`
 
+Review pending.
+
 ### POST `/api/trades/invoices/:id/mark-paid-external`
 
 - middleware: `authenticateToken`
@@ -2139,6 +2693,8 @@ are classified by name). Facts, not judgments.
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 - errorTextInResponse: `parsed.error.errors`
 
+Review pending.
+
 ### POST `/api/trades/invoices/:id/complete`
 
 - middleware: `authenticateToken`
@@ -2146,6 +2702,8 @@ are classified by name). Facts, not judgments.
 - authChecks: `compares inv.merchantId !== merchantId`
 - storageMethods: `createJobEvent`, `getJobInvoice`, `updateJobInvoice`
 - statuses: `200`, `401`, `403`, `404`, `409`, `500`, `503`
+
+Review pending.
 
 ### POST `/api/trades/invoices/:id/void`
 
@@ -2155,11 +2713,15 @@ are classified by name). Facts, not judgments.
 - storageMethods: `getJobInvoice`, `updateJobInvoice`
 - statuses: `200`, `401`, `403`, `404`, `500`, `503`
 
+Review pending.
+
 ### GET `/api/trades/schedules`
 
 - middleware: `authenticateToken`
 - storageMethods: `getJobSchedulesByMerchant`
 - statuses: `200`, `401`, `403`, `500`, `503`
+
+Review pending.
 
 ### POST `/api/trades/schedules`
 
@@ -2172,6 +2734,8 @@ are classified by name). Facts, not judgments.
 - entitlementGates: `BILLING_CARD_REQUIRED`, `billingCardIsReady`, `requireBillingCard`
 - helpers: `requireBillingCard`
 
+Review pending.
+
 ### PUT `/api/trades/schedules/:id`
 
 - middleware: `authenticateToken`
@@ -2182,6 +2746,8 @@ are classified by name). Facts, not judgments.
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 - errorTextInResponse: `parsed.error.errors`
 
+Review pending.
+
 ### DELETE `/api/trades/schedules/:id`
 
 - middleware: `authenticateToken`
@@ -2190,13 +2756,39 @@ are classified by name). Facts, not judgments.
 - storageMethods: `createJobEvent`, `getJobSchedule`, `terminateJobSchedule`
 - statuses: `200`, `401`, `403`, `404`, `500`, `503`
 
+Review pending.
+
 ### GET `/api/internal/cron/status`
 
-- authChecks: `authorizeCronRequest`
+- authChecks: `authorizeCronRequest`, `constant-time comparison: crypto.timingSafeEqual`
 - statuses: `200`, `401`, `503`
+
+Reviewed policy:
+
+- **Who:** cron. **Tenant (none):** no merchant data: whether a run is in progress, and the last run's summary
+- **Input:** nothing is read but the x-cron-secret header
+- **Idempotency:** read-only
+- **Success:** { configured, running, startedAt, lastRun }
+- **Error disclosure:** fixed
+- **Authenticity:** x-cron-secret must equal CRON_SECRET, compared in constant time (authorizeCronRequest); 503 when CRON_SECRET is unset
+- **Replay:** read-only
+- **Rate:** none — the secret is the only gate
 
 ### POST `/api/internal/cron`
 
-- authChecks: `authorizeCronRequest`
-- statuses: `401`, `409`, `500`, `503`
+- authChecks: `authorizeCronRequest`, `constant-time comparison: crypto.timingSafeEqual`
+- statuses: `200`, `207`, `401`, `409`, `500`, `503`
 - helpers: `runPass`
+
+Reviewed policy:
+
+- **Who:** cron. **Tenant (system):** a scheduled run over every merchant's billing, invoices and reminders
+- **Input:** nothing is read but the x-cron-secret header (link URLs come from getBaseUrl(req))
+- **Idempotency:** one run at a time in this server process (409 while one runs); each pass is meant to act once per period. Another server instance can run at the same time (finding)
+- **Side effects:** charges stored cards for due subscriptions (server/subscription-cron.ts); generates and sends property and trades invoices and reminders by email or SMS (server/property-cron.ts, server/trades-cron.ts, server/trades-delivery.ts); daily payout notifications (server/daily-payout-notifications.ts)
+- **Success:** 200, or 207 when a pass failed: { ok, ranAt, failedPasses, and each pass's counts }
+- **Error disclosure:** fixed
+- **Authenticity:** x-cron-secret must equal CRON_SECRET, compared in constant time (authorizeCronRequest); 503 when CRON_SECRET is unset
+- **Replay:** starts another run once the last has finished; each pass is meant to be idempotent per period
+- **Rate:** none — the secret is the only gate
+- **Finding:** Overlapping runs are refused only within one server process (the in-memory cronRunning flag): two instances can run the passes at once. Plan 13.3 (durable cron leases).
