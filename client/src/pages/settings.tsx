@@ -1590,12 +1590,13 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
           </>
         )}
 
-        {/* Customer Payment Page Button — unchanged, per Oliver's instruction */}
+        {/* Customer Payment Page Button — unchanged per Oliver's instruction, except where it
+            goes: the boards (owner decision 2026-09-26; the business-wide page was retired) */}
         {!activeSection && (
         <>
         <div className="pt-bounce mb-5" style={{ '--pt-d': '365ms' } as any}>
           <Button
-            onClick={() => setLocation(`/pay/${merchantId}`)}
+            onClick={() => setLocation('/board-builder')}
             className="w-full bg-[#040D6D] hover:bg-[#0a1580] text-[#58ABFF] py-6 rounded-2xl text-lg"
             data-testid="button-customer-page"
           >

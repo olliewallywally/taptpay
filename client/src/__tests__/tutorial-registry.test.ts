@@ -262,6 +262,17 @@ describe("merchant tutorial registry", () => {
     expect(unscoped).toEqual([]);
   });
 
+  it("introduces the Settings Customer Payment Page button as the way to the boards", () => {
+    // Owner decision 2026-09-26 (answer 2): the button opens the boards; the step says so.
+    const step = TUTORIAL_REGISTRY.settings.steps.find((candidate) =>
+      candidate.target.includes("button-customer-page"),
+    );
+    expect(step).toBeDefined();
+    expect(step!.title).toBe("Open your payment boards");
+    expect(step!.body).toMatch(/board/i);
+    expect(step!.body).not.toMatch(/public customer page/i);
+  });
+
   it("contains the shared Settings restart page", () => {
     expect(TUTORIAL_REGISTRY.settings.steps.some(step =>
       step.target.includes("settings-tutorial-help"),

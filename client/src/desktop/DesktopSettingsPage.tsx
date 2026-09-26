@@ -534,11 +534,9 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
   const status = String(merchant?.status ?? "pending");
   const isActive = status === "active";
 
-  const openPaymentPage = () => {
-    const url = merchant?.paymentUrl || (merchantId ? `${window.location.origin}/pay/${merchantId}` : "");
-    if (!url) return;
-    window.open(url, "_blank", "noopener");
-  };
+  // The boards, where each printed board's QR and customer page are chosen (owner
+  // decision 2026-09-26; the business-wide payment page was retired).
+  const openPaymentPage = () => setLocation("/board-builder");
 
   const switchMode = (mode: DesktopVertical, path: string) => {
     if (mode === vertical) return;

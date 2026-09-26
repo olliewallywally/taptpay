@@ -196,6 +196,37 @@ describe("desktop settings business-details save contract", () => {
     expect(request.headers.Authorization).toBe("Bearer merchant.jwt.token");
   });
 
+  it("opens the boards from the Customer Payment Page button, never the retired business-wide page", async () => {
+    // Owner decision 2026-09-26 (answer 2, "Open the boards").
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+          queryFn: async ({ queryKey }) => {
+            if (queryKey[0] === "/api/billing/card") return { ready: false, card: null };
+            throw new Error(`Unexpected query: ${String(queryKey[0])}`);
+          },
+        },
+        mutations: { retry: false },
+      },
+    });
+    const open = jest.spyOn(window, "open").mockImplementation(() => null);
+    const user = userEvent.setup();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <DesktopSettingsPage deviceClass="desktop" vertical="retail" />
+      </QueryClientProvider>,
+    );
+    await screen.findByRole("textbox", { name: "trading name" });
+
+    await user.click(screen.getByTestId("button-customer-page"));
+
+    expect(mockSetLocation).toHaveBeenCalledWith("/board-builder");
+    expect(open).not.toHaveBeenCalled();
+    open.mockRestore();
+  });
+
   it("renders the three notification preferences and updates the selected event", async () => {
     const queryClient = new QueryClient({
       defaultOptions: {
