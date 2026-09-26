@@ -1259,8 +1259,9 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
     // go back to the split page so the customer can adjust — not to /pay which would loop
     if (transaction?.splitEnabled && txId) {
       setLocation(`/split/${txId}`);
-    } else if (transaction?.merchantId) {
-      setLocation(`/pay/${transaction.merchantId}`);
+    } else if (transaction?.merchantId && transaction.taptStoneId) {
+      // Back to the board's page; the business-wide page is retired (2026-09-25).
+      setLocation(`/pay/${transaction.merchantId}/stone/${transaction.taptStoneId}`);
     } else {
       window.history.back();
     }

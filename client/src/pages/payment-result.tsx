@@ -37,10 +37,9 @@ export default function PaymentResult() {
   const amount = transaction ? `$${parseFloat(transaction.price).toFixed(2)}` : "";
   const itemName = transaction?.itemName || "";
   const merchantName = merchant?.businessName || "the merchant";
-  const paymentUrl = transaction?.merchantId
-    ? transaction.taptStoneId
-      ? `/pay/${transaction.merchantId}/stone/${transaction.taptStoneId}`
-      : `/pay/${transaction.merchantId}`
+  // A board sale's own board; the business-wide page is retired (2026-09-25).
+  const paymentUrl = transaction?.merchantId && transaction.taptStoneId
+    ? `/pay/${transaction.merchantId}/stone/${transaction.taptStoneId}`
     : "/";
 
   const receiptUrl = `/receipt/${txnId}`;
