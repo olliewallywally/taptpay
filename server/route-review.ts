@@ -128,12 +128,8 @@ const CHECKOUT_AUTHENTICITY =
   "holding the invoice's checkout link: its token is the credential for that one invoice and for nothing else";
 const CHECKOUT_RATE =
   "tokenRateLimit (10 a minute per token, counted in this server process only; an unknown token gets a count of its own, so it limits one link's use, not guessing, which a 160-bit token makes futile)";
-const SPLIT_INVOICE_SESSION_FINDING =
-  "A split invoice records none of the sessions opened for it, so its completion checks only that the provider approved the session the page sends: any approved session on the platform's provider account (another invoice's share, a $1 purchase anywhere) marks one share paid, one such session per share marks the invoice paid, and each is emailed a GST invoice once rent is paid. The single-payment branch was fixed 2026-09-26 (R1-T7's rule). Needs each opened session recorded (the payment attempts engine, R3, or an interim column): put to the owner 2026-09-26.";
 const SPLIT_INVOICE_SHARE_FINDING =
-  "What a split share costs is fixed when its session is opened, from the share count and the shares paid at that moment, and is never checked again: the count can change until a share is paid, so a share opened at 1/12 then counts as 1/2 and the invoice shows paid with less money; shares opened at once are all charged the equal share, so the remainder's cents go uncharged. Same root as the session finding (R3).";
-const PAYER_EMAIL_FINDING =
-  "payerEmail, checked only against /.+@.+\\..+/, is added to splitPayerEmails without limit (10 calls a minute per link), and every address gets the rent invoice's GST invoice once it is paid: a link holder can have the business email its tenant's name, address and rent to any number of addresses. Trades store the list but email only the client.";
+  "What a split share costs is fixed when its session is opened, from the share count and the shares paid at that moment: sessions opened at once are all charged the equal share, so up to one cent per share of the remainder can go uncharged. Since 2026-09-26 the count locks once any session is opened (0030), so a share opened at 1/12 can no longer count as 1/2. The remainder is R3's (payment attempts).";
 const RESESSION_FINDING =
   "Every call opens another provider session and re-pins a single-payment invoice to it: a payment completed on an earlier session is then refused at completion (403) and missed by the notification, which finds invoices by their pinned session. The payer is charged and the invoice stays unpaid (R3: payment attempts).";
 const QUOTE_TENANT_RULE =
@@ -360,7 +356,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         principal: "provider",
         tenant: "provider-session",
         tenantRule:
-          "the provider's session id selects the one rent invoice created with it (storage.getInvoiceRentRequestByWindcaveSessionId); an unknown id does nothing",
+          "the provider's session id selects the one rent invoice created with it (storage.getInvoiceRentRequestByWindcaveSessionId), or the split invoice it was recorded for (getInvoiceSplitSession, since 2026-09-26); an unknown id does nothing",
       },
     ],
     input: "sessionId / sessionid (query or body): an opaque provider session id; nothing else is read",
@@ -387,7 +383,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         principal: "provider",
         tenant: "provider-session",
         tenantRule:
-          "the provider's session id selects the one job invoice created with it (storage.getJobInvoiceByWindcaveSessionId); an unknown id does nothing",
+          "the provider's session id selects the one job invoice created with it (storage.getJobInvoiceByWindcaveSessionId), or the split invoice it was recorded for (getInvoiceSplitSession, since 2026-09-26); an unknown id does nothing",
       },
     ],
     input: "sessionId / sessionid (query or body): an opaque provider session id; nothing else is read",
@@ -892,13 +888,13 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     input: "token: read raw, then looked up; body: count, a whole number from 2 to 12, strict (400 otherwise; parseInt until 2026-09-26)",
     capability: null,
     entitlement: null,
-    idempotency: "sets the invoice's share count; refused once a share is paid (409) and when the business has not allowed splitting (400)",
+    idempotency: "sets the invoice's share count; refused once any session has been opened for it or a share is paid (409, since 2026-09-26) and when the business has not allowed splitting (400)",
     sideEffects: null,
     successDto: "{ splitCount, splitPaidCount: 0, shareCents }",
     errorDisclosure: ["fixed"],
     controls: {
       authenticity: CHECKOUT_AUTHENTICITY,
-      replay: "the same count again changes nothing; another count is taken until a share is paid (finding)",
+      replay: "the same count again changes nothing; another count is taken only until someone starts paying",
       rate: CHECKOUT_RATE,
     },
     findings: [SPLIT_INVOICE_SHARE_FINDING],
@@ -906,12 +902,12 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
 
   "POST /api/checkout/:token/session": {
     branches: [{ principal: "public-bearer", tenant: "token", tenantRule: CHECKOUT_TENANT_RULE }],
-    input: "token: read raw, then looked up; body read without a schema: payerEmail (checked only against /.+@.+\\..+/)",
+    input: "token: read raw, then looked up; body read without a schema: payerEmail (checked as an email address; for a split invoice kept with that session only, never on a list)",
     capability: "isWindcaveConfigured() (503 PAYMENT_PROVIDER_UNAVAILABLE)",
     entitlement: null,
     idempotency: "none: every call opens another provider session (finding)",
     sideEffects:
-      "creates a payment session with the provider (createWindcaveSession); when the provider reports it already complete, settles the invoice: events, and once paid the GST invoice email (rent, sendGstInvoices) or the payment invoice (trades, sendTradePaymentInvoice)",
+      "creates a payment session with the provider (createWindcaveSession) and, for a split invoice, records it with its amount and payer's email (recordInvoiceSplitSession, 0030); when the provider reports it already complete, settles the invoice: events, and once paid the GST invoice email (rent, sendGstInvoices) or the payment invoice (trades, sendTradePaymentInvoice)",
     successDto:
       "the provider session id, the amount and the hosted-fields submit URLs (also cached here against the token, invoiceAjaxUrlCache); or { alreadyComplete, approved }",
     errorDisclosure: ["fixed"],
@@ -920,7 +916,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       replay: "each call opens another provider session for the same invoice",
       rate: CHECKOUT_RATE,
     },
-    findings: [RESESSION_FINDING, PAYER_EMAIL_FINDING, SPLIT_INVOICE_SHARE_FINDING],
+    findings: [RESESSION_FINDING, SPLIT_INVOICE_SHARE_FINDING],
   },
 
   "POST /api/checkout/:token/hosted-fields-complete": {
@@ -928,24 +924,23 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       {
         principal: "public-bearer",
         tenant: "token",
-        tenantRule: `${CHECKOUT_TENANT_RULE}; a single payment must send the session pinned to it (403 otherwise, and when none is pinned, since 2026-09-26); a split invoice's session is not checked (finding)`,
+        tenantRule: `${CHECKOUT_TENANT_RULE}; a single payment must send the session pinned to it, a split share a session recorded for this invoice when it was opened (getInvoiceSplitSession; 403 otherwise, since 2026-09-26)`,
       },
     ],
     input: "token: read raw, then looked up; body read without a schema: sessionId (required; sent to the provider as one encoded path segment)",
     capability: "isWindcaveConfigured() (503 PAYMENT_PROVIDER_UNAVAILABLE: the outcome waits)",
     entitlement: null,
     idempotency:
-      "finalizeCheckoutInvoice: a settled invoice is left alone; a split share counts once per session (atomicClaimSplitShare / atomicClaimJobSplitShare); a single payment settles by a read then a write",
+      "finalizeCheckoutInvoice: a settled invoice is left alone; a split share counts once per recorded session (atomicClaimSplitShare / atomicClaimJobSplitShare, then markInvoiceSplitSessionPaid), and an approved session that finds every share paid is recorded for a refund; a single payment settles by a read then a write",
     sideEffects:
       "queries the provider for the session (queryWindcaveSession); once paid, the GST invoice email (rent, sendGstInvoices) or the payment invoice (trades, sendTradePaymentInvoice)",
     successDto: "{ approved, status, splitCount, splitPaidCount }",
     errorDisclosure: ["fixed"],
     controls: {
-      authenticity: `${CHECKOUT_AUTHENTICITY}, with the invoice's pinned session for a single payment`,
+      authenticity: `${CHECKOUT_AUTHENTICITY}, with the invoice's pinned session for a single payment or a session recorded for it for a split share`,
       replay: "a settled invoice is left alone and a split session counts once; two calls at once for a single payment can both settle it (R3 / C20)",
       rate: "none — every call asks the provider about the session sent, with the platform's credentials",
     },
-    findings: [SPLIT_INVOICE_SESSION_FINDING],
   },
 
   "POST /api/checkout/:token/googlepay-complete": {
@@ -953,7 +948,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       {
         principal: "public-bearer",
         tenant: "token",
-        tenantRule: `${CHECKOUT_TENANT_RULE}; a single payment must send the session pinned to it (403 otherwise, and when none is pinned, since 2026-09-26); a split invoice's session is not checked (finding)`,
+        tenantRule: `${CHECKOUT_TENANT_RULE}; a single payment must send the session pinned to it, a split share a session recorded for this invoice when it was opened (getInvoiceSplitSession; 403 otherwise, since 2026-09-26)`,
       },
     ],
     input:
@@ -967,12 +962,11 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     successDto: "{ approved, status, splitCount, splitPaidCount }",
     errorDisclosure: ["fixed"],
     controls: {
-      authenticity: `${CHECKOUT_AUTHENTICITY}, with the invoice's pinned session for a single payment`,
+      authenticity: `${CHECKOUT_AUTHENTICITY}, with the invoice's pinned session for a single payment or a session recorded for it for a split share`,
       replay: "a settled invoice is left alone and a split session counts once; two calls at once for a single payment can both settle it (R3 / C20)",
       rate: "none — every call reaches the provider, with the platform's credentials",
     },
     findings: [
-      SPLIT_INVOICE_SESSION_FINDING,
       "The submit URLs are cached per link, not per session: when two payers of one split invoice open sessions, the first one's Google Pay payment goes to the second one's session, and both sessions are then counted as shares.",
     ],
   },

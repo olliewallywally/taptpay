@@ -486,7 +486,10 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
     // when preSessionTrigger has incremented. On the initial load (trigger === 0)
     // we leave any existing session in place so there is never a gap where
     // preSessionRef.current is null while the async is in flight.
-    if (preSessionTrigger > 0) {
+    // A ready session is good only for the amount it was opened for: choosing a split, or a
+    // share being paid, changes what the page charges, so a stale one is dropped at once rather
+    // than charged (owner decision 2026-09-26: a split share is paid only by its own session).
+    if (preSessionTrigger > 0 || (preSessionRef.current && preSessionRef.current.__readyForPrice !== transaction.price)) {
       preSessionRef.current = null;
     }
 
@@ -496,7 +499,7 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
         if (!cancelled && res.ok) {
           const data = hydrateSession(await res.json());
           if (data.ajaxSubmitApplePayUrl) {
-            preSessionRef.current = data;
+            preSessionRef.current = { ...data, __readyForPrice: transaction.price };
           }
         }
       } catch {}
@@ -507,7 +510,7 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
   // React Query refetches, so the effect only re-runs when something meaningful
   // changes (new transaction, different env, overrideAmount param, or a payment
   // was attempted and preSessionTrigger incremented).
-  }, [applePayAvailable, payId, transaction?.status, envData?.env, overrideAmount, preSessionTrigger, tokenCanCreateSession, tokenShareIndex]);
+  }, [applePayAvailable, payId, transaction?.status, transaction?.price, envData?.env, overrideAmount, preSessionTrigger, tokenCanCreateSession, tokenShareIndex]);
 
   // Pre-create a Windcave session for Google Pay so it is ready the instant
   // the user approves — eliminates the createSession() network call that
@@ -517,7 +520,8 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
     if (!googlePayAvailable || !transaction || !envData?.env || !payId || !tokenCanCreateSession) return;
     let cancelled = false;
 
-    if (googlePreSessionTrigger > 0) {
+    // As for Apple Pay: a ready session is good only for the amount it was opened for.
+    if (googlePreSessionTrigger > 0 || (googlePreSessionRef.current && googlePreSessionRef.current.__readyForPrice !== transaction.price)) {
       googlePreSessionRef.current = null;
     }
 
@@ -527,14 +531,14 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
         if (!cancelled && res.ok) {
           const data = hydrateSession(await res.json());
           if (data?.sessionId) {
-            googlePreSessionRef.current = data;
+            googlePreSessionRef.current = { ...data, __readyForPrice: transaction.price };
           }
         }
       } catch {}
     })();
 
     return () => { cancelled = true; };
-  }, [googlePayAvailable, payId, transaction?.status, envData?.env, overrideAmount, googlePreSessionTrigger, tokenCanCreateSession, tokenShareIndex]);
+  }, [googlePayAvailable, payId, transaction?.status, transaction?.price, envData?.env, overrideAmount, googlePreSessionTrigger, tokenCanCreateSession, tokenShareIndex]);
 
   // Lazy-load Windcave Hosted Fields scripts only when the card tab is first
   // opened — loading them at page load causes the HF SDK to auto-initialise

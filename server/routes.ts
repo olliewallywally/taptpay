@@ -7190,7 +7190,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       ]);
       if (!merchant || !tenant) return;
       const recipients = Array.from(new Set(
-        [tenant.email, ...extractEmails(tenant.coTenantsText), ...((invoice.splitPayerEmails) || [])]
+        [
+          tenant.email,
+          ...extractEmails(tenant.coTenantsText),
+          // Only payers whose share was paid, never every address typed (owner decision 2026-09-26).
+          ...(await storage.getPaidInvoiceSplitPayerEmails({ vertical: "property", invoiceId: invoice.id })),
+        ]
           .filter(Boolean).map((e: string) => e.toLowerCase()),
       ));
       if (recipients.length === 0) return;
@@ -7219,7 +7224,22 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   async function finalizeRentInvoice(invoiceId: string, approved: boolean, windcaveTransactionId?: string, sessionId?: string): Promise<any> {
     const inv = await storage.getInvoiceRentRequest(invoiceId);
     if (!inv) return null;
-    if (["paid", "paid_external", "voided"].includes(inv.status)) return inv; // already settled
+    // A split share's approved session that nothing counts (every share already paid, or the
+    // invoice settled): the payer was charged, so it is recorded for a refund (R3 automates
+    // this). A repeat of a session already counted is not.
+    const recordUncountedShare = async (current: any) => {
+      if (!approved || !sessionId || !(inv.splitEnabled && inv.splitCount && inv.splitCount > 1)) return;
+      if ((current?.splitPaidSessions ?? []).includes(sessionId)) return;
+      await storage.logTransactionEvent({
+        merchantId: inv.merchantId, tenantProfileId: inv.tenantProfileId, invoiceId,
+        eventType: "Split_Share_Unrecorded",
+        payload: { channel: "card", reason: "every share already paid", windcaveTransactionId: windcaveTransactionId ?? null },
+      });
+    };
+    if (["paid", "paid_external", "voided"].includes(inv.status)) { // already settled
+      await recordUncountedShare(inv);
+      return inv;
+    }
 
     if (!approved) {
       await storage.logTransactionEvent({
@@ -7236,8 +7256,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const claimed = await storage.atomicClaimSplitShare(invoiceId, dedupeKey);
       if (!claimed) {
         // Session already counted, or all shares claimed — return current state.
-        return await storage.getInvoiceRentRequest(invoiceId);
+        const current = await storage.getInvoiceRentRequest(invoiceId);
+        await recordUncountedShare(current);
+        return current;
       }
+      if (sessionId) await storage.markInvoiceSplitSessionPaid(sessionId, new Date());
       const fullyPaid = claimed.splitPaidCount >= inv.splitCount;
       const statusUpdates: any = { windcaveTransactionId: windcaveTransactionId ?? inv.windcaveTransactionId };
       if (fullyPaid) { statusUpdates.status = "paid"; statusUpdates.paidAt = new Date(); }
@@ -7311,6 +7334,18 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     } : null;
   }
 
+  // Split invoices (0030; owner decision 2026-09-26): each share is paid only by a session
+  // opened for that invoice and recorded when it was opened.
+  const splitInvoiceRef = (invoice: CheckoutInvoice) => ({
+    vertical: invoice.checkoutVertical === "trades" ? "trades" as const : "property" as const,
+    invoiceId: invoice.id as string,
+  });
+  async function splitSessionOpenedFor(invoice: CheckoutInvoice, sessionId: string): Promise<boolean> {
+    const opened = await storage.getInvoiceSplitSession(sessionId);
+    if (!opened) return false;
+    return invoice.checkoutVertical === "trades" ? opened.jobInvoiceId === invoice.id : opened.rentInvoiceId === invoice.id;
+  }
+
   async function updateCheckoutInvoice(invoice: CheckoutInvoice, updates: any): Promise<any> {
     return invoice.checkoutVertical === "trades"
       ? storage.updateJobInvoice(invoice.id, updates)
@@ -7320,14 +7355,28 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   async function finalizeTradeInvoice(invoiceId: string, approved: boolean, windcaveTransactionId?: string, sessionId?: string): Promise<any> {
     const invoice = await storage.getJobInvoice(invoiceId);
     if (!invoice) return null;
-    if (["paid", "paid_external", "voided"].includes(invoice.status)) return invoice;
+    // As for rent: an approved split session nothing counts is recorded for a refund (R3).
+    const recordUncountedShare = async (current: any) => {
+      if (!approved || !sessionId || !(invoice.splitEnabled && invoice.splitCount && invoice.splitCount > 1)) return;
+      if ((current?.splitPaidSessions ?? []).includes(sessionId)) return;
+      await storage.createJobEvent({ merchantId: invoice.merchantId, clientProfileId: invoice.clientProfileId, jobInvoiceId: invoice.id, eventType: "split_share_unrecorded", payload: { channel: "card", reason: "every share already paid", windcaveTransactionId: windcaveTransactionId ?? null } });
+    };
+    if (["paid", "paid_external", "voided"].includes(invoice.status)) {
+      await recordUncountedShare(invoice);
+      return invoice;
+    }
     if (!approved) {
       await storage.createJobEvent({ merchantId: invoice.merchantId, clientProfileId: invoice.clientProfileId, jobInvoiceId: invoice.id, eventType: "payment_declined", payload: { channel: "card" } });
       return invoice;
     }
     if (invoice.splitEnabled && invoice.splitCount && invoice.splitCount > 1) {
       const claimed = await storage.atomicClaimJobSplitShare(invoiceId, sessionId ?? crypto.randomUUID());
-      if (!claimed) return storage.getJobInvoice(invoiceId);
+      if (!claimed) {
+        const current = await storage.getJobInvoice(invoiceId);
+        await recordUncountedShare(current);
+        return current;
+      }
+      if (sessionId) await storage.markInvoiceSplitSessionPaid(sessionId, new Date());
       const fullyPaid = claimed.splitPaidCount >= invoice.splitCount;
       const updated = await storage.updateJobInvoice(invoiceId, {
         ...(fullyPaid ? { status: "paid", paidAt: new Date() } : {}),
@@ -7845,6 +7894,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!invoice.splitEnabled) return res.status(400).json({ message: "Splitting is not enabled for this payment" });
       if (["voided", "paid", "paid_external"].includes(invoice.status)) return res.status(409).json({ message: "Invoice is not payable" });
       if ((invoice.splitPaidCount ?? 0) > 0) return res.status(409).json({ message: "A split is already in progress" });
+      // A share's amount is fixed when its session opens, so the count cannot change after one has.
+      if (await storage.invoiceHasSplitSessions(splitInvoiceRef(invoice))) {
+        return res.status(409).json({ message: "The split can't change once someone has started paying" });
+      }
       await updateCheckoutInvoice(invoice, { splitCount: count });
       res.json({ splitCount: count, splitPaidCount: 0, shareCents: Math.floor(invoice.amountCents / count) });
     } catch (err) { console.error("[CHECKOUT_SPLIT]", err); res.status(500).json({ message: "Failed to set up split" }); }
@@ -7879,13 +7932,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         const base = Math.floor(invoice.amountCents / invoice.splitCount!);
         const isLastShare = paid === invoice.splitCount! - 1;
         chargeCents = isLastShare ? invoice.amountCents - base * (invoice.splitCount! - 1) : base;
-        // Record the payer's email (for their GST copy) before charging.
-        if (typeof payerEmail === "string" && /.+@.+\..+/.test(payerEmail)) {
-          const emails: string[] = invoice.splitPayerEmails || [];
-          const lower = payerEmail.toLowerCase();
-          if (!emails.includes(lower)) await updateCheckoutInvoice(invoice, { splitPayerEmails: [...emails, lower] });
-        }
       }
+      // The payer's email (for their GST copy) goes with their own session, recorded below.
+      const checkedEmail = z.string().trim().email().max(254).safeParse(payerEmail);
+      const splitPayerEmail = isSplit && checkedEmail.success ? checkedEmail.data.toLowerCase() : null;
 
       const amountStr = (chargeCents / 100).toFixed(2);
       const merchantRef = (invoice.checkoutVertical === "trades" ? "JOB-" : "RENT-") + invoice.id.slice(0, 8).toUpperCase();
@@ -7900,10 +7950,18 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!sessionResult.success) return res.status(502).json({ message: "Payment gateway error. Please try again." });
       // Pin single-payment invoices to their one Windcave session so a stale or
       // foreign session can't finalize them. Split invoices legitimately create
-      // one session per payer; pinning a single shared value would 403 every
-      // payer but the most recent, so we skip it and rely on per-session dedup
-      // (splitPaidSessions) instead.
+      // one session per payer (several per payer: the page readies Apple Pay and
+      // Google Pay sessions too), so each is recorded instead, with its amount and
+      // its payer's email; only a recorded session can pay a share (0030).
       if (sessionResult.sessionId && !isSplit) await updateCheckoutInvoice(invoice, { windcaveSessionId: sessionResult.sessionId });
+      if (sessionResult.sessionId && isSplit) {
+        await storage.recordInvoiceSplitSession({
+          ...splitInvoiceRef(invoice),
+          sessionId: sessionResult.sessionId,
+          amountCents: chargeCents,
+          payerEmail: splitPayerEmail,
+        });
+      }
 
       // Duplicate X-ID — Windcave reports the session already completed; finalize now
       // and tell the page to show its success/declined state without a second submit.
@@ -7938,13 +7996,15 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!sessionId) return res.status(400).json({ message: "sessionId required" });
       const invoice = await getCheckoutInvoiceByToken(token);
       if (!invoice) return res.status(404).json({ message: "Payment link not found" });
-      // Split invoices have one session per payer (not pinned on the invoice), so
-      // the single-session equality check only applies to single payments. It is
-      // unconditional, as on the numbered routes (R1-T7): an invoice with no
-      // session opened accepts none, or any approved session on the platform's
-      // provider account would pay it.
+      // A single payment completes only with the session pinned on the invoice, a split
+      // share only with a session recorded for this invoice when it was opened (0030).
+      // Both unconditional, as on the numbered routes (R1-T7): otherwise any approved
+      // session on the platform's provider account would pay it.
       const isSplit = invoice.splitEnabled && invoice.splitCount && invoice.splitCount > 1;
-      if (!isSplit && invoice.windcaveSessionId !== sessionId) {
+      const sessionOpenedForIt = isSplit
+        ? await splitSessionOpenedFor(invoice, sessionId)
+        : invoice.windcaveSessionId === sessionId;
+      if (!sessionOpenedForIt) {
         console.error(`[checkout-complete] sessionId mismatch for invoice ${invoice.id}`);
         return res.status(403).json({ message: "Session ID mismatch" });
       }
@@ -7972,13 +8032,15 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!sessionId) return res.status(400).json({ message: "sessionId required" });
       const invoice = await getCheckoutInvoiceByToken(token);
       if (!invoice) return res.status(404).json({ message: "Payment link not found" });
-      // Split invoices have one session per payer (not pinned on the invoice), so
-      // the single-session equality check only applies to single payments. It is
-      // unconditional, as on the numbered routes (R1-T7): an invoice with no
-      // session opened accepts none, or any approved session on the platform's
-      // provider account would pay it.
+      // A single payment completes only with the session pinned on the invoice, a split
+      // share only with a session recorded for this invoice when it was opened (0030).
+      // Both unconditional, as on the numbered routes (R1-T7): otherwise any approved
+      // session on the platform's provider account would pay it.
       const isSplit = invoice.splitEnabled && invoice.splitCount && invoice.splitCount > 1;
-      if (!isSplit && invoice.windcaveSessionId !== sessionId) {
+      const sessionOpenedForIt = isSplit
+        ? await splitSessionOpenedFor(invoice, sessionId)
+        : invoice.windcaveSessionId === sessionId;
+      if (!sessionOpenedForIt) {
         console.error(`[checkout-gpay] sessionId mismatch for invoice ${invoice.id}`);
         return res.status(403).json({ message: "Session ID mismatch" });
       }
@@ -8053,7 +8115,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const sessionId = (req.query?.sessionid as string) || (req.query?.sessionId as string) || req.body?.sessionId || req.body?.sessionid;
       if (!sessionId) { console.warn("[RENT_NOTIF] No sessionId", req.query); return; }
-      const invoice = await storage.getInvoiceRentRequestByWindcaveSessionId(sessionId);
+      let invoice = await storage.getInvoiceRentRequestByWindcaveSessionId(sessionId);
+      if (!invoice) {
+        // A split share's session is recorded, not pinned (0030).
+        const opened = await storage.getInvoiceSplitSession(sessionId);
+        if (opened?.rentInvoiceId) invoice = await storage.getInvoiceRentRequest(opened.rentInvoiceId);
+      }
       if (!invoice) { console.warn(`[RENT_NOTIF] No invoice for session ${sessionId}`); return; }
       if (["paid", "paid_external", "voided"].includes(invoice.status)) return; // already settled
       if (!isWindcaveConfigured()) return;
@@ -8070,7 +8137,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const sessionId = (req.query?.sessionid as string) || (req.query?.sessionId as string) || req.body?.sessionId || req.body?.sessionid;
       if (!sessionId) { console.warn("[TRADES_NOTIF] No sessionId", req.query); return; }
-      const stored = await storage.getJobInvoiceByWindcaveSessionId(sessionId);
+      let stored = await storage.getJobInvoiceByWindcaveSessionId(sessionId);
+      if (!stored) {
+        // A split share's session is recorded, not pinned (0030).
+        const opened = await storage.getInvoiceSplitSession(sessionId);
+        if (opened?.jobInvoiceId) stored = await storage.getJobInvoice(opened.jobInvoiceId);
+      }
       if (!stored) { console.warn(`[TRADES_NOTIF] No invoice for session ${sessionId}`); return; }
       if (["paid", "paid_external", "voided"].includes(stored.status)) return;
       if (!isWindcaveConfigured()) return;

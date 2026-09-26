@@ -5,7 +5,7 @@ import { getDb, isDatabaseConnected } from "./database";
 import { config } from "./config";
 import { eq, ne, desc, asc, and, inArray, notInArray, gt, gte, lte, lt, or, ilike, like, sql, isNull, isNotNull } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
-import { authHandoffCodes, authThrottle, invoiceDocumentAccessAudit, invoiceDocumentReadLimits } from "@shared/schema";
+import { authHandoffCodes, authThrottle, invoiceDocumentAccessAudit, invoiceDocumentReadLimits, invoiceSplitSessions, type InvoiceSplitSession } from "@shared/schema";
 import {
   AUTH_THROTTLE_RECLAIM_AFTER_MS, planAuthThrottleTake, settleAuthThrottleRow, uniqueAuthThrottleBuckets,
   type AuthThrottleBucket, type AuthThrottleOutcome, type AuthThrottleRow, type AuthThrottleTake,
@@ -25,6 +25,15 @@ import type {
 
 // The anonymous business-wide "legacy-no-board" scope was retired on 2026-09-25 with the
 // address it served (server/no-board-address.ts): no public caller reads a no-board sale.
+/** A split invoice (0030): rent ("property") or trades, by its id. */
+export type InvoiceSplitRef = { vertical: "property" | "trades"; invoiceId: string };
+/** One provider session opened for a split invoice: the amount it was opened for and its payer's email. */
+export type InvoiceSplitSessionInput = InvoiceSplitRef & {
+  sessionId: string;
+  amountCents: number;
+  payerEmail: string | null;
+};
+
 export type ActiveTransactionScope =
   | { kind: "merchant-any" }
   | { kind: "board"; stoneId: number };
@@ -794,6 +803,15 @@ export interface IStorage extends PaymentAttemptRepository {
   getInvoiceRentRequestsByMerchant(merchantId: number, opts?: { status?: string; tenantProfileId?: string }): Promise<any[]>;
   updateInvoiceRentRequest(id: string, updates: any): Promise<any | undefined>;
   atomicClaimSplitShare(invoiceId: string, sessionId: string): Promise<any | null>;
+  /**
+   * Split invoices (0030; owner decision 2026-09-26): each provider session opened for one,
+   * and the one share it paid. A split share is paid only by a session recorded here.
+   */
+  recordInvoiceSplitSession(input: InvoiceSplitSessionInput): Promise<void>;
+  getInvoiceSplitSession(sessionId: string): Promise<InvoiceSplitSession | undefined>;
+  invoiceHasSplitSessions(invoice: InvoiceSplitRef): Promise<boolean>;
+  markInvoiceSplitSessionPaid(sessionId: string, paidAt: Date): Promise<void>;
+  getPaidInvoiceSplitPayerEmails(invoice: InvoiceSplitRef): Promise<string[]>;
   getInvoiceRentRequestByWhatsappMessageId(messageId: string): Promise<any | undefined>;
   getPendingDispatchInvoices(): Promise<any[]>;
   getOverdueEligibleInvoices(now: Date): Promise<any[]>;
@@ -960,6 +978,7 @@ export class MemStorage implements IStorage {
   private documentReadLimits = new Map<string, { count: number; expiresAt: number }>();
   private authHandoffCodes = new Map<string, { userId: number; newUser: boolean; expiresAt: Date; consumedAt: Date | null }>();
   private authThrottleRows = new Map<string, AuthThrottleRow>();
+  private invoiceSplitSessionRows = new Map<string, InvoiceSplitSession>();
   private documentAccessAudit: Array<{ adminUserId: number; documentName: string }> = [];
 
   constructor() {
@@ -2416,6 +2435,7 @@ export class MemStorage implements IStorage {
     this.uploadedFileBlobs.clear();
     this.documentReadLimits.clear();
     this.authThrottleRows.clear();
+    this.invoiceSplitSessionRows.clear();
     this.documentAccessAudit = [];
     console.log("All merchants and transactions cleared from memory");
   }
@@ -3077,6 +3097,38 @@ export class MemStorage implements IStorage {
   async getInvoiceRentRequestsByMerchant(merchantId: number, opts?: any): Promise<any[]> { return []; }
   async updateInvoiceRentRequest(id: string, updates: any): Promise<any> { return undefined; }
   async atomicClaimSplitShare(invoiceId: string, sessionId: string): Promise<any | null> { return null; }
+  async recordInvoiceSplitSession(input: InvoiceSplitSessionInput): Promise<void> {
+    if (this.invoiceSplitSessionRows.has(input.sessionId)) return;
+    this.invoiceSplitSessionRows.set(input.sessionId, {
+      windcaveSessionId: input.sessionId,
+      rentInvoiceId: input.vertical === "property" ? input.invoiceId : null,
+      jobInvoiceId: input.vertical === "trades" ? input.invoiceId : null,
+      amountCents: input.amountCents,
+      payerEmail: input.payerEmail,
+      openedAt: new Date(),
+      paidAt: null,
+    });
+  }
+  async getInvoiceSplitSession(sessionId: string): Promise<InvoiceSplitSession | undefined> {
+    const row = this.invoiceSplitSessionRows.get(sessionId);
+    return row ? { ...row } : undefined;
+  }
+  private splitSessionsOf(invoice: InvoiceSplitRef): InvoiceSplitSession[] {
+    return Array.from(this.invoiceSplitSessionRows.values()).filter((row) =>
+      invoice.vertical === "property" ? row.rentInvoiceId === invoice.invoiceId : row.jobInvoiceId === invoice.invoiceId);
+  }
+  async invoiceHasSplitSessions(invoice: InvoiceSplitRef): Promise<boolean> {
+    return this.splitSessionsOf(invoice).length > 0;
+  }
+  async markInvoiceSplitSessionPaid(sessionId: string, paidAt: Date): Promise<void> {
+    const row = this.invoiceSplitSessionRows.get(sessionId);
+    if (row && !row.paidAt) row.paidAt = paidAt;
+  }
+  async getPaidInvoiceSplitPayerEmails(invoice: InvoiceSplitRef): Promise<string[]> {
+    return this.splitSessionsOf(invoice)
+      .filter((row) => row.paidAt && row.payerEmail)
+      .map((row) => row.payerEmail as string);
+  }
   async getInvoiceRentRequestByWhatsappMessageId(messageId: string): Promise<any | undefined> { return undefined; }
   async getPendingDispatchInvoices(): Promise<any[]> { return []; }
   async getOverdueEligibleInvoices(now: Date): Promise<any[]> { return []; }
@@ -7632,6 +7684,43 @@ export class DatabaseStorage implements IStorage {
       if (isNeonEmptyResultError(error)) return undefined;
       throw error;
     }
+  }
+  async recordInvoiceSplitSession(input: InvoiceSplitSessionInput): Promise<void> {
+    const db = this.db; if (!db) throw new Error("Database not connected");
+    await db.insert(invoiceSplitSessions).values({
+      windcaveSessionId: input.sessionId,
+      rentInvoiceId: input.vertical === "property" ? input.invoiceId : null,
+      jobInvoiceId: input.vertical === "trades" ? input.invoiceId : null,
+      amountCents: input.amountCents,
+      payerEmail: input.payerEmail,
+    }).onConflictDoNothing();
+  }
+  async getInvoiceSplitSession(sessionId: string): Promise<InvoiceSplitSession | undefined> {
+    const db = this.db; if (!db) throw new Error("Database not connected");
+    const [row] = await db.select().from(invoiceSplitSessions).where(eq(invoiceSplitSessions.windcaveSessionId, sessionId));
+    return row;
+  }
+  private splitSessionInvoiceMatch(invoice: InvoiceSplitRef) {
+    return invoice.vertical === "property"
+      ? eq(invoiceSplitSessions.rentInvoiceId, invoice.invoiceId)
+      : eq(invoiceSplitSessions.jobInvoiceId, invoice.invoiceId);
+  }
+  async invoiceHasSplitSessions(invoice: InvoiceSplitRef): Promise<boolean> {
+    const db = this.db; if (!db) throw new Error("Database not connected");
+    const rows = await db.select({ id: invoiceSplitSessions.windcaveSessionId }).from(invoiceSplitSessions)
+      .where(this.splitSessionInvoiceMatch(invoice)).limit(1);
+    return rows.length > 0;
+  }
+  async markInvoiceSplitSessionPaid(sessionId: string, paidAt: Date): Promise<void> {
+    const db = this.db; if (!db) throw new Error("Database not connected");
+    await db.update(invoiceSplitSessions).set({ paidAt })
+      .where(and(eq(invoiceSplitSessions.windcaveSessionId, sessionId), isNull(invoiceSplitSessions.paidAt)));
+  }
+  async getPaidInvoiceSplitPayerEmails(invoice: InvoiceSplitRef): Promise<string[]> {
+    const db = this.db; if (!db) throw new Error("Database not connected");
+    const rows = await db.select({ payerEmail: invoiceSplitSessions.payerEmail }).from(invoiceSplitSessions)
+      .where(and(this.splitSessionInvoiceMatch(invoice), isNotNull(invoiceSplitSessions.paidAt), isNotNull(invoiceSplitSessions.payerEmail)));
+    return rows.map((row) => row.payerEmail as string);
   }
   async atomicClaimSplitShare(invoiceId: string, sessionId: string): Promise<any | null> {
     const db = getDb(); if (!db) return null;

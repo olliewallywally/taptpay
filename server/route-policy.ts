@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ a3e04c8f0dd6257211cd4596a2421060c91b3e10 on 2026-09-26.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 0581341a54c2d93823d0fe84eb4b296c059f18eb on 2026-09-26.
  *
  * 216 registrations (89 GET, 89 POST, 3 PATCH, 5 ALL, 21 PUT, 9 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -2473,10 +2473,10 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       params: ["token: raw"],
       body: ["schema: z.object({ count: z.number().int().min(2).max(12) }).strict()"],
       authChecks: ["getCheckoutInvoiceByToken"],
-      storageMethods: ["getInvoiceRentRequestByToken","getJobInvoiceByToken","updateInvoiceRentRequest","updateJobInvoice"],
+      storageMethods: ["getInvoiceRentRequestByToken","getJobInvoiceByToken","invoiceHasSplitSessions","updateInvoiceRentRequest","updateJobInvoice"],
       statuses: [200,400,404,409,429,500],
       rateLimits: ["tokenRateLimit"],
-      helpers: ["tokenRateLimit","updateCheckoutInvoice"],
+      helpers: ["splitInvoiceRef","tokenRateLimit","updateCheckoutInvoice"],
     },
   },
   "POST /api/checkout/:token/session": {
@@ -2488,13 +2488,13 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       params: ["token: raw"],
       body: ["fields: payerEmail"],
       authChecks: ["getCheckoutInvoiceByToken"],
-      storageMethods: ["atomicClaimJobSplitShare","atomicClaimSplitShare","createJobEvent","getClientProfile","getInvoiceRentRequest","getInvoiceRentRequestByToken","getJobInvoice","getJobInvoiceByToken","getMerchant","getTenantProfile","logTransactionEvent","updateInvoiceRentRequest","updateJobInvoice"],
+      storageMethods: ["atomicClaimJobSplitShare","atomicClaimSplitShare","createJobEvent","getClientProfile","getInvoiceRentRequest","getInvoiceRentRequestByToken","getJobInvoice","getJobInvoiceByToken","getMerchant","getPaidInvoiceSplitPayerEmails","getTenantProfile","logTransactionEvent","markInvoiceSplitSessionPaid","recordInvoiceSplitSession","updateInvoiceRentRequest","updateJobInvoice"],
       sideEffects: ["email/SMS: sendTradePaymentInvoice","email: sendGstInvoices","provider: createWindcaveSession"],
       statuses: [200,404,409,429,500,502,503],
       capabilityGates: ["isWindcaveConfigured"],
       rateLimits: ["tokenRateLimit"],
       idempotency: ["atomicClaimJobSplitShare","atomicClaimSplitShare"],
-      helpers: ["finalizeCheckoutInvoice","finalizeRentInvoice","finalizeTradeInvoice","getCheckoutParty","sendRentGstInvoices","tokenRateLimit","updateCheckoutInvoice"],
+      helpers: ["finalizeCheckoutInvoice","finalizeRentInvoice","finalizeTradeInvoice","getCheckoutParty","recordUncountedShare","sendRentGstInvoices","splitInvoiceRef","tokenRateLimit","updateCheckoutInvoice"],
     },
   },
   "POST /api/checkout/:token/hosted-fields-complete": {
@@ -2506,12 +2506,12 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       params: ["token: raw"],
       body: ["fields: sessionId"],
       authChecks: ["getCheckoutInvoiceByToken"],
-      storageMethods: ["atomicClaimJobSplitShare","atomicClaimSplitShare","createJobEvent","getInvoiceRentRequest","getInvoiceRentRequestByToken","getJobInvoice","getJobInvoiceByToken","getMerchant","getTenantProfile","logTransactionEvent","updateInvoiceRentRequest","updateJobInvoice"],
+      storageMethods: ["atomicClaimJobSplitShare","atomicClaimSplitShare","createJobEvent","getInvoiceRentRequest","getInvoiceRentRequestByToken","getInvoiceSplitSession","getJobInvoice","getJobInvoiceByToken","getMerchant","getPaidInvoiceSplitPayerEmails","getTenantProfile","logTransactionEvent","markInvoiceSplitSessionPaid","updateInvoiceRentRequest","updateJobInvoice"],
       sideEffects: ["email/SMS: sendTradePaymentInvoice","email: sendGstInvoices","provider: queryWindcaveSession"],
       statuses: [200,400,403,404,500,503],
       capabilityGates: ["isWindcaveConfigured"],
       idempotency: ["atomicClaimJobSplitShare","atomicClaimSplitShare"],
-      helpers: ["finalizeCheckoutInvoice","finalizeRentInvoice","finalizeTradeInvoice","sendRentGstInvoices"],
+      helpers: ["finalizeCheckoutInvoice","finalizeRentInvoice","finalizeTradeInvoice","recordUncountedShare","sendRentGstInvoices","splitSessionOpenedFor"],
     },
   },
   "POST /api/checkout/:token/googlepay-complete": {
@@ -2523,12 +2523,12 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       params: ["token: raw"],
       body: ["fields: googlePayToken, sessionId"],
       authChecks: ["getCheckoutInvoiceByToken"],
-      storageMethods: ["atomicClaimJobSplitShare","atomicClaimSplitShare","createJobEvent","getInvoiceRentRequest","getInvoiceRentRequestByToken","getJobInvoice","getJobInvoiceByToken","getMerchant","getTenantProfile","logTransactionEvent","updateInvoiceRentRequest","updateJobInvoice"],
+      storageMethods: ["atomicClaimJobSplitShare","atomicClaimSplitShare","createJobEvent","getInvoiceRentRequest","getInvoiceRentRequestByToken","getInvoiceSplitSession","getJobInvoice","getJobInvoiceByToken","getMerchant","getPaidInvoiceSplitPayerEmails","getTenantProfile","logTransactionEvent","markInvoiceSplitSessionPaid","updateInvoiceRentRequest","updateJobInvoice"],
       sideEffects: ["email/SMS: sendTradePaymentInvoice","email: sendGstInvoices","provider: queryWindcaveSession","provider: submitGooglePayToken"],
       statuses: [200,400,403,404,500,503],
       capabilityGates: ["isWindcaveConfigured"],
       idempotency: ["atomicClaimJobSplitShare","atomicClaimSplitShare"],
-      helpers: ["assertWindcaveUrl","finalizeCheckoutInvoice","finalizeRentInvoice","finalizeTradeInvoice","sendRentGstInvoices"],
+      helpers: ["assertWindcaveUrl","finalizeCheckoutInvoice","finalizeRentInvoice","finalizeTradeInvoice","recordUncountedShare","sendRentGstInvoices","splitSessionOpenedFor"],
     },
   },
   "GET /api/checkout/callback": {
@@ -2539,12 +2539,12 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       query: ["result: raw","token: raw"],
       authChecks: ["getCheckoutInvoiceByToken"],
-      storageMethods: ["atomicClaimJobSplitShare","atomicClaimSplitShare","createJobEvent","getInvoiceRentRequest","getInvoiceRentRequestByToken","getJobInvoice","getJobInvoiceByToken","getMerchant","getTenantProfile","logTransactionEvent","updateInvoiceRentRequest","updateJobInvoice"],
+      storageMethods: ["atomicClaimJobSplitShare","atomicClaimSplitShare","createJobEvent","getInvoiceRentRequest","getInvoiceRentRequestByToken","getJobInvoice","getJobInvoiceByToken","getMerchant","getPaidInvoiceSplitPayerEmails","getTenantProfile","logTransactionEvent","markInvoiceSplitSessionPaid","updateInvoiceRentRequest","updateJobInvoice"],
       sideEffects: ["email/SMS: sendTradePaymentInvoice","email: sendGstInvoices","provider: queryWindcaveSession"],
       statuses: [302],
       capabilityGates: ["isWindcaveConfigured"],
       idempotency: ["atomicClaimJobSplitShare","atomicClaimSplitShare"],
-      helpers: ["finalizeCheckoutInvoice","finalizeRentInvoice","finalizeTradeInvoice","sendRentGstInvoices"],
+      helpers: ["finalizeCheckoutInvoice","finalizeRentInvoice","finalizeTradeInvoice","recordUncountedShare","sendRentGstInvoices"],
     },
   },
   "ALL /api/windcave/rent-notification": {
@@ -2556,12 +2556,12 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       middleware: ["express.urlencoded(…)","express.json(…)"],
       query: ["sessionId: raw","sessionid: raw"],
       body: ["fields: sessionId, sessionid"],
-      storageMethods: ["atomicClaimSplitShare","getInvoiceRentRequest","getInvoiceRentRequestByWindcaveSessionId","getMerchant","getTenantProfile","logTransactionEvent","updateInvoiceRentRequest"],
+      storageMethods: ["atomicClaimSplitShare","getInvoiceRentRequest","getInvoiceRentRequestByWindcaveSessionId","getInvoiceSplitSession","getMerchant","getPaidInvoiceSplitPayerEmails","getTenantProfile","logTransactionEvent","markInvoiceSplitSessionPaid","updateInvoiceRentRequest"],
       sideEffects: ["email: sendGstInvoices","provider: queryWindcaveSession"],
       statuses: [200],
       capabilityGates: ["isWindcaveConfigured"],
       idempotency: ["atomicClaimSplitShare"],
-      helpers: ["finalizeRentInvoice","sendRentGstInvoices"],
+      helpers: ["finalizeRentInvoice","recordUncountedShare","sendRentGstInvoices"],
     },
   },
   "ALL /api/windcave/trades-notification": {
@@ -2573,12 +2573,12 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       middleware: ["express.urlencoded(…)","express.json(…)"],
       query: ["sessionId: raw","sessionid: raw"],
       body: ["fields: sessionId, sessionid"],
-      storageMethods: ["atomicClaimJobSplitShare","atomicClaimSplitShare","createJobEvent","getInvoiceRentRequest","getJobInvoice","getJobInvoiceByWindcaveSessionId","getMerchant","getTenantProfile","logTransactionEvent","updateInvoiceRentRequest","updateJobInvoice"],
+      storageMethods: ["atomicClaimJobSplitShare","atomicClaimSplitShare","createJobEvent","getInvoiceRentRequest","getInvoiceSplitSession","getJobInvoice","getJobInvoiceByWindcaveSessionId","getMerchant","getPaidInvoiceSplitPayerEmails","getTenantProfile","logTransactionEvent","markInvoiceSplitSessionPaid","updateInvoiceRentRequest","updateJobInvoice"],
       sideEffects: ["email/SMS: sendTradePaymentInvoice","email: sendGstInvoices","provider: queryWindcaveSession"],
       statuses: [200],
       capabilityGates: ["isWindcaveConfigured"],
       idempotency: ["atomicClaimJobSplitShare","atomicClaimSplitShare"],
-      helpers: ["finalizeCheckoutInvoice","finalizeRentInvoice","finalizeTradeInvoice","sendRentGstInvoices"],
+      helpers: ["finalizeCheckoutInvoice","finalizeRentInvoice","finalizeTradeInvoice","recordUncountedShare","sendRentGstInvoices"],
     },
   },
   "POST /api/webhooks/whatsapp": {

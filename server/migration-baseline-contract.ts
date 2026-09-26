@@ -182,6 +182,10 @@ export const BASELINE_EFFECT_REQUIREMENTS: readonly Requirement[] = [
   r("0029_push_subscriptions_user.sql", "column", "push_subscriptions", "user_id"),
   r("0029_push_subscriptions_user.sql", "constraint", "push_subscriptions", "push_subscriptions_user_id_fkey"),
   r("0029_push_subscriptions_user.sql", "index", "push_subscriptions", "push_subscriptions_user_id_idx"),
+  r("0030_invoice_split_sessions.sql", "table", "invoice_split_sessions"),
+  r("0030_invoice_split_sessions.sql", "constraint", "invoice_split_sessions", "invoice_split_sessions_one_invoice_chk"),
+  r("0030_invoice_split_sessions.sql", "index", "invoice_split_sessions", "invoice_split_sessions_rent_invoice_idx"),
+  r("0030_invoice_split_sessions.sql", "index", "invoice_split_sessions", "invoice_split_sessions_job_invoice_idx"),
 ];
 
 export const FIND_MISSING_BASELINE_EFFECTS_SQL = `

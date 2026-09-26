@@ -1,4 +1,4 @@
-# R1-T2 route inventory — generated 2026-09-26 @ `a3e04c8f0dd6257211cd4596a2421060c91b3e10`
+# R1-T2 route inventory — generated 2026-09-26 @ `0581341a54c2d93823d0fe84eb4b296c059f18eb`
 
 Regenerate with `npx tsx scripts/generate-route-policy.ts`. This table is
 evidence for the SHA named above, not a timeless constant — see
@@ -41,12 +41,9 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 - **GET /api/transactions/:id/receipt-qr:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
 - **GET /api/windcave/callback:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
 - **GET /api/windcave/callback:** Settles by a read then a write, not a claim, racing the notification (plan 22.7 / R3, C20).
-- **POST /api/checkout/:token/split:** What a split share costs is fixed when its session is opened, from the share count and the shares paid at that moment, and is never checked again: the count can change until a share is paid, so a share opened at 1/12 then counts as 1/2 and the invoice shows paid with less money; shares opened at once are all charged the equal share, so the remainder's cents go uncharged. Same root as the session finding (R3).
+- **POST /api/checkout/:token/split:** What a split share costs is fixed when its session is opened, from the share count and the shares paid at that moment: sessions opened at once are all charged the equal share, so up to one cent per share of the remainder can go uncharged. Since 2026-09-26 the count locks once any session is opened (0030), so a share opened at 1/12 can no longer count as 1/2. The remainder is R3's (payment attempts).
 - **POST /api/checkout/:token/session:** Every call opens another provider session and re-pins a single-payment invoice to it: a payment completed on an earlier session is then refused at completion (403) and missed by the notification, which finds invoices by their pinned session. The payer is charged and the invoice stays unpaid (R3: payment attempts).
-- **POST /api/checkout/:token/session:** payerEmail, checked only against /.+@.+\..+/, is added to splitPayerEmails without limit (10 calls a minute per link), and every address gets the rent invoice's GST invoice once it is paid: a link holder can have the business email its tenant's name, address and rent to any number of addresses. Trades store the list but email only the client.
-- **POST /api/checkout/:token/session:** What a split share costs is fixed when its session is opened, from the share count and the shares paid at that moment, and is never checked again: the count can change until a share is paid, so a share opened at 1/12 then counts as 1/2 and the invoice shows paid with less money; shares opened at once are all charged the equal share, so the remainder's cents go uncharged. Same root as the session finding (R3).
-- **POST /api/checkout/:token/hosted-fields-complete:** A split invoice records none of the sessions opened for it, so its completion checks only that the provider approved the session the page sends: any approved session on the platform's provider account (another invoice's share, a $1 purchase anywhere) marks one share paid, one such session per share marks the invoice paid, and each is emailed a GST invoice once rent is paid. The single-payment branch was fixed 2026-09-26 (R1-T7's rule). Needs each opened session recorded (the payment attempts engine, R3, or an interim column): put to the owner 2026-09-26.
-- **POST /api/checkout/:token/googlepay-complete:** A split invoice records none of the sessions opened for it, so its completion checks only that the provider approved the session the page sends: any approved session on the platform's provider account (another invoice's share, a $1 purchase anywhere) marks one share paid, one such session per share marks the invoice paid, and each is emailed a GST invoice once rent is paid. The single-payment branch was fixed 2026-09-26 (R1-T7's rule). Needs each opened session recorded (the payment attempts engine, R3, or an interim column): put to the owner 2026-09-26.
+- **POST /api/checkout/:token/session:** What a split share costs is fixed when its session is opened, from the share count and the shares paid at that moment: sessions opened at once are all charged the equal share, so up to one cent per share of the remainder can go uncharged. Since 2026-09-26 the count locks once any session is opened (0030), so a share opened at 1/12 can no longer count as 1/2. The remainder is R3's (payment attempts).
 - **POST /api/checkout/:token/googlepay-complete:** The submit URLs are cached per link, not per session: when two payers of one split invoice open sessions, the first one's Google Pay payment goes to the second one's session, and both sessions are then counted as shares.
 - **GET /api/checkout/callback:** Settles by a read then a write, not a claim, racing the notification (R3 / C20).
 - **GET /api/trades/quotes/token/:token:** Returns the whole quote row, where the code's own comment asks for a narrow reply: with it the business's numeric id, the client profile id, the token, internal timestamps and documentUrl, a storage path (served to nobody since gap 13).
@@ -219,72 +216,72 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 | DELETE | `/api/billing/card` | 7046 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
 | POST | `/api/board-builder/submit` | 7071 | merchant | authenticateToken |
 | GET | `/uploads/:folder/:name` | 7136 | public | getCheckoutInvoiceByToken( |
-| GET | `/api/property/tenants` | 7352 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/property/tenants` | 7363 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/property/tenants/:id` | 7377 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| PUT | `/api/property/tenants/:id` | 7388 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| POST | `/api/property/tenants/:id/archive` | 7404 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| POST | `/api/property/tenants/:id/unarchive` | 7417 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| GET | `/api/property/tenants/:id/events` | 7430 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| GET | `/api/property/schedules` | 7446 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/property/tenants/:tenantId/schedules` | 7454 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| POST | `/api/property/tenants/:tenantId/schedules` | 7465 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| PUT | `/api/property/schedules/:id` | 7483 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| DELETE | `/api/property/schedules/:id` | 7502 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| GET | `/api/property/invoices` | 7517 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/property/invoices/document` | 7547 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/invoice-documents/:name` | 7593 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/property/invoices` | 7622 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| POST | `/api/property/invoices/:id/resend` | 7664 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| GET | `/api/property/invoices/:id` | 7679 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| POST | `/api/property/invoices/:id/void` | 7690 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| POST | `/api/property/invoices/:id/mark-paid-external` | 7704 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| GET | `/api/checkout/resolve/:token` | 7724 | public-bearer | getCheckoutInvoiceByToken( |
-| GET | `/api/checkout/document/:token` | 7810 | public-bearer | getCheckoutInvoiceByToken( |
-| POST | `/api/checkout/:token/split` | 7834 | public-bearer | getCheckoutInvoiceByToken( |
-| POST | `/api/checkout/:token/session` | 7861 | public-bearer | getCheckoutInvoiceByToken( |
-| POST | `/api/checkout/:token/hosted-fields-complete` | 7934 | public-bearer | getCheckoutInvoiceByToken( |
-| POST | `/api/checkout/:token/googlepay-complete` | 7968 | public-bearer | getCheckoutInvoiceByToken( |
-| GET | `/api/checkout/callback` | 8024 | public-bearer | getCheckoutInvoiceByToken( |
-| ALL | `/api/windcave/rent-notification` | 8051 | provider | — |
-| ALL | `/api/windcave/trades-notification` | 8068 | provider | — |
-| POST | `/api/webhooks/whatsapp` | 8088 | provider | req.headers["apikey"] |
-| PUT | `/api/merchants/:merchantId/sector` | 8124 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| GET | `/api/property/reminder-settings` | 8149 | merchant-user (heuristic) | authenticateToken |
-| PUT | `/api/property/reminder-settings` | 8159 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/reminder-settings` | 8176 | merchant-user (heuristic) | authenticateToken |
-| PUT | `/api/trades/reminder-settings` | 8186 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/gst-settings` | 8199 | merchant-user (heuristic) | authenticateToken |
-| PUT | `/api/trades/gst-settings` | 8215 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/clients` | 8232 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/clients` | 8240 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/clients/:id` | 8250 | merchant-user (heuristic) | authenticateToken |
-| PUT | `/api/trades/clients/:id` | 8259 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/clients/:id/archive` | 8270 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/clients/:id/unarchive` | 8279 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/clients/:id/promote` | 8289 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/clients/:id/events` | 8299 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/quotes` | 8309 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/quotes` | 8316 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/quotes/:id` | 8393 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/quotes/:id/pdf` | 8420 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/quotes/token/:token/pdf` | 8433 | public-bearer | getQuoteByToken( |
-| POST | `/api/trades/quotes/:id/resend` | 8444 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/quotes/token/:token` | 8460 | public-bearer | getQuoteByToken( |
-| POST | `/api/trades/quotes/token/:token/respond` | 8505 | public-bearer | getQuoteByToken( |
-| GET | `/api/trades/invoices` | 8554 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/invoices` | 8564 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/invoices/:id/resend` | 8616 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/invoices/:id/send-balance` | 8629 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/invoices/:id/mark-paid-external` | 8666 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/invoices/:id/complete` | 8683 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/invoices/:id/void` | 8700 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/schedules` | 8710 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/schedules` | 8717 | merchant-user (heuristic) | authenticateToken |
-| PUT | `/api/trades/schedules/:id` | 8735 | merchant-user (heuristic) | authenticateToken |
-| DELETE | `/api/trades/schedules/:id` | 8748 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/internal/cron/status` | 8762 | cron | authorizeCronRequest |
-| POST | `/api/internal/cron` | 8772 | cron | authorizeCronRequest |
+| GET | `/api/property/tenants` | 7401 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/property/tenants` | 7412 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/property/tenants/:id` | 7426 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| PUT | `/api/property/tenants/:id` | 7437 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| POST | `/api/property/tenants/:id/archive` | 7453 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| POST | `/api/property/tenants/:id/unarchive` | 7466 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/property/tenants/:id/events` | 7479 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/property/schedules` | 7495 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/property/tenants/:tenantId/schedules` | 7503 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| POST | `/api/property/tenants/:tenantId/schedules` | 7514 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| PUT | `/api/property/schedules/:id` | 7532 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| DELETE | `/api/property/schedules/:id` | 7551 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/property/invoices` | 7566 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/property/invoices/document` | 7596 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/invoice-documents/:name` | 7642 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/property/invoices` | 7671 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| POST | `/api/property/invoices/:id/resend` | 7713 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/property/invoices/:id` | 7728 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| POST | `/api/property/invoices/:id/void` | 7739 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| POST | `/api/property/invoices/:id/mark-paid-external` | 7753 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/checkout/resolve/:token` | 7773 | public-bearer | getCheckoutInvoiceByToken( |
+| GET | `/api/checkout/document/:token` | 7859 | public-bearer | getCheckoutInvoiceByToken( |
+| POST | `/api/checkout/:token/split` | 7883 | public-bearer | getCheckoutInvoiceByToken( |
+| POST | `/api/checkout/:token/session` | 7914 | public-bearer | getCheckoutInvoiceByToken( |
+| POST | `/api/checkout/:token/hosted-fields-complete` | 7992 | public-bearer | getCheckoutInvoiceByToken( |
+| POST | `/api/checkout/:token/googlepay-complete` | 8028 | public-bearer | getCheckoutInvoiceByToken( |
+| GET | `/api/checkout/callback` | 8086 | public-bearer | getCheckoutInvoiceByToken( |
+| ALL | `/api/windcave/rent-notification` | 8113 | provider | — |
+| ALL | `/api/windcave/trades-notification` | 8135 | provider | — |
+| POST | `/api/webhooks/whatsapp` | 8160 | provider | req.headers["apikey"] |
+| PUT | `/api/merchants/:merchantId/sector` | 8196 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/property/reminder-settings` | 8221 | merchant-user (heuristic) | authenticateToken |
+| PUT | `/api/property/reminder-settings` | 8231 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/reminder-settings` | 8248 | merchant-user (heuristic) | authenticateToken |
+| PUT | `/api/trades/reminder-settings` | 8258 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/gst-settings` | 8271 | merchant-user (heuristic) | authenticateToken |
+| PUT | `/api/trades/gst-settings` | 8287 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/clients` | 8304 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/clients` | 8312 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/clients/:id` | 8322 | merchant-user (heuristic) | authenticateToken |
+| PUT | `/api/trades/clients/:id` | 8331 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/clients/:id/archive` | 8342 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/clients/:id/unarchive` | 8351 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/clients/:id/promote` | 8361 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/clients/:id/events` | 8371 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/quotes` | 8381 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/quotes` | 8388 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/quotes/:id` | 8465 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/quotes/:id/pdf` | 8492 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/quotes/token/:token/pdf` | 8505 | public-bearer | getQuoteByToken( |
+| POST | `/api/trades/quotes/:id/resend` | 8516 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/quotes/token/:token` | 8532 | public-bearer | getQuoteByToken( |
+| POST | `/api/trades/quotes/token/:token/respond` | 8577 | public-bearer | getQuoteByToken( |
+| GET | `/api/trades/invoices` | 8626 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/invoices` | 8636 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/invoices/:id/resend` | 8688 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/invoices/:id/send-balance` | 8701 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/invoices/:id/mark-paid-external` | 8738 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/invoices/:id/complete` | 8755 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/invoices/:id/void` | 8772 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/schedules` | 8782 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/schedules` | 8789 | merchant-user (heuristic) | authenticateToken |
+| PUT | `/api/trades/schedules/:id` | 8807 | merchant-user (heuristic) | authenticateToken |
+| DELETE | `/api/trades/schedules/:id` | 8820 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/internal/cron/status` | 8834 | cron | authorizeCronRequest |
+| POST | `/api/internal/cron` | 8844 | cron | authorizeCronRequest |
 
 ## Per-route facts
 
@@ -2754,115 +2751,112 @@ Reviewed policy:
 - params: `token: raw`
 - body: `schema: z.object({ count: z.number().int().min(2).max(12) }).strict()`
 - authChecks: `getCheckoutInvoiceByToken`
-- storageMethods: `getInvoiceRentRequestByToken`, `getJobInvoiceByToken`, `updateInvoiceRentRequest`, `updateJobInvoice`
+- storageMethods: `getInvoiceRentRequestByToken`, `getJobInvoiceByToken`, `invoiceHasSplitSessions`, `updateInvoiceRentRequest`, `updateJobInvoice`
 - statuses: `200`, `400`, `404`, `409`, `429`, `500`
 - rateLimits: `tokenRateLimit`
-- helpers: `tokenRateLimit`, `updateCheckoutInvoice`
+- helpers: `splitInvoiceRef`, `tokenRateLimit`, `updateCheckoutInvoice`
 
 Reviewed policy:
 
 - **Who:** public-bearer. **Tenant (token):** the invoice's checkout token (20 random bytes, base64url) selects its one invoice, rent or trades (getCheckoutInvoiceByToken); an unknown token is 404
 - **Input:** token: read raw, then looked up; body: count, a whole number from 2 to 12, strict (400 otherwise; parseInt until 2026-09-26)
-- **Idempotency:** sets the invoice's share count; refused once a share is paid (409) and when the business has not allowed splitting (400)
+- **Idempotency:** sets the invoice's share count; refused once any session has been opened for it or a share is paid (409, since 2026-09-26) and when the business has not allowed splitting (400)
 - **Success:** { splitCount, splitPaidCount: 0, shareCents }
 - **Error disclosure:** fixed
 - **Authenticity:** holding the invoice's checkout link: its token is the credential for that one invoice and for nothing else
-- **Replay:** the same count again changes nothing; another count is taken until a share is paid (finding)
+- **Replay:** the same count again changes nothing; another count is taken only until someone starts paying
 - **Rate:** tokenRateLimit (10 a minute per token, counted in this server process only; an unknown token gets a count of its own, so it limits one link's use, not guessing, which a 160-bit token makes futile)
-- **Finding:** What a split share costs is fixed when its session is opened, from the share count and the shares paid at that moment, and is never checked again: the count can change until a share is paid, so a share opened at 1/12 then counts as 1/2 and the invoice shows paid with less money; shares opened at once are all charged the equal share, so the remainder's cents go uncharged. Same root as the session finding (R3).
+- **Finding:** What a split share costs is fixed when its session is opened, from the share count and the shares paid at that moment: sessions opened at once are all charged the equal share, so up to one cent per share of the remainder can go uncharged. Since 2026-09-26 the count locks once any session is opened (0030), so a share opened at 1/12 can no longer count as 1/2. The remainder is R3's (payment attempts).
 
 ### POST `/api/checkout/:token/session`
 
 - params: `token: raw`
 - body: `fields: payerEmail`
 - authChecks: `getCheckoutInvoiceByToken`
-- storageMethods: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`, `createJobEvent`, `getClientProfile`, `getInvoiceRentRequest`, `getInvoiceRentRequestByToken`, `getJobInvoice`, `getJobInvoiceByToken`, `getMerchant`, `getTenantProfile`, `logTransactionEvent`, `updateInvoiceRentRequest`, `updateJobInvoice`
+- storageMethods: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`, `createJobEvent`, `getClientProfile`, `getInvoiceRentRequest`, `getInvoiceRentRequestByToken`, `getJobInvoice`, `getJobInvoiceByToken`, `getMerchant`, `getPaidInvoiceSplitPayerEmails`, `getTenantProfile`, `logTransactionEvent`, `markInvoiceSplitSessionPaid`, `recordInvoiceSplitSession`, `updateInvoiceRentRequest`, `updateJobInvoice`
 - sideEffects: `email/SMS: sendTradePaymentInvoice`, `email: sendGstInvoices`, `provider: createWindcaveSession`
 - statuses: `200`, `404`, `409`, `429`, `500`, `502`, `503`
 - capabilityGates: `isWindcaveConfigured`
 - rateLimits: `tokenRateLimit`
 - idempotency: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`
-- helpers: `finalizeCheckoutInvoice`, `finalizeRentInvoice`, `finalizeTradeInvoice`, `getCheckoutParty`, `sendRentGstInvoices`, `tokenRateLimit`, `updateCheckoutInvoice`
+- helpers: `finalizeCheckoutInvoice`, `finalizeRentInvoice`, `finalizeTradeInvoice`, `getCheckoutParty`, `recordUncountedShare`, `sendRentGstInvoices`, `splitInvoiceRef`, `tokenRateLimit`, `updateCheckoutInvoice`
 
 Reviewed policy:
 
 - **Who:** public-bearer. **Tenant (token):** the invoice's checkout token (20 random bytes, base64url) selects its one invoice, rent or trades (getCheckoutInvoiceByToken); an unknown token is 404
-- **Input:** token: read raw, then looked up; body read without a schema: payerEmail (checked only against /.+@.+\..+/)
+- **Input:** token: read raw, then looked up; body read without a schema: payerEmail (checked as an email address; for a split invoice kept with that session only, never on a list)
 - **Capability gate:** isWindcaveConfigured() (503 PAYMENT_PROVIDER_UNAVAILABLE)
 - **Idempotency:** none: every call opens another provider session (finding)
-- **Side effects:** creates a payment session with the provider (createWindcaveSession); when the provider reports it already complete, settles the invoice: events, and once paid the GST invoice email (rent, sendGstInvoices) or the payment invoice (trades, sendTradePaymentInvoice)
+- **Side effects:** creates a payment session with the provider (createWindcaveSession) and, for a split invoice, records it with its amount and payer's email (recordInvoiceSplitSession, 0030); when the provider reports it already complete, settles the invoice: events, and once paid the GST invoice email (rent, sendGstInvoices) or the payment invoice (trades, sendTradePaymentInvoice)
 - **Success:** the provider session id, the amount and the hosted-fields submit URLs (also cached here against the token, invoiceAjaxUrlCache); or { alreadyComplete, approved }
 - **Error disclosure:** fixed
 - **Authenticity:** holding the invoice's checkout link: its token is the credential for that one invoice and for nothing else
 - **Replay:** each call opens another provider session for the same invoice
 - **Rate:** tokenRateLimit (10 a minute per token, counted in this server process only; an unknown token gets a count of its own, so it limits one link's use, not guessing, which a 160-bit token makes futile)
 - **Finding:** Every call opens another provider session and re-pins a single-payment invoice to it: a payment completed on an earlier session is then refused at completion (403) and missed by the notification, which finds invoices by their pinned session. The payer is charged and the invoice stays unpaid (R3: payment attempts).
-- **Finding:** payerEmail, checked only against /.+@.+\..+/, is added to splitPayerEmails without limit (10 calls a minute per link), and every address gets the rent invoice's GST invoice once it is paid: a link holder can have the business email its tenant's name, address and rent to any number of addresses. Trades store the list but email only the client.
-- **Finding:** What a split share costs is fixed when its session is opened, from the share count and the shares paid at that moment, and is never checked again: the count can change until a share is paid, so a share opened at 1/12 then counts as 1/2 and the invoice shows paid with less money; shares opened at once are all charged the equal share, so the remainder's cents go uncharged. Same root as the session finding (R3).
+- **Finding:** What a split share costs is fixed when its session is opened, from the share count and the shares paid at that moment: sessions opened at once are all charged the equal share, so up to one cent per share of the remainder can go uncharged. Since 2026-09-26 the count locks once any session is opened (0030), so a share opened at 1/12 can no longer count as 1/2. The remainder is R3's (payment attempts).
 
 ### POST `/api/checkout/:token/hosted-fields-complete`
 
 - params: `token: raw`
 - body: `fields: sessionId`
 - authChecks: `getCheckoutInvoiceByToken`
-- storageMethods: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`, `createJobEvent`, `getInvoiceRentRequest`, `getInvoiceRentRequestByToken`, `getJobInvoice`, `getJobInvoiceByToken`, `getMerchant`, `getTenantProfile`, `logTransactionEvent`, `updateInvoiceRentRequest`, `updateJobInvoice`
+- storageMethods: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`, `createJobEvent`, `getInvoiceRentRequest`, `getInvoiceRentRequestByToken`, `getInvoiceSplitSession`, `getJobInvoice`, `getJobInvoiceByToken`, `getMerchant`, `getPaidInvoiceSplitPayerEmails`, `getTenantProfile`, `logTransactionEvent`, `markInvoiceSplitSessionPaid`, `updateInvoiceRentRequest`, `updateJobInvoice`
 - sideEffects: `email/SMS: sendTradePaymentInvoice`, `email: sendGstInvoices`, `provider: queryWindcaveSession`
 - statuses: `200`, `400`, `403`, `404`, `500`, `503`
 - capabilityGates: `isWindcaveConfigured`
 - idempotency: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`
-- helpers: `finalizeCheckoutInvoice`, `finalizeRentInvoice`, `finalizeTradeInvoice`, `sendRentGstInvoices`
+- helpers: `finalizeCheckoutInvoice`, `finalizeRentInvoice`, `finalizeTradeInvoice`, `recordUncountedShare`, `sendRentGstInvoices`, `splitSessionOpenedFor`
 
 Reviewed policy:
 
-- **Who:** public-bearer. **Tenant (token):** the invoice's checkout token (20 random bytes, base64url) selects its one invoice, rent or trades (getCheckoutInvoiceByToken); an unknown token is 404; a single payment must send the session pinned to it (403 otherwise, and when none is pinned, since 2026-09-26); a split invoice's session is not checked (finding)
+- **Who:** public-bearer. **Tenant (token):** the invoice's checkout token (20 random bytes, base64url) selects its one invoice, rent or trades (getCheckoutInvoiceByToken); an unknown token is 404; a single payment must send the session pinned to it, a split share a session recorded for this invoice when it was opened (getInvoiceSplitSession; 403 otherwise, since 2026-09-26)
 - **Input:** token: read raw, then looked up; body read without a schema: sessionId (required; sent to the provider as one encoded path segment)
 - **Capability gate:** isWindcaveConfigured() (503 PAYMENT_PROVIDER_UNAVAILABLE: the outcome waits)
-- **Idempotency:** finalizeCheckoutInvoice: a settled invoice is left alone; a split share counts once per session (atomicClaimSplitShare / atomicClaimJobSplitShare); a single payment settles by a read then a write
+- **Idempotency:** finalizeCheckoutInvoice: a settled invoice is left alone; a split share counts once per recorded session (atomicClaimSplitShare / atomicClaimJobSplitShare, then markInvoiceSplitSessionPaid), and an approved session that finds every share paid is recorded for a refund; a single payment settles by a read then a write
 - **Side effects:** queries the provider for the session (queryWindcaveSession); once paid, the GST invoice email (rent, sendGstInvoices) or the payment invoice (trades, sendTradePaymentInvoice)
 - **Success:** { approved, status, splitCount, splitPaidCount }
 - **Error disclosure:** fixed
-- **Authenticity:** holding the invoice's checkout link: its token is the credential for that one invoice and for nothing else, with the invoice's pinned session for a single payment
+- **Authenticity:** holding the invoice's checkout link: its token is the credential for that one invoice and for nothing else, with the invoice's pinned session for a single payment or a session recorded for it for a split share
 - **Replay:** a settled invoice is left alone and a split session counts once; two calls at once for a single payment can both settle it (R3 / C20)
 - **Rate:** none — every call asks the provider about the session sent, with the platform's credentials
-- **Finding:** A split invoice records none of the sessions opened for it, so its completion checks only that the provider approved the session the page sends: any approved session on the platform's provider account (another invoice's share, a $1 purchase anywhere) marks one share paid, one such session per share marks the invoice paid, and each is emailed a GST invoice once rent is paid. The single-payment branch was fixed 2026-09-26 (R1-T7's rule). Needs each opened session recorded (the payment attempts engine, R3, or an interim column): put to the owner 2026-09-26.
 
 ### POST `/api/checkout/:token/googlepay-complete`
 
 - params: `token: raw`
 - body: `fields: googlePayToken, sessionId`
 - authChecks: `getCheckoutInvoiceByToken`
-- storageMethods: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`, `createJobEvent`, `getInvoiceRentRequest`, `getInvoiceRentRequestByToken`, `getJobInvoice`, `getJobInvoiceByToken`, `getMerchant`, `getTenantProfile`, `logTransactionEvent`, `updateInvoiceRentRequest`, `updateJobInvoice`
+- storageMethods: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`, `createJobEvent`, `getInvoiceRentRequest`, `getInvoiceRentRequestByToken`, `getInvoiceSplitSession`, `getJobInvoice`, `getJobInvoiceByToken`, `getMerchant`, `getPaidInvoiceSplitPayerEmails`, `getTenantProfile`, `logTransactionEvent`, `markInvoiceSplitSessionPaid`, `updateInvoiceRentRequest`, `updateJobInvoice`
 - sideEffects: `email/SMS: sendTradePaymentInvoice`, `email: sendGstInvoices`, `provider: queryWindcaveSession`, `provider: submitGooglePayToken`
 - statuses: `200`, `400`, `403`, `404`, `500`, `503`
 - capabilityGates: `isWindcaveConfigured`
 - idempotency: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`
-- helpers: `assertWindcaveUrl`, `finalizeCheckoutInvoice`, `finalizeRentInvoice`, `finalizeTradeInvoice`, `sendRentGstInvoices`
+- helpers: `assertWindcaveUrl`, `finalizeCheckoutInvoice`, `finalizeRentInvoice`, `finalizeTradeInvoice`, `recordUncountedShare`, `sendRentGstInvoices`, `splitSessionOpenedFor`
 
 Reviewed policy:
 
-- **Who:** public-bearer. **Tenant (token):** the invoice's checkout token (20 random bytes, base64url) selects its one invoice, rent or trades (getCheckoutInvoiceByToken); an unknown token is 404; a single payment must send the session pinned to it (403 otherwise, and when none is pinned, since 2026-09-26); a split invoice's session is not checked (finding)
+- **Who:** public-bearer. **Tenant (token):** the invoice's checkout token (20 random bytes, base64url) selects its one invoice, rent or trades (getCheckoutInvoiceByToken); an unknown token is 404; a single payment must send the session pinned to it, a split share a session recorded for this invoice when it was opened (getInvoiceSplitSession; 403 otherwise, since 2026-09-26)
 - **Input:** token: read raw, then looked up; body read without a schema: sessionId (required), googlePayToken (any object, passed to the provider as it came)
 - **Capability gate:** isWindcaveConfigured() (503 PAYMENT_PROVIDER_UNAVAILABLE: the outcome waits)
 - **Idempotency:** finalizeCheckoutInvoice: a settled invoice is left alone; a split share counts once per session; a single payment settles by a read then a write
 - **Side effects:** submits the Google Pay token to the cached submit URL (submitGooglePayToken, checked by assertWindcaveUrl) or queries the provider (queryWindcaveSession); once paid, the GST invoice email (rent) or the payment invoice (trades)
 - **Success:** { approved, status, splitCount, splitPaidCount }
 - **Error disclosure:** fixed
-- **Authenticity:** holding the invoice's checkout link: its token is the credential for that one invoice and for nothing else, with the invoice's pinned session for a single payment
+- **Authenticity:** holding the invoice's checkout link: its token is the credential for that one invoice and for nothing else, with the invoice's pinned session for a single payment or a session recorded for it for a split share
 - **Replay:** a settled invoice is left alone and a split session counts once; two calls at once for a single payment can both settle it (R3 / C20)
 - **Rate:** none — every call reaches the provider, with the platform's credentials
-- **Finding:** A split invoice records none of the sessions opened for it, so its completion checks only that the provider approved the session the page sends: any approved session on the platform's provider account (another invoice's share, a $1 purchase anywhere) marks one share paid, one such session per share marks the invoice paid, and each is emailed a GST invoice once rent is paid. The single-payment branch was fixed 2026-09-26 (R1-T7's rule). Needs each opened session recorded (the payment attempts engine, R3, or an interim column): put to the owner 2026-09-26.
 - **Finding:** The submit URLs are cached per link, not per session: when two payers of one split invoice open sessions, the first one's Google Pay payment goes to the second one's session, and both sessions are then counted as shares.
 
 ### GET `/api/checkout/callback`
 
 - query: `result: raw`, `token: raw`
 - authChecks: `getCheckoutInvoiceByToken`
-- storageMethods: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`, `createJobEvent`, `getInvoiceRentRequest`, `getInvoiceRentRequestByToken`, `getJobInvoice`, `getJobInvoiceByToken`, `getMerchant`, `getTenantProfile`, `logTransactionEvent`, `updateInvoiceRentRequest`, `updateJobInvoice`
+- storageMethods: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`, `createJobEvent`, `getInvoiceRentRequest`, `getInvoiceRentRequestByToken`, `getJobInvoice`, `getJobInvoiceByToken`, `getMerchant`, `getPaidInvoiceSplitPayerEmails`, `getTenantProfile`, `logTransactionEvent`, `markInvoiceSplitSessionPaid`, `updateInvoiceRentRequest`, `updateJobInvoice`
 - sideEffects: `email/SMS: sendTradePaymentInvoice`, `email: sendGstInvoices`, `provider: queryWindcaveSession`
 - statuses: `302`
 - capabilityGates: `isWindcaveConfigured`
 - idempotency: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`
-- helpers: `finalizeCheckoutInvoice`, `finalizeRentInvoice`, `finalizeTradeInvoice`, `sendRentGstInvoices`
+- helpers: `finalizeCheckoutInvoice`, `finalizeRentInvoice`, `finalizeTradeInvoice`, `recordUncountedShare`, `sendRentGstInvoices`
 
 Reviewed policy:
 
@@ -2883,16 +2877,16 @@ Reviewed policy:
 - middleware: `express.urlencoded(…)`, `express.json(…)`
 - query: `sessionId: raw`, `sessionid: raw`
 - body: `fields: sessionId, sessionid`
-- storageMethods: `atomicClaimSplitShare`, `getInvoiceRentRequest`, `getInvoiceRentRequestByWindcaveSessionId`, `getMerchant`, `getTenantProfile`, `logTransactionEvent`, `updateInvoiceRentRequest`
+- storageMethods: `atomicClaimSplitShare`, `getInvoiceRentRequest`, `getInvoiceRentRequestByWindcaveSessionId`, `getInvoiceSplitSession`, `getMerchant`, `getPaidInvoiceSplitPayerEmails`, `getTenantProfile`, `logTransactionEvent`, `markInvoiceSplitSessionPaid`, `updateInvoiceRentRequest`
 - sideEffects: `email: sendGstInvoices`, `provider: queryWindcaveSession`
 - statuses: `200`
 - capabilityGates: `isWindcaveConfigured`
 - idempotency: `atomicClaimSplitShare`
-- helpers: `finalizeRentInvoice`, `sendRentGstInvoices`
+- helpers: `finalizeRentInvoice`, `recordUncountedShare`, `sendRentGstInvoices`
 
 Reviewed policy:
 
-- **Who:** provider. **Tenant (provider-session):** the provider's session id selects the one rent invoice created with it (storage.getInvoiceRentRequestByWindcaveSessionId); an unknown id does nothing
+- **Who:** provider. **Tenant (provider-session):** the provider's session id selects the one rent invoice created with it (storage.getInvoiceRentRequestByWindcaveSessionId), or the split invoice it was recorded for (getInvoiceSplitSession, since 2026-09-26); an unknown id does nothing
 - **Input:** sessionId / sessionid (query or body): an opaque provider session id; nothing else is read
 - **Capability gate:** isWindcaveConfigured(): unconfigured, the notification is ignored
 - **Idempotency:** a settled invoice (paid, paid externally, voided) is skipped; a split share is claimed atomically per session (storage.atomicClaimSplitShare), but a single payment is marked paid by a read then a write (finding)
@@ -2909,16 +2903,16 @@ Reviewed policy:
 - middleware: `express.urlencoded(…)`, `express.json(…)`
 - query: `sessionId: raw`, `sessionid: raw`
 - body: `fields: sessionId, sessionid`
-- storageMethods: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`, `createJobEvent`, `getInvoiceRentRequest`, `getJobInvoice`, `getJobInvoiceByWindcaveSessionId`, `getMerchant`, `getTenantProfile`, `logTransactionEvent`, `updateInvoiceRentRequest`, `updateJobInvoice`
+- storageMethods: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`, `createJobEvent`, `getInvoiceRentRequest`, `getInvoiceSplitSession`, `getJobInvoice`, `getJobInvoiceByWindcaveSessionId`, `getMerchant`, `getPaidInvoiceSplitPayerEmails`, `getTenantProfile`, `logTransactionEvent`, `markInvoiceSplitSessionPaid`, `updateInvoiceRentRequest`, `updateJobInvoice`
 - sideEffects: `email/SMS: sendTradePaymentInvoice`, `email: sendGstInvoices`, `provider: queryWindcaveSession`
 - statuses: `200`
 - capabilityGates: `isWindcaveConfigured`
 - idempotency: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`
-- helpers: `finalizeCheckoutInvoice`, `finalizeRentInvoice`, `finalizeTradeInvoice`, `sendRentGstInvoices`
+- helpers: `finalizeCheckoutInvoice`, `finalizeRentInvoice`, `finalizeTradeInvoice`, `recordUncountedShare`, `sendRentGstInvoices`
 
 Reviewed policy:
 
-- **Who:** provider. **Tenant (provider-session):** the provider's session id selects the one job invoice created with it (storage.getJobInvoiceByWindcaveSessionId); an unknown id does nothing
+- **Who:** provider. **Tenant (provider-session):** the provider's session id selects the one job invoice created with it (storage.getJobInvoiceByWindcaveSessionId), or the split invoice it was recorded for (getInvoiceSplitSession, since 2026-09-26); an unknown id does nothing
 - **Input:** sessionId / sessionid (query or body): an opaque provider session id; nothing else is read
 - **Capability gate:** isWindcaveConfigured(): unconfigured, the notification is ignored
 - **Idempotency:** a settled invoice is skipped; a split share is claimed atomically per session (storage.atomicClaimJobSplitShare), but a single payment is marked paid by a read then a write (finding)

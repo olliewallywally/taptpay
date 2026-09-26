@@ -132,7 +132,10 @@ jobs:
           # constraints, 1 foreign key and 4 indexes and removed nothing.
           # 2026-09-22 (R1-T4): 0029 added 1 column, 1 constraint, 1 foreign key
           # and 1 index (push_subscriptions.user_id) and removed nothing.
-          RECORDED: docs/evidence/remediation-v2-2/r1/R1-T4-push-empty-fingerprint-2026-09-22.json
+          # 2026-09-26 (C10): 0030 added 1 table (invoice_split_sessions), 7
+          # columns, 5 constraints, 2 foreign keys and 3 indexes and removed
+          # nothing.
+          RECORDED: docs/evidence/remediation-v2-2/r1/C10-invoice-split-sessions-empty-fingerprint-2026-09-26.json
         run: |
           node scripts/schema-fingerprint.mjs > "$RUNNER_TEMP/fingerprint.json"
           node -e "

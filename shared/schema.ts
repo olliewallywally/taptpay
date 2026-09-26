@@ -1533,6 +1533,24 @@ export const authThrottle = pgTable("auth_throttle", {
   updatedAtIdx: index("auth_throttle_updated_at_idx").on(t.updatedAt),
 }));
 
+// Each provider session opened for a split rent or trades invoice (0030; owner decision
+// 2026-09-26): the amount it was opened for and the email its payer gave. A split share is
+// paid only by a session recorded here for its invoice; paid_at marks the share it paid.
+export const invoiceSplitSessions = pgTable("invoice_split_sessions", {
+  windcaveSessionId: text("windcave_session_id").primaryKey(),
+  rentInvoiceId: uuid("rent_invoice_id").references(() => invoicesRentRequests.id, { onDelete: "cascade" }),
+  jobInvoiceId: uuid("job_invoice_id").references(() => jobInvoices.id, { onDelete: "cascade" }),
+  amountCents: integer("amount_cents").notNull(),
+  payerEmail: text("payer_email"),
+  openedAt: timestamp("opened_at", { withTimezone: true }).notNull().defaultNow(),
+  paidAt: timestamp("paid_at", { withTimezone: true }),
+}, (t) => ({
+  rentInvoiceIdx: index("invoice_split_sessions_rent_invoice_idx").on(t.rentInvoiceId),
+  jobInvoiceIdx: index("invoice_split_sessions_job_invoice_idx").on(t.jobInvoiceId),
+}));
+
+export type InvoiceSplitSession = typeof invoiceSplitSessions.$inferSelect;
+
 // Gap 13 (0025): what the operator-approved inventory decided for each legacy
 // invoice document — an owner with its evidence, or locked (admin-only) with a
 // reason. Written once by the migration, never by the app. Audit data: no foreign
