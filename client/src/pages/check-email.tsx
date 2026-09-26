@@ -22,15 +22,16 @@ export default function CheckEmail() {
   const email = params.get("email") || "";
   const id = params.get("id") || "";
 
+  // Only the address can ask: resending by account number was removed (2026-09-26). Old
+  // links that carry only ?id= have no address to ask with.
   const handleResend = async () => {
-    if (!id && !email) return;
+    if (!email) return;
     setResending(true);
     try {
-      const body = id ? { merchantId: id } : { email };
       const res = await fetch("/api/auth/resend-confirmation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ email }),
       });
       if (res.ok) {
         setResent(true);

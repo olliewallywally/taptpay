@@ -13,7 +13,7 @@ import {
   subscriptionCardSessionState,
 } from "./storage";
 import { TUTORIAL_PAGE_KEYS, isTutorialPageKey } from "@shared/tutorial";
-import { inviteTeamMemberSchema, acceptInviteSchema, retailTransactionCreateRequestSchema, updateMerchantDetailsSchema, updateThemeSchema, updateDailyGoalSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, changePasswordSchema, newPasswordSchema, createRefundSchema, insertRefundSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema, pushNotificationPreferencesSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createClientProfileSchema, updateClientProfileSchema, createQuoteSchema, acceptQuoteSchema, createJobInvoiceSchema, markJobPaidExternalSchema, createJobScheduleSchema, updateJobScheduleSchema, updateTradeReminderSettingsSchema, updateTradeGstSettingsSchema } from "@shared/schema";
+import { inviteTeamMemberSchema, acceptInviteSchema, retailTransactionCreateRequestSchema, updateMerchantDetailsSchema, updateThemeSchema, updateDailyGoalSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, changePasswordSchema, newPasswordSchema, createRefundSchema, insertRefundSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, pushNotificationPreferencesSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createClientProfileSchema, updateClientProfileSchema, createQuoteSchema, acceptQuoteSchema, createJobInvoiceSchema, markJobPaidExternalSchema, createJobScheduleSchema, updateJobScheduleSchema, updateTradeReminderSettingsSchema, updateTradeGstSettingsSchema } from "@shared/schema";
 import { isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, getWindcaveEnv, submitGooglePayToken, createAttendedSession, submitTapToPayToken, createCardStorageSession, queryStoredCardSession, chargeStoredCard } from "./windcave";
 import { authenticateUser, checkPasswordEvenly, passwordCheckBudget, generateToken, authenticateToken, createUser, issueTokenForUserId, tokenForUserRow, isAccountOwner, requestPasswordReset, resetPassword, validateResetToken, type AuthenticatedRequest, logSecurityEvent, syncVerifiedMerchants } from "./auth";
 import {
@@ -5035,75 +5035,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // Merchant auth sync now happens automatically on verification; use the admin-gated
   // endpoints for any operational needs.
 
-  // Public merchant verification endpoint
-  app.post("/api/merchants/verify", async (req, res) => {
-    try {
-      // Simple validation without confirmPassword requirement
-      const { token, password } = req.body;
-      
-      if (!token || !password) {
-        return res.status(400).json({ 
-          message: "Token and password are required"
-        });
-      }
-      // The rule every new password meets (owner decision 2026-09-23).
-      const checked = newPasswordSchema.safeParse(password);
-      if (!checked.success) {
-        return res.status(400).json({ message: checked.error.issues[0]?.message });
-      }
-
-      // Hash the password
-      const passwordHash = await bcrypt.hash(checked.data, 12);
-
-      // Verify the merchant
-      const merchant = await storage.verifyMerchant(token, passwordHash);
-      if (!merchant) {
-        return res.status(400).json({ message: "Invalid or expired verification token" });
-      }
-
-      // Create user account for the verified merchant
-      try {
-        await createUser(merchant.email, checked.data, merchant.id, 'merchant');
-        console.log("User account created successfully for merchant:", merchant.email);
-      } catch (error) {
-        console.error("Error creating user account:", error);
-        // Don't fail verification if user creation fails, but log it
-      }
-
-      res.json({
-        message: "Merchant account verified successfully. You can now log in.",
-        merchant: {
-          id: merchant.id,
-          name: merchant.name,
-          businessName: merchant.businessName,
-          email: merchant.email,
-          status: merchant.status,
-        }
-      });
-    } catch (error) {
-      console.error("Error verifying merchant:", error);
-      res.status(500).json({ message: "Failed to verify merchant account" });
-    }
-  });
-
-  // Public email verification status check (for /business-details soft gate)
-  app.get("/api/merchants/:id/email-status", async (req, res) => {
-    try {
-      const merchantId = strictPositiveIntegerParam(req.params.id);
-      if (merchantId === null) return res.status(400).json({ message: "Invalid id" });
-      if (isNaN(merchantId)) return res.status(400).json({ message: "Invalid merchant ID" });
-      const merchant = await storage.getMerchant(merchantId);
-      if (!merchant) return res.status(404).json({ message: "Merchant not found" });
-      // Treat existing active/verified merchants as email-verified for backwards compatibility
-      const emailVerified = merchant.emailVerified === true ||
-        merchant.status === "verified" ||
-        merchant.status === "active";
-      res.json({ emailVerified });
-    } catch (error) {
-      console.error("Email status check error:", error);
-      res.status(500).json({ message: "Failed to check email status" });
-    }
-  });
+  // (Removed POST /api/merchants/verify and GET /api/merchants/:id/email-status, owner
+  // decision 2026-09-26. Nothing called the first: it confirmed an application with its
+  // emailed link and a password of the caller's choosing, which the 2026-09-23 rule forbids.
+  // The second served only the old /business-details page, removed with it, and told
+  // anyone which business numbers exist and which had confirmed their email.)
 
   // Confirm email via token (public signup flow)
   // Confirms a sign-up's email. Owner decision 2026-09-23: the link alone no longer
@@ -5232,29 +5168,22 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   });
 
   // Resend confirmation email (public — for check-email screen)
-  // Resends a sign-up's confirmation link, asked by address (the check-email page) or by
-  // account number (business-details). Owner decision 2026-09-23: the same answer, after
-  // the same wait, whether or not an application is waiting; only a waiting one is sent
-  // its own link. Limited per address or number asked, whether it exists or not, so a
-  // refusal says nothing about it either.
+  // Resends a sign-up's confirmation link, asked by address. Owner decision 2026-09-23: the
+  // same answer, after the same wait, whether or not an application is waiting; only a
+  // waiting one is sent its own link. Limited per address asked, whether it exists or not,
+  // so a refusal says nothing about it either. Asking by account number was removed on
+  // 2026-09-26 (owner decision): anyone could resend any waiting link by counting.
   app.post("/api/auth/resend-confirmation", async (req, res) => {
     const startedAt = replyStart();
     try {
       const byEmail = forgotPasswordSchema.safeParse({ email: req.body?.email });
-      const merchantId = req.body?.merchantId === undefined
-        ? null
-        : strictPositiveIntegerParam(String(req.body.merchantId));
-      const asked: { email: string } | { merchantId: number } | null = byEmail.success
-        ? { email: byEmail.data.email.trim().toLowerCase() }
-        : merchantId !== null ? { merchantId } : null;
-      if (!asked) return res.status(400).json({ message: "Enter the email address you signed up with." });
+      if (!byEmail.success) return res.status(400).json({ message: "Enter the email address you signed up with." });
+      const asked = { email: byEmail.data.email.trim().toLowerCase() };
 
       const slot = await storage.takeAuthThrottleSlot([confirmationResendBucket(asked)], new Date());
       if (!slot.allowed) return refuseTooManyAttempts(res, slot.retryAfterMs, "confirmation-resend");
 
-      const merchant = "email" in asked
-        ? await storage.getMerchantByEmail(asked.email)
-        : await storage.getMerchant(asked.merchantId);
+      const merchant = await storage.getMerchantByEmail(asked.email);
       if (merchant && !merchant.emailVerified && merchant.verificationToken) {
         const { sendMerchantVerificationEmail } = await import('./email-service-multi');
         const { getBaseUrl } = await import('./url-utils');
@@ -5428,71 +5357,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  // Submit business details after signup
-  app.put("/api/merchants/:id/business-details", authenticateToken, async (req: AuthenticatedRequest, res) => {
-    try {
-      const merchantId = strictPositiveIntegerParam(req.params.id);
-      if (merchantId === null) return res.status(400).json({ message: "Invalid id" });
-      if (isNaN(merchantId)) {
-        return res.status(400).json({ message: "Invalid merchant ID" });
-      }
-      if (!checkAccountOwnership(req, merchantId)) {
-        return res.status(403).json({ message: "You can only update your own business details" });
-      }
-
-
-      const merchant = await storage.getMerchant(merchantId);
-      if (!merchant) {
-        return res.status(404).json({ message: "Merchant not found" });
-      }
-
-      // Enforce email verification before accepting business details
-      const isEmailVerified = merchant.emailVerified === true ||
-        merchant.status === "verified" ||
-        merchant.status === "active";
-      if (!isEmailVerified) {
-        return res.status(403).json({ message: "Email address must be verified before submitting business details" });
-      }
-
-      // This legacy post-confirmation step may only fill an unfinished account.
-      // Established merchants edit these fields through authenticated Settings.
-      if (merchant.status === "active" || merchant.onboardingCompleted === true) {
-        return res.status(403).json({ message: "Business details can no longer be edited here. Please sign in to update your details." });
-      }
-
-      const validation = businessDetailsSchema.safeParse(req.body);
-      if (!validation.success) {
-        return res.status(400).json({
-          message: validation.error.issues[0]?.message || "Invalid input",
-          errors: validation.error.issues,
-        });
-      }
-
-      const { businessName, director, contactEmail, contactPhone, gstNumber, businessAddress, nzbn } = validation.data;
-
-      await storage.updateMerchant(merchantId, {
-        businessName,
-        director,
-        contactEmail,
-        contactPhone,
-        gstNumber,
-        businessAddress: businessAddress || null,
-        nzbn: nzbn || null,
-        phone: contactPhone,
-        address: businessAddress || '',
-      });
-
-      // Admin is notified at signup (lead) and again with the full record at KYC
-      // onboarding, so this mid-funnel step no longer sends a third, redundant
-      // email — its fields are all included in the KYC submission notification.
-
-      res.json({ message: "Business details saved successfully." });
-
-    } catch (error) {
-      console.error("Business details update error:", error);
-      res.status(500).json({ message: "Failed to save business details" });
-    }
-  });
+  // (Removed PUT /api/merchants/:id/business-details, owner decision 2026-09-26: only the
+  // old /business-details page saved through it, and that page is removed.)
 
   // Create merchant signup (admin version)
   app.post("/api/admin/merchants/signup", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
@@ -7941,64 +7807,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     } catch (err) { console.error("[CHECKOUT_SPLIT]", err); res.status(500).json({ message: "Failed to set up split" }); }
   });
 
-  app.post("/api/checkout/pay", async (req, res) => {
-    try {
-      const { token, payerEmail } = req.body as { token?: string; payerEmail?: string };
-      if (!token) return res.status(400).json({ message: "token required" });
-      if (!tokenRateLimit(token)) return res.status(429).json({ message: "Too many requests" });
-      const invoice = await getCheckoutInvoiceByToken(token);
-      if (!invoice) return res.status(404).json({ message: "Payment link not found" });
-      if (["voided", "paid", "paid_external"].includes(invoice.status)) return res.status(409).json({ message: "Invoice is not payable" });
-      const [merchant, party] = await Promise.all([storage.getMerchant(invoice.merchantId), getCheckoutParty(invoice)]);
-      if (!merchant || !party) return res.status(500).json({ message: "Invoice data unavailable" });
-      const baseUrl = getBaseUrl(req);
+  // (Removed POST /api/checkout/pay, owner decision 2026-09-26: no page used it, and a
+  // split share paid through it could never be recorded.)
 
-      // Determine what to charge: the full amount, or one share of a split.
-      let chargeCents = invoice.amountCents;
-      const isSplit = invoice.splitEnabled && invoice.splitCount && invoice.splitCount > 1;
-      if (isSplit) {
-        const paid = invoice.splitPaidCount ?? 0;
-        if (paid >= invoice.splitCount) return res.status(409).json({ message: "This split is already fully paid" });
-        const base = Math.floor(invoice.amountCents / invoice.splitCount);
-        const isLastShare = paid === invoice.splitCount - 1;
-        chargeCents = isLastShare ? invoice.amountCents - base * (invoice.splitCount - 1) : base;
-        // Record the payer's email (for their GST copy) before sending them to the gateway.
-        if (typeof payerEmail === "string" && /.+@.+\..+/.test(payerEmail)) {
-          const emails: string[] = invoice.splitPayerEmails || [];
-          const lower = payerEmail.toLowerCase();
-          if (!emails.includes(lower)) await updateCheckoutInvoice(invoice, { splitPayerEmails: [...emails, lower] });
-        }
-      }
-
-      const amountStr = (chargeCents / 100).toFixed(2);
-      const merchantRef = (invoice.checkoutVertical === "trades" ? "JOB-" : "RENT-") + invoice.id.slice(0, 8).toUpperCase();
-      const xId = crypto.randomBytes(16).toString("hex");
-      if (!isWindcaveConfigured()) {
-        return res.status(503).json({ code: "PAYMENT_PROVIDER_UNAVAILABLE", message: "Payment gateway unavailable. Please try again." });
-      }
-      const sessionResult: any = await createWindcaveSession(
-          xId, amountStr, merchantRef, party.email ?? "tenant@taptpay.co.nz", baseUrl, 0, 0,
-          { callbackBase: `${baseUrl}/api/checkout/callback?token=${token}`, notificationUrl: `${baseUrl}/api/windcave/${invoice.checkoutVertical === "trades" ? "trades" : "rent"}-notification` },
-        );
-      if (!sessionResult.success) return res.status(502).json({ message: "Payment gateway error. Please try again." });
-      // Pin single-payment invoices to their one Windcave session so a stale or
-      // foreign session can't finalize them. Split invoices legitimately create
-      // one session per payer; pinning a single shared value would 403 every
-      // payer but the most recent, so we skip it and rely on per-session dedup
-      // (splitPaidSessions) instead.
-      if (sessionResult.sessionId && !isSplit) await updateCheckoutInvoice(invoice, { windcaveSessionId: sessionResult.sessionId });
-      // Duplicate X-ID — Windcave reports the session already completed; finalize now
-      // and bounce the payer back to the checkout page to see the result.
-      if (sessionResult.alreadyComplete) {
-        await finalizeCheckoutInvoice(invoice, !!sessionResult.approved, sessionResult.windcaveTransactionId, sessionResult.sessionId);
-        return res.json({ hppUrl: `${baseUrl}/r/${token}` });
-      }
-      if (!sessionResult.hppUrl) return res.status(502).json({ message: "Payment gateway error. Please try again." });
-      res.json({ hppUrl: sessionResult.hppUrl });
-    } catch (err) { console.error("[CHECKOUT_PAY]", err); res.status(500).json({ message: "Failed to initiate payment" }); }
-  });
-
-  // In-page (Hosted Fields) equivalent of /api/checkout/pay. Creates a Windcave
+  // The in-page (Hosted Fields) checkout: creates a Windcave
   // session for the invoice and returns the AJAX submit URLs so the branded
   // checkout page can take card / Apple Pay / Google Pay details in-page instead
   // of redirecting the payer out to the external Windcave HPP. The URLs are

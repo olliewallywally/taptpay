@@ -102,12 +102,12 @@ describe("bucket keys", () => {
       passwordChangeBucket(7).key,
       signupNoticeBucket("a@example.test").key,
       confirmationResendBucket({ email: "a@example.test" }).key,
-      confirmationResendBucket({ merchantId: 7 }).key,
     ];
-    expect(new Set(keys).size).toBe(8);
-    expect(new Set(keys.map((key) => key.split(":")[1])).size).toBe(8);
+    // (Resends by account number were removed on 2026-09-26: only an address can ask.)
+    expect(new Set(keys).size).toBe(7);
+    expect(new Set(keys.map((key) => key.split(":")[1])).size).toBe(7);
     // Each emails its address, so each is limited like a reset.
-    for (const emailing of [signupNoticeBucket("a@example.test"), confirmationResendBucket({ merchantId: 7 })]) {
+    for (const emailing of [signupNoticeBucket("a@example.test"), confirmationResendBucket({ email: "a@example.test" })]) {
       expect(emailing.policy).toBe(PASSWORD_RESET_POLICY);
     }
     expect(confirmationResendBucket({ email: " A@Example.test" }).key)

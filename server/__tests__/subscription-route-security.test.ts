@@ -36,7 +36,6 @@ describe("subscription and team route authorization", () => {
   test.each([
     ["post", "/api/merchants/:id/onboarding"],
     ["put", "/api/merchants/:id/details"],
-    ["put", "/api/merchants/:id/business-details"],
     ["put", "/api/merchants/:id"],
   ] as const)("%s %s requires account ownership", (method, route) => {
     expect(handler(method, route)).toContain("checkAccountOwnership(req, merchantId)");

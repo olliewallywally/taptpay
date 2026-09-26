@@ -320,8 +320,9 @@ describe("R1-T3 safe-default: password change proves the path merchant is the ca
  * had cross-tenant or role-based regression coverage in this file; details,
  * business-details, the general PUT, and sector did not, despite sharing the
  * identical checkAccountOwnership/checkMerchantOwnership guard already
- * exercised above. These four close that gap, following the exact
- * cross-tenant + zero-side-effect pattern change-password already uses.
+ * exercised above. These close that gap, following the exact
+ * cross-tenant + zero-side-effect pattern change-password already uses (the
+ * business-details one went with its route on 2026-09-26).
  */
 describe("R1-T3 UPL-6 — cross-tenant regression coverage for the remaining settings routes", () => {
   beforeEach(() => {
@@ -360,28 +361,8 @@ describe("R1-T3 UPL-6 — cross-tenant regression coverage for the remaining set
     expect(legit.status).toBe(200);
   });
 
-  it("PUT /api/merchants/:id/business-details refuses a cross-tenant caller and changes nothing", async () => {
-    const { app } = await createTestApp();
-    const ownerA = await createOwnerPrincipal();
-    const ownerB = await createOwnerPrincipal();
-
-    const attack = await request(app)
-      .put(`/api/merchants/${ownerB.merchantId}/business-details`)
-      .set(bearer(ownerA))
-      .send({
-        businessName: "Hijacked Business",
-        director: "Attacker Name",
-        contactEmail: "hijacked@harness.test",
-        contactPhone: "021 000 0000",
-        gstNumber: "999-999-999",
-      });
-    expect(attack.status).toBe(403);
-
-    const bProfile = await request(app).get(`/api/merchants/${ownerB.merchantId}/profile`).set(bearer(ownerB));
-    expect(bProfile.status).toBe(200);
-    expect(bProfile.body.businessName).not.toBe("Hijacked Business");
-    expect(bProfile.body.director).not.toBe("Attacker Name");
-  });
+  // PUT /api/merchants/:id/business-details was removed on 2026-09-26 with the old
+  // /business-details page (owner decision; c10-batch-3-retired-routes.test.ts).
 
   it("PUT /api/merchants/:id (general) refuses a cross-tenant caller and changes nothing", async () => {
     const { app } = await createTestApp();

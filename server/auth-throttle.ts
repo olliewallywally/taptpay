@@ -232,14 +232,13 @@ export function signupNoticeBucket(email: string): AuthThrottleBucket {
 }
 
 /**
- * Confirmation-link resends, per the address or account number asked about: counted
- * whether or not it exists, so a refusal says nothing about it.
+ * Confirmation-link resends, per the address asked about: counted whether or not it has an
+ * application, so a refusal says nothing about it. (Asking by account number was removed on
+ * 2026-09-26.)
  */
-export function confirmationResendBucket(asked: { email: string } | { merchantId: number }): AuthThrottleBucket {
-  const [purpose, value] = "email" in asked
-    ? ["confirm-resend", normalizeThrottleEmail(asked.email)]
-    : ["confirm-resend-id", String(asked.merchantId)];
-  return { key: `${purpose}:${bucketKeyHmac(purpose, value)}`, policy: PASSWORD_RESET_POLICY };
+export function confirmationResendBucket(asked: { email: string }): AuthThrottleBucket {
+  const purpose = "confirm-resend";
+  return { key: `${purpose}:${bucketKeyHmac(purpose, normalizeThrottleEmail(asked.email))}`, policy: PASSWORD_RESET_POLICY };
 }
 
 // ── The refusal ──────────────────────────────────────────────────────────────

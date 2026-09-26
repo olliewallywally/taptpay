@@ -343,7 +343,7 @@ describe("R1-T2 / R1-T3 — every route's reviewed policy holds against its hand
     });
 
     it("refuse a route that emails an address the caller names without a rate limit", () => {
-      const status = "GET /api/merchants/:id/email-status";
+      const status = "GET /api/merchants/:id/qr"; // any route with no rate limit
       const review: RouteReview = {
         branches: [{ principal: "public", tenant: "mailbox", tenantRule: "the address named" }],
         input: "id: strict",
@@ -360,7 +360,7 @@ describe("R1-T2 / R1-T3 — every route's reviewed policy holds against its hand
 
     it("refuse a sign-up link or Google's one-time code held without its credential check", () => {
       // The checks that make these routes a credential holder's are recorded (route-facts.ts).
-      for (const key of ["POST /api/auth/google/session", "POST /api/merchants/verify"]) {
+      for (const key of ["POST /api/auth/google/session", "POST /api/auth/confirm-email"]) {
         const facts = factsOf(key);
         expect(facts.authChecks.filter((check) => TOKEN_CHECKS.includes(check))).toHaveLength(1);
       }

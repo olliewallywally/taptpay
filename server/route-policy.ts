@@ -1,8 +1,8 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 4ac759d1af8005342af899326c6fab87814c9c71 on 2026-09-26.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 6fd8eeeade360a9db00752c97333af9479860ac1 on 2026-09-26.
  *
- * 220 registrations (90 GET, 91 POST, 3 PATCH, 5 ALL, 22 PUT, 9 DELETE) on this SHA — evidence for THIS commit, not a timeless
+ * 216 registrations (89 GET, 89 POST, 3 PATCH, 5 ALL, 21 PUT, 9 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
  * live count on every run rather than trusting this comment.
  *
@@ -1435,30 +1435,6 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       helpers: ["authenticateAdmin"],
     },
   },
-  "POST /api/merchants/verify": {
-    method: "POST",
-    path: "/api/merchants/verify",
-    principal: "public",
-    markers: ["storage.verifyMerchant("],
-    facts: {
-      body: ["fields: password, token"],
-      authChecks: ["storage.verifyMerchant"],
-      storageMethods: ["verifyMerchant"],
-      statuses: [200,400,500],
-      errorTextInResponse: ["checked.error.issues"],
-    },
-  },
-  "GET /api/merchants/:id/email-status": {
-    method: "GET",
-    path: "/api/merchants/:id/email-status",
-    principal: "public",
-    markers: [],
-    facts: {
-      params: ["id: strictPositiveIntegerParam"],
-      storageMethods: ["getMerchant"],
-      statuses: [200,400,404,500],
-    },
-  },
   "POST /api/auth/confirm-email": {
     method: "POST",
     path: "/api/auth/confirm-email",
@@ -1480,8 +1456,8 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     principal: "public",
     markers: [],
     facts: {
-      body: ["fields: email, merchantId"],
-      storageMethods: ["getMerchant","getMerchantByEmail","takeAuthThrottleSlot"],
+      body: ["fields: email"],
+      storageMethods: ["getMerchantByEmail","takeAuthThrottleSlot"],
       sideEffects: ["email: sendMerchantVerificationEmail"],
       statuses: [200,400,429,500],
       rateLimits: ["refuseTooManyAttempts","tooManyAttempts"],
@@ -1516,21 +1492,6 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       errorTextInResponse: ["validation.error.issues"],
       rateLimits: ["checkRateLimit"],
       helpers: ["checkRateLimit","replyToSignup"],
-    },
-  },
-  "PUT /api/merchants/:id/business-details": {
-    method: "PUT",
-    path: "/api/merchants/:id/business-details",
-    principal: "merchant-user",
-    markers: ["authenticateToken","checkAccountOwnership"],
-    facts: {
-      middleware: ["authenticateToken"],
-      params: ["id: strictPositiveIntegerParam"],
-      body: ["schema: businessDetailsSchema"],
-      authChecks: ["checkAccountOwnership","checkMerchantOwnership","isAccountOwner"],
-      storageMethods: ["getMerchant","updateMerchant"],
-      statuses: [200,400,401,403,404,500,503],
-      errorTextInResponse: ["validation.error.issues"],
     },
   },
   "POST /api/admin/merchants/signup": {
@@ -2509,23 +2470,6 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       statuses: [200,400,404,409,429,500],
       rateLimits: ["tokenRateLimit"],
       helpers: ["tokenRateLimit","updateCheckoutInvoice"],
-    },
-  },
-  "POST /api/checkout/pay": {
-    method: "POST",
-    path: "/api/checkout/pay",
-    principal: "public",
-    markers: ["getCheckoutInvoiceByToken("],
-    facts: {
-      body: ["fields: payerEmail, token"],
-      authChecks: ["getCheckoutInvoiceByToken"],
-      storageMethods: ["atomicClaimJobSplitShare","atomicClaimSplitShare","createJobEvent","getClientProfile","getInvoiceRentRequest","getInvoiceRentRequestByToken","getJobInvoice","getJobInvoiceByToken","getMerchant","getTenantProfile","logTransactionEvent","updateInvoiceRentRequest","updateJobInvoice"],
-      sideEffects: ["email/SMS: sendTradePaymentInvoice","email: sendGstInvoices","provider: createWindcaveSession"],
-      statuses: [200,400,404,409,429,500,502,503],
-      capabilityGates: ["isWindcaveConfigured"],
-      rateLimits: ["tokenRateLimit"],
-      idempotency: ["atomicClaimJobSplitShare","atomicClaimSplitShare"],
-      helpers: ["finalizeCheckoutInvoice","finalizeRentInvoice","finalizeTradeInvoice","getCheckoutParty","sendRentGstInvoices","tokenRateLimit","updateCheckoutInvoice"],
     },
   },
   "POST /api/checkout/:token/session": {

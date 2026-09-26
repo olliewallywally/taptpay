@@ -152,7 +152,7 @@ const EVEN_ANSWER =
 const ONE_TIME_TOKEN_RATE =
   "none — the token is 32 random bytes and only its hash is looked up, so it cannot be guessed; a password is hashed only once a live token is found";
 const CONFIRMATION_TOKEN_FINDING =
-  "The sign-up confirmation token is stored as it was sent, not hashed (reset and invite tokens keep only a SHA-256), and never expires: anyone who can read the merchants table holds every waiting application's link. Here the link alone confirms nothing (the password chosen at sign-up is asked for), but POST /api/merchants/verify still accepts it with a new password.";
+  "The sign-up confirmation token is stored as it was sent, not hashed (reset and invite tokens keep only a SHA-256), and never expires: anyone who can read the merchants table holds every waiting application's link. Here the link alone confirms nothing (the password chosen at sign-up is asked for).";
 
 // ── Public pages, configuration and boards ──
 const FIXED_CONTENT_CONTROLS: UnauthenticatedControls = {
@@ -904,32 +904,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     findings: [SPLIT_INVOICE_SHARE_FINDING],
   },
 
-  "POST /api/checkout/pay": {
-    branches: [
-      { principal: "public-bearer", tenant: "token", tenantRule: `${CHECKOUT_TENANT_RULE}; here the token comes in the body` },
-    ],
-    input:
-      "body read without a schema: token (required and looked up; its type is not checked) and payerEmail (checked only against /.+@.+\\..+/)",
-    capability: "isWindcaveConfigured() (503 PAYMENT_PROVIDER_UNAVAILABLE)",
-    entitlement: null,
-    idempotency: "none: every call opens another provider session (finding)",
-    sideEffects:
-      "creates a payment session with the provider (createWindcaveSession); when the provider reports it already complete, settles the invoice: events, and once paid the GST invoice email (rent, sendGstInvoices) or the payment invoice (trades, sendTradePaymentInvoice)",
-    successDto: "{ hppUrl }: the provider's hosted page, or the invoice's own checkout page when already complete",
-    errorDisclosure: ["fixed"],
-    controls: {
-      authenticity: CHECKOUT_AUTHENTICITY,
-      replay: "each call opens another provider session for the same invoice",
-      rate: CHECKOUT_RATE,
-    },
-    findings: [
-      "No screen calls this route (the checkout page uses POST /api/checkout/:token/session): a public redirect flow kept alive. A split invoice's share paid through it can never be recorded: no session is pinned, the browser return settles only a pinned session, and the notification finds invoices by their pinned session.",
-      RESESSION_FINDING,
-      PAYER_EMAIL_FINDING,
-      SPLIT_INVOICE_SHARE_FINDING,
-    ],
-  },
-
   "POST /api/checkout/:token/session": {
     branches: [{ principal: "public-bearer", tenant: "token", tenantRule: CHECKOUT_TENANT_RULE }],
     input: "token: read raw, then looked up; body read without a schema: payerEmail (checked only against /.+@.+\\..+/)",
@@ -1323,26 +1297,23 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         principal: "public",
         tenant: "mailbox",
         tenantRule:
-          "the application the email (or account number) names, reached only by email to its own address: only one still waiting to be confirmed is sent its link again; the answer is the same for every address or number (owner decision 2026-09-23)",
+          "the application the email names, reached only by email to its own address: only one still waiting to be confirmed is sent its link again; the answer is the same for every address (owner decision 2026-09-23). Asking by account number was removed on 2026-09-26 (owner decision)",
       },
     ],
     input:
-      "body read without a schema: email (checked with forgotPasswordSchema) or merchantId (strictPositiveIntegerParam); 400 when neither is usable",
+      "body read without a schema: email, checked with forgotPasswordSchema (400 otherwise; an account number alone is 400 too)",
     capability: null,
     entitlement: null,
     idempotency: "each request sends the same link again; the token is not replaced",
     sideEffects: "for a waiting application, emails its confirmation link again (sendMerchantVerificationEmail)",
-    successDto: EVEN_ANSWER.replace("every address", "every address or number"),
+    successDto: EVEN_ANSWER,
     errorDisclosure: ["fixed"],
     controls: {
       authenticity: "none needed: the link goes only to the application's own address",
       replay: "each replay sends the link again, within the limit",
       rate:
-        "takeAuthThrottleSlot per address or number asked, whether or not one is waiting: 3 free, then waits from 5 minutes doubling to an hour; in the database",
+        "takeAuthThrottleSlot per address asked, whether or not one is waiting: 3 free, then waits from 5 minutes doubling to an hour; in the database",
     },
-    findings: [
-      "Asked by account number, anyone can have any waiting application's link sent to its address again by counting through the numbers (three sends per number, then slowed). Only the old /business-details page asks by number (see GET /api/merchants/:id/email-status).",
-    ],
   },
 
   "POST /api/merchants/signup": {
@@ -1375,35 +1346,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     ],
   },
 
-  "POST /api/merchants/verify": {
-    branches: [
-      {
-        principal: "public-bearer",
-        tenant: "token",
-        tenantRule:
-          "the confirmation token selects the one application it was sent for; storage.verifyMerchant sets the password given here, marks the application verified and clears the token, in one transaction",
-      },
-    ],
-    input:
-      "body read without a schema: token (any truthy value) and password (the one password rule, newPasswordSchema; 400 with its first issue)",
-    capability: null,
-    entitlement: null,
-    idempotency: "one-time: the token is cleared as the application is verified; a second use is 400",
-    sideEffects: null,
-    successDto: "{ message, merchant: { id, name, businessName, email, status } }",
-    errorDisclosure: ["input-issues"],
-    controls: {
-      authenticity: "holding the emailed confirmation link only: the password is chosen here, not checked",
-      replay: "refused once used: the token is cleared",
-      rate: "none — no limit, and a bcrypt hash (cost 12) is computed before the token is looked up",
-    },
-    findings: [
-      "No screen calls it (the email links to /confirm-email, whose page uses POST /api/auth/confirm-email). It confirms an application with the emailed link and a password of the caller's choosing, which the owner's 2026-09-23 rule forbids: the link alone must confirm nothing, so that an address's owner cannot be led to confirm a stranger's application. It also marks the application verified without marking its email confirmed. Retire it: put to the owner 2026-09-26.",
-      "Computes a bcrypt hash (cost 12) for any well-formed request before the token is looked up, with no limit: anyone can load the server's processor with it.",
-      CONFIRMATION_TOKEN_FINDING,
-    ],
-  },
-
   "POST /api/team/accept-invite": {
     branches: [
       {
@@ -1426,31 +1368,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       replay: "refused: the token is burned",
       rate: ONE_TIME_TOKEN_RATE,
     },
-  },
-
-  "GET /api/merchants/:id/email-status": {
-    branches: [
-      {
-        principal: "public",
-        tenant: "number",
-        tenantRule: "the merchant's sequential number selects it, for any business: anyone can ask whether a number exists (404) and whether its email is confirmed",
-      },
-    ],
-    input: "id: strictPositiveIntegerParam (400 otherwise)",
-    capability: null,
-    entitlement: null,
-    idempotency: "read-only",
-    sideEffects: null,
-    successDto: "{ emailVerified } (true for a merchant verified or active by status, too)",
-    errorDisclosure: ["fixed"],
-    controls: {
-      authenticity: "anyone with a merchant's number: numbers are sequential",
-      replay: "read-only",
-      rate: "none — no limit",
-    },
-    findings: [
-      "Public and addressed by a guessable sequential number: anyone can count through the merchants and learn which numbers exist and which have confirmed their email. Its only caller is the old /business-details page, which takes the number from its own address (?id=) and which nothing links to any more (sign-up no longer hands out the number). Retire both, or require the session: put to the owner 2026-09-26.",
-    ],
   },
 
   // ── Batch 3c (2026-09-26): public pages, configuration and boards ──
@@ -1820,7 +1737,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
  * Routes not reviewed yet. May only shrink: PENDING_CEILING is lowered by
  * every batch, so a route cannot be added here instead of being reviewed.
  */
-export const PENDING_CEILING = 147;
+export const PENDING_CEILING = 146;
 
 export const REVIEW_PENDING: readonly string[] = [
   "POST /api/auth/sign-out-everywhere",
@@ -1878,7 +1795,6 @@ export const REVIEW_PENDING: readonly string[] = [
   "POST /api/admin/resend-verification",
   "POST /api/admin/test-email",
   "GET /api/admin/email-status",
-  "PUT /api/merchants/:id/business-details",
   "POST /api/admin/merchants/signup",
   "POST /api/push/subscribe",
   "POST /api/push/unsubscribe",

@@ -466,18 +466,7 @@ export const acceptInviteSchema = z.object({
   path: ["confirmPassword"],
 });
 
-export const businessDetailsSchema = z.object({
-  businessName: z.string().min(1, "Business name is required").max(100),
-  director: z.string().min(1, "Director / responsible person name is required").max(100),
-  contactEmail: z.string().email("Valid email is required"),
-  contactPhone: z.string().min(1, "Phone number is required").max(20),
-  gstNumber: z.string().min(1, "GST number is required").max(20),
-  businessAddress: z.string().max(200).optional(),
-  nzbn: z.string().max(20).optional(),
-});
-
 export type PublicSignup = z.infer<typeof publicSignupSchema>;
-export type BusinessDetails = z.infer<typeof businessDetailsSchema>;
 
 export const createMerchantSchema = z.object({
   name: z.string().min(1, "Merchant name is required").max(50),

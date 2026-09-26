@@ -447,8 +447,6 @@ export const PUBLIC_PATH_ALLOWLIST: Record<string, string> = {
     "retired business-wide no-board QR (owner decision 2026-09-25): validates the id, then a constant 410 NO_BOARD_ADDRESS_RETIRED tombstone; reads nothing",
   "GET /nfc/:merchantId":
     "retired business-wide no-board NFC tag address (owner decision 2026-09-25): validates the id, then a constant 410 notice page with no script or onward link; reads nothing",
-  "GET /api/merchants/:id/email-status":
-    "boolean-only lookup for the pre-session /business-details soft gate; leading '// Public' comment is misattributed by sliceHandlerBodies to the preceding registration",
   "GET /api/push/capabilities": "static VAPID/APNs-configured booleans, no secret",
   "GET /api/push/vapid-key": "Web Push VAPID PUBLIC key — not a secret by the standard's own design",
   "GET /api/windcave/env": "publishable Apple/Google Pay merchant ids for the unauthenticated checkout page",

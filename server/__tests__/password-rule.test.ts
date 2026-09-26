@@ -201,18 +201,8 @@ describe("every route that sets a password applies the rule and says it", () => 
     expect((await create("Password!")).status).toBe(200);
   });
 
-  it("email verification, which used to take any password at all", async () => {
-    const { app } = await createTestApp();
-    const { token } = await pendingSignup();
-    const verify = (password: unknown) => request(app).post("/api/merchants/verify").send({ token, password });
-
-    const refused = await verify("password");
-    expect(refused.status).toBe(400);
-    expect(refused.body.message).toBe(RULE);
-    expect((await verify(12345678)).status).toBe(400);
-
-    expect((await verify("Password1")).status).toBe(200);
-  });
+  // "Email verification, which used to take any password at all" tested POST
+  // /api/merchants/verify, removed on 2026-09-26 (owner decision): nothing called it.
 
   it("admin activation, which used to take any password at all", async () => {
     const { app } = await createTestApp();

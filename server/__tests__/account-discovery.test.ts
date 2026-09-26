@@ -155,7 +155,9 @@ describe("resending the confirmation link never says whether an address has an a
     expect(mockSent.map((message) => [recipient(message), message.subject])).toEqual([[waiting, CONFIRM_SUBJECT]]);
   });
 
-  it("answers the same when asked by account number, sending only a waiting application its own link", async () => {
+  it("no longer resends by account number: only the address can ask (owner decision 2026-09-26)", async () => {
+    // Asked by number, anyone could have any waiting application's link sent again by counting.
+    // Only the old /business-details page asked that way, and it is removed.
     const { app } = await createTestApp();
     const waiting = randomEmail("waiting");
     await signUp(app, waiting);
@@ -166,9 +168,13 @@ describe("resending the confirmation link never says whether an address has an a
     const byMissingNumber = await resend(app, { merchantId: application.id + 1000 });
 
     for (const res of [byNumber, byMissingNumber]) {
-      expect(res.status).toBe(200);
-      expect(res.body).toEqual(RESENT);
+      expect(res.status).toBe(400);
+      expect(res.body).toEqual({ message: "Enter the email address you signed up with." });
     }
+    expect(mockSent).toEqual([]);
+
+    const byAddress = await resend(app, { email: waiting });
+    expect(byAddress.status).toBe(200);
     expect(mockSent.map(recipient)).toEqual([waiting]);
   });
 

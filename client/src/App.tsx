@@ -54,7 +54,6 @@ const CreateMerchant        = lazyWithRetry(() => import("@/pages/create-merchan
 const StockManagement       = lazyWithRetry(() => import("@/pages/stock-management"));
 const LegalPage             = lazyWithRetry(() => import("@/pages/legal"));
 const InfoPage              = lazyWithRetry(() => import("@/pages/info"));
-const BusinessDetails       = lazyWithRetry(() => import("@/pages/business-details"));
 const CheckEmail            = lazyWithRetry(() => import("@/pages/check-email"));
 const ConfirmEmail          = lazyWithRetry(() => import("@/pages/confirm-email"));
 const MerchantOnboarding    = lazyWithRetry(() => import("@/pages/merchant-onboarding"));
@@ -840,7 +839,6 @@ function RouteTable({
         <Switch location={location}>
           <Route path="/"><LandingPage /></Route>
           <Route path="/info" component={InfoPage} />
-          <Route path="/business-details" component={BusinessDetails} />
           <Route path="/check-email" component={CheckEmail} />
           <Route path="/confirm-email" component={ConfirmEmail} />
           <Route path="/login" component={Login} />
