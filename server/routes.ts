@@ -7979,8 +7979,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const { token } = req.params;
       if (!tokenRateLimit(token)) return res.status(429).json({ message: "Too many requests" });
-      const count = parseInt(String(req.body?.count), 10);
-      if (!Number.isInteger(count) || count < 2 || count > 12) return res.status(400).json({ message: "Choose between 2 and 12 people" });
+      // A whole number of people from 2 to 12 and nothing else (plan §8.4), as the
+      // page sends it; parseInt had taken "3 people", "3" and 2.5.
+      const parsedCount = z.object({ count: z.number().int().min(2).max(12) }).strict().safeParse(req.body);
+      if (!parsedCount.success) return res.status(400).json({ message: "Choose between 2 and 12 people" });
+      const { count } = parsedCount.data;
       const invoice = await getCheckoutInvoiceByToken(token);
       if (!invoice) return res.status(404).json({ message: "Payment link not found" });
       if (!invoice.splitEnabled) return res.status(400).json({ message: "Splitting is not enabled for this payment" });
@@ -8134,9 +8137,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const invoice = await getCheckoutInvoiceByToken(token);
       if (!invoice) return res.status(404).json({ message: "Payment link not found" });
       // Split invoices have one session per payer (not pinned on the invoice), so
-      // the single-session equality check only applies to single payments.
+      // the single-session equality check only applies to single payments. It is
+      // unconditional, as on the numbered routes (R1-T7): an invoice with no
+      // session opened accepts none, or any approved session on the platform's
+      // provider account would pay it.
       const isSplit = invoice.splitEnabled && invoice.splitCount && invoice.splitCount > 1;
-      if (!isSplit && invoice.windcaveSessionId && invoice.windcaveSessionId !== sessionId) {
+      if (!isSplit && invoice.windcaveSessionId !== sessionId) {
         console.error(`[checkout-complete] sessionId mismatch for invoice ${invoice.id}`);
         return res.status(403).json({ message: "Session ID mismatch" });
       }
@@ -8165,9 +8171,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const invoice = await getCheckoutInvoiceByToken(token);
       if (!invoice) return res.status(404).json({ message: "Payment link not found" });
       // Split invoices have one session per payer (not pinned on the invoice), so
-      // the single-session equality check only applies to single payments.
+      // the single-session equality check only applies to single payments. It is
+      // unconditional, as on the numbered routes (R1-T7): an invoice with no
+      // session opened accepts none, or any approved session on the platform's
+      // provider account would pay it.
       const isSplit = invoice.splitEnabled && invoice.splitCount && invoice.splitCount > 1;
-      if (!isSplit && invoice.windcaveSessionId && invoice.windcaveSessionId !== sessionId) {
+      if (!isSplit && invoice.windcaveSessionId !== sessionId) {
         console.error(`[checkout-gpay] sessionId mismatch for invoice ${invoice.id}`);
         return res.status(403).json({ message: "Session ID mismatch" });
       }

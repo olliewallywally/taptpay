@@ -205,7 +205,8 @@ export async function queryWindcaveSession(
 
   let response: Response;
   try {
-    response = await fetchWithTimeout(`${SESSION_URL}/${sessionId}`, {
+    // One encoded path segment: a split invoice passes on the id its page sent.
+    response = await fetchWithTimeout(`${SESSION_URL}/${encodeURIComponent(sessionId)}`, {
       method: "GET",
       headers: { Authorization: buildAuthHeader() },
     });

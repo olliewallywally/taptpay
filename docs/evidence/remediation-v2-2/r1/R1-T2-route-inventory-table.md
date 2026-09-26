@@ -1,4 +1,4 @@
-# R1-T2 route inventory — generated 2026-09-26 @ `cee1276a2a7323a9b9ecd73566b7762678820206`
+# R1-T2 route inventory — generated 2026-09-26 @ `30c9d8cb7cb8a1e461ff6834d1d7ebe7839a964b`
 
 Regenerate with `npx tsx scripts/generate-route-policy.ts`. This table is
 evidence for the SHA named above, not a timeless constant — see
@@ -225,50 +225,50 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 | GET | `/api/checkout/resolve/:token` | 7868 | public (heuristic) | getCheckoutInvoiceByToken( |
 | GET | `/api/checkout/document/:token` | 7954 | public (heuristic) | getCheckoutInvoiceByToken( |
 | POST | `/api/checkout/:token/split` | 7978 | public (heuristic) | getCheckoutInvoiceByToken( |
-| POST | `/api/checkout/pay` | 7994 | public (heuristic) | getCheckoutInvoiceByToken( |
-| POST | `/api/checkout/:token/session` | 8056 | public (heuristic) | getCheckoutInvoiceByToken( |
-| POST | `/api/checkout/:token/hosted-fields-complete` | 8129 | public (heuristic) | getCheckoutInvoiceByToken( |
-| POST | `/api/checkout/:token/googlepay-complete` | 8160 | public (heuristic) | getCheckoutInvoiceByToken( |
-| GET | `/api/checkout/callback` | 8213 | public (heuristic) | getCheckoutInvoiceByToken( |
-| ALL | `/api/windcave/rent-notification` | 8240 | provider | — |
-| ALL | `/api/windcave/trades-notification` | 8257 | provider | — |
-| POST | `/api/webhooks/whatsapp` | 8277 | provider | req.headers["apikey"] |
-| PUT | `/api/merchants/:merchantId/sector` | 8313 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| GET | `/api/property/reminder-settings` | 8338 | merchant-user (heuristic) | authenticateToken |
-| PUT | `/api/property/reminder-settings` | 8348 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/reminder-settings` | 8365 | merchant-user (heuristic) | authenticateToken |
-| PUT | `/api/trades/reminder-settings` | 8375 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/gst-settings` | 8388 | merchant-user (heuristic) | authenticateToken |
-| PUT | `/api/trades/gst-settings` | 8404 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/clients` | 8421 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/clients` | 8429 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/clients/:id` | 8439 | merchant-user (heuristic) | authenticateToken |
-| PUT | `/api/trades/clients/:id` | 8448 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/clients/:id/archive` | 8459 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/clients/:id/unarchive` | 8468 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/clients/:id/promote` | 8478 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/clients/:id/events` | 8488 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/quotes` | 8498 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/quotes` | 8505 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/quotes/:id` | 8582 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/quotes/:id/pdf` | 8609 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/quotes/token/:token/pdf` | 8622 | public (heuristic) | getQuoteByToken( |
-| POST | `/api/trades/quotes/:id/resend` | 8633 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/quotes/token/:token` | 8649 | public (heuristic) | getQuoteByToken( |
-| POST | `/api/trades/quotes/token/:token/respond` | 8694 | public (heuristic) | getQuoteByToken( |
-| GET | `/api/trades/invoices` | 8743 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/invoices` | 8753 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/invoices/:id/resend` | 8805 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/invoices/:id/send-balance` | 8818 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/invoices/:id/mark-paid-external` | 8855 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/invoices/:id/complete` | 8872 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/invoices/:id/void` | 8889 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/schedules` | 8899 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/schedules` | 8906 | merchant-user (heuristic) | authenticateToken |
-| PUT | `/api/trades/schedules/:id` | 8924 | merchant-user (heuristic) | authenticateToken |
-| DELETE | `/api/trades/schedules/:id` | 8937 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/internal/cron/status` | 8951 | cron | authorizeCronRequest |
-| POST | `/api/internal/cron` | 8961 | cron | authorizeCronRequest |
+| POST | `/api/checkout/pay` | 7997 | public (heuristic) | getCheckoutInvoiceByToken( |
+| POST | `/api/checkout/:token/session` | 8059 | public (heuristic) | getCheckoutInvoiceByToken( |
+| POST | `/api/checkout/:token/hosted-fields-complete` | 8132 | public (heuristic) | getCheckoutInvoiceByToken( |
+| POST | `/api/checkout/:token/googlepay-complete` | 8166 | public (heuristic) | getCheckoutInvoiceByToken( |
+| GET | `/api/checkout/callback` | 8222 | public (heuristic) | getCheckoutInvoiceByToken( |
+| ALL | `/api/windcave/rent-notification` | 8249 | provider | — |
+| ALL | `/api/windcave/trades-notification` | 8266 | provider | — |
+| POST | `/api/webhooks/whatsapp` | 8286 | provider | req.headers["apikey"] |
+| PUT | `/api/merchants/:merchantId/sector` | 8322 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/property/reminder-settings` | 8347 | merchant-user (heuristic) | authenticateToken |
+| PUT | `/api/property/reminder-settings` | 8357 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/reminder-settings` | 8374 | merchant-user (heuristic) | authenticateToken |
+| PUT | `/api/trades/reminder-settings` | 8384 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/gst-settings` | 8397 | merchant-user (heuristic) | authenticateToken |
+| PUT | `/api/trades/gst-settings` | 8413 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/clients` | 8430 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/clients` | 8438 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/clients/:id` | 8448 | merchant-user (heuristic) | authenticateToken |
+| PUT | `/api/trades/clients/:id` | 8457 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/clients/:id/archive` | 8468 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/clients/:id/unarchive` | 8477 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/clients/:id/promote` | 8487 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/clients/:id/events` | 8497 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/quotes` | 8507 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/quotes` | 8514 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/quotes/:id` | 8591 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/quotes/:id/pdf` | 8618 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/quotes/token/:token/pdf` | 8631 | public (heuristic) | getQuoteByToken( |
+| POST | `/api/trades/quotes/:id/resend` | 8642 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/quotes/token/:token` | 8658 | public (heuristic) | getQuoteByToken( |
+| POST | `/api/trades/quotes/token/:token/respond` | 8703 | public (heuristic) | getQuoteByToken( |
+| GET | `/api/trades/invoices` | 8752 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/invoices` | 8762 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/invoices/:id/resend` | 8814 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/invoices/:id/send-balance` | 8827 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/invoices/:id/mark-paid-external` | 8864 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/invoices/:id/complete` | 8881 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/invoices/:id/void` | 8898 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/schedules` | 8908 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/trades/schedules` | 8915 | merchant-user (heuristic) | authenticateToken |
+| PUT | `/api/trades/schedules/:id` | 8933 | merchant-user (heuristic) | authenticateToken |
+| DELETE | `/api/trades/schedules/:id` | 8946 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/internal/cron/status` | 8960 | cron | authorizeCronRequest |
+| POST | `/api/internal/cron` | 8970 | cron | authorizeCronRequest |
 
 ## Per-route facts
 
@@ -2468,7 +2468,7 @@ Review pending.
 ### POST `/api/checkout/:token/split`
 
 - params: `token: raw`
-- body: `fields: count`
+- body: `schema: z.object({ count: z.number().int().min(2).max(12) }).strict()`
 - authChecks: `getCheckoutInvoiceByToken`
 - storageMethods: `getInvoiceRentRequestByToken`, `getJobInvoiceByToken`, `updateInvoiceRentRequest`, `updateJobInvoice`
 - statuses: `200`, `400`, `404`, `409`, `429`, `500`

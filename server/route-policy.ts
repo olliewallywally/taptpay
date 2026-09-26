@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ cee1276a2a7323a9b9ecd73566b7762678820206 on 2026-09-26.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 30c9d8cb7cb8a1e461ff6834d1d7ebe7839a964b on 2026-09-26.
  *
  * 223 registrations (93 GET, 91 POST, 3 PATCH, 5 ALL, 22 PUT, 9 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -2527,7 +2527,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     markers: ["getCheckoutInvoiceByToken("],
     facts: {
       params: ["token: raw"],
-      body: ["fields: count"],
+      body: ["schema: z.object({ count: z.number().int().min(2).max(12) }).strict()"],
       authChecks: ["getCheckoutInvoiceByToken"],
       storageMethods: ["getInvoiceRentRequestByToken","getJobInvoiceByToken","updateInvoiceRentRequest","updateJobInvoice"],
       statuses: [200,400,404,409,429,500],
