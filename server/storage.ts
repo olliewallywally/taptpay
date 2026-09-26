@@ -5554,14 +5554,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deactivatePushSubscriptionByEndpoint(endpoint: string): Promise<void> {
-    try {
-      await this.db!
-        .update(pushSubscriptions)
-        .set({ isActive: false })
-        .where(eq(pushSubscriptions.endpoint, endpoint));
-    } catch (error) {
-      console.error("Database error in deactivatePushSubscriptionByEndpoint:", error);
-    }
+    // A fault reaches the caller: turning a device's notifications off is never reported done
+    // when it failed (C10 batch 5).
+    await this.db!
+      .update(pushSubscriptions)
+      .set({ isActive: false })
+      .where(eq(pushSubscriptions.endpoint, endpoint));
   }
 
   async deactivatePushSubscriptionsForLogin(merchantId: number, userId: number): Promise<void> {

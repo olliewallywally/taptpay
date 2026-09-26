@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 8aad300b0e3722929a330062a8199bb948d5bd57 on 2026-09-26.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ c1889ca3c86b0b64c39c5c51ae5a830b8fa45d9f on 2026-09-26.
  *
  * 203 registrations (85 GET, 82 POST, 3 PATCH, 5 ALL, 20 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -1721,11 +1721,11 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     method: "PUT",
     path: "/api/subscription/plan",
     principal: "merchant-user",
-    markers: ["authenticateToken"],
+    markers: ["authenticateToken","isAccountOwner"],
     facts: {
       middleware: ["authenticateToken"],
       body: ["fields: planId"],
-      authChecks: ["compares req.user?.role === \"member\""],
+      authChecks: ["isAccountOwner"],
       storageMethods: ["changeSubscriptionPlan","countSeatsInUse","getOrCreateSubscription"],
       statuses: [200,400,401,402,403,404,409,422,500,502,503],
       dtos: ["subscriptionDto"],
@@ -1735,11 +1735,11 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     method: "POST",
     path: "/api/subscription/cancel",
     principal: "merchant-user",
-    markers: ["authenticateToken"],
+    markers: ["authenticateToken","isAccountOwner"],
     facts: {
       middleware: ["authenticateToken"],
       body: ["fields: reason"],
-      authChecks: ["compares req.user?.role === \"member\""],
+      authChecks: ["isAccountOwner"],
       storageMethods: ["cancelSubscription","countSeatsInUse","getOrCreateSubscription"],
       statuses: [200,400,401,403,404,409,500,503],
       dtos: ["subscriptionDto"],
@@ -1749,10 +1749,10 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     method: "POST",
     path: "/api/subscription/resume",
     principal: "merchant-user",
-    markers: ["authenticateToken"],
+    markers: ["authenticateToken","isAccountOwner"],
     facts: {
       middleware: ["authenticateToken"],
-      authChecks: ["compares req.user?.role === \"member\""],
+      authChecks: ["isAccountOwner"],
       storageMethods: ["countSeatsInUse","resumeSubscription"],
       statuses: [200,400,401,403,409,500,503],
       dtos: ["subscriptionDto"],
@@ -1842,7 +1842,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       middleware: ["authenticateToken"],
       params: ["userId: strictPositiveIntegerParam"],
       authChecks: ["compares member.merchantId !== merchantId","compares member.role === \"owner\"","isAccountOwner"],
-      storageMethods: ["getUserById","removeTeamMember"],
+      storageMethods: ["deactivatePushSubscriptionsForLogin","getUserById","removeTeamMember"],
       sideEffects: ["live update: sseBroker.disconnectUser"],
       statuses: [200,400,401,403,404,409,500,503],
     },

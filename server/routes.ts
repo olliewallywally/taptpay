@@ -6224,7 +6224,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const merchantId = req.user?.merchantId;
       if (!merchantId) return res.status(400).json({ message: "Merchant ID required" });
-      if (req.user?.role === "member") {
+      if (!isAccountOwner(req.user)) {
         return res.status(403).json({ message: "Only the account owner can change the plan" });
       }
 
@@ -6289,7 +6289,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchantId) {
         return res.status(400).json({ message: "Merchant ID required" });
       }
-      if (req.user?.role === "member") {
+      if (!isAccountOwner(req.user)) {
         return res.status(403).json({ message: "Only the account owner can cancel the subscription" });
       }
 
@@ -6330,7 +6330,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const merchantId = req.user?.merchantId;
       if (!merchantId) return res.status(400).json({ message: "Merchant ID required" });
-      if (req.user?.role === "member") {
+      if (!isAccountOwner(req.user)) {
         return res.status(403).json({ message: "Only the account owner can change the subscription" });
       }
 
@@ -6613,6 +6613,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(404).json({ message: "Login not found, or it is the account owner" });
       }
       sseBroker.disconnectUser(merchantId, userId);
+      // Its devices stop getting notifications too, as when a login is disabled (owner decision
+      // 2026-09-22). The cascade takes the subscriptions recorded against it; this also stops the
+      // business's unattributed ones from before 0029. The login is already removed, so a fault
+      // here is logged, never returned.
+      await storage.deactivatePushSubscriptionsForLogin(merchantId, userId)
+        .catch((error) => console.error("[TEAM_REMOVE_PUSH_STOP]", error));
       res.json({ message: "Login removed" });
     } catch (error) {
       console.error("Remove team member error:", error);

@@ -364,6 +364,24 @@ describe("MemStorage board allocation", () => {
 });
 
 describe("DatabaseStorage write shape", () => {
+  // C10 batch 5 (2026-09-26): turning a device's notifications off answered "done" when the
+  // database failed, because this method swallowed every error; the device kept notifying.
+  test("does not report a device's notifications stopped when the database fails", async () => {
+    const fakeDb = {
+      update: () => ({
+        set: () => ({
+          where: async () => { throw new Error("connection terminated"); },
+        }),
+      }),
+    };
+    const storage = new DatabaseStorage();
+    (storage as unknown as { db: unknown }).db = fakeDb;
+
+    await expect(
+      storage.deactivatePushSubscriptionByEndpoint("https://push.example.test/device"),
+    ).rejects.toThrow("connection terminated");
+  });
+
   test("inserts taptStoneId without forwarding selectedStoneId to Drizzle", async () => {
     let inserted: Record<string, unknown> | undefined;
     const fakeDb = {
