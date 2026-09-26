@@ -98,6 +98,11 @@ const AUTH_CHECK_CALLS = new Set([
   "storage.getMerchantByToken",
   "storage.getQuoteByToken",
   "storage.getUserByInviteToken",
+  // Sign-in: a password, Google's one-time code, a sign-up's emailed link.
+  "authenticateUser",
+  "checkPasswordEvenly",
+  "storage.consumeAuthHandoffCode",
+  "storage.verifyMerchant",
 ]);
 
 /** Calls that leave the process, by the kind of effect. */
@@ -130,6 +135,13 @@ const SIDE_EFFECT_PREFIXES: Array<[string, string]> = [
   ["sseBroker.", "live update"],
   ["fs.", "file system"],
 ];
+
+/**
+ * Any function named send…Email or resend…Email sends one: the email service's
+ * senders are imported where they are used, often inside the handler, so a new
+ * one is recognised by its name without being listed.
+ */
+const EMAIL_SENDER = /^(re)?send\w*Email$/;
 
 const CAPABILITY_CALLS = new Set(["isWindcaveConfigured", "requireEcommerceApi"]);
 const ENTITLEMENT_NAMES = new Set(["requireBillingCard", "billingCardIsReady", "BILLING_CARD_REQUIRED"]);
@@ -450,7 +462,10 @@ class FactCollector {
     }
     // Recorded even inside a check followed quietly: it is how that check compares.
     if (calleeName === "timingSafeEqual") this.authChecks.add(`constant-time comparison: ${callee}`);
-    const effect = SIDE_EFFECT_CALLS[callee] ?? SIDE_EFFECT_PREFIXES.find(([prefix]) => callee.startsWith(prefix))?.[1];
+    const effect =
+      SIDE_EFFECT_CALLS[callee] ??
+      SIDE_EFFECT_PREFIXES.find(([prefix]) => callee.startsWith(prefix))?.[1] ??
+      (EMAIL_SENDER.test(calleeName) ? "email" : undefined);
     if (effect) this.sideEffects.add(`${effect}: ${callee}`);
     if (CAPABILITY_CALLS.has(callee)) this.capabilityGates.add(callee);
     // A storage budget that refuses a request once spent (consume…Limit) is a rate limit too.

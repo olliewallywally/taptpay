@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 567e1cfa4940f7b6b44c52240dca753dc8a963d6 on 2026-09-26.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ ba1b67420938280ffd620205358cfbb06b595a6e on 2026-09-26.
  *
  * 223 registrations (93 GET, 91 POST, 3 PATCH, 5 ALL, 22 PUT, 9 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -159,6 +159,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     principal: "public",
     markers: [],
     facts: {
+      authChecks: ["storage.consumeAuthHandoffCode"],
       storageMethods: ["consumeAuthHandoffCode"],
       statuses: [200,401,403,500],
       helpers: ["expired"],
@@ -184,6 +185,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     markers: [],
     facts: {
       body: ["schema: loginSchema"],
+      authChecks: ["authenticateUser"],
       storageMethods: ["settleAuthThrottle","takeAuthThrottleSlot"],
       sideEffects: ["audit log: logSecurityEvent"],
       statuses: [200,400,401,429,500],
@@ -252,6 +254,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     markers: [],
     facts: {
       body: ["schema: loginSchema"],
+      authChecks: ["checkPasswordEvenly"],
       storageMethods: ["settleAuthThrottle","takeAuthThrottleSlot"],
       sideEffects: ["audit log: logSecurityEvent"],
       statuses: [200,400,401,429,500],
@@ -967,7 +970,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       middleware: ["authenticateAdmin"],
       params: ["id: strictPositiveIntegerParam"],
       body: ["fields: password"],
-      authChecks: ["authenticateToken","compares req.user?.role !== \"admin\""],
+      authChecks: ["authenticateToken","compares req.user?.role !== \"admin\"","storage.verifyMerchant"],
       storageMethods: ["getMerchant","verifyMerchant"],
       sideEffects: ["audit log: logSecurityEvent"],
       statuses: [200,400,401,403,404,500,503],
@@ -1422,7 +1425,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       body: ["fields: email"],
       authChecks: ["authenticateToken","compares req.user?.role !== \"admin\""],
       storageMethods: ["getMerchantByEmail"],
-      sideEffects: ["audit log: logSecurityEvent"],
+      sideEffects: ["audit log: logSecurityEvent","email: sendMerchantVerificationEmail"],
       statuses: [200,400,401,403,404,500,503],
       helpers: ["authenticateAdmin"],
     },
@@ -1460,6 +1463,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     markers: ["storage.verifyMerchant("],
     facts: {
       body: ["fields: password, token"],
+      authChecks: ["storage.verifyMerchant"],
       storageMethods: ["verifyMerchant"],
       statuses: [200,400,500],
       errorTextInResponse: ["checked.error.issues"],
@@ -1499,6 +1503,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       body: ["fields: email, merchantId"],
       storageMethods: ["getMerchant","getMerchantByEmail","takeAuthThrottleSlot"],
+      sideEffects: ["email: sendMerchantVerificationEmail"],
       statuses: [200,400,429,500],
       rateLimits: ["refuseTooManyAttempts","tooManyAttempts"],
       helpers: ["refuseTooManyAttempts"],
@@ -1527,7 +1532,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       body: ["schema: publicSignupSchema"],
       storageMethods: ["createMerchantWithSignup","getMerchantByEmail","getUserByEmail","takeAuthThrottleSlot"],
-      sideEffects: ["audit log: logSecurityEvent"],
+      sideEffects: ["audit log: logSecurityEvent","email: sendExistingAccountNoticeEmail","email: sendMerchantVerificationEmail"],
       statuses: [200,400,429,500],
       errorTextInResponse: ["validation.error.issues"],
       rateLimits: ["checkRateLimit"],
@@ -2209,6 +2214,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     markers: [],
     facts: {
       body: ["fields: businessName, layout, pdf, stoneId, submitterEmail, submitterName"],
+      sideEffects: ["email: sendBoardBuilderEmail"],
       statuses: [200,400,500],
     },
   },

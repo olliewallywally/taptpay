@@ -28,7 +28,12 @@ const TOKEN_CHECKS = [
   "storage.getMerchantByToken",
   "storage.getQuoteByToken",
   "storage.getUserByInviteToken",
+  "storage.consumeAuthHandoffCode",
+  "storage.verifyMerchant",
 ];
+
+/** Checks that prove a sign-in: a password, or Google's code for a verified email. */
+const CREDENTIAL_CHECKS = ["authenticateUser", "checkPasswordEvenly", "verifyGoogleSignInState"];
 
 const UNAUTHENTICATED: ReadonlyArray<ReviewedBranch["principal"]> = [
   "public",
@@ -130,6 +135,15 @@ function problemsWith(key: string, review: RouteReview): string[] {
         break;
       case "system":
         if (branch.principal !== "cron") say(`${label} is a scheduled run, but is not cron`);
+        break;
+      case "credentials":
+        if (branch.principal !== "public") say(`${label} is selected by credentials, but is not a public branch`);
+        if (!has(facts.authChecks, CREDENTIAL_CHECKS)) say(`${label} is selected by credentials, but the route calls no password or Google check`);
+        break;
+      case "mailbox":
+        // Anyone may name any address: without a limit, the server emails it on their say-so.
+        if (branch.principal !== "public") say(`${label} acts by emailing an address, but is not a public branch`);
+        if (facts.rateLimits.length === 0) say(`${label} emails an address the caller names, but calls no rate limit`);
         break;
       default:
         break;
@@ -273,6 +287,51 @@ describe("R1-T2 / R1-T3 — every route's reviewed policy holds against its hand
         controls: { authenticity: "anyone", replay: "read-only", rate: "none" },
       };
       expect(problemsWith(read, review).join("\n")).toContain("must be a finding");
+    });
+
+    it("refuse a sign-in by credentials on a route that checks no password and asks Google nothing", () => {
+      const start = "GET /api/auth/google";
+      const review: RouteReview = {
+        branches: [{ principal: "public", tenant: "credentials", tenantRule: "the login the email names" }],
+        input: "nothing",
+        capability: null,
+        entitlement: null,
+        idempotency: "starts a sign-in",
+        sideEffects: null,
+        successDto: "302",
+        errorDisclosure: ["fixed"],
+        controls: { authenticity: "a password", replay: "harmless", rate: "none" },
+      };
+      expect(problemsWith(start, review).join("\n")).toContain("calls no password or Google check");
+      const signedIn: RouteReview = {
+        ...review,
+        branches: [{ principal: "merchant", roles: ["owner"], tenant: "credentials", tenantRule: "the login" }],
+      };
+      expect(problemsWith(start, signedIn).join("\n")).toContain("is selected by credentials, but is not a public branch");
+    });
+
+    it("refuse a route that emails an address the caller names without a rate limit", () => {
+      const status = "GET /api/merchants/:id/email-status";
+      const review: RouteReview = {
+        branches: [{ principal: "public", tenant: "mailbox", tenantRule: "the address named" }],
+        input: "id: strict",
+        capability: null,
+        entitlement: null,
+        idempotency: "read-only",
+        sideEffects: null,
+        successDto: "{ emailVerified }",
+        errorDisclosure: ["fixed"],
+        controls: { authenticity: "the mailbox", replay: "read-only", rate: "none" },
+      };
+      expect(problemsWith(status, review).join("\n")).toContain("emails an address the caller names, but calls no rate limit");
+    });
+
+    it("refuse a sign-up link or Google's one-time code held without its credential check", () => {
+      // The checks that make these routes a credential holder's are recorded (route-facts.ts).
+      for (const key of ["POST /api/auth/google/session", "POST /api/merchants/verify"]) {
+        const facts = factsOf(key);
+        expect(facts.authChecks.filter((check) => TOKEN_CHECKS.includes(check))).toHaveLength(1);
+      }
     });
 
     it("refuse a silent rate limit, an unexplained raw value, and a missing gate", () => {

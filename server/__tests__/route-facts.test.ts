@@ -297,6 +297,48 @@ describe("R1-T2 route facts, read from each handler's syntax tree (C10)", () => 
     ]);
   });
 
+  it("reads the sign-in checks: a password, a one-time code and a sign-up link", () => {
+    // Batch 3b: without these, sign-in and its one-time credentials would read as
+    // routes that check nothing.
+    const source = `
+      export function wire(app: Express) {
+        app.post("/login", async (req, res) => {
+          const user = await authenticateUser(req.body.email, req.body.password);
+          if (!user) return res.status(401).end();
+          res.json({ ok: true });
+        });
+        app.post("/admin", async (req, res) => {
+          if (!(await checkPasswordEvenly(req.body.password, config.admin.passwordHash))) return res.status(401).end();
+          res.json({ ok: true });
+        });
+        app.post("/session", async (req, res) => {
+          res.json({ redeemed: await storage.consumeAuthHandoffCode(req.body.code, new Date()) });
+        });
+        app.post("/verify", async (req, res) => {
+          res.json({ merchant: await storage.verifyMerchant(req.body.token, "hash") });
+        });
+      }`;
+    const facts = extractRouteFacts(source, "server/wire.ts");
+    expect(facts.get("POST /login")?.authChecks).toEqual(["authenticateUser"]);
+    expect(facts.get("POST /admin")?.authChecks).toEqual(["checkPasswordEvenly"]);
+    expect(facts.get("POST /session")?.authChecks).toEqual(["storage.consumeAuthHandoffCode"]);
+    expect(facts.get("POST /verify")?.authChecks).toEqual(["storage.verifyMerchant"]);
+  });
+
+  it("reads an email sent by any send…Email function, even one imported inside the handler", () => {
+    const source = `
+      export function wire(app: Express) {
+        app.post("/signup", async (req, res) => {
+          const { sendMerchantVerificationEmail } = await import("./email-service-multi");
+          await sendMerchantVerificationEmail(req.body.email, "token");
+          res.json({ ok: true });
+        });
+      }`;
+    expect(extractRouteFacts(source, "server/wire.ts").get("POST /signup")?.sideEffects).toEqual([
+      "email: sendMerchantVerificationEmail",
+    ]);
+  });
+
   it("reads a handler passed by name", () => {
     expect(factsFor("GET /api/billing/card/callback")).toMatchObject({
       middleware: [],

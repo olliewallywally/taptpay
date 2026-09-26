@@ -41,6 +41,8 @@ export type TenantSource =
   | "key" // the API key's merchant
   | "any-merchant" // the platform admin, across merchants
   | "system" // a scheduled job over every merchant
+  | "credentials" // sign-in: the login an email and its password, or Google's verified email, name
+  | "mailbox" // the account an address (or number) names, acted on only by emailing that address; the same answer for any
   | "none"; // no merchant data
 
 /** What an error response can reveal. */
@@ -139,6 +141,18 @@ const QUOTE_TENANT_RULE =
 const QUOTE_AUTHENTICITY = "holding the quote's link: its token is the credential for that one quote";
 const QUOTE_WHOLE_ROW_FINDING =
   "Returns the whole quote row, where the code's own comment asks for a narrow reply: with it the business's numeric id, the client profile id, the token, internal timestamps and documentUrl, a storage path (served to nobody since gap 13).";
+
+// ── Sign-in entry points: /api/auth/*, the admin sign-in, sign-up, confirmation, invites ──
+// The attempt limits (server/auth-throttle.ts) are counted in the database (auth_throttle), so
+// across server instances; an address's own count starts only once TRUST_PROXY_HOPS is set.
+const SIGN_IN_RATE =
+  "takeAuthThrottleSlot before the password is checked: per email (a device that has signed in with it is counted on its own), 5 free, then waits from 30 s doubling to 15 minutes, never a lockout; per visitor address (50 free) once TRUST_PROXY_HOPS is set (R1-T4 phase B). Counted in the database, so across server instances";
+const EVEN_ANSWER =
+  "one fixed message for every address, never sooner than ACCOUNT_EMAIL_REPLY_FLOOR_MS after the request began (owner decision 2026-09-23), so neither the answer nor its timing tells which addresses have accounts";
+const ONE_TIME_TOKEN_RATE =
+  "none — the token is 32 random bytes and only its hash is looked up, so it cannot be guessed; a password is hashed only once a live token is found";
+const CONFIRMATION_TOKEN_FINDING =
+  "The sign-up confirmation token is stored as it was sent, not hashed (reset and invite tokens keep only a SHA-256), and never expires: anyone who can read the merchants table holds every waiting application's link. Here the link alone confirms nothing (the password chosen at sign-up is asked for), but POST /api/merchants/verify still accepts it with a new password.";
 
 function tokenRate(family: string, perMinute: number): string {
   return (
@@ -1038,13 +1052,388 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       QUOTE_WHOLE_ROW_FINDING,
     ],
   },
+
+  // ── Batch 3b (2026-09-26): sign-in entry points ──
+  "GET /api/auth/google": {
+    branches: [
+      { principal: "public", tenant: "none", tenantRule: "no merchant data: starts a Google sign-in for whoever asks; Google then says who they are" },
+    ],
+    input:
+      "nothing is read from the request; redirect_uri comes from getBaseUrl(req): the configured public origin, or in development the request's own Host",
+    capability:
+      "Google sign-in configured (config.oauth.googleClientId, server/config.ts): without it the browser goes back to /login with an error",
+    entitlement: null,
+    idempotency: "each call starts a new sign-in: a fresh state and PKCE verifier replace this browser's cookie; nothing is stored",
+    sideEffects: null,
+    successDto:
+      "302 to Google's consent page with the client id, redirect_uri, state and the PKCE challenge (S256); sets the HttpOnly state cookie (SameSite=Lax, 10 minutes, __Host- on https); Cache-Control no-store",
+    errorDisclosure: ["fixed"],
+    controls: {
+      authenticity: "anyone: this only starts a sign-in, which Google authenticates and the callback checks",
+      replay: "harmless: a new call replaces this browser's pending sign-in",
+      rate: "none — it stores nothing and calls no one",
+    },
+  },
+
+  "GET /api/auth/google/callback": {
+    branches: [
+      {
+        principal: "public",
+        tenant: "credentials",
+        tenantRule:
+          "the login Google's verified email names: the owner of an existing verified or active merchant (linked to one Google id, never re-linked), or a new verified merchant when the address has neither a merchant nor a login. Refused: an email Google has not verified, an address whose login belongs to another merchant or is not its owner (the existingLogin comparisons), a pending or suspended merchant, a merchant linked to another Google id",
+      },
+    ],
+    input:
+      "query read raw: code (sent to Google with this browser's PKCE verifier), state (must equal the state cookie's, compared in constant time by verifyGoogleSignInState; both halves must be 43 base64url characters) and error (only its presence is used)",
+    capability:
+      "Google sign-in configured (config.oauth.googleClientId and googleClientSecret, server/config.ts): without them the browser goes back to /login with an error",
+    entitlement: null,
+    idempotency:
+      "the state cookie is cleared on every call; a new Google user gets one merchant (two first sign-ins at once: the second fails on the unique email and is asked to try again); an existing merchant is linked to the Google id once; each success stores a new one-time handoff code",
+    sideEffects:
+      "asks Google to exchange the code (oauth2.googleapis.com/token, with the client secret and the PKCE verifier) and for the profile (googleapis.com/oauth2/v2/userinfo); for a new Google user, creates a verified merchant (createMerchantWithPassword) and its owner login (createUser, server/auth.ts, which keeps an existing password)",
+    successDto:
+      "302 to /login?google=complete, with the one-time handoff code in a second HttpOnly cookie (SameSite=Strict, 60 seconds): never a token in an address. Every refusal is a 302 to /login?error=<a fixed message>",
+    errorDisclosure: ["fixed"],
+    controls: {
+      authenticity:
+        "Google's authorization code, exchanged with the PKCE verifier from this browser's state cookie, and Google's word that the email is verified. The returned state must equal the cookie's, which stops login CSRF and makes a stolen code useless. The server keeps no record of the pair, so a script can present one of its own making; that gets it only Google's refusal of a made-up code",
+      replay: "Google accepts a code once; a replayed cookie and state make the server ask Google again, which refuses the spent code",
+      rate:
+        "tooManyAttempts after takeAuthThrottleSlot per visitor address (20 free, then waits from 30 s), counted before Google is asked, only once TRUST_PROXY_HOPS is set (R1-T4 phase B, off by default): until then no limit. A success gives its count back",
+    },
+    findings: [
+      "Until TRUST_PROXY_HOPS is set there is no limit: every request carrying a self-made cookie and state makes the server call Google's token endpoint, which refuses the made-up code. Phase B's live check switches the limit on.",
+    ],
+  },
+
+  "POST /api/auth/google/session": {
+    branches: [
+      {
+        principal: "public-bearer",
+        tenant: "token",
+        tenantRule:
+          "the one-time handoff code in this browser's cookie selects the one login the callback signed in: only its SHA-256 is looked up, and storage.consumeAuthHandoffCode spends it in one statement (unknown, spent, or older than 60 seconds: 401 GOOGLE_SIGN_IN_EXPIRED)",
+      },
+    ],
+    input: "only the handoff cookie, refused unless it is 43 base64url characters (handoffCodeHash); the body is not read",
+    capability: null,
+    entitlement: null,
+    idempotency: "one-time: the first redemption spends the code (of two at once, exactly one succeeds); the cookie is cleared on every call",
+    sideEffects: null,
+    successDto:
+      "{ token, merchantId, newUser }: the account token in the body only, Cache-Control no-store. 403 ACCOUNT_UNAVAILABLE when the login is no longer active, its merchant neither verified nor active, or a member over the seat limit (issueTokenForUserId, server/auth.ts)",
+    errorDisclosure: ["fixed"],
+    controls: {
+      authenticity:
+        "the one-time code the callback set in this browser's cookie. SameSite=Strict, so another site cannot make the browser redeem it",
+      replay: "refused: the code is spent on first use",
+      rate: "none — a 32-byte code that lives 60 seconds cannot be guessed",
+    },
+  },
+
+  "POST /api/auth/login": {
+    branches: [
+      {
+        principal: "public",
+        tenant: "credentials",
+        tenantRule:
+          "the login the email names, when its password matches (authenticateUser: the password is checked at full cost for every email, one with no login included; then the login must be active, its merchant verified or active, and a member within the seat limit). Every refusal is the same 401",
+      },
+    ],
+    input: "body: loginSchema (400 with its issues)",
+    capability: null,
+    entitlement: null,
+    idempotency:
+      "each success issues another one-hour token and records the login time; each failure counts against the email (or this device) and, once addresses are told apart, the visitor's address",
+    sideEffects: "security audit log entries (logSecurityEvent: LOGIN_SUCCESS, FAILED_LOGIN, LOGIN_SLOWED, LOGIN_ERROR), with the email and address",
+    successDto: "{ token, user: { id, email, merchantId, role } }; sets the known-device cookie",
+    errorDisclosure: ["input-issues"],
+    controls: {
+      authenticity: "the email and its password",
+      replay: "a replayed success issues another token; a replayed failure counts again",
+      rate: SIGN_IN_RATE,
+    },
+  },
+
+  "POST /api/admin/auth/login": {
+    branches: [
+      {
+        principal: "public",
+        tenant: "credentials",
+        tenantRule:
+          "the platform admin: the configured admin email (compared without regard to case) and ADMIN_PASSWORD_HASH; any other email is refused after the same work (checkPasswordEvenly with the admin hash's budget)",
+      },
+    ],
+    input: "body: loginSchema (400 with its issues)",
+    capability: null,
+    entitlement: null,
+    idempotency: "each success issues another one-hour admin token; each failure counts against the email (or this device) and the visitor's address",
+    sideEffects: "security audit log entries (logSecurityEvent: ADMIN_LOGIN_SUCCESS, ADMIN_FAILED_LOGIN, ADMIN_LOGIN_SLOWED, ADMIN_LOGIN_ERROR)",
+    successDto:
+      "{ token, user: { id: 1, email, merchantId: 0, role: 'admin' } }: a one-hour token under the dedicated admin principal; sets the admin known-device cookie",
+    errorDisclosure: ["input-issues"],
+    controls: {
+      authenticity: "the admin email and its password",
+      replay: "a replayed success issues another token; a replayed failure counts again",
+      rate: `${SIGN_IN_RATE}; the admin's buckets are its own`,
+    },
+    findings: [
+      "While ADMIN_PASSWORD_HASH is unset (today, everywhere), the admin's email is answered 500 'Admin login unavailable' at once and every other email 401 after a full password check: the answer and its timing show which address is the admin's, against the owner's 2026-09-23 rule for sign-in. It ends when the owner sets the hash (npm run admin:password).",
+    ],
+  },
+
+  "POST /api/auth/forgot-password": {
+    branches: [
+      {
+        principal: "public",
+        tenant: "mailbox",
+        tenantRule:
+          "the login the email names, reached only by email to that address: only an active owner or member login is sent a link (requestPasswordReset, server/auth.ts); the answer is the same for every address",
+      },
+    ],
+    input: "body: forgotPasswordSchema (400 with its issues)",
+    capability: null,
+    entitlement: null,
+    idempotency:
+      "each request for a login replaces its live link (a new token, valid one hour); counted before any link is made, so a refused request leaves the link already sent working",
+    sideEffects:
+      "for an active login, stores the hash of a new reset token and emails the link (requestPasswordReset → sendPasswordResetEmail, server/auth.ts); security audit log (logSecurityEvent: PASSWORD_RESET_SLOWED)",
+    successDto: EVEN_ANSWER,
+    errorDisclosure: ["input-issues"],
+    controls: {
+      authenticity: "none needed: the link goes only to the address's own mailbox",
+      replay: "each replay replaces the live link and sends another email, within the limit",
+      rate:
+        "takeAuthThrottleSlot per email asked, whether or not it has a login (3 free, then waits from 5 minutes doubling to an hour), and per visitor address (10 free) once TRUST_PROXY_HOPS is set; in the database",
+    },
+    findings: [
+      "A storage or email fault is answered as a success: requestPasswordReset returns false and the route ignores it, so the visitor is told a link was sent when none was. Partly deliberate: only a login's request writes and sends, so an error answered there would show which addresses have logins. A failed lookup, which fails alike for every address, could be answered 500 without that.",
+    ],
+  },
+
+  "POST /api/auth/reset-password": {
+    branches: [
+      {
+        principal: "public-bearer",
+        tenant: "token",
+        tenantRule:
+          "the reset token (32 random bytes, hex) selects the one login it was sent to: only its SHA-256 is looked up; it must be live (one hour), the login active and an owner or member (resetPassword, server/auth.ts); storage.resetUserPasswordByToken spends it in the statement that sets the password",
+      },
+    ],
+    input: "body: resetPasswordSchema: the token and a new password meeting the one password rule, with its confirmation (400 with the first issue and the issues)",
+    capability: null,
+    entitlement: null,
+    idempotency:
+      "one-time: the token is spent with the new password in one statement, and a second use is 400. A storage fault is 500 and changes nothing, so the same link can be tried again (until 2026-09-26 a fault was answered 400 'Invalid or expired reset token')",
+    sideEffects:
+      "ends every session of the login (its session version, advanced in the same statement), closes its live streams (sseBroker.disconnectUser) and stops its devices' notifications; forgives its sign-in slow-downs",
+    successDto: "{ message }; marks this browser as a known device for the login",
+    errorDisclosure: ["input-issues"],
+    controls: {
+      authenticity: "holding the emailed reset link: its token is the credential for that one login's reset",
+      replay: "refused: the token is spent in the statement that sets the password",
+      rate: ONE_TIME_TOKEN_RATE,
+    },
+  },
+
+  "GET /api/auth/validate-reset-token/:token": {
+    branches: [
+      {
+        principal: "public-bearer",
+        tenant: "token",
+        tenantRule:
+          "the reset token selects the one login it was sent to: only its SHA-256 is looked up (validateResetToken, server/auth.ts); valid while live, for an active owner or member login",
+      },
+    ],
+    input: "token: read raw, then only its SHA-256 is looked up",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto:
+      "{ valid }. A storage fault is 500, not { valid: false } (until 2026-09-26 the helper answered a fault as an expired link, against this route's own comment)",
+    errorDisclosure: ["fixed"],
+    controls: {
+      authenticity: "holding the emailed reset link",
+      replay: "read-only",
+      rate: "none — the token cannot be guessed, and each call is one read by its hash",
+    },
+    findings: [
+      "The reset page (client/src/pages/reset-password.tsx) shows 'Expired Reset Link' for a failed check as well as for an expired link, and offers only a new link: now that the server answers a fault with 500, the page still has to tell the two apart. R1-T9's rule, but this public page was not on its screen list: put to the owner 2026-09-26.",
+    ],
+  },
+
+  "POST /api/auth/confirm-email": {
+    branches: [
+      {
+        principal: "public-bearer",
+        tenant: "token",
+        tenantRule:
+          "the confirmation token selects the one application it was sent for (storage.getMerchantByToken), and the password chosen at sign-up must match it (owner decision 2026-09-23); an application without a chosen password cannot be confirmed online",
+      },
+    ],
+    input: "body read without a schema: token and password, each used only when it is a string (400 when the token is missing)",
+    capability: null,
+    entitlement: null,
+    idempotency:
+      "one-time: confirmMerchantEmail clears the token as it confirms the application and activates its pending subscription, in one transaction; a second use is 400",
+    sideEffects:
+      "for a complete application, emails it to the owner's inbox (sendEmail to oliver@taptpay.co.nz, the text escaped); refreshes the login store (syncVerifiedMerchants, server/auth.ts)",
+    successDto: "{ message, merchantId }",
+    errorDisclosure: ["fixed"],
+    controls: {
+      authenticity: "holding the emailed link and the password chosen at sign-up",
+      replay: "refused once confirmed: the token is cleared",
+      rate:
+        "takeAuthThrottleSlot per link before the password is checked: 5 wrong passwords, then waits from 30 s doubling to 15 minutes, as sign-in; in the database",
+    },
+    findings: [CONFIRMATION_TOKEN_FINDING],
+  },
+
+  "POST /api/auth/resend-confirmation": {
+    branches: [
+      {
+        principal: "public",
+        tenant: "mailbox",
+        tenantRule:
+          "the application the email (or account number) names, reached only by email to its own address: only one still waiting to be confirmed is sent its link again; the answer is the same for every address or number (owner decision 2026-09-23)",
+      },
+    ],
+    input:
+      "body read without a schema: email (checked with forgotPasswordSchema) or merchantId (strictPositiveIntegerParam); 400 when neither is usable",
+    capability: null,
+    entitlement: null,
+    idempotency: "each request sends the same link again; the token is not replaced",
+    sideEffects: "for a waiting application, emails its confirmation link again (sendMerchantVerificationEmail)",
+    successDto: EVEN_ANSWER.replace("every address", "every address or number"),
+    errorDisclosure: ["fixed"],
+    controls: {
+      authenticity: "none needed: the link goes only to the application's own address",
+      replay: "each replay sends the link again, within the limit",
+      rate:
+        "takeAuthThrottleSlot per address or number asked, whether or not one is waiting: 3 free, then waits from 5 minutes doubling to an hour; in the database",
+    },
+    findings: [
+      "Asked by account number, anyone can have any waiting application's link sent to its address again by counting through the numbers (three sends per number, then slowed). Only the old /business-details page asks by number (see GET /api/merchants/:id/email-status).",
+    ],
+  },
+
+  "POST /api/merchants/signup": {
+    branches: [
+      {
+        principal: "public",
+        tenant: "mailbox",
+        tenantRule:
+          "a new pending application for the address named, usable only once its emailed link is used with the password chosen here; for an address that already has a merchant or a login, a note to that address instead. The answer is the same either way (owner decision 2026-09-23)",
+      },
+    ],
+    input: "body: publicSignupSchema (400 with the first issue and the issues)",
+    capability: null,
+    entitlement: null,
+    idempotency:
+      "a new address creates one pending application; asking again for the same address (now in use) sends that address a note instead, three, then slowed down (signupNoticeBucket)",
+    sideEffects:
+      "creates a pending merchant with its application (createMerchantWithSignup); emails the confirmation link (sendMerchantVerificationEmail) or, for an address in use, a note (sendExistingAccountNoticeEmail); security audit log (logSecurityEvent: SIGNUP_RATE_LIMITED)",
+    successDto:
+      "one fixed message ('Check your email to continue.'), never sooner than SIGN_UP_REPLY_FLOOR_MS after the request began; no account number",
+    errorDisclosure: ["input-issues"],
+    controls: {
+      authenticity:
+        "none needed: nothing made here can be used until the link sent to the address is used with the password chosen here",
+      replay: "for an address in use, a replay sends a note, within its limit; it creates nothing",
+      rate: `${CHECK_RATE_LIMIT}; that count is shared with the board page's feed and the numbered pay route`,
+    },
+    findings: [
+      "The only limit on new applications is checkRateLimit, 100 a minute per visitor address in this process only. Until TRUST_PROXY_HOPS is set, visitors may all count as the proxy's address, and the same count serves GET /api/merchants/:id/active-transaction (which each open board page asks every 3 seconds) and POST /api/transactions/:id/pay: five open board pages can use it up, refusing sign-ups and board payments, and a run of sign-ups can refuse board customers. Each new address costs a bcrypt hash, a merchant row and an email.",
+    ],
+  },
+
+  "POST /api/merchants/verify": {
+    branches: [
+      {
+        principal: "public-bearer",
+        tenant: "token",
+        tenantRule:
+          "the confirmation token selects the one application it was sent for; storage.verifyMerchant sets the password given here, marks the application verified and clears the token, in one transaction",
+      },
+    ],
+    input:
+      "body read without a schema: token (any truthy value) and password (the one password rule, newPasswordSchema; 400 with its first issue)",
+    capability: null,
+    entitlement: null,
+    idempotency: "one-time: the token is cleared as the application is verified; a second use is 400",
+    sideEffects: null,
+    successDto: "{ message, merchant: { id, name, businessName, email, status } }",
+    errorDisclosure: ["input-issues"],
+    controls: {
+      authenticity: "holding the emailed confirmation link only: the password is chosen here, not checked",
+      replay: "refused once used: the token is cleared",
+      rate: "none — no limit, and a bcrypt hash (cost 12) is computed before the token is looked up",
+    },
+    findings: [
+      "No screen calls it (the email links to /confirm-email, whose page uses POST /api/auth/confirm-email). It confirms an application with the emailed link and a password of the caller's choosing, which the owner's 2026-09-23 rule forbids: the link alone must confirm nothing, so that an address's owner cannot be led to confirm a stranger's application. It also marks the application verified without marking its email confirmed. Retire it: put to the owner 2026-09-26.",
+      "Computes a bcrypt hash (cost 12) for any well-formed request before the token is looked up, with no limit: anyone can load the server's processor with it.",
+      CONFIRMATION_TOKEN_FINDING,
+    ],
+  },
+
+  "POST /api/team/accept-invite": {
+    branches: [
+      {
+        principal: "public-bearer",
+        tenant: "token",
+        tenantRule:
+          "the invite token (32 random bytes, hex) selects the one invited login it was sent for (storage.getUserByInviteToken, by its SHA-256): the login must still be invited and the invite unexpired; activateInvitedUser spends the token in the statement that activates the login",
+      },
+    ],
+    input:
+      "body: acceptInviteSchema: the token, an optional name of up to 100 characters, and a password meeting the one password rule with its confirmation (400 with the first issue and the issues)",
+    capability: null,
+    entitlement: null,
+    idempotency: "one-time: the token is burned as the login is activated; a second use is 400",
+    sideEffects: "security audit log (logSecurityEvent: TEAM_INVITE_ACCEPTED)",
+    successDto: "{ message } only; no token: the new teammate signs in",
+    errorDisclosure: ["input-issues"],
+    controls: {
+      authenticity: "holding the emailed invite link",
+      replay: "refused: the token is burned",
+      rate: ONE_TIME_TOKEN_RATE,
+    },
+  },
+
+  "GET /api/merchants/:id/email-status": {
+    branches: [
+      {
+        principal: "public",
+        tenant: "number",
+        tenantRule: "the merchant's sequential number selects it, for any business: anyone can ask whether a number exists (404) and whether its email is confirmed",
+      },
+    ],
+    input: "id: strictPositiveIntegerParam (400 otherwise)",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto: "{ emailVerified } (true for a merchant verified or active by status, too)",
+    errorDisclosure: ["fixed"],
+    controls: {
+      authenticity: "anyone with a merchant's number: numbers are sequential",
+      replay: "read-only",
+      rate: "none — no limit",
+    },
+    findings: [
+      "Public and addressed by a guessable sequential number: anyone can count through the merchants and learn which numbers exist and which have confirmed their email. Its only caller is the old /business-details page, which takes the number from its own address (?id=) and which nothing links to any more (sign-up no longer hands out the number). Retire both, or require the session: put to the owner 2026-09-26.",
+    ],
+  },
 };
 
 /**
  * Routes not reviewed yet. May only shrink: PENDING_CEILING is lowered by
  * every batch, so a route cannot be added here instead of being reviewed.
  */
-export const PENDING_CEILING = 181;
+export const PENDING_CEILING = 167;
 
 export const REVIEW_PENDING: readonly string[] = [
   "GET /robots.txt",
@@ -1052,16 +1441,8 @@ export const REVIEW_PENDING: readonly string[] = [
   "GET /nfc/:merchantId",
   "GET /.well-known/apple-developer-merchantid-domain-association",
   "GET /sitemap.xml",
-  "GET /api/auth/google",
-  "GET /api/auth/google/callback",
-  "POST /api/auth/google/session",
   "POST /api/auth/sign-out-everywhere",
-  "POST /api/auth/login",
-  "POST /api/auth/forgot-password",
-  "POST /api/auth/reset-password",
-  "GET /api/auth/validate-reset-token/:token",
   "GET /api/admin/request-origin",
-  "POST /api/admin/auth/login",
   "GET /api/auth/me",
   "GET /api/tutorial/state",
   "PATCH /api/tutorial/pages/:pageKey",
@@ -1123,12 +1504,7 @@ export const REVIEW_PENDING: readonly string[] = [
   "POST /api/admin/resend-verification",
   "POST /api/admin/test-email",
   "GET /api/admin/email-status",
-  "POST /api/merchants/verify",
-  "GET /api/merchants/:id/email-status",
-  "POST /api/auth/confirm-email",
-  "POST /api/auth/resend-confirmation",
   "POST /api/info-pack-leads",
-  "POST /api/merchants/signup",
   "PUT /api/merchants/:id/business-details",
   "POST /api/admin/merchants/signup",
   "GET /api/merchants/:id/events",
@@ -1169,7 +1545,6 @@ export const REVIEW_PENDING: readonly string[] = [
   "DELETE /api/team/:userId/invite",
   "PUT /api/team/:userId/status",
   "DELETE /api/team/:userId",
-  "POST /api/team/accept-invite",
   "GET /api/subscription/billing-history",
   "GET /api/billing/card",
   "POST /api/billing/card/session",
