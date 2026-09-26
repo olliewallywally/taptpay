@@ -336,15 +336,56 @@ The work itself:
     done:** the auto-mode safety check denied reaching the development database. His to allow or
     do.
 
-**Next:** R1-T2's remaining parts (C10: the per-route fields, and every `app.use` and mounted
-router, which now include `server/app.ts`), then R1-T3's runtime matrix, both on the audited
+- **R1-T2's remaining parts (C10), 2026-09-26: `12bc7d78`, `a394cae3`, `c85501ad`, `9869da1c`,
+  `5e098281`, `cee1276a`, local, awaiting independent review**
+  ([working notes](r1/WORKING-2026-09-26-r1-t2-c10.md)).
+  - Coverage (`12bc7d78`): every file that registers on the app is inventoried (`app.ts`,
+    `routes.ts`, `index.ts`, `vite.ts`). Every `app.use` has a middleware policy entry, in order,
+    checked layer by layer against the harness app. The five `ALL` callbacks are driven with all
+    34 methods.
+  - Facts (`a394cae3`): a syntax-tree pass records what each handler does in the policy:
+    middleware, parsers, validation, ownership checks, storage calls, side effects, statuses,
+    DTOs, error text, gates and rate limits. A test fails on drift.
+  - Review (`9869da1c`, `cee1276a`): a hand-written review per route, held to those facts by rules.
+    31 of 223 are reviewed; the other 192 are on a list that can only shrink. Batch 1 covers
+    provider callbacks, cron, the ecommerce API and billing callbacks. Batch 2 covers payment
+    links, numbered board sales and the payment returns.
+  - Fixed from the review. `c85501ad`: the WhatsApp webhook fails closed and compares its key in
+    constant time; the ecommerce API checks permission before reading the body and hides other
+    merchants' sales. `5e098281`: a board sale splits only when the business allows it, with the
+    link route's strict body; the Windcave return parses its sale number strictly.
+  - Mutations 12, 14, 14 and 9, all caught; server 93/1,699 at `cee1276a`; `tsc` clean.
+  - Left for later phases, recorded in the review:
+    - `GET /api/transactions/:id` lists every sale by counting;
+    - read-then-write settlement (R3/C20);
+    - `authenticateToken` answers 403 for an expired token where P2.2 says 401 (R1-T3);
+    - about 40 property and trades UUID ids are read raw (§8.4).
+- **Owner answers (2026-09-26 ~02:56 UTC)**
+  ([decision](../../decisions/2026-09-26-split-amount-settings-button-board-limit-card-free-owner-answers.md)):
+  - **exact share only, `442bfadf`**: a board sale's customer pays exactly the share owed, and any
+    other amount is refused before a provider session (before, every share of $100 could be paid
+    with $0.01). The split page drops its amount box and rounds like the server.
+  - **the settings button opens the boards, `717b7384`**, and its tutorial step says so;
+  - found on the way, **`a419f948`**: a board sale's "Cancel payment" and "Try Again" no longer
+    lead to the retired `/pay/<business>`;
+  - boards stay capped at 10;
+  - **the card-free account is still not done**: the auto-mode safety check denied the one
+    dev-database write he approved. Nothing was written. His to allow or run.
+  - The session crashed (container restart 03:08 UTC) before committing. Resumed from its
+    transcript and re-verified: `tsc` clean, server 94/1,706, client 96/799, mutations 14/14.
+    Local, awaiting independent review.
+
+**Next:** R1-T2's review, batch 3 (public static and config routes, the sign-in entry points),
+then the signed-in families; 192 routes are pending. Then R1-T3's runtime matrix, on the audited
 harness. Also for R1-T2: `POST /api/board-builder/submit` is public with no rate limit (it emails
-a supplied PDF to the owner's inbox). Open for the owner: the three questions of the no-board
-rework (above). Release of the rework: when production has no pending shared no-board sale
-(count-only check once production is reopened), with `FEATURE_NEW_RETAIL_PAYMENTS` on.
+a supplied PDF to the owner's inbox). Open for the owner: the card-free dev write (above). The
+no-board rework's questions are all answered. Release of the rework: when production has no pending
+shared no-board sale (count-only check once production is reopened), with
+`FEATURE_NEW_RETAIL_PAYMENTS` on.
 
 The phase B live check waits for the owner to set `ADMIN_PASSWORD_HASH`.
 Independent reviews owed (each evidence file ends with its brief):
+- C10 so far (`2ec9d78f..cee1276a`) and the 2026-09-26 owner answers (`cee1276a..a419f948`);
 - the no-board rework (`da90d1a1..5c2cdb27`), its follow-up (`7051e25e..1fb41d14`), and the
   owner-answer fixes 2a–2c (`aba7b2be..da90d1a1`);
 - R1-T1 (`03c4663b..05195728`) and the live-updates fix (`05195728..3fac8ac8`);
