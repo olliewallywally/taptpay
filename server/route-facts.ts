@@ -453,7 +453,8 @@ class FactCollector {
     const effect = SIDE_EFFECT_CALLS[callee] ?? SIDE_EFFECT_PREFIXES.find(([prefix]) => callee.startsWith(prefix))?.[1];
     if (effect) this.sideEffects.add(`${effect}: ${callee}`);
     if (CAPABILITY_CALLS.has(callee)) this.capabilityGates.add(callee);
-    if (/RateLimit|Limiter|tooManyAttempts|TooManyAttempts/.test(callee)) this.rateLimits.add(callee);
+    // A storage budget that refuses a request once spent (consume…Limit) is a rate limit too.
+    if (/RateLimit|Limiter|tooManyAttempts|TooManyAttempts|consume\w*Limit$/.test(callee)) this.rateLimits.add(callee);
     if (/idempotency|claim/i.test(calleeName)) this.idempotency.add(calleeName);
 
     // Follow a helper defined in this file. An authorization check is followed

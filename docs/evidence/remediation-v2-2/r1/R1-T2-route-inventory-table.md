@@ -1,4 +1,4 @@
-# R1-T2 route inventory — generated 2026-09-26 @ `30c9d8cb7cb8a1e461ff6834d1d7ebe7839a964b`
+# R1-T2 route inventory — generated 2026-09-26 @ `567e1cfa4940f7b6b44c52240dca753dc8a963d6`
 
 Regenerate with `npx tsx scripts/generate-route-policy.ts`. This table is
 evidence for the SHA named above, not a timeless constant — see
@@ -14,7 +14,7 @@ necessarily a bug): **0**.
 
 ## Review
 
-31 of 223 routes reviewed (server/route-review.ts); 192 pending.
+42 of 223 routes reviewed (server/route-review.ts); 181 pending.
 A reviewed route's principal below is the review's; a pending one's is the heuristic, marked "(heuristic)".
 
 ### Open findings
@@ -41,6 +41,21 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 - **GET /api/transactions/:id/receipt-qr:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
 - **GET /api/windcave/callback:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
 - **GET /api/windcave/callback:** Settles by a read then a write, not a claim, racing the notification (plan 22.7 / R3, C20).
+- **POST /api/checkout/:token/split:** What a split share costs is fixed when its session is opened, from the share count and the shares paid at that moment, and is never checked again: the count can change until a share is paid, so a share opened at 1/12 then counts as 1/2 and the invoice shows paid with less money; shares opened at once are all charged the equal share, so the remainder's cents go uncharged. Same root as the session finding (R3).
+- **POST /api/checkout/pay:** No screen calls this route (the checkout page uses POST /api/checkout/:token/session): a public redirect flow kept alive. A split invoice's share paid through it can never be recorded: no session is pinned, the browser return settles only a pinned session, and the notification finds invoices by their pinned session.
+- **POST /api/checkout/pay:** Every call opens another provider session and re-pins a single-payment invoice to it: a payment completed on an earlier session is then refused at completion (403) and missed by the notification, which finds invoices by their pinned session. The payer is charged and the invoice stays unpaid (R3: payment attempts).
+- **POST /api/checkout/pay:** payerEmail, checked only against /.+@.+\..+/, is added to splitPayerEmails without limit (10 calls a minute per link), and every address gets the rent invoice's GST invoice once it is paid: a link holder can have the business email its tenant's name, address and rent to any number of addresses. Trades store the list but email only the client.
+- **POST /api/checkout/pay:** What a split share costs is fixed when its session is opened, from the share count and the shares paid at that moment, and is never checked again: the count can change until a share is paid, so a share opened at 1/12 then counts as 1/2 and the invoice shows paid with less money; shares opened at once are all charged the equal share, so the remainder's cents go uncharged. Same root as the session finding (R3).
+- **POST /api/checkout/:token/session:** Every call opens another provider session and re-pins a single-payment invoice to it: a payment completed on an earlier session is then refused at completion (403) and missed by the notification, which finds invoices by their pinned session. The payer is charged and the invoice stays unpaid (R3: payment attempts).
+- **POST /api/checkout/:token/session:** payerEmail, checked only against /.+@.+\..+/, is added to splitPayerEmails without limit (10 calls a minute per link), and every address gets the rent invoice's GST invoice once it is paid: a link holder can have the business email its tenant's name, address and rent to any number of addresses. Trades store the list but email only the client.
+- **POST /api/checkout/:token/session:** What a split share costs is fixed when its session is opened, from the share count and the shares paid at that moment, and is never checked again: the count can change until a share is paid, so a share opened at 1/12 then counts as 1/2 and the invoice shows paid with less money; shares opened at once are all charged the equal share, so the remainder's cents go uncharged. Same root as the session finding (R3).
+- **POST /api/checkout/:token/hosted-fields-complete:** A split invoice records none of the sessions opened for it, so its completion checks only that the provider approved the session the page sends: any approved session on the platform's provider account (another invoice's share, a $1 purchase anywhere) marks one share paid, one such session per share marks the invoice paid, and each is emailed a GST invoice once rent is paid. The single-payment branch was fixed 2026-09-26 (R1-T7's rule). Needs each opened session recorded (the payment attempts engine, R3, or an interim column): put to the owner 2026-09-26.
+- **POST /api/checkout/:token/googlepay-complete:** A split invoice records none of the sessions opened for it, so its completion checks only that the provider approved the session the page sends: any approved session on the platform's provider account (another invoice's share, a $1 purchase anywhere) marks one share paid, one such session per share marks the invoice paid, and each is emailed a GST invoice once rent is paid. The single-payment branch was fixed 2026-09-26 (R1-T7's rule). Needs each opened session recorded (the payment attempts engine, R3, or an interim column): put to the owner 2026-09-26.
+- **POST /api/checkout/:token/googlepay-complete:** The submit URLs are cached per link, not per session: when two payers of one split invoice open sessions, the first one's Google Pay payment goes to the second one's session, and both sessions are then counted as shares.
+- **GET /api/checkout/callback:** Settles by a read then a write, not a claim, racing the notification (R3 / C20).
+- **GET /api/trades/quotes/token/:token:** Returns the whole quote row, where the code's own comment asks for a narrow reply: with it the business's numeric id, the client profile id, the token, internal timestamps and documentUrl, a storage path (served to nobody since gap 13).
+- **POST /api/trades/quotes/token/:token/respond:** Two acceptances at once can both pass the status check, and each issues and sends an invoice (a read then a write; R3 / C20).
+- **POST /api/trades/quotes/token/:token/respond:** Returns the whole quote row, where the code's own comment asks for a narrow reply: with it the business's numeric id, the client profile id, the token, internal timestamps and documentUrl, a storage path (served to nobody since gap 13).
 
 ## Routes
 
@@ -222,14 +237,14 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 | GET | `/api/property/invoices/:id` | 7823 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
 | POST | `/api/property/invoices/:id/void` | 7834 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
 | POST | `/api/property/invoices/:id/mark-paid-external` | 7848 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| GET | `/api/checkout/resolve/:token` | 7868 | public (heuristic) | getCheckoutInvoiceByToken( |
-| GET | `/api/checkout/document/:token` | 7954 | public (heuristic) | getCheckoutInvoiceByToken( |
-| POST | `/api/checkout/:token/split` | 7978 | public (heuristic) | getCheckoutInvoiceByToken( |
-| POST | `/api/checkout/pay` | 7997 | public (heuristic) | getCheckoutInvoiceByToken( |
-| POST | `/api/checkout/:token/session` | 8059 | public (heuristic) | getCheckoutInvoiceByToken( |
-| POST | `/api/checkout/:token/hosted-fields-complete` | 8132 | public (heuristic) | getCheckoutInvoiceByToken( |
-| POST | `/api/checkout/:token/googlepay-complete` | 8166 | public (heuristic) | getCheckoutInvoiceByToken( |
-| GET | `/api/checkout/callback` | 8222 | public (heuristic) | getCheckoutInvoiceByToken( |
+| GET | `/api/checkout/resolve/:token` | 7868 | public-bearer | getCheckoutInvoiceByToken( |
+| GET | `/api/checkout/document/:token` | 7954 | public-bearer | getCheckoutInvoiceByToken( |
+| POST | `/api/checkout/:token/split` | 7978 | public-bearer | getCheckoutInvoiceByToken( |
+| POST | `/api/checkout/pay` | 7997 | public-bearer | getCheckoutInvoiceByToken( |
+| POST | `/api/checkout/:token/session` | 8059 | public-bearer | getCheckoutInvoiceByToken( |
+| POST | `/api/checkout/:token/hosted-fields-complete` | 8132 | public-bearer | getCheckoutInvoiceByToken( |
+| POST | `/api/checkout/:token/googlepay-complete` | 8166 | public-bearer | getCheckoutInvoiceByToken( |
+| GET | `/api/checkout/callback` | 8222 | public-bearer | getCheckoutInvoiceByToken( |
 | ALL | `/api/windcave/rent-notification` | 8249 | provider | — |
 | ALL | `/api/windcave/trades-notification` | 8266 | provider | — |
 | POST | `/api/webhooks/whatsapp` | 8286 | provider | req.headers["apikey"] |
@@ -252,10 +267,10 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 | POST | `/api/trades/quotes` | 8514 | merchant-user (heuristic) | authenticateToken |
 | GET | `/api/trades/quotes/:id` | 8591 | merchant-user (heuristic) | authenticateToken |
 | GET | `/api/trades/quotes/:id/pdf` | 8618 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/quotes/token/:token/pdf` | 8631 | public (heuristic) | getQuoteByToken( |
+| GET | `/api/trades/quotes/token/:token/pdf` | 8631 | public-bearer | getQuoteByToken( |
 | POST | `/api/trades/quotes/:id/resend` | 8642 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/quotes/token/:token` | 8658 | public (heuristic) | getQuoteByToken( |
-| POST | `/api/trades/quotes/token/:token/respond` | 8703 | public (heuristic) | getQuoteByToken( |
+| GET | `/api/trades/quotes/token/:token` | 8658 | public-bearer | getQuoteByToken( |
+| POST | `/api/trades/quotes/token/:token/respond` | 8703 | public-bearer | getQuoteByToken( |
 | GET | `/api/trades/invoices` | 8752 | merchant-user (heuristic) | authenticateToken |
 | POST | `/api/trades/invoices` | 8762 | merchant-user (heuristic) | authenticateToken |
 | POST | `/api/trades/invoices/:id/resend` | 8814 | merchant-user (heuristic) | authenticateToken |
@@ -2453,7 +2468,16 @@ Review pending.
 - rateLimits: `tokenRateLimit`
 - helpers: `getCheckoutParty`, `invoiceHasCheckoutDocument`, `tokenRateLimit`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public-bearer. **Tenant (token):** the invoice's checkout token (20 random bytes, base64url) selects its one invoice, rent or trades (getCheckoutInvoiceByToken); an unknown token is 404
+- **Input:** token: read raw, then looked up (only a real token finds an invoice)
+- **Idempotency:** read-only
+- **Success:** for a payable invoice: vertical, invoice id, amount, due date, status, the business's id, name and logo, the payer's name, address and co-tenants, kind and charge type, rent frequency or the quote's total and deposit terms, the description, a token-scoped document link (gap 13) and the split state; for a paid one only { alreadyPaid, amountCents }
+- **Error disclosure:** fixed
+- **Authenticity:** holding the invoice's checkout link: its token is the credential for that one invoice and for nothing else
+- **Replay:** read-only
+- **Rate:** tokenRateLimit (10 a minute per token, counted in this server process only; an unknown token gets a count of its own, so it limits one link's use, not guessing, which a 160-bit token makes futile)
 
 ### GET `/api/checkout/document/:token`
 
@@ -2461,9 +2485,19 @@ Review pending.
 - authChecks: `getCheckoutInvoiceByToken`
 - storageMethods: `consumeInvoiceDocumentReadLimit`, `getInvoiceRentRequestByToken`, `getJobInvoiceByToken`, `getUploadedFileForMerchant`
 - statuses: `200`, `404`, `410`, `429`, `500`, `503`
+- rateLimits: `storage.consumeInvoiceDocumentReadLimit`
 - helpers: `sendPrivateDocument`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public-bearer. **Tenant (token):** the invoice's checkout token (20 random bytes, base64url) selects its one invoice, rent or trades (getCheckoutInvoiceByToken); an unknown token is 404; the file must be the invoice's own attachment and belong to the invoice's business (getUploadedFileForMerchant)
+- **Input:** token: must match /^[A-Za-z0-9_-]{1,200}$/ (404 otherwise), then looked up
+- **Idempotency:** read-only (each read spends the link's read budget)
+- **Success:** the attached document's bytes, with its stored type, Cache-Control private, no-store and nosniff (sendPrivateDocument)
+- **Error disclosure:** fixed
+- **Authenticity:** holding the invoice's checkout link: its token is the credential for that one invoice and for nothing else
+- **Replay:** read-only
+- **Rate:** storage.consumeInvoiceDocumentReadLimit: 10 a minute per real link, shared through the database; an unknown link is 404 before it, and a limiter outage is 503 (fails closed)
 
 ### POST `/api/checkout/:token/split`
 
@@ -2475,7 +2509,17 @@ Review pending.
 - rateLimits: `tokenRateLimit`
 - helpers: `tokenRateLimit`, `updateCheckoutInvoice`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public-bearer. **Tenant (token):** the invoice's checkout token (20 random bytes, base64url) selects its one invoice, rent or trades (getCheckoutInvoiceByToken); an unknown token is 404
+- **Input:** token: read raw, then looked up; body: count, a whole number from 2 to 12, strict (400 otherwise; parseInt until 2026-09-26)
+- **Idempotency:** sets the invoice's share count; refused once a share is paid (409) and when the business has not allowed splitting (400)
+- **Success:** { splitCount, splitPaidCount: 0, shareCents }
+- **Error disclosure:** fixed
+- **Authenticity:** holding the invoice's checkout link: its token is the credential for that one invoice and for nothing else
+- **Replay:** the same count again changes nothing; another count is taken until a share is paid (finding)
+- **Rate:** tokenRateLimit (10 a minute per token, counted in this server process only; an unknown token gets a count of its own, so it limits one link's use, not guessing, which a 160-bit token makes futile)
+- **Finding:** What a split share costs is fixed when its session is opened, from the share count and the shares paid at that moment, and is never checked again: the count can change until a share is paid, so a share opened at 1/12 then counts as 1/2 and the invoice shows paid with less money; shares opened at once are all charged the equal share, so the remainder's cents go uncharged. Same root as the session finding (R3).
 
 ### POST `/api/checkout/pay`
 
@@ -2489,7 +2533,22 @@ Review pending.
 - idempotency: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`
 - helpers: `finalizeCheckoutInvoice`, `finalizeRentInvoice`, `finalizeTradeInvoice`, `getCheckoutParty`, `sendRentGstInvoices`, `tokenRateLimit`, `updateCheckoutInvoice`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public-bearer. **Tenant (token):** the invoice's checkout token (20 random bytes, base64url) selects its one invoice, rent or trades (getCheckoutInvoiceByToken); an unknown token is 404; here the token comes in the body
+- **Input:** body read without a schema: token (required and looked up; its type is not checked) and payerEmail (checked only against /.+@.+\..+/)
+- **Capability gate:** isWindcaveConfigured() (503 PAYMENT_PROVIDER_UNAVAILABLE)
+- **Idempotency:** none: every call opens another provider session (finding)
+- **Side effects:** creates a payment session with the provider (createWindcaveSession); when the provider reports it already complete, settles the invoice: events, and once paid the GST invoice email (rent, sendGstInvoices) or the payment invoice (trades, sendTradePaymentInvoice)
+- **Success:** { hppUrl }: the provider's hosted page, or the invoice's own checkout page when already complete
+- **Error disclosure:** fixed
+- **Authenticity:** holding the invoice's checkout link: its token is the credential for that one invoice and for nothing else
+- **Replay:** each call opens another provider session for the same invoice
+- **Rate:** tokenRateLimit (10 a minute per token, counted in this server process only; an unknown token gets a count of its own, so it limits one link's use, not guessing, which a 160-bit token makes futile)
+- **Finding:** No screen calls this route (the checkout page uses POST /api/checkout/:token/session): a public redirect flow kept alive. A split invoice's share paid through it can never be recorded: no session is pinned, the browser return settles only a pinned session, and the notification finds invoices by their pinned session.
+- **Finding:** Every call opens another provider session and re-pins a single-payment invoice to it: a payment completed on an earlier session is then refused at completion (403) and missed by the notification, which finds invoices by their pinned session. The payer is charged and the invoice stays unpaid (R3: payment attempts).
+- **Finding:** payerEmail, checked only against /.+@.+\..+/, is added to splitPayerEmails without limit (10 calls a minute per link), and every address gets the rent invoice's GST invoice once it is paid: a link holder can have the business email its tenant's name, address and rent to any number of addresses. Trades store the list but email only the client.
+- **Finding:** What a split share costs is fixed when its session is opened, from the share count and the shares paid at that moment, and is never checked again: the count can change until a share is paid, so a share opened at 1/12 then counts as 1/2 and the invoice shows paid with less money; shares opened at once are all charged the equal share, so the remainder's cents go uncharged. Same root as the session finding (R3).
 
 ### POST `/api/checkout/:token/session`
 
@@ -2504,7 +2563,21 @@ Review pending.
 - idempotency: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`
 - helpers: `finalizeCheckoutInvoice`, `finalizeRentInvoice`, `finalizeTradeInvoice`, `getCheckoutParty`, `sendRentGstInvoices`, `tokenRateLimit`, `updateCheckoutInvoice`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public-bearer. **Tenant (token):** the invoice's checkout token (20 random bytes, base64url) selects its one invoice, rent or trades (getCheckoutInvoiceByToken); an unknown token is 404
+- **Input:** token: read raw, then looked up; body read without a schema: payerEmail (checked only against /.+@.+\..+/)
+- **Capability gate:** isWindcaveConfigured() (503 PAYMENT_PROVIDER_UNAVAILABLE)
+- **Idempotency:** none: every call opens another provider session (finding)
+- **Side effects:** creates a payment session with the provider (createWindcaveSession); when the provider reports it already complete, settles the invoice: events, and once paid the GST invoice email (rent, sendGstInvoices) or the payment invoice (trades, sendTradePaymentInvoice)
+- **Success:** the provider session id, the amount and the hosted-fields submit URLs (also cached here against the token, invoiceAjaxUrlCache); or { alreadyComplete, approved }
+- **Error disclosure:** fixed
+- **Authenticity:** holding the invoice's checkout link: its token is the credential for that one invoice and for nothing else
+- **Replay:** each call opens another provider session for the same invoice
+- **Rate:** tokenRateLimit (10 a minute per token, counted in this server process only; an unknown token gets a count of its own, so it limits one link's use, not guessing, which a 160-bit token makes futile)
+- **Finding:** Every call opens another provider session and re-pins a single-payment invoice to it: a payment completed on an earlier session is then refused at completion (403) and missed by the notification, which finds invoices by their pinned session. The payer is charged and the invoice stays unpaid (R3: payment attempts).
+- **Finding:** payerEmail, checked only against /.+@.+\..+/, is added to splitPayerEmails without limit (10 calls a minute per link), and every address gets the rent invoice's GST invoice once it is paid: a link holder can have the business email its tenant's name, address and rent to any number of addresses. Trades store the list but email only the client.
+- **Finding:** What a split share costs is fixed when its session is opened, from the share count and the shares paid at that moment, and is never checked again: the count can change until a share is paid, so a share opened at 1/12 then counts as 1/2 and the invoice shows paid with less money; shares opened at once are all charged the equal share, so the remainder's cents go uncharged. Same root as the session finding (R3).
 
 ### POST `/api/checkout/:token/hosted-fields-complete`
 
@@ -2518,7 +2591,19 @@ Review pending.
 - idempotency: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`
 - helpers: `finalizeCheckoutInvoice`, `finalizeRentInvoice`, `finalizeTradeInvoice`, `sendRentGstInvoices`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public-bearer. **Tenant (token):** the invoice's checkout token (20 random bytes, base64url) selects its one invoice, rent or trades (getCheckoutInvoiceByToken); an unknown token is 404; a single payment must send the session pinned to it (403 otherwise, and when none is pinned, since 2026-09-26); a split invoice's session is not checked (finding)
+- **Input:** token: read raw, then looked up; body read without a schema: sessionId (required; sent to the provider as one encoded path segment)
+- **Capability gate:** isWindcaveConfigured() (503 PAYMENT_PROVIDER_UNAVAILABLE: the outcome waits)
+- **Idempotency:** finalizeCheckoutInvoice: a settled invoice is left alone; a split share counts once per session (atomicClaimSplitShare / atomicClaimJobSplitShare); a single payment settles by a read then a write
+- **Side effects:** queries the provider for the session (queryWindcaveSession); once paid, the GST invoice email (rent, sendGstInvoices) or the payment invoice (trades, sendTradePaymentInvoice)
+- **Success:** { approved, status, splitCount, splitPaidCount }
+- **Error disclosure:** fixed
+- **Authenticity:** holding the invoice's checkout link: its token is the credential for that one invoice and for nothing else, with the invoice's pinned session for a single payment
+- **Replay:** a settled invoice is left alone and a split session counts once; two calls at once for a single payment can both settle it (R3 / C20)
+- **Rate:** none — every call asks the provider about the session sent, with the platform's credentials
+- **Finding:** A split invoice records none of the sessions opened for it, so its completion checks only that the provider approved the session the page sends: any approved session on the platform's provider account (another invoice's share, a $1 purchase anywhere) marks one share paid, one such session per share marks the invoice paid, and each is emailed a GST invoice once rent is paid. The single-payment branch was fixed 2026-09-26 (R1-T7's rule). Needs each opened session recorded (the payment attempts engine, R3, or an interim column): put to the owner 2026-09-26.
 
 ### POST `/api/checkout/:token/googlepay-complete`
 
@@ -2532,7 +2617,20 @@ Review pending.
 - idempotency: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`
 - helpers: `assertWindcaveUrl`, `finalizeCheckoutInvoice`, `finalizeRentInvoice`, `finalizeTradeInvoice`, `sendRentGstInvoices`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public-bearer. **Tenant (token):** the invoice's checkout token (20 random bytes, base64url) selects its one invoice, rent or trades (getCheckoutInvoiceByToken); an unknown token is 404; a single payment must send the session pinned to it (403 otherwise, and when none is pinned, since 2026-09-26); a split invoice's session is not checked (finding)
+- **Input:** token: read raw, then looked up; body read without a schema: sessionId (required), googlePayToken (any object, passed to the provider as it came)
+- **Capability gate:** isWindcaveConfigured() (503 PAYMENT_PROVIDER_UNAVAILABLE: the outcome waits)
+- **Idempotency:** finalizeCheckoutInvoice: a settled invoice is left alone; a split share counts once per session; a single payment settles by a read then a write
+- **Side effects:** submits the Google Pay token to the cached submit URL (submitGooglePayToken, checked by assertWindcaveUrl) or queries the provider (queryWindcaveSession); once paid, the GST invoice email (rent) or the payment invoice (trades)
+- **Success:** { approved, status, splitCount, splitPaidCount }
+- **Error disclosure:** fixed
+- **Authenticity:** holding the invoice's checkout link: its token is the credential for that one invoice and for nothing else, with the invoice's pinned session for a single payment
+- **Replay:** a settled invoice is left alone and a split session counts once; two calls at once for a single payment can both settle it (R3 / C20)
+- **Rate:** none — every call reaches the provider, with the platform's credentials
+- **Finding:** A split invoice records none of the sessions opened for it, so its completion checks only that the provider approved the session the page sends: any approved session on the platform's provider account (another invoice's share, a $1 purchase anywhere) marks one share paid, one such session per share marks the invoice paid, and each is emailed a GST invoice once rent is paid. The single-payment branch was fixed 2026-09-26 (R1-T7's rule). Needs each opened session recorded (the payment attempts engine, R3, or an interim column): put to the owner 2026-09-26.
+- **Finding:** The submit URLs are cached per link, not per session: when two payers of one split invoice open sessions, the first one's Google Pay payment goes to the second one's session, and both sessions are then counted as shares.
 
 ### GET `/api/checkout/callback`
 
@@ -2545,7 +2643,19 @@ Review pending.
 - idempotency: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`
 - helpers: `finalizeCheckoutInvoice`, `finalizeRentInvoice`, `finalizeTradeInvoice`, `sendRentGstInvoices`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public-bearer. **Tenant (token):** the invoice's checkout token (20 random bytes, base64url) selects its one invoice, rent or trades (getCheckoutInvoiceByToken); an unknown token is 404; here the token comes in the query
+- **Input:** query read raw: token (looked up; unknown goes to /) and result (only "cancelled" is acted on: no query)
+- **Capability gate:** isWindcaveConfigured() (while unconfigured it only redirects)
+- **Idempotency:** a settled invoice only redirects; otherwise the invoice's pinned session is queried and settled (a split invoice pins none, so nothing is)
+- **Side effects:** queries the provider for the pinned session (queryWindcaveSession); once paid, the GST invoice email (rent) or the payment invoice (trades)
+- **Success:** a 302 to the invoice's checkout page (/r/<token>), or to / for an unknown token
+- **Error disclosure:** fixed
+- **Authenticity:** holding the invoice's checkout link: its token is the credential for that one invoice and for nothing else; the outcome always comes from querying the provider about the pinned session
+- **Replay:** a settled invoice only redirects; two calls at once can both settle it (R3 / C20)
+- **Rate:** none — each call with a real link to an unpaid single-payment invoice asks the provider
+- **Finding:** Settles by a read then a write, not a claim, racing the notification (R3 / C20).
 
 ### ALL `/api/windcave/rent-notification`
 
@@ -2814,7 +2924,16 @@ Review pending.
 - statuses: `200`, `404`, `500`
 - helpers: `streamQuotePdf`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public-bearer. **Tenant (token):** the quote's token (20 random bytes, base64url) selects its one quote (getQuoteByToken); an unknown token is 404
+- **Input:** token: read raw, then looked up
+- **Idempotency:** read-only
+- **Success:** the quote as a PDF attachment (generateQuotePdf), named from the business and the token's first 8 characters
+- **Error disclosure:** fixed
+- **Authenticity:** holding the quote's link: its token is the credential for that one quote
+- **Replay:** read-only
+- **Rate:** none — every call renders a PDF
 
 ### POST `/api/trades/quotes/:id/resend`
 
@@ -2836,7 +2955,17 @@ Review pending.
 - storageMethods: `createJobEvent`, `getClientProfile`, `getJobInvoicesByQuote`, `getMerchant`, `getQuoteByToken`, `updateQuote`
 - statuses: `200`, `404`, `500`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public-bearer. **Tenant (token):** the quote's token (20 random bytes, base64url) selects its one quote (getQuoteByToken); an unknown token is 404
+- **Input:** token: read raw, then looked up
+- **Idempotency:** the first read marks a sent quote viewed (and records the event); a quote past its date is marked expired; otherwise read-only
+- **Success:** the quote (the whole row), the client's name and site address, the business's name, trading name and GST settings, previouslyViewed, and once accepted the live invoice's token, kind, amount and status
+- **Error disclosure:** fixed
+- **Authenticity:** holding the quote's link: its token is the credential for that one quote
+- **Replay:** reading again changes nothing after the first view
+- **Rate:** none — no limit
+- **Finding:** Returns the whole quote row, where the code's own comment asks for a narrow reply: with it the business's numeric id, the client profile id, the token, internal timestamps and documentUrl, a storage path (served to nobody since gap 13).
 
 ### POST `/api/trades/quotes/token/:token/respond`
 
@@ -2850,7 +2979,20 @@ Review pending.
 - entitlementGates: `billingCardIsReady`
 - helpers: `generateInvoiceToken`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public-bearer. **Tenant (token):** the quote's token (20 random bytes, base64url) selects its one quote (getQuoteByToken); an unknown token is 404
+- **Input:** token: read raw, then looked up; body: acceptQuoteSchema (400 with its first issue's message)
+- **Entitlement gate:** billingCardIsReady on the quote's business: while its subscription lapses an acceptance is 402 QUOTE_ACCEPTANCE_UNAVAILABLE for the customer, and the business is emailed, at most once per quote per interval (quote-acceptance-notice.ts)
+- **Idempotency:** an accepted or declined quote is 409 and an expired one 410; the status check is a read then a write, so two acceptances at once can each issue an invoice (finding)
+- **Side effects:** on acceptance, issues the deposit or full invoice and sends it (resendTradeInvoice: email or SMS); when billing blocks acceptance, emails the business (tellBusinessQuoteAcceptanceBlocked)
+- **Success:** { quote, depositInvoice, paymentUrl, delivered }: the quote (the whole row), the new invoice and its checkout link
+- **Error disclosure:** input-issues
+- **Authenticity:** holding the quote's link: its token is the credential for that one quote
+- **Replay:** a second response is 409
+- **Rate:** none — no limit
+- **Finding:** Two acceptances at once can both pass the status check, and each issues and sends an invoice (a read then a write; R3 / C20).
+- **Finding:** Returns the whole quote row, where the code's own comment asks for a narrow reply: with it the business's numeric id, the client profile id, the token, internal timestamps and documentUrl, a storage path (served to nobody since gap 13).
 
 ### GET `/api/trades/invoices`
 

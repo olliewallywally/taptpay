@@ -282,6 +282,21 @@ describe("R1-T2 route facts, read from each handler's syntax tree (C10)", () => 
     });
   });
 
+  it("reads a storage budget that refuses a request as a rate limit", () => {
+    // GET /api/checkout/document/:token spends a per-link read budget shared
+    // through the database; without this its review would have to say "none".
+    const source = `
+      export function wire(app: Express) {
+        app.get("/doc/:token", async (req, res) => {
+          if (!(await storage.consumeInvoiceDocumentReadLimit(req.params.token))) return res.status(429).end();
+          res.json({ ok: true });
+        });
+      }`;
+    expect(extractRouteFacts(source, "server/wire.ts").get("GET /doc/:token")?.rateLimits).toEqual([
+      "storage.consumeInvoiceDocumentReadLimit",
+    ]);
+  });
+
   it("reads a handler passed by name", () => {
     expect(factsFor("GET /api/billing/card/callback")).toMatchObject({
       middleware: [],
