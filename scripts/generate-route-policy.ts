@@ -22,6 +22,7 @@ import {
   SUSPECTED_GAP_ROUTES,
   type RouteRegistration,
 } from "../server/route-inventory";
+import { compactFacts, currentRouteFacts, type RecordedRouteFacts } from "../server/route-facts";
 
 const POLICY_FILE = path.join(process.cwd(), "server", "route-policy.ts");
 const TABLE_FILE = path.join(
@@ -87,6 +88,34 @@ function classifyPrincipal(
   return "unclassified"; // needs a human read, not necessarily a bug
 }
 
+/** One entry per route, one line per recorded fact, so a changed fact is a one-line diff. */
+function renderPolicyEntry(r: {
+  method: string;
+  path: string;
+  principal: string;
+  markers: string[];
+  facts: RecordedRouteFacts;
+}): string {
+  const factLines = Object.entries(r.facts).map(([field, values]) => `      ${field}: ${JSON.stringify(values)},`);
+  return [
+    `  ${JSON.stringify(`${r.method} ${r.path}`)}: {`,
+    `    method: ${JSON.stringify(r.method)},`,
+    `    path: ${JSON.stringify(r.path)},`,
+    `    principal: ${JSON.stringify(r.principal)},`,
+    `    markers: ${JSON.stringify(r.markers)},`,
+    factLines.length > 0 ? `    facts: {\n${factLines.join("\n")}\n    },` : `    facts: {},`,
+    `  },`,
+  ].join("\n");
+}
+
+/** The documentation's per-route facts: one short section per route. */
+function renderFactsSection(r: { method: string; path: string; facts: RecordedRouteFacts }): string {
+  const lines = Object.entries(r.facts).map(
+    ([field, values]) => `- ${field}: ${(values as Array<string | number>).map((v) => `\`${v}\``).join(", ")}`,
+  );
+  return [`### ${r.method} \`${r.path}\``, "", ...(lines.length > 0 ? lines : ["- (no facts: a static answer)"]), ""].join("\n");
+}
+
 function main() {
   const sha = execSync("git rev-parse HEAD", { cwd: process.cwd() }).toString().trim();
   const generatedAt = new Date().toISOString().slice(0, 10);
@@ -101,8 +130,14 @@ function main() {
     return fileRegistrations.map((reg, i) => ({ ...reg, file, body: bodies[i] }));
   });
 
+  // What each handler does, read from its syntax tree (server/route-facts.ts).
+  const allFacts = currentRouteFacts();
+
   const rows = registrations.map((reg) => {
     const { body, ...registration } = reg;
+    const handlerFacts = allFacts.get(registrationKey(reg.method, reg.path));
+    if (!handlerFacts) throw new Error(`no facts for ${reg.method} ${reg.path}`);
+    const facts: RecordedRouteFacts = compactFacts(handlerFacts);
     const gateMarkers = detectGateMarkers(body);
     const publicMarkers = detectPublicMarkers(body);
     const webhookMarkers = detectProviderWebhookMarkers(body);
@@ -113,7 +148,7 @@ function main() {
     // instead of a text marker; see the per-route justification there.
     const markers = [...gateMarkers, ...publicMarkers, ...webhookMarkers];
     const principal = classifyPrincipal(reg.method, reg.path, gateMarkers, publicMarkers, webhookMarkers);
-    return { ...registration, markers, principal };
+    return { ...registration, markers, principal, facts };
   });
 
   const byMethod: Record<string, number> = {};
@@ -160,14 +195,21 @@ function main() {
  * "unclassified" remains the fallback for a route with no known gate, no
  * known public-design signal, and no allowlist entry — it still means "a
  * human needs to read this one," not "this is a hole."
- * capabilityGate/entitlementGate/idempotencyScope/storageMethods/successDto/
- * errorDisclosure are intentionally not populated yet — the plan's own R1-T2
- * text says do not rewrite 218 handlers' semantics in one commit; T3, T6 and
- * T7 enrich the routes they touch as they go, rather than this file
- * pretending to know things nobody has verified.
  *
- * Regenerate: npx tsx scripts/generate-route-policy.ts
+ * \`facts\` (C10, 2026-09-26) is what each handler does, read from its syntax
+ * tree by server/route-facts.ts — middleware, parameter parsing, body
+ * validation, authorization checks, storage methods, external side effects,
+ * statuses, response projections, error text in responses, capability,
+ * entitlement, rate-limit and idempotency calls — with empty lists left out.
+ * server/__tests__/route-policy-facts.test.ts re-reads every handler and fails
+ * when a recorded fact is no longer true, so a change to what a route checks
+ * or touches shows up here, in review. Facts are not judgments: who may call
+ * a route and on which tenant are reviewed separately.
+ *
+ * Regenerate: node --import tsx scripts/generate-route-policy.ts
  */
+
+import type { RecordedRouteFacts } from "./route-facts";
 
 export interface RoutePolicyEntry {
   method: string;
@@ -191,20 +233,12 @@ export interface RoutePolicyEntry {
    * path-rule there for that route's specific justification.
    */
   markers: string[];
+  /** What the handler does (server/route-facts.ts); empty lists are left out. */
+  facts: RecordedRouteFacts;
 }
 
 export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
-${rows
-  .map(
-    (r) =>
-      `  ${JSON.stringify(`${r.method} ${r.path}`)}: ${JSON.stringify({
-        method: r.method,
-        path: r.path,
-        principal: r.principal,
-        markers: r.markers,
-      })},`,
-  )
-  .join("\n")}
+${rows.map(renderPolicyEntry).join("\n")}
 };
 `;
 
@@ -255,7 +289,18 @@ ${rows
       `| ${r.method} | \`${r.path}\` | ${r.file === "server/routes.ts" ? r.line : `${r.file}:${r.line}`} | ${r.principal} | ${r.markers.join(", ") || "—"} |`,
   )
   .join("\n")}
-`;
+
+## Per-route facts
+
+What each handler does, read from its syntax tree (server/route-facts.ts): its
+middleware, how each path and query value is parsed ("raw": no parser), body
+validation, authorization checks and tenant/role comparisons, storage methods,
+calls that leave the process, statuses, response projections (DTOs), error text
+put into responses, and capability, entitlement, rate-limit and idempotency
+calls. Helpers in the same file are followed; imported functions are not (they
+are classified by name). Facts, not judgments.
+
+${rows.map(renderFactsSection).join("\n")}`;
 
   fs.writeFileSync(TABLE_FILE, table);
 
