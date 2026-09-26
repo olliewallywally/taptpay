@@ -446,9 +446,31 @@ The work itself:
   - **Open for the owner: apply 0030 to the development database** (the safety check denies it to
     the agent). Until then, in dev only, split checkouts and rent GST copies fail. Production is
     closed; 0030 goes before this code at release.
+- **C10 continued (2026-09-26): batch 4, the platform admin (29 routes): `8c40d067` (fix),
+  `4ed2e145` (29 reviews); local, awaiting independent review**
+  ([working notes](r1/WORKING-2026-09-26-r1-t2-c10.md)). 99 of 216 routes are reviewed; 117 are
+  pending.
+  - **Fixed, `8c40d067`: activating a business with a password could reach another business's
+    application.** It found the application by its sign-up token, so a business with no waiting
+    application reached any row holding an empty token (none does today: a 500). Now 409, and
+    nothing changes.
+  - **Found: the admin's business delete cannot delete any business the app has made.** Each has a
+    subscription row and an owner login whose keys don't cascade, so it answers 500 and changes
+    nothing (PostgreSQL verifier 3/3, `scripts/verify-admin-business-delete-postgres.ts`).
+  - The business page's Verify and Activate Account buttons reach routes (`…/verify`,
+    `…/set-active`) that accept states the page never offers: verify sets an active business back
+    to verified; set-active lets a never-confirmed application sign in.
+  - 15 of the 29 have no screen. `…/activate` (the admin sets the password) is the only way in
+    for an application made before sign-up took a password.
+  - Resumed after a stop mid-step (12:30 UTC, during `tsc`, before the commit): the interrupted
+    checks re-run; every review re-read against its handler; nine, and the shared audit text,
+    corrected. Mutations 10/10, re-run. Server 102/1,773; `tsc` clean.
+  - For the owner (asked 2026-09-26): retire the admin routes no screen uses; the admin choosing
+    passwords (the admin sign-up, `…/activate`); the email tools; verify and set-active accepting
+    only what the page offers.
 
-**Next:** the independent reviews owed, then R1-T2's review of the signed-in families; 146 routes
-are pending. Then R1-T3's runtime matrix, on the audited harness.
+**Next:** the batch 4 owner questions, then R1-T2's review of the signed-in merchant families; 117
+routes are pending. Then R1-T3's runtime matrix, on the audited harness.
 Open for the owner: 0030 in dev (above); the card-free dev write (above). The
 no-board rework's questions are all answered. Release of the rework: when production has no pending
 shared no-board sale (count-only check once production is reopened), with
@@ -456,8 +478,9 @@ shared no-board sale (count-only check once production is reopened), with
 
 The phase B live check waits for the owner to set `ADMIN_PASSWORD_HASH`.
 Independent reviews owed (each evidence file ends with its brief):
-- C10 so far (`2ec9d78f..cee1276a`), the 2026-09-26 owner answers (`cee1276a..a419f948`), and
-  C10's batch 3 (`30c9d8cb..d0d5495b`) and its owner answers (`4ac759d1..1a77530e`);
+- C10 so far (`2ec9d78f..cee1276a`), the 2026-09-26 owner answers (`cee1276a..a419f948`),
+  C10's batch 3 (`30c9d8cb..d0d5495b`) and its owner answers (`4ac759d1..1a77530e`), and batch 4
+  (`198a8265..4ed2e145`);
 - the no-board rework (`da90d1a1..5c2cdb27`), its follow-up (`7051e25e..1fb41d14`), and the
   owner-answer fixes 2a–2c (`aba7b2be..da90d1a1`);
 - R1-T1 (`03c4663b..05195728`) and the live-updates fix (`05195728..3fac8ac8`);
