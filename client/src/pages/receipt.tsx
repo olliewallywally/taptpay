@@ -76,16 +76,8 @@ export default function Receipt({ sourceKind = "retail-legacy" }: {
     staleTime: 0,
   });
 
-  const { data: legacyMerchant, isLoading: merchantLoading } = useQuery({
-    queryKey: ["/api/merchants", legacyTransaction?.merchantId],
-    queryFn: async () => {
-      if (!legacyTransaction?.merchantId) return null;
-      const response = await fetch(`/api/merchants/${legacyTransaction.merchantId}`);
-      if (!response.ok) throw new Error("Failed to fetch merchant");
-      return response.json();
-    },
-    enabled: !isTokenSource && !!legacyTransaction?.merchantId,
-  });
+  // A board sale's own read carries its business's details (owner decision 2026-09-26).
+  const legacyMerchant = legacyTransaction?.merchant;
 
   const { data: legacySplitPayment, isLoading: splitLoading } = useQuery({
     queryKey: ["/api/split-payments", splitId],
@@ -214,7 +206,7 @@ export default function Receipt({ sourceKind = "retail-legacy" }: {
 
   const isLoading = isTokenSource
     ? tokenReceiptLoading
-    : transactionLoading || merchantLoading || (!!splitId && splitLoading);
+    : transactionLoading || (!!splitId && splitLoading);
 
   if (isLoading) {
     return (

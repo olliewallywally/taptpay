@@ -4,7 +4,8 @@ import {
   adminMerchantSummaryDto,
   ownerMerchantDto,
   ownerTransactionDto,
-  publicMerchantBrandDto,
+  publicBoardBrandDto,
+  publicBusinessDto,
   publicTransactionDto,
   pushNotificationPreferencesDto,
   tokenPaymentDto,
@@ -127,12 +128,13 @@ describe("Phase 0 request and response contracts", () => {
   });
 
   test("merchant projections are positive allowlists", () => {
-    // Public by a sequential number: only what the customer pages show. The contact email
-    // is the sign-in address unless changed, and name is the account holder's (2026-09-26).
-    expect(Object.keys(publicMerchantBrandDto(merchant)).sort()).toEqual([
+    // Only what the customer pages show, and only with a sale, link or invoice (2026-09-26):
+    // never the contact email (the sign-in address unless changed) or the holder's name.
+    expect(Object.keys(publicBusinessDto(merchant)).sort()).toEqual([
       "businessAddress", "businessName", "contactPhone",
-      "customLogoUrl", "gstNumber", "id", "nzbn", "themeId",
+      "customLogoUrl", "gstNumber", "nzbn", "themeId",
     ]);
+    expect(Object.keys(publicBoardBrandDto(merchant)).sort()).toEqual(["businessName", "customLogoUrl"]);
     expect(Object.keys(adminMerchantSummaryDto(merchant)).sort()).toEqual([
       "businessName", "createdAt", "director", "email", "id", "name", "nzbn", "status",
     ]);
@@ -213,9 +215,10 @@ describe("Phase 0 request and response contracts", () => {
       "completedSplits", "createdAt", "isSplit", "itemName", "merchant",
       "paymentMethod", "price", "splitAmount", "splitEnabled", "status", "totalSplits",
     ]);
+    // No contact email (the sign-in address unless changed) and no holder's name (2026-09-26).
     expect(Object.keys(dto.merchant).sort()).toEqual([
-      "businessAddress", "businessName", "contactEmail", "contactPhone", "customLogoUrl",
-      "gstNumber", "name", "nzbn", "themeId",
+      "businessAddress", "businessName", "contactPhone", "customLogoUrl",
+      "gstNumber", "nzbn", "themeId",
     ]);
     for (const forbidden of [
       "id", "merchantId", "taptStoneId", "paymentTokenHash", "windcaveSessionId",

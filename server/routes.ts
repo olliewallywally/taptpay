@@ -61,7 +61,8 @@ import {
   memberMerchantSettingsDto,
   ownerMerchantDto,
   ownerTransactionDto,
-  publicMerchantBrandDto,
+  publicBoardBrandDto,
+  publicBusinessDto,
   publicSplitPaymentDto,
   publicTransactionDto,
   pushNotificationPreferencesDto,
@@ -1346,19 +1347,28 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  // Get merchant info
-  app.get("/api/merchants/:id", async (req, res) => {
+  // (Removed GET /api/merchants/:id, owner decision 2026-09-26: counting through business numbers
+  // listed every business, unconfirmed sign-ups included. Customer pages get the business's
+  // details with the sale, link or invoice they hold, and a board's page from its board, below.)
+
+  // A board's customer page: the business's name and logo, as the printed board shows them.
+  // Public like the board's page; only for one of the business's active boards.
+  app.get("/api/merchants/:id/stone/:stoneId/brand", async (req, res) => {
     try {
-      const id = strictPositiveIntegerParam(req.params.id);
-      if (id === null) return res.status(400).json({ message: "Invalid id" });
-      const merchant = await storage.getMerchant(id);
-      if (!merchant) {
-        return res.status(404).json({ message: "Merchant not found" });
+      const merchantId = strictPositiveIntegerParam(req.params.id);
+      if (merchantId === null) return res.status(400).json({ message: "Invalid id" });
+      const stoneId = strictPositiveIntegerParam(req.params.stoneId);
+      if (stoneId === null) return res.status(400).json({ message: "Invalid id" });
+      const stone = await storage.getTaptStone(stoneId);
+      if (!stone || !stone.isActive || stone.merchantId !== merchantId) {
+        return res.status(404).json({ message: "Payment board not found" });
       }
-      
-      res.json(publicMerchantBrandDto(merchant));
+      const merchant = await storage.getMerchant(merchantId);
+      if (!merchant) return res.status(404).json({ message: "Payment board not found" });
+      res.json(publicBoardBrandDto(merchant));
     } catch (error) {
-      res.status(500).json({ message: "Failed to get merchant" });
+      console.error("Board brand error:", error);
+      res.status(500).json({ message: "Failed to load the board" });
     }
   });
 
@@ -3253,8 +3263,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (isTokenAddressedTransaction(transaction)) {
         return res.status(404).json({ message: "Transaction not found" });
       }
-      
-      res.json(publicTransactionDto(transaction));
+
+      // The business's details come with its sale (owner decision 2026-09-26).
+      const merchant = transaction.merchantId == null ? undefined : await storage.getMerchant(transaction.merchantId);
+      res.json({ ...publicTransactionDto(transaction), merchant: merchant ? publicBusinessDto(merchant) : null });
     } catch (error) {
       console.error("Error fetching transaction:", error);
       res.status(500).json({ message: "Failed to fetch transaction" });

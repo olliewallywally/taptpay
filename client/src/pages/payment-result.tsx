@@ -24,15 +24,8 @@ export default function PaymentResult() {
     enabled: !!txnId && !isNaN(txnId),
   });
 
-  const { data: merchant } = useQuery({
-    queryKey: ["/api/merchants", transaction?.merchantId],
-    queryFn: async () => {
-      const response = await fetch(`/api/merchants/${transaction.merchantId}`);
-      if (!response.ok) throw new Error("Merchant not found");
-      return response.json();
-    },
-    enabled: !!transaction?.merchantId,
-  });
+  // The business's details come with the sale (owner decision 2026-09-26).
+  const merchant = transaction?.merchant;
 
   const amount = transaction ? `$${parseFloat(transaction.price).toFixed(2)}` : "";
   const itemName = transaction?.itemName || "";

@@ -784,11 +784,11 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     idempotency: "read-only",
     sideEffects: null,
     successDto:
-      "publicTransactionDto: id, business id, board id, item, price, status, method, split counts and date, and the board's page address",
+      "publicTransactionDto: id, business id, board id, item, price, status, method, split counts and date, and the board's page address; with merchant: publicBusinessDto, the business's name, address, phone, GST number, NZBN, logo and theme (since 2026-09-26, when the by-number business read was retired; never the contact email or the holder's name)",
     errorDisclosure: ["fixed"],
     controls: { authenticity: NUMBER_AUTHENTICITY, replay: "read-only", rate: "none — no limit" },
     findings: [
-      `${NUMBERED_SALE_FINDING} With no rate limit, counting through the numbers lists every such sale of every business: item, price, time, business and board.`,
+      `${NUMBERED_SALE_FINDING} With no rate limit, counting through the numbers lists every such sale of every business: item, price, time, business and board, and, since the by-number business read was retired (2026-09-26), each selling business's receipt details, which moved here.`,
     ],
   },
 
@@ -1498,31 +1498,29 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     },
   },
 
-  "GET /api/merchants/:id": {
+  "GET /api/merchants/:id/stone/:stoneId/brand": {
     branches: [
       {
         principal: "public",
-        tenant: "number",
+        tenant: "board",
         tenantRule:
-          "the business's sequential number selects it, any business in any state, pending applications included: anyone can read any business's public details by counting",
+          "the board must be one of the business's active boards (getTaptStone; 404 otherwise, the same for a missing one, a removed one and another business's); a board's page is public by design and shows the name and logo the printed board does",
       },
     ],
-    input: "id: strictPositiveIntegerParam (400 otherwise)",
+    input: "id, stoneId: strictPositiveIntegerParam (400 otherwise)",
     capability: null,
     entitlement: null,
     idempotency: "read-only",
     sideEffects: null,
     successDto:
-      "publicMerchantBrandDto: id, business name, business address, contact phone, GST number, NZBN, logo address and theme; since 2026-09-26 never the contact email or the account holder's name",
+      "publicBoardBrandDto: the business's name and logo address only; it replaced the retired by-number business read for a board's page (owner decision 2026-09-26)",
     errorDisclosure: ["fixed"],
     controls: {
-      authenticity: "anyone with a business's number: numbers are sequential",
+      authenticity:
+        "none: a board's printed name and logo are public by design; both numbers are sequential, so anyone can read any board's business name and logo by counting, but only for a real, active board",
       replay: "read-only",
       rate: "none — no limit",
     },
-    findings: [
-      "Still public by a guessable sequential number, with no limit: counting lists every business, pending applications included, with its business name, address and contact phone (set from the sign-up phone), GST number and NZBN. The customer pages that ask (a board's page, checkout, split, result and receipt pages) each already hold a sale, so they could be given these details with it instead: put to the owner 2026-09-26.",
-    ],
   },
 
   "GET /api/merchants/:id/active-transaction": {

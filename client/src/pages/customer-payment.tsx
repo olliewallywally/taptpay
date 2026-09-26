@@ -36,12 +36,16 @@ function redirectToRealBrowser() {
   return false;
 }
 
-function useMerchantBrand(id: number) {
-  return useQuery({
-    queryKey: ["/api/merchants", id],
+/**
+ * A board's page shows the business's name and logo as the printed board does, read from the
+ * board (owner decision 2026-09-26: the by-number business read is retired).
+ */
+function useBoardBrand(merchantId: number, stoneNumber: number) {
+  return useQuery<{ businessName?: string; customLogoUrl?: string | null }>({
+    queryKey: ["/api/merchants", merchantId, "stone", stoneNumber, "brand"],
     queryFn: async () => {
-      const response = await fetch(`/api/merchants/${id}`);
-      if (!response.ok) throw new Error("Failed to fetch merchant");
+      const response = await fetch(`/api/merchants/${merchantId}/stone/${stoneNumber}/brand`);
+      if (!response.ok) throw new Error("Failed to fetch the board");
       return response.json();
     },
   });
@@ -89,14 +93,14 @@ export default function CustomerPayment() {
   return <BoardPayment merchantId={id} stoneNumber={stoneNumber} />;
 }
 
-function NoBoardNotice({ merchantId }: { merchantId: number }) {
-  const { data: merchant } = useMerchantBrand(merchantId);
+// No board and no sale: nothing to give the business's details with, so TaptPay's logo shows.
+function NoBoardNotice(_props: { merchantId: number }) {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="w-full max-w-sm md:max-w-md">
         <div className="rounded-[48px] overflow-hidden shadow-2xl">
           <div className="bg-[#0055FF] px-8 pt-8 pb-20 rounded-b-[48px]">
-            <MerchantLogo customLogoUrl={merchant?.customLogoUrl} />
+            <MerchantLogo customLogoUrl={null} />
             <div className="text-center">
               <QrCode className="w-8 h-8 text-[#00E5CC] mx-auto mb-4" />
               <h2 className="text-xl font-bold text-white mb-2">Ask for your payment link</h2>
@@ -122,7 +126,7 @@ function BoardPayment({ merchantId: id, stoneNumber }: { merchantId: number; sto
   // Immediately redirect to Chrome/Safari if opened in an in-app browser
   useEffect(() => { redirectToRealBrowser(); }, []);
 
-  const { data: merchant } = useMerchantBrand(id);
+  const { data: merchant } = useBoardBrand(id, stoneNumber);
 
   const { data: activeTransaction, isLoading } = useQuery({
     queryKey: ["/api/merchants", id, "active-transaction", stoneNumber],

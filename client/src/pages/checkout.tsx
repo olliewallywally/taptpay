@@ -28,6 +28,7 @@ import {
   type CheckoutSource,
   type PaymentCheckoutSource,
 } from "@/lib/payment-addressing";
+import { checkoutBusiness } from "@/lib/checkout-business";
 // Window augmentations are declared centrally in client/src/global.d.ts.
 
 // ── Error boundary — catches any render crash and shows a safe fallback ──
@@ -408,16 +409,8 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
     queryFn: async () => (await fetch("/api/windcave/env")).json(),
   });
 
-  const { data: legacyMerchant } = useQuery({
-    queryKey: ["/api/merchants", transaction?.merchantId],
-    queryFn: async () => {
-      const res = await fetch(`/api/merchants/${transaction.merchantId}`);
-      if (!res.ok) throw new Error("Not found");
-      return res.json();
-    },
-    enabled: !isRetailToken && activeSource?.kind !== "quote-token" && !!transaction?.merchantId,
-  });
-  const merchant = isRetailToken ? tokenPayment?.merchant : legacyMerchant;
+  // The business's name and logo come with what the page holds (owner decision 2026-09-26).
+  const merchant = checkoutBusiness(activeSource?.kind, { tokenPayment, invoiceData, rawTransaction });
 
   useEffect(() => {
     if (!isRetailToken || !retailToken || !tokenPayment) return;

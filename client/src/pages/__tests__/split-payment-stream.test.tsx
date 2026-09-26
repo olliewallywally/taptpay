@@ -52,7 +52,6 @@ function renderSplit() {
 function serveSale(sale: Record<string, unknown>) {
   fetchMock.mockImplementation(async (url: string) => {
     if (url === "/api/transactions/5") return jsonResponse(sale);
-    if (url === "/api/merchants/1") return jsonResponse({});
     throw new Error(`unexpected fetch: ${url}`);
   });
 }
@@ -78,7 +77,8 @@ it("opens no live feed for a sale without a board", async () => {
 
   renderSplit();
   await screen.findByTestId("split-view");
-  await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/merchants/1"));
+  // The sale has loaded (its business's details come with it since 2026-09-26: no second read).
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/transactions/5", undefined));
 
   expect(sseClient.connectCustomer).not.toHaveBeenCalled();
 });

@@ -72,7 +72,6 @@ describe("customer-payment — the business-wide no-board page is retired", () =
   beforeEach(() => {
     mockParams = { merchantId: "1" };
     fetchMock.mockImplementation(async (url: string) => {
-      if (url === "/api/merchants/1") return jsonResponse(200, { customLogoUrl: "/uploads/logos/shop.png" });
       if (url.startsWith("/api/merchants/1/active-transaction")) {
         return jsonResponse(410, { code: "NO_BOARD_ADDRESS_RETIRED" });
       }
@@ -80,15 +79,21 @@ describe("customer-payment — the business-wide no-board page is retired", () =
     });
   });
 
-  test("tells the customer to ask for their sale's own link, with the business's logo", async () => {
+  test("tells the customer to ask for their sale's own link, and asks nothing about the business", async () => {
+    // Owner decision 2026-09-26: the by-number business read is retired; with no board and no
+    // sale there is nothing to give the business's details with, so TaptPay's logo shows.
     renderWithQuery(<CustomerPayment />);
 
     expect(await screen.findByText("Ask for your payment link")).toBeInTheDocument();
     expect(
       screen.getByText("Each sale now has its own payment link. Ask the business to show you the QR code for your sale."),
     ).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByAltText("merchant logo")).toHaveAttribute("src", "/uploads/logos/shop.png"));
+    expect(screen.getByAltText("merchant logo")).not.toHaveAttribute("src", "/uploads/logos/shop.png");
     expect(screen.queryByText("Waiting for Payment")).not.toBeInTheDocument();
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(requestedUrls()).toEqual([]);
   });
 
   test("reads no sale and opens no live feed, and never moves the customer on", async () => {
@@ -110,10 +115,26 @@ describe("customer-payment — a board's page is unchanged", () => {
     mockParams = { merchantId: "1", stoneId: "3" };
   });
 
+  test("shows the business's logo from its board, never asking for the business by number", async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url === "/api/merchants/1/stone/3/brand") {
+        return jsonResponse(200, { businessName: "Kōwhai Café", customLogoUrl: "/uploads/logos/shop.png" });
+      }
+      if (url === "/api/merchants/1/active-transaction?stoneId=3") return jsonResponse(200, null);
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+
+    renderWithQuery(<CustomerPayment />);
+
+    expect(await screen.findByText("Waiting for Payment")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByAltText("merchant logo")).toHaveAttribute("src", "/uploads/logos/shop.png"));
+    expect(requestedUrls()).not.toContain("/api/merchants/1");
+  });
+
   test("waits on its board's sale, then takes the customer to checkout", async () => {
     let boardSale: unknown = null;
     fetchMock.mockImplementation(async (url: string) => {
-      if (url === "/api/merchants/1") return jsonResponse(200, {});
+      if (url === "/api/merchants/1/stone/3/brand") return jsonResponse(200, { businessName: "Shop", customLogoUrl: null });
       if (url === "/api/merchants/1/active-transaction?stoneId=3") return jsonResponse(200, boardSale);
       throw new Error(`unexpected fetch: ${url}`);
     });
@@ -130,7 +151,7 @@ describe("customer-payment — a board's page is unchanged", () => {
 
   test("ignores an update that isn't for its board", async () => {
     fetchMock.mockImplementation(async (url: string) => {
-      if (url === "/api/merchants/1") return jsonResponse(200, {});
+      if (url === "/api/merchants/1/stone/3/brand") return jsonResponse(200, { businessName: "Shop", customLogoUrl: null });
       if (url === "/api/merchants/1/active-transaction?stoneId=3") return jsonResponse(200, null);
       throw new Error(`unexpected fetch: ${url}`);
     });

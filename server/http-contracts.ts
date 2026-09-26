@@ -88,13 +88,15 @@ export function teamMemberDto(user: User) {
   };
 }
 
-// Anyone can ask for this by a business's sequential number (GET /api/merchants/:id), so it
-// carries only what the customer pages show: the name and logo, and the receipt's business
-// details. Never the contact email, which sign-up sets to the sign-in address, nor the
-// account holder's name.
-export function publicMerchantBrandDto(merchant: MerchantInput) {
+/**
+ * What a customer page shows about the business behind a sale: its name and logo, and the
+ * receipt's business details (a tax invoice's). It comes only with the sale, link or invoice the
+ * page already holds (owner decision 2026-09-26): the public by-number business read is retired,
+ * and neither the contact email (the sign-in address unless changed) nor the account holder's
+ * name ever goes with it.
+ */
+export function publicBusinessDto(merchant: MerchantInput) {
   return {
-    id: merchant.id,
     businessName: merchant.businessName,
     businessAddress: merchant.businessAddress,
     contactPhone: merchant.contactPhone,
@@ -102,6 +104,14 @@ export function publicMerchantBrandDto(merchant: MerchantInput) {
     nzbn: merchant.nzbn,
     customLogoUrl: merchant.customLogoUrl,
     themeId: merchant.themeId,
+  };
+}
+
+/** A board's customer page: the business's name and logo, as the printed board shows them. */
+export function publicBoardBrandDto(merchant: MerchantInput) {
+  return {
+    businessName: merchant.businessName,
+    customLogoUrl: merchant.customLogoUrl,
   };
 }
 
@@ -260,17 +270,7 @@ export function tokenPaymentDto(transaction: TransactionInput, merchant: Merchan
     completedSplits: transaction.completedSplits,
     splitAmount: transaction.splitAmount,
     createdAt: transaction.createdAt,
-    merchant: {
-      name: merchant.name,
-      businessName: merchant.businessName,
-      contactEmail: merchant.contactEmail,
-      contactPhone: merchant.contactPhone,
-      businessAddress: merchant.businessAddress,
-      gstNumber: merchant.gstNumber,
-      nzbn: merchant.nzbn,
-      customLogoUrl: merchant.customLogoUrl,
-      themeId: merchant.themeId,
-    },
+    merchant: publicBusinessDto(merchant),
   };
 }
 

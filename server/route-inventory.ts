@@ -346,9 +346,10 @@ export function detectGateMarkers(handlerSlice: string): string[] {
  *    token-addressed transactions, the only gate these routes have.
  *  - getCheckoutInvoiceByToken(: the /api/checkout/* hosted rent/trades
  *    checkout flow's token lookup.
- *  - publicMerchantBrandDto(, publicTransactionDto(: the two
+ *  - publicBoardBrandDto(, publicTransactionDto(: the two
  *    hand-allowlisted "public<Name>Dto(" response projections
- *    (server/http-contracts.ts) already in use for customer-facing reads.
+ *    (server/http-contracts.ts) in use for customer-facing reads (the board
+ *    brand read replaced the retired by-number business read, 2026-09-26).
  *  - generatePaymentUrl(: pure string templating (server/url-utils.ts), no
  *    storage access — used by the NFC tap-landing redirects and printable
  *    QR routes to build the already-public payment URL.
@@ -374,7 +375,7 @@ export const KNOWN_PUBLIC_MARKERS = [
   "prepareTokenCompletion(",
   "isTokenAddressedTransaction(",
   "getCheckoutInvoiceByToken(",
-  "publicMerchantBrandDto(",
+  "publicBoardBrandDto(",
   "publicTransactionDto(",
   "generatePaymentUrl(",
   "paymentAttempts.resolveReturnState(",

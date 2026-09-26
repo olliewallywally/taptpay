@@ -83,3 +83,24 @@ describe("the unused sign-up and invoice routes, and the old business-details pa
     expect(storageSnapshot()).toBe(before);
   });
 });
+
+describe("the public business read by number is retired (batch 3c)", () => {
+  // Counting through business numbers listed every business, unconfirmed sign-ups included:
+  // name, address, phone, GST number and NZBN. Customer pages now get these with their sale
+  // (business-details-with-sale.test.ts).
+  it("is registered nowhere", () => {
+    expect(ROUTE_POLICY["GET /api/merchants/:id"]).toBeUndefined();
+  });
+
+  it("answers as an unknown address and reads nothing", async () => {
+    const { app } = await createTestApp();
+    const owner = await createOwnerPrincipal();
+    const before = storageSnapshot();
+
+    const res = await request(app).get(`/api/merchants/${owner.merchantId}`);
+
+    expect(res.status).toBe(404);
+    expect(res.headers["content-type"]).not.toMatch(/json/);
+    expect(storageSnapshot()).toBe(before);
+  });
+});

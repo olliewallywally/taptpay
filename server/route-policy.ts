@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 9d8b9fab17477d78a58efdbe3149b9b1237f5a92 on 2026-09-26.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ a3e04c8f0dd6257211cd4596a2421060c91b3e10 on 2026-09-26.
  *
  * 216 registrations (89 GET, 89 POST, 3 PATCH, 5 ALL, 21 PUT, 9 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -366,16 +366,17 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       statuses: [200,400,404,500],
     },
   },
-  "GET /api/merchants/:id": {
+  "GET /api/merchants/:id/stone/:stoneId/brand": {
     method: "GET",
-    path: "/api/merchants/:id",
+    path: "/api/merchants/:id/stone/:stoneId/brand",
     principal: "public",
-    markers: ["publicMerchantBrandDto("],
+    markers: ["publicBoardBrandDto("],
     facts: {
-      params: ["id: strictPositiveIntegerParam"],
-      storageMethods: ["getMerchant"],
+      params: ["id: strictPositiveIntegerParam","stoneId: strictPositiveIntegerParam"],
+      authChecks: ["compares stone.merchantId !== merchantId"],
+      storageMethods: ["getMerchant","getTaptStone"],
       statuses: [200,400,404,500],
-      dtos: ["publicMerchantBrandDto"],
+      dtos: ["publicBoardBrandDto"],
     },
   },
   "GET /api/merchants/:id/profile": {
@@ -800,9 +801,9 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       params: ["id: strictPositiveIntegerParam"],
       authChecks: ["isTokenAddressedTransaction"],
-      storageMethods: ["getTransaction"],
+      storageMethods: ["getMerchant","getTransaction"],
       statuses: [200,400,404,500],
-      dtos: ["publicTransactionDto"],
+      dtos: ["publicBusinessDto","publicTransactionDto"],
     },
   },
   "POST /api/transactions/:id/receipt-pdf": {

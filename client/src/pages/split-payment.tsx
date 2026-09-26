@@ -65,16 +65,6 @@ export default function SplitPayment({
     staleTime: 0,
   });
 
-  const { data: merchant } = useQuery({
-    queryKey: ['/api/merchants', transaction?.merchantId],
-    queryFn: async () => {
-      const response = await fetch(`/api/merchants/${transaction.merchantId}`);
-      if (!response.ok) throw new Error('Merchant not found');
-      return response.json();
-    },
-    enabled: !isTokenSource && !!transaction?.merchantId,
-  });
-
   useEffect(() => {
     if (transaction) setCurrentTransaction(transaction);
   }, [transaction]);
@@ -87,10 +77,11 @@ export default function SplitPayment({
     const handleUpdate = (message: any) => {
       if (message.transaction?.id === txnId) {
         setCurrentTransaction(message.transaction);
-        queryClient.setQueryData(
-          ['/api/transactions', txnId],
-          message.transaction
-        );
+        // The live copy carries no business details: keep those read with the sale.
+        queryClient.setQueryData(['/api/transactions', txnId], (previous: any) => ({
+          ...message.transaction,
+          merchant: previous?.merchant,
+        }));
       }
     };
     sseClient.subscribe('transaction_updated', handleUpdate);
@@ -142,10 +133,10 @@ export default function SplitPayment({
         const data = await response.json();
         if (!isTokenSource && data.transaction) {
           setCurrentTransaction(data.transaction);
-          queryClient.setQueryData(
-            ['/api/transactions', txnId],
-            data.transaction
-          );
+          queryClient.setQueryData(['/api/transactions', txnId], (previous: any) => ({
+            ...data.transaction,
+            merchant: previous?.merchant,
+          }));
         } else if (isTokenSource) {
           await refetchTransaction();
         }
@@ -202,9 +193,11 @@ export default function SplitPayment({
     setLocation(`/checkout/${txnId}`);
   };
 
+  // The business's logo comes with the sale's own read (owner decision 2026-09-26); a board
+  // sale's live copies carry none, so it is taken from the read, not from `txn`.
   const customLogoUrl: string | null = isTokenSource
     ? (txn?.merchant?.customLogoUrl ?? null)
-    : (merchant?.customLogoUrl ?? null);
+    : (transaction?.merchant?.customLogoUrl ?? null);
 
   return (
     <SplitPaymentView
