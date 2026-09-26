@@ -36,6 +36,7 @@ export type TenantSource =
   | "resource" // a resource read by id, then held to the caller's merchant
   | "token" // a bearer credential that addresses exactly one resource
   | "board" // a board (stone) of the merchant in the path: a board's public page
+  | "number" // a sequential sale number any caller can guess, held to nobody (always a finding)
   | "provider-session" // the provider's own reference (session or message id) selects the resource
   | "key" // the API key's merchant
   | "any-merchant" // the platform admin, across merchants
@@ -93,6 +94,37 @@ export interface RouteReview {
 }
 
 const PROVIDER_ACK = '200 "OK" at once, before any work; nothing else is returned';
+
+// ── Per-payment links (/api/pay/t/:token) ──
+const TOKEN_TENANT_RULE =
+  "the link's token (43 base64url characters) selects the one sale it was made for: only its hash is looked up (resolvePaymentToken); an unknown or malformed token is 404";
+const TOKEN_INPUT = "token: matched against PAYMENT_TOKEN_PATTERN, then only its hash is looked up";
+const TOKEN_AUTHENTICITY =
+  "holding the sale's link: its token is the credential for that one sale and for nothing else";
+const TOKEN_SHARE_INPUT =
+  "share: read with Number() and required to be a whole number of at least 1 (not the strict parser: finding)";
+const TOKEN_SHARE_FINDING =
+  "share is parsed with Number(), which accepts forms such as 1e0, 0x1 and ' 1' that the plan's strict parser (§8.4) refuses; the same on the receipt, its PDF and its QR.";
+// ── Numbered (board) sales: /api/transactions/:id and friends ──
+const NUMBER_TENANT_RULE =
+  "the sale's sequential number selects it, for any business; only a sale with its own link (isTokenAddressedTransaction) is hidden (404)";
+const NUMBER_AUTHENTICITY =
+  "anyone with the sale's number: numbers are sequential, so every board, cash and tap-to-pay sale can be found by counting";
+const NUMBERED_SALE_FINDING =
+  "Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.";
+const CHECK_RATE_LIMIT =
+  "checkRateLimit (100 a minute per visitor address, counted in this server process only; until TRUST_PROXY_HOPS is set every visitor shares one address — R1-T4 phase B)";
+const SPLIT_SHARE_FINDING =
+  "A split share is marked paid whatever amount the provider charged: with the pay route's customer-chosen amount, every share of a $100 sale can be paid with $0.01 and the sale shows fully paid (shown in the harness 2026-09-26). The custom amount is a product decision put to the owner; the amount check itself is R2/R3 (plan lines 870, 1511).";
+const GAP11_REPLAY_FINDING =
+  "Gap 11 (known, escalated 2026-09-13): the finaliser re-settles on every call with the bound session, and after a share it resets the session to pending, so one approved session can complete the next share too. Closed by moving onto the payment_attempts engine (C3).";
+
+function tokenRate(family: string, perMinute: number): string {
+  return (
+    `requirePaymentTokenRateLimit (the ${family} family: ${perMinute} a minute per visitor address, counted in ` +
+    "this server process only; until TRUST_PROXY_HOPS is set every visitor shares one address — R1-T4 phase B)"
+  );
+}
 
 export const ROUTE_REVIEW: Record<string, RouteReview> = {
   // ── Batch 1 (2026-09-26): provider callbacks, cron, the ecommerce API, billing callbacks ──
@@ -381,13 +413,393 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       "Overlapping runs are refused only within one server process (the in-memory cronRunning flag): two instances can run the passes at once. Plan 13.3 (durable cron leases).",
     ],
   },
+
+  // ── Batch 2a (2026-09-26): per-payment links and the payment return ──
+
+  "GET /api/pay/t/:token": {
+    branches: [{ principal: "public-bearer", tenant: "token", tenantRule: TOKEN_TENANT_RULE }],
+    input: `${TOKEN_INPUT}; nothing else is read`,
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto:
+      "tokenPaymentDto: the sale's item, price, status and split state, and the business's public details (name, contact, address, GST number, NZBN, logo, theme); a failed or cancelled sale answers 410 with the same",
+    errorDisclosure: ["fixed"],
+    controls: { authenticity: TOKEN_AUTHENTICITY, replay: "read-only", rate: tokenRate("resolve", 120) },
+  },
+
+  "GET /api/pay/t/:token/qr": {
+    branches: [{ principal: "public-bearer", tenant: "token", tenantRule: TOKEN_TENANT_RULE }],
+    input: `${TOKEN_INPUT}; size: strictBoundedIntegerQueryParam (100 to 800, default 300)`,
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto: "a PNG QR code of this link's own address (/pay/t/<token>), never cached",
+    errorDisclosure: ["fixed"],
+    controls: { authenticity: TOKEN_AUTHENTICITY, replay: "read-only", rate: tokenRate("qr", 30) },
+  },
+
+  "POST /api/pay/t/:token/split": {
+    branches: [{ principal: "public-bearer", tenant: "token", tenantRule: TOKEN_TENANT_RULE }],
+    input: `${TOKEN_INPUT}; body: { totalSplits: a whole number from 2 to 10 }, nothing else (strict)`,
+    capability: null,
+    entitlement: null,
+    idempotency:
+      "only while the sale is pending and the business allowed splitting; storage.createBillSplit sets it up atomically and a sale already split is refused (BillSplitConflictError, 409)",
+    sideEffects: "a live update to the business's screens (broadcastToStone)",
+    successDto: "tokenPaymentDto of the split sale; no split-payment id is returned",
+    errorDisclosure: ["domain-errors"],
+    controls: {
+      authenticity: TOKEN_AUTHENTICITY,
+      replay: "a second split is refused (409)",
+      rate: tokenRate("session", 20),
+    },
+  },
+
+  "GET /api/pay/t/:token/receipt": {
+    branches: [
+      {
+        principal: "public-bearer",
+        tenant: "token",
+        tenantRule: `${TOKEN_TENANT_RULE}; for a split sale, share picks one of its completed shares (loadTokenReceipt)`,
+      },
+    ],
+    input: `${TOKEN_INPUT}; ${TOKEN_SHARE_INPUT}`,
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto:
+      "tokenReceiptDto: the sale's item, price, status, method, split counts and date, the business's public details, and the share's index, amount, method and paid time; no internal ids",
+    errorDisclosure: ["fixed"],
+    controls: { authenticity: TOKEN_AUTHENTICITY, replay: "read-only", rate: tokenRate("resolve", 120) },
+    findings: [TOKEN_SHARE_FINDING],
+  },
+
+  "POST /api/pay/t/:token/receipt-pdf": {
+    branches: [
+      {
+        principal: "public-bearer",
+        tenant: "token",
+        tenantRule: `${TOKEN_TENANT_RULE}; for a split sale, share picks one of its completed shares (loadTokenReceipt)`,
+      },
+    ],
+    input: `${TOKEN_INPUT}; ${TOKEN_SHARE_INPUT}`,
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only (a POST so the download is not a link)",
+    sideEffects: null,
+    successDto: "a PDF receipt of the sale or share (generateReceiptPdf), as an attachment",
+    errorDisclosure: ["fixed"],
+    controls: { authenticity: TOKEN_AUTHENTICITY, replay: "read-only", rate: tokenRate("completion", 40) },
+  },
+
+  "GET /api/pay/t/:token/receipt-qr": {
+    branches: [
+      {
+        principal: "public-bearer",
+        tenant: "token",
+        tenantRule: `${TOKEN_TENANT_RULE}; for a split sale, share picks one of its completed shares (loadTokenReceipt)`,
+      },
+    ],
+    input: `${TOKEN_INPUT}; ${TOKEN_SHARE_INPUT}; size: strictBoundedIntegerQueryParam (100 to 800)`,
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto: "a PNG QR code of the receipt page's address (/receipt/t/<token>, with ?share=n for a share)",
+    errorDisclosure: ["fixed"],
+    controls: { authenticity: TOKEN_AUTHENTICITY, replay: "read-only", rate: tokenRate("qr", 30) },
+  },
+
+  "POST /api/pay/t/:token/session": {
+    branches: [{ principal: "public-bearer", tenant: "token", tenantRule: TOKEN_TENANT_RULE }],
+    input: `${TOKEN_INPUT}; body: tokenSessionRequestSchema, strict (idempotencyKey: a UUID; amount: optional, and must equal what is owed)`,
+    capability:
+      "isWindcaveConfigured() (503 PAYMENT_PROVIDER_UNAVAILABLE) and PAYMENT_RETURN_STATE_SECRET (503 PAYMENT_RETURN_STATE_UNAVAILABLE)",
+    entitlement: null,
+    idempotency:
+      "per sale share and idempotency key: paymentAttempts.claim keeps one active attempt; the same key resumes its attempt and session, another key while one is active is 409, and concurrent creation of one attempt's session is coalesced in this process",
+    sideEffects:
+      "creates a payment session with the provider (createWindcaveSession); an expired attempt is first reconciled by querying the provider, which can settle it (live update and push to the business)",
+    successDto:
+      "the provider session id, its hosted-page and submit URLs, attemptState and shareIndex; or, for a settled attempt, its outcome",
+    errorDisclosure: ["fixed"],
+    controls: {
+      authenticity: TOKEN_AUTHENTICITY,
+      replay: "the same idempotency key returns the same attempt and session; a new key while one is active is refused",
+      rate: tokenRate("session", 20),
+    },
+  },
+
+  "POST /api/pay/t/:token/hosted-fields-complete": {
+    branches: [
+      {
+        principal: "public-bearer",
+        tenant: "token",
+        tenantRule: `${TOKEN_TENANT_RULE}; the attempt must be this sale's, for this share and idempotency key, with this provider session (prepareTokenCompletion)`,
+      },
+    ],
+    input: `${TOKEN_INPUT}; body: idempotencyKey (a UUID), sessionId (1 to 512 characters), shareIndex (0 to 10), paymentMethod card or apple_pay; strict`,
+    capability: "isWindcaveConfigured() (503 while unconfigured: the outcome waits)",
+    entitlement: null,
+    idempotency: "paymentAttempts.claimFinalization: one finaliser per attempt; a settled attempt returns its outcome",
+    sideEffects: "queries the provider for the session's outcome; on settlement a live update and a push to the business",
+    successDto: "{ approved, outcome, receiptShare } (tokenAttemptOutcome)",
+    errorDisclosure: ["fixed"],
+    controls: {
+      authenticity: `${TOKEN_AUTHENTICITY}, together with the attempt's idempotency key and provider session id`,
+      replay: "returns the settled outcome; the outcome always comes from the provider, never from the request",
+      rate: tokenRate("completion", 40),
+    },
+  },
+
+  "POST /api/pay/t/:token/googlepay-complete": {
+    branches: [
+      {
+        principal: "public-bearer",
+        tenant: "token",
+        tenantRule: `${TOKEN_TENANT_RULE}; the attempt must be this sale's, for this share and idempotency key, with this provider session (prepareTokenCompletion)`,
+      },
+    ],
+    input: `${TOKEN_INPUT}; body: idempotencyKey (a UUID), sessionId (1 to 512 characters), shareIndex (0 to 10), and googlePayToken, an object passed to the provider as it is; strict`,
+    capability: "isWindcaveConfigured() (503 while unconfigured: the outcome waits)",
+    entitlement: null,
+    idempotency:
+      "paymentAttempts.claimFinalization: only the first finaliser submits the wallet token; a replay only queries the session, so it cannot charge twice",
+    sideEffects:
+      "the first finaliser submits the Google Pay token to the provider's submit URL cached for this attempt (assertWindcaveUrl checks it is the provider's); otherwise queries the session; on settlement a live update and a push to the business",
+    successDto: "{ approved, outcome, receiptShare } (tokenAttemptOutcome)",
+    errorDisclosure: ["fixed"],
+    controls: {
+      authenticity: `${TOKEN_AUTHENTICITY}, together with the attempt's idempotency key and provider session id`,
+      replay: "never resubmits the wallet token; returns the settled outcome",
+      rate: tokenRate("completion", 40),
+    },
+  },
+
+  "GET /api/pay/return/:state": {
+    branches: [
+      {
+        principal: "public-bearer",
+        tenant: "token",
+        tenantRule:
+          "the return state (HMAC-derived from one payment attempt) selects that attempt (paymentAttempts.resolveReturnState); an unknown state is 404",
+      },
+    ],
+    input:
+      "state: an opaque return state, resolved by its hash; source: only 'hpp' is acted on; result: only 'cancelled' changes anything (a provider-declined outcome is labelled cancelled)",
+    capability: "isWindcaveConfigured() (unconfigured, the attempt stays pending)",
+    entitlement: null,
+    idempotency:
+      "the provider's browser return reconciles through paymentAttempts.claimFinalization, once per attempt; a plain read is read-only",
+    sideEffects:
+      "on the provider's browser return: queries the provider and settles the attempt (live update and push to the business)",
+    successDto: "a browser return is always 303 to /pay/return/<state>; a plain read returns only { outcome, receiptShare }",
+    errorDisclosure: ["fixed"],
+    controls: {
+      authenticity: "holding the attempt's return state, the credential for that one attempt",
+      replay: "harmless: settlement is claimed once, and reads are read-only",
+      rate: tokenRate("resolve", 120),
+    },
+  },
+
+  // ── Batch 2b (2026-09-26): numbered (board) sales, their receipts, the Windcave browser return ──
+
+  "POST /api/transactions/:id/split": {
+    branches: [{ principal: "public", tenant: "number", tenantRule: NUMBER_TENANT_RULE }],
+    input: "id: strictPositiveIntegerParam; body: { totalSplits: a whole number from 2 to 10 }, nothing else (strict, since 2026-09-26)",
+    capability: null,
+    entitlement: null,
+    idempotency:
+      "only a pending sale the business allowed to split (409 otherwise, since 2026-09-26); storage.createBillSplit sets it up atomically, returns an exact retry unchanged, and refuses a different split (BillSplitConflictError, 409)",
+    sideEffects: "a live update to the business's screens (broadcastToStone)",
+    successDto: "publicTransactionDto of the split sale, with its board's page and QR addresses",
+    errorDisclosure: ["domain-errors"],
+    controls: {
+      authenticity: NUMBER_AUTHENTICITY,
+      replay: "an exact retry returns the same split; a different one is refused",
+      rate: "none — no limit",
+    },
+    findings: [NUMBERED_SALE_FINDING],
+  },
+
+  "GET /api/split-payments/:id": {
+    branches: [
+      {
+        principal: "public",
+        tenant: "number",
+        tenantRule: "the share's sequential number selects it; a share of a sale with its own link is hidden (404)",
+      },
+    ],
+    input: "id: strictPositiveIntegerParam (checked twice)",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto: "publicSplitPaymentDto: the share's id, sale number, index, amount, status, method and times",
+    errorDisclosure: ["fixed"],
+    controls: { authenticity: NUMBER_AUTHENTICITY, replay: "read-only", rate: "none — no limit" },
+    findings: [NUMBERED_SALE_FINDING],
+  },
+
+  "POST /api/transactions/:id/pay": {
+    branches: [{ principal: "public", tenant: "number", tenantRule: NUMBER_TENANT_RULE }],
+    input:
+      "id: strictPositiveIntegerParam; body: paymentRequestSchema (merchantId, stoneId, paymentMethod, cardLast4, amount — all optional; a merchantId or stoneId given must match the sale); amount: parsed with parseFloat, any positive figure up to what is left (finding)",
+    capability: "isWindcaveConfigured() (503 PAYMENT_PROVIDER_UNAVAILABLE while unconfigured)",
+    entitlement: null,
+    idempotency:
+      "a completed or processing sale is refused (409); otherwise every call creates a new provider session and binds it to the sale, replacing the last one",
+    sideEffects:
+      "creates a payment session with the provider (createWindcaveSession); when the provider reports the session already complete, settles the sale (live update and push)",
+    successDto: "the provider session id and its hosted-page and submit URLs (kept server-side too, and never taken back from a client)",
+    errorDisclosure: ["input-issues"],
+    controls: {
+      authenticity: NUMBER_AUTHENTICITY,
+      replay: "each call opens another provider session for the same sale",
+      rate: CHECK_RATE_LIMIT,
+    },
+    findings: [
+      NUMBERED_SALE_FINDING,
+      "For a split sale the customer may name their own amount (any positive figure up to what is left, parsed with parseFloat), and the share it pays is then counted as fully paid. " +
+        SPLIT_SHARE_FINDING,
+    ],
+  },
+
+  "POST /api/transactions/:id/hosted-fields-complete": {
+    branches: [
+      {
+        principal: "public",
+        tenant: "number",
+        tenantRule: `${NUMBER_TENANT_RULE}; the session id sent must be the one bound to the sale (403 otherwise)`,
+      },
+    ],
+    input:
+      "id: strictPositiveIntegerParam; body read without a schema: sessionId (required, compared with the bound session) and paymentMethod (only apple_pay is kept, anything else is card)",
+    capability: "isWindcaveConfigured() (503 while unconfigured)",
+    entitlement: null,
+    idempotency: "none: every call queries the provider and settles again (gap 11, finding)",
+    sideEffects:
+      "queries the provider for the bound session; settles the sale or its next share, counts it on the business, and sends a live update and a push",
+    successDto: "{ approved, redirectPath } to the receipt or the declined page",
+    errorDisclosure: ["fixed"],
+    controls: {
+      authenticity: `${NUMBER_AUTHENTICITY}, with the provider session id bound to it`,
+      replay: "settles again; after a share, the same session can complete the next one (gap 11)",
+      rate: "none — no limit",
+    },
+    findings: [NUMBERED_SALE_FINDING, GAP11_REPLAY_FINDING, SPLIT_SHARE_FINDING],
+  },
+
+  "POST /api/transactions/:id/googlepay-complete": {
+    branches: [
+      {
+        principal: "public",
+        tenant: "number",
+        tenantRule: `${NUMBER_TENANT_RULE}; the session id sent must be the one bound to the sale (403 otherwise)`,
+      },
+    ],
+    input:
+      "id: strictPositiveIntegerParam; body read without a schema: sessionId (required, compared with the bound session) and googlePayToken (an object passed to the provider)",
+    capability: "isWindcaveConfigured() (503 while unconfigured)",
+    entitlement: null,
+    idempotency:
+      "none: the wallet token is submitted to the provider's submit URL cached for the sale when there is one, otherwise the session is queried, and the result is settled again on every call (gap 11)",
+    sideEffects:
+      "submits the Google Pay token to the provider's cached submit URL (assertWindcaveUrl checks it) or queries the session; settles the sale or its next share, counts it, and sends a live update and a push",
+    successDto: "{ approved, redirectPath } to the receipt or the declined page",
+    errorDisclosure: ["fixed"],
+    controls: {
+      authenticity: `${NUMBER_AUTHENTICITY}, with the provider session id bound to it`,
+      replay: "settles again; after a share, the same session can complete the next one (gap 11)",
+      rate: "none — no limit",
+    },
+    findings: [NUMBERED_SALE_FINDING, GAP11_REPLAY_FINDING, SPLIT_SHARE_FINDING],
+  },
+
+  "GET /api/transactions/:id": {
+    branches: [{ principal: "public", tenant: "number", tenantRule: NUMBER_TENANT_RULE }],
+    input: "id: strictPositiveIntegerParam",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto:
+      "publicTransactionDto: id, business id, board id, item, price, status, method, split counts and date, and the board's page address",
+    errorDisclosure: ["fixed"],
+    controls: { authenticity: NUMBER_AUTHENTICITY, replay: "read-only", rate: "none — no limit" },
+    findings: [
+      `${NUMBERED_SALE_FINDING} With no rate limit, counting through the numbers lists every such sale of every business: item, price, time, business and board.`,
+    ],
+  },
+
+  "POST /api/transactions/:id/receipt-pdf": {
+    branches: [{ principal: "public", tenant: "number", tenantRule: NUMBER_TENANT_RULE }],
+    input:
+      "id: strictPositiveIntegerParam; splitId: present, it must pass strictPositiveIntegerQueryParam (400 otherwise), belong to the sale and be completed",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto: "a PDF receipt of a completed sale or share (generateReceiptPdf), as an attachment",
+    errorDisclosure: ["fixed"],
+    controls: { authenticity: NUMBER_AUTHENTICITY, replay: "read-only", rate: "none — no limit" },
+    findings: [NUMBERED_SALE_FINDING],
+  },
+
+  "GET /api/transactions/:id/receipt-qr": {
+    branches: [{ principal: "public", tenant: "number", tenantRule: NUMBER_TENANT_RULE }],
+    input: "id: strictPositiveIntegerParam (checked twice); size: strictBoundedIntegerQueryParam (up to 800)",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto: "a PNG QR code of the receipt page's address (/receipt/<number>), cached publicly for 7 days",
+    errorDisclosure: ["fixed"],
+    controls: { authenticity: NUMBER_AUTHENTICITY, replay: "read-only", rate: "none — no limit" },
+    findings: [NUMBERED_SALE_FINDING],
+  },
+
+  "GET /api/windcave/callback": {
+    branches: [
+      {
+        principal: "public",
+        tenant: "number",
+        tenantRule:
+          "the sale's number (transactionId), or else the provider session id, selects the sale; a sale with its own link is 404; a cancel is believed only with the bound session id",
+      },
+    ],
+    input:
+      "transactionId: read into a variable, then strictPositiveIntegerQueryParam (a malformed one finds nothing, since 2026-09-26); sessionId / sessionid: compared with the bound session before a cancel is believed; result: only 'cancelled' is acted on; any 'sim' key rejects the request (400)",
+    capability: "isWindcaveConfigured(): unconfigured, nothing is settled and the customer sees pending",
+    entitlement: null,
+    idempotency:
+      "an already approved or declined sale only redirects; otherwise pending → processing is a read then a write, like the notification's (R3 / C20)",
+    sideEffects:
+      "queries the provider for the bound session and settles the sale or its next share (count, live update, push); a matching cancel fails the sale (live update, push)",
+    successDto: "302 to the receipt, or to the result page (declined, cancelled or pending), or home",
+    errorDisclosure: ["fixed"],
+    controls: {
+      authenticity:
+        `${NUMBER_AUTHENTICITY}; the outcome always comes from querying the provider, and a cancel needs the bound session id`,
+      replay: "a settled sale only redirects; simultaneous calls can both settle (R3 / C20)",
+      rate: "none — anyone can prompt a provider query for a pending numbered sale",
+    },
+    findings: [
+      NUMBERED_SALE_FINDING,
+      "Settles by a read then a write, not a claim, racing the notification (plan 22.7 / R3, C20).",
+    ],
+  },
 };
 
 /**
  * Routes not reviewed yet. May only shrink: PENDING_CEILING is lowered by
  * every batch, so a route cannot be added here instead of being reviewed.
  */
-export const PENDING_CEILING = 211;
+export const PENDING_CEILING = 192;
 
 export const REVIEW_PENDING: readonly string[] = [
   "GET /robots.txt",
@@ -415,33 +827,15 @@ export const REVIEW_PENDING: readonly string[] = [
   "GET /api/merchants/:id/stone/:stoneId/qr",
   "GET /api/merchants/:id",
   "GET /api/merchants/:id/profile",
-  "GET /api/pay/t/:token",
-  "GET /api/pay/t/:token/qr",
-  "POST /api/pay/t/:token/split",
-  "GET /api/pay/t/:token/receipt",
-  "POST /api/pay/t/:token/receipt-pdf",
-  "GET /api/pay/t/:token/receipt-qr",
-  "POST /api/pay/t/:token/session",
-  "POST /api/pay/t/:token/hosted-fields-complete",
-  "POST /api/pay/t/:token/googlepay-complete",
-  "GET /api/pay/return/:state",
   "GET /api/merchants/:id/active-transaction",
   "POST /api/transactions",
   "POST /api/transactions/cash-sale",
   "POST /api/transactions/tap-to-pay",
-  "POST /api/transactions/:id/split",
   "PATCH /api/transactions/:id/split-enabled",
-  "GET /api/split-payments/:id",
   "POST /api/transactions/:id/cancel",
   "POST /api/merchants/:merchantId/nfc-pay",
   "GET /api/nfc/capabilities",
-  "POST /api/transactions/:id/pay",
   "GET /api/windcave/env",
-  "POST /api/transactions/:id/hosted-fields-complete",
-  "POST /api/transactions/:id/googlepay-complete",
-  "GET /api/transactions/:id",
-  "POST /api/transactions/:id/receipt-pdf",
-  "GET /api/transactions/:id/receipt-qr",
   "GET /api/merchants/:id/analytics",
   "GET /api/merchants/:id/revenue-over-time",
   "GET /api/merchants/:id/analytics/export",
@@ -468,7 +862,6 @@ export const REVIEW_PENDING: readonly string[] = [
   "DELETE /api/merchants/:merchantId/tapt-stones/:stoneId",
   "GET /api/tapt-stones/:id",
   "GET /api/admin/subscription-revenue",
-  "GET /api/windcave/callback",
   "GET /api/windcave/status",
   "GET /api/admin/analytics",
   "GET /api/admin/revenue-over-time",

@@ -114,6 +114,11 @@ function problemsWith(key: string, review: RouteReview): string[] {
       case "board":
         if (!comparesMerchant(facts)) say(`${label} is a board's page, but the route compares no merchant id`);
         break;
+      case "number":
+        // A guessable number that anyone may use stays visible until it is retired.
+        if (branch.principal !== "public") say(`${label} is addressed by a guessable number, but is not a public branch`);
+        if (!review.findings?.length) say(`${label} is addressed by a guessable number, which must be a finding`);
+        break;
       case "provider-session":
         if (branch.principal !== "provider") say(`${label} is selected by a provider's reference, but is not the provider`);
         break;
@@ -252,6 +257,22 @@ describe("R1-T2 / R1-T3 — every route's reviewed policy holds against its hand
 
     it("refuse 'fixed messages' on a route that puts validation issues into a response", () => {
       expect(problemsWith(theme, { ...base, errorDisclosure: ["fixed"] }).join("\n")).toContain("claims fixed messages only");
+    });
+
+    it("refuse a guessable-number route without a finding", () => {
+      const read = "GET /api/transactions/:id";
+      const review: RouteReview = {
+        branches: [{ principal: "public", tenant: "number", tenantRule: "the sale number" }],
+        input: "id: strict",
+        capability: null,
+        entitlement: null,
+        idempotency: "read-only",
+        sideEffects: null,
+        successDto: "publicTransactionDto",
+        errorDisclosure: ["fixed"],
+        controls: { authenticity: "anyone", replay: "read-only", rate: "none" },
+      };
+      expect(problemsWith(read, review).join("\n")).toContain("must be a finding");
     });
 
     it("refuse a silent rate limit, an unexplained raw value, and a missing gate", () => {

@@ -1,4 +1,4 @@
-# R1-T2 route inventory — generated 2026-09-26 @ `9869da1ca69e5f820781baa96c385ba5363758a3`
+# R1-T2 route inventory — generated 2026-09-26 @ `5e0982810dd09e805d1c59356134a44e029e1fb0`
 
 Regenerate with `npx tsx scripts/generate-route-policy.ts`. This table is
 evidence for the SHA named above, not a timeless constant — see
@@ -14,7 +14,7 @@ necessarily a bug): **0**.
 
 ## Review
 
-12 of 223 routes reviewed (server/route-review.ts); 211 pending.
+31 of 223 routes reviewed (server/route-review.ts); 192 pending.
 A reviewed route's principal below is the review's; a pending one's is the heuristic, marked "(heuristic)".
 
 ### Open findings
@@ -26,6 +26,22 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 - **ALL /api/windcave/rent-notification:** finalizeRentInvoice marks a single (unsplit) payment paid after a plain read: this notification and the browser's return arriving together can both record it, logging Payment_Received twice and sending the GST invoice twice. Plan 22.7 / R3 (C20).
 - **ALL /api/windcave/trades-notification:** finalizeTradeInvoice marks a single payment paid after a plain read: a notification and the browser's return arriving together can both record it and send the payment invoice twice. Plan 22.7 / R3 (C20).
 - **POST /api/internal/cron:** Overlapping runs are refused only within one server process (the in-memory cronRunning flag): two instances can run the passes at once. Plan 13.3 (durable cron leases).
+- **GET /api/pay/t/:token/receipt:** share is parsed with Number(), which accepts forms such as 1e0, 0x1 and ' 1' that the plan's strict parser (§8.4) refuses; the same on the receipt, its PDF and its QR.
+- **POST /api/transactions/:id/split:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
+- **GET /api/split-payments/:id:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
+- **POST /api/transactions/:id/pay:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
+- **POST /api/transactions/:id/pay:** For a split sale the customer may name their own amount (any positive figure up to what is left, parsed with parseFloat), and the share it pays is then counted as fully paid. A split share is marked paid whatever amount the provider charged: with the pay route's customer-chosen amount, every share of a $100 sale can be paid with $0.01 and the sale shows fully paid (shown in the harness 2026-09-26). The custom amount is a product decision put to the owner; the amount check itself is R2/R3 (plan lines 870, 1511).
+- **POST /api/transactions/:id/hosted-fields-complete:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
+- **POST /api/transactions/:id/hosted-fields-complete:** Gap 11 (known, escalated 2026-09-13): the finaliser re-settles on every call with the bound session, and after a share it resets the session to pending, so one approved session can complete the next share too. Closed by moving onto the payment_attempts engine (C3).
+- **POST /api/transactions/:id/hosted-fields-complete:** A split share is marked paid whatever amount the provider charged: with the pay route's customer-chosen amount, every share of a $100 sale can be paid with $0.01 and the sale shows fully paid (shown in the harness 2026-09-26). The custom amount is a product decision put to the owner; the amount check itself is R2/R3 (plan lines 870, 1511).
+- **POST /api/transactions/:id/googlepay-complete:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
+- **POST /api/transactions/:id/googlepay-complete:** Gap 11 (known, escalated 2026-09-13): the finaliser re-settles on every call with the bound session, and after a share it resets the session to pending, so one approved session can complete the next share too. Closed by moving onto the payment_attempts engine (C3).
+- **POST /api/transactions/:id/googlepay-complete:** A split share is marked paid whatever amount the provider charged: with the pay route's customer-chosen amount, every share of a $100 sale can be paid with $0.01 and the sale shows fully paid (shown in the harness 2026-09-26). The custom amount is a product decision put to the owner; the amount check itself is R2/R3 (plan lines 870, 1511).
+- **GET /api/transactions/:id:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it. With no rate limit, counting through the numbers lists every such sale of every business: item, price, time, business and board.
+- **POST /api/transactions/:id/receipt-pdf:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
+- **GET /api/transactions/:id/receipt-qr:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
+- **GET /api/windcave/callback:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
+- **GET /api/windcave/callback:** Settles by a read then a write, not a claim, racing the notification (plan 22.7 / R3, C20).
 
 ## Routes
 
@@ -56,34 +72,34 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 | GET | `/api/merchants/:id/stone/:stoneId/qr` | 1301 | public (heuristic) | — |
 | GET | `/api/merchants/:id` | 1349 | public (heuristic) | publicMerchantBrandDto( |
 | GET | `/api/merchants/:id/profile` | 1367 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership, isAccountOwner |
-| GET | `/api/pay/t/:token` | 1389 | public (heuristic) | resolvePaymentToken( |
-| GET | `/api/pay/t/:token/qr` | 1416 | public (heuristic) | resolvePaymentToken( |
-| POST | `/api/pay/t/:token/split` | 1444 | public (heuristic) | resolvePaymentToken(, loadTokenReceipt( |
-| GET | `/api/pay/t/:token/receipt` | 1541 | public (heuristic) | loadTokenReceipt( |
-| POST | `/api/pay/t/:token/receipt-pdf` | 1554 | public (heuristic) | loadTokenReceipt( |
-| GET | `/api/pay/t/:token/receipt-qr` | 1584 | public (heuristic) | loadTokenReceipt( |
-| POST | `/api/pay/t/:token/session` | 1660 | public (heuristic) | resolvePaymentToken(, prepareTokenCompletion( |
-| POST | `/api/pay/t/:token/hosted-fields-complete` | 1960 | public (heuristic) | prepareTokenCompletion( |
-| POST | `/api/pay/t/:token/googlepay-complete` | 2012 | public (heuristic) | prepareTokenCompletion(, paymentAttempts.resolveReturnState( |
-| GET | `/api/pay/return/:state` | 2143 | public (heuristic) | paymentAttempts.resolveReturnState( |
+| GET | `/api/pay/t/:token` | 1389 | public-bearer | resolvePaymentToken( |
+| GET | `/api/pay/t/:token/qr` | 1416 | public-bearer | resolvePaymentToken( |
+| POST | `/api/pay/t/:token/split` | 1444 | public-bearer | resolvePaymentToken(, loadTokenReceipt( |
+| GET | `/api/pay/t/:token/receipt` | 1541 | public-bearer | loadTokenReceipt( |
+| POST | `/api/pay/t/:token/receipt-pdf` | 1554 | public-bearer | loadTokenReceipt( |
+| GET | `/api/pay/t/:token/receipt-qr` | 1584 | public-bearer | loadTokenReceipt( |
+| POST | `/api/pay/t/:token/session` | 1660 | public-bearer | resolvePaymentToken(, prepareTokenCompletion( |
+| POST | `/api/pay/t/:token/hosted-fields-complete` | 1960 | public-bearer | prepareTokenCompletion( |
+| POST | `/api/pay/t/:token/googlepay-complete` | 2012 | public-bearer | prepareTokenCompletion(, paymentAttempts.resolveReturnState( |
+| GET | `/api/pay/return/:state` | 2143 | public-bearer | paymentAttempts.resolveReturnState( |
 | ALL | `/api/pay/notification/:state` | 2177 | provider | — |
 | GET | `/api/merchants/:id/active-transaction` | 2194 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership, publicTransactionDto(, generatePaymentUrl( |
 | POST | `/api/transactions` | 2311 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
 | POST | `/api/transactions/cash-sale` | 2392 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
 | POST | `/api/transactions/tap-to-pay` | 2452 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| POST | `/api/transactions/:id/split` | 2594 | public (heuristic) | isTokenAddressedTransaction(, publicTransactionDto( |
+| POST | `/api/transactions/:id/split` | 2594 | public | isTokenAddressedTransaction(, publicTransactionDto( |
 | PATCH | `/api/transactions/:id/split-enabled` | 2645 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/split-payments/:id` | 2690 | public (heuristic) | isTokenAddressedTransaction( |
+| GET | `/api/split-payments/:id` | 2690 | public | isTokenAddressedTransaction( |
 | POST | `/api/transactions/:id/cancel` | 2709 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
 | POST | `/api/merchants/:merchantId/nfc-pay` | 2762 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
 | GET | `/api/nfc/capabilities` | 2852 | public (heuristic) | — |
-| POST | `/api/transactions/:id/pay` | 2866 | public (heuristic) | isTokenAddressedTransaction( |
+| POST | `/api/transactions/:id/pay` | 2866 | public | isTokenAddressedTransaction( |
 | GET | `/api/windcave/env` | 3121 | public (heuristic) | — |
-| POST | `/api/transactions/:id/hosted-fields-complete` | 3135 | public (heuristic) | isTokenAddressedTransaction( |
-| POST | `/api/transactions/:id/googlepay-complete` | 3173 | public (heuristic) | isTokenAddressedTransaction( |
-| GET | `/api/transactions/:id` | 3246 | public (heuristic) | isTokenAddressedTransaction(, publicTransactionDto( |
-| POST | `/api/transactions/:id/receipt-pdf` | 3267 | public (heuristic) | isTokenAddressedTransaction( |
-| GET | `/api/transactions/:id/receipt-qr` | 3328 | public (heuristic) | isTokenAddressedTransaction( |
+| POST | `/api/transactions/:id/hosted-fields-complete` | 3135 | public | isTokenAddressedTransaction( |
+| POST | `/api/transactions/:id/googlepay-complete` | 3173 | public | isTokenAddressedTransaction( |
+| GET | `/api/transactions/:id` | 3246 | public | isTokenAddressedTransaction(, publicTransactionDto( |
+| POST | `/api/transactions/:id/receipt-pdf` | 3267 | public | isTokenAddressedTransaction( |
+| GET | `/api/transactions/:id/receipt-qr` | 3328 | public | isTokenAddressedTransaction( |
 | GET | `/api/merchants/:id/analytics` | 3370 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
 | GET | `/api/merchants/:id/revenue-over-time` | 3385 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
 | GET | `/api/merchants/:id/analytics/export` | 3411 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
@@ -111,7 +127,7 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 | GET | `/api/tapt-stones/:id` | 4186 | public (heuristic) | — |
 | GET | `/api/admin/subscription-revenue` | 4204 | admin (heuristic) | authenticateAdmin |
 | ALL | `/api/windcave/notification` | 4215 | provider | — |
-| GET | `/api/windcave/callback` | 4337 | public (heuristic) | isTokenAddressedTransaction( |
+| GET | `/api/windcave/callback` | 4337 | public | isTokenAddressedTransaction( |
 | GET | `/api/windcave/status` | 4532 | public (heuristic) | — |
 | GET | `/api/admin/analytics` | 4545 | admin (heuristic) | authenticateAdmin |
 | GET | `/api/admin/revenue-over-time` | 4618 | admin (heuristic) | authenticateAdmin |
@@ -509,7 +525,16 @@ Review pending.
 - rateLimits: `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
 - helpers: `requirePaymentTokenRateLimit`, `setPaymentTokenHeaders`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public-bearer. **Tenant (token):** the link's token (43 base64url characters) selects the one sale it was made for: only its hash is looked up (resolvePaymentToken); an unknown or malformed token is 404
+- **Input:** token: matched against PAYMENT_TOKEN_PATTERN, then only its hash is looked up; nothing else is read
+- **Idempotency:** read-only
+- **Success:** tokenPaymentDto: the sale's item, price, status and split state, and the business's public details (name, contact, address, GST number, NZBN, logo, theme); a failed or cancelled sale answers 410 with the same
+- **Error disclosure:** fixed
+- **Authenticity:** holding the sale's link: its token is the credential for that one sale and for nothing else
+- **Replay:** read-only
+- **Rate:** requirePaymentTokenRateLimit (the resolve family: 120 a minute per visitor address, counted in this server process only; until TRUST_PROXY_HOPS is set every visitor shares one address — R1-T4 phase B)
 
 ### GET `/api/pay/t/:token/qr`
 
@@ -520,7 +545,16 @@ Review pending.
 - rateLimits: `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
 - helpers: `requirePaymentTokenRateLimit`, `setPaymentTokenHeaders`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public-bearer. **Tenant (token):** the link's token (43 base64url characters) selects the one sale it was made for: only its hash is looked up (resolvePaymentToken); an unknown or malformed token is 404
+- **Input:** token: matched against PAYMENT_TOKEN_PATTERN, then only its hash is looked up; size: strictBoundedIntegerQueryParam (100 to 800, default 300)
+- **Idempotency:** read-only
+- **Success:** a PNG QR code of this link's own address (/pay/t/<token>), never cached
+- **Error disclosure:** fixed
+- **Authenticity:** holding the sale's link: its token is the credential for that one sale and for nothing else
+- **Replay:** read-only
+- **Rate:** requirePaymentTokenRateLimit (the qr family: 30 a minute per visitor address, counted in this server process only; until TRUST_PROXY_HOPS is set every visitor shares one address — R1-T4 phase B)
 
 ### POST `/api/pay/t/:token/split`
 
@@ -535,7 +569,17 @@ Review pending.
 - rateLimits: `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
 - helpers: `broadcastToStone`, `requirePaymentTokenRateLimit`, `setPaymentTokenHeaders`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public-bearer. **Tenant (token):** the link's token (43 base64url characters) selects the one sale it was made for: only its hash is looked up (resolvePaymentToken); an unknown or malformed token is 404
+- **Input:** token: matched against PAYMENT_TOKEN_PATTERN, then only its hash is looked up; body: { totalSplits: a whole number from 2 to 10 }, nothing else (strict)
+- **Idempotency:** only while the sale is pending and the business allowed splitting; storage.createBillSplit sets it up atomically and a sale already split is refused (BillSplitConflictError, 409)
+- **Side effects:** a live update to the business's screens (broadcastToStone)
+- **Success:** tokenPaymentDto of the split sale; no split-payment id is returned
+- **Error disclosure:** domain-errors
+- **Authenticity:** holding the sale's link: its token is the credential for that one sale and for nothing else
+- **Replay:** a second split is refused (409)
+- **Rate:** requirePaymentTokenRateLimit (the session family: 20 a minute per visitor address, counted in this server process only; until TRUST_PROXY_HOPS is set every visitor shares one address — R1-T4 phase B)
 
 ### GET `/api/pay/t/:token/receipt`
 
@@ -548,7 +592,17 @@ Review pending.
 - rateLimits: `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
 - helpers: `requirePaymentTokenRateLimit`, `sendTokenReceiptError`, `setPaymentTokenHeaders`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public-bearer. **Tenant (token):** the link's token (43 base64url characters) selects the one sale it was made for: only its hash is looked up (resolvePaymentToken); an unknown or malformed token is 404; for a split sale, share picks one of its completed shares (loadTokenReceipt)
+- **Input:** token: matched against PAYMENT_TOKEN_PATTERN, then only its hash is looked up; share: read with Number() and required to be a whole number of at least 1 (not the strict parser: finding)
+- **Idempotency:** read-only
+- **Success:** tokenReceiptDto: the sale's item, price, status, method, split counts and date, the business's public details, and the share's index, amount, method and paid time; no internal ids
+- **Error disclosure:** fixed
+- **Authenticity:** holding the sale's link: its token is the credential for that one sale and for nothing else
+- **Replay:** read-only
+- **Rate:** requirePaymentTokenRateLimit (the resolve family: 120 a minute per visitor address, counted in this server process only; until TRUST_PROXY_HOPS is set every visitor shares one address — R1-T4 phase B)
+- **Finding:** share is parsed with Number(), which accepts forms such as 1e0, 0x1 and ' 1' that the plan's strict parser (§8.4) refuses; the same on the receipt, its PDF and its QR.
 
 ### POST `/api/pay/t/:token/receipt-pdf`
 
@@ -560,7 +614,16 @@ Review pending.
 - rateLimits: `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
 - helpers: `requirePaymentTokenRateLimit`, `sendTokenReceiptError`, `setPaymentTokenHeaders`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public-bearer. **Tenant (token):** the link's token (43 base64url characters) selects the one sale it was made for: only its hash is looked up (resolvePaymentToken); an unknown or malformed token is 404; for a split sale, share picks one of its completed shares (loadTokenReceipt)
+- **Input:** token: matched against PAYMENT_TOKEN_PATTERN, then only its hash is looked up; share: read with Number() and required to be a whole number of at least 1 (not the strict parser: finding)
+- **Idempotency:** read-only (a POST so the download is not a link)
+- **Success:** a PDF receipt of the sale or share (generateReceiptPdf), as an attachment
+- **Error disclosure:** fixed
+- **Authenticity:** holding the sale's link: its token is the credential for that one sale and for nothing else
+- **Replay:** read-only
+- **Rate:** requirePaymentTokenRateLimit (the completion family: 40 a minute per visitor address, counted in this server process only; until TRUST_PROXY_HOPS is set every visitor shares one address — R1-T4 phase B)
 
 ### GET `/api/pay/t/:token/receipt-qr`
 
@@ -572,7 +635,16 @@ Review pending.
 - rateLimits: `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
 - helpers: `requirePaymentTokenRateLimit`, `sendTokenReceiptError`, `setPaymentTokenHeaders`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public-bearer. **Tenant (token):** the link's token (43 base64url characters) selects the one sale it was made for: only its hash is looked up (resolvePaymentToken); an unknown or malformed token is 404; for a split sale, share picks one of its completed shares (loadTokenReceipt)
+- **Input:** token: matched against PAYMENT_TOKEN_PATTERN, then only its hash is looked up; share: read with Number() and required to be a whole number of at least 1 (not the strict parser: finding); size: strictBoundedIntegerQueryParam (100 to 800)
+- **Idempotency:** read-only
+- **Success:** a PNG QR code of the receipt page's address (/receipt/t/<token>, with ?share=n for a share)
+- **Error disclosure:** fixed
+- **Authenticity:** holding the sale's link: its token is the credential for that one sale and for nothing else
+- **Replay:** read-only
+- **Rate:** requirePaymentTokenRateLimit (the qr family: 30 a minute per visitor address, counted in this server process only; until TRUST_PROXY_HOPS is set every visitor shares one address — R1-T4 phase B)
 
 ### POST `/api/pay/t/:token/session`
 
@@ -587,7 +659,18 @@ Review pending.
 - idempotency: `claim`, `claimFinalization`
 - helpers: `broadcastToStone`, `cacheTokenAttemptSession`, `persistTokenOutcome`, `reconcileExpiredTokenAttempt`, `requirePaymentTokenRateLimit`, `setPaymentTokenHeaders`, `tokenAttemptOutcome`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public-bearer. **Tenant (token):** the link's token (43 base64url characters) selects the one sale it was made for: only its hash is looked up (resolvePaymentToken); an unknown or malformed token is 404
+- **Input:** token: matched against PAYMENT_TOKEN_PATTERN, then only its hash is looked up; body: tokenSessionRequestSchema, strict (idempotencyKey: a UUID; amount: optional, and must equal what is owed)
+- **Capability gate:** isWindcaveConfigured() (503 PAYMENT_PROVIDER_UNAVAILABLE) and PAYMENT_RETURN_STATE_SECRET (503 PAYMENT_RETURN_STATE_UNAVAILABLE)
+- **Idempotency:** per sale share and idempotency key: paymentAttempts.claim keeps one active attempt; the same key resumes its attempt and session, another key while one is active is 409, and concurrent creation of one attempt's session is coalesced in this process
+- **Side effects:** creates a payment session with the provider (createWindcaveSession); an expired attempt is first reconciled by querying the provider, which can settle it (live update and push to the business)
+- **Success:** the provider session id, its hosted-page and submit URLs, attemptState and shareIndex; or, for a settled attempt, its outcome
+- **Error disclosure:** fixed
+- **Authenticity:** holding the sale's link: its token is the credential for that one sale and for nothing else
+- **Replay:** the same idempotency key returns the same attempt and session; a new key while one is active is refused
+- **Rate:** requirePaymentTokenRateLimit (the session family: 20 a minute per visitor address, counted in this server process only; until TRUST_PROXY_HOPS is set every visitor shares one address — R1-T4 phase B)
 
 ### POST `/api/pay/t/:token/hosted-fields-complete`
 
@@ -601,7 +684,18 @@ Review pending.
 - idempotency: `claimFinalization`
 - helpers: `broadcastToStone`, `persistTokenOutcome`, `requirePaymentTokenRateLimit`, `setPaymentTokenHeaders`, `tokenAttemptOutcome`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public-bearer. **Tenant (token):** the link's token (43 base64url characters) selects the one sale it was made for: only its hash is looked up (resolvePaymentToken); an unknown or malformed token is 404; the attempt must be this sale's, for this share and idempotency key, with this provider session (prepareTokenCompletion)
+- **Input:** token: matched against PAYMENT_TOKEN_PATTERN, then only its hash is looked up; body: idempotencyKey (a UUID), sessionId (1 to 512 characters), shareIndex (0 to 10), paymentMethod card or apple_pay; strict
+- **Capability gate:** isWindcaveConfigured() (503 while unconfigured: the outcome waits)
+- **Idempotency:** paymentAttempts.claimFinalization: one finaliser per attempt; a settled attempt returns its outcome
+- **Side effects:** queries the provider for the session's outcome; on settlement a live update and a push to the business
+- **Success:** { approved, outcome, receiptShare } (tokenAttemptOutcome)
+- **Error disclosure:** fixed
+- **Authenticity:** holding the sale's link: its token is the credential for that one sale and for nothing else, together with the attempt's idempotency key and provider session id
+- **Replay:** returns the settled outcome; the outcome always comes from the provider, never from the request
+- **Rate:** requirePaymentTokenRateLimit (the completion family: 40 a minute per visitor address, counted in this server process only; until TRUST_PROXY_HOPS is set every visitor shares one address — R1-T4 phase B)
 
 ### POST `/api/pay/t/:token/googlepay-complete`
 
@@ -615,7 +709,18 @@ Review pending.
 - idempotency: `claimFinalization`
 - helpers: `assertWindcaveUrl`, `broadcastToStone`, `persistTokenOutcome`, `requirePaymentTokenRateLimit`, `setPaymentTokenHeaders`, `tokenAttemptOutcome`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public-bearer. **Tenant (token):** the link's token (43 base64url characters) selects the one sale it was made for: only its hash is looked up (resolvePaymentToken); an unknown or malformed token is 404; the attempt must be this sale's, for this share and idempotency key, with this provider session (prepareTokenCompletion)
+- **Input:** token: matched against PAYMENT_TOKEN_PATTERN, then only its hash is looked up; body: idempotencyKey (a UUID), sessionId (1 to 512 characters), shareIndex (0 to 10), and googlePayToken, an object passed to the provider as it is; strict
+- **Capability gate:** isWindcaveConfigured() (503 while unconfigured: the outcome waits)
+- **Idempotency:** paymentAttempts.claimFinalization: only the first finaliser submits the wallet token; a replay only queries the session, so it cannot charge twice
+- **Side effects:** the first finaliser submits the Google Pay token to the provider's submit URL cached for this attempt (assertWindcaveUrl checks it is the provider's); otherwise queries the session; on settlement a live update and a push to the business
+- **Success:** { approved, outcome, receiptShare } (tokenAttemptOutcome)
+- **Error disclosure:** fixed
+- **Authenticity:** holding the sale's link: its token is the credential for that one sale and for nothing else, together with the attempt's idempotency key and provider session id
+- **Replay:** never resubmits the wallet token; returns the settled outcome
+- **Rate:** requirePaymentTokenRateLimit (the completion family: 40 a minute per visitor address, counted in this server process only; until TRUST_PROXY_HOPS is set every visitor shares one address — R1-T4 phase B)
 
 ### GET `/api/pay/return/:state`
 
@@ -629,7 +734,18 @@ Review pending.
 - idempotency: `claimFinalization`
 - helpers: `broadcastToStone`, `persistTokenOutcome`, `reconcileTokenReturnState`, `requirePaymentTokenRateLimit`, `setPaymentTokenHeaders`, `tokenAttemptOutcome`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public-bearer. **Tenant (token):** the return state (HMAC-derived from one payment attempt) selects that attempt (paymentAttempts.resolveReturnState); an unknown state is 404
+- **Input:** state: an opaque return state, resolved by its hash; source: only 'hpp' is acted on; result: only 'cancelled' changes anything (a provider-declined outcome is labelled cancelled)
+- **Capability gate:** isWindcaveConfigured() (unconfigured, the attempt stays pending)
+- **Idempotency:** the provider's browser return reconciles through paymentAttempts.claimFinalization, once per attempt; a plain read is read-only
+- **Side effects:** on the provider's browser return: queries the provider and settles the attempt (live update and push to the business)
+- **Success:** a browser return is always 303 to /pay/return/<state>; a plain read returns only { outcome, receiptShare }
+- **Error disclosure:** fixed
+- **Authenticity:** holding the attempt's return state, the credential for that one attempt
+- **Replay:** harmless: settlement is claimed once, and reads are read-only
+- **Rate:** requirePaymentTokenRateLimit (the resolve family: 120 a minute per visitor address, counted in this server process only; until TRUST_PROXY_HOPS is set every visitor shares one address — R1-T4 phase B)
 
 ### ALL `/api/pay/notification/:state`
 
@@ -726,7 +842,18 @@ Review pending.
 - errorTextInResponse: `error.message`
 - helpers: `broadcastToStone`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public. **Tenant (number):** the sale's sequential number selects it, for any business; only a sale with its own link (isTokenAddressedTransaction) is hidden (404)
+- **Input:** id: strictPositiveIntegerParam; body: { totalSplits: a whole number from 2 to 10 }, nothing else (strict, since 2026-09-26)
+- **Idempotency:** only a pending sale the business allowed to split (409 otherwise, since 2026-09-26); storage.createBillSplit sets it up atomically, returns an exact retry unchanged, and refuses a different split (BillSplitConflictError, 409)
+- **Side effects:** a live update to the business's screens (broadcastToStone)
+- **Success:** publicTransactionDto of the split sale, with its board's page and QR addresses
+- **Error disclosure:** domain-errors
+- **Authenticity:** anyone with the sale's number: numbers are sequential, so every board, cash and tap-to-pay sale can be found by counting
+- **Replay:** an exact retry returns the same split; a different one is refused
+- **Rate:** none — no limit
+- **Finding:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
 
 ### PATCH `/api/transactions/:id/split-enabled`
 
@@ -750,7 +877,17 @@ Review pending.
 - statuses: `200`, `400`, `404`, `500`
 - dtos: `publicSplitPaymentDto`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public. **Tenant (number):** the share's sequential number selects it; a share of a sale with its own link is hidden (404)
+- **Input:** id: strictPositiveIntegerParam (checked twice)
+- **Idempotency:** read-only
+- **Success:** publicSplitPaymentDto: the share's id, sale number, index, amount, status, method and times
+- **Error disclosure:** fixed
+- **Authenticity:** anyone with the sale's number: numbers are sequential, so every board, cash and tap-to-pay sale can be found by counting
+- **Replay:** read-only
+- **Rate:** none — no limit
+- **Finding:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
 
 ### POST `/api/transactions/:id/cancel`
 
@@ -801,7 +938,20 @@ Review pending.
 - rateLimits: `checkRateLimit`
 - helpers: `broadcastToStone`, `checkRateLimit`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public. **Tenant (number):** the sale's sequential number selects it, for any business; only a sale with its own link (isTokenAddressedTransaction) is hidden (404)
+- **Input:** id: strictPositiveIntegerParam; body: paymentRequestSchema (merchantId, stoneId, paymentMethod, cardLast4, amount — all optional; a merchantId or stoneId given must match the sale); amount: parsed with parseFloat, any positive figure up to what is left (finding)
+- **Capability gate:** isWindcaveConfigured() (503 PAYMENT_PROVIDER_UNAVAILABLE while unconfigured)
+- **Idempotency:** a completed or processing sale is refused (409); otherwise every call creates a new provider session and binds it to the sale, replacing the last one
+- **Side effects:** creates a payment session with the provider (createWindcaveSession); when the provider reports the session already complete, settles the sale (live update and push)
+- **Success:** the provider session id and its hosted-page and submit URLs (kept server-side too, and never taken back from a client)
+- **Error disclosure:** input-issues
+- **Authenticity:** anyone with the sale's number: numbers are sequential, so every board, cash and tap-to-pay sale can be found by counting
+- **Replay:** each call opens another provider session for the same sale
+- **Rate:** checkRateLimit (100 a minute per visitor address, counted in this server process only; until TRUST_PROXY_HOPS is set every visitor shares one address — R1-T4 phase B)
+- **Finding:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
+- **Finding:** For a split sale the customer may name their own amount (any positive figure up to what is left, parsed with parseFloat), and the share it pays is then counted as fully paid. A split share is marked paid whatever amount the provider charged: with the pay route's customer-chosen amount, every share of a $100 sale can be paid with $0.01 and the sale shows fully paid (shown in the harness 2026-09-26). The custom amount is a product decision put to the owner; the amount check itself is R2/R3 (plan lines 870, 1511).
 
 ### GET `/api/windcave/env`
 
@@ -820,7 +970,21 @@ Review pending.
 - capabilityGates: `isWindcaveConfigured`
 - helpers: `broadcastToStone`, `finaliseHostedPayment`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public. **Tenant (number):** the sale's sequential number selects it, for any business; only a sale with its own link (isTokenAddressedTransaction) is hidden (404); the session id sent must be the one bound to the sale (403 otherwise)
+- **Input:** id: strictPositiveIntegerParam; body read without a schema: sessionId (required, compared with the bound session) and paymentMethod (only apple_pay is kept, anything else is card)
+- **Capability gate:** isWindcaveConfigured() (503 while unconfigured)
+- **Idempotency:** none: every call queries the provider and settles again (gap 11, finding)
+- **Side effects:** queries the provider for the bound session; settles the sale or its next share, counts it on the business, and sends a live update and a push
+- **Success:** { approved, redirectPath } to the receipt or the declined page
+- **Error disclosure:** fixed
+- **Authenticity:** anyone with the sale's number: numbers are sequential, so every board, cash and tap-to-pay sale can be found by counting, with the provider session id bound to it
+- **Replay:** settles again; after a share, the same session can complete the next one (gap 11)
+- **Rate:** none — no limit
+- **Finding:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
+- **Finding:** Gap 11 (known, escalated 2026-09-13): the finaliser re-settles on every call with the bound session, and after a share it resets the session to pending, so one approved session can complete the next share too. Closed by moving onto the payment_attempts engine (C3).
+- **Finding:** A split share is marked paid whatever amount the provider charged: with the pay route's customer-chosen amount, every share of a $100 sale can be paid with $0.01 and the sale shows fully paid (shown in the harness 2026-09-26). The custom amount is a product decision put to the owner; the amount check itself is R2/R3 (plan lines 870, 1511).
 
 ### POST `/api/transactions/:id/googlepay-complete`
 
@@ -833,7 +997,21 @@ Review pending.
 - capabilityGates: `isWindcaveConfigured`
 - helpers: `assertWindcaveUrl`, `broadcastToStone`, `finaliseHostedPayment`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public. **Tenant (number):** the sale's sequential number selects it, for any business; only a sale with its own link (isTokenAddressedTransaction) is hidden (404); the session id sent must be the one bound to the sale (403 otherwise)
+- **Input:** id: strictPositiveIntegerParam; body read without a schema: sessionId (required, compared with the bound session) and googlePayToken (an object passed to the provider)
+- **Capability gate:** isWindcaveConfigured() (503 while unconfigured)
+- **Idempotency:** none: the wallet token is submitted to the provider's submit URL cached for the sale when there is one, otherwise the session is queried, and the result is settled again on every call (gap 11)
+- **Side effects:** submits the Google Pay token to the provider's cached submit URL (assertWindcaveUrl checks it) or queries the session; settles the sale or its next share, counts it, and sends a live update and a push
+- **Success:** { approved, redirectPath } to the receipt or the declined page
+- **Error disclosure:** fixed
+- **Authenticity:** anyone with the sale's number: numbers are sequential, so every board, cash and tap-to-pay sale can be found by counting, with the provider session id bound to it
+- **Replay:** settles again; after a share, the same session can complete the next one (gap 11)
+- **Rate:** none — no limit
+- **Finding:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
+- **Finding:** Gap 11 (known, escalated 2026-09-13): the finaliser re-settles on every call with the bound session, and after a share it resets the session to pending, so one approved session can complete the next share too. Closed by moving onto the payment_attempts engine (C3).
+- **Finding:** A split share is marked paid whatever amount the provider charged: with the pay route's customer-chosen amount, every share of a $100 sale can be paid with $0.01 and the sale shows fully paid (shown in the harness 2026-09-26). The custom amount is a product decision put to the owner; the amount check itself is R2/R3 (plan lines 870, 1511).
 
 ### GET `/api/transactions/:id`
 
@@ -843,7 +1021,17 @@ Review pending.
 - statuses: `200`, `400`, `404`, `500`
 - dtos: `publicTransactionDto`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public. **Tenant (number):** the sale's sequential number selects it, for any business; only a sale with its own link (isTokenAddressedTransaction) is hidden (404)
+- **Input:** id: strictPositiveIntegerParam
+- **Idempotency:** read-only
+- **Success:** publicTransactionDto: id, business id, board id, item, price, status, method, split counts and date, and the board's page address
+- **Error disclosure:** fixed
+- **Authenticity:** anyone with the sale's number: numbers are sequential, so every board, cash and tap-to-pay sale can be found by counting
+- **Replay:** read-only
+- **Rate:** none — no limit
+- **Finding:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it. With no rate limit, counting through the numbers lists every such sale of every business: item, price, time, business and board.
 
 ### POST `/api/transactions/:id/receipt-pdf`
 
@@ -853,7 +1041,17 @@ Review pending.
 - storageMethods: `getMerchant`, `getSplitPaymentById`, `getSplitPaymentsByTransaction`, `getTransaction`
 - statuses: `200`, `400`, `404`, `500`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public. **Tenant (number):** the sale's sequential number selects it, for any business; only a sale with its own link (isTokenAddressedTransaction) is hidden (404)
+- **Input:** id: strictPositiveIntegerParam; splitId: present, it must pass strictPositiveIntegerQueryParam (400 otherwise), belong to the sale and be completed
+- **Idempotency:** read-only
+- **Success:** a PDF receipt of a completed sale or share (generateReceiptPdf), as an attachment
+- **Error disclosure:** fixed
+- **Authenticity:** anyone with the sale's number: numbers are sequential, so every board, cash and tap-to-pay sale can be found by counting
+- **Replay:** read-only
+- **Rate:** none — no limit
+- **Finding:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
 
 ### GET `/api/transactions/:id/receipt-qr`
 
@@ -863,7 +1061,17 @@ Review pending.
 - storageMethods: `getTransaction`
 - statuses: `200`, `400`, `404`, `500`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public. **Tenant (number):** the sale's sequential number selects it, for any business; only a sale with its own link (isTokenAddressedTransaction) is hidden (404)
+- **Input:** id: strictPositiveIntegerParam (checked twice); size: strictBoundedIntegerQueryParam (up to 800)
+- **Idempotency:** read-only
+- **Success:** a PNG QR code of the receipt page's address (/receipt/<number>), cached publicly for 7 days
+- **Error disclosure:** fixed
+- **Authenticity:** anyone with the sale's number: numbers are sequential, so every board, cash and tap-to-pay sale can be found by counting
+- **Replay:** read-only
+- **Rate:** none — no limit
+- **Finding:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
 
 ### GET `/api/merchants/:id/analytics`
 
@@ -1193,7 +1401,20 @@ Reviewed policy:
 - capabilityGates: `isWindcaveConfigured`
 - helpers: `broadcastToStone`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** public. **Tenant (number):** the sale's number (transactionId), or else the provider session id, selects the sale; a sale with its own link is 404; a cancel is believed only with the bound session id
+- **Input:** transactionId: read into a variable, then strictPositiveIntegerQueryParam (a malformed one finds nothing, since 2026-09-26); sessionId / sessionid: compared with the bound session before a cancel is believed; result: only 'cancelled' is acted on; any 'sim' key rejects the request (400)
+- **Capability gate:** isWindcaveConfigured(): unconfigured, nothing is settled and the customer sees pending
+- **Idempotency:** an already approved or declined sale only redirects; otherwise pending → processing is a read then a write, like the notification's (R3 / C20)
+- **Side effects:** queries the provider for the bound session and settles the sale or its next share (count, live update, push); a matching cancel fails the sale (live update, push)
+- **Success:** 302 to the receipt, or to the result page (declined, cancelled or pending), or home
+- **Error disclosure:** fixed
+- **Authenticity:** anyone with the sale's number: numbers are sequential, so every board, cash and tap-to-pay sale can be found by counting; the outcome always comes from querying the provider, and a cancel needs the bound session id
+- **Replay:** a settled sale only redirects; simultaneous calls can both settle (R3 / C20)
+- **Rate:** none — anyone can prompt a provider query for a pending numbered sale
+- **Finding:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
+- **Finding:** Settles by a read then a write, not a claim, racing the notification (plan 22.7 / R3, C20).
 
 ### GET `/api/windcave/status`
 
