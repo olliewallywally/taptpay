@@ -1,4 +1,4 @@
-# R1-T2 route inventory — generated 2026-09-26 @ `c1889ca3c86b0b64c39c5c51ae5a830b8fa45d9f`
+# R1-T2 route inventory — generated 2026-09-26 @ `fa41de5248c412eed66c8971e86f08b309b1d417`
 
 Regenerate with `npx tsx scripts/generate-route-policy.ts`. This table is
 evidence for the SHA named above, not a timeless constant — see
@@ -14,7 +14,7 @@ necessarily a bug): **0**.
 
 ## Review
 
-86 of 203 routes reviewed (server/route-review.ts); 117 pending.
+113 of 203 routes reviewed (server/route-review.ts); 90 pending.
 A reviewed route's principal below is the review's; a pending one's is the heuristic, marked "(heuristic)".
 
 ### Open findings
@@ -71,6 +71,37 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 - **GET /api/admin/ga4-detailed:** Answers a failure with Google Analytics' own error text (error?.message), to the platform admin only. Minor: a fixed message and a server-side log would do.
 - **GET /api/admin/ga4-metrics:** Answers a failure with Google Analytics' own error text (error?.message), to the platform admin only. Minor: a fixed message and a server-side log would do.
 - **GET /api/admin/email-status:** No admin screen calls it: the live admin area (/admin: the overview, the businesses, one business, API, analytics) does not, and admin-merchant.tsx, admin-merchant-broken.tsx, admin-dashboard.tsx, admin-api.tsx, admin-revenue.tsx and create-merchant.tsx are mounted nowhere (checked 2026-09-26); a diagnostic, useful by hand. Kept by the owner's decision (2026-09-26).
+- **GET /api/team:** The platform admin (signed in, with no business) is refused with 400 "Merchant ID required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **POST /api/team/invite:** It tells a signed-in owner whether any address has a TaptPay login (409 'That email address already has a TaptPay login'), where the 2026-09-23 rule made the public doors answer alike. Recorded then as open for the owner (R1-T4-account-discovery-2026-09-23.md §5, item 2); no answer since. Each probe of an address without a login sends it a real invite.
+- **POST /api/team/invite:** The platform admin (signed in, with no business) is refused with 400 "Merchant ID required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **POST /api/team/:userId/resend:** The platform admin (signed in, with no business) is refused with 400 "Merchant ID required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **DELETE /api/team/:userId/invite:** The platform admin (signed in, with no business) is refused with 400 "Merchant ID required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **PUT /api/team/:userId/status:** The platform admin (signed in, with no business) is refused with 400 "Merchant ID required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **DELETE /api/team/:userId:** The platform admin (signed in, with no business) is refused with 400 "Merchant ID required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **GET /api/subscription:** The platform admin (signed in, with no business) is refused with 400 "Merchant ID required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **PUT /api/subscription/plan:** The platform admin (signed in, with no business) is refused with 400 "Merchant ID required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **POST /api/subscription/cancel:** reason is read raw: a number, an object or an array is a 500 (reason.trim is not a function) where P2.2 says 400 (§8.4).
+- **POST /api/subscription/cancel:** The platform admin (signed in, with no business) is refused with 400 "Merchant ID required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **POST /api/subscription/resume:** The platform admin (signed in, with no business) is refused with 400 "Merchant ID required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **GET /api/subscription/billing-history:** The platform admin (signed in, with no business) is refused with 400 "Merchant ID required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **GET /api/billing/card:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **POST /api/billing/card/session:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **POST /api/billing/card/confirm:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **DELETE /api/billing/card:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **PATCH /api/tutorial/pages/:pageKey:** The tutorial is the business's, not the login's: a teammate's progress, dismissal or restart applies to every login of the business, the owner's included (shown in the harness: a teammate's restart moved the business to generation 2). A product choice, recorded.
+- **POST /api/tutorial/restart:** The tutorial is the business's, not the login's: a teammate's progress, dismissal or restart applies to every login of the business, the owner's included (shown in the harness: a teammate's restart moved the business to generation 2). A product choice, recorded.
+- **POST /api/push/subscribe:** The endpoint is stored as sent, and on every payment event of the business the server POSTs to it (web-push opens an HTTPS request to whatever host, port and path it names): any signed-in login, a teammate included, can make the server send requests to an address of its choosing, TLS services only (blind request forgery). Put to the owner 2026-09-26: accept only the browser push services.
+- **POST /api/push/subscribe:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **POST /api/push/unsubscribe:** A database fault while listing the business's devices reads as none (getPushSubscriptionsByMerchant answers [] on any error), so the answer is 403 'Not authorized to unsubscribe this endpoint', not 500 (R1-T9's rule).
+- **POST /api/push/unsubscribe:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **POST /api/push/native-subscribe:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **POST /api/push/native-unsubscribe:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **GET /api/push/status:** A database fault reads as nothing: getPushSubscriptionsByMerchant answers [] and getPushNotificationPreferences the defaults on any error, so the page shows no devices and the default switches instead of that it could not check (R1-T9's rule).
+- **GET /api/push/status:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **GET /api/push/preferences:** A database fault reads as nothing: getPushSubscriptionsByMerchant answers [] and getPushNotificationPreferences the defaults on any error, so the page shows no devices and the default switches instead of that it could not check (R1-T9's rule).
+- **GET /api/push/preferences:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **PUT /api/push/preferences:** The switches are the business's: any login, a teammate included, turns payment notifications off on every device of the business, the owner's included (shown in the harness). Put to the owner 2026-09-26: per login.
+- **PUT /api/push/preferences:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ## Routes
 
@@ -84,17 +115,17 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 | GET | `/api/auth/google` | 571 | public | — |
 | GET | `/api/auth/google/callback` | 592 | public | — |
 | POST | `/api/auth/google/session` | 741 | public-bearer | — |
-| POST | `/api/auth/sign-out-everywhere` | 764 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/auth/sign-out-everywhere` | 764 | merchant | authenticateToken |
 | POST | `/api/auth/login` | 809 | public | — |
 | POST | `/api/auth/forgot-password` | 866 | public | requestPasswordReset( |
 | POST | `/api/auth/reset-password` | 906 | public-bearer | resetPassword( |
 | GET | `/api/auth/validate-reset-token/:token` | 946 | public-bearer | validateResetToken( |
 | GET | `/api/admin/request-origin` | 965 | platform-admin | authenticateAdmin |
 | POST | `/api/admin/auth/login` | 985 | public | — |
-| GET | `/api/auth/me` | 1073 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/tutorial/state` | 1114 | merchant-user (heuristic) | authenticateToken, req.user?.role === "admin" |
-| PATCH | `/api/tutorial/pages/:pageKey` | 1144 | merchant-user (heuristic) | authenticateToken, req.user?.role === "admin" |
-| POST | `/api/tutorial/restart` | 1181 | merchant-user (heuristic) | authenticateToken, req.user?.role === "admin" |
+| GET | `/api/auth/me` | 1073 | merchant | authenticateToken |
+| GET | `/api/tutorial/state` | 1114 | merchant | authenticateToken, req.user?.role === "admin" |
+| PATCH | `/api/tutorial/pages/:pageKey` | 1144 | merchant | authenticateToken, req.user?.role === "admin" |
+| POST | `/api/tutorial/restart` | 1181 | merchant | authenticateToken, req.user?.role === "admin" |
 | POST | `/api/merchants/:id/onboarding` | 1202 | merchant-user (heuristic) | authenticateToken, checkAccountOwnership |
 | GET | `/api/admin/auth/me` | 1283 | platform-admin | authenticateAdmin |
 | GET | `/api/merchants/:id/qr` | 1296 | public | — |
@@ -171,13 +202,13 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 | GET | `/api/merchants/:id/events` | 5287 | merchant / public | authenticateToken, checkMerchantOwnership |
 | GET | `/api/push/capabilities` | 5363 | public | — |
 | GET | `/api/push/vapid-key` | 5387 | public | — |
-| POST | `/api/push/subscribe` | 5397 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/push/unsubscribe` | 5434 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/push/native-subscribe` | 5461 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/push/native-unsubscribe` | 5495 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/push/status` | 5529 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/push/preferences` | 5553 | merchant-user (heuristic) | authenticateToken |
-| PUT | `/api/push/preferences` | 5567 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/push/subscribe` | 5397 | merchant | authenticateToken |
+| POST | `/api/push/unsubscribe` | 5434 | merchant | authenticateToken |
+| POST | `/api/push/native-subscribe` | 5461 | merchant | authenticateToken |
+| POST | `/api/push/native-unsubscribe` | 5495 | merchant | authenticateToken |
+| GET | `/api/push/status` | 5529 | merchant | authenticateToken |
+| GET | `/api/push/preferences` | 5553 | merchant | authenticateToken |
+| PUT | `/api/push/preferences` | 5567 | merchant | authenticateToken |
 | POST | `/api/merchants/:id/clear-transactions` | 5593 | merchant-user (heuristic) | authenticateToken, checkAccountOwnership, req.user?.role === "admin" |
 | POST | `/api/transactions/:transactionId/refunds` | 5613 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
 | GET | `/api/transactions/:transactionId/refunds` | 5751 | merchant-user (heuristic) | authenticateToken |
@@ -192,25 +223,25 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 | POST | `/api/payments/apple-pay/validate` | 6177 | merchant-user (heuristic) | authenticateToken |
 | POST | `/api/payments/apple-pay/process` | 6182 | merchant-user (heuristic) | authenticateToken |
 | POST | `/api/payments/google-pay/process` | 6187 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/subscription` | 6200 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| PUT | `/api/subscription/plan` | 6223 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| POST | `/api/subscription/cancel` | 6286 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| POST | `/api/subscription/resume` | 6329 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| GET | `/api/team` | 6360 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| POST | `/api/team/invite` | 6381 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| POST | `/api/team/:userId/resend` | 6442 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| DELETE | `/api/team/:userId/invite` | 6524 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| PUT | `/api/team/:userId/status` | 6544 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| DELETE | `/api/team/:userId` | 6592 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| GET | `/api/subscription` | 6200 | merchant | authenticateToken, isAccountOwner |
+| PUT | `/api/subscription/plan` | 6223 | merchant | authenticateToken, isAccountOwner |
+| POST | `/api/subscription/cancel` | 6286 | merchant | authenticateToken, isAccountOwner |
+| POST | `/api/subscription/resume` | 6329 | merchant | authenticateToken, isAccountOwner |
+| GET | `/api/team` | 6360 | merchant | authenticateToken, isAccountOwner |
+| POST | `/api/team/invite` | 6381 | merchant | authenticateToken, isAccountOwner |
+| POST | `/api/team/:userId/resend` | 6442 | merchant | authenticateToken, isAccountOwner |
+| DELETE | `/api/team/:userId/invite` | 6524 | merchant | authenticateToken, isAccountOwner |
+| PUT | `/api/team/:userId/status` | 6544 | merchant | authenticateToken, isAccountOwner |
+| DELETE | `/api/team/:userId` | 6592 | merchant | authenticateToken, isAccountOwner |
 | POST | `/api/team/accept-invite` | 6630 | public-bearer | getUserByInviteToken( |
-| GET | `/api/subscription/billing-history` | 6666 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| GET | `/api/billing/card` | 6696 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| POST | `/api/billing/card/session` | 6725 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| POST | `/api/billing/card/confirm` | 6771 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| GET | `/api/subscription/billing-history` | 6666 | merchant | authenticateToken, isAccountOwner |
+| GET | `/api/billing/card` | 6696 | merchant | authenticateToken, isAccountOwner |
+| POST | `/api/billing/card/session` | 6725 | merchant | authenticateToken, isAccountOwner |
+| POST | `/api/billing/card/confirm` | 6771 | merchant | authenticateToken, isAccountOwner |
 | ALL | `/api/billing/card/notification` | 6862 | provider | billingCardCallback |
 | GET | `/api/billing/card/callback` | 6872 | public | billingCardCallback |
 | POST | `/api/billing/card/callback` | 6873 | public | billingCardCallback |
-| DELETE | `/api/billing/card` | 6876 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
+| DELETE | `/api/billing/card` | 6876 | merchant | authenticateToken, isAccountOwner |
 | POST | `/api/board-builder/submit` | 6901 | merchant | authenticateToken |
 | GET | `/uploads/:folder/:name` | 6966 | public | getCheckoutInvoiceByToken( |
 | GET | `/api/property/tenants` | 7231 | merchant-user (heuristic) | authenticateToken |
@@ -436,7 +467,14 @@ Reviewed policy:
 - sideEffects: `live update: sseBroker.disconnectUser`
 - statuses: `204`, `401`, `403`, `404`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (session):** the session's own login: every session of it ends, this one included; the platform admin is refused (403 'Only a TaptPay login can do this.')
+- **Input:** nothing
+- **Idempotency:** advances the login's session version (advanceUserSessionVersion), spending every token issued before it, this one included: the same token again is 401 SESSION_ENDED
+- **Side effects:** ends the login's live streams (sseBroker.disconnectUser) and stops its devices' notifications and the business's unattributed ones (deactivatePushSubscriptionsForLogin; a fault there is logged, never returned, as the sessions have already ended)
+- **Success:** 204, no body, not cached
+- **Error disclosure:** fixed
 
 ### POST `/api/auth/login`
 
@@ -571,7 +609,14 @@ Reviewed policy:
 - statuses: `200`, `401`, `403`, `500`, `503`
 - entitlementGates: `billingCardIsReady`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (session):** the session's own login and business; the platform admin (validated by authenticateToken: its own principal, the configured email, business 0) is answered too, with no business
+- **Input:** nothing
+- **Entitlement gate:** none enforced: whether the business has paid access (billingCardIsReady) is only reported, for the app's own gate
+- **Idempotency:** read-only, apart from getOrCreateSubscription, which makes the business's subscription row if it has none
+- **Success:** { user: { id, email, merchantId, role, onboardingCompleted, merchantStatus, gstRegistered, tradeGstMode, billingCardReady } }: every client's start-up check
+- **Error disclosure:** fixed
 
 ### GET `/api/tutorial/state`
 
@@ -580,7 +625,13 @@ Review pending.
 - storageMethods: `getMerchant`, `getMerchantTutorialProgress`
 - statuses: `200`, `401`, `403`, `404`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (session):** the session's own business's tutorial; the platform admin is refused (403 'Merchant access required')
+- **Input:** nothing
+- **Idempotency:** read-only
+- **Success:** { generation, autoEnabled, pageCount, progress: per page { status, lastStep, when started, completed, dismissed } }
+- **Error disclosure:** fixed
 
 ### PATCH `/api/tutorial/pages/:pageKey`
 
@@ -592,7 +643,14 @@ Review pending.
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
 - errorTextInResponse: `parsed.error.errors`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (session):** the session's own business's tutorial; the platform admin is refused (403 'Merchant access required')
+- **Input:** pageKey: one of the tutorial's pages (isTutorialPageKey, 400 otherwise); body: tutorialProgressSchema, strict (generation, status, lastStep from 0 to 100; 400 with the issues)
+- **Idempotency:** upserts the page's progress in the current generation (a stale generation is 409); the same body again rewrites it, and a completed or dismissed page's time
+- **Success:** { pageKey, status, lastStep }
+- **Error disclosure:** input-issues
+- **Finding:** The tutorial is the business's, not the login's: a teammate's progress, dismissal or restart applies to every login of the business, the owner's included (shown in the harness: a teammate's restart moved the business to generation 2). A product choice, recorded.
 
 ### POST `/api/tutorial/restart`
 
@@ -601,7 +659,14 @@ Review pending.
 - storageMethods: `restartMerchantTutorial`
 - statuses: `200`, `401`, `403`, `404`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (session):** the session's own business's tutorial; the platform admin is refused (403 'Merchant access required')
+- **Input:** nothing is read
+- **Idempotency:** starts a new generation (restartMerchantTutorial): every page starts over and the tutorial turns itself on, for every login of the business
+- **Success:** { generation, autoEnabled: true, pageCount, progress: {} }
+- **Error disclosure:** fixed
+- **Finding:** The tutorial is the business's, not the login's: a teammate's progress, dismissal or restart applies to every login of the business, the owner's included (shown in the harness: a teammate's restart moved the business to generation 2). A product choice, recorded.
 
 ### POST `/api/merchants/:id/onboarding`
 
@@ -1327,6 +1392,7 @@ Review pending.
 - authChecks: `checkMerchantOwnership`
 - storageMethods: `getTransactionsByMerchantWithDateRange`
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
+- helpers: `csvCell`
 
 Review pending.
 
@@ -1975,7 +2041,16 @@ Reviewed policy:
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
 - dtos: `pushNotificationPreferencesDto`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (401 "Authentication required"); the subscription is recorded against the business and this login, and a device already registered moves to them (createPushSubscription, by its endpoint)
+- **Input:** body read without a schema: subscription, whose endpoint, keys.p256dh and keys.auth must be present (400 otherwise); none is checked for type or form, and the endpoint is not checked to be a push service's
+- **Capability gate:** the server's push keys must be set (config.push in server/config.ts: 503 otherwise)
+- **Idempotency:** registers the device, or re-registers it by its endpoint (active again, this login's); the same body again changes nothing
+- **Success:** { success: true, preferences: pushNotificationPreferencesDto }
+- **Error disclosure:** fixed
+- **Finding:** The endpoint is stored as sent, and on every payment event of the business the server POSTs to it (web-push opens an HTTPS request to whatever host, port and path it names): any signed-in login, a teammate included, can make the server send requests to an address of its choosing, TLS services only (blind request forgery). Put to the owner 2026-09-26: accept only the browser push services.
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### POST `/api/push/unsubscribe`
 
@@ -1984,7 +2059,15 @@ Review pending.
 - storageMethods: `deactivatePushSubscriptionByEndpoint`, `getPushSubscriptionsByMerchant`
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (401 "Authentication required"); the endpoint must be one of its active subscriptions (getPushSubscriptionsByMerchant: 403 otherwise), and any login of the business may stop any of its devices
+- **Input:** body read without a schema: endpoint, required, compared as sent
+- **Idempotency:** stops the device (deactivatePushSubscriptionByEndpoint; since 2026-09-26 a database fault is a 500, not a success); again is 403, as it is no longer active
+- **Success:** { success: true }
+- **Error disclosure:** fixed
+- **Finding:** A database fault while listing the business's devices reads as none (getPushSubscriptionsByMerchant answers [] on any error), so the answer is 403 'Not authorized to unsubscribe this endpoint', not 500 (R1-T9's rule).
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### POST `/api/push/native-subscribe`
 
@@ -1994,7 +2077,14 @@ Review pending.
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
 - dtos: `pushNotificationPreferencesDto`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (401 "Authentication required"); the iPhone is recorded against the business and this login (createPushSubscription, by its endpoint)
+- **Input:** body read without a schema: deviceToken, a string of at least 8 characters once trimmed (400 otherwise), stored as the endpoint apns://<token>
+- **Idempotency:** registers the iPhone, or re-registers it by its endpoint; the same body again changes nothing
+- **Success:** { success: true, preferences: pushNotificationPreferencesDto }
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### POST `/api/push/native-unsubscribe`
 
@@ -2002,7 +2092,14 @@ Review pending.
 - storageMethods: `deactivateNativePushSubscriptionsForLogin`, `deactivatePushSubscriptionByEndpoint`, `getPushSubscriptionsByMerchant`
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (401 "Authentication required"); with a deviceToken, that iPhone, which must be one of its active subscriptions (403 otherwise); without one, this login's iPhones and the business's unattributed ones (deactivateNativePushSubscriptionsForLogin)
+- **Input:** body read without a schema: deviceToken, optional; when present a string of at least 8 characters once trimmed (400 otherwise)
+- **Idempotency:** stops the iPhone or iPhones (since 2026-09-26 a database fault stopping one iPhone is a 500, not a success); again with the token is 403, without it changes nothing
+- **Success:** { success: true }
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### GET `/api/push/status`
 
@@ -2011,7 +2108,15 @@ Review pending.
 - statuses: `200`, `401`, `403`, `500`, `503`
 - dtos: `pushNotificationPreferencesDto`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** nothing
+- **Idempotency:** read-only
+- **Success:** { subscribed, deviceCount, webSubscribed, nativeSubscribed, preferences: pushNotificationPreferencesDto }: every active device of the business, not only this login's
+- **Error disclosure:** fixed
+- **Finding:** A database fault reads as nothing: getPushSubscriptionsByMerchant answers [] and getPushNotificationPreferences the defaults on any error, so the page shows no devices and the default switches instead of that it could not check (R1-T9's rule).
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### GET `/api/push/preferences`
 
@@ -2020,7 +2125,15 @@ Review pending.
 - statuses: `200`, `401`, `403`, `500`, `503`
 - dtos: `pushNotificationPreferencesDto`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** nothing
+- **Idempotency:** read-only
+- **Success:** { preferences: pushNotificationPreferencesDto }: the business's three switches (read from its newest subscription)
+- **Error disclosure:** fixed
+- **Finding:** A database fault reads as nothing: getPushSubscriptionsByMerchant answers [] and getPushNotificationPreferences the defaults on any error, so the page shows no devices and the default switches instead of that it could not check (R1-T9's rule).
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### PUT `/api/push/preferences`
 
@@ -2031,7 +2144,15 @@ Review pending.
 - dtos: `pushNotificationPreferencesDto`
 - errorTextInResponse: `parsed.error.errors`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** body: pushNotificationPreferencesSchema, strict: the three switches (400 with the issues)
+- **Idempotency:** sets the three switches on every device of the business (updatePushNotificationPreferences); the same body again changes nothing
+- **Success:** { preferences: pushNotificationPreferencesDto }
+- **Error disclosure:** input-issues
+- **Finding:** The switches are the business's: any login, a teammate included, turns payment notifications off on every device of the business, the owner's included (shown in the harness). Put to the owner 2026-09-26: per login.
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### POST `/api/merchants/:id/clear-transactions`
 
@@ -2209,7 +2330,14 @@ Review pending.
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
 - dtos: `subscriptionDto`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (400 "Merchant ID required"); a teammate gets it without the card (isAccountOwner)
+- **Input:** nothing
+- **Idempotency:** read-only, apart from getOrCreateSubscription, which makes the business's subscription row if it has none
+- **Success:** { subscription: subscriptionDto (plan, price, seats, status, period, cancellation, pending plan, failed payments, the card's brand, last 4 and expiry or null, sale counts), plans: every plan }
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 400 "Merchant ID required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### PUT `/api/subscription/plan`
 
@@ -2217,10 +2345,20 @@ Review pending.
 - body: `fields: planId`
 - authChecks: `isAccountOwner`
 - storageMethods: `changeSubscriptionPlan`, `countSeatsInUse`, `getOrCreateSubscription`
+- sideEffects: `provider: chargeStoredCard`
 - statuses: `200`, `400`, `401`, `402`, `403`, `404`, `409`, `422`, `500`, `502`, `503`
 - dtos: `subscriptionDto`
+- helpers: `executeStoredCardCharge`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (400 "Merchant ID required")
+- **Input:** body read without a schema but for planId: planIdSchema, one of the plans (400 'Unknown plan' otherwise); nothing else is read
+- **Idempotency:** the current plan again changes nothing; an upgrade applies at once after charging the stored card (no card 402, declined 422, unconfirmed 502); a downgrade waits for the period's end, and one that would strand logins is 409; each runs under the subscription's billing claim (409 while another billing step holds it)
+- **Side effects:** an upgrade charges the stored card, with an idempotency key (executeStoredCardCharge, then chargeStoredCard)
+- **Success:** { subscription: subscriptionDto, applied: 'immediate' | 'period-end', message }
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 400 "Merchant ID required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### POST `/api/subscription/cancel`
 
@@ -2231,7 +2369,15 @@ Review pending.
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
 - dtos: `subscriptionDto`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (400 "Merchant ID required")
+- **Input:** body read without a schema: reason, required, cut to 500 characters
+- **Idempotency:** cancels at the end of a running paid period (cancelAtPeriodEnd), at once otherwise; under the billing claim (409 while another billing step holds it)
+- **Success:** { subscription: subscriptionDto, message }
+- **Error disclosure:** fixed
+- **Finding:** reason is read raw: a number, an object or an array is a 500 (reason.trim is not a function) where P2.2 says 400 (§8.4).
+- **Finding:** The platform admin (signed in, with no business) is refused with 400 "Merchant ID required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### POST `/api/subscription/resume`
 
@@ -2241,7 +2387,14 @@ Review pending.
 - statuses: `200`, `400`, `401`, `403`, `409`, `500`, `503`
 - dtos: `subscriptionDto`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (400 "Merchant ID required")
+- **Input:** nothing is read
+- **Idempotency:** undoes a pending cancellation (resumeSubscription, only while one is pending); again, or with none pending, is 409
+- **Success:** { subscription: subscriptionDto, message }
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 400 "Merchant ID required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### GET `/api/team`
 
@@ -2251,7 +2404,14 @@ Review pending.
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
 - dtos: `teamMemberDto`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (400 "Merchant ID required")
+- **Input:** nothing
+- **Idempotency:** read-only, apart from getOrCreateSubscription, which makes the business's subscription row if it has none
+- **Success:** { members: teamMemberDto each (id, email, name, role, status, last sign-in, when made), seatLimit, seatsInUse }
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 400 "Merchant ID required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### POST `/api/team/invite`
 
@@ -2264,7 +2424,16 @@ Review pending.
 - dtos: `teamMemberDto`
 - errorTextInResponse: `parsed.error.errors`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (400 "Merchant ID required")
+- **Input:** body: inviteTeamMemberSchema (an email of at most 200 characters, an optional name of at most 100; 400 with the issues)
+- **Idempotency:** none: each call invites another login, within the plan's seats (inviteTeamMember counts them under a lock: 409 when all are in use); an address that already has a login anywhere is 409
+- **Side effects:** emails the invite link (sendTeamInviteEmail: 32 random bytes, only their SHA-256 kept, live for 7 days); if it cannot be sent the invite is taken back (revokeTeamInvite) and the answer is 502
+- **Success:** 201 { member: teamMemberDto }
+- **Error disclosure:** input-issues
+- **Finding:** It tells a signed-in owner whether any address has a TaptPay login (409 'That email address already has a TaptPay login'), where the 2026-09-23 rule made the public doors answer alike. Recorded then as open for the owner (R1-T4-account-discovery-2026-09-23.md §5, item 2); no answer since. Each probe of an address without a login sends it a real invite.
+- **Finding:** The platform admin (signed in, with no business) is refused with 400 "Merchant ID required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### POST `/api/team/:userId/resend`
 
@@ -2278,7 +2447,15 @@ Review pending.
 - rateLimits: `checkResendRateLimit`, `resendRateLimitMap.get`, `resendRateLimitMap.set`
 - helpers: `checkResendRateLimit`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner). **Tenant (resource):** the invited login read by id (getUserById) must be the session's business's, still invited, with a live token (404 otherwise, the same for another business's); the platform admin, with no business, is refused (400 "Merchant ID required")
+- **Input:** userId: strictPositiveIntegerParam (400 otherwise); no body
+- **Idempotency:** each call replaces the invite's token, only if it is unchanged since it was read (rotateTeamInvite: 409 otherwise), and sends the new link; the old link stops working. At most 5 per 10 minutes per business and login (checkResendRateLimit, in this server process only: 429)
+- **Side effects:** emails the new invite link (sendTeamInviteEmail); if it cannot be sent, the previous invite is put back, or failing that taken back (502)
+- **Success:** { member: teamMemberDto }
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 400 "Merchant ID required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### DELETE `/api/team/:userId/invite`
 
@@ -2288,7 +2465,14 @@ Review pending.
 - storageMethods: `revokeTeamInvite`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner). **Tenant (resource):** revokeTeamInvite deletes the login only if it is the session's business's, still invited and not the owner (404 otherwise, the same for another business's); the platform admin, with no business, is refused (400 "Merchant ID required")
+- **Input:** userId: strictPositiveIntegerParam (400 otherwise)
+- **Idempotency:** deletes the pending invite; again is 404
+- **Success:** { message: 'Invite revoked' }
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 400 "Merchant ID required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### PUT `/api/team/:userId/status`
 
@@ -2301,7 +2485,15 @@ Review pending.
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
 - dtos: `teamMemberDto`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner). **Tenant (resource):** setTeamMemberStatus changes the login only if it is the session's business's (404 otherwise, the same for another business's) and not the owner (403); the platform admin, with no business, is refused (400 "Merchant ID required")
+- **Input:** userId: strictPositiveIntegerParam; body read without a schema: status, which must be 'active' or 'disabled' (400 otherwise)
+- **Idempotency:** sets the login active or disabled; the same state again is 409; turning one back on counts the plan's seats under a lock (409 when all are in use). A disabled login's tokens are refused from its next request (authenticateToken reads the login)
+- **Side effects:** on disabling: ends the login's live streams (sseBroker.disconnectUser) and stops its devices' notifications and the business's unattributed ones (deactivatePushSubscriptionsForLogin, owner decision 2026-09-22; a fault is logged, never returned)
+- **Success:** { member: teamMemberDto }
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 400 "Merchant ID required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### DELETE `/api/team/:userId`
 
@@ -2312,7 +2504,15 @@ Review pending.
 - sideEffects: `live update: sseBroker.disconnectUser`
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner). **Tenant (resource):** the login read by id (getUserById) must be the session's business's and not its owner (404 otherwise, the same for another business's); a pending invite is 409 (revoke it instead); the platform admin, with no business, is refused (400 "Merchant ID required")
+- **Input:** userId: strictPositiveIntegerParam (400 otherwise)
+- **Idempotency:** deletes the login (removeTeamMember); again is 404
+- **Side effects:** ends the login's live streams (sseBroker.disconnectUser) and, since 2026-09-26, stops the business's unattributed device subscriptions as disabling does (deactivatePushSubscriptionsForLogin; the ones recorded against the login go with it by 0029's cascade; a fault is logged, never returned)
+- **Success:** { message: 'Login removed' }
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 400 "Merchant ID required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### POST `/api/team/accept-invite`
 
@@ -2345,7 +2545,14 @@ Reviewed policy:
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
 - dtos: `billingHistoryDto`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (400 "Merchant ID required")
+- **Input:** limit: strictBoundedIntegerQueryParam, 1 to 100, 50 when absent (400 otherwise)
+- **Idempotency:** read-only
+- **Success:** { history: billingHistoryDto each (type, amount, status, description, failure reason, period, when paid and made) }
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 400 "Merchant ID required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### GET `/api/billing/card`
 
@@ -2354,7 +2561,14 @@ Review pending.
 - storageMethods: `getMerchant`, `getOrCreateSubscription`
 - statuses: `200`, `401`, `403`, `404`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** nothing
+- **Idempotency:** read-only, apart from getOrCreateSubscription, which makes the business's subscription row if it has none
+- **Success:** { ready: whether the stored card can pay the next renewal, card: { last4, brand, expiry } or null }
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### POST `/api/billing/card/session`
 
@@ -2365,7 +2579,16 @@ Review pending.
 - statuses: `200`, `401`, `403`, `404`, `500`, `502`, `503`
 - capabilityGates: `isWindcaveConfigured`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** nothing is read
+- **Capability gate:** the provider must be configured (isWindcaveConfigured: 503 otherwise)
+- **Idempotency:** each call opens another hosted card page at the provider and binds its session to the subscription (bindSubscriptionCardSession), replacing any earlier one
+- **Side effects:** opens a hosted card-storage session at the provider (createCardStorageSession), with the business's contact email
+- **Success:** { sessionId, redirectUrl }: the provider's page; the session id reads back only this one result
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### POST `/api/billing/card/confirm`
 
@@ -2373,11 +2596,20 @@ Review pending.
 - body: `fields: sessionId`
 - authChecks: `isAccountOwner`
 - storageMethods: `completeSubscriptionCardSetup`, `countSeatsInUse`, `getSubscription`
-- sideEffects: `provider: queryStoredCardSession`
+- sideEffects: `provider: chargeStoredCard`, `provider: queryStoredCardSession`
 - statuses: `200`, `202`, `400`, `401`, `403`, `404`, `409`, `422`, `500`, `502`, `503`
 - dtos: `subscriptionDto`
+- helpers: `executeStoredCardCharge`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (401 "Authentication required"); the card session must be the one bound to its subscription (subscriptionCardSessionState: 403 otherwise, the same for another business's)
+- **Input:** body read without a schema: sessionId, a trimmed string matching /^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$/ (400 otherwise)
+- **Idempotency:** a session already settled answers from the stored result with no provider call; otherwise the provider is asked (202 while pending); an approved card is stored and, when the subscription needs paying, charged under the billing claim with an idempotency key (completeSubscriptionCardSetup: 409 busy, 422 declined, 502 unconfirmed)
+- **Side effects:** reads the card session back from the provider (queryStoredCardSession) and may charge the stored card (executeStoredCardCharge, then chargeStoredCard)
+- **Success:** { success, ready, charged, card: { last4, brand, expiry }, subscription: subscriptionDto }; 202 { pending: true }
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### ALL `/api/billing/card/notification`
 
@@ -2437,7 +2669,14 @@ Reviewed policy:
 - storageMethods: `removeSubscriptionCard`
 - statuses: `200`, `401`, `403`, `409`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** nothing
+- **Idempotency:** clears the stored card (removeSubscriptionCard); again changes nothing; refused while a billing step holds the claim (409)
+- **Success:** { success: true }
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### POST `/api/board-builder/submit`
 

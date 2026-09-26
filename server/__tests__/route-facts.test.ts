@@ -382,6 +382,26 @@ describe("R1-T2 route facts, read from each handler's syntax tree (C10)", () => 
     expect(facts.get("POST /c")?.errorTextInResponse).toEqual([]);
   });
 
+  it("follows a local function handed over by name, as to a storage call", () => {
+    const source = `
+      async function executeCharge(request: { cardId: string }) {
+        return chargeStoredCard("key", request.cardId, "1.00", "ref");
+      }
+      export function wire(app: Express) {
+        app.put("/plan", async (req, res) => {
+          const result = await storage.changePlan(1, "pro", executeCharge);
+          res.json(result);
+        });
+        app.put("/plain", async (req, res) => {
+          res.json(await storage.changePlan(1, "pro"));
+        });
+      }`;
+    const facts = extractRouteFacts(source, "server/wire.ts");
+    expect(facts.get("PUT /plan")?.sideEffects).toEqual(["provider: chargeStoredCard"]);
+    expect(facts.get("PUT /plan")?.helpers).toEqual(["executeCharge"]);
+    expect(facts.get("PUT /plain")?.sideEffects).toEqual([]);
+  });
+
   it("reads a handler passed by name", () => {
     expect(factsFor("GET /api/billing/card/callback")).toMatchObject({
       middleware: [],

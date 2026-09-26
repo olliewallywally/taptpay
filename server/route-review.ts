@@ -188,6 +188,21 @@ const NO_ADMIN_SCREEN =
 const ADMIN_EACH_BUSINESS_FINDING =
   "Reads every business's sales one business at a time (getAllMerchants, then getTransactionsByMerchant for each): the time grows with the platform. Fine today; for the performance phase.";
 
+// ── The account (batch 5) ──
+/** The platform admin passes authenticateToken with no business; these routes then refuse it. */
+const adminRefused = (refusal: string) => `the platform admin, with no business, is refused (${refusal})`;
+const sessionBusiness = (refusal: string) =>
+  `the session's own business: nothing in the request names one; ${adminRefused(refusal)}`;
+const ADMIN_400 = '400 "Merchant ID required"';
+const ADMIN_401 = '401 "Authentication required"';
+const adminStatusFinding = (refusal: string) =>
+  `The platform admin (signed in, with no business) is refused with ${refusal}; P2.2 says 403 for a caller without the role or tenant (R1-T3).`;
+const CREATES_SUBSCRIPTION = "apart from getOrCreateSubscription, which makes the business's subscription row if it has none";
+const TUTORIAL_SHARED =
+  "The tutorial is the business's, not the login's: a teammate's progress, dismissal or restart applies to every login of the business, the owner's included (shown in the harness: a teammate's restart moved the business to generation 2). A product choice, recorded.";
+const PUSH_FAULT_AS_NONE =
+  "A database fault reads as nothing: getPushSubscriptionsByMerchant answers [] and getPushNotificationPreferences the defaults on any error, so the page shows no devices and the default switches instead of that it could not check (R1-T9's rule).";
+
 function tokenRate(family: string, perMinute: number): string {
   return (
     `requirePaymentTokenRateLimit (the ${family} family: ${perMinute} a minute per visitor address, counted in ` +
@@ -1937,20 +1952,481 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     errorDisclosure: ["fixed"],
     findings: [`${NO_ADMIN_SCREEN}; a diagnostic, useful by hand. Kept by the owner's decision (2026-09-26).`],
   },
+
+  // ── Batch 5 (2026-09-26): the account ──
+  "POST /api/auth/sign-out-everywhere": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner", "member"],
+        tenant: "session",
+        tenantRule:
+          "the session's own login: every session of it ends, this one included; the platform admin is refused (403 'Only a TaptPay login can do this.')",
+      },
+    ],
+    input: "nothing",
+    capability: null,
+    entitlement: null,
+    idempotency:
+      "advances the login's session version (advanceUserSessionVersion), spending every token issued before it, this one included: the same token again is 401 SESSION_ENDED",
+    sideEffects:
+      "ends the login's live streams (sseBroker.disconnectUser) and stops its devices' notifications and the business's unattributed ones (deactivatePushSubscriptionsForLogin; a fault there is logged, never returned, as the sessions have already ended)",
+    successDto: "204, no body, not cached",
+    errorDisclosure: ["fixed"],
+  },
+
+  "GET /api/auth/me": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner", "member"],
+        tenant: "session",
+        tenantRule:
+          "the session's own login and business; the platform admin (validated by authenticateToken: its own principal, the configured email, business 0) is answered too, with no business",
+      },
+    ],
+    input: "nothing",
+    capability: null,
+    entitlement: "none enforced: whether the business has paid access (billingCardIsReady) is only reported, for the app's own gate",
+    idempotency: `read-only, ${CREATES_SUBSCRIPTION}`,
+    sideEffects: null,
+    successDto:
+      "{ user: { id, email, merchantId, role, onboardingCompleted, merchantStatus, gstRegistered, tradeGstMode, billingCardReady } }: every client's start-up check",
+    errorDisclosure: ["fixed"],
+  },
+
+  "GET /api/team": {
+    branches: [{ principal: "merchant", roles: ["owner"], tenant: "session", tenantRule: sessionBusiness(ADMIN_400) }],
+    input: "nothing",
+    capability: null,
+    entitlement: null,
+    idempotency: `read-only, ${CREATES_SUBSCRIPTION}`,
+    sideEffects: null,
+    successDto: "{ members: teamMemberDto each (id, email, name, role, status, last sign-in, when made), seatLimit, seatsInUse }",
+    errorDisclosure: ["fixed"],
+    findings: [adminStatusFinding(ADMIN_400)],
+  },
+
+  "POST /api/team/invite": {
+    branches: [{ principal: "merchant", roles: ["owner"], tenant: "session", tenantRule: sessionBusiness(ADMIN_400) }],
+    input: "body: inviteTeamMemberSchema (an email of at most 200 characters, an optional name of at most 100; 400 with the issues)",
+    capability: null,
+    entitlement: null,
+    idempotency:
+      "none: each call invites another login, within the plan's seats (inviteTeamMember counts them under a lock: 409 when all are in use); an address that already has a login anywhere is 409",
+    sideEffects:
+      "emails the invite link (sendTeamInviteEmail: 32 random bytes, only their SHA-256 kept, live for 7 days); if it cannot be sent the invite is taken back (revokeTeamInvite) and the answer is 502",
+    successDto: "201 { member: teamMemberDto }",
+    errorDisclosure: ["input-issues"],
+    findings: [
+      "It tells a signed-in owner whether any address has a TaptPay login (409 'That email address already has a TaptPay login'), where the 2026-09-23 rule made the public doors answer alike. Recorded then as open for the owner (R1-T4-account-discovery-2026-09-23.md §5, item 2); no answer since. Each probe of an address without a login sends it a real invite.",
+      adminStatusFinding(ADMIN_400),
+    ],
+  },
+
+  "POST /api/team/:userId/resend": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner"],
+        tenant: "resource",
+        tenantRule: `the invited login read by id (getUserById) must be the session's business's, still invited, with a live token (404 otherwise, the same for another business's); ${adminRefused(ADMIN_400)}`,
+      },
+    ],
+    input: "userId: strictPositiveIntegerParam (400 otherwise); no body",
+    capability: null,
+    entitlement: null,
+    idempotency:
+      "each call replaces the invite's token, only if it is unchanged since it was read (rotateTeamInvite: 409 otherwise), and sends the new link; the old link stops working. At most 5 per 10 minutes per business and login (checkResendRateLimit, in this server process only: 429)",
+    sideEffects:
+      "emails the new invite link (sendTeamInviteEmail); if it cannot be sent, the previous invite is put back, or failing that taken back (502)",
+    successDto: "{ member: teamMemberDto }",
+    errorDisclosure: ["fixed"],
+    findings: [adminStatusFinding(ADMIN_400)],
+  },
+
+  "DELETE /api/team/:userId/invite": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner"],
+        tenant: "resource",
+        tenantRule: `revokeTeamInvite deletes the login only if it is the session's business's, still invited and not the owner (404 otherwise, the same for another business's); ${adminRefused(ADMIN_400)}`,
+      },
+    ],
+    input: "userId: strictPositiveIntegerParam (400 otherwise)",
+    capability: null,
+    entitlement: null,
+    idempotency: "deletes the pending invite; again is 404",
+    sideEffects: null,
+    successDto: "{ message: 'Invite revoked' }",
+    errorDisclosure: ["fixed"],
+    findings: [adminStatusFinding(ADMIN_400)],
+  },
+
+  "PUT /api/team/:userId/status": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner"],
+        tenant: "resource",
+        tenantRule: `setTeamMemberStatus changes the login only if it is the session's business's (404 otherwise, the same for another business's) and not the owner (403); ${adminRefused(ADMIN_400)}`,
+      },
+    ],
+    input: "userId: strictPositiveIntegerParam; body read without a schema: status, which must be 'active' or 'disabled' (400 otherwise)",
+    capability: null,
+    entitlement: null,
+    idempotency:
+      "sets the login active or disabled; the same state again is 409; turning one back on counts the plan's seats under a lock (409 when all are in use). A disabled login's tokens are refused from its next request (authenticateToken reads the login)",
+    sideEffects:
+      "on disabling: ends the login's live streams (sseBroker.disconnectUser) and stops its devices' notifications and the business's unattributed ones (deactivatePushSubscriptionsForLogin, owner decision 2026-09-22; a fault is logged, never returned)",
+    successDto: "{ member: teamMemberDto }",
+    errorDisclosure: ["fixed"],
+    findings: [adminStatusFinding(ADMIN_400)],
+  },
+
+  "DELETE /api/team/:userId": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner"],
+        tenant: "resource",
+        tenantRule: `the login read by id (getUserById) must be the session's business's and not its owner (404 otherwise, the same for another business's); a pending invite is 409 (revoke it instead); ${adminRefused(ADMIN_400)}`,
+      },
+    ],
+    input: "userId: strictPositiveIntegerParam (400 otherwise)",
+    capability: null,
+    entitlement: null,
+    idempotency: "deletes the login (removeTeamMember); again is 404",
+    sideEffects:
+      "ends the login's live streams (sseBroker.disconnectUser) and, since 2026-09-26, stops the business's unattributed device subscriptions as disabling does (deactivatePushSubscriptionsForLogin; the ones recorded against the login go with it by 0029's cascade; a fault is logged, never returned)",
+    successDto: "{ message: 'Login removed' }",
+    errorDisclosure: ["fixed"],
+    findings: [adminStatusFinding(ADMIN_400)],
+  },
+
+  "GET /api/subscription": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner", "member"],
+        tenant: "session",
+        tenantRule: `${sessionBusiness(ADMIN_400)}; a teammate gets it without the card (isAccountOwner)`,
+      },
+    ],
+    input: "nothing",
+    capability: null,
+    entitlement: null,
+    idempotency: `read-only, ${CREATES_SUBSCRIPTION}`,
+    sideEffects: null,
+    successDto:
+      "{ subscription: subscriptionDto (plan, price, seats, status, period, cancellation, pending plan, failed payments, the card's brand, last 4 and expiry or null, sale counts), plans: every plan }",
+    errorDisclosure: ["fixed"],
+    findings: [adminStatusFinding(ADMIN_400)],
+  },
+
+  "PUT /api/subscription/plan": {
+    branches: [{ principal: "merchant", roles: ["owner"], tenant: "session", tenantRule: sessionBusiness(ADMIN_400) }],
+    input: "body read without a schema but for planId: planIdSchema, one of the plans (400 'Unknown plan' otherwise); nothing else is read",
+    capability: null,
+    entitlement: null,
+    idempotency:
+      "the current plan again changes nothing; an upgrade applies at once after charging the stored card (no card 402, declined 422, unconfirmed 502); a downgrade waits for the period's end, and one that would strand logins is 409; each runs under the subscription's billing claim (409 while another billing step holds it)",
+    sideEffects: "an upgrade charges the stored card, with an idempotency key (executeStoredCardCharge, then chargeStoredCard)",
+    successDto: "{ subscription: subscriptionDto, applied: 'immediate' | 'period-end', message }",
+    errorDisclosure: ["fixed"],
+    findings: [adminStatusFinding(ADMIN_400)],
+  },
+
+  "POST /api/subscription/cancel": {
+    branches: [{ principal: "merchant", roles: ["owner"], tenant: "session", tenantRule: sessionBusiness(ADMIN_400) }],
+    input: "body read without a schema: reason, required, cut to 500 characters",
+    capability: null,
+    entitlement: null,
+    idempotency:
+      "cancels at the end of a running paid period (cancelAtPeriodEnd), at once otherwise; under the billing claim (409 while another billing step holds it)",
+    sideEffects: null,
+    successDto: "{ subscription: subscriptionDto, message }",
+    errorDisclosure: ["fixed"],
+    findings: [
+      "reason is read raw: a number, an object or an array is a 500 (reason.trim is not a function) where P2.2 says 400 (§8.4).",
+      adminStatusFinding(ADMIN_400),
+    ],
+  },
+
+  "POST /api/subscription/resume": {
+    branches: [{ principal: "merchant", roles: ["owner"], tenant: "session", tenantRule: sessionBusiness(ADMIN_400) }],
+    input: "nothing is read",
+    capability: null,
+    entitlement: null,
+    idempotency: "undoes a pending cancellation (resumeSubscription, only while one is pending); again, or with none pending, is 409",
+    sideEffects: null,
+    successDto: "{ subscription: subscriptionDto, message }",
+    errorDisclosure: ["fixed"],
+    findings: [adminStatusFinding(ADMIN_400)],
+  },
+
+  "GET /api/subscription/billing-history": {
+    branches: [{ principal: "merchant", roles: ["owner"], tenant: "session", tenantRule: sessionBusiness(ADMIN_400) }],
+    input: "limit: strictBoundedIntegerQueryParam, 1 to 100, 50 when absent (400 otherwise)",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto: "{ history: billingHistoryDto each (type, amount, status, description, failure reason, period, when paid and made) }",
+    errorDisclosure: ["fixed"],
+    findings: [adminStatusFinding(ADMIN_400)],
+  },
+
+  "GET /api/billing/card": {
+    branches: [{ principal: "merchant", roles: ["owner"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    input: "nothing",
+    capability: null,
+    entitlement: null,
+    idempotency: `read-only, ${CREATES_SUBSCRIPTION}`,
+    sideEffects: null,
+    successDto: "{ ready: whether the stored card can pay the next renewal, card: { last4, brand, expiry } or null }",
+    errorDisclosure: ["fixed"],
+    findings: [adminStatusFinding(ADMIN_401)],
+  },
+
+  "POST /api/billing/card/session": {
+    branches: [{ principal: "merchant", roles: ["owner"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    input: "nothing is read",
+    capability: "the provider must be configured (isWindcaveConfigured: 503 otherwise)",
+    entitlement: null,
+    idempotency:
+      "each call opens another hosted card page at the provider and binds its session to the subscription (bindSubscriptionCardSession), replacing any earlier one",
+    sideEffects: "opens a hosted card-storage session at the provider (createCardStorageSession), with the business's contact email",
+    successDto: "{ sessionId, redirectUrl }: the provider's page; the session id reads back only this one result",
+    errorDisclosure: ["fixed"],
+    findings: [adminStatusFinding(ADMIN_401)],
+  },
+
+  "POST /api/billing/card/confirm": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner"],
+        tenant: "session",
+        tenantRule: `${sessionBusiness(ADMIN_401)}; the card session must be the one bound to its subscription (subscriptionCardSessionState: 403 otherwise, the same for another business's)`,
+      },
+    ],
+    input: "body read without a schema: sessionId, a trimmed string matching /^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$/ (400 otherwise)",
+    capability: null,
+    entitlement: null,
+    idempotency:
+      "a session already settled answers from the stored result with no provider call; otherwise the provider is asked (202 while pending); an approved card is stored and, when the subscription needs paying, charged under the billing claim with an idempotency key (completeSubscriptionCardSetup: 409 busy, 422 declined, 502 unconfirmed)",
+    sideEffects:
+      "reads the card session back from the provider (queryStoredCardSession) and may charge the stored card (executeStoredCardCharge, then chargeStoredCard)",
+    successDto: "{ success, ready, charged, card: { last4, brand, expiry }, subscription: subscriptionDto }; 202 { pending: true }",
+    errorDisclosure: ["fixed"],
+    findings: [adminStatusFinding(ADMIN_401)],
+  },
+
+  "DELETE /api/billing/card": {
+    branches: [{ principal: "merchant", roles: ["owner"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    input: "nothing",
+    capability: null,
+    entitlement: null,
+    idempotency: "clears the stored card (removeSubscriptionCard); again changes nothing; refused while a billing step holds the claim (409)",
+    sideEffects: null,
+    successDto: "{ success: true }",
+    errorDisclosure: ["fixed"],
+    findings: [adminStatusFinding(ADMIN_401)],
+  },
+
+  "GET /api/tutorial/state": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner", "member"],
+        tenant: "session",
+        tenantRule: "the session's own business's tutorial; the platform admin is refused (403 'Merchant access required')",
+      },
+    ],
+    input: "nothing",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto: "{ generation, autoEnabled, pageCount, progress: per page { status, lastStep, when started, completed, dismissed } }",
+    errorDisclosure: ["fixed"],
+  },
+
+  "PATCH /api/tutorial/pages/:pageKey": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner", "member"],
+        tenant: "session",
+        tenantRule: "the session's own business's tutorial; the platform admin is refused (403 'Merchant access required')",
+      },
+    ],
+    input:
+      "pageKey: one of the tutorial's pages (isTutorialPageKey, 400 otherwise); body: tutorialProgressSchema, strict (generation, status, lastStep from 0 to 100; 400 with the issues)",
+    capability: null,
+    entitlement: null,
+    idempotency:
+      "upserts the page's progress in the current generation (a stale generation is 409); the same body again rewrites it, and a completed or dismissed page's time",
+    sideEffects: null,
+    successDto: "{ pageKey, status, lastStep }",
+    errorDisclosure: ["input-issues"],
+    findings: [TUTORIAL_SHARED],
+  },
+
+  "POST /api/tutorial/restart": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner", "member"],
+        tenant: "session",
+        tenantRule: "the session's own business's tutorial; the platform admin is refused (403 'Merchant access required')",
+      },
+    ],
+    input: "nothing is read",
+    capability: null,
+    entitlement: null,
+    idempotency: "starts a new generation (restartMerchantTutorial): every page starts over and the tutorial turns itself on, for every login of the business",
+    sideEffects: null,
+    successDto: "{ generation, autoEnabled: true, pageCount, progress: {} }",
+    errorDisclosure: ["fixed"],
+    findings: [TUTORIAL_SHARED],
+  },
+
+  "POST /api/push/subscribe": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner", "member"],
+        tenant: "session",
+        tenantRule: `${sessionBusiness(ADMIN_401)}; the subscription is recorded against the business and this login, and a device already registered moves to them (createPushSubscription, by its endpoint)`,
+      },
+    ],
+    input:
+      "body read without a schema: subscription, whose endpoint, keys.p256dh and keys.auth must be present (400 otherwise); none is checked for type or form, and the endpoint is not checked to be a push service's",
+    capability: "the server's push keys must be set (config.push in server/config.ts: 503 otherwise)",
+    entitlement: null,
+    idempotency: "registers the device, or re-registers it by its endpoint (active again, this login's); the same body again changes nothing",
+    sideEffects: null,
+    successDto: "{ success: true, preferences: pushNotificationPreferencesDto }",
+    errorDisclosure: ["fixed"],
+    findings: [
+      "The endpoint is stored as sent, and on every payment event of the business the server POSTs to it (web-push opens an HTTPS request to whatever host, port and path it names): any signed-in login, a teammate included, can make the server send requests to an address of its choosing, TLS services only (blind request forgery). Put to the owner 2026-09-26: accept only the browser push services.",
+      adminStatusFinding(ADMIN_401),
+    ],
+  },
+
+  "POST /api/push/unsubscribe": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner", "member"],
+        tenant: "session",
+        tenantRule: `${sessionBusiness(ADMIN_401)}; the endpoint must be one of its active subscriptions (getPushSubscriptionsByMerchant: 403 otherwise), and any login of the business may stop any of its devices`,
+      },
+    ],
+    input: "body read without a schema: endpoint, required, compared as sent",
+    capability: null,
+    entitlement: null,
+    idempotency:
+      "stops the device (deactivatePushSubscriptionByEndpoint; since 2026-09-26 a database fault is a 500, not a success); again is 403, as it is no longer active",
+    sideEffects: null,
+    successDto: "{ success: true }",
+    errorDisclosure: ["fixed"],
+    findings: [
+      "A database fault while listing the business's devices reads as none (getPushSubscriptionsByMerchant answers [] on any error), so the answer is 403 'Not authorized to unsubscribe this endpoint', not 500 (R1-T9's rule).",
+      adminStatusFinding(ADMIN_401),
+    ],
+  },
+
+  "POST /api/push/native-subscribe": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner", "member"],
+        tenant: "session",
+        tenantRule: `${sessionBusiness(ADMIN_401)}; the iPhone is recorded against the business and this login (createPushSubscription, by its endpoint)`,
+      },
+    ],
+    input: "body read without a schema: deviceToken, a string of at least 8 characters once trimmed (400 otherwise), stored as the endpoint apns://<token>",
+    capability: null,
+    entitlement: null,
+    idempotency: "registers the iPhone, or re-registers it by its endpoint; the same body again changes nothing",
+    sideEffects: null,
+    successDto: "{ success: true, preferences: pushNotificationPreferencesDto }",
+    errorDisclosure: ["fixed"],
+    findings: [adminStatusFinding(ADMIN_401)],
+  },
+
+  "POST /api/push/native-unsubscribe": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner", "member"],
+        tenant: "session",
+        tenantRule: `${sessionBusiness(ADMIN_401)}; with a deviceToken, that iPhone, which must be one of its active subscriptions (403 otherwise); without one, this login's iPhones and the business's unattributed ones (deactivateNativePushSubscriptionsForLogin)`,
+      },
+    ],
+    input: "body read without a schema: deviceToken, optional; when present a string of at least 8 characters once trimmed (400 otherwise)",
+    capability: null,
+    entitlement: null,
+    idempotency:
+      "stops the iPhone or iPhones (since 2026-09-26 a database fault stopping one iPhone is a 500, not a success); again with the token is 403, without it changes nothing",
+    sideEffects: null,
+    successDto: "{ success: true }",
+    errorDisclosure: ["fixed"],
+    findings: [adminStatusFinding(ADMIN_401)],
+  },
+
+  "GET /api/push/status": {
+    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    input: "nothing",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto:
+      "{ subscribed, deviceCount, webSubscribed, nativeSubscribed, preferences: pushNotificationPreferencesDto }: every active device of the business, not only this login's",
+    errorDisclosure: ["fixed"],
+    findings: [PUSH_FAULT_AS_NONE, adminStatusFinding(ADMIN_401)],
+  },
+
+  "GET /api/push/preferences": {
+    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    input: "nothing",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto: "{ preferences: pushNotificationPreferencesDto }: the business's three switches (read from its newest subscription)",
+    errorDisclosure: ["fixed"],
+    findings: [PUSH_FAULT_AS_NONE, adminStatusFinding(ADMIN_401)],
+  },
+
+  "PUT /api/push/preferences": {
+    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    input: "body: pushNotificationPreferencesSchema, strict: the three switches (400 with the issues)",
+    capability: null,
+    entitlement: null,
+    idempotency: "sets the three switches on every device of the business (updatePushNotificationPreferences); the same body again changes nothing",
+    sideEffects: null,
+    successDto: "{ preferences: pushNotificationPreferencesDto }",
+    errorDisclosure: ["input-issues"],
+    findings: [
+      "The switches are the business's: any login, a teammate included, turns payment notifications off on every device of the business, the owner's included (shown in the harness). Put to the owner 2026-09-26: per login.",
+      adminStatusFinding(ADMIN_401),
+    ],
+  },
 };
 
 /**
  * Routes not reviewed yet. May only shrink: PENDING_CEILING is lowered by
  * every batch, so a route cannot be added here instead of being reviewed.
  */
-export const PENDING_CEILING = 117;
+export const PENDING_CEILING = 90;
 
 export const REVIEW_PENDING: readonly string[] = [
-  "POST /api/auth/sign-out-everywhere",
-  "GET /api/auth/me",
-  "GET /api/tutorial/state",
-  "PATCH /api/tutorial/pages/:pageKey",
-  "POST /api/tutorial/restart",
   "POST /api/merchants/:id/onboarding",
   "GET /api/merchants/:id/profile",
   "POST /api/transactions",
@@ -1978,13 +2454,6 @@ export const REVIEW_PENDING: readonly string[] = [
   "POST /api/merchants/:id/tapt-stones",
   "PUT /api/merchants/:merchantId/tapt-stones/:stoneId",
   "DELETE /api/merchants/:merchantId/tapt-stones/:stoneId",
-  "POST /api/push/subscribe",
-  "POST /api/push/unsubscribe",
-  "POST /api/push/native-subscribe",
-  "POST /api/push/native-unsubscribe",
-  "GET /api/push/status",
-  "GET /api/push/preferences",
-  "PUT /api/push/preferences",
   "POST /api/merchants/:id/clear-transactions",
   "POST /api/transactions/:transactionId/refunds",
   "GET /api/transactions/:transactionId/refunds",
@@ -1997,21 +2466,6 @@ export const REVIEW_PENDING: readonly string[] = [
   "POST /api/payments/apple-pay/validate",
   "POST /api/payments/apple-pay/process",
   "POST /api/payments/google-pay/process",
-  "GET /api/subscription",
-  "PUT /api/subscription/plan",
-  "POST /api/subscription/cancel",
-  "POST /api/subscription/resume",
-  "GET /api/team",
-  "POST /api/team/invite",
-  "POST /api/team/:userId/resend",
-  "DELETE /api/team/:userId/invite",
-  "PUT /api/team/:userId/status",
-  "DELETE /api/team/:userId",
-  "GET /api/subscription/billing-history",
-  "GET /api/billing/card",
-  "POST /api/billing/card/session",
-  "POST /api/billing/card/confirm",
-  "DELETE /api/billing/card",
   "GET /api/property/tenants",
   "POST /api/property/tenants",
   "GET /api/property/tenants/:id",

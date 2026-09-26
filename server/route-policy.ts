@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ c1889ca3c86b0b64c39c5c51ae5a830b8fa45d9f on 2026-09-26.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ fa41de5248c412eed66c8971e86f08b309b1d417 on 2026-09-26.
  *
  * 203 registrations (85 GET, 82 POST, 3 PATCH, 5 ALL, 20 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -885,6 +885,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       authChecks: ["checkMerchantOwnership"],
       storageMethods: ["getTransactionsByMerchantWithDateRange"],
       statuses: [200,400,401,403,500,503],
+      helpers: ["csvCell"],
     },
   },
   "GET /api/merchants/:id/export/pdf": {
@@ -1727,8 +1728,10 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       body: ["fields: planId"],
       authChecks: ["isAccountOwner"],
       storageMethods: ["changeSubscriptionPlan","countSeatsInUse","getOrCreateSubscription"],
+      sideEffects: ["provider: chargeStoredCard"],
       statuses: [200,400,401,402,403,404,409,422,500,502,503],
       dtos: ["subscriptionDto"],
+      helpers: ["executeStoredCardCharge"],
     },
   },
   "POST /api/subscription/cancel": {
@@ -1912,9 +1915,10 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       body: ["fields: sessionId"],
       authChecks: ["isAccountOwner"],
       storageMethods: ["completeSubscriptionCardSetup","countSeatsInUse","getSubscription"],
-      sideEffects: ["provider: queryStoredCardSession"],
+      sideEffects: ["provider: chargeStoredCard","provider: queryStoredCardSession"],
       statuses: [200,202,400,401,403,404,409,422,500,502,503],
       dtos: ["subscriptionDto"],
+      helpers: ["executeStoredCardCharge"],
     },
   },
   "ALL /api/billing/card/notification": {

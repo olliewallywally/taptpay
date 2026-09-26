@@ -462,6 +462,17 @@ class FactCollector {
     for (const argument of node.arguments) {
       if (ts.isIdentifier(argument) && argument.text.endsWith("Dto")) this.dtos.add(argument.text);
     }
+    // A function of this file handed over by name, as in
+    // `storage.changeSubscriptionPlan(id, plan, executeStoredCardCharge)`: the callee calls it,
+    // so what it does belongs to this route too.
+    for (const argument of node.arguments) {
+      if (!ts.isIdentifier(argument) || AUTH_CHECK_CALLS.has(argument.text)) continue;
+      const handedOver = resolveLocalFunction(argument);
+      if (handedOver) {
+        this.helpers.add(argument.text);
+        this.readFunction(handedOver);
+      }
+    }
 
     if (AUTH_CHECK_CALLS.has(callee) || AUTH_CHECK_CALLS.has(calleeName)) {
       this.authChecks.add(AUTH_CHECK_CALLS.has(callee) ? callee : calleeName);
