@@ -620,9 +620,13 @@ The work itself:
   refusal changing nothing and the owner's same request passing (the positive control). All were already
   right; pinned. Mutations 5/5. Server 113/2,788, client 103/825.
 
-**Next:** R1-T3's remaining rows: another business's record on the 37 routes that address one (the
-missing record's 404), the allowed callers' success on every route, then the client route guards (plan
-page 24).
+- **R1-T3 batch (d) (2026-09-27): `47627286`; local, awaiting independent review.** Another business's record
+  is answered as a missing one: **fixed** on three sale routes (cancel, refund, a sale's refunds), which
+  answered 403 where a missing sale got 404 and so told which sale numbers exist; the eight record routes
+  outside property and trades pinned with real records. Mutations 4/4. Server 114/2,798, client 103/825.
+
+**Next:** R1-T3's remaining rows: the allowed callers' success on every route (so far each positive
+control shows only that the role and tenant checks pass), then the client route guards (plan page 24).
 Open for the owner: 0030 in dev (above); the card-free dev write (above). The
 no-board rework's questions are all answered. Release of the rework: when production has no pending
 shared no-board sale (count-only check once production is reopened), with
