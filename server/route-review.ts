@@ -204,6 +204,14 @@ const PUSH_SWITCHES_FAULT_AS_DEFAULTS =
   "A database fault reading the switches reads as the defaults (getPushNotificationPreferences answers them on any error), so the page shows the default switches instead of that it could not check (R1-T9's rule).";
 const OWN_SWITCHES = "each login its own (owner decision 2026-09-26)";
 
+// ── The business's own settings, boards and stock (batch 6) ──
+const BUSINESS_OWNER_RULE =
+  "checkAccountOwnership: the business in the path is the session's and the caller its owner; the platform admin is let through for any business";
+const TEAM_BOARDS =
+  "Any login of the business, a teammate included, creates, renames and deletes boards, and the phone terminal offers all three to every login: kept by the owner's decision (2026-09-27).";
+const BOARD_ROW = "a whole board row (number, name, page and QR addresses, whether active, when made and changed)";
+const STOCK_ROW = "a whole item row (name, description, cost, emoji, variations, whether active, when made and changed)";
+
 function tokenRate(family: string, perMinute: number): string {
   return (
     `requirePaymentTokenRateLimit (the ${family} family: ${perMinute} a minute per visitor address, counted in ` +
@@ -2435,17 +2443,278 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     errorDisclosure: ["input-issues"],
     findings: [adminStatusFinding(ADMIN_401)],
   },
+
+  // ── Batch 6a (2026-09-27): the business's settings, boards and stock ──
+  "GET /api/merchants/:id/profile": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner", "member"],
+        platformAdmin: true,
+        tenant: "path-merchant",
+        tenantRule: `${SIGNED_IN_BUSINESS_RULE}; the owner and the admin get the owner's view, a teammate the restricted one (isAccountOwner)`,
+      },
+    ],
+    input: "id: strictPositiveIntegerParam (400 otherwise)",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto: "ownerMerchantDto to the owner and the platform admin; memberMerchantSettingsDto (the read-only business fields) to a teammate",
+    errorDisclosure: ["fixed"],
+  },
+
+  "POST /api/merchants/:id/onboarding": {
+    branches: [{ principal: "merchant", roles: ["owner"], platformAdmin: true, tenant: "path-merchant", tenantRule: BUSINESS_OWNER_RULE }],
+    input:
+      "id: strictPositiveIntegerParam; body: merchantOnboardingSchema, strict, sign-up's rules (a director of 1 to 100 characters; NZBN and GST at most 20; a description of at most 500; a website address or nothing; one of the turnover ranges or nothing); 400 with the first issue and the issues, before anything is read, kept or sent",
+    capability: null,
+    entitlement: null,
+    idempotency:
+      "stores the six details and marks onboarding complete (updateMerchant; all six since 2026-09-27, when three had only been emailed); again stores them again and emails the admin again",
+    sideEffects: "emails the details to the platform's admin address (sendEmail; every value HTML-escaped, the subject's line breaks removed)",
+    successDto: "{ message }",
+    errorDisclosure: ["input-issues"],
+    findings: ["Every submission emails the admin again, with no limit (minor)."],
+  },
+
+  "PUT /api/merchants/:id/details": {
+    branches: [{ principal: "merchant", roles: ["owner"], platformAdmin: true, tenant: "path-merchant", tenantRule: BUSINESS_OWNER_RULE }],
+    input: "id: strictPositiveIntegerParam; body: updateMerchantDetailsSchema (business name, contact email, phone and address; 400 with the issues)",
+    capability: null,
+    entitlement: null,
+    idempotency: "sets the four contact details (updateMerchantDetails); the same values again change nothing",
+    sideEffects: null,
+    successDto: "ownerMerchantDto of the business afterwards",
+    errorDisclosure: ["input-issues"],
+  },
+
+  "PUT /api/merchants/:id/change-password": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner", "member"],
+        tenant: "path-merchant",
+        tenantRule:
+          "checkMerchantOwnership: the business in the path must be the session's, a precondition only: the caller's own login is what changes; the platform admin, which that check lets through, is then refused (403 'Only a TaptPay login can do this.', since 2026-09-27)",
+      },
+    ],
+    input: "id: strictPositiveIntegerParam; body: changePasswordSchema (the current password, and a new one held to the one password rule; 400 with the first issue and the issues)",
+    capability: null,
+    entitlement: null,
+    idempotency:
+      "checks the current password, counted per login and slowed down like sign-in (429), then sets the new one and ends every session of the login (updateUserPassword); again with the old password is 400",
+    sideEffects:
+      "ends the login's live streams (sseBroker.disconnectUser) and stops its devices' notifications and the business's unattributed ones (deactivatePushSubscriptionsForLogin; a fault is logged, never returned); logs a slowed attempt (logSecurityEvent: PASSWORD_CHANGE_SLOWED)",
+    successDto: "{ message, token }: a fresh token for this device, not cached",
+    errorDisclosure: ["input-issues"],
+  },
+
+  "PUT /api/merchants/:id/theme": {
+    branches: [{ principal: "merchant", roles: ["owner"], platformAdmin: true, tenant: "path-merchant", tenantRule: BUSINESS_OWNER_RULE }],
+    input: "id: strictPositiveIntegerParam; body: updateThemeSchema (one of the themes; 400 with the issues)",
+    capability: null,
+    entitlement: null,
+    idempotency: "sets the theme (updateMerchantTheme); the same again changes nothing",
+    sideEffects: null,
+    successDto: "ownerMerchantDto of the business afterwards",
+    errorDisclosure: ["input-issues"],
+  },
+
+  "PUT /api/merchants/:id/daily-goal": {
+    branches: [{ principal: "merchant", roles: ["owner"], platformAdmin: true, tenant: "path-merchant", tenantRule: BUSINESS_OWNER_RULE }],
+    input: "id: strictPositiveIntegerParam; body: updateDailyGoalSchema (400 with the issues)",
+    capability: null,
+    entitlement: null,
+    idempotency: "sets the daily goal (updateMerchant); the same again changes nothing",
+    sideEffects: null,
+    successDto: "ownerMerchantDto of the business afterwards",
+    errorDisclosure: ["input-issues"],
+  },
+
+  "PUT /api/merchants/:id": {
+    branches: [{ principal: "merchant", roles: ["owner"], platformAdmin: true, tenant: "path-merchant", tenantRule: BUSINESS_OWNER_RULE }],
+    input:
+      "id: strictPositiveIntegerParam; body: a strict schema of nine optional fields (business name, director, address, NZBN, phone, GST number, contact email as an email, contact phone, business address); 400 with the issues, and when none is given",
+    capability: null,
+    entitlement: null,
+    idempotency: "sets the fields given (updateMerchant); the same values again change nothing",
+    sideEffects: null,
+    successDto: "ownerMerchantDto of the business afterwards",
+    errorDisclosure: ["input-issues"],
+    findings: ["Its text fields have no length limit, and the NZBN and GST number are not checked for form (§8.4); only the settings screen bounds them."],
+  },
+
+  "POST /api/merchants/:id/logo": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner"],
+        platformAdmin: true,
+        tenant: "path-merchant",
+        tenantRule: `${BUSINESS_OWNER_RULE}; checked before the upload is read (requireLogoOwnership), and again in the handler`,
+      },
+    ],
+    input: "id: strictPositiveIntegerParam; the file 'logo': a PNG by its MIME type and its first 8 bytes (400 otherwise), up to 20 MB, read into memory",
+    capability: null,
+    entitlement: null,
+    idempotency:
+      "replaces the business's logo: one fixed name per business (merchant-<id>.png), saved before the business points at it and removed again if the business is gone",
+    sideEffects: null,
+    successDto: "{ logoUrl, message }",
+    errorDisclosure: ["fixed"],
+    findings: ["The upload is read into memory up to 20 MB per request (logoUpload); a logo needs far less (minor)."],
+  },
+
+  "DELETE /api/merchants/:id/logo": {
+    branches: [{ principal: "merchant", roles: ["owner"], platformAdmin: true, tenant: "path-merchant", tenantRule: BUSINESS_OWNER_RULE }],
+    input: "id: strictPositiveIntegerParam (400 otherwise)",
+    capability: null,
+    entitlement: null,
+    idempotency:
+      "removes the business's stored logo (deleteUploadedFile, only if the business owns it) and a legacy copy on disk, then clears the logo address; again changes nothing",
+    sideEffects: "removes a legacy logo file from the server's disk when one exists (fs.unlinkSync)",
+    successDto: "{ message }",
+    errorDisclosure: ["fixed"],
+    findings: [
+      "The legacy disk removal builds its path from the business's stored logo address. Only the upload route writes that address now (a fixed name), so it cannot point elsewhere, but the path is not checked to stay under uploads/ (minor).",
+    ],
+  },
+
+  "GET /api/merchants/:id/tapt-stones": {
+    branches: [{ principal: "merchant", roles: ["owner", "member"], platformAdmin: true, tenant: "path-merchant", tenantRule: SIGNED_IN_BUSINESS_RULE }],
+    input: "id: strictPositiveIntegerParam (400 otherwise)",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto: `the business's active boards, each ${BOARD_ROW}`,
+    errorDisclosure: ["fixed"],
+  },
+
+  "POST /api/merchants/:id/tapt-stones": {
+    branches: [{ principal: "merchant", roles: ["owner", "member"], platformAdmin: true, tenant: "path-merchant", tenantRule: SIGNED_IN_BUSINESS_RULE }],
+    input:
+      "id: strictPositiveIntegerParam; body read without a schema: name, optional, a string of at most 60 characters once trimmed (400 otherwise; blank or absent makes 'Stone N')",
+    capability: null,
+    entitlement: null,
+    idempotency: "none: each call makes the business's next board, up to 10 at a time (TaptStoneCapacityError, 400); a numbering clash is 409",
+    sideEffects: null,
+    successDto: `the new board, ${BOARD_ROW}`,
+    errorDisclosure: ["domain-errors"],
+    findings: [TEAM_BOARDS],
+  },
+
+  "PUT /api/merchants/:merchantId/tapt-stones/:stoneId": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner", "member"],
+        platformAdmin: true,
+        tenant: "path-merchant",
+        tenantRule: `${SIGNED_IN_BUSINESS_RULE}; the board read by id (getTaptStone) must be the business's (404 otherwise, the same for another business's)`,
+      },
+    ],
+    input:
+      "merchantId and stoneId: strictPositiveIntegerParam; body read without a schema: name, a non-blank string of at most 60 characters once trimmed (400 otherwise; the cap since 2026-09-27)",
+    capability: null,
+    entitlement: null,
+    idempotency: "renames the board; the same name again changes nothing. A deleted (inactive) board is still found and renamed",
+    sideEffects: null,
+    successDto: `the board, ${BOARD_ROW}`,
+    errorDisclosure: ["fixed"],
+    findings: [TEAM_BOARDS],
+  },
+
+  "DELETE /api/merchants/:merchantId/tapt-stones/:stoneId": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner", "member"],
+        platformAdmin: true,
+        tenant: "path-merchant",
+        tenantRule: `${SIGNED_IN_BUSINESS_RULE}; the board read by id (getTaptStone) must be the business's (404 otherwise, the same for another business's)`,
+      },
+    ],
+    input: "merchantId and stoneId: strictPositiveIntegerParam (400 otherwise)",
+    capability: null,
+    entitlement: null,
+    idempotency: "marks the board inactive (deleteTaptStone), so its page and printed QR stop working; again answers 200 and changes nothing",
+    sideEffects: null,
+    successDto: "{ message }",
+    errorDisclosure: ["fixed"],
+    findings: [TEAM_BOARDS],
+  },
+
+  "GET /api/merchants/:merchantId/stock-items": {
+    branches: [{ principal: "merchant", roles: ["owner", "member"], platformAdmin: true, tenant: "path-merchant", tenantRule: SIGNED_IN_BUSINESS_RULE }],
+    input: "merchantId: strictPositiveIntegerParam (400 otherwise)",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto: `the business's stock items, each ${STOCK_ROW}`,
+    errorDisclosure: ["fixed"],
+  },
+
+  "POST /api/merchants/:merchantId/stock-items": {
+    branches: [{ principal: "merchant", roles: ["owner", "member"], platformAdmin: true, tenant: "path-merchant", tenantRule: SIGNED_IN_BUSINESS_RULE }],
+    input:
+      "merchantId: strictPositiveIntegerParam; body: createStockItemSchema (a name of 1 to 100 characters, a description of at most 500, a cost like 1.50, an emoji, variations; 400 with the issues)",
+    capability: null,
+    entitlement: null,
+    idempotency: "none: each call adds another item",
+    sideEffects: null,
+    successDto: `201, the new item, ${STOCK_ROW}`,
+    errorDisclosure: ["input-issues"],
+  },
+
+  "PUT /api/merchants/:merchantId/stock-items/:itemId": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner", "member"],
+        platformAdmin: true,
+        tenant: "path-merchant",
+        tenantRule: `${SIGNED_IN_BUSINESS_RULE}; the item read by id (getStockItem) must be the business's (404 otherwise, the same for another business's)`,
+      },
+    ],
+    input: "merchantId and itemId: strictPositiveIntegerParam; body: updateStockItemSchema (as for a new item; 400 with the issues)",
+    capability: null,
+    entitlement: null,
+    idempotency: "sets the item's fields (updateStockItem); the same again changes nothing",
+    sideEffects: null,
+    successDto: `the item, ${STOCK_ROW}`,
+    errorDisclosure: ["input-issues"],
+  },
+
+  "DELETE /api/merchants/:merchantId/stock-items/:itemId": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner", "member"],
+        platformAdmin: true,
+        tenant: "path-merchant",
+        tenantRule: `${SIGNED_IN_BUSINESS_RULE}; the item read by id (getStockItem) must be the business's (404 otherwise, the same for another business's)`,
+      },
+    ],
+    input: "merchantId and itemId: strictPositiveIntegerParam (400 otherwise)",
+    capability: null,
+    entitlement: null,
+    idempotency: "deletes the item (deleteStockItem); again is 404",
+    sideEffects: null,
+    successDto: "{ message }",
+    errorDisclosure: ["fixed"],
+  },
 };
 
 /**
  * Routes not reviewed yet. May only shrink: PENDING_CEILING is lowered by
  * every batch, so a route cannot be added here instead of being reviewed.
  */
-export const PENDING_CEILING = 87;
+export const PENDING_CEILING = 70;
 
 export const REVIEW_PENDING: readonly string[] = [
-  "POST /api/merchants/:id/onboarding",
-  "GET /api/merchants/:id/profile",
   "POST /api/transactions",
   "POST /api/transactions/cash-sale",
   "POST /api/transactions/tap-to-pay",
@@ -2457,27 +2726,12 @@ export const REVIEW_PENDING: readonly string[] = [
   "GET /api/merchants/:id/analytics/export",
   "GET /api/merchants/:id/export/csv",
   "GET /api/merchants/:id/export/pdf",
-  "PUT /api/merchants/:id/details",
-  "PUT /api/merchants/:id/change-password",
-  "PUT /api/merchants/:id/theme",
-  "PUT /api/merchants/:id/daily-goal",
-  "PUT /api/merchants/:id",
-  "POST /api/merchants/:id/logo",
-  "DELETE /api/merchants/:id/logo",
   "GET /api/merchants/:id/transactions",
-  "GET /api/merchants/:id/tapt-stones",
-  "POST /api/merchants/:id/tapt-stones",
-  "PUT /api/merchants/:merchantId/tapt-stones/:stoneId",
-  "DELETE /api/merchants/:merchantId/tapt-stones/:stoneId",
   "POST /api/merchants/:id/clear-transactions",
   "POST /api/transactions/:transactionId/refunds",
   "GET /api/transactions/:transactionId/refunds",
   "GET /api/merchants/:merchantId/refunds",
   "GET /api/refunds/:refundId",
-  "GET /api/merchants/:merchantId/stock-items",
-  "POST /api/merchants/:merchantId/stock-items",
-  "PUT /api/merchants/:merchantId/stock-items/:itemId",
-  "DELETE /api/merchants/:merchantId/stock-items/:itemId",
   "POST /api/payments/apple-pay/validate",
   "POST /api/payments/apple-pay/process",
   "POST /api/payments/google-pay/process",

@@ -1,4 +1,4 @@
-# R1-T2 route inventory — generated 2026-09-27 @ `432f91a901d7fa564501356e137c7eaa111211a2`
+# R1-T2 route inventory — generated 2026-09-27 @ `9662065738e04d09a3844f2caa514f76bb9a3801`
 
 Regenerate with `npx tsx scripts/generate-route-policy.ts`. This table is
 evidence for the SHA named above, not a timeless constant — see
@@ -14,7 +14,7 @@ necessarily a bug): **0**.
 
 ## Review
 
-113 of 200 routes reviewed (server/route-review.ts); 87 pending.
+130 of 200 routes reviewed (server/route-review.ts); 70 pending.
 A reviewed route's principal below is the review's; a pending one's is the heuristic, marked "(heuristic)".
 
 ### Open findings
@@ -100,6 +100,13 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 - **GET /api/push/preferences:** A database fault reading the switches reads as the defaults (getPushNotificationPreferences answers them on any error), so the page shows the default switches instead of that it could not check (R1-T9's rule).
 - **GET /api/push/preferences:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 - **PUT /api/push/preferences:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **POST /api/merchants/:id/onboarding:** Every submission emails the admin again, with no limit (minor).
+- **PUT /api/merchants/:id:** Its text fields have no length limit, and the NZBN and GST number are not checked for form (§8.4); only the settings screen bounds them.
+- **POST /api/merchants/:id/logo:** The upload is read into memory up to 20 MB per request (logoUpload); a logo needs far less (minor).
+- **DELETE /api/merchants/:id/logo:** The legacy disk removal builds its path from the business's stored logo address. Only the upload route writes that address now (a fixed name), so it cannot point elsewhere, but the path is not checked to stay under uploads/ (minor).
+- **POST /api/merchants/:id/tapt-stones:** Any login of the business, a teammate included, creates, renames and deletes boards, and the phone terminal offers all three to every login: kept by the owner's decision (2026-09-27).
+- **PUT /api/merchants/:merchantId/tapt-stones/:stoneId:** Any login of the business, a teammate included, creates, renames and deletes boards, and the phone terminal offers all three to every login: kept by the owner's decision (2026-09-27).
+- **DELETE /api/merchants/:merchantId/tapt-stones/:stoneId:** Any login of the business, a teammate included, creates, renames and deletes boards, and the phone terminal offers all three to every login: kept by the owner's decision (2026-09-27).
 
 ## Routes
 
@@ -124,12 +131,12 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 | GET | `/api/tutorial/state` | 1115 | merchant | authenticateToken, req.user?.role === "admin" |
 | PATCH | `/api/tutorial/pages/:pageKey` | 1145 | merchant | authenticateToken, req.user?.role === "admin" |
 | POST | `/api/tutorial/restart` | 1182 | merchant | authenticateToken, req.user?.role === "admin" |
-| POST | `/api/merchants/:id/onboarding` | 1203 | merchant-user (heuristic) | authenticateToken, checkAccountOwnership |
+| POST | `/api/merchants/:id/onboarding` | 1203 | merchant | authenticateToken, checkAccountOwnership |
 | GET | `/api/admin/auth/me` | 1295 | platform-admin | authenticateAdmin |
 | GET | `/api/merchants/:id/qr` | 1308 | public | — |
 | GET | `/api/merchants/:id/stone/:stoneId/qr` | 1315 | public | — |
 | GET | `/api/merchants/:id/stone/:stoneId/brand` | 1368 | public | publicBoardBrandDto( |
-| GET | `/api/merchants/:id/profile` | 1390 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership, isAccountOwner |
+| GET | `/api/merchants/:id/profile` | 1390 | merchant | authenticateToken, checkMerchantOwnership, isAccountOwner |
 | GET | `/api/pay/t/:token` | 1412 | public-bearer | resolvePaymentToken( |
 | GET | `/api/pay/t/:token/qr` | 1439 | public-bearer | resolvePaymentToken( |
 | POST | `/api/pay/t/:token/split` | 1467 | public-bearer | resolvePaymentToken(, loadTokenReceipt( |
@@ -168,18 +175,18 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 | GET | `/api/admin/merchants/:id/transactions` | 3633 | platform-admin | authenticateAdmin |
 | PATCH | `/api/admin/merchants/:id/windcave-merchant-id` | 3646 | platform-admin | authenticateAdmin |
 | POST | `/api/admin/merchants/:id/activate` | 3662 | platform-admin | authenticateAdmin, storage.verifyMerchant( |
-| PUT | `/api/merchants/:id/details` | 3720 | merchant-user (heuristic) | authenticateToken, checkAccountOwnership |
-| PUT | `/api/merchants/:id/change-password` | 3746 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership, req.user?.role === "admin" |
-| PUT | `/api/merchants/:id/theme` | 3836 | merchant-user (heuristic) | authenticateToken, checkAccountOwnership |
-| PUT | `/api/merchants/:id/daily-goal` | 3864 | merchant-user (heuristic) | authenticateToken, checkAccountOwnership |
-| PUT | `/api/merchants/:id` | 3897 | merchant-user (heuristic) | authenticateToken, checkAccountOwnership |
-| POST | `/api/merchants/:id/logo` | 3971 | merchant-user (heuristic) | authenticateToken, checkAccountOwnership |
-| DELETE | `/api/merchants/:id/logo` | 4026 | merchant-user (heuristic) | authenticateToken, checkAccountOwnership |
+| PUT | `/api/merchants/:id/details` | 3720 | merchant | authenticateToken, checkAccountOwnership |
+| PUT | `/api/merchants/:id/change-password` | 3746 | merchant | authenticateToken, checkMerchantOwnership, req.user?.role === "admin" |
+| PUT | `/api/merchants/:id/theme` | 3836 | merchant | authenticateToken, checkAccountOwnership |
+| PUT | `/api/merchants/:id/daily-goal` | 3864 | merchant | authenticateToken, checkAccountOwnership |
+| PUT | `/api/merchants/:id` | 3897 | merchant | authenticateToken, checkAccountOwnership |
+| POST | `/api/merchants/:id/logo` | 3971 | merchant | authenticateToken, checkAccountOwnership |
+| DELETE | `/api/merchants/:id/logo` | 4026 | merchant | authenticateToken, checkAccountOwnership |
 | GET | `/api/merchants/:id/transactions` | 4069 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| GET | `/api/merchants/:id/tapt-stones` | 4086 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| POST | `/api/merchants/:id/tapt-stones` | 4102 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership, generatePaymentUrl( |
-| PUT | `/api/merchants/:merchantId/tapt-stones/:stoneId` | 4153 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| DELETE | `/api/merchants/:merchantId/tapt-stones/:stoneId` | 4192 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/merchants/:id/tapt-stones` | 4086 | merchant | authenticateToken, checkMerchantOwnership |
+| POST | `/api/merchants/:id/tapt-stones` | 4102 | merchant | authenticateToken, checkMerchantOwnership, generatePaymentUrl( |
+| PUT | `/api/merchants/:merchantId/tapt-stones/:stoneId` | 4153 | merchant | authenticateToken, checkMerchantOwnership |
+| DELETE | `/api/merchants/:merchantId/tapt-stones/:stoneId` | 4192 | merchant | authenticateToken, checkMerchantOwnership |
 | ALL | `/api/windcave/notification` | 4232 | provider | — |
 | GET | `/api/windcave/callback` | 4354 | public | isTokenAddressedTransaction( |
 | GET | `/api/admin/analytics` | 4552 | platform-admin | authenticateAdmin |
@@ -210,10 +217,10 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 | GET | `/api/transactions/:transactionId/refunds` | 5775 | merchant-user (heuristic) | authenticateToken |
 | GET | `/api/merchants/:merchantId/refunds` | 5805 | merchant-user (heuristic) | authenticateToken |
 | GET | `/api/refunds/:refundId` | 5826 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/merchants/:merchantId/stock-items` | 5864 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| POST | `/api/merchants/:merchantId/stock-items` | 5883 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| PUT | `/api/merchants/:merchantId/stock-items/:itemId` | 5911 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| DELETE | `/api/merchants/:merchantId/stock-items/:itemId` | 5948 | api-key (heuristic) | authenticateToken, authenticateApiKey, requireEcommerceApi, checkMerchantOwnership |
+| GET | `/api/merchants/:merchantId/stock-items` | 5864 | merchant | authenticateToken, checkMerchantOwnership |
+| POST | `/api/merchants/:merchantId/stock-items` | 5883 | merchant | authenticateToken, checkMerchantOwnership |
+| PUT | `/api/merchants/:merchantId/stock-items/:itemId` | 5911 | merchant | authenticateToken, checkMerchantOwnership |
+| DELETE | `/api/merchants/:merchantId/stock-items/:itemId` | 5948 | merchant | authenticateToken, authenticateApiKey, requireEcommerceApi, checkMerchantOwnership |
 | POST | `/api/v1/transactions` | 6016 | api-key | authenticateApiKey, requireEcommerceApi, publicTransactionDto( |
 | GET | `/api/v1/transactions/:id` | 6128 | api-key | authenticateApiKey, requireEcommerceApi |
 | POST | `/api/payments/apple-pay/validate` | 6201 | merchant-user (heuristic) | authenticateToken |
@@ -675,7 +682,15 @@ Reviewed policy:
 - errorTextInResponse: `validation.error.issues`
 - helpers: `escHtml`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, platform admin). **Tenant (path-merchant):** checkAccountOwnership: the business in the path is the session's and the caller its owner; the platform admin is let through for any business
+- **Input:** id: strictPositiveIntegerParam; body: merchantOnboardingSchema, strict, sign-up's rules (a director of 1 to 100 characters; NZBN and GST at most 20; a description of at most 500; a website address or nothing; one of the turnover ranges or nothing); 400 with the first issue and the issues, before anything is read, kept or sent
+- **Idempotency:** stores the six details and marks onboarding complete (updateMerchant; all six since 2026-09-27, when three had only been emailed); again stores them again and emails the admin again
+- **Side effects:** emails the details to the platform's admin address (sendEmail; every value HTML-escaped, the subject's line breaks removed)
+- **Success:** { message }
+- **Error disclosure:** input-issues
+- **Finding:** Every submission emails the admin again, with no limit (minor).
 
 ### GET `/api/admin/auth/me`
 
@@ -757,7 +772,13 @@ Reviewed policy:
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 - dtos: `memberMerchantSettingsDto`, `ownerMerchantDto`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member, platform admin). **Tenant (path-merchant):** checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business; the owner and the admin get the owner's view, a teammate the restricted one (isAccountOwner)
+- **Input:** id: strictPositiveIntegerParam (400 otherwise)
+- **Idempotency:** read-only
+- **Success:** ownerMerchantDto to the owner and the platform admin; memberMerchantSettingsDto (the read-only business fields) to a teammate
+- **Error disclosure:** fixed
 
 ### GET `/api/pay/t/:token`
 
@@ -1516,7 +1537,13 @@ Reviewed policy:
 - dtos: `ownerMerchantDto`
 - errorTextInResponse: `validation.error.errors`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, platform admin). **Tenant (path-merchant):** checkAccountOwnership: the business in the path is the session's and the caller its owner; the platform admin is let through for any business
+- **Input:** id: strictPositiveIntegerParam; body: updateMerchantDetailsSchema (business name, contact email, phone and address; 400 with the issues)
+- **Idempotency:** sets the four contact details (updateMerchantDetails); the same values again change nothing
+- **Success:** ownerMerchantDto of the business afterwards
+- **Error disclosure:** input-issues
 
 ### PUT `/api/merchants/:id/change-password`
 
@@ -1531,7 +1558,14 @@ Review pending.
 - rateLimits: `refuseTooManyAttempts`, `tooManyAttempts`
 - helpers: `refuseTooManyAttempts`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (path-merchant):** checkMerchantOwnership: the business in the path must be the session's, a precondition only: the caller's own login is what changes; the platform admin, which that check lets through, is then refused (403 'Only a TaptPay login can do this.', since 2026-09-27)
+- **Input:** id: strictPositiveIntegerParam; body: changePasswordSchema (the current password, and a new one held to the one password rule; 400 with the first issue and the issues)
+- **Idempotency:** checks the current password, counted per login and slowed down like sign-in (429), then sets the new one and ends every session of the login (updateUserPassword); again with the old password is 400
+- **Side effects:** ends the login's live streams (sseBroker.disconnectUser) and stops its devices' notifications and the business's unattributed ones (deactivatePushSubscriptionsForLogin; a fault is logged, never returned); logs a slowed attempt (logSecurityEvent: PASSWORD_CHANGE_SLOWED)
+- **Success:** { message, token }: a fresh token for this device, not cached
+- **Error disclosure:** input-issues
 
 ### PUT `/api/merchants/:id/theme`
 
@@ -1544,7 +1578,13 @@ Review pending.
 - dtos: `ownerMerchantDto`
 - errorTextInResponse: `validation.error.errors`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, platform admin). **Tenant (path-merchant):** checkAccountOwnership: the business in the path is the session's and the caller its owner; the platform admin is let through for any business
+- **Input:** id: strictPositiveIntegerParam; body: updateThemeSchema (one of the themes; 400 with the issues)
+- **Idempotency:** sets the theme (updateMerchantTheme); the same again changes nothing
+- **Success:** ownerMerchantDto of the business afterwards
+- **Error disclosure:** input-issues
 
 ### PUT `/api/merchants/:id/daily-goal`
 
@@ -1557,7 +1597,13 @@ Review pending.
 - dtos: `ownerMerchantDto`
 - errorTextInResponse: `validation.error.errors`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, platform admin). **Tenant (path-merchant):** checkAccountOwnership: the business in the path is the session's and the caller its owner; the platform admin is let through for any business
+- **Input:** id: strictPositiveIntegerParam; body: updateDailyGoalSchema (400 with the issues)
+- **Idempotency:** sets the daily goal (updateMerchant); the same again changes nothing
+- **Success:** ownerMerchantDto of the business afterwards
+- **Error disclosure:** input-issues
 
 ### PUT `/api/merchants/:id`
 
@@ -1570,7 +1616,14 @@ Review pending.
 - dtos: `ownerMerchantDto`
 - errorTextInResponse: `parseResult.error.errors`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, platform admin). **Tenant (path-merchant):** checkAccountOwnership: the business in the path is the session's and the caller its owner; the platform admin is let through for any business
+- **Input:** id: strictPositiveIntegerParam; body: a strict schema of nine optional fields (business name, director, address, NZBN, phone, GST number, contact email as an email, contact phone, business address); 400 with the issues, and when none is given
+- **Idempotency:** sets the fields given (updateMerchant); the same values again change nothing
+- **Success:** ownerMerchantDto of the business afterwards
+- **Error disclosure:** input-issues
+- **Finding:** Its text fields have no length limit, and the NZBN and GST number are not checked for form (§8.4); only the settings screen bounds them.
 
 ### POST `/api/merchants/:id/logo`
 
@@ -1582,7 +1635,14 @@ Review pending.
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 - helpers: `requireLogoOwnership`, `saveUploadedFile`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, platform admin). **Tenant (path-merchant):** checkAccountOwnership: the business in the path is the session's and the caller its owner; the platform admin is let through for any business; checked before the upload is read (requireLogoOwnership), and again in the handler
+- **Input:** id: strictPositiveIntegerParam; the file 'logo': a PNG by its MIME type and its first 8 bytes (400 otherwise), up to 20 MB, read into memory
+- **Idempotency:** replaces the business's logo: one fixed name per business (merchant-<id>.png), saved before the business points at it and removed again if the business is gone
+- **Success:** { logoUrl, message }
+- **Error disclosure:** fixed
+- **Finding:** The upload is read into memory up to 20 MB per request (logoUpload); a logo needs far less (minor).
 
 ### DELETE `/api/merchants/:id/logo`
 
@@ -1593,7 +1653,15 @@ Review pending.
 - sideEffects: `file system: fs.existsSync`, `file system: fs.unlinkSync`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, platform admin). **Tenant (path-merchant):** checkAccountOwnership: the business in the path is the session's and the caller its owner; the platform admin is let through for any business
+- **Input:** id: strictPositiveIntegerParam (400 otherwise)
+- **Idempotency:** removes the business's stored logo (deleteUploadedFile, only if the business owns it) and a legacy copy on disk, then clears the logo address; again changes nothing
+- **Side effects:** removes a legacy logo file from the server's disk when one exists (fs.unlinkSync)
+- **Success:** { message }
+- **Error disclosure:** fixed
+- **Finding:** The legacy disk removal builds its path from the business's stored logo address. Only the upload route writes that address now (a fixed name), so it cannot point elsewhere, but the path is not checked to stay under uploads/ (minor).
 
 ### GET `/api/merchants/:id/transactions`
 
@@ -1614,7 +1682,13 @@ Review pending.
 - storageMethods: `getTaptStonesByMerchant`
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member, platform admin). **Tenant (path-merchant):** checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business
+- **Input:** id: strictPositiveIntegerParam (400 otherwise)
+- **Idempotency:** read-only
+- **Success:** the business's active boards, each a whole board row (number, name, page and QR addresses, whether active, when made and changed)
+- **Error disclosure:** fixed
 
 ### POST `/api/merchants/:id/tapt-stones`
 
@@ -1625,7 +1699,14 @@ Review pending.
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
 - errorTextInResponse: `error.message`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member, platform admin). **Tenant (path-merchant):** checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business
+- **Input:** id: strictPositiveIntegerParam; body read without a schema: name, optional, a string of at most 60 characters once trimmed (400 otherwise; blank or absent makes 'Stone N')
+- **Idempotency:** none: each call makes the business's next board, up to 10 at a time (TaptStoneCapacityError, 400); a numbering clash is 409
+- **Success:** the new board, a whole board row (number, name, page and QR addresses, whether active, when made and changed)
+- **Error disclosure:** domain-errors
+- **Finding:** Any login of the business, a teammate included, creates, renames and deletes boards, and the phone terminal offers all three to every login: kept by the owner's decision (2026-09-27).
 
 ### PUT `/api/merchants/:merchantId/tapt-stones/:stoneId`
 
@@ -1636,7 +1717,14 @@ Review pending.
 - storageMethods: `getTaptStone`, `updateTaptStone`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member, platform admin). **Tenant (path-merchant):** checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business; the board read by id (getTaptStone) must be the business's (404 otherwise, the same for another business's)
+- **Input:** merchantId and stoneId: strictPositiveIntegerParam; body read without a schema: name, a non-blank string of at most 60 characters once trimmed (400 otherwise; the cap since 2026-09-27)
+- **Idempotency:** renames the board; the same name again changes nothing. A deleted (inactive) board is still found and renamed
+- **Success:** the board, a whole board row (number, name, page and QR addresses, whether active, when made and changed)
+- **Error disclosure:** fixed
+- **Finding:** Any login of the business, a teammate included, creates, renames and deletes boards, and the phone terminal offers all three to every login: kept by the owner's decision (2026-09-27).
 
 ### DELETE `/api/merchants/:merchantId/tapt-stones/:stoneId`
 
@@ -1646,7 +1734,14 @@ Review pending.
 - storageMethods: `deleteTaptStone`, `getTaptStone`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member, platform admin). **Tenant (path-merchant):** checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business; the board read by id (getTaptStone) must be the business's (404 otherwise, the same for another business's)
+- **Input:** merchantId and stoneId: strictPositiveIntegerParam (400 otherwise)
+- **Idempotency:** marks the board inactive (deleteTaptStone), so its page and printed QR stop working; again answers 200 and changes nothing
+- **Success:** { message }
+- **Error disclosure:** fixed
+- **Finding:** Any login of the business, a teammate included, creates, renames and deletes boards, and the phone terminal offers all three to every login: kept by the owner's decision (2026-09-27).
 
 ### ALL `/api/windcave/notification`
 
@@ -2195,7 +2290,13 @@ Review pending.
 - storageMethods: `getStockItemsByMerchant`
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member, platform admin). **Tenant (path-merchant):** checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business
+- **Input:** merchantId: strictPositiveIntegerParam (400 otherwise)
+- **Idempotency:** read-only
+- **Success:** the business's stock items, each a whole item row (name, description, cost, emoji, variations, whether active, when made and changed)
+- **Error disclosure:** fixed
 
 ### POST `/api/merchants/:merchantId/stock-items`
 
@@ -2207,7 +2308,13 @@ Review pending.
 - statuses: `201`, `400`, `401`, `403`, `500`, `503`
 - errorTextInResponse: `error.errors`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member, platform admin). **Tenant (path-merchant):** checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business
+- **Input:** merchantId: strictPositiveIntegerParam; body: createStockItemSchema (a name of 1 to 100 characters, a description of at most 500, a cost like 1.50, an emoji, variations; 400 with the issues)
+- **Idempotency:** none: each call adds another item
+- **Success:** 201, the new item, a whole item row (name, description, cost, emoji, variations, whether active, when made and changed)
+- **Error disclosure:** input-issues
 
 ### PUT `/api/merchants/:merchantId/stock-items/:itemId`
 
@@ -2219,7 +2326,13 @@ Review pending.
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 - errorTextInResponse: `error.errors`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member, platform admin). **Tenant (path-merchant):** checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business; the item read by id (getStockItem) must be the business's (404 otherwise, the same for another business's)
+- **Input:** merchantId and itemId: strictPositiveIntegerParam; body: updateStockItemSchema (as for a new item; 400 with the issues)
+- **Idempotency:** sets the item's fields (updateStockItem); the same again changes nothing
+- **Success:** the item, a whole item row (name, description, cost, emoji, variations, whether active, when made and changed)
+- **Error disclosure:** input-issues
 
 ### DELETE `/api/merchants/:merchantId/stock-items/:itemId`
 
@@ -2229,7 +2342,13 @@ Review pending.
 - storageMethods: `deleteStockItem`, `getStockItem`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member, platform admin). **Tenant (path-merchant):** checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business; the item read by id (getStockItem) must be the business's (404 otherwise, the same for another business's)
+- **Input:** merchantId and itemId: strictPositiveIntegerParam (400 otherwise)
+- **Idempotency:** deletes the item (deleteStockItem); again is 404
+- **Success:** { message }
+- **Error disclosure:** fixed
 
 ### POST `/api/v1/transactions`
 
