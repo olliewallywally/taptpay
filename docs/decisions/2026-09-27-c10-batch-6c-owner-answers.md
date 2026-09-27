@@ -60,3 +60,15 @@ automations running, and the first due date made two rent requests for the same 
 What this authorizes: code and tests on this branch, tests first: creating an automation cancels
 the tenant's other automations that are not already cancelled, each recorded as cancelled with the
 time and an event. No deploy or push.
+
+## Outcome (same day, local commits, not pushed)
+
+- 1, **`4900a475`**: the two routes removed (187 remain), their pending entries with them. Tests first
+  (red 4 of 5; the routes that stay beside them a green guard).
+- 2: nothing changed; the property reviews (**`bdbd6a60`**) record that every login of the business
+  has every property action and setting by the owner's choice.
+- 3, **`4900a475`**: resuming a paused automation moves its next date to the first date on its cycle
+  after the resume (`nextRunDateAfter`), so nothing is sent for the paused time; the generate pass then
+  has nothing due. Tests first (red 3 of 5; two next-date guards green).
+- 4, **`cd6b6709`**: a new automation cancels the tenant's other automations not already cancelled,
+  each recorded with the time and an event. Tests first (red 2 of 4; the guards green).

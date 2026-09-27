@@ -535,8 +535,31 @@ The work itself:
     came after both commits and before this record; re-checked from scratch and the suites re-run at
     HEAD, same counts.
 
-**Next:** R1-T2's review of the signed-in merchant families; 49 routes are pending (batch 6c: the
-property routes, 21; then 6d: trades, 28). Then R1-T3's runtime matrix, on the audited harness.
+- **C10 continued (2026-09-27): batch 6c, the property routes (21 routes): `4900a475` (code),
+  `cd6b6709` (answer 4), `bdbd6a60` (19 reviews); local, awaiting independent review**
+  ([working notes](r1/WORKING-2026-09-26-r1-t2-c10.md);
+  [owner answers](../../decisions/2026-09-27-c10-batch-6c-owner-answers.md)). 159 of 187 routes are
+  reviewed; 28 are pending.
+  - **Removed (owner decision): the two property routes no screen calls** (one rent invoice by id, one
+    tenant's automations).
+  - **Fixed:** another business's tenant, automation or invoice answered 403 where a missing one
+    answered 404, so the answer said the id exists; both are now 404, as in trades. A malformed id
+    reached PostgreSQL and answered 500; now 400. The server took actions the screens never offer:
+    resuming a cancelled automation (which billed again, even for an archived tenant), an automation
+    for an archived tenant, marking a voided invoice paid; each is now 409. A refused upload (wrong
+    type, over 20 MB) answered 500; now 400 and 413, for the invoice document and the logo (batch 6a's
+    logo review corrected).
+  - **Owner decisions built:** resuming a paused automation skips the paused time (it sent every
+    missed rent request, one per cron run, most already overdue); a new automation replaces the
+    tenant's old one (two sends left two automations billing the tenant every period). Teammates keep
+    every property action and setting.
+  - Extractor X21: a caught error's issues (`err.errors`) count as error text.
+  - Found, recorded: voiding or marking paid while a tenant pays leaves the charge unrecorded (R3); the
+    rent cron ignores an end date; resend has no limit (each an email, SMS or WhatsApp message).
+  - Mutations 29/29. Server 109/1,921, client 102/822, `tsc` clean.
+
+**Next:** R1-T2's review of the signed-in merchant families; 28 routes are pending (batch 6d: the
+trades routes). Then R1-T3's runtime matrix, on the audited harness.
 Open for the owner: 0030 in dev (above); the card-free dev write (above). The
 no-board rework's questions are all answered. Release of the rework: when production has no pending
 shared no-board sale (count-only check once production is reopened), with
@@ -548,7 +571,7 @@ Independent reviews owed (each evidence file ends with its brief):
   C10's batch 3 (`30c9d8cb..d0d5495b`) and its owner answers (`4ac759d1..1a77530e`), batch 4
   (`198a8265..4ed2e145`) and its owner answers (`867ef275..51feb200`), batch 5
   (`c1889ca3..737018b0`) and its owner answers (`e1feb9b1..b2f2e2a6`), batch 6a
-  (`64d2b17f..e6530ab6`), and batch 6b (`cd486341..cb24fbd8`);
+  (`64d2b17f..e6530ab6`), batch 6b (`cd486341..cb24fbd8`), and batch 6c (`5659c03e..bdbd6a60`);
 - the no-board rework (`da90d1a1..5c2cdb27`), its follow-up (`7051e25e..1fb41d14`), and the
   owner-answer fixes 2a–2c (`aba7b2be..da90d1a1`);
 - R1-T1 (`03c4663b..05195728`) and the live-updates fix (`05195728..3fac8ac8`);
