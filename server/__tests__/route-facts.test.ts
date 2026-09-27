@@ -402,6 +402,30 @@ describe("R1-T2 route facts, read from each handler's syntax tree (C10)", () => 
     expect(facts.get("PUT /plain")?.sideEffects).toEqual([]);
   });
 
+  it("reads a provider result's error put into a response, in a template too", () => {
+    const source = `
+      export function wire(app: Express) {
+        app.post("/a", async (req, res) => {
+          const result = await createWindcaveRefund("x", "1.00", "r");
+          if (!result.success) return res.status(502).json({ message: result.error || "Refund failed" });
+          res.json({ ok: true });
+        });
+        app.post("/b", async (req, res) => {
+          const session = await createAttendedSession("1.00", "r");
+          res.status(502).json({ message: \`Failed: \${session.error}\` });
+        });
+        app.post("/c", async (req, res) => {
+          const validation = schema.safeParse(req.body);
+          if (!validation.success) return res.status(400).json({ errors: validation.error.errors });
+          res.json({ error: "fixed text" });
+        });
+      }`;
+    const facts = extractRouteFacts(source, "server/wire.ts");
+    expect(facts.get("POST /a")?.errorTextInResponse).toEqual(["result.error"]);
+    expect(facts.get("POST /b")?.errorTextInResponse).toEqual(["session.error"]);
+    expect(facts.get("POST /c")?.errorTextInResponse).toEqual(["validation.error.errors"]);
+  });
+
   it("reads a handler passed by name", () => {
     expect(factsFor("GET /api/billing/card/callback")).toMatchObject({
       middleware: [],

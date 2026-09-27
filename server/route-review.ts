@@ -212,6 +212,11 @@ const TEAM_BOARDS =
 const BOARD_ROW = "a whole board row (number, name, page and QR addresses, whether active, when made and changed)";
 const STOCK_ROW = "a whole item row (name, description, cost, emoji, variations, whether active, when made and changed)";
 
+// ── The business's sales, refunds and reports (batch 6b) ──
+const ADMIN_MONEY =
+  "The platform admin passes checkMerchantOwnership for any business, so it can create sales, record cash sales and cancel sales for any business; no admin screen does. For R1-T3's matrix: whether money routes should admit the admin at all.";
+const REFUND_ROW = "whole refund rows (amount, reason, method, status, the provider's refund id, when made and completed)";
+
 function tokenRate(family: string, perMinute: number): string {
   return (
     `requirePaymentTokenRateLimit (the ${family} family: ${perMinute} a minute per visitor address, counted in ` +
@@ -2706,24 +2711,224 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     successDto: "{ message }",
     errorDisclosure: ["fixed"],
   },
+
+  // ── Batch 6b (2026-09-27): the business's sales, refunds and reports ──
+  "POST /api/transactions": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner", "member"],
+        platformAdmin: true,
+        tenant: "path-merchant",
+        tenantRule: `the business named in the body (merchantId), checked with ${SIGNED_IN_BUSINESS_RULE}; a board must be one of its active boards (400 otherwise)`,
+      },
+    ],
+    input:
+      "body: retailTransactionCreateRequestSchema, strict (the business, an item name of 1 to 200 characters, a price like 5.00, splitting, the board, the link type; 400 with the issues)",
+    capability: "a sale without a board has its own link, which needs per-payment links on (config.features.newRetailPayments: 503 otherwise)",
+    entitlement: "paid access (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise)",
+    idempotency:
+      "none: each call makes another pending sale, with a new private link (only its hash kept; a token clash is 503) or its board's shared address",
+    sideEffects: "a live update to the business, and to the board's page for a board sale (sseBroker, via broadcastToStone); a push notification to the business (sendPushToMerchant)",
+    successDto: "ownerTransactionDto with the sale's page and QR addresses; the private link's token appears only in this answer",
+    errorDisclosure: ["input-issues"],
+    findings: [ADMIN_MONEY],
+  },
+
+  "POST /api/transactions/cash-sale": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner", "member"],
+        platformAdmin: true,
+        tenant: "path-merchant",
+        tenantRule: `the business named in the body (merchantId), checked with ${SIGNED_IN_BUSINESS_RULE}; a board must be one of its active boards (getTaptStone: 400 otherwise, since 2026-09-27)`,
+      },
+    ],
+    input:
+      "body: cashSaleRequestSchema, strict: the business, item name and price by the rules creating a sale uses, and an optional board (400 with the issues; since 2026-09-27, when parseInt and parseFloat let '1abc' and 'Infinity' through)",
+    capability: null,
+    entitlement: "paid access (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise)",
+    idempotency: "none: each call records another completed cash sale",
+    sideEffects: "a live update to the business, and to the board's page for a board sale (sseBroker, via broadcastToStone); a push notification (sendPushToMerchant)",
+    successDto: "{ transaction: ownerTransactionDto }",
+    errorDisclosure: ["input-issues"],
+    findings: [ADMIN_MONEY],
+  },
+
+  "POST /api/transactions/tap-to-pay": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner", "member"],
+        platformAdmin: true,
+        tenant: "path-merchant",
+        tenantRule: `the business named in the body (merchantId), checked with ${SIGNED_IN_BUSINESS_RULE}; a sale named by transactionId must be the business's (404 otherwise) and pending (409)`,
+      },
+    ],
+    input:
+      "body read without a schema: merchantId and transactionId with parseInt, amount with parseFloat (400 if not above zero), windcaveToken required once the provider is configured",
+    capability: "Tap to Pay must be on (config.features.tapToPay: 503 TAP_TO_PAY_DISABLED otherwise), and the provider configured (isWindcaveConfigured: 503 otherwise)",
+    entitlement: "paid access (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise)",
+    idempotency:
+      "charges the named pending sale's stored price, or the business's newest pending sale, or, with none, a new sale for the amount sent; a sale no longer pending is 409. Nothing stops the same request finishing a different pending sale or making a new one when repeated",
+    sideEffects:
+      "opens an attended session at the provider and submits the phone's card token to it (createAttendedSession, submitTapToPayToken); a live update on approval (sseBroker, via broadcastToStone); a push notification either way (sendPushToMerchant)",
+    successDto: "{ approved, transactionId }",
+    errorDisclosure: ["provider-text"],
+    findings: [
+      "A provider failure answers with the provider's own error text (`Failed to create attended session: …`, `Payment processor error: …`, from sessionResult.error and paymentResult.error), to a signed-in login of the business (R2's provider boundary).",
+      "merchantId, transactionId and amount are read with parseInt and parseFloat (§8.4). It stays off (TAP_TO_PAY_DISABLED) until the iPhone hardware work (R7).",
+      "No idempotency: without a transactionId, a repeat finishes whatever is pending next, or charges a new sale for the amount sent (R3's payment attempts).",
+    ],
+  },
+
+  "POST /api/transactions/:id/cancel": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner", "member"],
+        platformAdmin: true,
+        tenant: "resource",
+        tenantRule: `the sale read by id (getTransaction) must be the session's business's, by ${SIGNED_IN_BUSINESS_RULE}`,
+      },
+    ],
+    input: "id: strictPositiveIntegerParam (400 otherwise)",
+    capability: null,
+    entitlement: null,
+    idempotency: "cancels a pending or processing sale; any other state is 400 (so again is 400)",
+    sideEffects: "a live update to the business, and to the board's page for a board sale (sseBroker, via broadcastToStone)",
+    successDto: "ownerTransactionDto with the board's addresses for a board sale",
+    errorDisclosure: ["fixed"],
+    findings: [ADMIN_MONEY],
+  },
+
+  "POST /api/transactions/:transactionId/refunds": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner"],
+        tenant: "resource",
+        tenantRule:
+          "the sale read by id (getTransaction) must be the session's business's (403 otherwise); the platform admin, with no business, is refused (401 'Merchant authentication required')",
+      },
+    ],
+    input:
+      "transactionId: strictPositiveIntegerParam; body: createRefundSchema (an amount like 5.00, a reason of 1 to 500 characters, a method; 400 with the issues; the amount's form since 2026-09-27)",
+    capability: "refunds must be on (config.features.refundInitiation: 503 otherwise), and the provider configured with the sale's provider transaction (isWindcaveConfigured: 503 otherwise)",
+    entitlement: null,
+    idempotency:
+      "reserves the amount against what is left to refund (reserveRefundAmount: 409 when it exceeds it or another refund is in progress), records the refund, asks the provider, and gives the amount back if the provider refuses",
+    sideEffects: "refunds at the provider (createWindcaveRefund); a live update (sseBroker, via broadcastToStone); a push notification (sendPushToMerchant)",
+    successDto: "{ success, message, refund: the whole refund row, transaction: the whole sale row }",
+    errorDisclosure: ["input-issues", "provider-text"],
+    findings: [
+      "A provider refusal answers with the provider's own error text (refundResult.error), to the owner (R2's provider boundary).",
+      "Not durable across a crash between the provider's refund and the record's update: the refund stays pending and its amount reserved (R4, durable refunds).",
+      adminStatusFinding("401"),
+    ],
+  },
+
+  "GET /api/transactions/:transactionId/refunds": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner", "member"],
+        tenant: "resource",
+        tenantRule:
+          "the sale read by id (getTransaction) must be the session's business's (403 otherwise); the platform admin, with no business, is refused (401 'Merchant authentication required')",
+      },
+    ],
+    input: "transactionId: strictPositiveIntegerParam (400 otherwise)",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto: `the sale's ${REFUND_ROW}`,
+    errorDisclosure: ["fixed"],
+    findings: [adminStatusFinding("401")],
+  },
+
+  "GET /api/merchants/:merchantId/refunds": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner", "member"],
+        platformAdmin: true,
+        tenant: "resource",
+        tenantRule: "the business in the path must be the session's (compared directly), or the caller the platform admin",
+      },
+    ],
+    input: "merchantId: strictPositiveIntegerParam (400 otherwise)",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto: `every refund of the business, ${REFUND_ROW}`,
+    errorDisclosure: ["fixed"],
+  },
+
+  "GET /api/merchants/:id/transactions": {
+    branches: [{ principal: "merchant", roles: ["owner", "member"], platformAdmin: true, tenant: "path-merchant", tenantRule: SIGNED_IN_BUSINESS_RULE }],
+    input: "id: strictPositiveIntegerParam (400 otherwise)",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto: "every sale of the business, ownerTransactionDto each, all at once (no paging)",
+    errorDisclosure: ["fixed"],
+  },
+
+  "GET /api/merchants/:id/export/pdf": {
+    branches: [{ principal: "merchant", roles: ["owner", "member"], platformAdmin: true, tenant: "path-merchant", tenantRule: SIGNED_IN_BUSINESS_RULE }],
+    input: "id: strictPositiveIntegerParam; startDate and endDate read raw with new Date(), optional (the live page sends neither)",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto: "a PDF business report (generateBusinessReportPdf): the business, its figures and its sales in the range",
+    errorDisclosure: ["fixed"],
+    findings: ["startDate and endDate are read raw: a malformed one reaches the storage query as an invalid date (a 500, not the 400 P2.2 asks for; §8.4). The live page sends neither."],
+  },
+
+  "GET /api/invoice-documents/:name": {
+    branches: [
+      {
+        principal: "merchant",
+        when: "a signed-in business",
+        roles: ["owner", "member"],
+        tenant: "resource",
+        tenantRule:
+          "only the business's own upload (getUploadedFileForMerchant): another business's, one no business could be attributed to, a malformed name and a missing one all give the same 404",
+      },
+      {
+        principal: "platform-admin",
+        when: "the validated platform admin (isValidatedPlatformAdmin)",
+        tenant: "any-merchant",
+        tenantRule:
+          "any invoice document by its generated name (owner decision S1, 2026-09-19), each read recorded before any bytes leave (recordInvoiceDocumentAdminRead: 503 when it cannot be)",
+      },
+    ],
+    input: "name: must be a generated invoice-document name (isInvoiceDocumentName: 404 otherwise), so no other folder or path can be asked for",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only, apart from the admin's audit record",
+    sideEffects: "an audit log line for each admin read (logSecurityEvent: ADMIN_INVOICE_DOCUMENT_READ)",
+    successDto: "the document's bytes as a private download (sendPrivateDocument)",
+    errorDisclosure: ["fixed"],
+    findings: [
+      "No screen calls it yet: the property terminal shows an attached document by name only. It serves gap 13's option C (owner decision 2026-09-14): a business reading its own documents, and the admin's audited reading.",
+    ],
+  },
 };
 
 /**
  * Routes not reviewed yet. May only shrink: PENDING_CEILING is lowered by
  * every batch, so a route cannot be added here instead of being reviewed.
  */
-export const PENDING_CEILING = 59;
+export const PENDING_CEILING = 49;
 
 export const REVIEW_PENDING: readonly string[] = [
-  "POST /api/transactions",
-  "POST /api/transactions/cash-sale",
-  "POST /api/transactions/tap-to-pay",
-  "POST /api/transactions/:id/cancel",
-  "GET /api/merchants/:id/export/pdf",
-  "GET /api/merchants/:id/transactions",
-  "POST /api/transactions/:transactionId/refunds",
-  "GET /api/transactions/:transactionId/refunds",
-  "GET /api/merchants/:merchantId/refunds",
   "GET /api/property/tenants",
   "POST /api/property/tenants",
   "GET /api/property/tenants/:id",
@@ -2738,7 +2943,6 @@ export const REVIEW_PENDING: readonly string[] = [
   "DELETE /api/property/schedules/:id",
   "GET /api/property/invoices",
   "POST /api/property/invoices/document",
-  "GET /api/invoice-documents/:name",
   "POST /api/property/invoices",
   "POST /api/property/invoices/:id/resend",
   "GET /api/property/invoices/:id",

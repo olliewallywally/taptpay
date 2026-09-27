@@ -542,6 +542,12 @@ class FactCollector {
           return;
         }
       }
+      // A provider's or library's result error put into the body: `result.error`, in a
+      // template too (`Payment processor error: ${paymentResult.error}`).
+      if (ts.isPropertyAccessExpression(node) && node.name.text === "error") {
+        this.errorText.add(this.text(node));
+        return;
+      }
       // A caught error put whole into the body: `{ error: error }`, `{ err }`.
       if (ts.isPropertyAssignment(node)) {
         const value = unwrap(node.initializer);

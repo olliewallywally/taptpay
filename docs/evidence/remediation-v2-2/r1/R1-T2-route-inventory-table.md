@@ -1,4 +1,4 @@
-# R1-T2 route inventory — generated 2026-09-27 @ `45fe98de7777d94907c82d5f20d9bcf46b2de014`
+# R1-T2 route inventory — generated 2026-09-27 @ `7151d0943ba0ddd3b24040b1fd582b40ea313eb0`
 
 Regenerate with `npx tsx scripts/generate-route-policy.ts`. This table is
 evidence for the SHA named above, not a timeless constant — see
@@ -14,7 +14,7 @@ necessarily a bug): **0**.
 
 ## Review
 
-130 of 189 routes reviewed (server/route-review.ts); 59 pending.
+140 of 189 routes reviewed (server/route-review.ts); 49 pending.
 A reviewed route's principal below is the review's; a pending one's is the heuristic, marked "(heuristic)".
 
 ### Open findings
@@ -107,6 +107,18 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 - **POST /api/merchants/:id/tapt-stones:** Any login of the business, a teammate included, creates, renames and deletes boards, and the phone terminal offers all three to every login: kept by the owner's decision (2026-09-27).
 - **PUT /api/merchants/:merchantId/tapt-stones/:stoneId:** Any login of the business, a teammate included, creates, renames and deletes boards, and the phone terminal offers all three to every login: kept by the owner's decision (2026-09-27).
 - **DELETE /api/merchants/:merchantId/tapt-stones/:stoneId:** Any login of the business, a teammate included, creates, renames and deletes boards, and the phone terminal offers all three to every login: kept by the owner's decision (2026-09-27).
+- **POST /api/transactions:** The platform admin passes checkMerchantOwnership for any business, so it can create sales, record cash sales and cancel sales for any business; no admin screen does. For R1-T3's matrix: whether money routes should admit the admin at all.
+- **POST /api/transactions/cash-sale:** The platform admin passes checkMerchantOwnership for any business, so it can create sales, record cash sales and cancel sales for any business; no admin screen does. For R1-T3's matrix: whether money routes should admit the admin at all.
+- **POST /api/transactions/tap-to-pay:** A provider failure answers with the provider's own error text (`Failed to create attended session: …`, `Payment processor error: …`, from sessionResult.error and paymentResult.error), to a signed-in login of the business (R2's provider boundary).
+- **POST /api/transactions/tap-to-pay:** merchantId, transactionId and amount are read with parseInt and parseFloat (§8.4). It stays off (TAP_TO_PAY_DISABLED) until the iPhone hardware work (R7).
+- **POST /api/transactions/tap-to-pay:** No idempotency: without a transactionId, a repeat finishes whatever is pending next, or charges a new sale for the amount sent (R3's payment attempts).
+- **POST /api/transactions/:id/cancel:** The platform admin passes checkMerchantOwnership for any business, so it can create sales, record cash sales and cancel sales for any business; no admin screen does. For R1-T3's matrix: whether money routes should admit the admin at all.
+- **POST /api/transactions/:transactionId/refunds:** A provider refusal answers with the provider's own error text (refundResult.error), to the owner (R2's provider boundary).
+- **POST /api/transactions/:transactionId/refunds:** Not durable across a crash between the provider's refund and the record's update: the refund stays pending and its amount reserved (R4, durable refunds).
+- **POST /api/transactions/:transactionId/refunds:** The platform admin (signed in, with no business) is refused with 401; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **GET /api/transactions/:transactionId/refunds:** The platform admin (signed in, with no business) is refused with 401; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **GET /api/merchants/:id/export/pdf:** startDate and endDate are read raw: a malformed one reaches the storage query as an invalid date (a 500, not the 400 P2.2 asks for; §8.4). The live page sends neither.
+- **GET /api/invoice-documents/:name:** No screen calls it yet: the property terminal shows an attached document by name only. It serves gap 13's option C (owner decision 2026-09-14): a business reading its own documents, and the admin's audited reading.
 
 ## Routes
 
@@ -149,12 +161,12 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 | GET | `/api/pay/return/:state` | 2166 | public-bearer | paymentAttempts.resolveReturnState( |
 | ALL | `/api/pay/notification/:state` | 2200 | provider | — |
 | GET | `/api/merchants/:id/active-transaction` | 2217 | merchant / public | authenticateToken, checkMerchantOwnership, publicTransactionDto(, generatePaymentUrl( |
-| POST | `/api/transactions` | 2334 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| POST | `/api/transactions/cash-sale` | 2415 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
-| POST | `/api/transactions/tap-to-pay` | 2479 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| POST | `/api/transactions` | 2334 | merchant | authenticateToken, checkMerchantOwnership |
+| POST | `/api/transactions/cash-sale` | 2415 | merchant | authenticateToken, checkMerchantOwnership |
+| POST | `/api/transactions/tap-to-pay` | 2479 | merchant | authenticateToken, checkMerchantOwnership |
 | POST | `/api/transactions/:id/split` | 2621 | public | isTokenAddressedTransaction(, publicTransactionDto( |
 | GET | `/api/split-payments/:id` | 2675 | public | isTokenAddressedTransaction( |
-| POST | `/api/transactions/:id/cancel` | 2694 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| POST | `/api/transactions/:id/cancel` | 2694 | merchant | authenticateToken, checkMerchantOwnership |
 | GET | `/api/nfc/capabilities` | 2752 | public | — |
 | POST | `/api/transactions/:id/pay` | 2766 | public | isTokenAddressedTransaction( |
 | GET | `/api/windcave/env` | 3018 | public | — |
@@ -163,7 +175,7 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 | GET | `/api/transactions/:id` | 3143 | public | isTokenAddressedTransaction(, publicTransactionDto( |
 | POST | `/api/transactions/:id/receipt-pdf` | 3166 | public | isTokenAddressedTransaction( |
 | GET | `/api/transactions/:id/receipt-qr` | 3227 | public | isTokenAddressedTransaction( |
-| GET | `/api/merchants/:id/export/pdf` | 3281 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/merchants/:id/export/pdf` | 3281 | merchant | authenticateToken, checkMerchantOwnership |
 | POST | `/api/admin/merchants/:id/verify` | 3321 | platform-admin | authenticateAdmin |
 | POST | `/api/admin/merchants/:id/set-active` | 3371 | platform-admin | authenticateAdmin |
 | GET | `/api/admin/merchants/:id/transactions` | 3394 | platform-admin | authenticateAdmin |
@@ -176,7 +188,7 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 | PUT | `/api/merchants/:id` | 3658 | merchant | authenticateToken, checkAccountOwnership |
 | POST | `/api/merchants/:id/logo` | 3732 | merchant | authenticateToken, checkAccountOwnership |
 | DELETE | `/api/merchants/:id/logo` | 3787 | merchant | authenticateToken, checkAccountOwnership |
-| GET | `/api/merchants/:id/transactions` | 3830 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
+| GET | `/api/merchants/:id/transactions` | 3830 | merchant | authenticateToken, checkMerchantOwnership |
 | GET | `/api/merchants/:id/tapt-stones` | 3847 | merchant | authenticateToken, checkMerchantOwnership |
 | POST | `/api/merchants/:id/tapt-stones` | 3863 | merchant | authenticateToken, checkMerchantOwnership, generatePaymentUrl( |
 | PUT | `/api/merchants/:merchantId/tapt-stones/:stoneId` | 3914 | merchant | authenticateToken, checkMerchantOwnership |
@@ -206,9 +218,9 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 | GET | `/api/push/status` | 5310 | merchant | authenticateToken |
 | GET | `/api/push/preferences` | 5335 | merchant | authenticateToken |
 | PUT | `/api/push/preferences` | 5350 | merchant | authenticateToken |
-| POST | `/api/transactions/:transactionId/refunds` | 5382 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| GET | `/api/transactions/:transactionId/refunds` | 5520 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/merchants/:merchantId/refunds` | 5550 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/transactions/:transactionId/refunds` | 5382 | merchant | authenticateToken, isAccountOwner |
+| GET | `/api/transactions/:transactionId/refunds` | 5520 | merchant | authenticateToken |
+| GET | `/api/merchants/:merchantId/refunds` | 5550 | merchant | authenticateToken |
 | GET | `/api/merchants/:merchantId/stock-items` | 5583 | merchant | authenticateToken, checkMerchantOwnership |
 | POST | `/api/merchants/:merchantId/stock-items` | 5602 | merchant | authenticateToken, checkMerchantOwnership |
 | PUT | `/api/merchants/:merchantId/stock-items/:itemId` | 5630 | merchant | authenticateToken, checkMerchantOwnership |
@@ -250,7 +262,7 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 | DELETE | `/api/property/schedules/:id` | 7116 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
 | GET | `/api/property/invoices` | 7131 | merchant-user (heuristic) | authenticateToken |
 | POST | `/api/property/invoices/document` | 7161 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/invoice-documents/:name` | 7207 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/invoice-documents/:name` | 7207 | merchant / platform-admin | authenticateToken |
 | POST | `/api/property/invoices` | 7236 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
 | POST | `/api/property/invoices/:id/resend` | 7278 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
 | GET | `/api/property/invoices/:id` | 7293 | merchant-user (heuristic) | authenticateToken, checkMerchantOwnership |
@@ -1066,7 +1078,17 @@ Reviewed policy:
 - entitlementGates: `BILLING_CARD_REQUIRED`, `billingCardIsReady`, `requireBillingCard`
 - helpers: `broadcastToStone`, `requireBillingCard`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member, platform admin). **Tenant (path-merchant):** the business named in the body (merchantId), checked with checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business; a board must be one of its active boards (400 otherwise)
+- **Input:** body: retailTransactionCreateRequestSchema, strict (the business, an item name of 1 to 200 characters, a price like 5.00, splitting, the board, the link type; 400 with the issues)
+- **Capability gate:** a sale without a board has its own link, which needs per-payment links on (config.features.newRetailPayments: 503 otherwise)
+- **Entitlement gate:** paid access (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise)
+- **Idempotency:** none: each call makes another pending sale, with a new private link (only its hash kept; a token clash is 503) or its board's shared address
+- **Side effects:** a live update to the business, and to the board's page for a board sale (sseBroker, via broadcastToStone); a push notification to the business (sendPushToMerchant)
+- **Success:** ownerTransactionDto with the sale's page and QR addresses; the private link's token appears only in this answer
+- **Error disclosure:** input-issues
+- **Finding:** The platform admin passes checkMerchantOwnership for any business, so it can create sales, record cash sales and cancel sales for any business; no admin screen does. For R1-T3's matrix: whether money routes should admit the admin at all.
 
 ### POST `/api/transactions/cash-sale`
 
@@ -1081,7 +1103,16 @@ Review pending.
 - entitlementGates: `BILLING_CARD_REQUIRED`, `billingCardIsReady`, `requireBillingCard`
 - helpers: `broadcastToStone`, `requireBillingCard`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member, platform admin). **Tenant (path-merchant):** the business named in the body (merchantId), checked with checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business; a board must be one of its active boards (getTaptStone: 400 otherwise, since 2026-09-27)
+- **Input:** body: cashSaleRequestSchema, strict: the business, item name and price by the rules creating a sale uses, and an optional board (400 with the issues; since 2026-09-27, when parseInt and parseFloat let '1abc' and 'Infinity' through)
+- **Entitlement gate:** paid access (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise)
+- **Idempotency:** none: each call records another completed cash sale
+- **Side effects:** a live update to the business, and to the board's page for a board sale (sseBroker, via broadcastToStone); a push notification (sendPushToMerchant)
+- **Success:** { transaction: ownerTransactionDto }
+- **Error disclosure:** input-issues
+- **Finding:** The platform admin passes checkMerchantOwnership for any business, so it can create sales, record cash sales and cancel sales for any business; no admin screen does. For R1-T3's matrix: whether money routes should admit the admin at all.
 
 ### POST `/api/transactions/tap-to-pay`
 
@@ -1091,11 +1122,24 @@ Review pending.
 - storageMethods: `createTransaction`, `getActiveTransactionByMerchant`, `getOrCreateSubscription`, `getTransaction`, `updateTransactionPaymentMethod`, `updateTransactionStatus`
 - sideEffects: `live update: sseBroker.broadcast`, `provider: createAttendedSession`, `provider: submitTapToPayToken`, `push: sendPushToMerchant`
 - statuses: `200`, `400`, `401`, `402`, `403`, `404`, `409`, `500`, `502`, `503`
+- errorTextInResponse: `paymentResult.error`, `sessionResult.error`
 - capabilityGates: `config.features.tapToPay`, `isWindcaveConfigured`
 - entitlementGates: `BILLING_CARD_REQUIRED`, `billingCardIsReady`, `requireBillingCard`
 - helpers: `broadcastToStone`, `requireBillingCard`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member, platform admin). **Tenant (path-merchant):** the business named in the body (merchantId), checked with checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business; a sale named by transactionId must be the business's (404 otherwise) and pending (409)
+- **Input:** body read without a schema: merchantId and transactionId with parseInt, amount with parseFloat (400 if not above zero), windcaveToken required once the provider is configured
+- **Capability gate:** Tap to Pay must be on (config.features.tapToPay: 503 TAP_TO_PAY_DISABLED otherwise), and the provider configured (isWindcaveConfigured: 503 otherwise)
+- **Entitlement gate:** paid access (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise)
+- **Idempotency:** charges the named pending sale's stored price, or the business's newest pending sale, or, with none, a new sale for the amount sent; a sale no longer pending is 409. Nothing stops the same request finishing a different pending sale or making a new one when repeated
+- **Side effects:** opens an attended session at the provider and submits the phone's card token to it (createAttendedSession, submitTapToPayToken); a live update on approval (sseBroker, via broadcastToStone); a push notification either way (sendPushToMerchant)
+- **Success:** { approved, transactionId }
+- **Error disclosure:** provider-text
+- **Finding:** A provider failure answers with the provider's own error text (`Failed to create attended session: …`, `Payment processor error: …`, from sessionResult.error and paymentResult.error), to a signed-in login of the business (R2's provider boundary).
+- **Finding:** merchantId, transactionId and amount are read with parseInt and parseFloat (§8.4). It stays off (TAP_TO_PAY_DISABLED) until the iPhone hardware work (R7).
+- **Finding:** No idempotency: without a transactionId, a repeat finishes whatever is pending next, or charges a new sale for the amount sent (R3's payment attempts).
 
 ### POST `/api/transactions/:id/split`
 
@@ -1153,7 +1197,15 @@ Reviewed policy:
 - dtos: `ownerTransactionDto`
 - helpers: `broadcastToStone`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member, platform admin). **Tenant (resource):** the sale read by id (getTransaction) must be the session's business's, by checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business
+- **Input:** id: strictPositiveIntegerParam (400 otherwise)
+- **Idempotency:** cancels a pending or processing sale; any other state is 400 (so again is 400)
+- **Side effects:** a live update to the business, and to the board's page for a board sale (sseBroker, via broadcastToStone)
+- **Success:** ownerTransactionDto with the board's addresses for a board sale
+- **Error disclosure:** fixed
+- **Finding:** The platform admin passes checkMerchantOwnership for any business, so it can create sales, record cash sales and cancel sales for any business; no admin screen does. For R1-T3's matrix: whether money routes should admit the admin at all.
 
 ### GET `/api/nfc/capabilities`
 
@@ -1338,7 +1390,14 @@ Reviewed policy:
 - storageMethods: `getMerchant`, `getMerchantAnalyticsWithDateRange`, `getTransactionsByMerchantWithDateRange`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member, platform admin). **Tenant (path-merchant):** checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business
+- **Input:** id: strictPositiveIntegerParam; startDate and endDate read raw with new Date(), optional (the live page sends neither)
+- **Idempotency:** read-only
+- **Success:** a PDF business report (generateBusinessReportPdf): the business, its figures and its sales in the range
+- **Error disclosure:** fixed
+- **Finding:** startDate and endDate are read raw: a malformed one reaches the storage query as an invalid date (a 500, not the 400 P2.2 asks for; §8.4). The live page sends neither.
 
 ### POST `/api/admin/merchants/:id/verify`
 
@@ -1588,7 +1647,13 @@ Reviewed policy:
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
 - dtos: `ownerTransactionDto`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member, platform admin). **Tenant (path-merchant):** checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business
+- **Input:** id: strictPositiveIntegerParam (400 otherwise)
+- **Idempotency:** read-only
+- **Success:** every sale of the business, ownerTransactionDto each, all at once (no paging)
+- **Error disclosure:** fixed
 
 ### GET `/api/merchants/:id/tapt-stones`
 
@@ -2153,11 +2218,22 @@ Reviewed policy:
 - storageMethods: `createRefund`, `getTransaction`, `releaseRefundAmount`, `reserveRefundAmount`, `updateRefundStatus`
 - sideEffects: `live update: sseBroker.broadcast`, `provider: createWindcaveRefund`, `push: sendPushToMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `502`, `503`
-- errorTextInResponse: `validation.error.errors`
+- errorTextInResponse: `refundResult.error`, `validation.error.errors`
 - capabilityGates: `config.features.refundInitiation`, `isWindcaveConfigured`
 - helpers: `broadcastToStone`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner). **Tenant (resource):** the sale read by id (getTransaction) must be the session's business's (403 otherwise); the platform admin, with no business, is refused (401 'Merchant authentication required')
+- **Input:** transactionId: strictPositiveIntegerParam; body: createRefundSchema (an amount like 5.00, a reason of 1 to 500 characters, a method; 400 with the issues; the amount's form since 2026-09-27)
+- **Capability gate:** refunds must be on (config.features.refundInitiation: 503 otherwise), and the provider configured with the sale's provider transaction (isWindcaveConfigured: 503 otherwise)
+- **Idempotency:** reserves the amount against what is left to refund (reserveRefundAmount: 409 when it exceeds it or another refund is in progress), records the refund, asks the provider, and gives the amount back if the provider refuses
+- **Side effects:** refunds at the provider (createWindcaveRefund); a live update (sseBroker, via broadcastToStone); a push notification (sendPushToMerchant)
+- **Success:** { success, message, refund: the whole refund row, transaction: the whole sale row }
+- **Error disclosure:** input-issues, provider-text
+- **Finding:** A provider refusal answers with the provider's own error text (refundResult.error), to the owner (R2's provider boundary).
+- **Finding:** Not durable across a crash between the provider's refund and the record's update: the refund stays pending and its amount reserved (R4, durable refunds).
+- **Finding:** The platform admin (signed in, with no business) is refused with 401; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### GET `/api/transactions/:transactionId/refunds`
 
@@ -2167,7 +2243,14 @@ Review pending.
 - storageMethods: `getRefundsByTransaction`, `getTransaction`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (resource):** the sale read by id (getTransaction) must be the session's business's (403 otherwise); the platform admin, with no business, is refused (401 'Merchant authentication required')
+- **Input:** transactionId: strictPositiveIntegerParam (400 otherwise)
+- **Idempotency:** read-only
+- **Success:** the sale's whole refund rows (amount, reason, method, status, the provider's refund id, when made and completed)
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 401; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### GET `/api/merchants/:merchantId/refunds`
 
@@ -2177,7 +2260,13 @@ Review pending.
 - storageMethods: `getRefundsByMerchant`
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member, platform admin). **Tenant (resource):** the business in the path must be the session's (compared directly), or the caller the platform admin
+- **Input:** merchantId: strictPositiveIntegerParam (400 otherwise)
+- **Idempotency:** read-only
+- **Success:** every refund of the business, whole refund rows (amount, reason, method, status, the provider's refund id, when made and completed)
+- **Error disclosure:** fixed
 
 ### GET `/api/merchants/:merchantId/stock-items`
 
@@ -2843,7 +2932,16 @@ Review pending.
 - statuses: `200`, `401`, `403`, `404`, `500`, `503`
 - helpers: `sendPrivateDocument`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member) — a signed-in business. **Tenant (resource):** only the business's own upload (getUploadedFileForMerchant): another business's, one no business could be attributed to, a malformed name and a missing one all give the same 404
+- **Who:** platform-admin — the validated platform admin (isValidatedPlatformAdmin). **Tenant (any-merchant):** any invoice document by its generated name (owner decision S1, 2026-09-19), each read recorded before any bytes leave (recordInvoiceDocumentAdminRead: 503 when it cannot be)
+- **Input:** name: must be a generated invoice-document name (isInvoiceDocumentName: 404 otherwise), so no other folder or path can be asked for
+- **Idempotency:** read-only, apart from the admin's audit record
+- **Side effects:** an audit log line for each admin read (logSecurityEvent: ADMIN_INVOICE_DOCUMENT_READ)
+- **Success:** the document's bytes as a private download (sendPrivateDocument)
+- **Error disclosure:** fixed
+- **Finding:** No screen calls it yet: the property terminal shows an attached document by name only. It serves gap 13's option C (owner decision 2026-09-14): a business reading its own documents, and the admin's audited reading.
 
 ### POST `/api/property/invoices`
 

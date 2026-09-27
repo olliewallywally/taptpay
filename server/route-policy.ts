@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 45fe98de7777d94907c82d5f20d9bcf46b2de014 on 2026-09-27.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 7151d0943ba0ddd3b24040b1fd582b40ea313eb0 on 2026-09-27.
  *
  * 189 registrations (80 GET, 77 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -639,6 +639,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       storageMethods: ["createTransaction","getActiveTransactionByMerchant","getOrCreateSubscription","getTransaction","updateTransactionPaymentMethod","updateTransactionStatus"],
       sideEffects: ["live update: sseBroker.broadcast","provider: createAttendedSession","provider: submitTapToPayToken","push: sendPushToMerchant"],
       statuses: [200,400,401,402,403,404,409,500,502,503],
+      errorTextInResponse: ["paymentResult.error","sessionResult.error"],
       capabilityGates: ["config.features.tapToPay","isWindcaveConfigured"],
       entitlementGates: ["BILLING_CARD_REQUIRED","billingCardIsReady","requireBillingCard"],
       helpers: ["broadcastToStone","requireBillingCard"],
@@ -1421,7 +1422,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       storageMethods: ["createRefund","getTransaction","releaseRefundAmount","reserveRefundAmount","updateRefundStatus"],
       sideEffects: ["live update: sseBroker.broadcast","provider: createWindcaveRefund","push: sendPushToMerchant"],
       statuses: [200,400,401,403,404,409,500,502,503],
-      errorTextInResponse: ["validation.error.errors"],
+      errorTextInResponse: ["refundResult.error","validation.error.errors"],
       capabilityGates: ["config.features.refundInitiation","isWindcaveConfigured"],
       helpers: ["broadcastToStone"],
     },
