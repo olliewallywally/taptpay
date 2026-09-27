@@ -614,9 +614,15 @@ The work itself:
   return answered a link's sale 404 where a missing sale was sent home (it told which numbers were link
   sales). Two reviews corrected. Mutations 6/6. Server 112/2,749, client 103/825.
 
-**Next:** R1-T3's callers each route serves (owner, teammate, another business's owner, the admin
-where admitted), family by family, each with a request the allowed caller succeeds with; then the
-client route guards (plan page 24).
+- **R1-T3 batch (c) (2026-09-27): `a64f5c4f`; local, awaiting independent review.** The role and tenant
+  refusals where no record is addressed: a teammate on the 23 owner-only routes and another business's
+  owner on the 22 routes that name the business, with real requests and fixtures (38 routes), each
+  refusal changing nothing and the owner's same request passing (the positive control). All were already
+  right; pinned. Mutations 5/5. Server 113/2,788, client 103/825.
+
+**Next:** R1-T3's remaining rows: another business's record on the 37 routes that address one (the
+missing record's 404), the allowed callers' success on every route, then the client route guards (plan
+page 24).
 Open for the owner: 0030 in dev (above); the card-free dev write (above). The
 no-board rework's questions are all answered. Release of the rework: when production has no pending
 shared no-board sale (count-only check once production is reopened), with
