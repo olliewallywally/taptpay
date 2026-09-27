@@ -13,7 +13,7 @@ import {
   subscriptionCardSessionState,
 } from "./storage";
 import { TUTORIAL_PAGE_KEYS, isTutorialPageKey } from "@shared/tutorial";
-import { inviteTeamMemberSchema, acceptInviteSchema, retailTransactionCreateRequestSchema, updateMerchantDetailsSchema, updateThemeSchema, updateDailyGoalSchema, forgotPasswordSchema, resetPasswordSchema, changePasswordSchema, newPasswordSchema, createRefundSchema, insertRefundSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, pushNotificationPreferencesSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createClientProfileSchema, updateClientProfileSchema, createQuoteSchema, acceptQuoteSchema, createJobInvoiceSchema, markJobPaidExternalSchema, createJobScheduleSchema, updateJobScheduleSchema, updateTradeReminderSettingsSchema, updateTradeGstSettingsSchema } from "@shared/schema";
+import { inviteTeamMemberSchema, acceptInviteSchema, retailTransactionCreateRequestSchema, updateMerchantDetailsSchema, updateThemeSchema, updateDailyGoalSchema, forgotPasswordSchema, resetPasswordSchema, changePasswordSchema, newPasswordSchema, createRefundSchema, insertRefundSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, merchantOnboardingSchema, pushNotificationPreferencesSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createClientProfileSchema, updateClientProfileSchema, createQuoteSchema, acceptQuoteSchema, createJobInvoiceSchema, markJobPaidExternalSchema, createJobScheduleSchema, updateJobScheduleSchema, updateTradeReminderSettingsSchema, updateTradeGstSettingsSchema } from "@shared/schema";
 import { isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, getWindcaveEnv, submitGooglePayToken, createAttendedSession, submitTapToPayToken, createCardStorageSession, queryStoredCardSession, chargeStoredCard } from "./windcave";
 import { authenticateUser, checkPasswordEvenly, passwordCheckBudget, generateToken, authenticateToken, createUser, issueTokenForUserId, tokenForUserRow, isAccountOwner, requestPasswordReset, resetPassword, validateResetToken, type AuthenticatedRequest, logSecurityEvent, syncVerifiedMerchants } from "./auth";
 import {
@@ -1207,12 +1207,14 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!Number.isInteger(merchantId) || !checkAccountOwnership(req, merchantId)) {
         return res.status(403).json({ message: "Forbidden" });
       }
-
-      const merchant = await storage.getMerchant(merchantId);
-      if (!merchant) {
-        return res.status(404).json({ message: "Merchant not found" });
+      // Held to sign-up's rules before anything is read, kept or sent (C10 batch 6).
+      const validation = merchantOnboardingSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({
+          message: validation.error.issues[0]?.message ?? "Invalid onboarding details",
+          errors: validation.error.issues,
+        });
       }
-
       const {
         director,
         nzbn,
@@ -1220,13 +1222,22 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         websiteUrl,
         estimatedAnnualTurnover,
         businessDescription,
-      } = req.body;
+      } = validation.data;
 
-      // Save all KYC details to merchant record
+      const merchant = await storage.getMerchant(merchantId);
+      if (!merchant) {
+        return res.status(404).json({ message: "Merchant not found" });
+      }
+
+      // Save all KYC details to merchant record. The website, turnover and description were
+      // emailed but never kept until 2026-09-27 (C10 batch 6).
       await storage.updateMerchant(merchantId, {
-        director: director || null,
+        director,
         nzbn: nzbn || null,
         gstNumber: gstNumber || null,
+        websiteUrl: websiteUrl || null,
+        estimatedAnnualTurnover: estimatedAnnualTurnover || null,
+        businessDescription: businessDescription || null,
         onboardingCompleted: true,
       });
 
@@ -3702,14 +3713,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  // Merchant processing rates were only ever used to compute a "savings vs your
-  // current provider" comparison. TaptPay charges no percentage, so the rate is
-  // meaningless and this endpoint is retired.
-  app.put("/api/merchants/:id/rates", authenticateToken, async (_req: AuthenticatedRequest, res) => {
-    res.status(410).json({
-      message: "Processing rates are no longer used. TaptPay pricing is a monthly subscription.",
-    });
-  });
+  // (Removed PUT /api/merchants/:id/rates, owner decision 2026-09-27: it answered 410 since
+  // processing rates stopped mattering (TaptPay is a monthly subscription), and no screen called it.)
 
   // Update merchant business details
   app.put("/api/merchants/:id/details", authenticateToken, async (req: AuthenticatedRequest, res) => {
@@ -3747,6 +3752,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // be refused rather than ignored.
       if (!checkMerchantOwnership(req, merchantId)) {
         return res.status(403).json({ message: "Access denied" });
+      }
+      // The platform admin has no login here to change (C10 batch 6): refused as sign-out
+      // everywhere refuses it, not left to fail later for want of a login id.
+      if (req.user?.role === "admin") {
+        return res.status(403).json({ message: "Only a TaptPay login can do this." });
       }
       const validation = changePasswordSchema.safeParse(req.body);
       
@@ -3820,9 +3830,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  app.put("/api/merchants/:id/bank-account", authenticateToken, async (req: AuthenticatedRequest, res) => {
-    res.status(410).json({ message: "Merchant bank account details are no longer collected" });
-  });
+  // (Removed PUT /api/merchants/:id/bank-account, owner decision 2026-09-27: it answered 410 since
+  // bank details stopped being collected, and no screen called it.)
 
   app.put("/api/merchants/:id/theme", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
@@ -4154,6 +4163,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       if (!name || typeof name !== 'string' || name.trim().length === 0) {
         return res.status(400).json({ message: "Valid stone name is required" });
+      }
+      // The rule creating a board uses (C10 batch 6).
+      if (name.trim().length > 60) {
+        return res.status(400).json({ message: "Board name must be 60 characters or fewer" });
       }
 
       // Verify the stone belongs to this merchant (cross-tenant guard)
@@ -5853,8 +5866,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const merchantId = strictPositiveIntegerParam(req.params.merchantId);
       if (merchantId === null) return res.status(400).json({ message: "Invalid id" });
       
-      // Verify merchant ownership or admin access
-      if (req.user?.role !== 'admin' && req.user?.merchantId !== merchantId) {
+      // The business's logins, and the platform admin (C10 batch 6: the shared check, not a copy).
+      if (!checkMerchantOwnership(req, merchantId)) {
         return res.status(403).json({ message: "Access denied" });
       }
       
@@ -5872,8 +5885,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const merchantId = strictPositiveIntegerParam(req.params.merchantId);
       if (merchantId === null) return res.status(400).json({ message: "Invalid id" });
       
-      // Verify merchant ownership or admin access
-      if (req.user?.role !== 'admin' && req.user?.merchantId !== merchantId) {
+      // The business's logins, and the platform admin (C10 batch 6: the shared check, not a copy).
+      if (!checkMerchantOwnership(req, merchantId)) {
         return res.status(403).json({ message: "Access denied" });
       }
       
@@ -5902,8 +5915,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const itemId = strictPositiveIntegerParam(req.params.itemId);
       if (itemId === null) return res.status(400).json({ message: "Invalid id" });
       
-      // Verify merchant ownership or admin access
-      if (req.user?.role !== 'admin' && req.user?.merchantId !== merchantId) {
+      // The business's logins, and the platform admin (C10 batch 6: the shared check, not a copy).
+      if (!checkMerchantOwnership(req, merchantId)) {
         return res.status(403).json({ message: "Access denied" });
       }
 
@@ -5939,8 +5952,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const itemId = strictPositiveIntegerParam(req.params.itemId);
       if (itemId === null) return res.status(400).json({ message: "Invalid id" });
       
-      // Verify merchant ownership or admin access
-      if (req.user?.role !== 'admin' && req.user?.merchantId !== merchantId) {
+      // The business's logins, and the platform admin (C10 batch 6: the shared check, not a copy).
+      if (!checkMerchantOwnership(req, merchantId)) {
         return res.status(403).json({ message: "Access denied" });
       }
 
@@ -8034,19 +8047,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
   // ── Merchant sector + timezone ────────────────────────────────────────────
 
-  app.put("/api/merchants/:merchantId/sector", authenticateToken, async (req: AuthenticatedRequest, res) => {
-    try {
-      const merchantId = strictPositiveIntegerParam(req.params.merchantId);
-      if (merchantId === null) return res.status(400).json({ message: "Invalid id" });
-      if (!checkMerchantOwnership(req, merchantId)) return res.status(403).json({ message: "Access denied" });
-      const { sector } = z.object({ sector: z.enum(["retail", "propertyManagement"]) }).parse(req.body);
-      const merchant = await storage.updateMerchant(merchantId, { sector } as any);
-      res.json({ sector: (merchant as any)?.sector });
-    } catch (err) {
-      if (err instanceof z.ZodError) return res.status(400).json({ message: "Validation error", errors: err.errors });
-      console.error("[PROP_SECTOR]", err); res.status(500).json({ message: "Failed to update sector" });
-    }
-  });
+  // (Removed PUT /api/merchants/:merchantId/sector, owner decision 2026-09-27: no screen called it,
+  // and any login of the business, a teammate included, could switch it between retail and property.)
 
   // ── Overdue reminder settings (per merchant) ──────────────────────────────
 

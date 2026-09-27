@@ -430,6 +430,9 @@ export const createRefundSchema = z.object({
 // Every new password meets the owner's rule (shared/password-rule.ts, 2026-09-23).
 export const newPasswordSchema = z.string().refine(meetsPasswordRule, PASSWORD_RULE);
 
+/** The turnover ranges sign-up and onboarding offer. */
+export const ANNUAL_TURNOVER_RANGES = ["Under $50k", "$50k–$150k", "$150k–$500k", "$500k–$1m", "Over $1m"] as const;
+
 export const publicSignupSchema = z.object({
   name: z.string().min(1, "Full name is required").max(100),
   email: z.string().email("Valid email is required"),
@@ -442,7 +445,7 @@ export const publicSignupSchema = z.object({
   director: z.string().min(1, "Director / owner name is required").max(100),
   businessDescription: z.string().min(1, "Business description is required").max(500),
   websiteUrl: z.union([z.string().url("Enter a valid website URL"), z.literal("")]).default(""),
-  estimatedAnnualTurnover: z.enum(["Under $50k", "$50k–$150k", "$150k–$500k", "$500k–$1m", "Over $1m"]),
+  estimatedAnnualTurnover: z.enum(ANNUAL_TURNOVER_RANGES),
   planId: planIdSchema.default("solo"),
   password: newPasswordSchema,
   confirmPassword: z.string(),
@@ -450,6 +453,19 @@ export const publicSignupSchema = z.object({
   message: "Passwords don't match",
   path: ["confirmPassword"],
 });
+
+/**
+ * The onboarding page's details (client/src/pages/merchant-onboarding.tsx), held to sign-up's
+ * rules; an empty optional detail means none (C10 batch 6, 2026-09-27).
+ */
+export const merchantOnboardingSchema = z.object({
+  director: z.string().trim().min(1, "Director / owner name is required").max(100),
+  nzbn: z.string().trim().max(20).default(""),
+  gstNumber: z.string().trim().max(20).default(""),
+  businessDescription: z.string().trim().max(500).default(""),
+  websiteUrl: z.union([z.string().url("Enter a valid website URL"), z.literal("")]).default(""),
+  estimatedAnnualTurnover: z.union([z.enum(ANNUAL_TURNOVER_RANGES), z.literal("")]).default(""),
+}).strict();
 
 export const inviteTeamMemberSchema = z.object({
   email: z.string().email("Valid email is required").max(200),

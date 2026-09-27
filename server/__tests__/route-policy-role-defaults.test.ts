@@ -386,24 +386,8 @@ describe("R1-T3 UPL-6 — cross-tenant regression coverage for the remaining set
     expect(legit.status).toBe(200);
   });
 
-  it("PUT /api/merchants/:merchantId/sector refuses a cross-tenant caller and changes nothing", async () => {
-    const { app } = await createTestApp();
-    const ownerA = await createOwnerPrincipal();
-    const ownerB = await createOwnerPrincipal();
-
-    const attack = await request(app)
-      .put(`/api/merchants/${ownerB.merchantId}/sector`)
-      .set(bearer(ownerA))
-      .send({ sector: "propertyManagement" });
-    expect(attack.status).toBe(403);
-
-    const legit = await request(app)
-      .put(`/api/merchants/${ownerB.merchantId}/sector`)
-      .set(bearer(ownerB))
-      .send({ sector: "propertyManagement" });
-    expect(legit.status).toBe(200);
-    expect(legit.body.sector).toBe("propertyManagement");
-  });
+  // PUT /api/merchants/:merchantId/sector was removed on 2026-09-27 (owner decision, C10 batch 6a):
+  // c10-batch-6-business.test.ts holds it to "registered nowhere".
 });
 
 /**

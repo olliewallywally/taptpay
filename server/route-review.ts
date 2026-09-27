@@ -2441,7 +2441,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
  * Routes not reviewed yet. May only shrink: PENDING_CEILING is lowered by
  * every batch, so a route cannot be added here instead of being reviewed.
  */
-export const PENDING_CEILING = 90;
+export const PENDING_CEILING = 87;
 
 export const REVIEW_PENDING: readonly string[] = [
   "POST /api/merchants/:id/onboarding",
@@ -2457,10 +2457,8 @@ export const REVIEW_PENDING: readonly string[] = [
   "GET /api/merchants/:id/analytics/export",
   "GET /api/merchants/:id/export/csv",
   "GET /api/merchants/:id/export/pdf",
-  "PUT /api/merchants/:id/rates",
   "PUT /api/merchants/:id/details",
   "PUT /api/merchants/:id/change-password",
-  "PUT /api/merchants/:id/bank-account",
   "PUT /api/merchants/:id/theme",
   "PUT /api/merchants/:id/daily-goal",
   "PUT /api/merchants/:id",
@@ -2503,7 +2501,6 @@ export const REVIEW_PENDING: readonly string[] = [
   "GET /api/property/invoices/:id",
   "POST /api/property/invoices/:id/void",
   "POST /api/property/invoices/:id/mark-paid-external",
-  "PUT /api/merchants/:merchantId/sector",
   "GET /api/property/reminder-settings",
   "PUT /api/property/reminder-settings",
   "GET /api/trades/reminder-settings",

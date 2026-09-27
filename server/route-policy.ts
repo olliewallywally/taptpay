@@ -1,8 +1,8 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 2c97a9a2057cc71238b5dd3e0791f55d0d092c9b on 2026-09-26.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 432f91a901d7fa564501356e137c7eaa111211a2 on 2026-09-27.
  *
- * 203 registrations (85 GET, 82 POST, 3 PATCH, 5 ALL, 20 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
+ * 200 registrations (85 GET, 82 POST, 3 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
  * live count on every run rather than trusting this comment.
  *
@@ -322,11 +322,12 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       middleware: ["authenticateToken"],
       params: ["id: strictPositiveIntegerParam"],
-      body: ["fields: businessDescription, director, estimatedAnnualTurnover, gstNumber, nzbn, websiteUrl"],
+      body: ["schema: merchantOnboardingSchema"],
       authChecks: ["checkAccountOwnership","checkMerchantOwnership","isAccountOwner"],
       storageMethods: ["getMerchant","updateMerchant"],
       sideEffects: ["email: sendEmail"],
       statuses: [200,400,401,403,404,500,503],
+      errorTextInResponse: ["validation.error.issues"],
       helpers: ["escHtml"],
     },
   },
@@ -981,16 +982,6 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       helpers: ["authenticateAdmin"],
     },
   },
-  "PUT /api/merchants/:id/rates": {
-    method: "PUT",
-    path: "/api/merchants/:id/rates",
-    principal: "merchant-user",
-    markers: ["authenticateToken"],
-    facts: {
-      middleware: ["authenticateToken"],
-      statuses: [401,403,410,503],
-    },
-  },
   "PUT /api/merchants/:id/details": {
     method: "PUT",
     path: "/api/merchants/:id/details",
@@ -1011,28 +1002,18 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     method: "PUT",
     path: "/api/merchants/:id/change-password",
     principal: "merchant-user",
-    markers: ["authenticateToken","checkMerchantOwnership"],
+    markers: ["authenticateToken","checkMerchantOwnership","req.user?.role === \"admin\""],
     facts: {
       middleware: ["authenticateToken"],
       params: ["id: strictPositiveIntegerParam"],
       body: ["schema: changePasswordSchema"],
-      authChecks: ["checkMerchantOwnership"],
+      authChecks: ["checkMerchantOwnership","compares req.user?.role === \"admin\""],
       storageMethods: ["deactivatePushSubscriptionsForLogin","getUserById","settleAuthThrottle","takeAuthThrottleSlot","updateUserPassword"],
       sideEffects: ["audit log: logSecurityEvent","live update: sseBroker.disconnectUser"],
       statuses: [200,400,401,403,404,429,500,503],
       errorTextInResponse: ["validation.error.errors","validation.error.issues"],
       rateLimits: ["refuseTooManyAttempts","tooManyAttempts"],
       helpers: ["refuseTooManyAttempts"],
-    },
-  },
-  "PUT /api/merchants/:id/bank-account": {
-    method: "PUT",
-    path: "/api/merchants/:id/bank-account",
-    principal: "merchant-user",
-    markers: ["authenticateToken"],
-    facts: {
-      middleware: ["authenticateToken"],
-      statuses: [401,403,410,503],
     },
   },
   "PUT /api/merchants/:id/theme": {
@@ -1591,11 +1572,11 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     method: "GET",
     path: "/api/merchants/:merchantId/stock-items",
     principal: "merchant-user",
-    markers: ["authenticateToken"],
+    markers: ["authenticateToken","checkMerchantOwnership"],
     facts: {
       middleware: ["authenticateToken"],
       params: ["merchantId: strictPositiveIntegerParam"],
-      authChecks: ["compares req.user?.merchantId !== merchantId","compares req.user?.role !== 'admin'"],
+      authChecks: ["checkMerchantOwnership"],
       storageMethods: ["getStockItemsByMerchant"],
       statuses: [200,400,401,403,500,503],
     },
@@ -1604,12 +1585,12 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     method: "POST",
     path: "/api/merchants/:merchantId/stock-items",
     principal: "merchant-user",
-    markers: ["authenticateToken"],
+    markers: ["authenticateToken","checkMerchantOwnership"],
     facts: {
       middleware: ["authenticateToken"],
       params: ["merchantId: strictPositiveIntegerParam"],
       body: ["schema: createStockItemSchema"],
-      authChecks: ["compares req.user?.merchantId !== merchantId","compares req.user?.role !== 'admin'"],
+      authChecks: ["checkMerchantOwnership"],
       storageMethods: ["createStockItem"],
       statuses: [201,400,401,403,500,503],
       errorTextInResponse: ["error.errors"],
@@ -1619,12 +1600,12 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     method: "PUT",
     path: "/api/merchants/:merchantId/stock-items/:itemId",
     principal: "merchant-user",
-    markers: ["authenticateToken"],
+    markers: ["authenticateToken","checkMerchantOwnership"],
     facts: {
       middleware: ["authenticateToken"],
       params: ["itemId: strictPositiveIntegerParam","merchantId: strictPositiveIntegerParam"],
       body: ["schema: updateStockItemSchema"],
-      authChecks: ["compares existingItem.merchantId !== merchantId","compares req.user?.merchantId !== merchantId","compares req.user?.role !== 'admin'"],
+      authChecks: ["checkMerchantOwnership","compares existingItem.merchantId !== merchantId"],
       storageMethods: ["getStockItem","updateStockItem"],
       statuses: [200,400,401,403,404,500,503],
       errorTextInResponse: ["error.errors"],
@@ -1634,11 +1615,11 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     method: "DELETE",
     path: "/api/merchants/:merchantId/stock-items/:itemId",
     principal: "api-key",
-    markers: ["authenticateToken","authenticateApiKey","requireEcommerceApi"],
+    markers: ["authenticateToken","authenticateApiKey","requireEcommerceApi","checkMerchantOwnership"],
     facts: {
       middleware: ["authenticateToken"],
       params: ["itemId: strictPositiveIntegerParam","merchantId: strictPositiveIntegerParam"],
-      authChecks: ["compares existingItem.merchantId !== merchantId","compares req.user?.merchantId !== merchantId","compares req.user?.role !== 'admin'"],
+      authChecks: ["checkMerchantOwnership","compares existingItem.merchantId !== merchantId"],
       storageMethods: ["deleteStockItem","getStockItem"],
       statuses: [200,400,401,403,404,500,503],
     },
@@ -2420,20 +2401,6 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       storageMethods: ["createJobEvent","getInvoiceRentRequestByWhatsappMessageId","getJobInvoiceByWhatsappMessageId","logTransactionEvent","updateInvoiceRentRequest","updateJobInvoice"],
       statuses: [200],
       helpers: ["presentedSecretMatches"],
-    },
-  },
-  "PUT /api/merchants/:merchantId/sector": {
-    method: "PUT",
-    path: "/api/merchants/:merchantId/sector",
-    principal: "merchant-user",
-    markers: ["authenticateToken","checkMerchantOwnership"],
-    facts: {
-      middleware: ["authenticateToken"],
-      params: ["merchantId: strictPositiveIntegerParam"],
-      body: ["schema: z.object({ sector: z.enum([\"retail\", \"propertyManagement\"]) })"],
-      authChecks: ["checkMerchantOwnership"],
-      storageMethods: ["updateMerchant"],
-      statuses: [200,400,401,403,500,503],
     },
   },
   "GET /api/property/reminder-settings": {
