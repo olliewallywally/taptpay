@@ -1221,8 +1221,10 @@ export const createAdHocInvoiceSchema = z.object({
   documentName: z.string().trim().max(255).optional().or(z.literal("")).transform(v => v || undefined),
 });
 
+// Every "mark received" screen sends null when no reference is typed: none (C10 batch 6d; it was
+// refused, 400).
 export const markInvoicePaidExternalSchema = z.object({
-  externalPaymentReference: z.string().trim().max(200).optional().or(z.literal("")).transform(v => v || undefined),
+  externalPaymentReference: z.string().trim().max(200).nullish().transform(v => v || undefined),
 });
 
 // Property management types
@@ -1433,7 +1435,9 @@ export const createJobInvoiceSchema = z.object({
   deliveryChannel: z.enum(["email", "whatsapp", "sms"]),
   dueAt: z.string().datetime().or(z.date()).transform(v => new Date(v as any)),
   scheduledSendAt: z.string().datetime().or(z.date()).optional().transform(v => v ? new Date(v as any) : undefined),
-  kind: z.enum(["deposit", "balance", "full", "recurring"]).default("full"),
+  // Only what the screens send (C10 batch 6d): a balance is made by send-balance, which checks the
+  // deposit is paid and bills what is left once; a recurring invoice by the cron.
+  kind: z.enum(["deposit", "full"]).default("full"),
   quoteId: z.string().uuid().optional(),
   jobDetails: z.string().trim().max(500).optional().or(z.literal("")).transform(v => v || undefined),
   splitEnabled: z.boolean().optional(),
@@ -1457,9 +1461,15 @@ export const createJobInvoiceSchema = z.object({
   path: ["recipient"],
 });
 
+// As markInvoicePaidExternalSchema: the screens send null for no reference.
 export const markJobPaidExternalSchema = z.object({
-  externalPaymentReference: z.string().trim().max(200).optional().or(z.literal("")).transform(v => v || undefined),
+  externalPaymentReference: z.string().trim().max(200).nullish().transform(v => v || undefined),
 });
+
+// Sending a deposit's balance takes only the split switch (C10 batch 6d: it was read from the raw body).
+export const sendJobBalanceSchema = z.object({
+  splitEnabled: z.boolean().optional(),
+}).strict();
 
 export const createJobScheduleSchema = z.object({
   clientProfileId: z.string().uuid(),
@@ -1470,11 +1480,12 @@ export const createJobScheduleSchema = z.object({
   endDate: z.string().datetime().or(z.date()).optional().transform(v => v ? new Date(v as any) : undefined),
 });
 
+// Cancelling is DELETE, which records when (C10 batch 6d, as for rent).
 export const updateJobScheduleSchema = z.object({
   amountCents: z.number().int().positive().max(100_000_000).optional(),
   frequency: z.enum(["weekly", "fortnightly", "monthly"]).optional(),
   deliveryChannel: z.enum(["email", "whatsapp", "sms"]).optional(),
-  status: z.enum(["active", "paused", "terminated"]).optional(),
+  status: z.enum(["active", "paused"]).optional(),
 });
 
 // Trades types

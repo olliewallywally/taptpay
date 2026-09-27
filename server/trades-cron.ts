@@ -21,6 +21,18 @@ function nextRun(from: Date, frequency: string, anchorDom?: number): Date {
   return date;
 }
 
+/**
+ * The first date on a recurring invoice's cycle after `now`, counting on from `from` and keeping a
+ * monthly one on its start date's day of the month. Resuming a paused one starts there (owner
+ * decision 2026-09-27): nothing is sent for the paused time.
+ */
+export function nextJobRunDateAfter(from: Date, frequency: string, startDate: Date, now: Date): Date {
+  const anchorDom = new Date(startDate).getUTCDate();
+  let next = new Date(from);
+  while (next <= now) next = nextRun(next, frequency, anchorDom);
+  return next;
+}
+
 export async function runTradesGeneratePass(now: Date = new Date()): Promise<{ generated: number; skipped: number; errors: number }> {
   const result = { generated: 0, skipped: 0, errors: 0 };
   const schedules = await storage.getDueJobSchedules(now);

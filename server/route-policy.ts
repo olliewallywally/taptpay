@@ -1,8 +1,8 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ cd6b67090a51a3af059f79a185106df1fafa0ede on 2026-09-27.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 414249052cb0ab44bb0614d950ea2360b33a7b49 on 2026-09-27.
  *
- * 187 registrations (78 GET, 77 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
+ * 184 registrations (77 GET, 75 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
  * live count on every run rather than trusting this comment.
  *
@@ -1368,6 +1368,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     markers: ["authenticateToken"],
     facts: {
       middleware: ["authenticateToken"],
+      body: ["fields: deviceToken"],
       storageMethods: ["deactivateNativePushSubscriptionsForLogin","deactivatePushSubscriptionByEndpoint","getPushSubscriptionsByMerchant"],
       statuses: [200,400,401,403,500,503],
     },
@@ -2232,6 +2233,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     markers: ["req.headers[\"apikey\"]"],
     facts: {
       middleware: ["express.json(…)"],
+      body: ["fields: data, event"],
       authChecks: ["constant-time comparison: crypto.timingSafeEqual"],
       storageMethods: ["createJobEvent","getInvoiceRentRequestByWhatsappMessageId","getJobInvoiceByWhatsappMessageId","logTransactionEvent","updateInvoiceRentRequest","updateJobInvoice"],
       statuses: [200],
@@ -2303,10 +2305,11 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     method: "PUT",
     path: "/api/trades/gst-settings",
     principal: "merchant-user",
-    markers: ["authenticateToken"],
+    markers: ["authenticateToken","isAccountOwner"],
     facts: {
       middleware: ["authenticateToken"],
       body: ["schema: updateTradeGstSettingsSchema"],
+      authChecks: ["isAccountOwner"],
       storageMethods: ["updateMerchant"],
       statuses: [200,400,401,403,500,503],
       errorTextInResponse: ["err.errors"],
@@ -2343,10 +2346,10 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     markers: ["authenticateToken"],
     facts: {
       middleware: ["authenticateToken"],
-      params: ["id: raw"],
+      params: ["id: strictUuidParam"],
       authChecks: ["compares row.merchantId !== merchantId"],
       storageMethods: ["getClientProfile"],
-      statuses: [200,401,403,404,500,503],
+      statuses: [200,400,401,403,404,500,503],
     },
   },
   "PUT /api/trades/clients/:id": {
@@ -2356,7 +2359,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     markers: ["authenticateToken"],
     facts: {
       middleware: ["authenticateToken"],
-      params: ["id: raw"],
+      params: ["id: strictUuidParam"],
       body: ["schema: updateClientProfileSchema"],
       authChecks: ["compares existing.merchantId !== merchantId"],
       storageMethods: ["getClientProfile","updateClientProfile"],
@@ -2371,10 +2374,10 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     markers: ["authenticateToken"],
     facts: {
       middleware: ["authenticateToken"],
-      params: ["id: raw"],
+      params: ["id: strictUuidParam"],
       authChecks: ["compares existing.merchantId !== merchantId"],
-      storageMethods: ["archiveClientProfile","getClientProfile"],
-      statuses: [200,401,403,404,500,503],
+      storageMethods: ["archiveClientProfile","createJobEvent","getClientProfile","getJobSchedulesByMerchant","terminateJobSchedule"],
+      statuses: [200,400,401,403,404,500,503],
     },
   },
   "POST /api/trades/clients/:id/unarchive": {
@@ -2384,10 +2387,10 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     markers: ["authenticateToken"],
     facts: {
       middleware: ["authenticateToken"],
-      params: ["id: raw"],
+      params: ["id: strictUuidParam"],
       authChecks: ["compares existing.merchantId !== merchantId"],
       storageMethods: ["getClientProfile","unarchiveClientProfile"],
-      statuses: [200,401,403,404,500,503],
+      statuses: [200,400,401,403,404,500,503],
     },
   },
   "POST /api/trades/clients/:id/promote": {
@@ -2397,7 +2400,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     markers: ["authenticateToken"],
     facts: {
       middleware: ["authenticateToken"],
-      params: ["id: raw"],
+      params: ["id: strictUuidParam"],
       authChecks: ["compares existing.merchantId !== merchantId"],
       storageMethods: ["getClientProfile","updateClientProfile"],
       statuses: [200,400,401,403,404,500,503],
@@ -2410,10 +2413,10 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     markers: ["authenticateToken"],
     facts: {
       middleware: ["authenticateToken"],
-      params: ["id: raw"],
+      params: ["id: strictUuidParam"],
       authChecks: ["compares existing.merchantId !== merchantId"],
       storageMethods: ["getClientProfile","getJobEventsByClient"],
-      statuses: [200,401,403,404,500,503],
+      statuses: [200,400,401,403,404,500,503],
     },
   },
   "GET /api/trades/quotes": {
@@ -2445,19 +2448,6 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       helpers: ["generateInvoiceToken","requireBillingCard","requireOwnedInvoiceDocument"],
     },
   },
-  "GET /api/trades/quotes/:id": {
-    method: "GET",
-    path: "/api/trades/quotes/:id",
-    principal: "merchant-user",
-    markers: ["authenticateToken"],
-    facts: {
-      middleware: ["authenticateToken"],
-      params: ["id: raw"],
-      authChecks: ["compares row.merchantId !== merchantId"],
-      storageMethods: ["getQuote"],
-      statuses: [200,401,403,404,500,503],
-    },
-  },
   "GET /api/trades/quotes/:id/pdf": {
     method: "GET",
     path: "/api/trades/quotes/:id/pdf",
@@ -2465,10 +2455,10 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     markers: ["authenticateToken"],
     facts: {
       middleware: ["authenticateToken"],
-      params: ["id: raw"],
+      params: ["id: strictUuidParam"],
       authChecks: ["compares quote.merchantId !== merchantId"],
       storageMethods: ["getClientProfile","getMerchant","getQuote"],
-      statuses: [200,401,403,404,500,503],
+      statuses: [200,400,401,403,404,500,503],
       helpers: ["streamQuotePdf"],
     },
   },
@@ -2483,22 +2473,6 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       storageMethods: ["getClientProfile","getMerchant","getQuoteByToken"],
       statuses: [200,404,500],
       helpers: ["streamQuotePdf"],
-    },
-  },
-  "POST /api/trades/quotes/:id/resend": {
-    method: "POST",
-    path: "/api/trades/quotes/:id/resend",
-    principal: "merchant-user",
-    markers: ["authenticateToken"],
-    facts: {
-      middleware: ["authenticateToken"],
-      params: ["id: raw"],
-      authChecks: ["compares quote.merchantId !== merchantId"],
-      storageMethods: ["getOrCreateSubscription","getQuote"],
-      sideEffects: ["email/SMS: sendTradeQuote"],
-      statuses: [200,401,402,403,404,409,500,502,503],
-      entitlementGates: ["BILLING_CARD_REQUIRED","billingCardIsReady","requireBillingCard"],
-      helpers: ["requireBillingCard"],
     },
   },
   "GET /api/trades/quotes/token/:token": {
@@ -2537,9 +2511,9 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     markers: ["authenticateToken"],
     facts: {
       middleware: ["authenticateToken"],
-      query: ["clientProfileId: raw","status: raw"],
+      query: ["clientProfileId: strictUuidParam","status: raw"],
       storageMethods: ["getJobInvoicesByMerchant"],
-      statuses: [200,401,403,500,503],
+      statuses: [200,400,401,403,500,503],
     },
   },
   "POST /api/trades/invoices": {
@@ -2559,22 +2533,6 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       helpers: ["generateInvoiceToken","requireBillingCard","requireOwnedInvoiceDocument"],
     },
   },
-  "POST /api/trades/invoices/:id/resend": {
-    method: "POST",
-    path: "/api/trades/invoices/:id/resend",
-    principal: "merchant-user",
-    markers: ["authenticateToken"],
-    facts: {
-      middleware: ["authenticateToken"],
-      params: ["id: raw"],
-      authChecks: ["compares invoice.merchantId !== merchantId"],
-      storageMethods: ["getJobInvoice","getOrCreateSubscription"],
-      sideEffects: ["email/SMS: resendTradeInvoice"],
-      statuses: [200,401,402,403,404,500,502,503],
-      entitlementGates: ["BILLING_CARD_REQUIRED","billingCardIsReady","requireBillingCard"],
-      helpers: ["requireBillingCard"],
-    },
-  },
   "POST /api/trades/invoices/:id/send-balance": {
     method: "POST",
     path: "/api/trades/invoices/:id/send-balance",
@@ -2582,11 +2540,13 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     markers: ["authenticateToken"],
     facts: {
       middleware: ["authenticateToken"],
-      params: ["id: raw"],
+      params: ["id: strictUuidParam"],
+      body: ["schema: sendJobBalanceSchema"],
       authChecks: ["compares dep.merchantId !== merchantId"],
       storageMethods: ["createJobEvent","createJobInvoice","getJobInvoice","getJobInvoicesByMerchant","getOrCreateSubscription","getQuote"],
       sideEffects: ["email/SMS: resendTradeInvoice"],
       statuses: [201,400,401,402,403,404,409,500,503],
+      errorTextInResponse: ["body.error.errors"],
       entitlementGates: ["BILLING_CARD_REQUIRED","billingCardIsReady","requireBillingCard"],
       helpers: ["generateInvoiceToken","requireBillingCard"],
     },
@@ -2598,12 +2558,12 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     markers: ["authenticateToken"],
     facts: {
       middleware: ["authenticateToken"],
-      params: ["id: raw"],
+      params: ["id: strictUuidParam"],
       body: ["schema: markJobPaidExternalSchema"],
       authChecks: ["compares inv.merchantId !== merchantId"],
       storageMethods: ["createJobEvent","getJobInvoice","updateJobInvoice"],
       sideEffects: ["email/SMS: sendTradePaymentInvoice"],
-      statuses: [200,400,401,403,404,500,503],
+      statuses: [200,400,401,403,404,409,500,503],
       errorTextInResponse: ["parsed.error.errors"],
     },
   },
@@ -2614,10 +2574,10 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     markers: ["authenticateToken"],
     facts: {
       middleware: ["authenticateToken"],
-      params: ["id: raw"],
+      params: ["id: strictUuidParam"],
       authChecks: ["compares inv.merchantId !== merchantId"],
       storageMethods: ["createJobEvent","getJobInvoice","updateJobInvoice"],
-      statuses: [200,401,403,404,409,500,503],
+      statuses: [200,400,401,403,404,409,500,503],
     },
   },
   "POST /api/trades/invoices/:id/void": {
@@ -2627,10 +2587,10 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     markers: ["authenticateToken"],
     facts: {
       middleware: ["authenticateToken"],
-      params: ["id: raw"],
+      params: ["id: strictUuidParam"],
       authChecks: ["compares inv.merchantId !== merchantId"],
       storageMethods: ["getJobInvoice","updateJobInvoice"],
-      statuses: [200,401,403,404,500,503],
+      statuses: [200,400,401,403,404,409,500,503],
     },
   },
   "GET /api/trades/schedules": {
@@ -2654,7 +2614,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       body: ["schema: createJobScheduleSchema"],
       authChecks: ["compares client.merchantId !== merchantId"],
       storageMethods: ["createJobEvent","createJobSchedule","getClientProfile","getOrCreateSubscription"],
-      statuses: [201,400,401,402,403,404,500,503],
+      statuses: [201,400,401,402,403,404,409,500,503],
       errorTextInResponse: ["parsed.error.errors"],
       entitlementGates: ["BILLING_CARD_REQUIRED","billingCardIsReady","requireBillingCard"],
       helpers: ["requireBillingCard"],
@@ -2667,11 +2627,11 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     markers: ["authenticateToken"],
     facts: {
       middleware: ["authenticateToken"],
-      params: ["id: raw"],
+      params: ["id: strictUuidParam"],
       body: ["schema: updateJobScheduleSchema"],
       authChecks: ["compares existing.merchantId !== merchantId"],
       storageMethods: ["createJobEvent","getJobSchedule","updateJobSchedule"],
-      statuses: [200,400,401,403,404,500,503],
+      statuses: [200,400,401,403,404,409,500,503],
       errorTextInResponse: ["parsed.error.errors"],
     },
   },
@@ -2682,10 +2642,10 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     markers: ["authenticateToken"],
     facts: {
       middleware: ["authenticateToken"],
-      params: ["id: raw"],
+      params: ["id: strictUuidParam"],
       authChecks: ["compares existing.merchantId !== merchantId"],
       storageMethods: ["createJobEvent","getJobSchedule","terminateJobSchedule"],
-      statuses: [200,401,403,404,500,503],
+      statuses: [200,400,401,403,404,500,503],
     },
   },
   "GET /api/internal/cron/status": {

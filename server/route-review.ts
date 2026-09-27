@@ -3257,7 +3257,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
  * Routes not reviewed yet. May only shrink: PENDING_CEILING is lowered by
  * every batch, so a route cannot be added here instead of being reviewed.
  */
-export const PENDING_CEILING = 28;
+export const PENDING_CEILING = 25;
 
 export const REVIEW_PENDING: readonly string[] = [
   "GET /api/trades/reminder-settings",
@@ -3274,12 +3274,9 @@ export const REVIEW_PENDING: readonly string[] = [
   "GET /api/trades/clients/:id/events",
   "GET /api/trades/quotes",
   "POST /api/trades/quotes",
-  "GET /api/trades/quotes/:id",
   "GET /api/trades/quotes/:id/pdf",
-  "POST /api/trades/quotes/:id/resend",
   "GET /api/trades/invoices",
   "POST /api/trades/invoices",
-  "POST /api/trades/invoices/:id/resend",
   "POST /api/trades/invoices/:id/send-balance",
   "POST /api/trades/invoices/:id/mark-paid-external",
   "POST /api/trades/invoices/:id/complete",

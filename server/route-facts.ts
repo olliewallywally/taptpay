@@ -315,6 +315,26 @@ class FactCollector {
     return part === "params" || part === "query" || part === "body" ? part : undefined;
   }
 
+  /**
+   * The expression inside parentheses, `as`, `!` and a default for a missing value: `req.body ?? {}`
+   * and `(req.body || {}) as T` read the body (C10 batch 6d: such reads were invisible).
+   */
+  private unwrapDefault(node: ts.Expression): ts.Expression {
+    let current = node;
+    for (;;) {
+      if (ts.isParenthesizedExpression(current) || ts.isAsExpression(current) || ts.isNonNullExpression(current)) {
+        current = current.expression;
+      } else if (
+        ts.isBinaryExpression(current) &&
+        (current.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken || current.operatorToken.kind === ts.SyntaxKind.BarBarToken)
+      ) {
+        current = current.left;
+      } else {
+        return current;
+      }
+    }
+  }
+
   private isNullishOrLiteral(node: ts.Expression): boolean {
     return (
       node.kind === ts.SyntaxKind.NullKeyword ||
@@ -350,9 +370,7 @@ class FactCollector {
     }
     // `const { a, b } = req.params | req.query | req.body`
     if (ts.isVariableDeclaration(node) && ts.isObjectBindingPattern(node.name) && node.initializer) {
-      let initializer: ts.Expression = node.initializer;
-      while (ts.isParenthesizedExpression(initializer) || ts.isAsExpression(initializer)) initializer = initializer.expression;
-      const part = this.requestPart(initializer);
+      const part = this.requestPart(this.unwrapDefault(node.initializer));
       if (part) {
         for (const element of node.name.elements) {
           const key = element.propertyName ?? element.name;
@@ -446,13 +464,13 @@ class FactCollector {
       ts.isPropertyAccessExpression(node.expression) &&
       (node.expression.name.text === "safeParse" || node.expression.name.text === "parse") &&
       node.arguments[0] &&
-      this.requestPart(node.arguments[0]) === "body"
+      this.requestPart(this.unwrapDefault(node.arguments[0])) === "body"
     ) {
       this.body.add(`schema: ${this.text(node.expression.expression)}`);
     }
     // The whole body handed to another call.
     for (const argument of node.arguments) {
-      if (this.requestPart(argument) === "body" && !/\.(safeParse|parse)$/.test(callee)) {
+      if (this.requestPart(this.unwrapDefault(argument)) === "body" && !/\.(safeParse|parse)$/.test(callee)) {
         this.body.add(`whole body: ${callee}`);
       }
     }

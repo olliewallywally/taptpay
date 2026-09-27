@@ -448,6 +448,32 @@ describe("R1-T2 route facts, read from each handler's syntax tree (C10)", () => 
     expect(facts.get("POST /c")?.errorTextInResponse).toEqual([]);
   });
 
+  it("reads the body through a default for a missing one (req.body ?? {})", () => {
+    const source = `
+      export function wire(app: Express) {
+        app.post("/a", async (req, res) => {
+          const { deviceToken } = req.body ?? {};
+          res.json({ deviceToken });
+        });
+        app.post("/b", async (req, res) => {
+          const { splitEnabled } = (req.body ?? {}) as { splitEnabled?: boolean };
+          res.json({ splitEnabled });
+        });
+        app.post("/c", async (req, res) => {
+          res.json(schema.safeParse(req.body ?? {}));
+        });
+        app.post("/d", async (req, res) => {
+          const { note } = req.body || {};
+          res.json({ note });
+        });
+      }`;
+    const facts = extractRouteFacts(source, "server/wire.ts");
+    expect(facts.get("POST /a")?.body).toEqual(["fields: deviceToken"]);
+    expect(facts.get("POST /b")?.body).toEqual(["fields: splitEnabled"]);
+    expect(facts.get("POST /c")?.body).toEqual(["schema: schema"]);
+    expect(facts.get("POST /d")?.body).toEqual(["fields: note"]);
+  });
+
   it("reads a handler passed by name", () => {
     expect(factsFor("GET /api/billing/card/callback")).toMatchObject({
       middleware: [],
