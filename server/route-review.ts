@@ -2926,7 +2926,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
  * Routes not reviewed yet. May only shrink: PENDING_CEILING is lowered by
  * every batch, so a route cannot be added here instead of being reviewed.
  */
-export const PENDING_CEILING = 49;
+export const PENDING_CEILING = 47;
 
 export const REVIEW_PENDING: readonly string[] = [
   "GET /api/property/tenants",
@@ -2937,7 +2937,6 @@ export const REVIEW_PENDING: readonly string[] = [
   "POST /api/property/tenants/:id/unarchive",
   "GET /api/property/tenants/:id/events",
   "GET /api/property/schedules",
-  "GET /api/property/tenants/:tenantId/schedules",
   "POST /api/property/tenants/:tenantId/schedules",
   "PUT /api/property/schedules/:id",
   "DELETE /api/property/schedules/:id",
@@ -2945,7 +2944,6 @@ export const REVIEW_PENDING: readonly string[] = [
   "POST /api/property/invoices/document",
   "POST /api/property/invoices",
   "POST /api/property/invoices/:id/resend",
-  "GET /api/property/invoices/:id",
   "POST /api/property/invoices/:id/void",
   "POST /api/property/invoices/:id/mark-paid-external",
   "GET /api/property/reminder-settings",

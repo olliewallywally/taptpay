@@ -151,7 +151,7 @@ describe("R1-T3 UPL-2 — invoice document upload validates content against decl
     expect(res.status).toBe(200);
   });
 
-  it("still rejects a mimetype outside the allowed set entirely (pre-existing fileFilter behavior, unaffected)", async () => {
+  it("still rejects a mimetype outside the allowed set entirely (400 since C10 batch 6c)", async () => {
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
 
@@ -163,10 +163,9 @@ describe("R1-T3 UPL-2 — invoice document upload validates content against decl
         contentType: "text/html",
       });
 
-    // multer's own fileFilter still runs and still throws a plain Error with
-    // no .status — this pre-existing 500 shape is unrelated to UPL-2 and is
-    // not what this pass changes; asserting it merely confirms the allowed-
-    // types gate is unaffected by adding the magic-byte check on top of it.
-    expect(res.status).toBe(500);
+    // multer's own fileFilter still runs; its refusal answered 500 until C10 batch 6c
+    // (receiveUpload in server/routes.ts), and is now 400 with the filter's message.
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ message: "Only PDF or image files are allowed" });
   });
 });

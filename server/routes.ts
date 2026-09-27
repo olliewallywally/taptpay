@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import express from "express";
 import { config } from "./config";
-import { strictBoundedIntegerQueryParam, strictPositiveIntegerParam, strictPositiveIntegerQueryParam } from "./http-params";
+import { strictBoundedIntegerQueryParam, strictPositiveIntegerParam, strictPositiveIntegerQueryParam, strictUuidParam } from "./http-params";
 import { createServer, type Server } from "http";
 import { installAsyncRouteGuard } from "./async-route-guard";
 import {
@@ -40,7 +40,7 @@ import path from "path";
 import fs from "fs";
 import { sendPushToMerchant } from "./push";
 import { isPushServiceEndpoint } from "./push-endpoint";
-import { resendInvoiceEmail } from "./property-cron";
+import { nextRunDateAfter, resendInvoiceEmail } from "./property-cron";
 import { INVOICE_DOCUMENT_FOLDER, isInvoiceDocumentName, isPublicUploadFolder, parseInvoiceDocumentRef } from "./upload-policy";
 import { INVOICE_DOCUMENT_EXTENSIONS } from "./invoice-document-security";
 import { resendTradeInvoice, sendTradePaymentInvoice, sendTradeQuote } from "./trades-delivery";
@@ -309,6 +309,28 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+/** A file of a type an upload's filter refuses: answered 400 with this message (receiveUpload). */
+class UploadTypeError extends Error {}
+
+/**
+ * Runs one multer upload and answers its refusals (C10 batch 6c): a type the filter refuses is 400
+ * with the filter's message, a file over the size limit 413, any other malformed upload 400. They
+ * reached the error handler without a status, which answered 500.
+ */
+function receiveUpload(upload: multer.Multer, field: string): express.RequestHandler {
+  const receive = upload.single(field);
+  return (req, res, next) => receive(req, res, (error?: unknown) => {
+    if (!error) return next();
+    if (error instanceof UploadTypeError) return res.status(400).json({ message: error.message });
+    if (error instanceof multer.MulterError) {
+      return error.code === "LIMIT_FILE_SIZE"
+        ? res.status(413).json({ message: "The file is larger than 20 MB" })
+        : res.status(400).json({ message: "Invalid upload" });
+    }
+    next(error);
+  });
+}
+
 // Multer configuration for logo uploads.
 // Files are held in memory and persisted to the uploaded_files table — never to
 // the local filesystem, which is ephemeral on autoscale deployments (a deploy or
@@ -322,7 +344,7 @@ const logoUpload = multer({
     if (file.mimetype === 'image/png') {
       cb(null, true);
     } else {
-      cb(new Error('Only PNG files are allowed'));
+      cb(new UploadTypeError('Only PNG files are allowed'));
     }
   }
 });
@@ -339,7 +361,7 @@ const invoiceDocUpload = multer({
   limits: { fileSize: 20 * 1024 * 1024 }, // 20MB max
   fileFilter: (_req, file, cb) => {
     if (INVOICE_DOC_MIME.has(file.mimetype)) cb(null, true);
-    else cb(new Error('Only PDF or image files are allowed'));
+    else cb(new UploadTypeError('Only PDF or image files are allowed'));
   },
 });
 
@@ -3717,7 +3739,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // "the logo upload route must not accept or write a file before merchant
   // ownership is known." This small middleware does exactly the id-parse +
   // checkAccountOwnership check the handler used to do internally, but ahead
-  // of `logoUpload.single('logo')` in the chain, so an unauthorized caller's
+  // of the upload (`receiveUpload(logoUpload, 'logo')`) in the chain, so an unauthorized caller's
   // body is never handed to multer at all. The handler keeps its own
   // (now-redundant) re-check below as defense in depth; it never changes
   // this route's outcome for a legitimate caller.
@@ -3729,7 +3751,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
     next();
   };
-  app.post("/api/merchants/:id/logo", authenticateToken, requireLogoOwnership, logoUpload.single('logo'), async (req: AuthenticatedRequest, res) => {
+  app.post("/api/merchants/:id/logo", authenticateToken, requireLogoOwnership, receiveUpload(logoUpload, 'logo'), async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = strictPositiveIntegerParam(req.params.id);
       if (merchantId === null) return res.status(400).json({ message: "Invalid id" });
@@ -6988,13 +7010,17 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
+  // C10 batch 6c (2026-09-27): a property id is parsed as a UUID (a malformed one reached
+  // PostgreSQL's uuid cast: a 500), and another business's record is not found, like a missing one
+  // (it answered 403, which said the id exists), as the trades routes answer.
   app.get("/api/property/tenants/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
       if (!merchantId) return res.status(401).json({ message: "Authentication required" });
-      const tenant = await storage.getTenantProfile(req.params.id);
-      if (!tenant) return res.status(404).json({ message: "Tenant not found" });
-      if (!checkMerchantOwnership(req, tenant.merchantId)) return res.status(403).json({ message: "Access denied" });
+      const id = strictUuidParam(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
+      const tenant = await storage.getTenantProfile(id);
+      if (!tenant || tenant.merchantId !== merchantId) return res.status(404).json({ message: "Tenant not found" });
       res.json(tenant);
     } catch (err) { console.error("[PROP_TENANT_GET]", err); res.status(500).json({ message: "Failed to fetch tenant" }); }
   });
@@ -7003,11 +7029,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const merchantId = req.user?.merchantId;
       if (!merchantId) return res.status(401).json({ message: "Authentication required" });
-      const existing = await storage.getTenantProfile(req.params.id);
-      if (!existing) return res.status(404).json({ message: "Tenant not found" });
-      if (!checkMerchantOwnership(req, existing.merchantId)) return res.status(403).json({ message: "Access denied" });
+      const id = strictUuidParam(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
+      const existing = await storage.getTenantProfile(id);
+      if (!existing || existing.merchantId !== merchantId) return res.status(404).json({ message: "Tenant not found" });
       const data = updateTenantProfileSchema.parse(req.body);
-      const tenant = await storage.updateTenantProfile(req.params.id, data);
+      const tenant = await storage.updateTenantProfile(id, data);
       res.json(tenant);
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: "Validation error", errors: err.errors });
@@ -7019,11 +7046,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const merchantId = req.user?.merchantId;
       if (!merchantId) return res.status(401).json({ message: "Authentication required" });
-      const existing = await storage.getTenantProfile(req.params.id);
-      if (!existing) return res.status(404).json({ message: "Tenant not found" });
-      if (!checkMerchantOwnership(req, existing.merchantId)) return res.status(403).json({ message: "Access denied" });
-      const tenant = await storage.archiveTenantProfile(req.params.id);
-      await storage.logTransactionEvent({ merchantId, tenantProfileId: req.params.id, eventType: "Tenant_Archived", payload: {} });
+      const id = strictUuidParam(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
+      const existing = await storage.getTenantProfile(id);
+      if (!existing || existing.merchantId !== merchantId) return res.status(404).json({ message: "Tenant not found" });
+      const tenant = await storage.archiveTenantProfile(id);
+      await storage.logTransactionEvent({ merchantId, tenantProfileId: id, eventType: "Tenant_Archived", payload: {} });
       res.json(tenant);
     } catch (err) { console.error("[PROP_TENANT_ARCHIVE]", err); res.status(500).json({ message: "Failed to archive tenant" }); }
   });
@@ -7032,11 +7060,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const merchantId = req.user?.merchantId;
       if (!merchantId) return res.status(401).json({ message: "Authentication required" });
-      const existing = await storage.getTenantProfile(req.params.id);
-      if (!existing) return res.status(404).json({ message: "Tenant not found" });
-      if (!checkMerchantOwnership(req, existing.merchantId)) return res.status(403).json({ message: "Access denied" });
-      const tenant = await storage.unarchiveTenantProfile(req.params.id);
-      await storage.logTransactionEvent({ merchantId, tenantProfileId: req.params.id, eventType: "Tenant_Restored", payload: {} });
+      const id = strictUuidParam(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
+      const existing = await storage.getTenantProfile(id);
+      if (!existing || existing.merchantId !== merchantId) return res.status(404).json({ message: "Tenant not found" });
+      const tenant = await storage.unarchiveTenantProfile(id);
+      await storage.logTransactionEvent({ merchantId, tenantProfileId: id, eventType: "Tenant_Restored", payload: {} });
       res.json(tenant);
     } catch (err) { console.error("[PROP_TENANT_UNARCHIVE]", err); res.status(500).json({ message: "Failed to restore tenant" }); }
   });
@@ -7045,12 +7074,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const merchantId = req.user?.merchantId;
       if (!merchantId) return res.status(401).json({ message: "Authentication required" });
-      const tenant = await storage.getTenantProfile(req.params.id);
-      if (!tenant) return res.status(404).json({ message: "Tenant not found" });
-      if (!checkMerchantOwnership(req, tenant.merchantId)) return res.status(403).json({ message: "Access denied" });
+      const id = strictUuidParam(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
+      const tenant = await storage.getTenantProfile(id);
+      if (!tenant || tenant.merchantId !== merchantId) return res.status(404).json({ message: "Tenant not found" });
       const limit = strictBoundedIntegerQueryParam(req.query.limit, { fallback: 50, max: 200 });
       if (limit === null) return res.status(400).json({ message: "Invalid limit" });
-      const events = await storage.getTransactionEventsByTenant(req.params.id, limit);
+      const events = await storage.getTransactionEventsByTenant(id, limit);
       res.json(events);
     } catch (err) { console.error("[PROP_EVENTS]", err); res.status(500).json({ message: "Failed to fetch events" }); }
   });
@@ -7065,28 +7095,23 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     } catch (err) { console.error("[PROP_SCHEDULES_MERCHANT]", err); res.status(500).json({ message: "Failed to fetch schedules" }); }
   });
 
-  app.get("/api/property/tenants/:tenantId/schedules", authenticateToken, async (req: AuthenticatedRequest, res) => {
-    try {
-      const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
-      const tenant = await storage.getTenantProfile(req.params.tenantId);
-      if (!tenant) return res.status(404).json({ message: "Tenant not found" });
-      if (!checkMerchantOwnership(req, tenant.merchantId)) return res.status(403).json({ message: "Access denied" });
-      res.json(await storage.getActiveSchedulesByTenant(req.params.tenantId));
-    } catch (err) { console.error("[PROP_SCHEDULES_LIST]", err); res.status(500).json({ message: "Failed to fetch schedules" }); }
-  });
+  // (Removed GET /api/property/tenants/:tenantId/schedules, owner decision 2026-09-27: no screen
+  // called it; the screens read every automation of the business and pick out a tenant's.)
 
   app.post("/api/property/tenants/:tenantId/schedules", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
       if (!merchantId) return res.status(401).json({ message: "Authentication required" });
-      const tenant = await storage.getTenantProfile(req.params.tenantId);
-      if (!tenant) return res.status(404).json({ message: "Tenant not found" });
-      if (!checkMerchantOwnership(req, tenant.merchantId)) return res.status(403).json({ message: "Access denied" });
+      const tenantId = strictUuidParam(req.params.tenantId);
+      if (tenantId === null) return res.status(400).json({ message: "Invalid id" });
+      const tenant = await storage.getTenantProfile(tenantId);
+      if (!tenant || tenant.merchantId !== merchantId) return res.status(404).json({ message: "Tenant not found" });
+      // Archiving a tenant cancels its automations, and the screens offer only current tenants.
+      if (tenant.status === "archived") return res.status(409).json({ message: "This tenant is archived" });
       if (!(await requireBillingCard(merchantId, res))) return;
-      const data = createActiveScheduleSchema.parse({ ...req.body, tenantProfileId: req.params.tenantId });
+      const data = createActiveScheduleSchema.parse({ ...req.body, tenantProfileId: tenantId });
       const schedule = await storage.createActiveSchedule({ ...data, merchantId, nextRunDate: data.startDate });
-      await storage.logTransactionEvent({ merchantId, tenantProfileId: req.params.tenantId, scheduleId: schedule.id, eventType: "Schedule_Created", payload: { amountCents: schedule.amountCents, frequency: schedule.frequency } });
+      await storage.logTransactionEvent({ merchantId, tenantProfileId: tenantId, scheduleId: schedule.id, eventType: "Schedule_Created", payload: { amountCents: schedule.amountCents, frequency: schedule.frequency } });
       res.status(201).json(schedule);
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: "Validation error", errors: err.errors });
@@ -7098,13 +7123,22 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const merchantId = req.user?.merchantId;
       if (!merchantId) return res.status(401).json({ message: "Authentication required" });
-      const existing = await storage.getActiveSchedule(req.params.id);
-      if (!existing) return res.status(404).json({ message: "Schedule not found" });
-      if (!checkMerchantOwnership(req, existing.merchantId)) return res.status(403).json({ message: "Access denied" });
+      const id = strictUuidParam(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
+      const existing = await storage.getActiveSchedule(id);
+      if (!existing || existing.merchantId !== merchantId) return res.status(404).json({ message: "Schedule not found" });
+      // A cancelled automation stays cancelled: the screens hide cancelled ones, and resuming one
+      // would bill again, even a tenant archived since. DELETE is how one is cancelled.
+      if (existing.status === "terminated") return res.status(409).json({ message: "This automation was cancelled" });
       const data = updateActiveScheduleSchema.parse(req.body);
-      const schedule = await storage.updateActiveSchedule(req.params.id, data);
+      // Resuming skips the paused time (owner decision 2026-09-27): the next date moves to the
+      // first date on the automation's cycle after now, instead of billing every period it missed.
+      const resuming = existing.status === "paused" && data.status === "active";
+      const schedule = await storage.updateActiveSchedule(id, resuming
+        ? { ...data, nextRunDate: nextRunDateAfter(new Date(existing.nextRunDate), data.frequency ?? existing.frequency, new Date()) }
+        : data);
       if (data.status === "paused" || data.status === "active") {
-        await storage.logTransactionEvent({ merchantId, tenantProfileId: existing.tenantProfileId, scheduleId: req.params.id, eventType: data.status === "paused" ? "Schedule_Paused" : "Schedule_Resumed", payload: {} });
+        await storage.logTransactionEvent({ merchantId, tenantProfileId: existing.tenantProfileId, scheduleId: id, eventType: data.status === "paused" ? "Schedule_Paused" : "Schedule_Resumed", payload: {} });
       }
       res.json(schedule);
     } catch (err) {
@@ -7117,11 +7151,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const merchantId = req.user?.merchantId;
       if (!merchantId) return res.status(401).json({ message: "Authentication required" });
-      const existing = await storage.getActiveSchedule(req.params.id);
-      if (!existing) return res.status(404).json({ message: "Schedule not found" });
-      if (!checkMerchantOwnership(req, existing.merchantId)) return res.status(403).json({ message: "Access denied" });
-      const schedule = await storage.terminateActiveSchedule(req.params.id);
-      await storage.logTransactionEvent({ merchantId, tenantProfileId: existing.tenantProfileId, scheduleId: req.params.id, eventType: "Schedule_Terminated", payload: {} });
+      const id = strictUuidParam(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
+      const existing = await storage.getActiveSchedule(id);
+      if (!existing || existing.merchantId !== merchantId) return res.status(404).json({ message: "Schedule not found" });
+      const schedule = await storage.terminateActiveSchedule(id);
+      await storage.logTransactionEvent({ merchantId, tenantProfileId: existing.tenantProfileId, scheduleId: id, eventType: "Schedule_Terminated", payload: {} });
       res.json(schedule);
     } catch (err) { console.error("[PROP_SCHEDULE_DELETE]", err); res.status(500).json({ message: "Failed to terminate schedule" }); }
   });
@@ -7132,7 +7167,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const merchantId = req.user?.merchantId;
       if (!merchantId) return res.status(401).json({ message: "Authentication required" });
-      const tenantProfileId = typeof req.query.tenantProfileId === "string" ? req.query.tenantProfileId : undefined;
+      const tenantProfileId = req.query.tenantProfileId === undefined ? undefined : strictUuidParam(req.query.tenantProfileId);
+      if (tenantProfileId === null) return res.status(400).json({ message: "Invalid tenantProfileId" });
       const status = typeof req.query.status === "string" ? req.query.status : undefined;
       const invoices = await storage.getInvoiceRentRequestsByMerchant(merchantId, { status, tenantProfileId });
       // Enrich with tenant display name/address and computed split owing.
@@ -7158,7 +7194,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // stored URL + original filename; the bill-create call then attaches them to
   // the invoice. Kept separate from invoice creation so the create route stays
   // JSON (multipart is only needed when there's actually a file to send).
-  app.post("/api/property/invoices/document", authenticateToken, invoiceDocUpload.single('document'), async (req: AuthenticatedRequest, res) => {
+  app.post("/api/property/invoices/document", authenticateToken, receiveUpload(invoiceDocUpload, 'document'), async (req: AuthenticatedRequest, res) => {
     try {
       if (!req.user?.merchantId) {
         return res.status(401).json({ message: "Authentication required" });
@@ -7237,11 +7273,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const merchantId = req.user?.merchantId;
       if (!merchantId) return res.status(401).json({ message: "Authentication required" });
-      const tenant = await storage.getTenantProfile(req.body.tenantProfileId);
-      if (!tenant) return res.status(404).json({ message: "Tenant not found" });
-      if (!checkMerchantOwnership(req, tenant.merchantId)) return res.status(403).json({ message: "Access denied" });
-      if (!(await requireBillingCard(merchantId, res))) return;
+      // The body's rules first: the tenant was read from the raw body before them.
       const data = createAdHocInvoiceSchema.parse(req.body);
+      const tenant = await storage.getTenantProfile(data.tenantProfileId);
+      if (!tenant || tenant.merchantId !== merchantId) return res.status(404).json({ message: "Tenant not found" });
+      if (!(await requireBillingCard(merchantId, res))) return;
       // Gap 13: an attached document must be this merchant's own upload.
       if (!(await requireOwnedInvoiceDocument(merchantId, data.documentUrl, res))) return;
       const baseUrl = getBaseUrl(req);
@@ -7279,38 +7315,32 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const merchantId = req.user?.merchantId;
       if (!merchantId) return res.status(401).json({ message: "Authentication required" });
-      const invoice = await storage.getInvoiceRentRequest(req.params.id);
-      if (!invoice) return res.status(404).json({ message: "Invoice not found" });
-      if (!checkMerchantOwnership(req, invoice.merchantId)) return res.status(403).json({ message: "Access denied" });
+      const id = strictUuidParam(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
+      const invoice = await storage.getInvoiceRentRequest(id);
+      if (!invoice || invoice.merchantId !== merchantId) return res.status(404).json({ message: "Invoice not found" });
       if (!(await requireBillingCard(merchantId, res))) return;
       if (["paid", "paid_external", "voided"].includes(invoice.status)) return res.status(400).json({ message: "Invoice is not payable" });
-      const delivery = await resendInvoiceEmail(req.params.id, getBaseUrl(req));
+      const delivery = await resendInvoiceEmail(id, getBaseUrl(req));
       if (!delivery.ok) return res.status(502).json({ message: "Could not resend", reason: delivery.reason });
       res.json(delivery.invoice);
     } catch (err) { console.error("[PROP_INVOICE_RESEND]", err); res.status(500).json({ message: "Failed to resend invoice" }); }
   });
 
-  app.get("/api/property/invoices/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
-    try {
-      const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
-      const invoice = await storage.getInvoiceRentRequest(req.params.id);
-      if (!invoice) return res.status(404).json({ message: "Invoice not found" });
-      if (!checkMerchantOwnership(req, invoice.merchantId)) return res.status(403).json({ message: "Access denied" });
-      res.json(invoice);
-    } catch (err) { console.error("[PROP_INVOICE_GET]", err); res.status(500).json({ message: "Failed to fetch invoice" }); }
-  });
+  // (Removed GET /api/property/invoices/:id, owner decision 2026-09-27: no screen called it; the
+  // screens read the invoice list.)
 
   app.post("/api/property/invoices/:id/void", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
       if (!merchantId) return res.status(401).json({ message: "Authentication required" });
-      const invoice = await storage.getInvoiceRentRequest(req.params.id);
-      if (!invoice) return res.status(404).json({ message: "Invoice not found" });
-      if (!checkMerchantOwnership(req, invoice.merchantId)) return res.status(403).json({ message: "Access denied" });
+      const id = strictUuidParam(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
+      const invoice = await storage.getInvoiceRentRequest(id);
+      if (!invoice || invoice.merchantId !== merchantId) return res.status(404).json({ message: "Invoice not found" });
       if (["paid", "paid_external"].includes(invoice.status)) return res.status(400).json({ message: "Cannot void a paid invoice" });
-      const updated = await storage.updateInvoiceRentRequest(req.params.id, { status: "voided", voidedAt: new Date() });
-      await storage.logTransactionEvent({ merchantId, tenantProfileId: invoice.tenantProfileId, invoiceId: req.params.id, eventType: "Invoice_Voided", payload: {} });
+      const updated = await storage.updateInvoiceRentRequest(id, { status: "voided", voidedAt: new Date() });
+      await storage.logTransactionEvent({ merchantId, tenantProfileId: invoice.tenantProfileId, invoiceId: id, eventType: "Invoice_Voided", payload: {} });
       res.json(updated);
     } catch (err) { console.error("[PROP_INVOICE_VOID]", err); res.status(500).json({ message: "Failed to void invoice" }); }
   });
@@ -7319,13 +7349,16 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const merchantId = req.user?.merchantId;
       if (!merchantId) return res.status(401).json({ message: "Authentication required" });
-      const invoice = await storage.getInvoiceRentRequest(req.params.id);
-      if (!invoice) return res.status(404).json({ message: "Invoice not found" });
-      if (!checkMerchantOwnership(req, invoice.merchantId)) return res.status(403).json({ message: "Access denied" });
+      const id = strictUuidParam(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
+      const invoice = await storage.getInvoiceRentRequest(id);
+      if (!invoice || invoice.merchantId !== merchantId) return res.status(404).json({ message: "Invoice not found" });
+      // A voided invoice stays voided: the screens hide voided invoices.
+      if (invoice.status === "voided") return res.status(409).json({ message: "This invoice was voided" });
       if (invoice.status === "paid" || invoice.status === "paid_external") return res.status(400).json({ message: "Invoice is already paid" });
       const { externalPaymentReference } = markInvoicePaidExternalSchema.parse(req.body);
-      const updated = await storage.updateInvoiceRentRequest(req.params.id, { status: "paid_external", paidAt: new Date(), externalPaymentReference: externalPaymentReference ?? null });
-      await storage.logTransactionEvent({ merchantId, tenantProfileId: invoice.tenantProfileId, invoiceId: req.params.id, eventType: "Payment_External", payload: { externalPaymentReference } });
+      const updated = await storage.updateInvoiceRentRequest(id, { status: "paid_external", paidAt: new Date(), externalPaymentReference: externalPaymentReference ?? null });
+      await storage.logTransactionEvent({ merchantId, tenantProfileId: invoice.tenantProfileId, invoiceId: id, eventType: "Payment_External", payload: { externalPaymentReference } });
       res.json(updated);
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: "Validation error", errors: err.errors });

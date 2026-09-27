@@ -1181,12 +1181,12 @@ export const createActiveScheduleSchema = z.object({
 });
 
 // Pause/resume is driven by `status` (active ↔ paused); the legacy pauseNextCycle
-// flag is no longer accepted from clients.
+// flag is no longer accepted from clients. Cancelling is DELETE, which records when (C10 batch 6c).
 export const updateActiveScheduleSchema = z.object({
   amountCents: z.number().int().positive().max(100_000_000).optional(),
   frequency: z.enum(["weekly", "fortnightly", "monthly"]).optional(),
   deliveryChannel: z.enum(["email", "whatsapp", "sms"]).optional(),
-  status: z.enum(["active", "paused", "terminated"]).optional(),
+  status: z.enum(["active", "paused"]).optional(),
 });
 
 export const updateRentReminderSettingsSchema = z.object({

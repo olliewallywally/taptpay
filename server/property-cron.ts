@@ -38,6 +38,16 @@ function computeNextRunDate(from: Date, frequency: string): Date {
   return d;
 }
 
+/**
+ * The first date on an automation's cycle after `now`, counting on from `from`. Resuming a paused
+ * automation starts there (owner decision 2026-09-27): nothing is sent for the paused time.
+ */
+export function nextRunDateAfter(from: Date, frequency: string, now: Date): Date {
+  let next = new Date(from);
+  while (next <= now) next = computeNextRunDate(next, frequency);
+  return next;
+}
+
 function addDaysUTC(from: Date, days: number): Date {
   const d = new Date(from);
   d.setUTCDate(d.getUTCDate() + days);
