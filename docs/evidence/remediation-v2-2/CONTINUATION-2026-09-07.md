@@ -584,6 +584,15 @@ The work itself:
     changes nothing (the empty value is dropped) while the screen says saved; voiding logs no event.
   - Mutations 30/30 + 10/10. Server 110/2,001, client 102/822, `tsc` clean.
 
+- **R1-T2 closed (2026-09-27), checked on the day's code before R1-T3** ([working notes](r1/WORKING-2026-09-26-r1-t2-c10.md),
+  "R1-T2 closed"): every registration inventoried (184, 5 of them ALL), and step 1's breakages re-run,
+  12/12 caught (a route, method, mounted router or middleware added without policy fails); `tsc`
+  clean; 184 of 184 reviewed. **Owner answers before R1-T3** ([decision](../../decisions/2026-09-27-before-r1-t3-owner-answers.md),
+  `87c03ff0`): start R1-T3 without the independent check first (they stay owed); fix two small bugs
+  first, done in **`996a5c7f`** (an emptied client or tenant field is now cleared, where the old value
+  was kept while the screen said saved; voiding a trades invoice is now in the client's history);
+  push; restart the dev server. Server 110/2,009, client 102/822.
+
 **Next:** R1-T3 (plan page 24): the owner / member / admin / public / provider / cron / API-key matrix,
 recorded in the inventory, with a runtime test per API row (allowed principals succeed; the others get
 the P2.2 status with zero side effects) and the client route guards. The route review's recorded P2.2

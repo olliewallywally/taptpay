@@ -38,3 +38,13 @@ template). The other options were "Leave them recorded" (2), "Not yet" (3) and "
   new blobs for secrets.
 - 4: restarting the development server (`npm run dev`) and checking it with `GET /` and a made-up
   sign-in.
+
+## Outcome (same day, local commits)
+
+- 1: R1-T3 starts from the reviews as committed; the independent reviews stay on the ledger's owed
+  list.
+- 2, **`996a5c7f`**: an emptied client or tenant field is cleared (the edit schemas turn "" into
+  `null`; a field not sent is still left as it is), and voiding a trades invoice logs `invoice_voided`.
+  Tests first (red 4 of 8), mutations 5/5; the three reviews updated. Server 110/2,009, client 102/822,
+  `tsc` clean.
+- 3 and 4: recorded in the working notes when done.
