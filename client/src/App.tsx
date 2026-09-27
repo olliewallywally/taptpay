@@ -63,7 +63,6 @@ const PaymentResult         = lazyWithRetry(() => import("@/pages/payment-result
 const PaymentReturn         = lazyWithRetry(() => import("@/pages/payment-return"));
 const Checkout              = lazyWithRetry(() => import("@/pages/checkout"));
 const BoardBuilder          = lazyWithRetry(() => import("@/pages/board-builder"));
-const SmartTerminal         = lazyWithRetry(() => import("@/components/SmartTransitions"));
 const PropertyDashboard     = lazyWithRetry(() => import("@/pages/property/property-dashboard"));
 const TenantDirectory       = lazyWithRetry(() => import("@/pages/property/tenant-directory"));
 const TenantProfile         = lazyWithRetry(() => import("@/pages/property/tenant-profile"));
@@ -889,7 +888,6 @@ function RouteTable({
               {deviceClass === "mobile" ? <BoardBuilder /> : <DesktopLegacyPage deviceClass={deviceClass} vertical="retail" page="settings"><BoardBuilder /></DesktopLegacyPage>}
             </ProtectedRoute>
           </Route>
-          <Route path="/smart-terminal" component={SmartTerminal} />
           {/* ── Property management section ── */}
           <Route path="/property">
             <ProtectedRoute tutorialPage="property-dashboard">
