@@ -31,3 +31,41 @@ The other options were "Keep all three" and "Keep sending each one".
 - 2: code and tests on this branch, tests first: resuming a paused recurring invoice moves its next
   date to the first date on its cycle after the resume, keeping a monthly one's day of the month, so
   nothing is sent for the paused time. No deploy or push.
+
+## Two more questions, asked later the same day
+
+Asked on resuming batch 6d (after a container restart), before any of its code, once re-reading the
+trades routes against the property ones showed both.
+
+| # | Question (as asked) | Answer |
+|---|---|---|
+| 3 | "When a trades client is archived, their recurring invoices keep running. Each one keeps making and emailing a new invoice every week, fortnight or month, even though the client is hidden from the lists. Archiving a rent tenant cancels their rent automations. Should trades work the same way?" | **"Cancel them, same as rent (Recommended)"** — "Archiving a client cancels their recurring invoices and records when. Restoring the client doesn't restart them. An archived client can't be given a new recurring invoice (409); the screens already don't offer it. Invoices already sent stay payable." |
+| 4 | "A trades recurring invoice can be given a start date in the past: the date picker allows it, though it defaults to today. The server then catches up, sending one overdue invoice for every period since that date, one each time the scheduler runs. That's the same catch-up you chose to skip when resuming. What should a past start date do?" | **"Refuse past dates (Recommended)"** — "The server answers "The start date can't be in the past" and makes nothing. Today still works, since the form defaults to it; a date up to a day back is still taken, because the form sends the UTC date." |
+
+The other options were, for 3, "Keep them running" ("Archiving only hides the client. Their recurring
+invoices carry on until each is cancelled by hand."); for 4, "Start from the next date" ("The server
+accepts it but sends nothing for the past: the first invoice is the next date on its cycle from
+today.") and "Keep catching up" ("As today: every period since the start date is billed, one invoice
+per scheduler run, all overdue.").
+
+### Background
+
+- 3: `archiveClientProfile` (`server/storage.ts`) sets only the client's status and when; the rent
+  tenant's `archiveTenantProfile` also cancels the tenant's automations. Neither the trades generate
+  pass (`runTradesGeneratePass`) nor the dispatch pass reads the client's status. The client
+  directory, the recurring-invoice page and the desktop trades terminal leave archived clients out of
+  their pickers.
+- 4: both trades forms (`client/src/pages/trades/recurring-schedules.tsx` and the desktop trades
+  terminal) default the start date to today's UTC date and send it at 09:00 UTC; the date input has no
+  lower limit. The create stores the start date as the first run date, and the generate pass makes one
+  invoice per due recurring invoice per run, then moves its next date on by one period.
+
+### What this authorizes
+
+- 3: code and tests on this branch, tests first: archiving a trades client cancels its recurring
+  invoices not already cancelled, each recorded with the time and an event; restoring the client does
+  not restart them; a new recurring invoice for an archived client is refused (409) and nothing is
+  made. No deploy or push.
+- 4: code and tests on this branch, tests first: a recurring invoice whose start date is more than a
+  day before the request is refused (400 "The start date can't be in the past") and nothing is made.
+  No deploy or push.
