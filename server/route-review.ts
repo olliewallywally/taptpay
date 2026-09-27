@@ -237,6 +237,32 @@ const paidElsewhereFinding = (action: string) =>
   `${action} while the tenant is paying: the provider's completion then finds the invoice settled (finalizeRentInvoice), so a single payment's charge is recorded nowhere; a split share's is logged (Split_Share_Unrecorded). R3 (payment attempts).`;
 const state400Finding = (refusal: string) => `${refusal} answers 400 where P2.2 says 409 for a state conflict (R1-T3).`;
 
+// ── The trades routes (batch 6d) ──
+const TRADES_ADMIN = adminRefused(ADMIN_401);
+const tradesRecord = (what: string, read: string) =>
+  `the ${what} read by id (${read}) must be the session's business's: another business's is 404, the same as a missing one`;
+const tradesId = (name: string) =>
+  `${name}: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500)`;
+const TRADES_TEAM =
+  "Every login of the business, a teammate included, has every trades action and setting but GST (clients, quotes, invoices, cancelling one, marking one paid outside TaptPay, recurring invoices, the reminder switch), as every trades screen offers them; in property the owner kept the same (2026-09-27, batch 6c answer 2).";
+const CLIENT_ROW =
+  "a whole client row (names, email, phone, the site address, notes, the preferred channel, the status: active, archived or a hidden quick-invoice prospect, when archived, made and changed)";
+const QUOTE_ROW =
+  "a whole quote row (the client, the public link's token, status, line items, subtotal, GST and how it was counted, total, the deposit's type, value and amount, channel, valid until, notes, an attached document's reference and name, when sent, viewed, accepted or declined, made and changed)";
+const JOB_INVOICE_ROW =
+  "a whole invoice row (the client, quote and recurring invoice, kind, amount, the checkout token, channel, job details, status and its dates, when the job was completed, the external payment reference, reminders sent, when to send, an attached document's reference and name, the provider's session and transaction ids, the split, the WhatsApp message id)";
+const RECURRING_ROW =
+  "a whole recurring invoice row (the client, amount, frequency, channel, start and end, next and last run, status, when made, changed and cancelled)";
+const tradesDelivery = (what: string) =>
+  `sends the client ${what} by its channel: WhatsApp or SMS when chosen, configured and the client has a phone, otherwise email (server/trades-delivery.ts)`;
+const INVOICE_DELIVERY_REASON = "deliveryReason (a fixed code: not_found, not_payable, missing_data, send_failed or no_deliverable)";
+const tradesPaidElsewhereFinding = (action: string) =>
+  `${action} while the client is paying: the provider's completion then finds the invoice settled (finalizeTradeInvoice), so a single payment's charge is recorded nowhere; a split share's is logged (split_share_unrecorded). R3 (payment attempts).`;
+const archivedStillFinding = (what: string) =>
+  `An archived client can still be ${what} here; no screen offers it (the pickers list only current clients). Only a recurring invoice is refused for one (owner decision 2026-09-27).`;
+const clearedFieldFinding = (fields: string) =>
+  `Clearing ${fields} changes nothing: the edit screen sends the field empty, the schema turns an empty value into none, and the update leaves out what is none (Drizzle skips undefined), so the old value stays while the screen shows it saved (found in batch 6d).`;
+
 function tokenRate(family: string, perMinute: number): string {
   return (
     `requirePaymentTokenRateLimit (the ${family} family: ${perMinute} a minute per visitor address, counted in ` +
@@ -2994,7 +3020,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: null,
     successDto: `the tenant afterwards, ${TENANT_ROW}`,
     errorDisclosure: ["input-issues"],
-    findings: [adminStatusFinding(ADMIN_401)],
+    findings: [adminStatusFinding(ADMIN_401), clearedFieldFinding("a tenant's email, phone or co-tenants")],
   },
 
   "POST /api/property/tenants/:id/archive": {
@@ -3211,7 +3237,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         tenantRule: `${propertyRecord("invoice", "getInvoiceRentRequest")}, and not voided (409, since 2026-09-27: a voided one stays voided); ${PROPERTY_ADMIN}`,
       },
     ],
-    input: `${propertyId("id")}; body: markInvoicePaidExternalSchema (an optional reference of at most 200 characters; 400 with the issues)`,
+    input: `${propertyId("id")}; body: markInvoicePaidExternalSchema (an optional reference of at most 200 characters, null or empty for none: both screens send null when no reference is typed, which was refused until 2026-09-27, batch 6d; 400 with the issues)`,
     capability: null,
     entitlement: null,
     idempotency: "marks the invoice paid outside TaptPay with the reference and the time; a paid or externally paid one is 400 'Invoice is already paid'",
@@ -3251,38 +3277,428 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     errorDisclosure: ["input-issues"],
     findings: [adminStatusFinding(ADMIN_401), PROPERTY_TEAM],
   },
+
+  // ── Batch 6d (2026-09-27): the trades routes ──
+  "GET /api/trades/reminder-settings": {
+    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    input: "nothing",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto: "{ tradeRemindersEnabled }: the business's, or on where unset; 404 when the business is gone",
+    errorDisclosure: ["fixed"],
+    findings: [adminStatusFinding(ADMIN_401)],
+  },
+
+  "PUT /api/trades/reminder-settings": {
+    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    input: "body: updateTradeReminderSettingsSchema (tradeRemindersEnabled, true or false, required; other fields are dropped; 400 with the issues)",
+    capability: null,
+    entitlement: null,
+    idempotency:
+      "sets the switch on the business (updateMerchant); the same again changes nothing. Off stops the trades payment reminders (runTradesReminderPass, which follows the rent reminder days and count); overdue invoices are still marked due",
+    sideEffects: null,
+    successDto: "{ tradeRemindersEnabled } afterwards",
+    errorDisclosure: ["input-issues"],
+    findings: [adminStatusFinding(ADMIN_401), TRADES_TEAM],
+  },
+
+  "GET /api/trades/gst-settings": {
+    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    input: "nothing",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto:
+      "{ gstRegistered, tradeGstMode: inclusive or exclusive }: the business's, or not registered and inclusive where unset; 404 when the business is gone. The settings page reads it for every login",
+    errorDisclosure: ["fixed"],
+    findings: [adminStatusFinding(ADMIN_401)],
+  },
+
+  "PUT /api/trades/gst-settings": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner"],
+        tenant: "session",
+        tenantRule: `the session's own business, its owner only (isAccountOwner: a teammate is 403 since 2026-09-27, as the settings page shows these to a teammate greyed out with the business's other details); ${adminRefused(ADMIN_401)}`,
+      },
+    ],
+    input:
+      "body: updateTradeGstSettingsSchema (gstRegistered, true or false, and tradeGstMode, inclusive or exclusive, each optional; other fields are dropped; 400 with the issues)",
+    capability: null,
+    entitlement: null,
+    idempotency:
+      "sets the given settings on the business (updateMerchant); the same again changes nothing. Quotes made afterwards take them (a quote keeps the GST worked out when it was made); the payment receipts (sendTradePaymentInvoice), the quote PDF's GST number and the public quote page read them when shown",
+    sideEffects: null,
+    successDto: "{ gstRegistered, tradeGstMode } afterwards",
+    errorDisclosure: ["input-issues"],
+    findings: [adminStatusFinding(ADMIN_401)],
+  },
+
+  "GET /api/trades/clients": {
+    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    input: "nothing (the includeArchived the client directory sends is not read)",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto: `every client of the business, archived ones and hidden quick-invoice prospects included (the screens leave both out of their lists), ${CLIENT_ROW} each, newest first, all at once (no paging)`,
+    errorDisclosure: ["fixed"],
+    findings: [adminStatusFinding(ADMIN_401)],
+  },
+
+  "POST /api/trades/clients": {
+    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    input:
+      "body: createClientProfileSchema (a first and last name of 1 to 80 characters, the site address of 1 to 200, an optional email of at most 200 and phone of at most 40, notes of at most 1,000, the preferred channel: email, WhatsApp or SMS; other fields are dropped, so the business is the session's and the client active; 400 with the first issue)",
+    capability: null,
+    entitlement: null,
+    idempotency: "none: each call adds another client (no check for the same person)",
+    sideEffects: null,
+    successDto: `201 with the client, ${CLIENT_ROW}`,
+    errorDisclosure: ["input-issues"],
+    findings: [adminStatusFinding(ADMIN_401)],
+  },
+
+  "GET /api/trades/clients/:id": {
+    branches: [
+      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${tradesRecord("client", "getClientProfile")}; ${TRADES_ADMIN}` },
+    ],
+    input: tradesId("id"),
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto: `the client, ${CLIENT_ROW}`,
+    errorDisclosure: ["fixed"],
+    findings: [adminStatusFinding(ADMIN_401)],
+  },
+
+  "PUT /api/trades/clients/:id": {
+    branches: [
+      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${tradesRecord("client", "getClientProfile")}; ${TRADES_ADMIN}` },
+    ],
+    input: `${tradesId("id")}; body: updateClientProfileSchema (the create rules, each field optional; other fields are dropped, so the status cannot be set here; 400 with the first issue)`,
+    capability: null,
+    entitlement: null,
+    idempotency: "sets the given fields (updateClientProfile), an archived client's or a prospect's too; the same again changes nothing but the time changed",
+    sideEffects: null,
+    successDto: `the client afterwards, ${CLIENT_ROW}`,
+    errorDisclosure: ["input-issues"],
+    findings: [adminStatusFinding(ADMIN_401), clearedFieldFinding("a client's email, phone or notes")],
+  },
+
+  "POST /api/trades/clients/:id/archive": {
+    branches: [
+      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${tradesRecord("client", "getClientProfile")}; ${TRADES_ADMIN}` },
+    ],
+    input: tradesId("id"),
+    capability: null,
+    entitlement: null,
+    idempotency:
+      "archives the client (archiveClientProfile), then cancels each of the client's recurring invoices not already cancelled, recording when (terminateJobSchedule) with a schedule_terminated event (owner decision 2026-09-27: they went on billing the archived client every period); invoices already sent stay payable. Again archives again, with a new time, and has nothing left to cancel",
+    sideEffects: null,
+    successDto: `the client afterwards, ${CLIENT_ROW}`,
+    errorDisclosure: ["fixed"],
+    findings: [
+      adminStatusFinding(ADMIN_401),
+      "The archive and the cancellations are separate writes: a failure between them leaves the client archived with recurring invoices still running, until the archive is repeated.",
+    ],
+  },
+
+  "POST /api/trades/clients/:id/unarchive": {
+    branches: [
+      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${tradesRecord("client", "getClientProfile")}; ${TRADES_ADMIN}` },
+    ],
+    input: tradesId("id"),
+    capability: null,
+    entitlement: null,
+    idempotency:
+      "sets the client active, whatever it was (a hidden prospect too), with no archive time (unarchiveClientProfile); recurring invoices cancelled by the archive stay cancelled. Again changes nothing but the time",
+    sideEffects: null,
+    successDto: `the client afterwards, ${CLIENT_ROW}`,
+    errorDisclosure: ["fixed"],
+    findings: [adminStatusFinding(ADMIN_401)],
+  },
+
+  "POST /api/trades/clients/:id/promote": {
+    branches: [
+      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${tradesRecord("client", "getClientProfile")}; ${TRADES_ADMIN}` },
+    ],
+    input: tradesId("id"),
+    capability: null,
+    entitlement: null,
+    idempotency: "a hidden quick-invoice prospect becomes a listed client (status active); any other client is 400 'Client is already saved'",
+    sideEffects: null,
+    successDto: `the client afterwards, ${CLIENT_ROW}`,
+    errorDisclosure: ["fixed"],
+    findings: [adminStatusFinding(ADMIN_401), state400Finding("Refusing a client already saved")],
+  },
+
+  "GET /api/trades/clients/:id/events": {
+    branches: [
+      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${tradesRecord("client", "getClientProfile")}; ${TRADES_ADMIN}` },
+    ],
+    input: tradesId("id"),
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto:
+      "the client's history, newest first, at most 50 (getJobEventsByClient): whole event rows (what happened, the quote, invoice or recurring invoice, and what it carried: amounts, channels, a failed send's reason, WhatsApp statuses, split shares, the provider's transaction ids)",
+    errorDisclosure: ["fixed"],
+    findings: [adminStatusFinding(ADMIN_401)],
+  },
+
+  "GET /api/trades/quotes": {
+    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    input:
+      "status: raw, a string only (since 2026-09-27; a repeated one reached the query as a list), compared as text with each quote's status (one that no quote has matches nothing)",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto: `the business's quotes, or those of one status, ${QUOTE_ROW} each, newest first, all at once (no paging)`,
+    errorDisclosure: ["fixed"],
+    findings: [adminStatusFinding(ADMIN_401)],
+  },
+
+  "POST /api/trades/quotes": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner", "member"],
+        tenant: "resource",
+        tenantRule: `a client named in the body (getClientProfile) must be the session's business's: another business's is 404 'Client not found', the same as a missing one; without one, a hidden prospect is made from the recipient's details, or with none for a link-only quote; ${TRADES_ADMIN}`,
+      },
+    ],
+    input:
+      "body: createQuoteSchema (exactly one of a client's UUID, a recipient (a name of 1 to 160 characters, an optional email and address) or skipClient; 1 or more lines, each a description of 1 to 200 characters, a whole quantity of 1 to 100,000 and a unit price of 0 to $1,000,000, the line total sent being ignored and worked out again; a channel; a deposit, a percentage of at most 100 or a fixed amount, its type and value required when enabled; valid until as a date-time; notes of at most 1,000 characters; an attached document's reference (at most 500) and name (at most 255); other fields are dropped; 400 with the first issue). An attached document must be the business's own upload (requireOwnedInvoiceDocument)",
+    capability: null,
+    entitlement: "paid access (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise)",
+    idempotency:
+      "none: each call makes another quote, sent at once with a new public link, and another hidden prospect when no client is named; its GST is worked out from the business's settings at that moment and kept",
+    sideEffects: `${tradesDelivery("the quote's link, with the quote as a PDF by email")}; a send that fails is recorded (quote_dispatch_failed) and the link still works`,
+    successDto: `201 with the quote, ${QUOTE_ROW}, with delivered and deliveryReason (a fixed code: not_found, missing_data, billing_card_required, send_failed or no_deliverable)`,
+    errorDisclosure: ["input-issues"],
+    findings: [
+      adminStatusFinding(ADMIN_401),
+      archivedStillFinding("quoted"),
+      "Each quote to someone not saved as a client makes another hidden prospect, and nothing removes them.",
+    ],
+  },
+
+  "GET /api/trades/quotes/:id/pdf": {
+    branches: [
+      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${tradesRecord("quote", "getQuote")}; ${TRADES_ADMIN}` },
+    ],
+    input: tradesId("id"),
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto:
+      "the quote as a PDF download (quote-<business>-<reference>.pdf), made from the quote, its client and the business (generateQuotePdf); 404 'Quote details unavailable' when the client or the business is gone",
+    errorDisclosure: ["fixed"],
+    findings: [adminStatusFinding(ADMIN_401)],
+  },
+
+  "GET /api/trades/invoices": {
+    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    input:
+      "clientProfileId: strictUuidParam when given (400 'Invalid clientProfileId' otherwise; since 2026-09-27, a 500 before); status: raw, a string only (since 2026-09-27; a repeated one reached the query as a list), compared as text with each invoice's status (one that no invoice has matches nothing)",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto: `the business's invoices (or one client's, or those of one status), ${JOB_INVOICE_ROW} each, newest first, all at once (no paging)`,
+    errorDisclosure: ["fixed"],
+    findings: [adminStatusFinding(ADMIN_401)],
+  },
+
+  "POST /api/trades/invoices": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner", "member"],
+        tenant: "resource",
+        tenantRule: `a client named in the body (getClientProfile) must be the session's business's, and a quote named (getQuote) the business's and that client's (since 2026-09-27; it had only to be the business's): each otherwise 404, the same as a missing one; for a quick invoice, a hidden prospect is made from the recipient's details; ${TRADES_ADMIN}`,
+      },
+    ],
+    input:
+      "body: createJobInvoiceSchema (a client's UUID or, for a quick invoice, a recipient: a name of 1 to 120 characters, with the email or phone its channel, email or SMS, needs; an amount of 1 cent to $1,000,000; a channel; the due date and an optional send date as date-times; the kind, full or deposit, since 2026-09-27 (a balance is made by send-balance and a recurring invoice by the cron: both were taken here); a quote's UUID, required for a deposit and not allowed for a quick invoice, which must be full; job details of at most 500 characters; splitting; an attached document's reference (at most 500) and name (at most 255); other fields are dropped; 400 with the first issue). An attached document must be the business's own upload (requireOwnedInvoiceDocument)",
+    capability: null,
+    entitlement: "paid access (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise)",
+    idempotency:
+      "none: each call makes another invoice with a fresh checkout token, and a hidden prospect for a quick invoice. Several deposits on one quote are taken; send-balance subtracts them all",
+    sideEffects: `${tradesDelivery("the payment link")}, at once unless the send date is later (the cron sends it then); a send that fails stays pending and the cron retries it`,
+    successDto: `201 with the invoice, ${JOB_INVOICE_ROW}, with delivered and deliveryReason (a fixed code: scheduled, not_found, not_payable, missing_data, send_failed or no_deliverable)`,
+    errorDisclosure: ["input-issues"],
+    findings: [
+      adminStatusFinding(ADMIN_401),
+      archivedStillFinding("invoiced"),
+      "A deposit's amount is the one typed, not checked against the deposit its quote worked out.",
+    ],
+  },
+
+  "POST /api/trades/invoices/:id/send-balance": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner", "member"],
+        tenant: "resource",
+        tenantRule: `${tradesRecord("deposit invoice", "getJobInvoice")}; its quote is the one the deposit names (getQuote); ${TRADES_ADMIN}`,
+      },
+    ],
+    input: `${tradesId("id")}; body: sendJobBalanceSchema (splitEnabled, true or false, optional, and nothing else, since 2026-09-27: it was read from the raw body, so "yes" turned splitting on; 400 with the first issue)`,
+    capability: null,
+    entitlement: "paid access (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise)",
+    idempotency:
+      "one balance per quote: the invoice must be a deposit (400), paid (409) and on a quote (400); a balance already made and not voided is 409. The balance is the quote's total less every invoice of the client's on that quote not voided (400 when nothing is left), due in 7 days, by the deposit's channel",
+    sideEffects: `${tradesDelivery("the balance's payment link")}, at once`,
+    successDto: `201 with the balance invoice, ${JOB_INVOICE_ROW}, with delivered and ${INVOICE_DELIVERY_REASON}`,
+    errorDisclosure: ["input-issues"],
+    findings: [
+      adminStatusFinding(ADMIN_401),
+      "Two sends at the same moment can each find no balance and each make one, billing the client twice: the one-balance check is a read, then a write (R3).",
+    ],
+  },
+
+  "POST /api/trades/invoices/:id/mark-paid-external": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner", "member"],
+        tenant: "resource",
+        tenantRule: `${tradesRecord("invoice", "getJobInvoice")}, and neither voided nor already paid (409 each, since 2026-09-27); ${TRADES_ADMIN}`,
+      },
+    ],
+    input: `${tradesId("id")}; body: markJobPaidExternalSchema (an optional reference of at most 200 characters, null or empty for none: every screen sends null when no reference is typed, and the desktop always does, which was refused until 2026-09-27; 400 with the first issue)`,
+    capability: null,
+    entitlement: null,
+    idempotency:
+      "marks the invoice paid outside TaptPay with the reference and the time, and logs it; a voided or paid one is 409 (since 2026-09-27: each call marked it again and emailed the client another receipt)",
+    sideEffects: "emails the client a receipt for the invoice, with the business's GST number (sendTradePaymentInvoice); nothing when the client has no email",
+    successDto: `the invoice afterwards, ${JOB_INVOICE_ROW}`,
+    errorDisclosure: ["input-issues"],
+    findings: [adminStatusFinding(ADMIN_401), tradesPaidElsewhereFinding("Marking an invoice paid outside TaptPay"), TRADES_TEAM],
+  },
+
+  "POST /api/trades/invoices/:id/complete": {
+    branches: [
+      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${tradesRecord("invoice", "getJobInvoice")}; ${TRADES_ADMIN}` },
+    ],
+    input: tradesId("id"),
+    capability: null,
+    entitlement: null,
+    idempotency:
+      "records the job complete, with the time and a job_completed event, on a paid invoice that is not a deposit: a deposit is 409 (the balance comes first), an unpaid invoice 409. Again records a new time, and logs again",
+    sideEffects: null,
+    successDto: `the invoice afterwards, ${JOB_INVOICE_ROW}`,
+    errorDisclosure: ["fixed"],
+    findings: [adminStatusFinding(ADMIN_401)],
+  },
+
+  "POST /api/trades/invoices/:id/void": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner", "member"],
+        tenant: "resource",
+        tenantRule: `${tradesRecord("invoice", "getJobInvoice")}, and not paid (409 since 2026-09-27: the screens offer cancelling only an unpaid one); ${TRADES_ADMIN}`,
+      },
+    ],
+    input: tradesId("id"),
+    capability: null,
+    entitlement: null,
+    idempotency: "voids the invoice with the time; a voided one is voided again, with a new time. Nothing is logged",
+    sideEffects: null,
+    successDto: `the invoice afterwards, ${JOB_INVOICE_ROW}`,
+    errorDisclosure: ["fixed"],
+    findings: [
+      adminStatusFinding(ADMIN_401),
+      tradesPaidElsewhereFinding("Voiding"),
+      "A split invoice with shares already paid can be voided: those shares stay collected, with nothing but their events to show for them (R3/R4, refunds).",
+      "Voiding logs no event (voiding a rent invoice logs Invoice_Voided), so the client's history shows the invoice sent and nothing after.",
+      TRADES_TEAM,
+    ],
+  },
+
+  "GET /api/trades/schedules": {
+    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    input: "nothing",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto: `every recurring invoice of the business, cancelled ones included (the recurring-invoice page lists them with their status), ${RECURRING_ROW} each, newest first, all at once (no paging)`,
+    errorDisclosure: ["fixed"],
+    findings: [adminStatusFinding(ADMIN_401)],
+  },
+
+  "POST /api/trades/schedules": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner", "member"],
+        tenant: "resource",
+        tenantRule: `the client named in the body (getClientProfile) must be the session's business's: another business's is 404 'Client not found', the same as a missing one; and not archived (409 since 2026-09-27: archiving cancels a client's recurring invoices, owner decision); ${TRADES_ADMIN}`,
+      },
+    ],
+    input:
+      `body: createJobScheduleSchema (the client's UUID, an amount of 1 cent to $1,000,000, weekly, fortnightly or monthly, a channel, the start and an optional end as date-times; other fields are dropped; 400 with the first issue). An end before the start is 400, and a start more than a day before now is 400 "The start date can't be in the past" (owner decision 2026-09-27: it billed every period since, one overdue invoice per cron run; the day's grace is because the forms send today's UTC date at 09:00 UTC)`,
+    capability: null,
+    entitlement: "paid access (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise)",
+    idempotency: "none: each call adds another recurring invoice, first run on its start date; a client may have several, one per job",
+    sideEffects: null,
+    successDto: `201 with the recurring invoice, ${RECURRING_ROW}`,
+    errorDisclosure: ["input-issues"],
+    findings: [adminStatusFinding(ADMIN_401)],
+  },
+
+  "PUT /api/trades/schedules/:id": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner", "member"],
+        tenant: "resource",
+        tenantRule: `${tradesRecord("recurring invoice", "getJobSchedule")}, and not cancelled (409 since 2026-09-27: a cancelled one stays cancelled); ${TRADES_ADMIN}`,
+      },
+    ],
+    input: `${tradesId("id")}; body: updateJobScheduleSchema (the amount, frequency, channel, and active or paused: 'terminated' is refused since 2026-09-27, DELETE cancels; other fields are dropped; 400 with the first issue)`,
+    capability: null,
+    entitlement: null,
+    idempotency:
+      "sets the given fields (updateJobSchedule). Resuming a paused one moves its next date to the first date on its cycle after now, a monthly one kept on its start date's day of the month (nextJobRunDateAfter; owner decision 2026-09-27), so nothing is sent for the paused time; it billed every period it missed. Every call logs an event (paused, resumed or updated, with the change), again too",
+    sideEffects: null,
+    successDto: `the recurring invoice afterwards, ${RECURRING_ROW}`,
+    errorDisclosure: ["input-issues"],
+    findings: [adminStatusFinding(ADMIN_401)],
+  },
+
+  "DELETE /api/trades/schedules/:id": {
+    branches: [
+      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${tradesRecord("recurring invoice", "getJobSchedule")}; ${TRADES_ADMIN}` },
+    ],
+    input: tradesId("id"),
+    capability: null,
+    entitlement: null,
+    idempotency:
+      "cancels the recurring invoice, recording when (terminateJobSchedule), and logs it; a cancelled one is cancelled again, with a new time, and logged again. Invoices it already made stay payable",
+    sideEffects: null,
+    successDto: `the recurring invoice afterwards, ${RECURRING_ROW}`,
+    errorDisclosure: ["fixed"],
+    findings: [adminStatusFinding(ADMIN_401)],
+  },
 };
 
 /**
  * Routes not reviewed yet. May only shrink: PENDING_CEILING is lowered by
  * every batch, so a route cannot be added here instead of being reviewed.
  */
-export const PENDING_CEILING = 25;
+export const PENDING_CEILING = 0;
 
-export const REVIEW_PENDING: readonly string[] = [
-  "GET /api/trades/reminder-settings",
-  "PUT /api/trades/reminder-settings",
-  "GET /api/trades/gst-settings",
-  "PUT /api/trades/gst-settings",
-  "GET /api/trades/clients",
-  "POST /api/trades/clients",
-  "GET /api/trades/clients/:id",
-  "PUT /api/trades/clients/:id",
-  "POST /api/trades/clients/:id/archive",
-  "POST /api/trades/clients/:id/unarchive",
-  "POST /api/trades/clients/:id/promote",
-  "GET /api/trades/clients/:id/events",
-  "GET /api/trades/quotes",
-  "POST /api/trades/quotes",
-  "GET /api/trades/quotes/:id/pdf",
-  "GET /api/trades/invoices",
-  "POST /api/trades/invoices",
-  "POST /api/trades/invoices/:id/send-balance",
-  "POST /api/trades/invoices/:id/mark-paid-external",
-  "POST /api/trades/invoices/:id/complete",
-  "POST /api/trades/invoices/:id/void",
-  "GET /api/trades/schedules",
-  "POST /api/trades/schedules",
-  "PUT /api/trades/schedules/:id",
-  "DELETE /api/trades/schedules/:id",
-];
+export const REVIEW_PENDING: readonly string[] = [];

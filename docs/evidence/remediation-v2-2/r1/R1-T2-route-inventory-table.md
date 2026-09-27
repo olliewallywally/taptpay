@@ -1,4 +1,4 @@
-# R1-T2 route inventory — generated 2026-09-27 @ `414249052cb0ab44bb0614d950ea2360b33a7b49`
+# R1-T2 route inventory — generated 2026-09-27 @ `00ec975dbc28e5ea0c6198df6e7b8fc7335a6d65`
 
 Regenerate with `npx tsx scripts/generate-route-policy.ts`. This table is
 evidence for the SHA named above, not a timeless constant — see
@@ -14,7 +14,7 @@ necessarily a bug): **0**.
 
 ## Review
 
-159 of 184 routes reviewed (server/route-review.ts); 25 pending.
+184 of 184 routes reviewed (server/route-review.ts); 0 pending.
 A reviewed route's principal below is the review's; a pending one's is the heuristic, marked "(heuristic)".
 
 ### Open findings
@@ -123,6 +123,7 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 - **POST /api/property/tenants:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 - **GET /api/property/tenants/:id:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 - **PUT /api/property/tenants/:id:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **PUT /api/property/tenants/:id:** Clearing a tenant's email, phone or co-tenants changes nothing: the edit screen sends the field empty, the schema turns an empty value into none, and the update leaves out what is none (Drizzle skips undefined), so the old value stays while the screen shows it saved (found in batch 6d).
 - **POST /api/property/tenants/:id/archive:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 - **POST /api/property/tenants/:id/unarchive:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 - **GET /api/property/tenants/:id/events:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
@@ -152,6 +153,46 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 - **GET /api/property/reminder-settings:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 - **PUT /api/property/reminder-settings:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 - **PUT /api/property/reminder-settings:** Every login of the business, a teammate included, has every property action and setting (tenants, rent and bills, voiding, marking paid outside TaptPay, automations, the reminder settings): kept by the owner's decision (2026-09-27).
+- **GET /api/trades/reminder-settings:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **PUT /api/trades/reminder-settings:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **PUT /api/trades/reminder-settings:** Every login of the business, a teammate included, has every trades action and setting but GST (clients, quotes, invoices, cancelling one, marking one paid outside TaptPay, recurring invoices, the reminder switch), as every trades screen offers them; in property the owner kept the same (2026-09-27, batch 6c answer 2).
+- **GET /api/trades/gst-settings:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **PUT /api/trades/gst-settings:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **GET /api/trades/clients:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **POST /api/trades/clients:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **GET /api/trades/clients/:id:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **PUT /api/trades/clients/:id:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **PUT /api/trades/clients/:id:** Clearing a client's email, phone or notes changes nothing: the edit screen sends the field empty, the schema turns an empty value into none, and the update leaves out what is none (Drizzle skips undefined), so the old value stays while the screen shows it saved (found in batch 6d).
+- **POST /api/trades/clients/:id/archive:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **POST /api/trades/clients/:id/archive:** The archive and the cancellations are separate writes: a failure between them leaves the client archived with recurring invoices still running, until the archive is repeated.
+- **POST /api/trades/clients/:id/unarchive:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **POST /api/trades/clients/:id/promote:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **POST /api/trades/clients/:id/promote:** Refusing a client already saved answers 400 where P2.2 says 409 for a state conflict (R1-T3).
+- **GET /api/trades/clients/:id/events:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **GET /api/trades/quotes:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **POST /api/trades/quotes:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **POST /api/trades/quotes:** An archived client can still be quoted here; no screen offers it (the pickers list only current clients). Only a recurring invoice is refused for one (owner decision 2026-09-27).
+- **POST /api/trades/quotes:** Each quote to someone not saved as a client makes another hidden prospect, and nothing removes them.
+- **GET /api/trades/quotes/:id/pdf:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **GET /api/trades/invoices:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **POST /api/trades/invoices:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **POST /api/trades/invoices:** An archived client can still be invoiced here; no screen offers it (the pickers list only current clients). Only a recurring invoice is refused for one (owner decision 2026-09-27).
+- **POST /api/trades/invoices:** A deposit's amount is the one typed, not checked against the deposit its quote worked out.
+- **POST /api/trades/invoices/:id/send-balance:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **POST /api/trades/invoices/:id/send-balance:** Two sends at the same moment can each find no balance and each make one, billing the client twice: the one-balance check is a read, then a write (R3).
+- **POST /api/trades/invoices/:id/mark-paid-external:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **POST /api/trades/invoices/:id/mark-paid-external:** Marking an invoice paid outside TaptPay while the client is paying: the provider's completion then finds the invoice settled (finalizeTradeInvoice), so a single payment's charge is recorded nowhere; a split share's is logged (split_share_unrecorded). R3 (payment attempts).
+- **POST /api/trades/invoices/:id/mark-paid-external:** Every login of the business, a teammate included, has every trades action and setting but GST (clients, quotes, invoices, cancelling one, marking one paid outside TaptPay, recurring invoices, the reminder switch), as every trades screen offers them; in property the owner kept the same (2026-09-27, batch 6c answer 2).
+- **POST /api/trades/invoices/:id/complete:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **POST /api/trades/invoices/:id/void:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **POST /api/trades/invoices/:id/void:** Voiding while the client is paying: the provider's completion then finds the invoice settled (finalizeTradeInvoice), so a single payment's charge is recorded nowhere; a split share's is logged (split_share_unrecorded). R3 (payment attempts).
+- **POST /api/trades/invoices/:id/void:** A split invoice with shares already paid can be voided: those shares stay collected, with nothing but their events to show for them (R3/R4, refunds).
+- **POST /api/trades/invoices/:id/void:** Voiding logs no event (voiding a rent invoice logs Invoice_Voided), so the client's history shows the invoice sent and nothing after.
+- **POST /api/trades/invoices/:id/void:** Every login of the business, a teammate included, has every trades action and setting but GST (clients, quotes, invoices, cancelling one, marking one paid outside TaptPay, recurring invoices, the reminder switch), as every trades screen offers them; in property the owner kept the same (2026-09-27, batch 6c answer 2).
+- **GET /api/trades/schedules:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **POST /api/trades/schedules:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **PUT /api/trades/schedules/:id:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **DELETE /api/trades/schedules/:id:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ## Routes
 
@@ -311,34 +352,34 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 | POST | `/api/webhooks/whatsapp` | 7766 | provider | req.headers["apikey"] |
 | GET | `/api/property/reminder-settings` | 7816 | merchant | authenticateToken |
 | PUT | `/api/property/reminder-settings` | 7826 | merchant | authenticateToken |
-| GET | `/api/trades/reminder-settings` | 7846 | merchant-user (heuristic) | authenticateToken |
-| PUT | `/api/trades/reminder-settings` | 7856 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/gst-settings` | 7869 | merchant-user (heuristic) | authenticateToken |
-| PUT | `/api/trades/gst-settings` | 7885 | merchant-user (heuristic) | authenticateToken, isAccountOwner |
-| GET | `/api/trades/clients` | 7905 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/clients` | 7913 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/clients/:id` | 7925 | merchant-user (heuristic) | authenticateToken |
-| PUT | `/api/trades/clients/:id` | 7936 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/clients/:id/archive` | 7949 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/clients/:id/unarchive` | 7968 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/clients/:id/promote` | 7981 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/clients/:id/events` | 7993 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/quotes` | 8005 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/quotes` | 8014 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/quotes/:id/pdf` | 8111 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/reminder-settings` | 7846 | merchant | authenticateToken |
+| PUT | `/api/trades/reminder-settings` | 7856 | merchant | authenticateToken |
+| GET | `/api/trades/gst-settings` | 7869 | merchant | authenticateToken |
+| PUT | `/api/trades/gst-settings` | 7885 | merchant | authenticateToken, isAccountOwner |
+| GET | `/api/trades/clients` | 7905 | merchant | authenticateToken |
+| POST | `/api/trades/clients` | 7913 | merchant | authenticateToken |
+| GET | `/api/trades/clients/:id` | 7925 | merchant | authenticateToken |
+| PUT | `/api/trades/clients/:id` | 7936 | merchant | authenticateToken |
+| POST | `/api/trades/clients/:id/archive` | 7949 | merchant | authenticateToken |
+| POST | `/api/trades/clients/:id/unarchive` | 7968 | merchant | authenticateToken |
+| POST | `/api/trades/clients/:id/promote` | 7981 | merchant | authenticateToken |
+| GET | `/api/trades/clients/:id/events` | 7993 | merchant | authenticateToken |
+| GET | `/api/trades/quotes` | 8005 | merchant | authenticateToken |
+| POST | `/api/trades/quotes` | 8014 | merchant | authenticateToken |
+| GET | `/api/trades/quotes/:id/pdf` | 8111 | merchant | authenticateToken |
 | GET | `/api/trades/quotes/token/:token/pdf` | 8126 | public-bearer | getQuoteByToken( |
 | GET | `/api/trades/quotes/token/:token` | 8141 | public-bearer | getQuoteByToken( |
 | POST | `/api/trades/quotes/token/:token/respond` | 8186 | public-bearer | getQuoteByToken( |
-| GET | `/api/trades/invoices` | 8235 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/invoices` | 8247 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/invoices/:id/send-balance` | 8305 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/invoices/:id/mark-paid-external` | 8346 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/invoices/:id/complete` | 8369 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/invoices/:id/void` | 8388 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/trades/schedules` | 8402 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/trades/schedules` | 8409 | merchant-user (heuristic) | authenticateToken |
-| PUT | `/api/trades/schedules/:id` | 8434 | merchant-user (heuristic) | authenticateToken |
-| DELETE | `/api/trades/schedules/:id` | 8457 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/trades/invoices` | 8235 | merchant | authenticateToken |
+| POST | `/api/trades/invoices` | 8247 | merchant | authenticateToken |
+| POST | `/api/trades/invoices/:id/send-balance` | 8305 | merchant | authenticateToken |
+| POST | `/api/trades/invoices/:id/mark-paid-external` | 8346 | merchant | authenticateToken |
+| POST | `/api/trades/invoices/:id/complete` | 8369 | merchant | authenticateToken |
+| POST | `/api/trades/invoices/:id/void` | 8388 | merchant | authenticateToken |
+| GET | `/api/trades/schedules` | 8402 | merchant | authenticateToken |
+| POST | `/api/trades/schedules` | 8409 | merchant | authenticateToken |
+| PUT | `/api/trades/schedules/:id` | 8434 | merchant | authenticateToken |
+| DELETE | `/api/trades/schedules/:id` | 8457 | merchant | authenticateToken |
 | GET | `/api/internal/cron/status` | 8473 | cron | authorizeCronRequest |
 | POST | `/api/internal/cron` | 8483 | cron | authorizeCronRequest |
 
@@ -2879,6 +2920,7 @@ Reviewed policy:
 - **Success:** the tenant afterwards, a whole tenant row (names, email, phone, the property address, co-tenants, the preferred channel, whether archived and when, when made and changed)
 - **Error disclosure:** input-issues
 - **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **Finding:** Clearing a tenant's email, phone or co-tenants changes nothing: the edit screen sends the field empty, the schema turns an empty value into none, and the update leaves out what is none (Drizzle skips undefined), so the old value stays while the screen shows it saved (found in batch 6d).
 
 ### POST `/api/property/tenants/:id/archive`
 
@@ -3143,7 +3185,7 @@ Reviewed policy:
 Reviewed policy:
 
 - **Who:** merchant (owner, member). **Tenant (resource):** the invoice read by id (getInvoiceRentRequest) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403), and not voided (409, since 2026-09-27: a voided one stays voided); the platform admin, with no business, is refused (401 "Authentication required")
-- **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500); body: markInvoicePaidExternalSchema (an optional reference of at most 200 characters; 400 with the issues)
+- **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500); body: markInvoicePaidExternalSchema (an optional reference of at most 200 characters, null or empty for none: both screens send null when no reference is typed, which was refused until 2026-09-27, batch 6d; 400 with the issues)
 - **Idempotency:** marks the invoice paid outside TaptPay with the reference and the time; a paid or externally paid one is 400 'Invoice is already paid'
 - **Success:** the invoice afterwards, a whole invoice row (the tenant and automation, amount, the checkout token, channel, rent or a charge with its type and description, the attached document's reference and name, status and its dates, the external payment reference, reminders sent, the provider's session and transaction ids, the split, the WhatsApp message id)
 - **Error disclosure:** input-issues
@@ -3431,7 +3473,14 @@ Reviewed policy:
 - storageMethods: `getMerchant`
 - statuses: `200`, `401`, `403`, `404`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** nothing
+- **Idempotency:** read-only
+- **Success:** { tradeRemindersEnabled }: the business's, or on where unset; 404 when the business is gone
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### PUT `/api/trades/reminder-settings`
 
@@ -3441,7 +3490,15 @@ Review pending.
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
 - errorTextInResponse: `err.errors`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** body: updateTradeReminderSettingsSchema (tradeRemindersEnabled, true or false, required; other fields are dropped; 400 with the issues)
+- **Idempotency:** sets the switch on the business (updateMerchant); the same again changes nothing. Off stops the trades payment reminders (runTradesReminderPass, which follows the rent reminder days and count); overdue invoices are still marked due
+- **Success:** { tradeRemindersEnabled } afterwards
+- **Error disclosure:** input-issues
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **Finding:** Every login of the business, a teammate included, has every trades action and setting but GST (clients, quotes, invoices, cancelling one, marking one paid outside TaptPay, recurring invoices, the reminder switch), as every trades screen offers them; in property the owner kept the same (2026-09-27, batch 6c answer 2).
 
 ### GET `/api/trades/gst-settings`
 
@@ -3449,7 +3506,14 @@ Review pending.
 - storageMethods: `getMerchant`
 - statuses: `200`, `401`, `403`, `404`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** nothing
+- **Idempotency:** read-only
+- **Success:** { gstRegistered, tradeGstMode: inclusive or exclusive }: the business's, or not registered and inclusive where unset; 404 when the business is gone. The settings page reads it for every login
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### PUT `/api/trades/gst-settings`
 
@@ -3460,7 +3524,14 @@ Review pending.
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
 - errorTextInResponse: `err.errors`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner). **Tenant (session):** the session's own business, its owner only (isAccountOwner: a teammate is 403 since 2026-09-27, as the settings page shows these to a teammate greyed out with the business's other details); the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** body: updateTradeGstSettingsSchema (gstRegistered, true or false, and tradeGstMode, inclusive or exclusive, each optional; other fields are dropped; 400 with the issues)
+- **Idempotency:** sets the given settings on the business (updateMerchant); the same again changes nothing. Quotes made afterwards take them (a quote keeps the GST worked out when it was made); the payment receipts (sendTradePaymentInvoice), the quote PDF's GST number and the public quote page read them when shown
+- **Success:** { gstRegistered, tradeGstMode } afterwards
+- **Error disclosure:** input-issues
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### GET `/api/trades/clients`
 
@@ -3468,7 +3539,14 @@ Review pending.
 - storageMethods: `getClientProfilesByMerchant`
 - statuses: `200`, `401`, `403`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** nothing (the includeArchived the client directory sends is not read)
+- **Idempotency:** read-only
+- **Success:** every client of the business, archived ones and hidden quick-invoice prospects included (the screens leave both out of their lists), a whole client row (names, email, phone, the site address, notes, the preferred channel, the status: active, archived or a hidden quick-invoice prospect, when archived, made and changed) each, newest first, all at once (no paging)
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### POST `/api/trades/clients`
 
@@ -3478,7 +3556,14 @@ Review pending.
 - statuses: `201`, `400`, `401`, `403`, `500`, `503`
 - errorTextInResponse: `parsed.error.errors`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** body: createClientProfileSchema (a first and last name of 1 to 80 characters, the site address of 1 to 200, an optional email of at most 200 and phone of at most 40, notes of at most 1,000, the preferred channel: email, WhatsApp or SMS; other fields are dropped, so the business is the session's and the client active; 400 with the first issue)
+- **Idempotency:** none: each call adds another client (no check for the same person)
+- **Success:** 201 with the client, a whole client row (names, email, phone, the site address, notes, the preferred channel, the status: active, archived or a hidden quick-invoice prospect, when archived, made and changed)
+- **Error disclosure:** input-issues
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### GET `/api/trades/clients/:id`
 
@@ -3488,7 +3573,14 @@ Review pending.
 - storageMethods: `getClientProfile`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (resource):** the client read by id (getClientProfile) must be the session's business's: another business's is 404, the same as a missing one; the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500)
+- **Idempotency:** read-only
+- **Success:** the client, a whole client row (names, email, phone, the site address, notes, the preferred channel, the status: active, archived or a hidden quick-invoice prospect, when archived, made and changed)
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### PUT `/api/trades/clients/:id`
 
@@ -3500,7 +3592,15 @@ Review pending.
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 - errorTextInResponse: `parsed.error.errors`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (resource):** the client read by id (getClientProfile) must be the session's business's: another business's is 404, the same as a missing one; the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500); body: updateClientProfileSchema (the create rules, each field optional; other fields are dropped, so the status cannot be set here; 400 with the first issue)
+- **Idempotency:** sets the given fields (updateClientProfile), an archived client's or a prospect's too; the same again changes nothing but the time changed
+- **Success:** the client afterwards, a whole client row (names, email, phone, the site address, notes, the preferred channel, the status: active, archived or a hidden quick-invoice prospect, when archived, made and changed)
+- **Error disclosure:** input-issues
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **Finding:** Clearing a client's email, phone or notes changes nothing: the edit screen sends the field empty, the schema turns an empty value into none, and the update leaves out what is none (Drizzle skips undefined), so the old value stays while the screen shows it saved (found in batch 6d).
 
 ### POST `/api/trades/clients/:id/archive`
 
@@ -3510,7 +3610,15 @@ Review pending.
 - storageMethods: `archiveClientProfile`, `createJobEvent`, `getClientProfile`, `getJobSchedulesByMerchant`, `terminateJobSchedule`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (resource):** the client read by id (getClientProfile) must be the session's business's: another business's is 404, the same as a missing one; the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500)
+- **Idempotency:** archives the client (archiveClientProfile), then cancels each of the client's recurring invoices not already cancelled, recording when (terminateJobSchedule) with a schedule_terminated event (owner decision 2026-09-27: they went on billing the archived client every period); invoices already sent stay payable. Again archives again, with a new time, and has nothing left to cancel
+- **Success:** the client afterwards, a whole client row (names, email, phone, the site address, notes, the preferred channel, the status: active, archived or a hidden quick-invoice prospect, when archived, made and changed)
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **Finding:** The archive and the cancellations are separate writes: a failure between them leaves the client archived with recurring invoices still running, until the archive is repeated.
 
 ### POST `/api/trades/clients/:id/unarchive`
 
@@ -3520,7 +3628,14 @@ Review pending.
 - storageMethods: `getClientProfile`, `unarchiveClientProfile`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (resource):** the client read by id (getClientProfile) must be the session's business's: another business's is 404, the same as a missing one; the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500)
+- **Idempotency:** sets the client active, whatever it was (a hidden prospect too), with no archive time (unarchiveClientProfile); recurring invoices cancelled by the archive stay cancelled. Again changes nothing but the time
+- **Success:** the client afterwards, a whole client row (names, email, phone, the site address, notes, the preferred channel, the status: active, archived or a hidden quick-invoice prospect, when archived, made and changed)
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### POST `/api/trades/clients/:id/promote`
 
@@ -3530,7 +3645,15 @@ Review pending.
 - storageMethods: `getClientProfile`, `updateClientProfile`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (resource):** the client read by id (getClientProfile) must be the session's business's: another business's is 404, the same as a missing one; the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500)
+- **Idempotency:** a hidden quick-invoice prospect becomes a listed client (status active); any other client is 400 'Client is already saved'
+- **Success:** the client afterwards, a whole client row (names, email, phone, the site address, notes, the preferred channel, the status: active, archived or a hidden quick-invoice prospect, when archived, made and changed)
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **Finding:** Refusing a client already saved answers 400 where P2.2 says 409 for a state conflict (R1-T3).
 
 ### GET `/api/trades/clients/:id/events`
 
@@ -3540,7 +3663,14 @@ Review pending.
 - storageMethods: `getClientProfile`, `getJobEventsByClient`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (resource):** the client read by id (getClientProfile) must be the session's business's: another business's is 404, the same as a missing one; the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500)
+- **Idempotency:** read-only
+- **Success:** the client's history, newest first, at most 50 (getJobEventsByClient): whole event rows (what happened, the quote, invoice or recurring invoice, and what it carried: amounts, channels, a failed send's reason, WhatsApp statuses, split shares, the provider's transaction ids)
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### GET `/api/trades/quotes`
 
@@ -3549,7 +3679,14 @@ Review pending.
 - storageMethods: `getQuotesByMerchant`
 - statuses: `200`, `401`, `403`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** status: raw, a string only (since 2026-09-27; a repeated one reached the query as a list), compared as text with each quote's status (one that no quote has matches nothing)
+- **Idempotency:** read-only
+- **Success:** the business's quotes, or those of one status, a whole quote row (the client, the public link's token, status, line items, subtotal, GST and how it was counted, total, the deposit's type, value and amount, channel, valid until, notes, an attached document's reference and name, when sent, viewed, accepted or declined, made and changed) each, newest first, all at once (no paging)
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### POST `/api/trades/quotes`
 
@@ -3563,7 +3700,18 @@ Review pending.
 - entitlementGates: `BILLING_CARD_REQUIRED`, `billingCardIsReady`, `requireBillingCard`
 - helpers: `generateInvoiceToken`, `requireBillingCard`, `requireOwnedInvoiceDocument`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (resource):** a client named in the body (getClientProfile) must be the session's business's: another business's is 404 'Client not found', the same as a missing one; without one, a hidden prospect is made from the recipient's details, or with none for a link-only quote; the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** body: createQuoteSchema (exactly one of a client's UUID, a recipient (a name of 1 to 160 characters, an optional email and address) or skipClient; 1 or more lines, each a description of 1 to 200 characters, a whole quantity of 1 to 100,000 and a unit price of 0 to $1,000,000, the line total sent being ignored and worked out again; a channel; a deposit, a percentage of at most 100 or a fixed amount, its type and value required when enabled; valid until as a date-time; notes of at most 1,000 characters; an attached document's reference (at most 500) and name (at most 255); other fields are dropped; 400 with the first issue). An attached document must be the business's own upload (requireOwnedInvoiceDocument)
+- **Entitlement gate:** paid access (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise)
+- **Idempotency:** none: each call makes another quote, sent at once with a new public link, and another hidden prospect when no client is named; its GST is worked out from the business's settings at that moment and kept
+- **Side effects:** sends the client the quote's link, with the quote as a PDF by email by its channel: WhatsApp or SMS when chosen, configured and the client has a phone, otherwise email (server/trades-delivery.ts); a send that fails is recorded (quote_dispatch_failed) and the link still works
+- **Success:** 201 with the quote, a whole quote row (the client, the public link's token, status, line items, subtotal, GST and how it was counted, total, the deposit's type, value and amount, channel, valid until, notes, an attached document's reference and name, when sent, viewed, accepted or declined, made and changed), with delivered and deliveryReason (a fixed code: not_found, missing_data, billing_card_required, send_failed or no_deliverable)
+- **Error disclosure:** input-issues
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **Finding:** An archived client can still be quoted here; no screen offers it (the pickers list only current clients). Only a recurring invoice is refused for one (owner decision 2026-09-27).
+- **Finding:** Each quote to someone not saved as a client makes another hidden prospect, and nothing removes them.
 
 ### GET `/api/trades/quotes/:id/pdf`
 
@@ -3574,7 +3722,14 @@ Review pending.
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 - helpers: `streamQuotePdf`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (resource):** the quote read by id (getQuote) must be the session's business's: another business's is 404, the same as a missing one; the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500)
+- **Idempotency:** read-only
+- **Success:** the quote as a PDF download (quote-<business>-<reference>.pdf), made from the quote, its client and the business (generateQuotePdf); 404 'Quote details unavailable' when the client or the business is gone
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### GET `/api/trades/quotes/token/:token/pdf`
 
@@ -3648,7 +3803,14 @@ Reviewed policy:
 - storageMethods: `getJobInvoicesByMerchant`
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** clientProfileId: strictUuidParam when given (400 'Invalid clientProfileId' otherwise; since 2026-09-27, a 500 before); status: raw, a string only (since 2026-09-27; a repeated one reached the query as a list), compared as text with each invoice's status (one that no invoice has matches nothing)
+- **Idempotency:** read-only
+- **Success:** the business's invoices (or one client's, or those of one status), a whole invoice row (the client, quote and recurring invoice, kind, amount, the checkout token, channel, job details, status and its dates, when the job was completed, the external payment reference, reminders sent, when to send, an attached document's reference and name, the provider's session and transaction ids, the split, the WhatsApp message id) each, newest first, all at once (no paging)
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### POST `/api/trades/invoices`
 
@@ -3662,7 +3824,18 @@ Review pending.
 - entitlementGates: `BILLING_CARD_REQUIRED`, `billingCardIsReady`, `requireBillingCard`
 - helpers: `generateInvoiceToken`, `requireBillingCard`, `requireOwnedInvoiceDocument`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (resource):** a client named in the body (getClientProfile) must be the session's business's, and a quote named (getQuote) the business's and that client's (since 2026-09-27; it had only to be the business's): each otherwise 404, the same as a missing one; for a quick invoice, a hidden prospect is made from the recipient's details; the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** body: createJobInvoiceSchema (a client's UUID or, for a quick invoice, a recipient: a name of 1 to 120 characters, with the email or phone its channel, email or SMS, needs; an amount of 1 cent to $1,000,000; a channel; the due date and an optional send date as date-times; the kind, full or deposit, since 2026-09-27 (a balance is made by send-balance and a recurring invoice by the cron: both were taken here); a quote's UUID, required for a deposit and not allowed for a quick invoice, which must be full; job details of at most 500 characters; splitting; an attached document's reference (at most 500) and name (at most 255); other fields are dropped; 400 with the first issue). An attached document must be the business's own upload (requireOwnedInvoiceDocument)
+- **Entitlement gate:** paid access (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise)
+- **Idempotency:** none: each call makes another invoice with a fresh checkout token, and a hidden prospect for a quick invoice. Several deposits on one quote are taken; send-balance subtracts them all
+- **Side effects:** sends the client the payment link by its channel: WhatsApp or SMS when chosen, configured and the client has a phone, otherwise email (server/trades-delivery.ts), at once unless the send date is later (the cron sends it then); a send that fails stays pending and the cron retries it
+- **Success:** 201 with the invoice, a whole invoice row (the client, quote and recurring invoice, kind, amount, the checkout token, channel, job details, status and its dates, when the job was completed, the external payment reference, reminders sent, when to send, an attached document's reference and name, the provider's session and transaction ids, the split, the WhatsApp message id), with delivered and deliveryReason (a fixed code: scheduled, not_found, not_payable, missing_data, send_failed or no_deliverable)
+- **Error disclosure:** input-issues
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **Finding:** An archived client can still be invoiced here; no screen offers it (the pickers list only current clients). Only a recurring invoice is refused for one (owner decision 2026-09-27).
+- **Finding:** A deposit's amount is the one typed, not checked against the deposit its quote worked out.
 
 ### POST `/api/trades/invoices/:id/send-balance`
 
@@ -3677,7 +3850,17 @@ Review pending.
 - entitlementGates: `BILLING_CARD_REQUIRED`, `billingCardIsReady`, `requireBillingCard`
 - helpers: `generateInvoiceToken`, `requireBillingCard`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (resource):** the deposit invoice read by id (getJobInvoice) must be the session's business's: another business's is 404, the same as a missing one; its quote is the one the deposit names (getQuote); the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500); body: sendJobBalanceSchema (splitEnabled, true or false, optional, and nothing else, since 2026-09-27: it was read from the raw body, so "yes" turned splitting on; 400 with the first issue)
+- **Entitlement gate:** paid access (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise)
+- **Idempotency:** one balance per quote: the invoice must be a deposit (400), paid (409) and on a quote (400); a balance already made and not voided is 409. The balance is the quote's total less every invoice of the client's on that quote not voided (400 when nothing is left), due in 7 days, by the deposit's channel
+- **Side effects:** sends the client the balance's payment link by its channel: WhatsApp or SMS when chosen, configured and the client has a phone, otherwise email (server/trades-delivery.ts), at once
+- **Success:** 201 with the balance invoice, a whole invoice row (the client, quote and recurring invoice, kind, amount, the checkout token, channel, job details, status and its dates, when the job was completed, the external payment reference, reminders sent, when to send, an attached document's reference and name, the provider's session and transaction ids, the split, the WhatsApp message id), with delivered and deliveryReason (a fixed code: not_found, not_payable, missing_data, send_failed or no_deliverable)
+- **Error disclosure:** input-issues
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **Finding:** Two sends at the same moment can each find no balance and each make one, billing the client twice: the one-balance check is a read, then a write (R3).
 
 ### POST `/api/trades/invoices/:id/mark-paid-external`
 
@@ -3690,7 +3873,17 @@ Review pending.
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
 - errorTextInResponse: `parsed.error.errors`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (resource):** the invoice read by id (getJobInvoice) must be the session's business's: another business's is 404, the same as a missing one, and neither voided nor already paid (409 each, since 2026-09-27); the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500); body: markJobPaidExternalSchema (an optional reference of at most 200 characters, null or empty for none: every screen sends null when no reference is typed, and the desktop always does, which was refused until 2026-09-27; 400 with the first issue)
+- **Idempotency:** marks the invoice paid outside TaptPay with the reference and the time, and logs it; a voided or paid one is 409 (since 2026-09-27: each call marked it again and emailed the client another receipt)
+- **Side effects:** emails the client a receipt for the invoice, with the business's GST number (sendTradePaymentInvoice); nothing when the client has no email
+- **Success:** the invoice afterwards, a whole invoice row (the client, quote and recurring invoice, kind, amount, the checkout token, channel, job details, status and its dates, when the job was completed, the external payment reference, reminders sent, when to send, an attached document's reference and name, the provider's session and transaction ids, the split, the WhatsApp message id)
+- **Error disclosure:** input-issues
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **Finding:** Marking an invoice paid outside TaptPay while the client is paying: the provider's completion then finds the invoice settled (finalizeTradeInvoice), so a single payment's charge is recorded nowhere; a split share's is logged (split_share_unrecorded). R3 (payment attempts).
+- **Finding:** Every login of the business, a teammate included, has every trades action and setting but GST (clients, quotes, invoices, cancelling one, marking one paid outside TaptPay, recurring invoices, the reminder switch), as every trades screen offers them; in property the owner kept the same (2026-09-27, batch 6c answer 2).
 
 ### POST `/api/trades/invoices/:id/complete`
 
@@ -3700,7 +3893,14 @@ Review pending.
 - storageMethods: `createJobEvent`, `getJobInvoice`, `updateJobInvoice`
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (resource):** the invoice read by id (getJobInvoice) must be the session's business's: another business's is 404, the same as a missing one; the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500)
+- **Idempotency:** records the job complete, with the time and a job_completed event, on a paid invoice that is not a deposit: a deposit is 409 (the balance comes first), an unpaid invoice 409. Again records a new time, and logs again
+- **Success:** the invoice afterwards, a whole invoice row (the client, quote and recurring invoice, kind, amount, the checkout token, channel, job details, status and its dates, when the job was completed, the external payment reference, reminders sent, when to send, an attached document's reference and name, the provider's session and transaction ids, the split, the WhatsApp message id)
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### POST `/api/trades/invoices/:id/void`
 
@@ -3710,7 +3910,18 @@ Review pending.
 - storageMethods: `getJobInvoice`, `updateJobInvoice`
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (resource):** the invoice read by id (getJobInvoice) must be the session's business's: another business's is 404, the same as a missing one, and not paid (409 since 2026-09-27: the screens offer cancelling only an unpaid one); the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500)
+- **Idempotency:** voids the invoice with the time; a voided one is voided again, with a new time. Nothing is logged
+- **Success:** the invoice afterwards, a whole invoice row (the client, quote and recurring invoice, kind, amount, the checkout token, channel, job details, status and its dates, when the job was completed, the external payment reference, reminders sent, when to send, an attached document's reference and name, the provider's session and transaction ids, the split, the WhatsApp message id)
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **Finding:** Voiding while the client is paying: the provider's completion then finds the invoice settled (finalizeTradeInvoice), so a single payment's charge is recorded nowhere; a split share's is logged (split_share_unrecorded). R3 (payment attempts).
+- **Finding:** A split invoice with shares already paid can be voided: those shares stay collected, with nothing but their events to show for them (R3/R4, refunds).
+- **Finding:** Voiding logs no event (voiding a rent invoice logs Invoice_Voided), so the client's history shows the invoice sent and nothing after.
+- **Finding:** Every login of the business, a teammate included, has every trades action and setting but GST (clients, quotes, invoices, cancelling one, marking one paid outside TaptPay, recurring invoices, the reminder switch), as every trades screen offers them; in property the owner kept the same (2026-09-27, batch 6c answer 2).
 
 ### GET `/api/trades/schedules`
 
@@ -3718,7 +3929,14 @@ Review pending.
 - storageMethods: `getJobSchedulesByMerchant`
 - statuses: `200`, `401`, `403`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** nothing
+- **Idempotency:** read-only
+- **Success:** every recurring invoice of the business, cancelled ones included (the recurring-invoice page lists them with their status), a whole recurring invoice row (the client, amount, frequency, channel, start and end, next and last run, status, when made, changed and cancelled) each, newest first, all at once (no paging)
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### POST `/api/trades/schedules`
 
@@ -3731,7 +3949,15 @@ Review pending.
 - entitlementGates: `BILLING_CARD_REQUIRED`, `billingCardIsReady`, `requireBillingCard`
 - helpers: `requireBillingCard`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (resource):** the client named in the body (getClientProfile) must be the session's business's: another business's is 404 'Client not found', the same as a missing one; and not archived (409 since 2026-09-27: archiving cancels a client's recurring invoices, owner decision); the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** body: createJobScheduleSchema (the client's UUID, an amount of 1 cent to $1,000,000, weekly, fortnightly or monthly, a channel, the start and an optional end as date-times; other fields are dropped; 400 with the first issue). An end before the start is 400, and a start more than a day before now is 400 "The start date can't be in the past" (owner decision 2026-09-27: it billed every period since, one overdue invoice per cron run; the day's grace is because the forms send today's UTC date at 09:00 UTC)
+- **Entitlement gate:** paid access (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise)
+- **Idempotency:** none: each call adds another recurring invoice, first run on its start date; a client may have several, one per job
+- **Success:** 201 with the recurring invoice, a whole recurring invoice row (the client, amount, frequency, channel, start and end, next and last run, status, when made, changed and cancelled)
+- **Error disclosure:** input-issues
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### PUT `/api/trades/schedules/:id`
 
@@ -3743,7 +3969,14 @@ Review pending.
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
 - errorTextInResponse: `parsed.error.errors`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (resource):** the recurring invoice read by id (getJobSchedule) must be the session's business's: another business's is 404, the same as a missing one, and not cancelled (409 since 2026-09-27: a cancelled one stays cancelled); the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500); body: updateJobScheduleSchema (the amount, frequency, channel, and active or paused: 'terminated' is refused since 2026-09-27, DELETE cancels; other fields are dropped; 400 with the first issue)
+- **Idempotency:** sets the given fields (updateJobSchedule). Resuming a paused one moves its next date to the first date on its cycle after now, a monthly one kept on its start date's day of the month (nextJobRunDateAfter; owner decision 2026-09-27), so nothing is sent for the paused time; it billed every period it missed. Every call logs an event (paused, resumed or updated, with the change), again too
+- **Success:** the recurring invoice afterwards, a whole recurring invoice row (the client, amount, frequency, channel, start and end, next and last run, status, when made, changed and cancelled)
+- **Error disclosure:** input-issues
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### DELETE `/api/trades/schedules/:id`
 
@@ -3753,7 +3986,14 @@ Review pending.
 - storageMethods: `createJobEvent`, `getJobSchedule`, `terminateJobSchedule`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (resource):** the recurring invoice read by id (getJobSchedule) must be the session's business's: another business's is 404, the same as a missing one; the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500)
+- **Idempotency:** cancels the recurring invoice, recording when (terminateJobSchedule), and logs it; a cancelled one is cancelled again, with a new time, and logged again. Invoices it already made stay payable
+- **Success:** the recurring invoice afterwards, a whole recurring invoice row (the client, amount, frequency, channel, start and end, next and last run, status, when made, changed and cancelled)
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### GET `/api/internal/cron/status`
 
