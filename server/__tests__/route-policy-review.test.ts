@@ -281,12 +281,13 @@ describe("R1-T2 / R1-T3 — every route's reviewed policy holds against its hand
     });
 
     it("accept silence about the platform admin on a route that compares the role to refuse it", () => {
-      const clear = "POST /api/merchants/:id/clear-transactions";
+      // checkMerchantOwnership, then the admin refused by its role (since 2026-09-27).
+      const password = "PUT /api/merchants/:id/change-password";
       const review: RouteReview = {
         ...base,
-        branches: [{ principal: "merchant", roles: ["owner"], tenant: "path-merchant", tenantRule: "the owner's own business; the admin is refused" }],
+        branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "path-merchant", tenantRule: "the session's own business; the admin is refused" }],
       };
-      expect(problemsWith(clear, review).join("\n")).not.toContain("platform admin");
+      expect(problemsWith(password, review).join("\n")).not.toContain("platform admin");
     });
 
     it("refuse any principal but the platform admin on a route behind authenticateAdmin", () => {
@@ -309,7 +310,8 @@ describe("R1-T2 / R1-T3 — every route's reviewed policy holds against its hand
     });
 
     it("refuse an owner-only claim on a route with no owner check", () => {
-      const splitEnabled = "PATCH /api/transactions/:id/split-enabled";
+      // checkMerchantOwnership only: any login of the business.
+      const cancel = "POST /api/transactions/:id/cancel";
       const review: RouteReview = {
         ...base,
         branches: [{ principal: "merchant", roles: ["owner"], tenant: "resource", tenantRule: "compares the sale's merchant" }],
@@ -317,7 +319,7 @@ describe("R1-T2 / R1-T3 — every route's reviewed policy holds against its hand
         errorDisclosure: ["fixed"],
         sideEffects: "a live update",
       };
-      expect(problemsWith(splitEnabled, review).join("\n")).toContain("owner-only");
+      expect(problemsWith(cancel, review).join("\n")).toContain("owner-only");
     });
 
     it("refuse 'fixed messages' on a route that puts validation issues into a response", () => {

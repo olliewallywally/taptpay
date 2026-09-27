@@ -6,7 +6,7 @@ import type { TransactionStorageInput } from "../storage";
 
 /**
  * Route review, batch 2b (C10): a board sale's numbered split route. Splitting
- * is the business's choice per sale (PATCH …/split-enabled): the customer's
+ * is the business's choice per sale (made when the sale is created): the customer's
  * page only offers it when allowed, and the per-payment link route refuses it
  * otherwise, but this route split any pending sale. Its body is now checked
  * like the link route's: a whole number of shares from 2 to 10, nothing else.

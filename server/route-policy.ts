@@ -1,8 +1,8 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 9662065738e04d09a3844f2caa514f76bb9a3801 on 2026-09-27.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 45fe98de7777d94907c82d5f20d9bcf46b2de014 on 2026-09-27.
  *
- * 200 registrations (85 GET, 82 POST, 3 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
+ * 189 registrations (80 GET, 77 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
  * live count on every run rather than trusting this comment.
  *
@@ -616,12 +616,13 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     markers: ["authenticateToken","checkMerchantOwnership"],
     facts: {
       middleware: ["authenticateToken"],
-      body: ["fields: itemName, merchantId, price, stoneId"],
-      authChecks: ["checkMerchantOwnership"],
-      storageMethods: ["createTransaction","getOrCreateSubscription"],
+      body: ["schema: cashSaleRequestSchema"],
+      authChecks: ["checkMerchantOwnership","compares stone.merchantId !== merchantId"],
+      storageMethods: ["createTransaction","getOrCreateSubscription","getTaptStone"],
       sideEffects: ["live update: sseBroker.broadcast","push: sendPushToMerchant"],
       statuses: [200,400,401,402,403,500,503],
       dtos: ["ownerTransactionDto"],
+      errorTextInResponse: ["validation.error.errors"],
       entitlementGates: ["BILLING_CARD_REQUIRED","billingCardIsReady","requireBillingCard"],
       helpers: ["broadcastToStone","requireBillingCard"],
     },
@@ -660,23 +661,6 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       helpers: ["broadcastToStone"],
     },
   },
-  "PATCH /api/transactions/:id/split-enabled": {
-    method: "PATCH",
-    path: "/api/transactions/:id/split-enabled",
-    principal: "merchant-user",
-    markers: ["authenticateToken"],
-    facts: {
-      middleware: ["authenticateToken"],
-      params: ["id: strictPositiveIntegerParam"],
-      body: ["fields: splitEnabled"],
-      authChecks: ["compares transaction.merchantId !== user?.merchantId","compares user?.role !== 'admin'"],
-      storageMethods: ["getTransaction","updateTransactionSplitEnabled"],
-      sideEffects: ["live update: sseBroker.broadcast"],
-      statuses: [200,400,401,403,404,409,500,503],
-      dtos: ["ownerTransactionDto"],
-      helpers: ["broadcastToStone"],
-    },
-  },
   "GET /api/split-payments/:id": {
     method: "GET",
     path: "/api/split-payments/:id",
@@ -704,25 +688,6 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       statuses: [200,400,401,403,404,500,503],
       dtos: ["ownerTransactionDto"],
       helpers: ["broadcastToStone"],
-    },
-  },
-  "POST /api/merchants/:merchantId/nfc-pay": {
-    method: "POST",
-    path: "/api/merchants/:merchantId/nfc-pay",
-    principal: "merchant-user",
-    markers: ["authenticateToken","checkMerchantOwnership"],
-    facts: {
-      middleware: ["authenticateToken"],
-      params: ["merchantId: strictPositiveIntegerParam"],
-      body: ["fields: amount, deviceId, itemName, nfcCapabilities"],
-      authChecks: ["checkMerchantOwnership"],
-      storageMethods: ["createTransaction","getMerchant","getOrCreateSubscription","updateTransactionNfcSession"],
-      sideEffects: ["live update: sseBroker.broadcast"],
-      statuses: [200,400,401,402,403,404,500,503],
-      dtos: ["ownerTransactionDto"],
-      capabilityGates: ["config.features.tapToPay"],
-      entitlementGates: ["BILLING_CARD_REQUIRED","billingCardIsReady","requireBillingCard"],
-      helpers: ["broadcastToStone","requireBillingCard"],
     },
   },
   "GET /api/nfc/capabilities": {
@@ -831,62 +796,6 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       authChecks: ["isTokenAddressedTransaction"],
       storageMethods: ["getTransaction"],
       statuses: [200,400,404,500],
-    },
-  },
-  "GET /api/merchants/:id/analytics": {
-    method: "GET",
-    path: "/api/merchants/:id/analytics",
-    principal: "merchant-user",
-    markers: ["authenticateToken","checkMerchantOwnership"],
-    facts: {
-      middleware: ["authenticateToken"],
-      params: ["id: strictPositiveIntegerParam"],
-      authChecks: ["checkMerchantOwnership"],
-      storageMethods: ["getMerchantAnalytics"],
-      statuses: [200,400,401,403,500,503],
-    },
-  },
-  "GET /api/merchants/:id/revenue-over-time": {
-    method: "GET",
-    path: "/api/merchants/:id/revenue-over-time",
-    principal: "merchant-user",
-    markers: ["authenticateToken","checkMerchantOwnership"],
-    facts: {
-      middleware: ["authenticateToken"],
-      params: ["id: strictPositiveIntegerParam"],
-      query: ["days: strictBoundedIntegerQueryParam"],
-      authChecks: ["checkMerchantOwnership"],
-      storageMethods: ["getRevenueOverTime"],
-      statuses: [200,400,401,403,500,503],
-    },
-  },
-  "GET /api/merchants/:id/analytics/export": {
-    method: "GET",
-    path: "/api/merchants/:id/analytics/export",
-    principal: "merchant-user",
-    markers: ["authenticateToken","checkMerchantOwnership"],
-    facts: {
-      middleware: ["authenticateToken"],
-      params: ["id: strictPositiveIntegerParam"],
-      query: ["endDate: raw","startDate: raw"],
-      authChecks: ["checkMerchantOwnership"],
-      storageMethods: ["getMerchantAnalyticsWithDateRange"],
-      statuses: [200,400,401,403,500,503],
-    },
-  },
-  "GET /api/merchants/:id/export/csv": {
-    method: "GET",
-    path: "/api/merchants/:id/export/csv",
-    principal: "merchant-user",
-    markers: ["authenticateToken","checkMerchantOwnership"],
-    facts: {
-      middleware: ["authenticateToken"],
-      params: ["id: strictPositiveIntegerParam"],
-      query: ["endDate: raw","startDate: raw"],
-      authChecks: ["checkMerchantOwnership"],
-      storageMethods: ["getTransactionsByMerchantWithDateRange"],
-      statuses: [200,400,401,403,500,503],
-      helpers: ["csvCell"],
     },
   },
   "GET /api/merchants/:id/export/pdf": {
@@ -1500,18 +1409,6 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       errorTextInResponse: ["parsed.error.errors"],
     },
   },
-  "POST /api/merchants/:id/clear-transactions": {
-    method: "POST",
-    path: "/api/merchants/:id/clear-transactions",
-    principal: "merchant-user",
-    markers: ["authenticateToken","checkAccountOwnership","req.user?.role === \"admin\""],
-    facts: {
-      middleware: ["authenticateToken"],
-      params: ["id: strictPositiveIntegerParam"],
-      authChecks: ["checkAccountOwnership","checkMerchantOwnership","compares req.user?.role === \"admin\"","isAccountOwner"],
-      statuses: [400,401,403,410,503],
-    },
-  },
   "POST /api/transactions/:transactionId/refunds": {
     method: "POST",
     path: "/api/transactions/:transactionId/refunds",
@@ -1553,19 +1450,6 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       authChecks: ["compares req.user?.role !== 'admin'","compares userMerchantId !== merchantId"],
       storageMethods: ["getRefundsByMerchant"],
       statuses: [200,400,401,403,500,503],
-    },
-  },
-  "GET /api/refunds/:refundId": {
-    method: "GET",
-    path: "/api/refunds/:refundId",
-    principal: "merchant-user",
-    markers: ["authenticateToken"],
-    facts: {
-      middleware: ["authenticateToken"],
-      params: ["refundId: strictPositiveIntegerParam"],
-      authChecks: ["compares refund.merchantId !== merchantId","compares req.user?.role !== 'admin'"],
-      storageMethods: ["getRefund"],
-      statuses: [200,400,401,403,404,500,503],
     },
   },
   "GET /api/merchants/:merchantId/stock-items": {
@@ -1654,36 +1538,6 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       statuses: [200,400,401,403,404,500],
       capabilityGates: ["config.features.ecommerceApi","requireEcommerceApi"],
       helpers: ["authenticateApiKey","requireEcommerceApi"],
-    },
-  },
-  "POST /api/payments/apple-pay/validate": {
-    method: "POST",
-    path: "/api/payments/apple-pay/validate",
-    principal: "merchant-user",
-    markers: ["authenticateToken"],
-    facts: {
-      middleware: ["authenticateToken"],
-      statuses: [401,403,404,503],
-    },
-  },
-  "POST /api/payments/apple-pay/process": {
-    method: "POST",
-    path: "/api/payments/apple-pay/process",
-    principal: "merchant-user",
-    markers: ["authenticateToken"],
-    facts: {
-      middleware: ["authenticateToken"],
-      statuses: [401,403,503],
-    },
-  },
-  "POST /api/payments/google-pay/process": {
-    method: "POST",
-    path: "/api/payments/google-pay/process",
-    principal: "merchant-user",
-    markers: ["authenticateToken"],
-    facts: {
-      middleware: ["authenticateToken"],
-      statuses: [401,403,503],
     },
   },
   "GET /api/subscription": {

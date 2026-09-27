@@ -11,9 +11,9 @@ function handler(method: string, route: string): string {
 }
 
 describe("R0-T5 disabled capability gates", () => {
+  // POST /api/merchants/:merchantId/nfc-pay was removed on 2026-09-27 (owner decision, C10 batch 6b).
   test.each([
     ["post", "/api/transactions/tap-to-pay"],
-    ["post", "/api/merchants/:merchantId/nfc-pay"],
   ])("%s %s fails before billing or transaction writes", (method, route) => {
     const source = handler(method, route);
     const gate = source.indexOf("config.features.tapToPay");

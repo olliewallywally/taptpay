@@ -129,7 +129,6 @@ describe("the business-wide no-board live feed is retired", () => {
   it("still delivers a no-board sale's update to the business's own stream, and never to a board's stream", async () => {
     const { app } = await createTestApp();
     const { merchantId, token } = await createOwnerPrincipal();
-    const sale = await privateLinkSale(merchantId);
     const { board } = await boardSale(merchantId);
 
     const merchantStream = await openEventStream(app, `/api/merchants/${merchantId}/events`, bearer({ token }));
@@ -140,15 +139,18 @@ describe("the business-wide no-board live feed is retired", () => {
       await expect(merchantStream.nextEvent()).resolves.toMatchObject({ type: "connected", audience: "merchant" });
       await expect(boardStream.nextEvent()).resolves.toMatchObject({ type: "connected", audience: "board" });
 
-      const patched = await request(app)
-        .patch(`/api/transactions/${sale.id}/split-enabled`)
+      // A new sale with its own private link is the update. (These tests toggled splitting on an
+      // existing sale until that route was removed on 2026-09-27, C10 batch 6b.)
+      billingInOrder();
+      const created = await request(app)
+        .post("/api/transactions")
         .set(bearer({ token }))
-        .send({ splitEnabled: true });
-      expect(patched.status).toBe(200);
+        .send({ merchantId, itemName: "Private link sale", price: "30.00" });
+      expect(created.status).toBe(200);
 
       await expect(merchantStream.nextEvent()).resolves.toMatchObject({
         type: "transaction_updated",
-        transaction: { id: sale.id, itemName: "Private link sale" },
+        transaction: { id: created.body.id, itemName: "Private link sale" },
       });
       await expect(boardStream.nextEvent(300)).rejects.toThrow(/no event/);
     } finally {
@@ -160,7 +162,7 @@ describe("the business-wide no-board live feed is retired", () => {
   it("delivers a board's sale to that board's stream at once, with the business's stream", async () => {
     const { app } = await createTestApp();
     const { merchantId, token } = await createOwnerPrincipal();
-    const { board, sale } = await boardSale(merchantId);
+    const board = await storage.createNextTaptStone(merchantId);
 
     const merchantStream = await openEventStream(app, `/api/merchants/${merchantId}/events`, bearer({ token }));
     const boardStream = await openEventStream(app, `/api/merchants/${merchantId}/events?stoneId=${board.id}`);
@@ -168,21 +170,23 @@ describe("the business-wide no-board live feed is retired", () => {
       await merchantStream.nextEvent();
       await boardStream.nextEvent();
 
-      await request(app)
-        .patch(`/api/transactions/${sale.id}/split-enabled`)
+      // A new sale on the board is the update (see the test above).
+      billingInOrder();
+      const created = await request(app)
+        .post("/api/transactions")
         .set(bearer({ token }))
-        .send({ splitEnabled: true })
+        .send({ merchantId, itemName: "Board sale", price: "8.00", selectedStoneId: board.id })
         .expect(200);
 
       await expect(boardStream.nextEvent()).resolves.toMatchObject({
         type: "transaction_updated",
         addressingMode: "board",
         stoneId: board.id,
-        transaction: { id: sale.id },
+        transaction: { id: created.body.id },
       });
       await expect(merchantStream.nextEvent()).resolves.toMatchObject({
         type: "transaction_updated",
-        transaction: { id: sale.id },
+        transaction: { id: created.body.id },
       });
     } finally {
       await merchantStream.close();

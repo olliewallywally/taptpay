@@ -30,36 +30,18 @@ function routeHandler(
   );
 }
 
-function registrationPrefix(method: "post", route: string): string {
-  const handler = routeHandler(method, route);
-  const asyncStart = handler.indexOf("async");
-  return asyncStart < 0 ? handler.slice(0, 240) : handler.slice(0, asyncStart);
-}
-
 describe("R0 containment — failing baseline evidence", () => {
-  test("cross-tenant transaction clearing is authorized and cannot delete", () => {
-    const clear = routeHandler("post", "/api/merchants/:id/clear-transactions");
-    const violations: string[] = [];
-    if (!/check(?:Account|Merchant)Ownership\s*\(/.test(clear)) {
-      violations.push("missing tenant ownership gate");
-    }
-    if (clear.includes("storage.clearTransactions(")) {
-      violations.push("destructive storage call remains");
-    }
-
-    expect(violations).toEqual([]);
-  });
-
-  test("wallet processing routes reject unauthenticated requests", () => {
+  // Transaction clearing (a 410 tombstone since R0-T4) and the three retired wallet routes were
+  // removed on 2026-09-27 (owner decision, C10 batch 6b): nothing called them.
+  test("no route clears transactions, and the retired wallet routes are registered nowhere", () => {
+    expect(routesSource).not.toMatch(/app\.\w+\("[^"]*clear-transactions/);
+    expect(routesSource).not.toContain("storage.clearTransactions(");
     for (const route of [
       "/api/payments/apple-pay/validate",
       "/api/payments/apple-pay/process",
       "/api/payments/google-pay/process",
     ]) {
-      expect({ route, registration: registrationPrefix("post", route) }).toEqual({
-        route,
-        registration: expect.stringContaining("authenticateToken"),
-      });
+      expect({ route, registered: routesSource.includes(`app.post("${route}"`) }).toEqual({ route, registered: false });
     }
   });
 

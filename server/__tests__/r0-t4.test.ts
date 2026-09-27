@@ -6,12 +6,6 @@ import { isDemoAccountLoginBlocked } from "../demo-safety";
 
 const routesSource = fs.readFileSync(path.join(process.cwd(), "server/routes.ts"), "utf8");
 
-function clearingHandler(): string {
-  const start = routesSource.indexOf('app.post("/api/merchants/:id/clear-transactions"');
-  if (start < 0) throw new Error("transaction-clearing tombstone is missing");
-  const next = routesSource.indexOf("\n  app.", start + 1);
-  return routesSource.slice(start, next < 0 ? routesSource.length : next);
-}
 
 describe("R0-T4 retired clearing and seed safety", () => {
   test.each([
@@ -27,16 +21,11 @@ describe("R0-T4 retired clearing and seed safety", () => {
     expect(strictPositiveIntegerParam(raw)).toBe(expected);
   });
 
-  test("clearing route authenticates, authorizes, and only returns its tombstone", () => {
-    const handler = clearingHandler();
-    expect(handler.slice(0, 180)).toContain("authenticateToken");
-    expect(handler).toContain("strictPositiveIntegerParam");
-    expect(handler).toContain("checkAccountOwnership");
-    expect(handler).toContain("status(400)");
-    expect(handler).toContain("status(403)");
-    expect(handler).toContain("status(410)");
-    expect(handler).toContain("TRANSACTION_CLEARING_RETIRED");
-    expect(handler).not.toMatch(/storage\.|windcave|sendPush|sseBroker|outbox/i);
+  // The tombstone that replaced clearing (410) was removed on 2026-09-27 (owner decision, C10 batch
+  // 6b): nothing called it. What R0-T4 holds is that no route clears a business's sales.
+  test("no route clears a business's sales", () => {
+    expect(routesSource).not.toMatch(/app\.\w+\("[^"]*clear-transactions/);
+    expect(routesSource).not.toMatch(/storage\.(clear|deleteAll|deleteTransactionsBy)\w*/);
   });
 
   test("direct seed policy requires the flag and a development/test environment", () => {

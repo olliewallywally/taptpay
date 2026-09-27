@@ -73,32 +73,5 @@ describe("R1-T6 — bounded query values reject garbage and default only when ab
     });
   });
 
-  describe("GET /api/merchants/:id/revenue-over-time — days", () => {
-    test("absent days defaults, garbage days is refused", async () => {
-      const { app } = await createTestApp();
-      const owner = await createOwnerPrincipal();
-
-      const ok = await request(app)
-        .get(`/api/merchants/${owner.merchantId}/revenue-over-time`).set(bearer(owner));
-      expect(ok.status).toBe(200);
-
-      for (const raw of ["abc", "0", "-30", "1.5"]) {
-        const bad = await request(app)
-          .get(`/api/merchants/${owner.merchantId}/revenue-over-time`).query({ days: raw }).set(bearer(owner));
-        expect({ raw, status: bad.status }).toEqual({ raw, status: 400 });
-        expect(bad.body.message).toBe("Invalid days");
-      }
-    });
-
-    test("a valid days value still reaches storage clamped, not as NaN", async () => {
-      const { app } = await createTestApp();
-      const owner = await createOwnerPrincipal();
-      const revenue = jest.spyOn(storage, "getRevenueOverTime");
-
-      await request(app)
-        .get(`/api/merchants/${owner.merchantId}/revenue-over-time`).query({ days: "9999" }).set(bearer(owner));
-
-      expect(revenue).toHaveBeenCalledWith(owner.merchantId, 365);
-    });
-  });
+  // GET /api/merchants/:id/revenue-over-time was removed on 2026-09-27 (owner decision, C10 batch 6b).
 });

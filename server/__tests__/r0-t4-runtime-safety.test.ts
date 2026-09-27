@@ -16,7 +16,9 @@ function snapshot() {
 describe("R0-T4 runtime clearing and direct-seed safety", () => {
   beforeEach(() => resetTestStorage());
 
-  test("clearing enforces the principal matrix without data or notification effects", async () => {
+  // The clearing tombstone (410) was removed on 2026-09-27 (owner decision, C10 batch 6b): every
+  // caller now meets an unknown address, still with no data or notification effects.
+  test("clearing is registered nowhere, for any caller, without data or notification effects", async () => {
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
     const other = await createOwnerPrincipal();
@@ -29,22 +31,19 @@ describe("R0-T4 runtime clearing and direct-seed safety", () => {
       eligibleSubscriptions: 0, attempted: 0, delivered: 0, failed: 0,
     });
     const cases = [
-      { principal: undefined, id: String(owner.merchantId), status: 401 },
-      { principal: owner, id: "1abc", status: 400 },
-      { principal: owner, id: "0", status: 400 },
-      { principal: owner, id: "-1", status: 400 },
-      { principal: owner, id: "1.5", status: 400 },
-      { principal: owner, id: String(other.merchantId), status: 403 },
-      { principal: member, id: String(owner.merchantId), status: 403 },
-      { principal: admin, id: String(owner.merchantId), status: 403 },
-      { principal: owner, id: String(owner.merchantId), status: 410 },
+      { principal: undefined, id: String(owner.merchantId) },
+      { principal: owner, id: "1abc" },
+      { principal: owner, id: String(other.merchantId) },
+      { principal: member, id: String(owner.merchantId) },
+      { principal: admin, id: String(owner.merchantId) },
+      { principal: owner, id: String(owner.merchantId) },
     ];
     for (let retry = 0; retry < 2; retry++) {
-      await Promise.all(cases.map(async ({ principal, id, status }) => {
+      await Promise.all(cases.map(async ({ principal, id }) => {
         const response = await request(app).post(`/api/merchants/${id}/clear-transactions`)
           .set(principal ? bearer(principal) : {});
-        expect(response.status).toBe(status);
-        if (status === 410) expect(response.body.code).toBe("TRANSACTION_CLEARING_RETIRED");
+        expect(response.status).toBe(404);
+        expect(response.headers["content-type"]).not.toMatch(/json/);
       }));
     }
     expect(snapshot()).toBe(before);

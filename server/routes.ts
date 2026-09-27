@@ -13,7 +13,7 @@ import {
   subscriptionCardSessionState,
 } from "./storage";
 import { TUTORIAL_PAGE_KEYS, isTutorialPageKey } from "@shared/tutorial";
-import { inviteTeamMemberSchema, acceptInviteSchema, retailTransactionCreateRequestSchema, updateMerchantDetailsSchema, updateThemeSchema, updateDailyGoalSchema, forgotPasswordSchema, resetPasswordSchema, changePasswordSchema, newPasswordSchema, createRefundSchema, insertRefundSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, merchantOnboardingSchema, pushNotificationPreferencesSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createClientProfileSchema, updateClientProfileSchema, createQuoteSchema, acceptQuoteSchema, createJobInvoiceSchema, markJobPaidExternalSchema, createJobScheduleSchema, updateJobScheduleSchema, updateTradeReminderSettingsSchema, updateTradeGstSettingsSchema } from "@shared/schema";
+import { inviteTeamMemberSchema, acceptInviteSchema, retailTransactionCreateRequestSchema, cashSaleRequestSchema, updateMerchantDetailsSchema, updateThemeSchema, updateDailyGoalSchema, forgotPasswordSchema, resetPasswordSchema, changePasswordSchema, newPasswordSchema, createRefundSchema, insertRefundSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, merchantOnboardingSchema, pushNotificationPreferencesSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createClientProfileSchema, updateClientProfileSchema, createQuoteSchema, acceptQuoteSchema, createJobInvoiceSchema, markJobPaidExternalSchema, createJobScheduleSchema, updateJobScheduleSchema, updateTradeReminderSettingsSchema, updateTradeGstSettingsSchema } from "@shared/schema";
 import { isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, getWindcaveEnv, submitGooglePayToken, createAttendedSession, submitTapToPayToken, createCardStorageSession, queryStoredCardSession, chargeStoredCard } from "./windcave";
 import { authenticateUser, checkPasswordEvenly, passwordCheckBudget, generateToken, authenticateToken, createUser, issueTokenForUserId, tokenForUserRow, isAccountOwner, requestPasswordReset, resetPassword, validateResetToken, type AuthenticatedRequest, logSecurityEvent, syncVerifiedMerchants } from "./auth";
 import {
@@ -2414,34 +2414,38 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // Cash Sale — creates and immediately completes a transaction (no payment processing)
   app.post("/api/transactions/cash-sale", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
-      const { merchantId, itemName, price, stoneId } = req.body;
-
-      if (!merchantId || !itemName || !price) {
-        return res.status(400).json({ message: "merchantId, itemName and price are required" });
+      // The rules creating a sale uses (C10 batch 6b): the body was read without a schema
+      // (parseInt, parseFloat), and the board was never checked.
+      const validation = cashSaleRequestSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ message: "Invalid cash sale", errors: validation.error.errors });
       }
-      if (!checkMerchantOwnership(req, parseInt(merchantId))) {
+      const { merchantId, itemName, stoneId } = validation.data;
+      if (!checkMerchantOwnership(req, merchantId)) {
         return res.status(403).json({ message: "Access denied" });
       }
-      if (!(await requireBillingCard(parseInt(merchantId), res))) return;
-
-      const priceNum = parseFloat(price);
-      if (isNaN(priceNum) || priceNum <= 0) {
-        return res.status(400).json({ message: "Invalid price" });
+      if (!(await requireBillingCard(merchantId, res))) return;
+      if (stoneId != null) {
+        const stone = await storage.getTaptStone(stoneId);
+        if (!stone || stone.merchantId !== merchantId || !stone.isActive) {
+          return res.status(400).json({ message: "Selected payment board is unavailable" });
+        }
       }
+      const price = Number(validation.data.price).toFixed(2);
 
       // No per-transaction fee — merchants pay a monthly subscription.
       const transaction = await storage.createTransaction({
-        merchantId: parseInt(merchantId),
-        taptStoneId: stoneId ? parseInt(stoneId) : null,
+        merchantId,
+        taptStoneId: stoneId ?? null,
         itemName,
-        price: priceNum.toFixed(2),
+        price,
         status: "completed",
         paymentMethod: "cash",
         windcaveFeeRate: "0.0000",
         windcaveFeeAmount: "0.00",
         platformFeeRate: "0.0000",
         platformFeeAmount: "0.00",
-        merchantNet: priceNum.toFixed(2),
+        merchantNet: price,
         splitEnabled: false,
       } as any);
 
@@ -2631,7 +2635,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!transaction || isTokenAddressedTransaction(transaction)) {
         return res.status(404).json({ message: "Transaction not found" });
       }
-      // Splitting is the business's choice for each sale (PATCH …/split-enabled).
+      // Splitting is the business's choice for each sale, made when the sale is created.
       if (!transaction.splitEnabled) {
         return res.status(409).json({ message: "This payment cannot be split" });
       }
@@ -2664,50 +2668,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  // Update splitEnabled on a pending transaction (merchant toggle)
-  app.patch("/api/transactions/:id/split-enabled", authenticateToken, async (req, res) => {
-    try {
-      const transactionId = strictPositiveIntegerParam(req.params.id);
-      if (transactionId === null) return res.status(400).json({ message: "Invalid id" });
-      const { splitEnabled } = req.body;
-
-      if (typeof splitEnabled !== 'boolean') {
-        return res.status(400).json({ message: "splitEnabled must be a boolean" });
-      }
-
-      const transaction = await storage.getTransaction(transactionId);
-      if (!transaction) {
-        return res.status(404).json({ message: "Transaction not found" });
-      }
-
-      // Only the owning merchant (or an admin) can update
-      const user = (req as any).user;
-      if (user?.role !== 'admin' && transaction.merchantId !== user?.merchantId) {
-        return res.status(403).json({ message: "Forbidden" });
-      }
-
-      // Only update if still pending
-      if (transaction.status !== 'pending') {
-        return res.status(409).json({ message: "Cannot update split status on a non-pending transaction" });
-      }
-
-      const updated = await storage.updateTransactionSplitEnabled(transactionId, splitEnabled);
-      if (!updated) {
-        return res.status(404).json({ message: "Transaction not found" });
-      }
-
-      // Broadcast change to SSE listeners
-      broadcastToStone(updated.merchantId!, updated.taptStoneId, {
-        type: 'transaction_updated',
-        transaction: updated,
-      });
-
-      res.json(ownerTransactionDto(updated));
-    } catch (error) {
-      console.error("Error updating split enabled:", error);
-      res.status(500).json({ message: "Failed to update split enabled" });
-    }
-  });
+  // (Removed PATCH /api/transactions/:id/split-enabled, owner decision 2026-09-27: no screen called it;
+  // both terminals set splitting when they create the sale.)
 
   // Get a single split payment by ID (public — needed for customer receipt page)
   app.get("/api/split-payments/:id", async (req, res) => {
@@ -2776,94 +2738,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  // NFC Tap to Phone Payment API
-  // The merchant's own phone is the terminal, so only the authenticated owner may
-  // open a charge. Leaving this public let anyone create pending transactions with
-  // an arbitrary itemName/amount on any merchant — polluting their transaction list,
-  // spamming fake nfc_transaction_created events onto their live SSE feed, and
-  // planting CSV-formula-injection payloads in their export.
-  app.post("/api/merchants/:merchantId/nfc-pay", authenticateToken, async (req: AuthenticatedRequest, res) => {
-    try {
-      const merchantId = strictPositiveIntegerParam(req.params.merchantId);
-      if (merchantId === null) return res.status(400).json({ message: "Invalid id" });
-      if (!checkMerchantOwnership(req, merchantId)) {
-        return res.status(403).json({ message: "Access denied" });
-      }
-      if (!config.features.tapToPay) {
-        return res.status(503).json({ code: "TAP_TO_PAY_DISABLED", message: "Tap to Pay is temporarily unavailable" });
-      }
-      if (!(await requireBillingCard(merchantId, res))) return;
-      const { amount, itemName, deviceId, nfcCapabilities } = req.body;
-
-      // Validate required fields
-      if (!amount || !itemName) {
-        return res.status(400).json({ message: "Amount and item name are required" });
-      }
-      const priceNum = parseFloat(amount);
-      if (isNaN(priceNum) || priceNum <= 0) {
-        return res.status(400).json({ message: "Invalid amount" });
-      }
-
-      // Check if merchant exists
-      const merchant = await storage.getMerchant(merchantId);
-      if (!merchant) {
-        return res.status(404).json({ message: "Merchant not found" });
-      }
-
-      // Create transaction with NFC payment method
-      const transaction = await storage.createTransaction({
-        merchantId,
-        itemName,
-        price: priceNum.toFixed(2),
-        paymentMethod: "nfc_tap",
-        deviceId: deviceId || "unknown",
-        status: "pending",
-        splitEnabled: false,
-      });
-      
-      // Generate NFC session for contactless payment. Include a cryptographically
-      // random component so the session id (later accepted by the public
-      // /complete endpoint) cannot be guessed from the transaction id + time.
-      const nfcSessionId = `NFC_${transaction.id}_${crypto.randomBytes(16).toString('hex')}`;
-      
-      // Update transaction with NFC session ID
-      await storage.updateTransactionNfcSession(transaction.id, nfcSessionId);
-      
-      // Notify connected clients about new NFC transaction
-      broadcastToStone(merchantId, transaction.taptStoneId, { 
-        type: 'nfc_transaction_created', 
-        transaction: { ...transaction, nfcSessionId },
-        nfcSession: {
-          sessionId: nfcSessionId,
-          amount: amount,
-          merchantName: merchant.businessName || merchant.name,
-          paymentMethods: ['apple_pay', 'google_pay', 'contactless_card']
-        }
-      });
-      
-      res.json({
-        success: true,
-        transaction: ownerTransactionDto(transaction),
-        nfcSession: {
-          sessionId: nfcSessionId,
-          amount: amount,
-          merchantName: merchant.businessName || merchant.name,
-          windcaveSessionId: null,
-          paymentUrl: null,
-          supportedMethods: [
-            'apple_pay',
-            'google_pay', 
-            'samsung_pay',
-            'contactless_card',
-            'nfc_enabled_cards'
-          ]
-        }
-      });
-    } catch (error) {
-      console.error("NFC payment creation error:", error);
-      res.status(500).json({ message: "Failed to create NFC payment session" });
-    }
-  });
+  // (Removed POST /api/merchants/:merchantId/nfc-pay, owner decision 2026-09-27: no screen called it,
+  // and the pending sales it opened could never complete: the NFC completion that faked payments was
+  // removed in R0-T5. Tap to Pay is POST /api/transactions/tap-to-pay.)
 
   // Get NFC payment capabilities for a device
   // R0-T5: capability is what this platform will actually honour, not what the
@@ -3388,133 +3265,17 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  // Get merchant analytics
-  app.get("/api/merchants/:id/analytics", authenticateToken, async (req: AuthenticatedRequest, res) => {
-    try {
-      const merchantId = strictPositiveIntegerParam(req.params.id);
-      if (merchantId === null) return res.status(400).json({ message: "Invalid id" });
-      if (!checkMerchantOwnership(req, merchantId)) {
-        return res.status(403).json({ message: "Access denied" });
-      }
-      const analytics = await storage.getMerchantAnalytics(merchantId);
-      res.json(analytics);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to get analytics" });
-    }
-  });
+  // (Removed GET /api/merchants/:id/analytics, owner decision 2026-09-27: no screen called it; the
+  // analytics screens work from the business's sales list.)
 
-  // Get revenue over time data
-  app.get("/api/merchants/:id/revenue-over-time", authenticateToken, async (req: AuthenticatedRequest, res) => {
-    try {
-      const merchantId = strictPositiveIntegerParam(req.params.id);
-      if (merchantId === null) return res.status(400).json({ message: "Invalid id" });
-      if (!checkMerchantOwnership(req, merchantId)) {
-        return res.status(403).json({ message: "Access denied" });
-      }
-      // Unbounded before this fix: unlike every "size" query param in this file
-      // (all wrapped in Math.min against a pixel cap), this had no upper bound —
-      // a huge positive value (falsy-safe, so it survives the `|| 30` fallback)
-      // reaches getRevenueOverTime's `for (let i = 0; i <= days; i++)` loop,
-      // which is synchronous and builds one Map entry per day. That blocks
-      // Node's single event loop thread for every tenant, not just the caller.
-      // Clamped to a generous 1-year reporting window, same shape as the size
-      // clamps elsewhere in this file.
-      const days = strictBoundedIntegerQueryParam(req.query.days, { fallback: 30, max: 365 });
-      if (days === null) return res.status(400).json({ message: "Invalid days" });
-      const revenueData = await storage.getRevenueOverTime(merchantId, days);
-      res.json(revenueData);
-    } catch (error) {
-      console.error("Error fetching revenue over time:", error);
-      res.status(500).json({ message: "Failed to get revenue data" });
-    }
-  });
+  // (Removed GET /api/merchants/:id/revenue-over-time, owner decision 2026-09-27: no screen called it;
+  // the revenue charts are drawn from the business's sales list.)
 
-  // Get merchant analytics with date range
-  app.get("/api/merchants/:id/analytics/export", authenticateToken, async (req: AuthenticatedRequest, res) => {
-    try {
-      const merchantId = strictPositiveIntegerParam(req.params.id);
-      if (merchantId === null) return res.status(400).json({ message: "Invalid id" });
-      if (!checkMerchantOwnership(req, merchantId)) {
-        return res.status(403).json({ message: "Access denied" });
-      }
-      const { startDate, endDate } = req.query;
-      
-      const start = startDate ? new Date(startDate as string) : undefined;
-      const end = endDate ? new Date(endDate as string) : undefined;
-      
-      const analytics = await storage.getMerchantAnalyticsWithDateRange(merchantId, start, end);
-      res.json(analytics);
-    } catch (error) {
-      console.error("Error fetching analytics with date range:", error);
-      res.status(500).json({ message: "Failed to get analytics" });
-    }
-  });
+  // (Removed GET /api/merchants/:id/analytics/export, owner decision 2026-09-27: only a page mounted
+  // nowhere called it.)
 
-  // Export transactions as CSV
-  app.get("/api/merchants/:id/export/csv", authenticateToken, async (req: AuthenticatedRequest, res) => {
-    try {
-      const merchantId = strictPositiveIntegerParam(req.params.id);
-      if (merchantId === null) return res.status(400).json({ message: "Invalid id" });
-      if (!checkMerchantOwnership(req, merchantId)) {
-        return res.status(403).json({ message: "Access denied" });
-      }
-      const { startDate, endDate } = req.query;
-      
-      const start = startDate ? new Date(startDate as string) : undefined;
-      const end = endDate ? new Date(endDate as string) : undefined;
-      
-      const transactions = await storage.getTransactionsByMerchantWithDateRange(merchantId, start, end);
-      
-      // Generate CSV headers
-      const headers = [
-        "Transaction ID",
-        "Date & Time", 
-        "Item Name",
-        "Amount (NZD)",
-        "Status",
-        "Payment Reference"
-      ];
-      
-      // Escape one CSV field: RFC-4180 quote-wrap (doubling internal quotes) and
-      // neutralise formula injection (a leading = + - @ makes Excel/Sheets execute
-      // the cell). Mirrors client csvCell() in report-utils.
-      const csvCell = (value: unknown): string => {
-        let s = value == null ? "" : String(value);
-        if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
-        if (/[",\n\r]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
-        return s;
-      };
-
-      // Generate CSV content
-      const csvRows = [headers.map(csvCell).join(",")];
-
-      transactions.forEach(transaction => {
-        const row = [
-          transaction.id,
-          transaction.createdAt ? new Date(transaction.createdAt).toLocaleString('en-NZ') : 'N/A',
-          transaction.itemName,
-          `$${parseFloat(transaction.price).toFixed(2)}`,
-          transaction.status,
-          transaction.windcaveTransactionId || 'N/A'
-        ].map(csvCell);
-        csvRows.push(row.join(","));
-      });
-      
-      const csvContent = csvRows.join("\n");
-      
-      // Set response headers for CSV download
-      const dateRange = start || end ? 
-        `_${start?.toISOString().split('T')[0] || 'beginning'}_to_${end?.toISOString().split('T')[0] || 'today'}` : 
-        '_all_time';
-      
-      res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', `attachment; filename=tapt_transactions${dateRange}.csv`);
-      res.send(csvContent);
-    } catch (error) {
-      console.error("Error generating CSV export:", error);
-      res.status(500).json({ message: "Failed to generate CSV export" });
-    }
-  });
+  // (Removed GET /api/merchants/:id/export/csv, owner decision 2026-09-27: only a page mounted nowhere
+  // called it; the phone's Transactions page builds its CSV and Xero CSV itself.)
 
   // Export business report as PDF
   app.get("/api/merchants/:id/export/pdf", authenticateToken, async (req: AuthenticatedRequest, res) => {
@@ -5612,24 +5373,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  // Compatibility tombstone. Financial records are never bulk-deleted; future
-  // corrections use typed state transitions and append-only events.
-  app.post("/api/merchants/:id/clear-transactions", authenticateToken, async (req: AuthenticatedRequest, res) => {
-    const merchantId = strictPositiveIntegerParam(req.params.id);
-    if (merchantId === null) {
-      return res.status(400).json({
-        code: "INVALID_MERCHANT_ID",
-        message: "Merchant ID must be a positive integer",
-      });
-    }
-    if (req.user?.role === "admin" || !checkAccountOwnership(req, merchantId)) {
-      return res.status(403).json({ code: "FORBIDDEN", message: "Access denied" });
-    }
-    return res.status(410).json({
-      code: "TRANSACTION_CLEARING_RETIRED",
-      message: "Transaction clearing has been retired",
-    });
-  });
+  // (Removed POST /api/merchants/:id/clear-transactions, owner decision 2026-09-27: R0-T4's 410
+  // tombstone, which nothing called. Financial records are never bulk-deleted.)
 
   // ===== REFUND MANAGEMENT ROUTES =====
   
@@ -5822,34 +5567,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  // Get specific refund details
-  app.get("/api/refunds/:refundId", authenticateToken, async (req: AuthenticatedRequest, res) => {
-    try {
-      const refundId = strictPositiveIntegerParam(req.params.refundId);
-      if (refundId === null) return res.status(400).json({ message: "Invalid refundId" });
-      const merchantId = req.user?.merchantId;
-      
-      if (!merchantId) {
-        return res.status(401).json({ message: "Merchant authentication required" });
-      }
-
-      const refund = await storage.getRefund(refundId);
-      if (!refund) {
-        return res.status(404).json({ message: "Refund not found" });
-      }
-
-      // Verify access
-      if (refund.merchantId !== merchantId && req.user?.role !== 'admin') {
-        return res.status(403).json({ message: "Access denied" });
-      }
-
-      res.json(refund);
-
-    } catch (error) {
-      console.error("Error fetching refund:", error);
-      res.status(500).json({ message: "Failed to fetch refund" });
-    }
-  });
+  // (Removed GET /api/refunds/:refundId, owner decision 2026-09-27: no screen called it; refunds are
+  // listed per sale and per business.)
 
   // (Removed the five admin API-key and usage routes, GET and POST /api/admin/api-keys,
   // POST /api/admin/api-keys/:keyId/revoke, GET /api/admin/api-metrics and GET /api/admin/api-usage,
@@ -6197,20 +5916,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // routes. There is deliberately no capability flag here — a flag around fake-success
   // code is not containment (plan rule 5). A real implementation is R2/R7 scope.
 
-  // Apple Pay merchant validation endpoint — retired, no real Apple merchant validation exists
-  app.post("/api/payments/apple-pay/validate", authenticateToken, async (req, res) => {
-    return res.status(404).json({ code: "NOT_FOUND", message: "Not found" });
-  });
+  // (Removed the three retired wallet routes, POST /api/payments/apple-pay/validate,
+  // /api/payments/apple-pay/process and /api/payments/google-pay/process, owner decision 2026-09-27:
+  // they only answered unavailable, and nothing called them. Customers pay with Apple Pay and Google
+  // Pay through the checkout page's own routes.)
 
-  // Apple Pay payment processing endpoint — retired, no success fallback under any condition
-  app.post("/api/payments/apple-pay/process", authenticateToken, async (req, res) => {
-    return res.status(503).json({ code: "DIGITAL_WALLET_DISABLED", message: "Digital wallet payments are unavailable" });
-  });
 
-  // Google Pay payment processing endpoint — retired, no success fallback under any condition
-  app.post("/api/payments/google-pay/process", authenticateToken, async (req, res) => {
-    return res.status(503).json({ code: "DIGITAL_WALLET_DISABLED", message: "Digital wallet payments are unavailable" });
-  });
 
   // (Removed GET /api/payments/digital-wallet/config, owner decision 2026-09-26: nothing called
   // it, the wallet payment routes above are retired, and it guessed the device from the

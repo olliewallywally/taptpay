@@ -2712,29 +2712,18 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
  * Routes not reviewed yet. May only shrink: PENDING_CEILING is lowered by
  * every batch, so a route cannot be added here instead of being reviewed.
  */
-export const PENDING_CEILING = 70;
+export const PENDING_CEILING = 59;
 
 export const REVIEW_PENDING: readonly string[] = [
   "POST /api/transactions",
   "POST /api/transactions/cash-sale",
   "POST /api/transactions/tap-to-pay",
-  "PATCH /api/transactions/:id/split-enabled",
   "POST /api/transactions/:id/cancel",
-  "POST /api/merchants/:merchantId/nfc-pay",
-  "GET /api/merchants/:id/analytics",
-  "GET /api/merchants/:id/revenue-over-time",
-  "GET /api/merchants/:id/analytics/export",
-  "GET /api/merchants/:id/export/csv",
   "GET /api/merchants/:id/export/pdf",
   "GET /api/merchants/:id/transactions",
-  "POST /api/merchants/:id/clear-transactions",
   "POST /api/transactions/:transactionId/refunds",
   "GET /api/transactions/:transactionId/refunds",
   "GET /api/merchants/:merchantId/refunds",
-  "GET /api/refunds/:refundId",
-  "POST /api/payments/apple-pay/validate",
-  "POST /api/payments/apple-pay/process",
-  "POST /api/payments/google-pay/process",
   "GET /api/property/tenants",
   "POST /api/property/tenants",
   "GET /api/property/tenants/:id",

@@ -92,44 +92,9 @@ describe("R1-T6 — transactions/refunds identifier batch", () => {
     });
   });
 
-  describe("PATCH /api/transactions/:id/split-enabled (owner/admin only)", () => {
-    it.each(GARBAGE_IDS)("id=%s returns 400 even with a valid owner token", async (garbage) => {
-      const { app } = await createTestApp();
-      const owner = await createOwnerPrincipal();
-      const response = await request(app)
-        .patch(`/api/transactions/${encodeURIComponent(garbage)}/split-enabled`)
-        .set(bearer(owner))
-        .send({ splitEnabled: true });
-      expect(response.status).toBe(400);
-      expect(response.body.message).toBe("Invalid id");
-    });
+  // PATCH /api/transactions/:id/split-enabled was removed on 2026-09-27 (owner decision, C10 batch 6b):
+  // both terminals set splitting when they create the sale.
 
-    it("the owning merchant can toggle split-enabled on their own pending transaction", async () => {
-      const { app } = await createTestApp();
-      const owner = await createOwnerPrincipal();
-      const txn = await pendingTransaction(owner.merchantId);
-
-      const response = await request(app)
-        .patch(`/api/transactions/${txn.id}/split-enabled`)
-        .set(bearer(owner))
-        .send({ splitEnabled: true });
-      expect(response.status).toBe(200);
-      expect(response.body.splitEnabled).toBe(true);
-    });
-
-    it("a well-formed id belonging to a different merchant is 403, not 400 — parsing and ownership are distinct stages", async () => {
-      const { app } = await createTestApp();
-      const owner = await createOwnerPrincipal();
-      const otherOwner = await createOwnerPrincipal();
-      const txn = await pendingTransaction(owner.merchantId);
-
-      const response = await request(app)
-        .patch(`/api/transactions/${txn.id}/split-enabled`)
-        .set(bearer(otherOwner))
-        .send({ splitEnabled: true });
-      expect(response.status).toBe(403);
-    });
-  });
 
   describe("GET /api/split-payments/:id (public)", () => {
     it.each(GARBAGE_IDS)("id=%s returns 400", async (garbage) => {
@@ -420,48 +385,8 @@ describe("R1-T6 — transactions/refunds identifier batch", () => {
     });
   });
 
-  describe("GET /api/refunds/:refundId (auth)", () => {
-    it.each(GARBAGE_IDS)("refundId=%s returns 400", async (garbage) => {
-      const { app } = await createTestApp();
-      const owner = await createOwnerPrincipal();
-      const response = await request(app)
-        .get(`/api/refunds/${encodeURIComponent(garbage)}`)
-        .set(bearer(owner));
-      expect(response.status).toBe(400);
-      expect(response.body.message).toBe("Invalid refundId");
-    });
+  // GET /api/refunds/:refundId was removed on 2026-09-27 (owner decision, C10 batch 6b).
 
-    it("an unknown-but-well-formed refundId 404s rather than 400", async () => {
-      const { app } = await createTestApp();
-      const owner = await createOwnerPrincipal();
-      const response = await request(app)
-        .get("/api/refunds/999999")
-        .set(bearer(owner));
-      expect(response.status).toBe(404);
-    });
-
-    it("the owning merchant can fetch a real refund by id", async () => {
-      const { app } = await createTestApp();
-      const owner = await createOwnerPrincipal();
-      const txn = await completedTransaction(owner.merchantId);
-      const refund = await storage.createRefund({
-        transactionId: txn.id,
-        merchantId: owner.merchantId,
-        refundAmount: "5.00",
-        refundReason: "batch fixture",
-        refundMethod: "original_payment_method",
-        status: "completed",
-        windcaveRefundId: null,
-        completedAt: null,
-      } as any);
-
-      const response = await request(app)
-        .get(`/api/refunds/${refund.id}`)
-        .set(bearer(owner));
-      expect(response.status).toBe(200);
-      expect(response.body.id).toBe(refund.id);
-    });
-  });
 
   describe("GET /api/v1/transactions/:id (ecommerce API key; error-envelope route, see evidence doc)", () => {
     it("without a valid API key, a garbage id never reaches the parser at all — 401 from authenticateApiKey first", async () => {

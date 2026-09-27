@@ -208,3 +208,61 @@ describe("stock belongs to the business's logins and the platform admin", () => 
     expect((await request(app).delete(`${base}/${itemId}`).set(bearer(createAdminPrincipal()))).status).toBe(200);
   });
 });
+
+/**
+ * Owner decision 2026-09-27 (docs/decisions/2026-09-27-c10-batch-6b-owner-answers.md): eleven
+ * sales, report and payment routes no screen calls are removed. Every function they touched keeps
+ * working through the routes that stay (the guards below are those routes' neighbours).
+ */
+describe("the sales, report and payment routes no screen calls are removed", () => {
+  type Method = "get" | "post" | "patch";
+  const RETIRED: Array<[string, Method, string, Record<string, unknown> | undefined]> = [
+    ["PATCH /api/transactions/:id/split-enabled", "patch", "/api/transactions/{sale}/split-enabled", { splitEnabled: true }],
+    ["GET /api/merchants/:id/analytics", "get", "/api/merchants/{business}/analytics", undefined],
+    ["GET /api/merchants/:id/revenue-over-time", "get", "/api/merchants/{business}/revenue-over-time", undefined],
+    ["POST /api/merchants/:merchantId/nfc-pay", "post", "/api/merchants/{business}/nfc-pay", { amount: "5.00", itemName: "Tap" }],
+    ["POST /api/payments/apple-pay/validate", "post", "/api/payments/apple-pay/validate", { validationURL: "https://apple-pay-gateway.apple.com/" }],
+    ["POST /api/payments/apple-pay/process", "post", "/api/payments/apple-pay/process", {}],
+    ["POST /api/payments/google-pay/process", "post", "/api/payments/google-pay/process", {}],
+    ["GET /api/refunds/:refundId", "get", "/api/refunds/1", undefined],
+    ["GET /api/merchants/:id/analytics/export", "get", "/api/merchants/{business}/analytics/export", undefined],
+    ["GET /api/merchants/:id/export/csv", "get", "/api/merchants/{business}/export/csv", undefined],
+    ["POST /api/merchants/:id/clear-transactions", "post", "/api/merchants/{business}/clear-transactions", undefined],
+  ];
+  const pendingSale = (merchantId: number) => storage.createTransaction({
+    merchantId, itemName: "Counter sale", price: "12.50", status: "pending", paymentMethod: "qr_code", splitEnabled: false,
+  } as any);
+
+  it.each(RETIRED)("%s is registered nowhere", (key) => {
+    expect(ROUTE_POLICY[key]).toBeUndefined();
+  });
+
+  it.each(RETIRED)("%s answers the owner as an unknown address, and changes nothing", async (_key, method, address, body) => {
+    const { app } = await createTestApp();
+    const owner = await createOwnerPrincipal();
+    const sale = await pendingSale(owner.merchantId);
+    const before = storageSnapshot();
+
+    let pending = request(app)[method](address.replace("{business}", String(owner.merchantId)).replace("{sale}", String(sale.id)))
+      .set(bearer(owner));
+    if (body) pending = pending.send(body);
+    const res = await pending;
+
+    expect(res.status).toBe(404);
+    expect(res.headers["content-type"]).not.toMatch(/json/);
+    expect(storageSnapshot()).toBe(before);
+  });
+
+  it("the routes that stay beside them still answer the owner", async () => {
+    const { app } = await createTestApp();
+    const owner = await createOwnerPrincipal();
+    const sale = await pendingSale(owner.merchantId);
+
+    expect((await request(app).get(`/api/merchants/${owner.merchantId}/transactions`).set(bearer(owner))).status).toBe(200);
+    expect((await request(app).get(`/api/transactions/${sale.id}/refunds`).set(bearer(owner))).status).toBe(200);
+    const pdf = await request(app).get(`/api/merchants/${owner.merchantId}/export/pdf`).set(bearer(owner));
+    expect(pdf.status).toBe(200);
+    expect(pdf.headers["content-type"]).toMatch(/pdf/);
+    expect((await request(app).post(`/api/transactions/${sale.id}/cancel`).set(bearer(owner))).status).toBe(200);
+  });
+});

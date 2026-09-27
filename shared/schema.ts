@@ -419,10 +419,10 @@ export const insertRefundSchema = createInsertSchema(refunds).omit({
 
 export const createRefundSchema = z.object({
   transactionId: z.number().min(1, "Transaction ID is required"),
-  refundAmount: z.string().refine((val) => {
-    const num = parseFloat(val);
-    return !isNaN(num) && num > 0;
-  }, "Refund amount must be a positive number"),
+  // A plain amount of money, like a sale's price (C10 batch 6b): parseFloat let "5abc" through as 5.
+  refundAmount: z.string()
+    .regex(/^\d+(\.\d{1,2})?$/, "Refund amount must be a plain amount, like 5.00")
+    .refine((val) => Number(val) > 0, "Refund amount must be a positive number"),
   refundReason: z.string().min(1, "Refund reason is required").max(500, "Reason must be under 500 characters"),
   refundMethod: z.enum(["original_payment_method", "bank_transfer", "manual"]).default("original_payment_method"),
 });
@@ -571,6 +571,14 @@ export const retailTransactionCreateRequestSchema = z.object({
 }).strict();
 
 export type RetailTransactionCreateRequest = z.infer<typeof retailTransactionCreateRequestSchema>;
+
+/** A cash sale from the terminals, held to the rules creating a sale uses (C10 batch 6b, 2026-09-27). */
+export const cashSaleRequestSchema = z.object({
+  merchantId: retailTransactionCreateRequestSchema.shape.merchantId,
+  itemName: retailTransactionCreateRequestSchema.shape.itemName,
+  price: retailTransactionCreateRequestSchema.shape.price,
+  stoneId: z.number().int().positive().nullable().optional(),
+}).strict();
 
 // Password reset schemas
 export const forgotPasswordSchema = z.object({

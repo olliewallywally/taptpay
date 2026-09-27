@@ -126,29 +126,8 @@ describe("R1-T6 — /nfc, /api/tapt-stones, active-transaction stoneId", () => {
     });
   });
 
-  describe("GET /api/merchants/:id/revenue-over-time — days clamp (judgment call, see evidence doc)", () => {
-    it("defaults to a 30-day (31-bucket) window when no days param is given", async () => {
-      const { app } = await createTestApp();
-      const owner = await createOwnerPrincipal();
+  // GET /api/merchants/:id/revenue-over-time was removed on 2026-09-27 (owner decision, C10 batch 6b).
 
-      const response = await request(app)
-        .get(`/api/merchants/${owner.merchantId}/revenue-over-time`)
-        .set(bearer(owner));
-      expect(response.status).toBe(200);
-      expect(response.body.length).toBe(31);
-    });
-
-    it("clamps an absurd days value to the 365-day cap instead of building an unbounded date-bucket map", async () => {
-      const { app } = await createTestApp();
-      const owner = await createOwnerPrincipal();
-
-      const response = await request(app)
-        .get(`/api/merchants/${owner.merchantId}/revenue-over-time?days=999999999`)
-        .set(bearer(owner));
-      expect(response.status).toBe(200);
-      expect(response.body.length).toBe(366);
-    });
-  });
 
   // SUPERSEDED 2026-09-11. This block previously asserted that a negative size
   // "does not crash the handler — the qrcode library silently ignores a

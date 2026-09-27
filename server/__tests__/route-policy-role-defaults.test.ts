@@ -402,37 +402,8 @@ describe("R1-T3 UPL-7 — cross-tenant regression coverage for the export/analyt
     resetTestStorage();
   });
 
-  it("GET /api/merchants/:id/analytics/export refuses a cross-tenant caller", async () => {
-    const { app } = await createTestApp();
-    const ownerA = await createOwnerPrincipal();
-    const ownerB = await createOwnerPrincipal();
-
-    const attack = await request(app)
-      .get(`/api/merchants/${ownerB.merchantId}/analytics/export`)
-      .set(bearer(ownerA));
-    expect(attack.status).toBe(403);
-
-    const legit = await request(app)
-      .get(`/api/merchants/${ownerB.merchantId}/analytics/export`)
-      .set(bearer(ownerB));
-    expect(legit.status).toBe(200);
-  });
-
-  it("GET /api/merchants/:id/export/csv refuses a cross-tenant caller", async () => {
-    const { app } = await createTestApp();
-    const ownerA = await createOwnerPrincipal();
-    const ownerB = await createOwnerPrincipal();
-
-    const attack = await request(app)
-      .get(`/api/merchants/${ownerB.merchantId}/export/csv`)
-      .set(bearer(ownerA));
-    expect(attack.status).toBe(403);
-
-    const legit = await request(app)
-      .get(`/api/merchants/${ownerB.merchantId}/export/csv`)
-      .set(bearer(ownerB));
-    expect(legit.status).toBe(200);
-  });
+  // GET /api/merchants/:id/analytics/export and /export/csv were removed on 2026-09-27 (owner
+  // decision, C10 batch 6b): only a page mounted nowhere called them. The PDF report stays.
 
   it("GET /api/merchants/:id/export/pdf refuses a cross-tenant caller", async () => {
     const { app } = await createTestApp();
