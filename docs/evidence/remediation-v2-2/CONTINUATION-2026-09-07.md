@@ -606,10 +606,17 @@ The work itself:
   - **Retired (owner decision):** the unguarded `/smart-terminal` page.
   - Mutations 18/18. Server 111/2,586, client 103/825, `tsc` clean.
 
-**Next:** R1-T3's batch (b): the routes with their own gates (69: signed-out, cron, provider callbacks,
-the API key, bearer tokens). Then the callers each route serves (owner, teammate, another business's
-owner), family by family, each with a request the allowed caller succeeds with; then the client route
-guards (plan page 24).
+- **R1-T3 batch (b) (2026-09-27): `adefe881`; local, awaiting independent review.** The matrix's
+  own-gate refusals, each driven with nothing changed: a payment link's token is never a sign-in (401 on
+  all 115 gated routes); the scheduler's missing or wrong secret (401); the ecommerce API's missing,
+  unknown or under-permitted key (401, 403); an unknown link on the 25 link routes; a link's sale asked by
+  number, answered as a missing sale; the WhatsApp webhook's wrong key. **Fixed:** the numbered Windcave
+  return answered a link's sale 404 where a missing sale was sent home (it told which numbers were link
+  sales). Two reviews corrected. Mutations 6/6. Server 112/2,749, client 103/825.
+
+**Next:** R1-T3's callers each route serves (owner, teammate, another business's owner, the admin
+where admitted), family by family, each with a request the allowed caller succeeds with; then the
+client route guards (plan page 24).
 Open for the owner: 0030 in dev (above); the card-free dev write (above). The
 no-board rework's questions are all answered. Release of the rework: when production has no pending
 shared no-board sale (count-only check once production is reopened), with
