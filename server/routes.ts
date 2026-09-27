@@ -2731,8 +2731,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       // Only the owning merchant (or an admin) can cancel — prevents cancelling
       // an arbitrary transaction by guessing its numeric id.
+      // Another business's sale is answered as a missing one (P2.2's tenant-safe 404, R1-T3): its 403
+      // told a caller which sale numbers exist.
       if (!checkMerchantOwnership(req, transaction.merchantId!)) {
-        return res.status(403).json({ message: "Access denied" });
+        return res.status(404).json({ message: "Transaction not found" });
       }
 
       // Only allow canceling pending or processing transactions
@@ -5443,8 +5445,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
 
       // Verify merchant owns this transaction
+      // Another business's sale is answered as a missing one (P2.2's tenant-safe 404, R1-T3): its 403
+      // told a caller which sale numbers exist.
       if (transaction.merchantId !== merchantId) {
-        return res.status(403).json({ message: "Access denied" });
+        return res.status(404).json({ message: "Transaction not found" });
       }
 
       // Check if transaction can be refunded (allow partially_refunded for further partial refunds)
@@ -5562,8 +5566,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(404).json({ message: "Transaction not found" });
       }
 
+      // Another business's sale is answered as a missing one (P2.2's tenant-safe 404, R1-T3): its 403
+      // told a caller which sale numbers exist.
       if (transaction.merchantId !== merchantId) {
-        return res.status(403).json({ message: "Access denied" });
+        return res.status(404).json({ message: "Transaction not found" });
       }
 
       const refunds = await storage.getRefundsByTransaction(transactionId);

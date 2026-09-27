@@ -2819,7 +2819,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         roles: ["owner", "member"],
         platformAdmin: true,
         tenant: "resource",
-        tenantRule: `the sale read by id (getTransaction) must be the session's business's, by ${SIGNED_IN_BUSINESS_RULE}`,
+        tenantRule: `the sale read by id (getTransaction) must be the session's business's, by ${SIGNED_IN_BUSINESS_RULE}; another business's is answered as a missing one (404, since 2026-09-27: its 403 told which sale numbers exist)`,
       },
     ],
     input: "id: strictPositiveIntegerParam (400 otherwise)",
@@ -2839,7 +2839,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         roles: ["owner"],
         tenant: "resource",
         tenantRule:
-          "the sale read by id (getTransaction) must be the session's business's (403 otherwise); the platform admin, with no business, is refused (403 'Merchant access required', since 2026-09-27; it was 401)",
+          "the sale read by id (getTransaction) must be the session's business's: another business's is answered as a missing one (404, since 2026-09-27: its 403 told which sale numbers exist); the platform admin, with no business, is refused (403 'Merchant access required', since 2026-09-27; it was 401)",
       },
     ],
     input:
@@ -2864,7 +2864,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         roles: ["owner", "member"],
         tenant: "resource",
         tenantRule:
-          "the sale read by id (getTransaction) must be the session's business's (403 otherwise); the platform admin, with no business, is refused (403 'Merchant access required', since 2026-09-27; it was 401)",
+          "the sale read by id (getTransaction) must be the session's business's: another business's is answered as a missing one (404, since 2026-09-27: its 403 told which sale numbers exist); the platform admin, with no business, is refused (403 'Merchant access required', since 2026-09-27; it was 401)",
       },
     ],
     input: "transactionId: strictPositiveIntegerParam (400 otherwise)",

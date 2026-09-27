@@ -64,6 +64,14 @@ export const ADMIN_SERVED_AT_THE_GATE: Record<string, string> = {
 };
 
 /**
+ * Record routes whose business is named in the path and compared before any read: another business
+ * gets 403 whatever the record (its answer says nothing about which records exist).
+ */
+export const RECORD_ROUTES_NAMING_THE_BUSINESS: Record<string, string> = {
+  "GET /api/merchants/:merchantId/refunds": "the business in the path is compared with the session's before anything is read",
+};
+
+/**
  * Callers every gated route refuses before any route-specific work. A payment link's token is never a
  * sign-in (the plan's safe default: a public checkout token never grants merchant API access).
  */
@@ -133,6 +141,9 @@ export function matrixRowFor(key: string): MatrixRow {
     answers.owner = "allowed";
     answers.member = merchantBranch.roles?.includes("member") ? "allowed" : 403;
     if (merchantBranch.tenant === "path-merchant") answers["other-owner"] = 403;
+    // One record, read by id: another business's is answered as a missing one is (404, P2.2's
+    // tenant-safe answer), unless the business is compared from the path before anything is read.
+    if (merchantBranch.tenant === "resource") answers["other-owner"] = key in RECORD_ROUTES_NAMING_THE_BUSINESS ? 403 : 404;
   }
   const admitsAdmin =
     key in ADMIN_SERVED_AT_THE_GATE ||

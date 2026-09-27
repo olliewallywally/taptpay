@@ -115,6 +115,7 @@ const RECIPES: Record<string, (ctx: Ctx) => Promise<Req> | Req> = {
   "DELETE /api/merchants/:id/logo": (ctx) => ({ method: "delete", path: `/api/merchants/${ctx.merchantId}/logo` }),
   // The business named in the path or body, served to any login of it.
   "GET /api/merchants/:id/profile": (ctx) => ({ method: "get", path: `/api/merchants/${ctx.merchantId}/profile` }),
+  "GET /api/merchants/:merchantId/refunds": (ctx) => ({ method: "get", path: `/api/merchants/${ctx.merchantId}/refunds` }),
   "POST /api/transactions": (ctx) => ({ method: "post", path: "/api/transactions", body: { merchantId: ctx.merchantId, itemName: "Flat white", price: "5.50" } }),
   "POST /api/transactions/cash-sale": (ctx) => ({
     method: "post", path: "/api/transactions/cash-sale", body: { merchantId: ctx.merchantId, itemName: "Flat white", price: "5.50" },
