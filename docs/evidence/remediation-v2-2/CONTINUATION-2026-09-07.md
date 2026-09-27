@@ -625,8 +625,19 @@ The work itself:
   answered 403 where a missing sale got 404 and so told which sale numbers exist; the eight record routes
   outside property and trades pinned with real records. Mutations 4/4. Server 114/2,798, client 103/825.
 
+- **R1-T3 batch (e) (2026-09-27): `1b1572a6`; local, awaiting independent review.** The page guards
+  (plan §22.11): the whole app rendered through its real router at each listed address (`/terminal`,
+  `/stack`, `/property/*`, `/trades/*`, `/admin/*`; `/smart-terminal` retired), on the phone, tablet and
+  desktop shells, for each caller (signed out, a session the server refuses, the owner, a teammate,
+  another business's owner, the platform admin, an unfinished onboarding): 331 cases, nothing shown to a
+  caller it is not for, even for a moment; and the route table is read, so a new route in those families
+  must be classified with its guard. Every guard was already right; pinned. Mutations 14/14, checked case
+  by case (the first breakage left the run's first framed case green, where the frame's code arrived
+  after the redirect; the test now loads it first). Server 114/2,798, client 104/1,156.
+
 **Next:** R1-T3's remaining rows: the allowed callers' success on every route (so far each positive
-control shows only that the role and tenant checks pass), then the client route guards (plan page 24).
+control shows only that the role and tenant checks pass), family by family. Held for the owner with
+R1-T3's other questions: the body-token pages' 400 (batch (b) of the R1-T3 notes).
 Open for the owner: 0030 in dev (above); the card-free dev write (above). The
 no-board rework's questions are all answered. Release of the rework: when production has no pending
 shared no-board sale (count-only check once production is reopened), with
