@@ -493,9 +493,15 @@ The work itself:
     27 with the admin, a teammate and the owner).
   - Mutations 13/13. Server 104/1,786, `tsc` clean.
   - For the owner (asked 2026-09-26): accept only the browser push services; per-login switches.
+- **Owner answers to batch 5 (2026-09-26), both recommendations**
+  ([decision](../../decisions/2026-09-26-c10-batch-5-owner-answers.md)), **`b2f2e2a6`**, local,
+  awaiting independent review: push endpoints only from Google's, Mozilla's, Apple's or Microsoft's
+  push services (registration refuses others; the sender turns stored ones off); each login its own
+  switches and status. Mutations 11/11; PostgreSQL verifier 5/5 (four breakages caught). Server
+  106/1,830, client 102/822, `tsc` clean.
 
-**Next:** the batch 5 owner questions, then R1-T2's review of the signed-in merchant families; 90
-routes are pending. Then R1-T3's runtime matrix, on the audited harness.
+**Next:** R1-T2's review of the signed-in merchant families; 90 routes are pending (batch 6). Then
+R1-T3's runtime matrix, on the audited harness.
 Open for the owner: 0030 in dev (above); the card-free dev write (above). The
 no-board rework's questions are all answered. Release of the rework: when production has no pending
 shared no-board sale (count-only check once production is reopened), with
@@ -506,7 +512,7 @@ Independent reviews owed (each evidence file ends with its brief):
 - C10 so far (`2ec9d78f..cee1276a`), the 2026-09-26 owner answers (`cee1276a..a419f948`),
   C10's batch 3 (`30c9d8cb..d0d5495b`) and its owner answers (`4ac759d1..1a77530e`), batch 4
   (`198a8265..4ed2e145`) and its owner answers (`867ef275..51feb200`), and batch 5
-  (`c1889ca3..737018b0`);
+  (`c1889ca3..737018b0`) and its owner answers (`e1feb9b1..b2f2e2a6`);
 - the no-board rework (`da90d1a1..5c2cdb27`), its follow-up (`7051e25e..1fb41d14`), and the
   owner-answer fixes 2a–2c (`aba7b2be..da90d1a1`);
 - R1-T1 (`03c4663b..05195728`) and the live-updates fix (`05195728..3fac8ac8`);

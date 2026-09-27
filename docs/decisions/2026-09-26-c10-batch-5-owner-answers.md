@@ -29,3 +29,14 @@ Asked in one question set after batch 5 of the C10 route review (the account's 2
 - 2: the switches are read and written per login; a device a login registers starts with that
   login's switches. Subscriptions from before 0029 (recorded against no login) keep their switches
   until their device registers again.
+
+## Outcome (2026-09-26/27, one local commit, not pushed)
+
+- 1 and 2, **`b2f2e2a6`**. Registration accepts only a push service's endpoint
+  (`server/push-endpoint.ts`), and the sender turns off, and never contacts, a stored one that fails
+  the check. The switches, and the status's device counts, are the signed-in login's. The switches
+  still live on the devices: a login with no device reads the defaults. A device that moves to
+  another login takes that login's switches.
+- Tests first; mutations 11/11. The database storage was proven on PostgreSQL 16
+  (`scripts/verify-push-switches-per-login-postgres.ts`, 5/5, with each of four storage breakages
+  failing exactly its checks). Server 106/1,830, client 102/822, `tsc` clean.
