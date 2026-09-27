@@ -49,3 +49,10 @@ Callers were checked in the live web app, which the iPhone app loads (`capacitor
 Code and tests on this branch, tests first: the eleven routes removed, their pending review entries
 with them, the older tests of them replaced, the route policy regenerated. No deploy or push. The
 pages mounted nowhere that called them are left as they were.
+
+## Outcome (same day, local commits, not pushed)
+
+- **`7151d094`**: the eleven routes removed (189 remain), their pending entries with them; thirteen
+  older tests of them reworked. Tests first (red 22 of 23; the routes that stay beside them a green
+  guard). No screen changed.
+- The ten routes that stay from batch 6b are reviewed in **`cb24fbd8`**.

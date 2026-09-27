@@ -513,10 +513,30 @@ The work itself:
     outright (403). The stock routes use the shared business check.
   - Teammates keep creating, renaming and deleting boards (owner's choice).
   - Mutations 11/11. Server 107/1,850, client 102/822, `tsc` clean.
+- **C10 continued (2026-09-27): batch 6b, the business's sales, payments, refunds and reports (21
+  routes): `7151d094` (code), `cb24fbd8` (10 reviews); local, awaiting independent review**
+  ([working notes](r1/WORKING-2026-09-26-r1-t2-c10.md);
+  [owner answer](../../decisions/2026-09-27-c10-batch-6b-owner-answers.md)). 140 of 189 routes are
+  reviewed; 49 are pending.
+  - **Removed (owner decision): eleven routes no screen calls**, after the owner asked whether those
+    functions work and are needed; each keeps working through the routes that stay. The split
+    toggle, the analytics and revenue-chart reads, NFC pay (its sales could never complete), the
+    three wallet stubs, one refund by number, the analytics and CSV downloads, and R0-T4's clearing
+    tombstone.
+  - **Fixed:** a cash sale could be recorded on another business's board, or a deleted one, and its
+    body had no schema ("1abc" and "Infinity" passed); it now follows sale creation's rules. A refund
+    of "5abc" passed as 5, reserved the amount, then failed to store, leaving the reservation behind;
+    a refund amount must now be a plain amount like a price.
+  - Found, for R1-T3: the platform admin can create sales, record cash sales and cancel sales for any
+    business (no admin screen does). Tap to pay and the refund show the provider's error text to the
+    business (R2); tap to pay has no idempotency (R3); a refund is not durable across a crash between
+    the provider and the record (R4).
+  - Mutations 11/11. Server 108/1,866, client 102/822, `tsc` clean. A container restart (01:25 UTC)
+    came after both commits and before this record; re-checked from scratch and the suites re-run at
+    HEAD, same counts.
 
-**Next:** R1-T2's review of the signed-in merchant families; 70 routes are pending (batch 6b: the
-business's sales, payments, refunds, analytics and exports, 21 routes). Then R1-T3's runtime matrix,
-on the audited harness.
+**Next:** R1-T2's review of the signed-in merchant families; 49 routes are pending (batch 6c: the
+property routes, 21; then 6d: trades, 28). Then R1-T3's runtime matrix, on the audited harness.
 Open for the owner: 0030 in dev (above); the card-free dev write (above). The
 no-board rework's questions are all answered. Release of the rework: when production has no pending
 shared no-board sale (count-only check once production is reopened), with
@@ -527,8 +547,8 @@ Independent reviews owed (each evidence file ends with its brief):
 - C10 so far (`2ec9d78f..cee1276a`), the 2026-09-26 owner answers (`cee1276a..a419f948`),
   C10's batch 3 (`30c9d8cb..d0d5495b`) and its owner answers (`4ac759d1..1a77530e`), batch 4
   (`198a8265..4ed2e145`) and its owner answers (`867ef275..51feb200`), batch 5
-  (`c1889ca3..737018b0`) and its owner answers (`e1feb9b1..b2f2e2a6`), and batch 6a
-  (`64d2b17f..e6530ab6`);
+  (`c1889ca3..737018b0`) and its owner answers (`e1feb9b1..b2f2e2a6`), batch 6a
+  (`64d2b17f..e6530ab6`), and batch 6b (`cd486341..cb24fbd8`);
 - the no-board rework (`da90d1a1..5c2cdb27`), its follow-up (`7051e25e..1fb41d14`), and the
   owner-answer fixes 2a–2c (`aba7b2be..da90d1a1`);
 - R1-T1 (`03c4663b..05195728`) and the live-updates fix (`05195728..3fac8ac8`);
