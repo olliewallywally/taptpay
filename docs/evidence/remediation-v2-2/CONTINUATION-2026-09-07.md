@@ -558,8 +558,36 @@ The work itself:
     rent cron ignores an end date; resend has no limit (each an email, SMS or WhatsApp message).
   - Mutations 29/29. Server 109/1,921, client 102/822, `tsc` clean.
 
-**Next:** R1-T2's review of the signed-in merchant families; 28 routes are pending (batch 6d: the
-trades routes). Then R1-T3's runtime matrix, on the audited harness.
+- **C10 continued (2026-09-27): batch 6d, the trades routes (28 routes): `00ec975d` (code), `ed7082f0`
+  (25 reviews); local, awaiting independent review**
+  ([working notes](r1/WORKING-2026-09-26-r1-t2-c10.md);
+  [owner answers](../../decisions/2026-09-27-c10-batch-6d-owner-answers.md)). **All 184 routes are
+  reviewed; none is pending, and `PENDING_CEILING` is 0, so a new route must arrive reviewed.**
+  - **Removed (owner decision): the three trades routes no screen calls** (one quote by id, a quote's
+    resend, an invoice's resend).
+  - **Fixed:** a malformed trades id reached PostgreSQL and answered 500; now 400. The server took
+    actions the screens never offer: voiding a paid invoice, marking a voided or paid invoice paid
+    (which emailed the client another receipt each time), changing a cancelled recurring invoice, an
+    invoice of the "balance" or "recurring" kind made directly, a deposit on another client's quote;
+    each is now refused. The balance's split switch was read from the raw body. A teammate could change
+    the GST settings the page shows them greyed out; now owner-only (403).
+  - **Fixed, found on resuming: marking an invoice received without a reference failed on all four
+    screens** (phone and desktop, trades and property): they send `null` for no reference, which both
+    schemas refused (400).
+  - **Owner decisions built:** resuming a paused recurring invoice skips the paused time (as for rent);
+    archiving a client cancels their recurring invoices (as a rent tenant's archive does), and an
+    archived client gets no new one; a recurring invoice cannot start more than a day in the past (it
+    billed every period since, one per cron run).
+  - Extractor X22: a body read through a default (`req.body ?? {}`) counts.
+  - Found, recorded: voiding or marking paid while a client pays leaves the charge unrecorded (R3); two
+    balance sends at once can both bill (R3); clearing a client's or tenant's email, phone or notes
+    changes nothing (the empty value is dropped) while the screen says saved; voiding logs no event.
+  - Mutations 30/30 + 10/10. Server 110/2,001, client 102/822, `tsc` clean.
+
+**Next:** R1-T3 (plan page 24): the owner / member / admin / public / provider / cron / API-key matrix,
+recorded in the inventory, with a runtime test per API row (allowed principals succeed; the others get
+the P2.2 status with zero side effects) and the client route guards. The route review's recorded P2.2
+mismatches (the admin's 400/401, state refusals answering 400) are its first input.
 Open for the owner: 0030 in dev (above); the card-free dev write (above). The
 no-board rework's questions are all answered. Release of the rework: when production has no pending
 shared no-board sale (count-only check once production is reopened), with
@@ -571,7 +599,8 @@ Independent reviews owed (each evidence file ends with its brief):
   C10's batch 3 (`30c9d8cb..d0d5495b`) and its owner answers (`4ac759d1..1a77530e`), batch 4
   (`198a8265..4ed2e145`) and its owner answers (`867ef275..51feb200`), batch 5
   (`c1889ca3..737018b0`) and its owner answers (`e1feb9b1..b2f2e2a6`), batch 6a
-  (`64d2b17f..e6530ab6`), batch 6b (`cd486341..cb24fbd8`), and batch 6c (`5659c03e..bdbd6a60`);
+  (`64d2b17f..e6530ab6`), batch 6b (`cd486341..cb24fbd8`), batch 6c (`5659c03e..bdbd6a60`), and batch 6d
+  (`9e4d6399..ed7082f0`);
 - the no-board rework (`da90d1a1..5c2cdb27`), its follow-up (`7051e25e..1fb41d14`), and the
   owner-answer fixes 2a–2c (`aba7b2be..da90d1a1`);
 - R1-T1 (`03c4663b..05195728`) and the live-updates fix (`05195728..3fac8ac8`);

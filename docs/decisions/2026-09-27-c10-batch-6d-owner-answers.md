@@ -69,3 +69,20 @@ per scheduler run, all overdue.").
 - 4: code and tests on this branch, tests first: a recurring invoice whose start date is more than a
   day before the request is refused (400 "The start date can't be in the past") and nothing is made.
   No deploy or push.
+
+## Outcome (same day, local commits, not pushed)
+
+- 1, **`00ec975d`**: the three routes removed (184 remain), their pending entries with them. Tests first
+  (red 6 of 7; the routes that stay beside them a green guard).
+- 2, **`00ec975d`**: resuming a paused recurring invoice moves its next date to the first date on its
+  cycle after the resume, a monthly one kept on its start date's day of the month
+  (`nextJobRunDateAfter`), so nothing is sent for the paused time; the generate pass then has nothing
+  due. Tests first (red 3 of 5; two next-date guards green).
+- 3, **`00ec975d`**: archiving a client cancels its recurring invoices not already cancelled, each with
+  the time and a `schedule_terminated` event; restoring the client does not restart them; a new
+  recurring invoice for an archived client is 409. Tests first (red 4 of 5; one already cancelled and
+  another client's stay as they were, a green guard).
+- 4, **`00ec975d`**: a start date more than a day back is 400 "The start date can't be in the past";
+  today at 09:00 UTC (the forms' default), 23 hours back and next week are taken. Tests first (red 2
+  of 5; three guards green).
+- The reviews (**`ed7082f0`**) record each answer on its route.
