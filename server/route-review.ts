@@ -217,6 +217,26 @@ const ADMIN_MONEY =
   "The platform admin passes checkMerchantOwnership for any business, so it can create sales, record cash sales and cancel sales for any business; no admin screen does. For R1-T3's matrix: whether money routes should admit the admin at all.";
 const REFUND_ROW = "whole refund rows (amount, reason, method, status, the provider's refund id, when made and completed)";
 
+// ── The property routes (batch 6c) ──
+const PROPERTY_ADMIN = adminRefused(ADMIN_401);
+const propertyRecord = (what: string, read: string) =>
+  `the ${what} read by id (${read}) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403)`;
+const propertyId = (name: string) =>
+  `${name}: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500)`;
+const PROPERTY_TEAM =
+  "Every login of the business, a teammate included, has every property action and setting (tenants, rent and bills, voiding, marking paid outside TaptPay, automations, the reminder settings): kept by the owner's decision (2026-09-27).";
+const TENANT_ROW =
+  "a whole tenant row (names, email, phone, the property address, co-tenants, the preferred channel, whether archived and when, when made and changed)";
+const AUTOMATION_ROW =
+  "a whole automation row (the tenant, amount, frequency, channel, start and end, next and last run, status, when made, changed and cancelled)";
+const RENT_INVOICE_ROW =
+  "a whole invoice row (the tenant and automation, amount, the checkout token, channel, rent or a charge with its type and description, the attached document's reference and name, status and its dates, the external payment reference, reminders sent, the provider's session and transaction ids, the split, the WhatsApp message id)";
+const RENT_DELIVERY =
+  "sends the tenant the payment link by the invoice's channel: WhatsApp or SMS when chosen, configured and the tenant has a phone, otherwise email (resendInvoiceEmail, then deliverInvoice, server/property-cron.ts)";
+const paidElsewhereFinding = (action: string) =>
+  `${action} while the tenant is paying: the provider's completion then finds the invoice settled (finalizeRentInvoice), so a single payment's charge is recorded nowhere; a split share's is logged (Split_Share_Unrecorded). R3 (payment attempts).`;
+const state400Finding = (refusal: string) => `${refusal} answers 400 where P2.2 says 409 for a state conflict (R1-T3).`;
+
 function tokenRate(family: string, perMinute: number): string {
   return (
     `requirePaymentTokenRateLimit (the ${family} family: ${perMinute} a minute per visitor address, counted in ` +
@@ -2560,7 +2580,8 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         tenantRule: `${BUSINESS_OWNER_RULE}; checked before the upload is read (requireLogoOwnership), and again in the handler`,
       },
     ],
-    input: "id: strictPositiveIntegerParam; the file 'logo': a PNG by its MIME type and its first 8 bytes (400 otherwise), up to 20 MB, read into memory",
+    input:
+      "id: strictPositiveIntegerParam; the file 'logo': a PNG by its MIME type (400 with the filter's message otherwise) and its first 8 bytes (400), up to 20 MB (413 above it), read into memory. The type and size refusals were 500s until 2026-09-27 (receiveUpload, server/routes.ts), where this review said 400",
     capability: null,
     entitlement: null,
     idempotency:
@@ -2920,34 +2941,325 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       "No screen calls it yet: the property terminal shows an attached document by name only. It serves gap 13's option C (owner decision 2026-09-14): a business reading its own documents, and the admin's audited reading.",
     ],
   },
+
+  // ── Batch 6c (2026-09-27): the property routes ──
+  "GET /api/property/tenants": {
+    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    input:
+      "search: raw, a string only: trimmed and matched anywhere in the first name, last name or property address, ignoring case (% and _ act as wildcards, over the business's own tenants); includeArchived: raw, 'true' includes archived tenants, anything else leaves them out",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto: `the business's tenants, ${TENANT_ROW} each, newest first, all at once (no paging)`,
+    errorDisclosure: ["fixed"],
+    findings: [adminStatusFinding(ADMIN_401)],
+  },
+
+  "POST /api/property/tenants": {
+    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    input:
+      "body: createTenantProfileSchema (a first and last name of 1 to 80 characters, the property address of 1 to 200, an optional email of at most 200 and phone of at most 40, co-tenants of at most 1,000, the preferred channel: email, WhatsApp or SMS; other fields are dropped, so the business is the session's; 400 with the issues)",
+    capability: null,
+    entitlement: null,
+    idempotency: "none: each call adds another tenant (no check for the same person)",
+    sideEffects: null,
+    successDto: `201 with the tenant, ${TENANT_ROW}`,
+    errorDisclosure: ["input-issues"],
+    findings: [adminStatusFinding(ADMIN_401)],
+  },
+
+  "GET /api/property/tenants/:id": {
+    branches: [
+      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${propertyRecord("tenant", "getTenantProfile")}; ${PROPERTY_ADMIN}` },
+    ],
+    input: propertyId("id"),
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto: `the tenant, ${TENANT_ROW}`,
+    errorDisclosure: ["fixed"],
+    findings: [adminStatusFinding(ADMIN_401)],
+  },
+
+  "PUT /api/property/tenants/:id": {
+    branches: [
+      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${propertyRecord("tenant", "getTenantProfile")}; ${PROPERTY_ADMIN}` },
+    ],
+    input: `${propertyId("id")}; body: updateTenantProfileSchema (the create rules, each field optional; other fields are dropped; 400 with the issues)`,
+    capability: null,
+    entitlement: null,
+    idempotency: "sets the given fields (updateTenantProfile), an archived tenant's too; the same again changes nothing but the time changed",
+    sideEffects: null,
+    successDto: `the tenant afterwards, ${TENANT_ROW}`,
+    errorDisclosure: ["input-issues"],
+    findings: [adminStatusFinding(ADMIN_401)],
+  },
+
+  "POST /api/property/tenants/:id/archive": {
+    branches: [
+      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${propertyRecord("tenant", "getTenantProfile")}; ${PROPERTY_ADMIN}` },
+    ],
+    input: propertyId("id"),
+    capability: null,
+    entitlement: null,
+    idempotency:
+      "archives the tenant and cancels every automation of theirs not already cancelled (archiveTenantProfile); invoices already sent stay payable. Again archives again, with a new time, and logs again",
+    sideEffects: null,
+    successDto: `the tenant afterwards, ${TENANT_ROW}`,
+    errorDisclosure: ["fixed"],
+    findings: [adminStatusFinding(ADMIN_401)],
+  },
+
+  "POST /api/property/tenants/:id/unarchive": {
+    branches: [
+      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${propertyRecord("tenant", "getTenantProfile")}; ${PROPERTY_ADMIN}` },
+    ],
+    input: propertyId("id"),
+    capability: null,
+    entitlement: null,
+    idempotency:
+      "restores the tenant (unarchiveTenantProfile); automations cancelled by the archive stay cancelled. Again changes nothing but the time, and logs again",
+    sideEffects: null,
+    successDto: `the tenant afterwards, ${TENANT_ROW}`,
+    errorDisclosure: ["fixed"],
+    findings: [adminStatusFinding(ADMIN_401)],
+  },
+
+  "GET /api/property/tenants/:id/events": {
+    branches: [
+      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${propertyRecord("tenant", "getTenantProfile")}; ${PROPERTY_ADMIN}` },
+    ],
+    input: `${propertyId("id")}; limit: strictBoundedIntegerQueryParam (50 by default, at most 200; 400 otherwise)`,
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto:
+      "the tenant's history, newest first: whole event rows (what happened, the invoice or automation, and what it carried: amounts, channels, a charge's type and description, an external payment reference, the tenant's names and address when added)",
+    errorDisclosure: ["fixed"],
+    findings: [adminStatusFinding(ADMIN_401)],
+  },
+
+  "GET /api/property/schedules": {
+    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    input: "nothing",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto: `every automation of the business, cancelled ones included (the screens leave those out), ${AUTOMATION_ROW} each, all at once (no paging)`,
+    errorDisclosure: ["fixed"],
+    findings: [adminStatusFinding(ADMIN_401)],
+  },
+
+  "POST /api/property/tenants/:tenantId/schedules": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner", "member"],
+        tenant: "resource",
+        tenantRule: `${propertyRecord("tenant", "getTenantProfile")}, and must not be archived (409, since 2026-09-27); ${PROPERTY_ADMIN}`,
+      },
+    ],
+    input: `${propertyId("tenantId")}; body: createActiveScheduleSchema (an amount of 1 cent to $1,000,000, weekly, fortnightly or monthly, a channel, the start and an optional end as date-times; other fields are dropped; 400 with the issues)`,
+    capability: null,
+    entitlement: "paid access (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise)",
+    idempotency:
+      "each call adds an automation, first run on its start date, and cancels the tenant's other automations not already cancelled (owner decision 2026-09-27: the new one replaces the old; each recorded with the time and an event). Two made at the same moment could each cancel the other",
+    sideEffects: null,
+    successDto: `201 with the automation, ${AUTOMATION_ROW}`,
+    errorDisclosure: ["input-issues"],
+    findings: [
+      adminStatusFinding(ADMIN_401),
+      "The end date is stored but the rent cron never reads it (runGeneratePass; trades honours its own), and an end before the start is taken. No screen sends one.",
+      "A start date in the past bills every period since, one request per cron run. No screen sends one: they start one interval from now.",
+    ],
+  },
+
+  "PUT /api/property/schedules/:id": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner", "member"],
+        tenant: "resource",
+        tenantRule: `${propertyRecord("automation", "getActiveSchedule")}, and not cancelled (409, since 2026-09-27: a cancelled one stays cancelled); ${PROPERTY_ADMIN}`,
+      },
+    ],
+    input: `${propertyId("id")}; body: updateActiveScheduleSchema (the amount, frequency, channel, and active or paused: 'terminated' is refused since 2026-09-27, DELETE cancels; other fields are dropped; 400 with the issues)`,
+    capability: null,
+    entitlement: null,
+    idempotency:
+      "sets the given fields (updateActiveSchedule). Resuming a paused automation moves its next date to the first date on its cycle after now (nextRunDateAfter; owner decision 2026-09-27), so nothing is sent for the paused time; it billed every period it missed. Pausing or resuming logs an event, again too",
+    sideEffects: null,
+    successDto: `the automation afterwards, ${AUTOMATION_ROW}`,
+    errorDisclosure: ["input-issues"],
+    findings: [adminStatusFinding(ADMIN_401)],
+  },
+
+  "DELETE /api/property/schedules/:id": {
+    branches: [
+      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${propertyRecord("automation", "getActiveSchedule")}; ${PROPERTY_ADMIN}` },
+    ],
+    input: propertyId("id"),
+    capability: null,
+    entitlement: null,
+    idempotency: "cancels the automation and records when (terminateActiveSchedule); a cancelled one is cancelled again, with a new time, and logged again",
+    sideEffects: null,
+    successDto: `the automation afterwards, ${AUTOMATION_ROW}`,
+    errorDisclosure: ["fixed"],
+    findings: [adminStatusFinding(ADMIN_401)],
+  },
+
+  "GET /api/property/invoices": {
+    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    input:
+      "tenantProfileId: strictUuidParam when given (400 'Invalid tenantProfileId' otherwise; since 2026-09-27, a 500 before); status: raw, a string only, compared as text with each invoice's status (one that no invoice has matches nothing)",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto: `the business's invoices (or one tenant's, or those of one status), ${RENT_INVOICE_ROW} each, with the tenant's name and property address and what is still owed (owingCents, sharesLeft), newest first, all at once (no paging)`,
+    errorDisclosure: ["fixed"],
+    findings: [adminStatusFinding(ADMIN_401)],
+  },
+
+  "POST /api/property/invoices/document": {
+    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    input:
+      "the file 'document': a PDF, PNG, JPEG, WebP or HEIC by its MIME type (400 with the filter's message otherwise), whose first bytes must match that type for all but HEIC (400), up to 20 MB (413 above it), read into memory; the type and size refusals were 500s until 2026-09-27 (receiveUpload, server/routes.ts). Its own name is returned as sent",
+    capability: null,
+    entitlement: null,
+    idempotency: "none: each upload stores another document under a new random name (invoice-<time>-<16 hex characters>), stamped with the business (saveUploadedFile)",
+    sideEffects: null,
+    successDto: "{ documentUrl: an opaque reference the invoice create checks against the business, documentName: the file's own name }",
+    errorDisclosure: ["fixed"],
+    findings: [adminStatusFinding(ADMIN_401), "The upload is read into memory up to 20 MB per request (invoiceDocUpload), by any login of the business."],
+  },
+
+  "POST /api/property/invoices": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner", "member"],
+        tenant: "resource",
+        tenantRule: `the tenant named in the body (getTenantProfile) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403); ${PROPERTY_ADMIN}`,
+      },
+    ],
+    input:
+      "body: createAdHocInvoiceSchema, run before anything is read (since 2026-09-27; the tenant was read from the raw body first): the tenant as a UUID, an amount of 1 cent to $1,000,000, a channel, the due date as a date-time, splitting, rent or a charge with its type and a description of at most 200 characters, an attached document's reference (at most 500) and name (at most 255); other fields are dropped; 400 with the issues. An attached document must be the business's own upload (requireOwnedInvoiceDocument)",
+    capability: null,
+    entitlement: "paid access (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise)",
+    idempotency:
+      "Rent, when the tenant has a live rent invoice (getLiveInvoiceByTenant): that invoice takes the new amount and is sent again (200, resent: true). Otherwise, and for every charge, a new invoice with a fresh checkout token (201)",
+    sideEffects: `${RENT_DELIVERY}, at once; one that fails to send stays pending and the cron retries it`,
+    successDto: `${RENT_INVOICE_ROW}, with resent, delivered and deliveryReason (a fixed code: not_found, not_payable, billing_card_required, missing_data, send_failed or no_deliverable)`,
+    errorDisclosure: ["input-issues"],
+    findings: [
+      adminStatusFinding(ADMIN_401),
+      "Sending rent to a tenant with a live rent invoice changes that invoice's amount, even with split shares paid or a payment session open: the shares paid were worked out on the old amount, and an open session charges the old one (R3: payment attempts).",
+    ],
+  },
+
+  "POST /api/property/invoices/:id/resend": {
+    branches: [
+      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${propertyRecord("invoice", "getInvoiceRentRequest")}; ${PROPERTY_ADMIN}` },
+    ],
+    input: propertyId("id"),
+    capability: null,
+    entitlement: "paid access (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise)",
+    idempotency:
+      "none: each call sends the link again, and a pending or failed invoice becomes dispatched; a paid, externally paid or voided one is 400 'Invoice is not payable', and a send that fails is 502 with its reason, a fixed code",
+    sideEffects: RENT_DELIVERY,
+    successDto: `the invoice afterwards, ${RENT_INVOICE_ROW}`,
+    errorDisclosure: ["domain-errors"],
+    findings: [
+      adminStatusFinding(ADMIN_401),
+      "No limit on resending: each call is an email, SMS or WhatsApp message to the tenant, at the platform's cost (operations).",
+      state400Finding("Refusing a settled invoice"),
+    ],
+  },
+
+  "POST /api/property/invoices/:id/void": {
+    branches: [
+      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${propertyRecord("invoice", "getInvoiceRentRequest")}; ${PROPERTY_ADMIN}` },
+    ],
+    input: propertyId("id"),
+    capability: null,
+    entitlement: null,
+    idempotency:
+      "voids an invoice that is not paid (a paid or externally paid one is 400 'Cannot void a paid invoice'); a voided one is voided again, with a new time, and logged again",
+    sideEffects: null,
+    successDto: `the invoice afterwards, ${RENT_INVOICE_ROW}`,
+    errorDisclosure: ["fixed"],
+    findings: [
+      adminStatusFinding(ADMIN_401),
+      paidElsewhereFinding("Voiding"),
+      "A split invoice with shares already paid can be voided: those shares stay collected, with nothing but their events to show for them (R3/R4, refunds).",
+      state400Finding("Refusing a paid invoice"),
+      PROPERTY_TEAM,
+    ],
+  },
+
+  "POST /api/property/invoices/:id/mark-paid-external": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner", "member"],
+        tenant: "resource",
+        tenantRule: `${propertyRecord("invoice", "getInvoiceRentRequest")}, and not voided (409, since 2026-09-27: a voided one stays voided); ${PROPERTY_ADMIN}`,
+      },
+    ],
+    input: `${propertyId("id")}; body: markInvoicePaidExternalSchema (an optional reference of at most 200 characters; 400 with the issues)`,
+    capability: null,
+    entitlement: null,
+    idempotency: "marks the invoice paid outside TaptPay with the reference and the time; a paid or externally paid one is 400 'Invoice is already paid'",
+    sideEffects: null,
+    successDto: `the invoice afterwards, ${RENT_INVOICE_ROW}`,
+    errorDisclosure: ["input-issues"],
+    findings: [
+      adminStatusFinding(ADMIN_401),
+      paidElsewhereFinding("Marking an invoice paid outside TaptPay"),
+      state400Finding("Refusing a paid invoice"),
+      PROPERTY_TEAM,
+    ],
+  },
+
+  "GET /api/property/reminder-settings": {
+    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    input: "nothing",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto:
+      "{ rentReminderEnabled, rentReminderDelayDays, rentReminderIntervalDays, rentReminderMaxCount }: the business's, or the defaults (on, 3, 3, 3) where unset; 404 when the business is gone",
+    errorDisclosure: ["fixed"],
+    findings: [adminStatusFinding(ADMIN_401)],
+  },
+
+  "PUT /api/property/reminder-settings": {
+    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    input:
+      "body: updateRentReminderSettingsSchema (on or off, the first reminder 0 to 90 days after the due date, then every 1 to 90 days, at most 0 to 20 reminders with 0 for no limit, shown as ∞; each optional; other fields are dropped; 400 with the issues)",
+    capability: null,
+    entitlement: null,
+    idempotency: "sets the given settings on the business (updateMerchant); the same again changes nothing",
+    sideEffects: null,
+    successDto: "the four settings afterwards",
+    errorDisclosure: ["input-issues"],
+    findings: [adminStatusFinding(ADMIN_401), PROPERTY_TEAM],
+  },
 };
 
 /**
  * Routes not reviewed yet. May only shrink: PENDING_CEILING is lowered by
  * every batch, so a route cannot be added here instead of being reviewed.
  */
-export const PENDING_CEILING = 47;
+export const PENDING_CEILING = 28;
 
 export const REVIEW_PENDING: readonly string[] = [
-  "GET /api/property/tenants",
-  "POST /api/property/tenants",
-  "GET /api/property/tenants/:id",
-  "PUT /api/property/tenants/:id",
-  "POST /api/property/tenants/:id/archive",
-  "POST /api/property/tenants/:id/unarchive",
-  "GET /api/property/tenants/:id/events",
-  "GET /api/property/schedules",
-  "POST /api/property/tenants/:tenantId/schedules",
-  "PUT /api/property/schedules/:id",
-  "DELETE /api/property/schedules/:id",
-  "GET /api/property/invoices",
-  "POST /api/property/invoices/document",
-  "POST /api/property/invoices",
-  "POST /api/property/invoices/:id/resend",
-  "POST /api/property/invoices/:id/void",
-  "POST /api/property/invoices/:id/mark-paid-external",
-  "GET /api/property/reminder-settings",
-  "PUT /api/property/reminder-settings",
   "GET /api/trades/reminder-settings",
   "PUT /api/trades/reminder-settings",
   "GET /api/trades/gst-settings",

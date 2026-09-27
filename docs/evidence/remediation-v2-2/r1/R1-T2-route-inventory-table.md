@@ -1,4 +1,4 @@
-# R1-T2 route inventory — generated 2026-09-27 @ `a28abff1157777e441372539484e995fa0c27e9f`
+# R1-T2 route inventory — generated 2026-09-27 @ `cd6b67090a51a3af059f79a185106df1fafa0ede`
 
 Regenerate with `npx tsx scripts/generate-route-policy.ts`. This table is
 evidence for the SHA named above, not a timeless constant — see
@@ -14,7 +14,7 @@ necessarily a bug): **0**.
 
 ## Review
 
-140 of 187 routes reviewed (server/route-review.ts); 47 pending.
+159 of 187 routes reviewed (server/route-review.ts); 28 pending.
 A reviewed route's principal below is the review's; a pending one's is the heuristic, marked "(heuristic)".
 
 ### Open findings
@@ -119,6 +119,39 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 - **GET /api/transactions/:transactionId/refunds:** The platform admin (signed in, with no business) is refused with 401; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 - **GET /api/merchants/:id/export/pdf:** startDate and endDate are read raw: a malformed one reaches the storage query as an invalid date (a 500, not the 400 P2.2 asks for; §8.4). The live page sends neither.
 - **GET /api/invoice-documents/:name:** No screen calls it yet: the property terminal shows an attached document by name only. It serves gap 13's option C (owner decision 2026-09-14): a business reading its own documents, and the admin's audited reading.
+- **GET /api/property/tenants:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **POST /api/property/tenants:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **GET /api/property/tenants/:id:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **PUT /api/property/tenants/:id:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **POST /api/property/tenants/:id/archive:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **POST /api/property/tenants/:id/unarchive:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **GET /api/property/tenants/:id/events:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **GET /api/property/schedules:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **POST /api/property/tenants/:tenantId/schedules:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **POST /api/property/tenants/:tenantId/schedules:** The end date is stored but the rent cron never reads it (runGeneratePass; trades honours its own), and an end before the start is taken. No screen sends one.
+- **POST /api/property/tenants/:tenantId/schedules:** A start date in the past bills every period since, one request per cron run. No screen sends one: they start one interval from now.
+- **PUT /api/property/schedules/:id:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **DELETE /api/property/schedules/:id:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **GET /api/property/invoices:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **POST /api/property/invoices/document:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **POST /api/property/invoices/document:** The upload is read into memory up to 20 MB per request (invoiceDocUpload), by any login of the business.
+- **POST /api/property/invoices:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **POST /api/property/invoices:** Sending rent to a tenant with a live rent invoice changes that invoice's amount, even with split shares paid or a payment session open: the shares paid were worked out on the old amount, and an open session charges the old one (R3: payment attempts).
+- **POST /api/property/invoices/:id/resend:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **POST /api/property/invoices/:id/resend:** No limit on resending: each call is an email, SMS or WhatsApp message to the tenant, at the platform's cost (operations).
+- **POST /api/property/invoices/:id/resend:** Refusing a settled invoice answers 400 where P2.2 says 409 for a state conflict (R1-T3).
+- **POST /api/property/invoices/:id/void:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **POST /api/property/invoices/:id/void:** Voiding while the tenant is paying: the provider's completion then finds the invoice settled (finalizeRentInvoice), so a single payment's charge is recorded nowhere; a split share's is logged (Split_Share_Unrecorded). R3 (payment attempts).
+- **POST /api/property/invoices/:id/void:** A split invoice with shares already paid can be voided: those shares stay collected, with nothing but their events to show for them (R3/R4, refunds).
+- **POST /api/property/invoices/:id/void:** Refusing a paid invoice answers 400 where P2.2 says 409 for a state conflict (R1-T3).
+- **POST /api/property/invoices/:id/void:** Every login of the business, a teammate included, has every property action and setting (tenants, rent and bills, voiding, marking paid outside TaptPay, automations, the reminder settings): kept by the owner's decision (2026-09-27).
+- **POST /api/property/invoices/:id/mark-paid-external:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **POST /api/property/invoices/:id/mark-paid-external:** Marking an invoice paid outside TaptPay while the tenant is paying: the provider's completion then finds the invoice settled (finalizeRentInvoice), so a single payment's charge is recorded nowhere; a split share's is logged (Split_Share_Unrecorded). R3 (payment attempts).
+- **POST /api/property/invoices/:id/mark-paid-external:** Refusing a paid invoice answers 400 where P2.2 says 409 for a state conflict (R1-T3).
+- **POST /api/property/invoices/:id/mark-paid-external:** Every login of the business, a teammate included, has every property action and setting (tenants, rent and bills, voiding, marking paid outside TaptPay, automations, the reminder settings): kept by the owner's decision (2026-09-27).
+- **GET /api/property/reminder-settings:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **PUT /api/property/reminder-settings:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **PUT /api/property/reminder-settings:** Every login of the business, a teammate included, has every property action and setting (tenants, rent and bills, voiding, marking paid outside TaptPay, automations, the reminder settings): kept by the owner's decision (2026-09-27).
 
 ## Routes
 
@@ -248,24 +281,24 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 | DELETE | `/api/billing/card` | 6633 | merchant | authenticateToken, isAccountOwner |
 | POST | `/api/board-builder/submit` | 6658 | merchant | authenticateToken |
 | GET | `/uploads/:folder/:name` | 6723 | public | getCheckoutInvoiceByToken( |
-| GET | `/api/property/tenants` | 6988 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/property/tenants` | 6999 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/property/tenants/:id` | 7016 | merchant-user (heuristic) | authenticateToken |
-| PUT | `/api/property/tenants/:id` | 7028 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/property/tenants/:id/archive` | 7045 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/property/tenants/:id/unarchive` | 7059 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/property/tenants/:id/events` | 7073 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/property/schedules` | 7090 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/property/tenants/:tenantId/schedules` | 7101 | merchant-user (heuristic) | authenticateToken |
-| PUT | `/api/property/schedules/:id` | 7129 | merchant-user (heuristic) | authenticateToken |
-| DELETE | `/api/property/schedules/:id` | 7157 | merchant-user (heuristic) | authenticateToken |
-| GET | `/api/property/invoices` | 7173 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/property/invoices/document` | 7204 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/property/tenants` | 6988 | merchant | authenticateToken |
+| POST | `/api/property/tenants` | 6999 | merchant | authenticateToken |
+| GET | `/api/property/tenants/:id` | 7016 | merchant | authenticateToken |
+| PUT | `/api/property/tenants/:id` | 7028 | merchant | authenticateToken |
+| POST | `/api/property/tenants/:id/archive` | 7045 | merchant | authenticateToken |
+| POST | `/api/property/tenants/:id/unarchive` | 7059 | merchant | authenticateToken |
+| GET | `/api/property/tenants/:id/events` | 7073 | merchant | authenticateToken |
+| GET | `/api/property/schedules` | 7090 | merchant | authenticateToken |
+| POST | `/api/property/tenants/:tenantId/schedules` | 7101 | merchant | authenticateToken |
+| PUT | `/api/property/schedules/:id` | 7129 | merchant | authenticateToken |
+| DELETE | `/api/property/schedules/:id` | 7157 | merchant | authenticateToken |
+| GET | `/api/property/invoices` | 7173 | merchant | authenticateToken |
+| POST | `/api/property/invoices/document` | 7204 | merchant | authenticateToken |
 | GET | `/api/invoice-documents/:name` | 7250 | merchant / platform-admin | authenticateToken |
-| POST | `/api/property/invoices` | 7279 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/property/invoices/:id/resend` | 7321 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/property/invoices/:id/void` | 7340 | merchant-user (heuristic) | authenticateToken |
-| POST | `/api/property/invoices/:id/mark-paid-external` | 7355 | merchant-user (heuristic) | authenticateToken |
+| POST | `/api/property/invoices` | 7279 | merchant | authenticateToken |
+| POST | `/api/property/invoices/:id/resend` | 7321 | merchant | authenticateToken |
+| POST | `/api/property/invoices/:id/void` | 7340 | merchant | authenticateToken |
+| POST | `/api/property/invoices/:id/mark-paid-external` | 7355 | merchant | authenticateToken |
 | GET | `/api/checkout/resolve/:token` | 7378 | public-bearer | getCheckoutInvoiceByToken( |
 | GET | `/api/checkout/document/:token` | 7464 | public-bearer | getCheckoutInvoiceByToken( |
 | POST | `/api/checkout/:token/split` | 7488 | public-bearer | getCheckoutInvoiceByToken( |
@@ -276,8 +309,8 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 | ALL | `/api/windcave/rent-notification` | 7718 | provider | — |
 | ALL | `/api/windcave/trades-notification` | 7740 | provider | — |
 | POST | `/api/webhooks/whatsapp` | 7765 | provider | req.headers["apikey"] |
-| GET | `/api/property/reminder-settings` | 7815 | merchant-user (heuristic) | authenticateToken |
-| PUT | `/api/property/reminder-settings` | 7825 | merchant-user (heuristic) | authenticateToken |
+| GET | `/api/property/reminder-settings` | 7815 | merchant | authenticateToken |
+| PUT | `/api/property/reminder-settings` | 7825 | merchant | authenticateToken |
 | GET | `/api/trades/reminder-settings` | 7842 | merchant-user (heuristic) | authenticateToken |
 | PUT | `/api/trades/reminder-settings` | 7852 | merchant-user (heuristic) | authenticateToken |
 | GET | `/api/trades/gst-settings` | 7865 | merchant-user (heuristic) | authenticateToken |
@@ -1611,7 +1644,7 @@ Reviewed policy:
 Reviewed policy:
 
 - **Who:** merchant (owner, platform admin). **Tenant (path-merchant):** checkAccountOwnership: the business in the path is the session's and the caller its owner; the platform admin is let through for any business; checked before the upload is read (requireLogoOwnership), and again in the handler
-- **Input:** id: strictPositiveIntegerParam; the file 'logo': a PNG by its MIME type and its first 8 bytes (400 otherwise), up to 20 MB, read into memory
+- **Input:** id: strictPositiveIntegerParam; the file 'logo': a PNG by its MIME type (400 with the filter's message otherwise) and its first 8 bytes (400), up to 20 MB (413 above it), read into memory. The type and size refusals were 500s until 2026-09-27 (receiveUpload, server/routes.ts), where this review said 400
 - **Idempotency:** replaces the business's logo: one fixed name per business (merchant-<id>.png), saved before the business points at it and removed again if the business is gone
 - **Success:** { logoUrl, message }
 - **Error disclosure:** fixed
@@ -2787,7 +2820,14 @@ Reviewed policy:
 - storageMethods: `getTenantProfilesByMerchant`
 - statuses: `200`, `401`, `403`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** search: raw, a string only: trimmed and matched anywhere in the first name, last name or property address, ignoring case (% and _ act as wildcards, over the business's own tenants); includeArchived: raw, 'true' includes archived tenants, anything else leaves them out
+- **Idempotency:** read-only
+- **Success:** the business's tenants, a whole tenant row (names, email, phone, the property address, co-tenants, the preferred channel, whether archived and when, when made and changed) each, newest first, all at once (no paging)
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### POST `/api/property/tenants`
 
@@ -2795,8 +2835,16 @@ Review pending.
 - body: `schema: createTenantProfileSchema`
 - storageMethods: `createTenantProfile`, `logTransactionEvent`
 - statuses: `201`, `400`, `401`, `403`, `500`, `503`
+- errorTextInResponse: `err.errors`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** body: createTenantProfileSchema (a first and last name of 1 to 80 characters, the property address of 1 to 200, an optional email of at most 200 and phone of at most 40, co-tenants of at most 1,000, the preferred channel: email, WhatsApp or SMS; other fields are dropped, so the business is the session's; 400 with the issues)
+- **Idempotency:** none: each call adds another tenant (no check for the same person)
+- **Success:** 201 with the tenant, a whole tenant row (names, email, phone, the property address, co-tenants, the preferred channel, whether archived and when, when made and changed)
+- **Error disclosure:** input-issues
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### GET `/api/property/tenants/:id`
 
@@ -2806,7 +2854,14 @@ Review pending.
 - storageMethods: `getTenantProfile`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (resource):** the tenant read by id (getTenantProfile) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403); the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500)
+- **Idempotency:** read-only
+- **Success:** the tenant, a whole tenant row (names, email, phone, the property address, co-tenants, the preferred channel, whether archived and when, when made and changed)
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### PUT `/api/property/tenants/:id`
 
@@ -2816,8 +2871,16 @@ Review pending.
 - authChecks: `compares existing.merchantId !== merchantId`
 - storageMethods: `getTenantProfile`, `updateTenantProfile`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
+- errorTextInResponse: `err.errors`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (resource):** the tenant read by id (getTenantProfile) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403); the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500); body: updateTenantProfileSchema (the create rules, each field optional; other fields are dropped; 400 with the issues)
+- **Idempotency:** sets the given fields (updateTenantProfile), an archived tenant's too; the same again changes nothing but the time changed
+- **Success:** the tenant afterwards, a whole tenant row (names, email, phone, the property address, co-tenants, the preferred channel, whether archived and when, when made and changed)
+- **Error disclosure:** input-issues
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### POST `/api/property/tenants/:id/archive`
 
@@ -2827,7 +2890,14 @@ Review pending.
 - storageMethods: `archiveTenantProfile`, `getTenantProfile`, `logTransactionEvent`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (resource):** the tenant read by id (getTenantProfile) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403); the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500)
+- **Idempotency:** archives the tenant and cancels every automation of theirs not already cancelled (archiveTenantProfile); invoices already sent stay payable. Again archives again, with a new time, and logs again
+- **Success:** the tenant afterwards, a whole tenant row (names, email, phone, the property address, co-tenants, the preferred channel, whether archived and when, when made and changed)
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### POST `/api/property/tenants/:id/unarchive`
 
@@ -2837,7 +2907,14 @@ Review pending.
 - storageMethods: `getTenantProfile`, `logTransactionEvent`, `unarchiveTenantProfile`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (resource):** the tenant read by id (getTenantProfile) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403); the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500)
+- **Idempotency:** restores the tenant (unarchiveTenantProfile); automations cancelled by the archive stay cancelled. Again changes nothing but the time, and logs again
+- **Success:** the tenant afterwards, a whole tenant row (names, email, phone, the property address, co-tenants, the preferred channel, whether archived and when, when made and changed)
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### GET `/api/property/tenants/:id/events`
 
@@ -2848,7 +2925,14 @@ Review pending.
 - storageMethods: `getTenantProfile`, `getTransactionEventsByTenant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (resource):** the tenant read by id (getTenantProfile) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403); the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500); limit: strictBoundedIntegerQueryParam (50 by default, at most 200; 400 otherwise)
+- **Idempotency:** read-only
+- **Success:** the tenant's history, newest first: whole event rows (what happened, the invoice or automation, and what it carried: amounts, channels, a charge's type and description, an external payment reference, the tenant's names and address when added)
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### GET `/api/property/schedules`
 
@@ -2856,7 +2940,14 @@ Review pending.
 - storageMethods: `getActiveSchedulesByMerchant`
 - statuses: `200`, `401`, `403`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** nothing
+- **Idempotency:** read-only
+- **Success:** every automation of the business, cancelled ones included (the screens leave those out), a whole automation row (the tenant, amount, frequency, channel, start and end, next and last run, status, when made, changed and cancelled) each, all at once (no paging)
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### POST `/api/property/tenants/:tenantId/schedules`
 
@@ -2865,10 +2956,21 @@ Review pending.
 - authChecks: `compares tenant.merchantId !== merchantId`
 - storageMethods: `createActiveSchedule`, `getActiveSchedulesByTenant`, `getOrCreateSubscription`, `getTenantProfile`, `logTransactionEvent`, `terminateActiveSchedule`
 - statuses: `201`, `400`, `401`, `402`, `403`, `404`, `409`, `500`, `503`
+- errorTextInResponse: `err.errors`
 - entitlementGates: `BILLING_CARD_REQUIRED`, `billingCardIsReady`, `requireBillingCard`
 - helpers: `requireBillingCard`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (resource):** the tenant read by id (getTenantProfile) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403), and must not be archived (409, since 2026-09-27); the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** tenantId: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500); body: createActiveScheduleSchema (an amount of 1 cent to $1,000,000, weekly, fortnightly or monthly, a channel, the start and an optional end as date-times; other fields are dropped; 400 with the issues)
+- **Entitlement gate:** paid access (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise)
+- **Idempotency:** each call adds an automation, first run on its start date, and cancels the tenant's other automations not already cancelled (owner decision 2026-09-27: the new one replaces the old; each recorded with the time and an event). Two made at the same moment could each cancel the other
+- **Success:** 201 with the automation, a whole automation row (the tenant, amount, frequency, channel, start and end, next and last run, status, when made, changed and cancelled)
+- **Error disclosure:** input-issues
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **Finding:** The end date is stored but the rent cron never reads it (runGeneratePass; trades honours its own), and an end before the start is taken. No screen sends one.
+- **Finding:** A start date in the past bills every period since, one request per cron run. No screen sends one: they start one interval from now.
 
 ### PUT `/api/property/schedules/:id`
 
@@ -2878,8 +2980,16 @@ Review pending.
 - authChecks: `compares existing.merchantId !== merchantId`
 - storageMethods: `getActiveSchedule`, `logTransactionEvent`, `updateActiveSchedule`
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
+- errorTextInResponse: `err.errors`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (resource):** the automation read by id (getActiveSchedule) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403), and not cancelled (409, since 2026-09-27: a cancelled one stays cancelled); the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500); body: updateActiveScheduleSchema (the amount, frequency, channel, and active or paused: 'terminated' is refused since 2026-09-27, DELETE cancels; other fields are dropped; 400 with the issues)
+- **Idempotency:** sets the given fields (updateActiveSchedule). Resuming a paused automation moves its next date to the first date on its cycle after now (nextRunDateAfter; owner decision 2026-09-27), so nothing is sent for the paused time; it billed every period it missed. Pausing or resuming logs an event, again too
+- **Success:** the automation afterwards, a whole automation row (the tenant, amount, frequency, channel, start and end, next and last run, status, when made, changed and cancelled)
+- **Error disclosure:** input-issues
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### DELETE `/api/property/schedules/:id`
 
@@ -2889,7 +2999,14 @@ Review pending.
 - storageMethods: `getActiveSchedule`, `logTransactionEvent`, `terminateActiveSchedule`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (resource):** the automation read by id (getActiveSchedule) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403); the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500)
+- **Idempotency:** cancels the automation and records when (terminateActiveSchedule); a cancelled one is cancelled again, with a new time, and logged again
+- **Success:** the automation afterwards, a whole automation row (the tenant, amount, frequency, channel, start and end, next and last run, status, when made, changed and cancelled)
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### GET `/api/property/invoices`
 
@@ -2898,7 +3015,14 @@ Review pending.
 - storageMethods: `getInvoiceRentRequestsByMerchant`, `getTenantProfile`
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** tenantProfileId: strictUuidParam when given (400 'Invalid tenantProfileId' otherwise; since 2026-09-27, a 500 before); status: raw, a string only, compared as text with each invoice's status (one that no invoice has matches nothing)
+- **Idempotency:** read-only
+- **Success:** the business's invoices (or one tenant's, or those of one status), a whole invoice row (the tenant and automation, amount, the checkout token, channel, rent or a charge with its type and description, the attached document's reference and name, status and its dates, the external payment reference, reminders sent, the provider's session and transaction ids, the split, the WhatsApp message id) each, with the tenant's name and property address and what is still owed (owingCents, sharesLeft), newest first, all at once (no paging)
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### POST `/api/property/invoices/document`
 
@@ -2908,7 +3032,15 @@ Review pending.
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
 - helpers: `saveUploadedFile`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** the file 'document': a PDF, PNG, JPEG, WebP or HEIC by its MIME type (400 with the filter's message otherwise), whose first bytes must match that type for all but HEIC (400), up to 20 MB (413 above it), read into memory; the type and size refusals were 500s until 2026-09-27 (receiveUpload, server/routes.ts). Its own name is returned as sent
+- **Idempotency:** none: each upload stores another document under a new random name (invoice-<time>-<16 hex characters>), stamped with the business (saveUploadedFile)
+- **Success:** { documentUrl: an opaque reference the invoice create checks against the business, documentName: the file's own name }
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **Finding:** The upload is read into memory up to 20 MB per request (invoiceDocUpload), by any login of the business.
 
 ### GET `/api/invoice-documents/:name`
 
@@ -2939,10 +3071,21 @@ Reviewed policy:
 - storageMethods: `createInvoiceRentRequest`, `getInvoiceRentRequest`, `getLiveInvoiceByTenant`, `getOrCreateSubscription`, `getTenantProfile`, `logTransactionEvent`, `updateInvoiceRentRequest`, `uploadedFileOwnedByMerchant`
 - sideEffects: `email: resendInvoiceEmail`
 - statuses: `200`, `201`, `400`, `401`, `402`, `403`, `404`, `500`, `503`
+- errorTextInResponse: `err.errors`
 - entitlementGates: `BILLING_CARD_REQUIRED`, `billingCardIsReady`, `requireBillingCard`
 - helpers: `generateInvoiceToken`, `requireBillingCard`, `requireOwnedInvoiceDocument`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (resource):** the tenant named in the body (getTenantProfile) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403); the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** body: createAdHocInvoiceSchema, run before anything is read (since 2026-09-27; the tenant was read from the raw body first): the tenant as a UUID, an amount of 1 cent to $1,000,000, a channel, the due date as a date-time, splitting, rent or a charge with its type and a description of at most 200 characters, an attached document's reference (at most 500) and name (at most 255); other fields are dropped; 400 with the issues. An attached document must be the business's own upload (requireOwnedInvoiceDocument)
+- **Entitlement gate:** paid access (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise)
+- **Idempotency:** Rent, when the tenant has a live rent invoice (getLiveInvoiceByTenant): that invoice takes the new amount and is sent again (200, resent: true). Otherwise, and for every charge, a new invoice with a fresh checkout token (201)
+- **Side effects:** sends the tenant the payment link by the invoice's channel: WhatsApp or SMS when chosen, configured and the tenant has a phone, otherwise email (resendInvoiceEmail, then deliverInvoice, server/property-cron.ts), at once; one that fails to send stays pending and the cron retries it
+- **Success:** a whole invoice row (the tenant and automation, amount, the checkout token, channel, rent or a charge with its type and description, the attached document's reference and name, status and its dates, the external payment reference, reminders sent, the provider's session and transaction ids, the split, the WhatsApp message id), with resent, delivered and deliveryReason (a fixed code: not_found, not_payable, billing_card_required, missing_data, send_failed or no_deliverable)
+- **Error disclosure:** input-issues
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **Finding:** Sending rent to a tenant with a live rent invoice changes that invoice's amount, even with split shares paid or a payment session open: the shares paid were worked out on the old amount, and an open session charges the old one (R3: payment attempts).
 
 ### POST `/api/property/invoices/:id/resend`
 
@@ -2955,7 +3098,18 @@ Review pending.
 - entitlementGates: `BILLING_CARD_REQUIRED`, `billingCardIsReady`, `requireBillingCard`
 - helpers: `requireBillingCard`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (resource):** the invoice read by id (getInvoiceRentRequest) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403); the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500)
+- **Entitlement gate:** paid access (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise)
+- **Idempotency:** none: each call sends the link again, and a pending or failed invoice becomes dispatched; a paid, externally paid or voided one is 400 'Invoice is not payable', and a send that fails is 502 with its reason, a fixed code
+- **Side effects:** sends the tenant the payment link by the invoice's channel: WhatsApp or SMS when chosen, configured and the tenant has a phone, otherwise email (resendInvoiceEmail, then deliverInvoice, server/property-cron.ts)
+- **Success:** the invoice afterwards, a whole invoice row (the tenant and automation, amount, the checkout token, channel, rent or a charge with its type and description, the attached document's reference and name, status and its dates, the external payment reference, reminders sent, the provider's session and transaction ids, the split, the WhatsApp message id)
+- **Error disclosure:** domain-errors
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **Finding:** No limit on resending: each call is an email, SMS or WhatsApp message to the tenant, at the platform's cost (operations).
+- **Finding:** Refusing a settled invoice answers 400 where P2.2 says 409 for a state conflict (R1-T3).
 
 ### POST `/api/property/invoices/:id/void`
 
@@ -2965,7 +3119,18 @@ Review pending.
 - storageMethods: `getInvoiceRentRequest`, `logTransactionEvent`, `updateInvoiceRentRequest`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (resource):** the invoice read by id (getInvoiceRentRequest) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403); the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500)
+- **Idempotency:** voids an invoice that is not paid (a paid or externally paid one is 400 'Cannot void a paid invoice'); a voided one is voided again, with a new time, and logged again
+- **Success:** the invoice afterwards, a whole invoice row (the tenant and automation, amount, the checkout token, channel, rent or a charge with its type and description, the attached document's reference and name, status and its dates, the external payment reference, reminders sent, the provider's session and transaction ids, the split, the WhatsApp message id)
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **Finding:** Voiding while the tenant is paying: the provider's completion then finds the invoice settled (finalizeRentInvoice), so a single payment's charge is recorded nowhere; a split share's is logged (Split_Share_Unrecorded). R3 (payment attempts).
+- **Finding:** A split invoice with shares already paid can be voided: those shares stay collected, with nothing but their events to show for them (R3/R4, refunds).
+- **Finding:** Refusing a paid invoice answers 400 where P2.2 says 409 for a state conflict (R1-T3).
+- **Finding:** Every login of the business, a teammate included, has every property action and setting (tenants, rent and bills, voiding, marking paid outside TaptPay, automations, the reminder settings): kept by the owner's decision (2026-09-27).
 
 ### POST `/api/property/invoices/:id/mark-paid-external`
 
@@ -2975,8 +3140,19 @@ Review pending.
 - authChecks: `compares invoice.merchantId !== merchantId`
 - storageMethods: `getInvoiceRentRequest`, `logTransactionEvent`, `updateInvoiceRentRequest`
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
+- errorTextInResponse: `err.errors`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (resource):** the invoice read by id (getInvoiceRentRequest) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403), and not voided (409, since 2026-09-27: a voided one stays voided); the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500); body: markInvoicePaidExternalSchema (an optional reference of at most 200 characters; 400 with the issues)
+- **Idempotency:** marks the invoice paid outside TaptPay with the reference and the time; a paid or externally paid one is 400 'Invoice is already paid'
+- **Success:** the invoice afterwards, a whole invoice row (the tenant and automation, amount, the checkout token, channel, rent or a charge with its type and description, the attached document's reference and name, status and its dates, the external payment reference, reminders sent, the provider's session and transaction ids, the split, the WhatsApp message id)
+- **Error disclosure:** input-issues
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **Finding:** Marking an invoice paid outside TaptPay while the tenant is paying: the provider's completion then finds the invoice settled (finalizeRentInvoice), so a single payment's charge is recorded nowhere; a split share's is logged (Split_Share_Unrecorded). R3 (payment attempts).
+- **Finding:** Refusing a paid invoice answers 400 where P2.2 says 409 for a state conflict (R1-T3).
+- **Finding:** Every login of the business, a teammate included, has every property action and setting (tenants, rent and bills, voiding, marking paid outside TaptPay, automations, the reminder settings): kept by the owner's decision (2026-09-27).
 
 ### GET `/api/checkout/resolve/:token`
 
@@ -3222,7 +3398,14 @@ Reviewed policy:
 - statuses: `200`, `401`, `403`, `404`, `500`, `503`
 - helpers: `reminderSettingsOf`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** nothing
+- **Idempotency:** read-only
+- **Success:** { rentReminderEnabled, rentReminderDelayDays, rentReminderIntervalDays, rentReminderMaxCount }: the business's, or the defaults (on, 3, 3, 3) where unset; 404 when the business is gone
+- **Error disclosure:** fixed
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 
 ### PUT `/api/property/reminder-settings`
 
@@ -3230,9 +3413,18 @@ Review pending.
 - body: `schema: updateRentReminderSettingsSchema`
 - storageMethods: `updateMerchant`
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
+- errorTextInResponse: `err.errors`
 - helpers: `reminderSettingsOf`
 
-Review pending.
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (401 "Authentication required")
+- **Input:** body: updateRentReminderSettingsSchema (on or off, the first reminder 0 to 90 days after the due date, then every 1 to 90 days, at most 0 to 20 reminders with 0 for no limit, shown as ∞; each optional; other fields are dropped; 400 with the issues)
+- **Idempotency:** sets the given settings on the business (updateMerchant); the same again changes nothing
+- **Success:** the four settings afterwards
+- **Error disclosure:** input-issues
+- **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
+- **Finding:** Every login of the business, a teammate included, has every property action and setting (tenants, rent and bills, voiding, marking paid outside TaptPay, automations, the reminder settings): kept by the owner's decision (2026-09-27).
 
 ### GET `/api/trades/reminder-settings`
 
@@ -3248,6 +3440,7 @@ Review pending.
 - body: `schema: updateTradeReminderSettingsSchema`
 - storageMethods: `updateMerchant`
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
+- errorTextInResponse: `err.errors`
 
 Review pending.
 
@@ -3265,6 +3458,7 @@ Review pending.
 - body: `schema: updateTradeGstSettingsSchema`
 - storageMethods: `updateMerchant`
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
+- errorTextInResponse: `err.errors`
 
 Review pending.
 

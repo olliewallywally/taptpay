@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ a28abff1157777e441372539484e995fa0c27e9f on 2026-09-27.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ cd6b67090a51a3af059f79a185106df1fafa0ede on 2026-09-27.
  *
  * 187 registrations (78 GET, 77 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -1853,6 +1853,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       body: ["schema: createTenantProfileSchema"],
       storageMethods: ["createTenantProfile","logTransactionEvent"],
       statuses: [201,400,401,403,500,503],
+      errorTextInResponse: ["err.errors"],
     },
   },
   "GET /api/property/tenants/:id": {
@@ -1880,6 +1881,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       authChecks: ["compares existing.merchantId !== merchantId"],
       storageMethods: ["getTenantProfile","updateTenantProfile"],
       statuses: [200,400,401,403,404,500,503],
+      errorTextInResponse: ["err.errors"],
     },
   },
   "POST /api/property/tenants/:id/archive": {
@@ -1944,6 +1946,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       authChecks: ["compares tenant.merchantId !== merchantId"],
       storageMethods: ["createActiveSchedule","getActiveSchedulesByTenant","getOrCreateSubscription","getTenantProfile","logTransactionEvent","terminateActiveSchedule"],
       statuses: [201,400,401,402,403,404,409,500,503],
+      errorTextInResponse: ["err.errors"],
       entitlementGates: ["BILLING_CARD_REQUIRED","billingCardIsReady","requireBillingCard"],
       helpers: ["requireBillingCard"],
     },
@@ -1960,6 +1963,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       authChecks: ["compares existing.merchantId !== merchantId"],
       storageMethods: ["getActiveSchedule","logTransactionEvent","updateActiveSchedule"],
       statuses: [200,400,401,403,404,409,500,503],
+      errorTextInResponse: ["err.errors"],
     },
   },
   "DELETE /api/property/schedules/:id": {
@@ -2027,6 +2031,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       storageMethods: ["createInvoiceRentRequest","getInvoiceRentRequest","getLiveInvoiceByTenant","getOrCreateSubscription","getTenantProfile","logTransactionEvent","updateInvoiceRentRequest","uploadedFileOwnedByMerchant"],
       sideEffects: ["email: resendInvoiceEmail"],
       statuses: [200,201,400,401,402,403,404,500,503],
+      errorTextInResponse: ["err.errors"],
       entitlementGates: ["BILLING_CARD_REQUIRED","billingCardIsReady","requireBillingCard"],
       helpers: ["generateInvoiceToken","requireBillingCard","requireOwnedInvoiceDocument"],
     },
@@ -2072,6 +2077,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       authChecks: ["compares invoice.merchantId !== merchantId"],
       storageMethods: ["getInvoiceRentRequest","logTransactionEvent","updateInvoiceRentRequest"],
       statuses: [200,400,401,403,404,409,500,503],
+      errorTextInResponse: ["err.errors"],
     },
   },
   "GET /api/checkout/resolve/:token": {
@@ -2254,6 +2260,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       body: ["schema: updateRentReminderSettingsSchema"],
       storageMethods: ["updateMerchant"],
       statuses: [200,400,401,403,500,503],
+      errorTextInResponse: ["err.errors"],
       helpers: ["reminderSettingsOf"],
     },
   },
@@ -2278,6 +2285,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       body: ["schema: updateTradeReminderSettingsSchema"],
       storageMethods: ["updateMerchant"],
       statuses: [200,400,401,403,500,503],
+      errorTextInResponse: ["err.errors"],
     },
   },
   "GET /api/trades/gst-settings": {
@@ -2301,6 +2309,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       body: ["schema: updateTradeGstSettingsSchema"],
       storageMethods: ["updateMerchant"],
       statuses: [200,400,401,403,500,503],
+      errorTextInResponse: ["err.errors"],
     },
   },
   "GET /api/trades/clients": {

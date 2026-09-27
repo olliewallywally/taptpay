@@ -536,7 +536,8 @@ class FactCollector {
         const ownerLast = owner.split(/\?\.|\./).pop() ?? owner;
         if (
           (["message", "stack"].includes(name) && ERROR_NAMES.test(ownerLast)) ||
-          (["errors", "issues"].includes(name) && /(^|\.)error$/.test(owner))
+          // A validation result's error (`validation.error.errors`), or a caught one (`err.errors`, C10 batch 6c).
+          (["errors", "issues"].includes(name) && (/(^|\.)error$/.test(owner) || ERROR_NAMES.test(ownerLast)))
         ) {
           this.errorText.add(this.text(node));
           return;
