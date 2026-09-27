@@ -193,10 +193,8 @@ const ADMIN_EACH_BUSINESS_FINDING =
 const adminRefused = (refusal: string) => `the platform admin, with no business, is refused (${refusal})`;
 const sessionBusiness = (refusal: string) =>
   `the session's own business: nothing in the request names one; ${adminRefused(refusal)}`;
-const ADMIN_400 = '400 "Merchant ID required"';
-const ADMIN_401 = '401 "Authentication required"';
-const adminStatusFinding = (refusal: string) =>
-  `The platform admin (signed in, with no business) is refused with ${refusal}; P2.2 says 403 for a caller without the role or tenant (R1-T3).`;
+/** P2.2's answer to a principal without the tenant; it was 400 "Merchant ID required" or 401 "Authentication required", route by route. */
+const ADMIN_403 = '403 "Merchant access required", since 2026-09-27 (R1-T3)';
 const CREATES_SUBSCRIPTION = "apart from getOrCreateSubscription, which makes the business's subscription row if it has none";
 const TUTORIAL_SHARED =
   "The tutorial is the business's, not the login's: a teammate's progress, dismissal or restart applies to every login of the business, the owner's included (shown in the harness: a teammate's restart moved the business to generation 2). A product choice, recorded.";
@@ -218,7 +216,7 @@ const ADMIN_MONEY =
 const REFUND_ROW = "whole refund rows (amount, reason, method, status, the provider's refund id, when made and completed)";
 
 // ── The property routes (batch 6c) ──
-const PROPERTY_ADMIN = adminRefused(ADMIN_401);
+const PROPERTY_ADMIN = adminRefused(ADMIN_403);
 const propertyRecord = (what: string, read: string) =>
   `the ${what} read by id (${read}) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403)`;
 const propertyId = (name: string) =>
@@ -235,10 +233,9 @@ const RENT_DELIVERY =
   "sends the tenant the payment link by the invoice's channel: WhatsApp or SMS when chosen, configured and the tenant has a phone, otherwise email (resendInvoiceEmail, then deliverInvoice, server/property-cron.ts)";
 const paidElsewhereFinding = (action: string) =>
   `${action} while the tenant is paying: the provider's completion then finds the invoice settled (finalizeRentInvoice), so a single payment's charge is recorded nowhere; a split share's is logged (Split_Share_Unrecorded). R3 (payment attempts).`;
-const state400Finding = (refusal: string) => `${refusal} answers 400 where P2.2 says 409 for a state conflict (R1-T3).`;
 
 // ── The trades routes (batch 6d) ──
-const TRADES_ADMIN = adminRefused(ADMIN_401);
+const TRADES_ADMIN = adminRefused(ADMIN_403);
 const tradesRecord = (what: string, read: string) =>
   `the ${what} read by id (${read}) must be the session's business's: another business's is 404, the same as a missing one`;
 const tradesId = (name: string) =>
@@ -1864,7 +1861,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     capability: null,
     entitlement: null,
     idempotency:
-      "marks a waiting application verified (updateMerchantStatus) and makes any missing owner login (syncVerifiedMerchants); again is 400 (already verified), any other state 409 (only what the business page offers, since 2026-09-26); an application with no password set is 400",
+      "marks a waiting application verified (updateMerchantStatus) and makes any missing owner login (syncVerifiedMerchants); again is 409 (already verified; 400 until 2026-09-27, P2.2), any other state 409 (only what the business page offers, since 2026-09-26); an application with no password set is 400",
     sideEffects: ADMIN_AUDIT,
     successDto: "{ message, merchant: { id, name, businessName, email, status } }",
     errorDisclosure: ["fixed"],
@@ -1878,7 +1875,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     input: "id: strictPositiveIntegerParam (400 otherwise); no body",
     capability: null,
     entitlement: null,
-    idempotency: "sets a verified business active; again is 400, any other state 409 (only what the business page offers, since 2026-09-26)",
+    idempotency: "sets a verified business active; again is 409 (400 until 2026-09-27, P2.2), any other state 409 (only what the business page offers, since 2026-09-26)",
     sideEffects: ADMIN_AUDIT,
     successDto: "{ message, merchant: { id, status } }",
     errorDisclosure: ["fixed"],
@@ -1905,7 +1902,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     capability: null,
     entitlement: null,
     idempotency:
-      "one-time: sets the waiting application's password, marks it verified and clears its token (verifyMerchant, by that token); a business with no waiting application is 409 (since 2026-09-26), a verified one 400",
+      "one-time: sets the waiting application's password, marks it verified and clears its token (verifyMerchant, by that token); a business with no waiting application is 409 (since 2026-09-26), a verified one 409 (400 until 2026-09-27, P2.2)",
     sideEffects: ADMIN_AUDIT,
     successDto: "{ message, merchant: { id, name, businessName, email, status } }",
     errorDisclosure: ["input-issues"],
@@ -1987,7 +1984,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       {
         principal: "platform-admin",
         tenant: "any-merchant",
-        tenantRule: "the business the email names (getMerchantByEmail): only one still waiting to be confirmed, with its token, is sent its link again (404, or 400 otherwise)",
+        tenantRule: "the business the email names (getMerchantByEmail): only one still waiting to be confirmed, with its token, is sent its link again (404 for no business; 409 for one no longer waiting, 400 until 2026-09-27, P2.2; 400 for one waiting with no token, which P2.2 would also call a state conflict: R1-T3's admin family)",
       },
     ],
     input: "body read without a schema: email, trimmed and lower-cased by the look-up (getMerchantByEmail); anything but a string is a 500",
@@ -2054,7 +2051,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
   },
 
   "GET /api/team": {
-    branches: [{ principal: "merchant", roles: ["owner"], tenant: "session", tenantRule: sessionBusiness(ADMIN_400) }],
+    branches: [{ principal: "merchant", roles: ["owner"], tenant: "session", tenantRule: sessionBusiness(ADMIN_403) }],
     input: "nothing",
     capability: null,
     entitlement: null,
@@ -2062,11 +2059,10 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: null,
     successDto: "{ members: teamMemberDto each (id, email, name, role, status, last sign-in, when made), seatLimit, seatsInUse }",
     errorDisclosure: ["fixed"],
-    findings: [adminStatusFinding(ADMIN_400)],
   },
 
   "POST /api/team/invite": {
-    branches: [{ principal: "merchant", roles: ["owner"], tenant: "session", tenantRule: sessionBusiness(ADMIN_400) }],
+    branches: [{ principal: "merchant", roles: ["owner"], tenant: "session", tenantRule: sessionBusiness(ADMIN_403) }],
     input: "body: inviteTeamMemberSchema (an email of at most 200 characters, an optional name of at most 100; 400 with the issues)",
     capability: null,
     entitlement: null,
@@ -2078,7 +2074,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     errorDisclosure: ["input-issues"],
     findings: [
       "It tells a signed-in owner whether any address has a TaptPay login (409 'That email address already has a TaptPay login'), where the 2026-09-23 rule made the public doors answer alike. Recorded then as open for the owner (R1-T4-account-discovery-2026-09-23.md §5, item 2); no answer since. Each probe of an address without a login sends it a real invite.",
-      adminStatusFinding(ADMIN_400),
     ],
   },
 
@@ -2088,7 +2083,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         principal: "merchant",
         roles: ["owner"],
         tenant: "resource",
-        tenantRule: `the invited login read by id (getUserById) must be the session's business's, still invited, with a live token (404 otherwise, the same for another business's); ${adminRefused(ADMIN_400)}`,
+        tenantRule: `the invited login read by id (getUserById) must be the session's business's, still invited, with a live token (404 otherwise, the same for another business's); ${adminRefused(ADMIN_403)}`,
       },
     ],
     input: "userId: strictPositiveIntegerParam (400 otherwise); no body",
@@ -2100,7 +2095,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       "emails the new invite link (sendTeamInviteEmail); if it cannot be sent, the previous invite is put back, or failing that taken back (502)",
     successDto: "{ member: teamMemberDto }",
     errorDisclosure: ["fixed"],
-    findings: [adminStatusFinding(ADMIN_400)],
   },
 
   "DELETE /api/team/:userId/invite": {
@@ -2109,7 +2103,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         principal: "merchant",
         roles: ["owner"],
         tenant: "resource",
-        tenantRule: `revokeTeamInvite deletes the login only if it is the session's business's, still invited and not the owner (404 otherwise, the same for another business's); ${adminRefused(ADMIN_400)}`,
+        tenantRule: `revokeTeamInvite deletes the login only if it is the session's business's, still invited and not the owner (404 otherwise, the same for another business's); ${adminRefused(ADMIN_403)}`,
       },
     ],
     input: "userId: strictPositiveIntegerParam (400 otherwise)",
@@ -2119,7 +2113,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: null,
     successDto: "{ message: 'Invite revoked' }",
     errorDisclosure: ["fixed"],
-    findings: [adminStatusFinding(ADMIN_400)],
   },
 
   "PUT /api/team/:userId/status": {
@@ -2128,7 +2121,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         principal: "merchant",
         roles: ["owner"],
         tenant: "resource",
-        tenantRule: `setTeamMemberStatus changes the login only if it is the session's business's (404 otherwise, the same for another business's) and not the owner (403); ${adminRefused(ADMIN_400)}`,
+        tenantRule: `setTeamMemberStatus changes the login only if it is the session's business's (404 otherwise, the same for another business's) and not the owner (403); ${adminRefused(ADMIN_403)}`,
       },
     ],
     input: "userId: strictPositiveIntegerParam; body read without a schema: status, which must be 'active' or 'disabled' (400 otherwise)",
@@ -2140,7 +2133,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       "on disabling: ends the login's live streams (sseBroker.disconnectUser) and stops its devices' notifications and the business's unattributed ones (deactivatePushSubscriptionsForLogin, owner decision 2026-09-22; a fault is logged, never returned)",
     successDto: "{ member: teamMemberDto }",
     errorDisclosure: ["fixed"],
-    findings: [adminStatusFinding(ADMIN_400)],
   },
 
   "DELETE /api/team/:userId": {
@@ -2149,7 +2141,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         principal: "merchant",
         roles: ["owner"],
         tenant: "resource",
-        tenantRule: `the login read by id (getUserById) must be the session's business's and not its owner (404 otherwise, the same for another business's); a pending invite is 409 (revoke it instead); ${adminRefused(ADMIN_400)}`,
+        tenantRule: `the login read by id (getUserById) must be the session's business's and not its owner (404 otherwise, the same for another business's); a pending invite is 409 (revoke it instead); ${adminRefused(ADMIN_403)}`,
       },
     ],
     input: "userId: strictPositiveIntegerParam (400 otherwise)",
@@ -2160,7 +2152,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       "ends the login's live streams (sseBroker.disconnectUser) and, since 2026-09-26, stops the business's unattributed device subscriptions as disabling does (deactivatePushSubscriptionsForLogin; the ones recorded against the login go with it by 0029's cascade; a fault is logged, never returned)",
     successDto: "{ message: 'Login removed' }",
     errorDisclosure: ["fixed"],
-    findings: [adminStatusFinding(ADMIN_400)],
   },
 
   "GET /api/subscription": {
@@ -2169,7 +2160,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         principal: "merchant",
         roles: ["owner", "member"],
         tenant: "session",
-        tenantRule: `${sessionBusiness(ADMIN_400)}; a teammate gets it without the card (isAccountOwner)`,
+        tenantRule: `${sessionBusiness(ADMIN_403)}; a teammate gets it without the card (isAccountOwner)`,
       },
     ],
     input: "nothing",
@@ -2180,11 +2171,10 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     successDto:
       "{ subscription: subscriptionDto (plan, price, seats, status, period, cancellation, pending plan, failed payments, the card's brand, last 4 and expiry or null, sale counts), plans: every plan }",
     errorDisclosure: ["fixed"],
-    findings: [adminStatusFinding(ADMIN_400)],
   },
 
   "PUT /api/subscription/plan": {
-    branches: [{ principal: "merchant", roles: ["owner"], tenant: "session", tenantRule: sessionBusiness(ADMIN_400) }],
+    branches: [{ principal: "merchant", roles: ["owner"], tenant: "session", tenantRule: sessionBusiness(ADMIN_403) }],
     input: "body read without a schema but for planId: planIdSchema, one of the plans (400 'Unknown plan' otherwise); nothing else is read",
     capability: null,
     entitlement: null,
@@ -2193,11 +2183,10 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: "an upgrade charges the stored card, with an idempotency key (executeStoredCardCharge, then chargeStoredCard)",
     successDto: "{ subscription: subscriptionDto, applied: 'immediate' | 'period-end', message }",
     errorDisclosure: ["fixed"],
-    findings: [adminStatusFinding(ADMIN_400)],
   },
 
   "POST /api/subscription/cancel": {
-    branches: [{ principal: "merchant", roles: ["owner"], tenant: "session", tenantRule: sessionBusiness(ADMIN_400) }],
+    branches: [{ principal: "merchant", roles: ["owner"], tenant: "session", tenantRule: sessionBusiness(ADMIN_403) }],
     input: "body read without a schema: reason, required, cut to 500 characters",
     capability: null,
     entitlement: null,
@@ -2208,12 +2197,11 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     errorDisclosure: ["fixed"],
     findings: [
       "reason is read raw: a number, an object or an array is a 500 (reason.trim is not a function) where P2.2 says 400 (§8.4).",
-      adminStatusFinding(ADMIN_400),
     ],
   },
 
   "POST /api/subscription/resume": {
-    branches: [{ principal: "merchant", roles: ["owner"], tenant: "session", tenantRule: sessionBusiness(ADMIN_400) }],
+    branches: [{ principal: "merchant", roles: ["owner"], tenant: "session", tenantRule: sessionBusiness(ADMIN_403) }],
     input: "nothing is read",
     capability: null,
     entitlement: null,
@@ -2221,11 +2209,10 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: null,
     successDto: "{ subscription: subscriptionDto, message }",
     errorDisclosure: ["fixed"],
-    findings: [adminStatusFinding(ADMIN_400)],
   },
 
   "GET /api/subscription/billing-history": {
-    branches: [{ principal: "merchant", roles: ["owner"], tenant: "session", tenantRule: sessionBusiness(ADMIN_400) }],
+    branches: [{ principal: "merchant", roles: ["owner"], tenant: "session", tenantRule: sessionBusiness(ADMIN_403) }],
     input: "limit: strictBoundedIntegerQueryParam, 1 to 100, 50 when absent (400 otherwise)",
     capability: null,
     entitlement: null,
@@ -2233,11 +2220,10 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: null,
     successDto: "{ history: billingHistoryDto each (type, amount, status, description, failure reason, period, when paid and made) }",
     errorDisclosure: ["fixed"],
-    findings: [adminStatusFinding(ADMIN_400)],
   },
 
   "GET /api/billing/card": {
-    branches: [{ principal: "merchant", roles: ["owner"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    branches: [{ principal: "merchant", roles: ["owner"], tenant: "session", tenantRule: sessionBusiness(ADMIN_403) }],
     input: "nothing",
     capability: null,
     entitlement: null,
@@ -2245,11 +2231,10 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: null,
     successDto: "{ ready: whether the stored card can pay the next renewal, card: { last4, brand, expiry } or null }",
     errorDisclosure: ["fixed"],
-    findings: [adminStatusFinding(ADMIN_401)],
   },
 
   "POST /api/billing/card/session": {
-    branches: [{ principal: "merchant", roles: ["owner"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    branches: [{ principal: "merchant", roles: ["owner"], tenant: "session", tenantRule: sessionBusiness(ADMIN_403) }],
     input: "nothing is read",
     capability: "the provider must be configured (isWindcaveConfigured: 503 otherwise)",
     entitlement: null,
@@ -2258,7 +2243,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: "opens a hosted card-storage session at the provider (createCardStorageSession), with the business's contact email",
     successDto: "{ sessionId, redirectUrl }: the provider's page; the session id reads back only this one result",
     errorDisclosure: ["fixed"],
-    findings: [adminStatusFinding(ADMIN_401)],
   },
 
   "POST /api/billing/card/confirm": {
@@ -2267,7 +2251,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         principal: "merchant",
         roles: ["owner"],
         tenant: "session",
-        tenantRule: `${sessionBusiness(ADMIN_401)}; the card session must be the one bound to its subscription (subscriptionCardSessionState: 403 otherwise, the same for another business's)`,
+        tenantRule: `${sessionBusiness(ADMIN_403)}; the card session must be the one bound to its subscription (subscriptionCardSessionState: 403 otherwise, the same for another business's)`,
       },
     ],
     input: "body read without a schema: sessionId, a trimmed string matching /^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$/ (400 otherwise)",
@@ -2279,11 +2263,10 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       "reads the card session back from the provider (queryStoredCardSession) and may charge the stored card (executeStoredCardCharge, then chargeStoredCard)",
     successDto: "{ success, ready, charged, card: { last4, brand, expiry }, subscription: subscriptionDto }; 202 { pending: true }",
     errorDisclosure: ["fixed"],
-    findings: [adminStatusFinding(ADMIN_401)],
   },
 
   "DELETE /api/billing/card": {
-    branches: [{ principal: "merchant", roles: ["owner"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    branches: [{ principal: "merchant", roles: ["owner"], tenant: "session", tenantRule: sessionBusiness(ADMIN_403) }],
     input: "nothing",
     capability: null,
     entitlement: null,
@@ -2291,7 +2274,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: null,
     successDto: "{ success: true }",
     errorDisclosure: ["fixed"],
-    findings: [adminStatusFinding(ADMIN_401)],
   },
 
   "GET /api/tutorial/state": {
@@ -2358,7 +2340,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         principal: "merchant",
         roles: ["owner", "member"],
         tenant: "session",
-        tenantRule: `${sessionBusiness(ADMIN_401)}; the subscription is recorded against the business and this login, and a device already registered moves to them and takes this login's switches (createPushSubscription, by its endpoint; ${OWN_SWITCHES})`,
+        tenantRule: `${sessionBusiness(ADMIN_403)}; the subscription is recorded against the business and this login, and a device already registered moves to them and takes this login's switches (createPushSubscription, by its endpoint; ${OWN_SWITCHES})`,
       },
     ],
     input:
@@ -2369,7 +2351,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: null,
     successDto: "{ success: true, preferences: pushNotificationPreferencesDto }",
     errorDisclosure: ["fixed"],
-    findings: [adminStatusFinding(ADMIN_401)],
   },
 
   "POST /api/push/unsubscribe": {
@@ -2378,7 +2359,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         principal: "merchant",
         roles: ["owner", "member"],
         tenant: "session",
-        tenantRule: `${sessionBusiness(ADMIN_401)}; the endpoint must be one of its active subscriptions (getPushSubscriptionsByMerchant: 403 otherwise), and any login of the business may stop any of its devices`,
+        tenantRule: `${sessionBusiness(ADMIN_403)}; the endpoint must be one of its active subscriptions (getPushSubscriptionsByMerchant: 403 otherwise), and any login of the business may stop any of its devices`,
       },
     ],
     input: "body read without a schema: endpoint, required, compared as sent",
@@ -2391,7 +2372,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     errorDisclosure: ["fixed"],
     findings: [
       "A database fault while listing the business's devices reads as none (getPushSubscriptionsByMerchant answers [] on any error), so the answer is 403 'Not authorized to unsubscribe this endpoint', not 500 (R1-T9's rule).",
-      adminStatusFinding(ADMIN_401),
     ],
   },
 
@@ -2401,7 +2381,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         principal: "merchant",
         roles: ["owner", "member"],
         tenant: "session",
-        tenantRule: `${sessionBusiness(ADMIN_401)}; the iPhone is recorded against the business and this login, and takes this login's switches (createPushSubscription, by its endpoint; ${OWN_SWITCHES})`,
+        tenantRule: `${sessionBusiness(ADMIN_403)}; the iPhone is recorded against the business and this login, and takes this login's switches (createPushSubscription, by its endpoint; ${OWN_SWITCHES})`,
       },
     ],
     input: "body read without a schema: deviceToken, a string of at least 8 characters once trimmed (400 otherwise), stored as the endpoint apns://<token>",
@@ -2411,7 +2391,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: null,
     successDto: "{ success: true, preferences: pushNotificationPreferencesDto }",
     errorDisclosure: ["fixed"],
-    findings: [adminStatusFinding(ADMIN_401)],
   },
 
   "POST /api/push/native-unsubscribe": {
@@ -2420,7 +2399,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         principal: "merchant",
         roles: ["owner", "member"],
         tenant: "session",
-        tenantRule: `${sessionBusiness(ADMIN_401)}; with a deviceToken, that iPhone, which must be one of its active subscriptions (403 otherwise); without one, this login's iPhones and the business's unattributed ones (deactivateNativePushSubscriptionsForLogin)`,
+        tenantRule: `${sessionBusiness(ADMIN_403)}; with a deviceToken, that iPhone, which must be one of its active subscriptions (403 otherwise); without one, this login's iPhones and the business's unattributed ones (deactivateNativePushSubscriptionsForLogin)`,
       },
     ],
     input: "body read without a schema: deviceToken, optional; when present a string of at least 8 characters once trimmed (400 otherwise)",
@@ -2431,7 +2410,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: null,
     successDto: "{ success: true }",
     errorDisclosure: ["fixed"],
-    findings: [adminStatusFinding(ADMIN_401)],
   },
 
   "GET /api/push/status": {
@@ -2440,7 +2418,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         principal: "merchant",
         roles: ["owner", "member"],
         tenant: "session",
-        tenantRule: `${sessionBusiness(ADMIN_401)}; this login's own devices and switches (getPushSubscriptionsForLogin; ${OWN_SWITCHES})`,
+        tenantRule: `${sessionBusiness(ADMIN_403)}; this login's own devices and switches (getPushSubscriptionsForLogin; ${OWN_SWITCHES})`,
       },
     ],
     input: "nothing",
@@ -2451,7 +2429,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     successDto:
       "{ subscribed, deviceCount, webSubscribed, nativeSubscribed, preferences: pushNotificationPreferencesDto }: this login's active devices and its switches",
     errorDisclosure: ["fixed"],
-    findings: [PUSH_SWITCHES_FAULT_AS_DEFAULTS, adminStatusFinding(ADMIN_401)],
+    findings: [PUSH_SWITCHES_FAULT_AS_DEFAULTS],
   },
 
   "GET /api/push/preferences": {
@@ -2460,7 +2438,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         principal: "merchant",
         roles: ["owner", "member"],
         tenant: "session",
-        tenantRule: `${sessionBusiness(ADMIN_401)}; this login's own switches (${OWN_SWITCHES})`,
+        tenantRule: `${sessionBusiness(ADMIN_403)}; this login's own switches (${OWN_SWITCHES})`,
       },
     ],
     input: "nothing",
@@ -2470,7 +2448,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: null,
     successDto: "{ preferences: pushNotificationPreferencesDto }: this login's three switches, read from its newest device (the defaults with none)",
     errorDisclosure: ["fixed"],
-    findings: [PUSH_SWITCHES_FAULT_AS_DEFAULTS, adminStatusFinding(ADMIN_401)],
+    findings: [PUSH_SWITCHES_FAULT_AS_DEFAULTS],
   },
 
   "PUT /api/push/preferences": {
@@ -2479,7 +2457,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         principal: "merchant",
         roles: ["owner", "member"],
         tenant: "session",
-        tenantRule: `${sessionBusiness(ADMIN_401)}; this login's own switches, on its own devices only (${OWN_SWITCHES})`,
+        tenantRule: `${sessionBusiness(ADMIN_403)}; this login's own switches, on its own devices only (${OWN_SWITCHES})`,
       },
     ],
     input: "body: pushNotificationPreferencesSchema, strict: the three switches (400 with the issues)",
@@ -2490,7 +2468,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: null,
     successDto: "{ preferences: pushNotificationPreferencesDto }",
     errorDisclosure: ["input-issues"],
-    findings: [adminStatusFinding(ADMIN_401)],
   },
 
   // ── Batch 6a (2026-09-27): the business's settings, boards and stock ──
@@ -2855,7 +2832,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         roles: ["owner"],
         tenant: "resource",
         tenantRule:
-          "the sale read by id (getTransaction) must be the session's business's (403 otherwise); the platform admin, with no business, is refused (401 'Merchant authentication required')",
+          "the sale read by id (getTransaction) must be the session's business's (403 otherwise); the platform admin, with no business, is refused (403 'Merchant access required', since 2026-09-27; it was 401)",
       },
     ],
     input:
@@ -2870,7 +2847,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     findings: [
       "A provider refusal answers with the provider's own error text (refundResult.error), to the owner (R2's provider boundary).",
       "Not durable across a crash between the provider's refund and the record's update: the refund stays pending and its amount reserved (R4, durable refunds).",
-      adminStatusFinding("401"),
     ],
   },
 
@@ -2881,7 +2857,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         roles: ["owner", "member"],
         tenant: "resource",
         tenantRule:
-          "the sale read by id (getTransaction) must be the session's business's (403 otherwise); the platform admin, with no business, is refused (401 'Merchant authentication required')",
+          "the sale read by id (getTransaction) must be the session's business's (403 otherwise); the platform admin, with no business, is refused (403 'Merchant access required', since 2026-09-27; it was 401)",
       },
     ],
     input: "transactionId: strictPositiveIntegerParam (400 otherwise)",
@@ -2891,7 +2867,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: null,
     successDto: `the sale's ${REFUND_ROW}`,
     errorDisclosure: ["fixed"],
-    findings: [adminStatusFinding("401")],
   },
 
   "GET /api/merchants/:merchantId/refunds": {
@@ -2968,7 +2943,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
 
   // ── Batch 6c (2026-09-27): the property routes ──
   "GET /api/property/tenants": {
-    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_403) }],
     input:
       "search: raw, a string only: trimmed and matched anywhere in the first name, last name or property address, ignoring case (% and _ act as wildcards, over the business's own tenants); includeArchived: raw, 'true' includes archived tenants, anything else leaves them out",
     capability: null,
@@ -2977,11 +2952,10 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: null,
     successDto: `the business's tenants, ${TENANT_ROW} each, newest first, all at once (no paging)`,
     errorDisclosure: ["fixed"],
-    findings: [adminStatusFinding(ADMIN_401)],
   },
 
   "POST /api/property/tenants": {
-    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_403) }],
     input:
       "body: createTenantProfileSchema (a first and last name of 1 to 80 characters, the property address of 1 to 200, an optional email of at most 200 and phone of at most 40, co-tenants of at most 1,000, the preferred channel: email, WhatsApp or SMS; other fields are dropped, so the business is the session's; 400 with the issues)",
     capability: null,
@@ -2990,7 +2964,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: null,
     successDto: `201 with the tenant, ${TENANT_ROW}`,
     errorDisclosure: ["input-issues"],
-    findings: [adminStatusFinding(ADMIN_401)],
   },
 
   "GET /api/property/tenants/:id": {
@@ -3004,7 +2977,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: null,
     successDto: `the tenant, ${TENANT_ROW}`,
     errorDisclosure: ["fixed"],
-    findings: [adminStatusFinding(ADMIN_401)],
   },
 
   "PUT /api/property/tenants/:id": {
@@ -3018,7 +2990,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: null,
     successDto: `the tenant afterwards, ${TENANT_ROW}`,
     errorDisclosure: ["input-issues"],
-    findings: [adminStatusFinding(ADMIN_401)],
   },
 
   "POST /api/property/tenants/:id/archive": {
@@ -3033,7 +3004,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: null,
     successDto: `the tenant afterwards, ${TENANT_ROW}`,
     errorDisclosure: ["fixed"],
-    findings: [adminStatusFinding(ADMIN_401)],
   },
 
   "POST /api/property/tenants/:id/unarchive": {
@@ -3048,7 +3018,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: null,
     successDto: `the tenant afterwards, ${TENANT_ROW}`,
     errorDisclosure: ["fixed"],
-    findings: [adminStatusFinding(ADMIN_401)],
   },
 
   "GET /api/property/tenants/:id/events": {
@@ -3063,11 +3032,10 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     successDto:
       "the tenant's history, newest first: whole event rows (what happened, the invoice or automation, and what it carried: amounts, channels, a charge's type and description, an external payment reference, the tenant's names and address when added)",
     errorDisclosure: ["fixed"],
-    findings: [adminStatusFinding(ADMIN_401)],
   },
 
   "GET /api/property/schedules": {
-    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_403) }],
     input: "nothing",
     capability: null,
     entitlement: null,
@@ -3075,7 +3043,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: null,
     successDto: `every automation of the business, cancelled ones included (the screens leave those out), ${AUTOMATION_ROW} each, all at once (no paging)`,
     errorDisclosure: ["fixed"],
-    findings: [adminStatusFinding(ADMIN_401)],
   },
 
   "POST /api/property/tenants/:tenantId/schedules": {
@@ -3096,7 +3063,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     successDto: `201 with the automation, ${AUTOMATION_ROW}`,
     errorDisclosure: ["input-issues"],
     findings: [
-      adminStatusFinding(ADMIN_401),
       "The end date is stored but the rent cron never reads it (runGeneratePass; trades honours its own), and an end before the start is taken. No screen sends one.",
       "A start date in the past bills every period since, one request per cron run. No screen sends one: they start one interval from now.",
     ],
@@ -3119,7 +3085,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: null,
     successDto: `the automation afterwards, ${AUTOMATION_ROW}`,
     errorDisclosure: ["input-issues"],
-    findings: [adminStatusFinding(ADMIN_401)],
   },
 
   "DELETE /api/property/schedules/:id": {
@@ -3133,11 +3098,10 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: null,
     successDto: `the automation afterwards, ${AUTOMATION_ROW}`,
     errorDisclosure: ["fixed"],
-    findings: [adminStatusFinding(ADMIN_401)],
   },
 
   "GET /api/property/invoices": {
-    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_403) }],
     input:
       "tenantProfileId: strictUuidParam when given (400 'Invalid tenantProfileId' otherwise; since 2026-09-27, a 500 before); status: raw, a string only, compared as text with each invoice's status (one that no invoice has matches nothing)",
     capability: null,
@@ -3146,11 +3110,10 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: null,
     successDto: `the business's invoices (or one tenant's, or those of one status), ${RENT_INVOICE_ROW} each, with the tenant's name and property address and what is still owed (owingCents, sharesLeft), newest first, all at once (no paging)`,
     errorDisclosure: ["fixed"],
-    findings: [adminStatusFinding(ADMIN_401)],
   },
 
   "POST /api/property/invoices/document": {
-    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_403) }],
     input:
       "the file 'document': a PDF, PNG, JPEG, WebP or HEIC by its MIME type (400 with the filter's message otherwise), whose first bytes must match that type for all but HEIC (400), up to 20 MB (413 above it), read into memory; the type and size refusals were 500s until 2026-09-27 (receiveUpload, server/routes.ts). Its own name is returned as sent",
     capability: null,
@@ -3159,7 +3122,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: null,
     successDto: "{ documentUrl: an opaque reference the invoice create checks against the business, documentName: the file's own name }",
     errorDisclosure: ["fixed"],
-    findings: [adminStatusFinding(ADMIN_401), "The upload is read into memory up to 20 MB per request (invoiceDocUpload), by any login of the business."],
+    findings: ["The upload is read into memory up to 20 MB per request (invoiceDocUpload), by any login of the business."],
   },
 
   "POST /api/property/invoices": {
@@ -3181,7 +3144,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     successDto: `${RENT_INVOICE_ROW}, with resent, delivered and deliveryReason (a fixed code: not_found, not_payable, billing_card_required, missing_data, send_failed or no_deliverable)`,
     errorDisclosure: ["input-issues"],
     findings: [
-      adminStatusFinding(ADMIN_401),
       "Sending rent to a tenant with a live rent invoice changes that invoice's amount, even with split shares paid or a payment session open: the shares paid were worked out on the old amount, and an open session charges the old one (R3: payment attempts).",
     ],
   },
@@ -3194,14 +3156,12 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     capability: null,
     entitlement: "paid access (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise)",
     idempotency:
-      "none: each call sends the link again, and a pending or failed invoice becomes dispatched; a paid, externally paid or voided one is 400 'Invoice is not payable', and a send that fails is 502 with its reason, a fixed code",
+      "none: each call sends the link again, and a pending or failed invoice becomes dispatched; a paid, externally paid or voided one is 409 'Invoice is not payable' (400 until 2026-09-27, P2.2), and a send that fails is 502 with its reason, a fixed code",
     sideEffects: RENT_DELIVERY,
     successDto: `the invoice afterwards, ${RENT_INVOICE_ROW}`,
     errorDisclosure: ["domain-errors"],
     findings: [
-      adminStatusFinding(ADMIN_401),
       "No limit on resending: each call is an email, SMS or WhatsApp message to the tenant, at the platform's cost (operations).",
-      state400Finding("Refusing a settled invoice"),
     ],
   },
 
@@ -3213,15 +3173,13 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     capability: null,
     entitlement: null,
     idempotency:
-      "voids an invoice that is not paid (a paid or externally paid one is 400 'Cannot void a paid invoice'); a voided one is voided again, with a new time, and logged again",
+      "voids an invoice that is not paid (a paid or externally paid one is 409 'Cannot void a paid invoice', 400 until 2026-09-27, P2.2); a voided one is voided again, with a new time, and logged again",
     sideEffects: null,
     successDto: `the invoice afterwards, ${RENT_INVOICE_ROW}`,
     errorDisclosure: ["fixed"],
     findings: [
-      adminStatusFinding(ADMIN_401),
       paidElsewhereFinding("Voiding"),
       "A split invoice with shares already paid can be voided: those shares stay collected, with nothing but their events to show for them (R3/R4, refunds).",
-      state400Finding("Refusing a paid invoice"),
       PROPERTY_TEAM,
     ],
   },
@@ -3238,20 +3196,18 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     input: `${propertyId("id")}; body: markInvoicePaidExternalSchema (an optional reference of at most 200 characters, null or empty for none: both screens send null when no reference is typed, which was refused until 2026-09-27, batch 6d; 400 with the issues)`,
     capability: null,
     entitlement: null,
-    idempotency: "marks the invoice paid outside TaptPay with the reference and the time; a paid or externally paid one is 400 'Invoice is already paid'",
+    idempotency: "marks the invoice paid outside TaptPay with the reference and the time; a paid or externally paid one is 409 'Invoice is already paid' (400 until 2026-09-27, P2.2)",
     sideEffects: null,
     successDto: `the invoice afterwards, ${RENT_INVOICE_ROW}`,
     errorDisclosure: ["input-issues"],
     findings: [
-      adminStatusFinding(ADMIN_401),
       paidElsewhereFinding("Marking an invoice paid outside TaptPay"),
-      state400Finding("Refusing a paid invoice"),
       PROPERTY_TEAM,
     ],
   },
 
   "GET /api/property/reminder-settings": {
-    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_403) }],
     input: "nothing",
     capability: null,
     entitlement: null,
@@ -3260,11 +3216,10 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     successDto:
       "{ rentReminderEnabled, rentReminderDelayDays, rentReminderIntervalDays, rentReminderMaxCount }: the business's, or the defaults (on, 3, 3, 3) where unset; 404 when the business is gone",
     errorDisclosure: ["fixed"],
-    findings: [adminStatusFinding(ADMIN_401)],
   },
 
   "PUT /api/property/reminder-settings": {
-    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_403) }],
     input:
       "body: updateRentReminderSettingsSchema (on or off, the first reminder 0 to 90 days after the due date, then every 1 to 90 days, at most 0 to 20 reminders with 0 for no limit, shown as ∞; each optional; other fields are dropped; 400 with the issues)",
     capability: null,
@@ -3273,12 +3228,12 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: null,
     successDto: "the four settings afterwards",
     errorDisclosure: ["input-issues"],
-    findings: [adminStatusFinding(ADMIN_401), PROPERTY_TEAM],
+    findings: [PROPERTY_TEAM],
   },
 
   // ── Batch 6d (2026-09-27): the trades routes ──
   "GET /api/trades/reminder-settings": {
-    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_403) }],
     input: "nothing",
     capability: null,
     entitlement: null,
@@ -3286,11 +3241,10 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: null,
     successDto: "{ tradeRemindersEnabled }: the business's, or on where unset; 404 when the business is gone",
     errorDisclosure: ["fixed"],
-    findings: [adminStatusFinding(ADMIN_401)],
   },
 
   "PUT /api/trades/reminder-settings": {
-    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_403) }],
     input: "body: updateTradeReminderSettingsSchema (tradeRemindersEnabled, true or false, required; other fields are dropped; 400 with the issues)",
     capability: null,
     entitlement: null,
@@ -3299,11 +3253,11 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: null,
     successDto: "{ tradeRemindersEnabled } afterwards",
     errorDisclosure: ["input-issues"],
-    findings: [adminStatusFinding(ADMIN_401), TRADES_TEAM],
+    findings: [TRADES_TEAM],
   },
 
   "GET /api/trades/gst-settings": {
-    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_403) }],
     input: "nothing",
     capability: null,
     entitlement: null,
@@ -3312,7 +3266,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     successDto:
       "{ gstRegistered, tradeGstMode: inclusive or exclusive }: the business's, or not registered and inclusive where unset; 404 when the business is gone. The settings page reads it for every login",
     errorDisclosure: ["fixed"],
-    findings: [adminStatusFinding(ADMIN_401)],
   },
 
   "PUT /api/trades/gst-settings": {
@@ -3321,7 +3274,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         principal: "merchant",
         roles: ["owner"],
         tenant: "session",
-        tenantRule: `the session's own business, its owner only (isAccountOwner: a teammate is 403 since 2026-09-27, as the settings page shows these to a teammate greyed out with the business's other details); ${adminRefused(ADMIN_401)}`,
+        tenantRule: `the session's own business, its owner only (isAccountOwner: a teammate is 403 since 2026-09-27, as the settings page shows these to a teammate greyed out with the business's other details); ${adminRefused(ADMIN_403)}`,
       },
     ],
     input:
@@ -3333,11 +3286,10 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: null,
     successDto: "{ gstRegistered, tradeGstMode } afterwards",
     errorDisclosure: ["input-issues"],
-    findings: [adminStatusFinding(ADMIN_401)],
   },
 
   "GET /api/trades/clients": {
-    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_403) }],
     input: "nothing (the includeArchived the client directory sends is not read)",
     capability: null,
     entitlement: null,
@@ -3345,11 +3297,10 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: null,
     successDto: `every client of the business, archived ones and hidden quick-invoice prospects included (the screens leave both out of their lists), ${CLIENT_ROW} each, newest first, all at once (no paging)`,
     errorDisclosure: ["fixed"],
-    findings: [adminStatusFinding(ADMIN_401)],
   },
 
   "POST /api/trades/clients": {
-    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_403) }],
     input:
       "body: createClientProfileSchema (a first and last name of 1 to 80 characters, the site address of 1 to 200, an optional email of at most 200 and phone of at most 40, notes of at most 1,000, the preferred channel: email, WhatsApp or SMS; other fields are dropped, so the business is the session's and the client active; 400 with the first issue)",
     capability: null,
@@ -3358,7 +3309,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: null,
     successDto: `201 with the client, ${CLIENT_ROW}`,
     errorDisclosure: ["input-issues"],
-    findings: [adminStatusFinding(ADMIN_401)],
   },
 
   "GET /api/trades/clients/:id": {
@@ -3372,7 +3322,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: null,
     successDto: `the client, ${CLIENT_ROW}`,
     errorDisclosure: ["fixed"],
-    findings: [adminStatusFinding(ADMIN_401)],
   },
 
   "PUT /api/trades/clients/:id": {
@@ -3386,7 +3335,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: null,
     successDto: `the client afterwards, ${CLIENT_ROW}`,
     errorDisclosure: ["input-issues"],
-    findings: [adminStatusFinding(ADMIN_401)],
   },
 
   "POST /api/trades/clients/:id/archive": {
@@ -3402,7 +3350,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     successDto: `the client afterwards, ${CLIENT_ROW}`,
     errorDisclosure: ["fixed"],
     findings: [
-      adminStatusFinding(ADMIN_401),
       "The archive and the cancellations are separate writes: a failure between them leaves the client archived with recurring invoices still running, until the archive is repeated.",
     ],
   },
@@ -3419,7 +3366,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: null,
     successDto: `the client afterwards, ${CLIENT_ROW}`,
     errorDisclosure: ["fixed"],
-    findings: [adminStatusFinding(ADMIN_401)],
   },
 
   "POST /api/trades/clients/:id/promote": {
@@ -3429,11 +3375,10 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     input: tradesId("id"),
     capability: null,
     entitlement: null,
-    idempotency: "a hidden quick-invoice prospect becomes a listed client (status active); any other client is 400 'Client is already saved'",
+    idempotency: "a hidden quick-invoice prospect becomes a listed client (status active); any other client is 409 'Client is already saved' (400 until 2026-09-27, P2.2)",
     sideEffects: null,
     successDto: `the client afterwards, ${CLIENT_ROW}`,
     errorDisclosure: ["fixed"],
-    findings: [adminStatusFinding(ADMIN_401), state400Finding("Refusing a client already saved")],
   },
 
   "GET /api/trades/clients/:id/events": {
@@ -3448,11 +3393,10 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     successDto:
       "the client's history, newest first, at most 50 (getJobEventsByClient): whole event rows (what happened, the quote, invoice or recurring invoice, and what it carried: amounts, channels, a failed send's reason, WhatsApp statuses, split shares, the provider's transaction ids)",
     errorDisclosure: ["fixed"],
-    findings: [adminStatusFinding(ADMIN_401)],
   },
 
   "GET /api/trades/quotes": {
-    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_403) }],
     input:
       "status: raw, a string only (since 2026-09-27; a repeated one reached the query as a list), compared as text with each quote's status (one that no quote has matches nothing)",
     capability: null,
@@ -3461,7 +3405,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: null,
     successDto: `the business's quotes, or those of one status, ${QUOTE_ROW} each, newest first, all at once (no paging)`,
     errorDisclosure: ["fixed"],
-    findings: [adminStatusFinding(ADMIN_401)],
   },
 
   "POST /api/trades/quotes": {
@@ -3483,7 +3426,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     successDto: `201 with the quote, ${QUOTE_ROW}, with delivered and deliveryReason (a fixed code: not_found, missing_data, billing_card_required, send_failed or no_deliverable)`,
     errorDisclosure: ["input-issues"],
     findings: [
-      adminStatusFinding(ADMIN_401),
       archivedStillFinding("quoted"),
       "Each quote to someone not saved as a client makes another hidden prospect, and nothing removes them.",
     ],
@@ -3501,11 +3443,10 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     successDto:
       "the quote as a PDF download (quote-<business>-<reference>.pdf), made from the quote, its client and the business (generateQuotePdf); 404 'Quote details unavailable' when the client or the business is gone",
     errorDisclosure: ["fixed"],
-    findings: [adminStatusFinding(ADMIN_401)],
   },
 
   "GET /api/trades/invoices": {
-    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_403) }],
     input:
       "clientProfileId: strictUuidParam when given (400 'Invalid clientProfileId' otherwise; since 2026-09-27, a 500 before); status: raw, a string only (since 2026-09-27; a repeated one reached the query as a list), compared as text with each invoice's status (one that no invoice has matches nothing)",
     capability: null,
@@ -3514,7 +3455,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: null,
     successDto: `the business's invoices (or one client's, or those of one status), ${JOB_INVOICE_ROW} each, newest first, all at once (no paging)`,
     errorDisclosure: ["fixed"],
-    findings: [adminStatusFinding(ADMIN_401)],
   },
 
   "POST /api/trades/invoices": {
@@ -3536,7 +3476,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     successDto: `201 with the invoice, ${JOB_INVOICE_ROW}, with delivered and deliveryReason (a fixed code: scheduled, not_found, not_payable, missing_data, send_failed or no_deliverable)`,
     errorDisclosure: ["input-issues"],
     findings: [
-      adminStatusFinding(ADMIN_401),
       archivedStillFinding("invoiced"),
       "A deposit's amount is the one typed, not checked against the deposit its quote worked out.",
     ],
@@ -3560,7 +3499,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     successDto: `201 with the balance invoice, ${JOB_INVOICE_ROW}, with delivered and ${INVOICE_DELIVERY_REASON}`,
     errorDisclosure: ["input-issues"],
     findings: [
-      adminStatusFinding(ADMIN_401),
       "Two sends at the same moment can each find no balance and each make one, billing the client twice: the one-balance check is a read, then a write (R3).",
     ],
   },
@@ -3582,7 +3520,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: "emails the client a receipt for the invoice, with the business's GST number (sendTradePaymentInvoice); nothing when the client has no email",
     successDto: `the invoice afterwards, ${JOB_INVOICE_ROW}`,
     errorDisclosure: ["input-issues"],
-    findings: [adminStatusFinding(ADMIN_401), tradesPaidElsewhereFinding("Marking an invoice paid outside TaptPay"), TRADES_TEAM],
+    findings: [tradesPaidElsewhereFinding("Marking an invoice paid outside TaptPay"), TRADES_TEAM],
   },
 
   "POST /api/trades/invoices/:id/complete": {
@@ -3597,7 +3535,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: null,
     successDto: `the invoice afterwards, ${JOB_INVOICE_ROW}`,
     errorDisclosure: ["fixed"],
-    findings: [adminStatusFinding(ADMIN_401)],
   },
 
   "POST /api/trades/invoices/:id/void": {
@@ -3618,7 +3555,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     successDto: `the invoice afterwards, ${JOB_INVOICE_ROW}`,
     errorDisclosure: ["fixed"],
     findings: [
-      adminStatusFinding(ADMIN_401),
       tradesPaidElsewhereFinding("Voiding"),
       "A split invoice with shares already paid can be voided: those shares stay collected, with nothing but their events to show for them (R3/R4, refunds).",
       TRADES_TEAM,
@@ -3626,7 +3562,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
   },
 
   "GET /api/trades/schedules": {
-    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_403) }],
     input: "nothing",
     capability: null,
     entitlement: null,
@@ -3634,7 +3570,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: null,
     successDto: `every recurring invoice of the business, cancelled ones included (the recurring-invoice page lists them with their status), ${RECURRING_ROW} each, newest first, all at once (no paging)`,
     errorDisclosure: ["fixed"],
-    findings: [adminStatusFinding(ADMIN_401)],
   },
 
   "POST /api/trades/schedules": {
@@ -3654,7 +3589,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: null,
     successDto: `201 with the recurring invoice, ${RECURRING_ROW}`,
     errorDisclosure: ["input-issues"],
-    findings: [adminStatusFinding(ADMIN_401)],
   },
 
   "PUT /api/trades/schedules/:id": {
@@ -3674,7 +3608,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: null,
     successDto: `the recurring invoice afterwards, ${RECURRING_ROW}`,
     errorDisclosure: ["input-issues"],
-    findings: [adminStatusFinding(ADMIN_401)],
   },
 
   "DELETE /api/trades/schedules/:id": {
@@ -3689,7 +3622,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     sideEffects: null,
     successDto: `the recurring invoice afterwards, ${RECURRING_ROW}`,
     errorDisclosure: ["fixed"],
-    findings: [adminStatusFinding(ADMIN_401)],
   },
 };
 

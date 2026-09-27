@@ -96,7 +96,7 @@ describe("seat revocation", () => {
     );
 
     expect(next).not.toHaveBeenCalled();
-    expect(response.status).toHaveBeenCalledWith(403);
+    expect(response.status).toHaveBeenCalledWith(401); // 401 since 2026-09-27 (R1-T3, P2.2, owner decision): a sign-in that is invalid, expired or disabled was 403.
   });
 
   it("refuses a token whose merchant no longer matches the user row", async () => {
@@ -115,7 +115,7 @@ describe("seat revocation", () => {
     );
 
     expect(next).not.toHaveBeenCalled();
-    expect(response.status).toHaveBeenCalledWith(403);
+    expect(response.status).toHaveBeenCalledWith(401);
   });
 });
 

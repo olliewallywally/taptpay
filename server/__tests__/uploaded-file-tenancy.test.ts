@@ -407,7 +407,7 @@ describe("gap 13 (S1) — the platform admin may open any merchant's invoice doc
         .set({ Authorization: `Bearer ${jwt.sign(claims, secret, { expiresIn: "1h" })}` })
         .buffer(true)
         .parse(binaryParser);
-      expect(res.status).toBe(403);
+      expect(res.status).toBe(401); // 401 since 2026-09-27 (R1-T3, P2.2, owner decision): a sign-in that is invalid, expired or disabled was 403.
       expect((res.body as Buffer).equals(PDF_BYTES)).toBe(false);
     }
   });

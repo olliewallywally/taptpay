@@ -192,7 +192,7 @@ describe('admin token provenance', () => {
     await authenticateToken({ headers: { authorization: `Bearer ${token}` } } as any, result, next);
 
     expect(next).not.toHaveBeenCalled();
-    expect(result.status).toHaveBeenCalledWith(403);
+    expect(result.status).toHaveBeenCalledWith(401); // 401 since 2026-09-27 (R1-T3, P2.2, owner decision): a sign-in that is invalid, expired or disabled was 403.
   });
 });
 
@@ -280,41 +280,41 @@ describe('database outage versus a real rejection', () => {
     expect(result.status).toHaveBeenCalledWith(503);
   });
 
-  it('answers 403 when the database says the merchant principal is gone', async () => {
+  it('answers 401 when the database says the merchant principal is gone', async () => {
     storageMock.getMerchant.mockResolvedValue(undefined);
 
     const { result, next } = await callWithToken();
 
     expect(next).not.toHaveBeenCalled();
-    expect(result.status).toHaveBeenCalledWith(403);
+    expect(result.status).toHaveBeenCalledWith(401);
     expect(bodyOf(result)).toEqual({ code: 'ACCESS_REVOKED', message: 'Access revoked' });
   });
 
   it.each(['pending', 'suspended', 'rejected'])(
-    'answers 403 when the merchant row exists but is %s',
+    'answers 401 when the merchant row exists but is %s',
     async (status) => {
       storageMock.getMerchant.mockResolvedValue({ ...MERCHANT, status });
 
       const { result, next } = await callWithToken();
 
       expect(next).not.toHaveBeenCalled();
-      expect(result.status).toHaveBeenCalledWith(403);
+      expect(result.status).toHaveBeenCalledWith(401);
     },
   );
 
-  it('still answers 403 for a revoked seat rather than hiding it behind 503', async () => {
+  it('still answers 401 for a revoked seat rather than hiding it behind 503', async () => {
     storageMock.getUserById.mockResolvedValue({ ...ownerRow, status: 'disabled' });
 
     const { result, next } = await callWithToken();
 
     expect(next).not.toHaveBeenCalled();
-    expect(result.status).toHaveBeenCalledWith(403);
+    expect(result.status).toHaveBeenCalledWith(401);
     expect(result.status).not.toHaveBeenCalledWith(503);
   });
 
   it('does not consult the database at all for an unreadable token', async () => {
     // Whether the database is up is irrelevant when the token itself is bad —
-    // that verdict must stay a 403 and must not become an outage report.
+    // that verdict must stay a 401 and must not become an outage report.
     storageMock.getUserById.mockRejectedValue(new Error('db is down'));
     const result = response();
     const next = jest.fn();
@@ -322,7 +322,7 @@ describe('database outage versus a real rejection', () => {
     await authenticateToken({ headers: { authorization: 'Bearer not-a-jwt' } } as any, result, next);
 
     expect(next).not.toHaveBeenCalled();
-    expect(result.status).toHaveBeenCalledWith(403);
+    expect(result.status).toHaveBeenCalledWith(401);
     expect(storageMock.getUserById).not.toHaveBeenCalled();
   });
 

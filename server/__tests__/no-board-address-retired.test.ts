@@ -295,7 +295,7 @@ describe("the anonymous no-board 'current sale' read is retired", () => {
       .set({ Authorization: "Bearer not-a-real-token" });
 
     // authenticateToken's answer for a token that doesn't verify, on every signed-in route.
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(401); // 401 since 2026-09-27 (R1-T3, P2.2, owner decision): a sign-in that is invalid, expired or disabled was 403.
     expect(response.body).toEqual({ message: "Invalid or expired token" });
   });
 

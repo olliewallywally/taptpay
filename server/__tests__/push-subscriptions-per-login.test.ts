@@ -195,7 +195,7 @@ describe("a fault stopping notifications never undoes or misreports ending the s
     const disabled = await request(app).put(`/api/team/${member.user.id}/status`).set(bearer(owner))
       .send({ status: "disabled" });
     expect(disabled.status).toBe(200);
-    expect((await subscribeWeb(app, member, "after")).status).toBe(403);
+    expect((await subscribeWeb(app, member, "after")).status).toBe(401); // 401 since 2026-09-27 (R1-T3, P2.2, owner decision): a sign-in that is invalid, expired or disabled was 403.
     expect(loggedTags(logged)).toContain("[TEAM_DISABLE_PUSH_STOP]");
   });
 

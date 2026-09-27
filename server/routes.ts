@@ -573,6 +573,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     return next();
   };
   
+  // P2.2 (R1-T3): the platform admin passes authenticateToken with no business (merchant 0), so a route
+  // serving a business's own logins refuses it as an authenticated principal without the tenant: 403.
+  // It was 400 or 401, route by route.
+  const MERCHANT_ACCESS_REQUIRED = { message: "Merchant access required" } as const;
+
   function checkMerchantOwnership(req: AuthenticatedRequest, merchantId: number): boolean {
     if (!req.user) return false;
     if (!Number.isInteger(merchantId) || merchantId <= 0) return false;
@@ -3351,8 +3356,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(404).json({ message: "Merchant not found" });
       }
 
+      // A state conflict (P2.2, R1-T3): 409, where it was 400.
       if (merchant.status === 'verified') {
-        return res.status(400).json({ message: "Merchant is already verified" });
+        return res.status(409).json({ message: "Merchant is already verified" });
       }
       // The business page offers Verify only for a waiting application (owner decision
       // 2026-09-26, C10 batch 4): an active business is never set back to verified.
@@ -3397,7 +3403,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (merchantId === null) return res.status(400).json({ message: "Invalid id" });
       const merchant = await storage.getMerchant(merchantId);
       if (!merchant) return res.status(404).json({ message: "Merchant not found" });
-      if (merchant.status === 'active') return res.status(400).json({ message: "Merchant is already active" });
+      if (merchant.status === 'active') return res.status(409).json({ message: "Merchant is already active" }); // P2.2 (R1-T3): was 400
       // The business page offers Activate Account only for a verified business (owner decision
       // 2026-09-26, C10 batch 4): an application is never made active before it is confirmed.
       if (merchant.status !== 'verified') {
@@ -3464,7 +3470,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
 
       if (merchant.status === 'verified') {
-        return res.status(400).json({ message: "Merchant already verified" });
+        return res.status(409).json({ message: "Merchant already verified" }); // P2.2 (R1-T3): was 400
       }
       // The application is found by its own sign-up token, so there must be one: asked for
       // '' (none), verifyMerchant would set the password of whichever business held an empty
@@ -4679,7 +4685,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
 
       if (merchant.status !== "pending") {
-        return res.status(400).json({ message: "Merchant is already verified" });
+        return res.status(409).json({ message: "Merchant is already verified" }); // P2.2 (R1-T3): was 400
       }
 
       if (!merchant.verificationToken) {
@@ -5210,7 +5216,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       const merchantId = req.user?.merchantId;
       if (!merchantId) {
-        return res.status(401).json({ message: "Authentication required" });
+        return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       }
 
       const pushSub = await storage.createPushSubscription({
@@ -5243,7 +5249,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       const merchantId = req.user?.merchantId;
       if (!merchantId) {
-        return res.status(401).json({ message: "Authentication required" });
+        return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       }
 
       const subs = await storage.getPushSubscriptionsByMerchant(merchantId);
@@ -5270,7 +5276,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       const merchantId = req.user?.merchantId;
       if (!merchantId) {
-        return res.status(401).json({ message: "Authentication required" });
+        return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       }
 
       const endpoint = `apns://${deviceToken.trim()}`;
@@ -5299,7 +5305,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const merchantId = req.user?.merchantId;
       if (!merchantId) {
-        return res.status(401).json({ message: "Authentication required" });
+        return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       }
 
       // R1-T4: stop this iPhone only. It used to stop every iPhone of the merchant.
@@ -5335,7 +5341,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const merchantId = req.user?.merchantId;
       const userId = req.user?.userId;
       if (!merchantId || !userId) {
-        return res.status(401).json({ message: "Authentication required" });
+        return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       }
 
       const subs = await storage.getPushSubscriptionsForLogin(merchantId, userId);
@@ -5360,7 +5366,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const merchantId = req.user?.merchantId;
       const userId = req.user?.userId;
       if (!merchantId || !userId) {
-        return res.status(401).json({ message: "Authentication required" });
+        return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       }
       const preferences = await storage.getPushNotificationPreferences(merchantId, userId);
       res.json({ preferences: pushNotificationPreferencesDto(preferences) });
@@ -5375,7 +5381,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const merchantId = req.user?.merchantId;
       const userId = req.user?.userId;
       if (!merchantId || !userId) {
-        return res.status(401).json({ message: "Authentication required" });
+        return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       }
       const parsed = pushNotificationPreferencesSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -5409,7 +5415,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const merchantId = req.user?.merchantId;
 
       if (!merchantId) {
-        return res.status(401).json({ message: "Merchant authentication required" });
+        return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       }
       if (!config.features.refundInitiation) {
         return res.status(503).json({ code: "REFUND_INITIATION_DISABLED", message: "Refund initiation is temporarily unavailable" });
@@ -5547,7 +5553,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const merchantId = req.user?.merchantId;
       
       if (!merchantId) {
-        return res.status(401).json({ message: "Merchant authentication required" });
+        return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       }
 
       // Get the transaction to verify ownership
@@ -5959,7 +5965,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const merchantId = req.user?.merchantId;
       if (!merchantId) {
-        return res.status(400).json({ message: "Merchant ID required" });
+        return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       }
 
       const subscription = await storage.getOrCreateSubscription(merchantId);
@@ -5981,7 +5987,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.put("/api/subscription/plan", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(400).json({ message: "Merchant ID required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       if (!isAccountOwner(req.user)) {
         return res.status(403).json({ message: "Only the account owner can change the plan" });
       }
@@ -6045,7 +6051,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const merchantId = req.user?.merchantId;
       if (!merchantId) {
-        return res.status(400).json({ message: "Merchant ID required" });
+        return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       }
       if (!isAccountOwner(req.user)) {
         return res.status(403).json({ message: "Only the account owner can cancel the subscription" });
@@ -6087,7 +6093,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.post("/api/subscription/resume", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(400).json({ message: "Merchant ID required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       if (!isAccountOwner(req.user)) {
         return res.status(403).json({ message: "Only the account owner can change the subscription" });
       }
@@ -6118,7 +6124,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.get("/api/team", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(400).json({ message: "Merchant ID required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
 
       if (!isAccountOwner(req.user)) {
         return res.status(403).json({ message: "Only the account owner can view team logins" });
@@ -6139,7 +6145,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.post("/api/team/invite", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(400).json({ message: "Merchant ID required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       if (!isAccountOwner(req.user)) {
         return res.status(403).json({ message: "Only the account owner can invite logins" });
       }
@@ -6202,7 +6208,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const userId = strictPositiveIntegerParam(req.params.userId);
       if (userId === null) return res.status(400).json({ message: "Invalid userId" });
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(400).json({ message: "Merchant ID required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       if (!isAccountOwner(req.user)) {
         return res.status(403).json({ message: "Only the account owner can resend invites" });
       }
@@ -6284,7 +6290,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const userId = strictPositiveIntegerParam(req.params.userId);
       if (userId === null) return res.status(400).json({ message: "Invalid userId" });
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(400).json({ message: "Merchant ID required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       if (!isAccountOwner(req.user)) {
         return res.status(403).json({ message: "Only the account owner can revoke invites" });
       }
@@ -6304,7 +6310,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const userId = strictPositiveIntegerParam(req.params.userId);
       if (userId === null) return res.status(400).json({ message: "Invalid userId" });
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(400).json({ message: "Merchant ID required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       if (!isAccountOwner(req.user)) {
         return res.status(403).json({ message: "Only the account owner can change logins" });
       }
@@ -6352,7 +6358,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const userId = strictPositiveIntegerParam(req.params.userId);
       if (userId === null) return res.status(400).json({ message: "Invalid userId" });
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(400).json({ message: "Merchant ID required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       if (!isAccountOwner(req.user)) {
         return res.status(403).json({ message: "Only the account owner can remove logins" });
       }
@@ -6425,7 +6431,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const merchantId = req.user?.merchantId;
       if (!merchantId) {
-        return res.status(400).json({ message: "Merchant ID required" });
+        return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       }
       if (!isAccountOwner(req.user)) {
         return res.status(403).json({ message: "Only the account owner can view billing history" });
@@ -6454,7 +6460,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.get("/api/billing/card", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       if (!isAccountOwner(req.user)) {
         return res.status(403).json({ message: "Only the account owner can view the payment method" });
       }
@@ -6483,7 +6489,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.post("/api/billing/card/session", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       if (!isAccountOwner(req.user)) {
         return res.status(403).json({ message: "Only the account owner can change the payment method" });
       }
@@ -6529,7 +6535,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.post("/api/billing/card/confirm", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       if (!isAccountOwner(req.user)) {
         return res.status(403).json({ message: "Only the account owner can change the payment method" });
       }
@@ -6634,7 +6640,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.delete("/api/billing/card", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       if (!isAccountOwner(req.user)) {
         return res.status(403).json({ message: "Only the account owner can change the payment method" });
       }
@@ -6989,7 +6995,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.get("/api/property/tenants", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const search = typeof req.query.search === "string" ? req.query.search : undefined;
       const includeArchived = req.query.includeArchived === "true";
       const tenants = await storage.getTenantProfilesByMerchant(merchantId, { search, includeArchived });
@@ -7000,7 +7006,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.post("/api/property/tenants", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const data = createTenantProfileSchema.parse(req.body);
       const tenant = await storage.createTenantProfile({ ...data, merchantId });
       await storage.logTransactionEvent({ merchantId, tenantProfileId: tenant.id, eventType: "Tenant_Created", payload: { firstName: tenant.firstName, lastName: tenant.lastName, propertyAddress: tenant.propertyAddress } });
@@ -7017,7 +7023,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.get("/api/property/tenants/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
       const tenant = await storage.getTenantProfile(id);
@@ -7029,7 +7035,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.put("/api/property/tenants/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
       const existing = await storage.getTenantProfile(id);
@@ -7046,7 +7052,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.post("/api/property/tenants/:id/archive", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
       const existing = await storage.getTenantProfile(id);
@@ -7060,7 +7066,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.post("/api/property/tenants/:id/unarchive", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
       const existing = await storage.getTenantProfile(id);
@@ -7074,7 +7080,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.get("/api/property/tenants/:id/events", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
       const tenant = await storage.getTenantProfile(id);
@@ -7091,7 +7097,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.get("/api/property/schedules", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       res.json(await storage.getActiveSchedulesByMerchant(merchantId));
     } catch (err) { console.error("[PROP_SCHEDULES_MERCHANT]", err); res.status(500).json({ message: "Failed to fetch schedules" }); }
   });
@@ -7102,7 +7108,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.post("/api/property/tenants/:tenantId/schedules", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const tenantId = strictUuidParam(req.params.tenantId);
       if (tenantId === null) return res.status(400).json({ message: "Invalid id" });
       const tenant = await storage.getTenantProfile(tenantId);
@@ -7130,7 +7136,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.put("/api/property/schedules/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
       const existing = await storage.getActiveSchedule(id);
@@ -7158,7 +7164,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.delete("/api/property/schedules/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
       const existing = await storage.getActiveSchedule(id);
@@ -7174,7 +7180,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.get("/api/property/invoices", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const tenantProfileId = req.query.tenantProfileId === undefined ? undefined : strictUuidParam(req.query.tenantProfileId);
       if (tenantProfileId === null) return res.status(400).json({ message: "Invalid tenantProfileId" });
       const status = typeof req.query.status === "string" ? req.query.status : undefined;
@@ -7205,7 +7211,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.post("/api/property/invoices/document", authenticateToken, receiveUpload(invoiceDocUpload, 'document'), async (req: AuthenticatedRequest, res) => {
     try {
       if (!req.user?.merchantId) {
-        return res.status(401).json({ message: "Authentication required" });
+        return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       }
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
@@ -7280,7 +7286,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.post("/api/property/invoices", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       // The body's rules first: the tenant was read from the raw body before them.
       const data = createAdHocInvoiceSchema.parse(req.body);
       const tenant = await storage.getTenantProfile(data.tenantProfileId);
@@ -7322,13 +7328,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.post("/api/property/invoices/:id/resend", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
       const invoice = await storage.getInvoiceRentRequest(id);
       if (!invoice || invoice.merchantId !== merchantId) return res.status(404).json({ message: "Invoice not found" });
       if (!(await requireBillingCard(merchantId, res))) return;
-      if (["paid", "paid_external", "voided"].includes(invoice.status)) return res.status(400).json({ message: "Invoice is not payable" });
+      if (["paid", "paid_external", "voided"].includes(invoice.status)) return res.status(409).json({ message: "Invoice is not payable" }); // P2.2 (R1-T3): was 400
       const delivery = await resendInvoiceEmail(id, getBaseUrl(req));
       if (!delivery.ok) return res.status(502).json({ message: "Could not resend", reason: delivery.reason });
       res.json(delivery.invoice);
@@ -7341,12 +7347,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.post("/api/property/invoices/:id/void", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
       const invoice = await storage.getInvoiceRentRequest(id);
       if (!invoice || invoice.merchantId !== merchantId) return res.status(404).json({ message: "Invoice not found" });
-      if (["paid", "paid_external"].includes(invoice.status)) return res.status(400).json({ message: "Cannot void a paid invoice" });
+      if (["paid", "paid_external"].includes(invoice.status)) return res.status(409).json({ message: "Cannot void a paid invoice" }); // P2.2 (R1-T3): was 400
       const updated = await storage.updateInvoiceRentRequest(id, { status: "voided", voidedAt: new Date() });
       await storage.logTransactionEvent({ merchantId, tenantProfileId: invoice.tenantProfileId, invoiceId: id, eventType: "Invoice_Voided", payload: {} });
       res.json(updated);
@@ -7356,14 +7362,14 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.post("/api/property/invoices/:id/mark-paid-external", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
       const invoice = await storage.getInvoiceRentRequest(id);
       if (!invoice || invoice.merchantId !== merchantId) return res.status(404).json({ message: "Invoice not found" });
       // A voided invoice stays voided: the screens hide voided invoices.
       if (invoice.status === "voided") return res.status(409).json({ message: "This invoice was voided" });
-      if (invoice.status === "paid" || invoice.status === "paid_external") return res.status(400).json({ message: "Invoice is already paid" });
+      if (invoice.status === "paid" || invoice.status === "paid_external") return res.status(409).json({ message: "Invoice is already paid" }); // P2.2 (R1-T3): was 400
       const { externalPaymentReference } = markInvoicePaidExternalSchema.parse(req.body);
       const updated = await storage.updateInvoiceRentRequest(id, { status: "paid_external", paidAt: new Date(), externalPaymentReference: externalPaymentReference ?? null });
       await storage.logTransactionEvent({ merchantId, tenantProfileId: invoice.tenantProfileId, invoiceId: id, eventType: "Payment_External", payload: { externalPaymentReference } });
@@ -7816,7 +7822,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.get("/api/property/reminder-settings", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const merchant = await storage.getMerchant(merchantId);
       if (!merchant) return res.status(404).json({ message: "Merchant not found" });
       res.json(reminderSettingsOf(merchant));
@@ -7826,7 +7832,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.put("/api/property/reminder-settings", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const data = updateRentReminderSettingsSchema.parse(req.body);
       const merchant = await storage.updateMerchant(merchantId, data as any);
       res.json(reminderSettingsOf(merchant));
@@ -7846,7 +7852,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.get("/api/trades/reminder-settings", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const merchant = await storage.getMerchant(merchantId);
       if (!merchant) return res.status(404).json({ message: "Merchant not found" });
       res.json({ tradeRemindersEnabled: merchant.tradeRemindersEnabled ?? true });
@@ -7856,7 +7862,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.put("/api/trades/reminder-settings", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const data = updateTradeReminderSettingsSchema.parse(req.body);
       const merchant = await storage.updateMerchant(merchantId, data as any);
       res.json({ tradeRemindersEnabled: merchant?.tradeRemindersEnabled ?? true });
@@ -7869,7 +7875,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.get("/api/trades/gst-settings", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const merchant = await storage.getMerchant(merchantId);
       if (!merchant) return res.status(404).json({ message: "Merchant not found" });
       res.json({
@@ -7885,7 +7891,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.put("/api/trades/gst-settings", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       // The owner's to change (C10 batch 6d): GST changes the tax on every quote and invoice, and the
       // settings page shows these to a teammate greyed out, with the business's other details.
       if (!isAccountOwner(req.user)) return res.status(403).json({ message: "Only the account owner can change GST settings" });
@@ -7905,7 +7911,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.get("/api/trades/clients", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const rows = await storage.getClientProfilesByMerchant(merchantId);
       res.json(rows);
     } catch (err) { console.error("[TRADES_CLIENTS_GET]", err); res.status(500).json({ message: "Failed to fetch clients" }); }
@@ -7913,7 +7919,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.post("/api/trades/clients", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const parsed = createClientProfileSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
       const row = await storage.createClientProfile({ ...parsed.data, merchantId });
@@ -7925,7 +7931,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.get("/api/trades/clients/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
       const row = await storage.getClientProfile(id);
@@ -7936,7 +7942,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.put("/api/trades/clients/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
       const existing = await storage.getClientProfile(id);
@@ -7949,7 +7955,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.post("/api/trades/clients/:id/archive", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
       const existing = await storage.getClientProfile(id);
@@ -7968,7 +7974,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.post("/api/trades/clients/:id/unarchive", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
       const existing = await storage.getClientProfile(id);
@@ -7981,19 +7987,19 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.post("/api/trades/clients/:id/promote", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
       const existing = await storage.getClientProfile(id);
       if (!existing || existing.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
-      if (existing.status !== "prospect") return res.status(400).json({ message: "Client is already saved" });
+      if (existing.status !== "prospect") return res.status(409).json({ message: "Client is already saved" }); // P2.2 (R1-T3): was 400
       res.json(await storage.updateClientProfile(id, { status: "active" }));
     } catch (err) { console.error("[TRADES_CLIENTS_PROMOTE]", err); res.status(500).json({ message: "Failed to save client" }); }
   });
   app.get("/api/trades/clients/:id/events", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
       const existing = await storage.getClientProfile(id);
@@ -8005,7 +8011,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.get("/api/trades/quotes", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       // A status filter is taken only as text: a repeated one reached the query as a list.
       const status = typeof req.query.status === "string" ? req.query.status : undefined;
       res.json(await storage.getQuotesByMerchant(merchantId, { status }));
@@ -8014,7 +8020,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.post("/api/trades/quotes", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       if (!(await requireBillingCard(merchantId, res))) return;
       const parsed = createQuoteSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
@@ -8111,7 +8117,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.get("/api/trades/quotes/:id/pdf", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
       const quote = await storage.getQuote(id);
@@ -8235,7 +8241,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.get("/api/trades/invoices", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       // The client filter is a UUID (a malformed one reached PostgreSQL's uuid cast: a 500), and the
       // status filter is taken only as text (a repeated one reached the query as a list).
       const clientProfileId = req.query.clientProfileId === undefined ? undefined : strictUuidParam(req.query.clientProfileId);
@@ -8247,7 +8253,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.post("/api/trades/invoices", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       if (!(await requireBillingCard(merchantId, res))) return;
       const parsed = createJobInvoiceSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
@@ -8305,7 +8311,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.post("/api/trades/invoices/:id/send-balance", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
       // Only the split switch (C10 batch 6d): it was read from the raw body, so "yes" turned splitting on.
@@ -8346,7 +8352,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.post("/api/trades/invoices/:id/mark-paid-external", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
       const inv = await storage.getJobInvoice(id);
@@ -8369,7 +8375,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.post("/api/trades/invoices/:id/complete", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
       const inv = await storage.getJobInvoice(id);
@@ -8388,7 +8394,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.post("/api/trades/invoices/:id/void", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
       const inv = await storage.getJobInvoice(id);
@@ -8405,14 +8411,14 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.get("/api/trades/schedules", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       res.json(await storage.getJobSchedulesByMerchant(merchantId));
     } catch (err) { console.error("[TRADES_SCHEDULES_GET]", err); res.status(500).json({ message: "Failed to fetch schedules" }); }
   });
   app.post("/api/trades/schedules", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       if (!(await requireBillingCard(merchantId, res))) return;
       const parsed = createJobScheduleSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
@@ -8437,7 +8443,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.put("/api/trades/schedules/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
       const existing = await storage.getJobSchedule(id);
@@ -8460,7 +8466,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.delete("/api/trades/schedules/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
       const existing = await storage.getJobSchedule(id);

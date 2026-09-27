@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 87c03ff02498e95b9f6dee89759f6a28978ed92e on 2026-09-27.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ ff4c34ccd31dcbc11f9c2b2dcfb7d885f41c01c9 on 2026-09-27.
  *
  * 184 registrations (77 GET, 75 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -271,7 +271,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       middleware: ["authenticateToken"],
       storageMethods: ["getMerchant","getOrCreateSubscription"],
-      statuses: [200,401,403,500,503],
+      statuses: [200,401,500,503],
       entitlementGates: ["billingCardIsReady"],
     },
   },
@@ -1215,7 +1215,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       authChecks: ["authenticateToken","compares req.user?.role !== \"admin\""],
       storageMethods: ["getMerchantByEmail"],
       sideEffects: ["audit log: logSecurityEvent","email: sendMerchantVerificationEmail"],
-      statuses: [200,400,401,403,404,500,503],
+      statuses: [200,400,401,403,404,409,500,503],
       helpers: ["authenticateAdmin"],
     },
   },
@@ -1551,7 +1551,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       middleware: ["authenticateToken"],
       authChecks: ["isAccountOwner"],
       storageMethods: ["countSeatsInUse","getOrCreateSubscription"],
-      statuses: [200,400,401,403,500,503],
+      statuses: [200,401,403,500,503],
       dtos: ["subscriptionDto"],
     },
   },
@@ -1594,7 +1594,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       middleware: ["authenticateToken"],
       authChecks: ["isAccountOwner"],
       storageMethods: ["countSeatsInUse","resumeSubscription"],
-      statuses: [200,400,401,403,409,500,503],
+      statuses: [200,401,403,409,500,503],
       dtos: ["subscriptionDto"],
     },
   },
@@ -1607,7 +1607,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       middleware: ["authenticateToken"],
       authChecks: ["isAccountOwner"],
       storageMethods: ["countSeatsInUse","getOrCreateSubscription","getTeamMembers"],
-      statuses: [200,400,401,403,500,503],
+      statuses: [200,401,403,500,503],
       dtos: ["teamMemberDto"],
     },
   },
@@ -2016,7 +2016,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       authChecks: ["isValidatedPlatformAdmin"],
       storageMethods: ["getUploadedFile","getUploadedFileForMerchant","recordInvoiceDocumentAdminRead"],
       sideEffects: ["audit log: logSecurityEvent"],
-      statuses: [200,401,403,404,500,503],
+      statuses: [200,401,404,500,503],
       helpers: ["sendPrivateDocument"],
     },
   },
@@ -2048,7 +2048,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       authChecks: ["compares invoice.merchantId !== merchantId"],
       storageMethods: ["getInvoiceRentRequest","getOrCreateSubscription"],
       sideEffects: ["email: resendInvoiceEmail"],
-      statuses: [200,400,401,402,403,404,500,502,503],
+      statuses: [200,400,401,402,403,404,409,500,502,503],
       entitlementGates: ["BILLING_CARD_REQUIRED","billingCardIsReady","requireBillingCard"],
       helpers: ["requireBillingCard"],
     },
@@ -2063,7 +2063,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       params: ["id: strictUuidParam"],
       authChecks: ["compares invoice.merchantId !== merchantId"],
       storageMethods: ["getInvoiceRentRequest","logTransactionEvent","updateInvoiceRentRequest"],
-      statuses: [200,400,401,403,404,500,503],
+      statuses: [200,400,401,403,404,409,500,503],
     },
   },
   "POST /api/property/invoices/:id/mark-paid-external": {
@@ -2403,7 +2403,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       params: ["id: strictUuidParam"],
       authChecks: ["compares existing.merchantId !== merchantId"],
       storageMethods: ["getClientProfile","updateClientProfile"],
-      statuses: [200,400,401,403,404,500,503],
+      statuses: [200,400,401,403,404,409,500,503],
     },
   },
   "GET /api/trades/clients/:id/events": {

@@ -774,3 +774,25 @@ describe("voiding a trades invoice is recorded in the client's history (owner de
     expect(fake.writes).toEqual([]);
   });
 });
+
+/** R1-T3 (P2.2): saving a client already saved is a state conflict, 409 (it answered 400). */
+describe("saving a client already saved is 409 (R1-T3, P2.2)", () => {
+  it("promote on a listed client: 409, and nothing changes", async () => {
+    const { app, owner, fake } = await ownerWithTrades();
+
+    const res = await request(app).post(`/api/trades/clients/${CLIENT}/promote`).set(bearer(owner));
+
+    expect(res.status).toBe(409);
+    expect(fake.clients.get(CLIENT).status).toBe("active");
+    expect(fake.writes).toEqual([]);
+  });
+
+  it("promote still saves a hidden quick-invoice prospect", async () => {
+    const { app, owner, fake } = await ownerWithTrades({ client: { status: "prospect" } });
+
+    const res = await request(app).post(`/api/trades/clients/${CLIENT}/promote`).set(bearer(owner));
+
+    expect(res.status).toBe(200);
+    expect(fake.clients.get(CLIENT).status).toBe("active");
+  });
+});

@@ -364,8 +364,10 @@ export async function authenticateToken(req: AuthenticatedRequest, res: Response
   }
   const token = match[1];
   const decoded = verifyToken(token);
+  // P2.2 (R1-T3, owner decision 2026-09-27): a credential that is missing, invalid, expired or disabled
+  // is 401, so every page sends the person to sign in again (it was 403 here and below).
   if (!decoded) {
-    return res.status(403).json({ message: 'Invalid or expired token' });
+    return res.status(401).json({ message: 'Invalid or expired token' });
   }
 
   // A role string alone is not admin authority. Require the dedicated principal,
@@ -380,7 +382,7 @@ export async function authenticateToken(req: AuthenticatedRequest, res: Response
       decoded.merchantId !== 0 ||
       !isPositiveInteger(decoded.userId)
     ) {
-      return res.status(403).json({ message: 'Invalid admin session' });
+      return res.status(401).json({ message: 'Invalid admin session' });
     }
     req.user = {
       id: decoded.userId,
@@ -413,8 +415,8 @@ export async function authenticateToken(req: AuthenticatedRequest, res: Response
   }
 
   // Each read is guarded on its own, and the decisions sit outside the guard, so
-  // that only a genuine answer from the database can produce a 403/404 — a
-  // rejection here is a statement about this principal, never about our uptime.
+  // that only a genuine answer from the database can produce a 401 — a rejection
+  // here is a statement about this principal, never about our uptime.
   const storageModule = await readForAuth('load the storage module', () => import('./storage'));
   if (storageModule === STORAGE_UNAVAILABLE) return respondAuthBackendUnavailable(res);
   const { storage } = storageModule;
@@ -427,7 +429,7 @@ export async function authenticateToken(req: AuthenticatedRequest, res: Response
   // Re-check the identity on every request so disabling a teammate takes effect
   // within the token's remaining lifetime rather than at its natural expiry.
   if (!userRow || !user || userRow.status !== 'active' || user.merchantId !== decoded.merchantId) {
-    return res.status(403).json({ message: 'Access revoked' });
+    return res.status(401).json({ message: 'Access revoked' });
   }
 
   // A password reset or "sign out everywhere" advanced the version: every token
@@ -442,7 +444,7 @@ export async function authenticateToken(req: AuthenticatedRequest, res: Response
   // A row that is absent, unverified or suspended — the database answered, and
   // the answer is that this login has no usable account behind it.
   if (!merchant || (merchant.status !== 'verified' && merchant.status !== 'active')) {
-    return res.status(403).json({ code: 'ACCESS_REVOKED', message: 'Access revoked' });
+    return res.status(401).json({ code: 'ACCESS_REVOKED', message: 'Access revoked' });
   }
 
   // The database role is authoritative; stale JWT role claims are ignored.

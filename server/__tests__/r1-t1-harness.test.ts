@@ -175,7 +175,7 @@ describe("R1-T1 — the harness is production's app, and nothing else", () => {
       const stale = await request(app).get("/api/auth/me").set(bearer(owner));
 
       expect(fresh.status).toBe(200);
-      expect(stale.status).toBe(403);
+      expect(stale.status).toBe(401); // 401 since 2026-09-27 (R1-T3, P2.2, owner decision): a sign-in that is invalid, expired or disabled was 403.
       expect(stale.body.message).toBe("Invalid or expired token");
     } finally {
       clock.restore();

@@ -582,3 +582,25 @@ describe("an emptied tenant field is cleared (owner decision 2026-09-27)", () =>
     expect(fake.tenants.get(TENANT)).toMatchObject({ firstName: "Tessa", email: null, phone: "021 555 0100", coTenantsText: "Sam" });
   });
 });
+
+/** R1-T3 (P2.2): a settled invoice is a state conflict, 409 (these three answered 400). */
+describe("a settled rent invoice's conflicts are 409 (R1-T3, P2.2)", () => {
+  it.each([
+    ["resent", "post", (id: string) => `/api/property/invoices/${id}/resend`, undefined, "paid"],
+    ["voided", "post", (id: string) => `/api/property/invoices/${id}/void`, undefined, "paid_external"],
+    ["marked paid again", "post", (id: string) => `/api/property/invoices/${id}/mark-paid-external`, {}, "paid"],
+  ] as const)("a paid invoice cannot be %s: 409, and nothing changes or is sent", async (_label, _method, address, body, status) => {
+    const { app } = await createTestApp();
+    const owner = await createOwnerPrincipal();
+    const fake = fakeProperty();
+    seed(fake, owner.merchantId, { invoice: { status } });
+
+    let pending = request(app).post(address(INVOICE)).set(bearer(owner));
+    if (body) pending = pending.send(body);
+    const res = await pending;
+
+    expect(res.status).toBe(409);
+    expect(fake.invoices.get(INVOICE).status).toBe(status);
+    expect(fake.writes).toEqual([]);
+  });
+});

@@ -61,7 +61,7 @@ describe("R1-T1 no-live-system HTTP harness", () => {
 
     const response = await request(app).get("/api/auth/me").set(bearer(disabled));
 
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(401); // 401 since 2026-09-27 (R1-T3, P2.2, owner decision): a sign-in that is invalid, expired or disabled was 403.
   });
 
   it("two merchants see two different owners on the same route", async () => {

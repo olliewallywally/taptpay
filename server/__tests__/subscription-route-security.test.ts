@@ -27,7 +27,9 @@ describe("subscription and team route authorization", () => {
   test("get /api/subscription is member-readable but remains authenticated", () => {
     const body = handler("get", "/api/subscription");
     expect(body.slice(0, body.indexOf("async ("))).toContain("authenticateToken");
-    expect(body).not.toContain("res.status(403)");
+    // A teammate is never refused here. The one 403 is the platform admin's, which has no business
+    // (P2.2, R1-T3, 2026-09-27: it was 400).
+    expect(body.match(/res\.status\(403\)[^;]*/g) ?? []).toEqual(["res.status(403).json(MERCHANT_ACCESS_REQUIRED)"]);
     expect(body.indexOf("isAccountOwner(req.user)"))
       .toBeGreaterThan(body.indexOf("storage.getOrCreateSubscription("));
     expect(body).toContain("subscriptionDto(subscription, seatsInUse)");

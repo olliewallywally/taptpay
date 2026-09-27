@@ -120,3 +120,47 @@ describe("verify and set-active accept only what the business page offers", () =
     expect(await storage.getMerchant(verified.id)).toMatchObject({ status: "active" });
   });
 });
+
+/**
+ * R1-T3 (P2.2): a request the business's state already answers is a state conflict, 409. These four
+ * answered 400, kept so in batch 4 for R1-T3's matrix. Each still changes nothing.
+ */
+describe("the admin's state conflicts are 409 (R1-T3, P2.2)", () => {
+  const signup = (status: string) => storage.createMerchantWithSignup({
+    name: "State Owner", businessName: "State Ltd", businessType: "retail",
+    email: `state.${crypto.randomBytes(4).toString("hex")}@harness.test`,
+    phone: "021 555 0100", address: "1 State Street, Auckland",
+    verificationToken: crypto.randomBytes(32).toString("hex"), passwordHash: "synthetic-password-hash",
+  } as any).then(async (merchant: any) => {
+    if (status !== "pending") await storage.updateMerchantStatus(merchant.id, status as any);
+    return storage.getMerchant(merchant.id);
+  });
+
+  it.each([
+    ["verify, a business already verified", "verified", (id: number) => `/api/admin/merchants/${id}/verify`, undefined],
+    ["set-active, a business already active", "active", (id: number) => `/api/admin/merchants/${id}/set-active`, undefined],
+    ["activate, a business already verified", "verified", (id: number) => `/api/admin/merchants/${id}/activate`, { password: "Password1!" }],
+  ])("%s: 409, and nothing changes", async (_label, status, address, body) => {
+    const { app } = await createTestApp();
+    const merchant: any = await signup(status);
+    const before = storageSnapshot();
+
+    let pending = request(app).post(address(merchant.id)).set(bearer(createAdminPrincipal()));
+    if (body) pending = pending.send(body);
+    const res = await pending;
+
+    expect(res.status).toBe(409);
+    expect(storageSnapshot()).toBe(before);
+  });
+
+  it("resend-verification, a business no longer waiting: 409, and nothing is sent", async () => {
+    const { app } = await createTestApp();
+    const merchant: any = await signup("verified");
+    const before = storageSnapshot();
+
+    const res = await request(app).post("/api/admin/resend-verification").set(bearer(createAdminPrincipal())).send({ email: merchant.email });
+
+    expect(res.status).toBe(409);
+    expect(storageSnapshot()).toBe(before);
+  });
+});
