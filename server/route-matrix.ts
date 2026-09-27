@@ -28,6 +28,7 @@ export type MatrixCaller =
   | "suspended-business" // the owner of a business that is no longer verified or active
   | "owner" // the business's owner
   | "member" // a teammate of the business
+  | "other-owner" // the owner of another business
   | "platform-admin" // the validated platform admin (no business of its own)
   | "link-as-sign-in" // a payment link's token presented as a sign-in (Authorization: Bearer)
   | "no-secret" // the scheduler's routes without x-cron-secret
@@ -124,6 +125,15 @@ export function matrixRowFor(key: string): MatrixRow {
   // Behind authenticateToken: the platform admin passes the gate with no business of its own, so a
   // route that does not admit it (per its review) must refuse it as a principal without the tenant.
   const review = ROUTE_REVIEW[key];
+  // The business's own logins: the owner is served; a teammate is refused (403) on an owner-only route;
+  // another business's owner is refused (403) where the request names the business (in its path or
+  // body). The routes that act on the session's own business, or address one record, follow by family.
+  const merchantBranch = review.branches.find((branch) => branch.principal === "merchant");
+  if (merchantBranch) {
+    answers.owner = "allowed";
+    answers.member = merchantBranch.roles?.includes("member") ? "allowed" : 403;
+    if (merchantBranch.tenant === "path-merchant") answers["other-owner"] = 403;
+  }
   const admitsAdmin =
     key in ADMIN_SERVED_AT_THE_GATE ||
     review.branches.some((branch) => branch.principal === "platform-admin" || branch.platformAdmin === true);

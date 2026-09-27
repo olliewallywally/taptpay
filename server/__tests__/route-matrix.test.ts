@@ -60,10 +60,18 @@ const WELL_FORMED_BODY: Record<string, Record<string, unknown>> = {
   "POST /api/push/native-subscribe": { deviceToken: "matrix-placeholder-device" },
 };
 
+/**
+ * The refusals a gate makes before any route-specific work: the callers GATE_REFUSED names, the
+ * platform admin, and the owner and a teammate on the admin routes. A teammate's or another business's
+ * refusal at a route's own role or tenant check is driven with real requests (route-matrix-roles).
+ */
+const AT_THE_GATE = (gate: string, caller: MatrixCaller) =>
+  (GATE_REFUSED as readonly string[]).includes(caller) || caller === "platform-admin" || (gate === "admin" && (caller === "owner" || caller === "member"));
+
 /** [route, caller, the status the matrix says it is refused with] for every refusal of a gated route. */
 const REFUSALS: Array<[string, MatrixCaller, number]> = Object.entries(ROUTE_MATRIX).filter(([, row]) => row.gate !== "own").flatMap(([key, row]) =>
   (Object.entries(row.answers) as Array<[MatrixCaller, unknown]>)
-    .filter(([, answer]) => typeof answer === "number")
+    .filter(([caller, answer]) => typeof answer === "number" && AT_THE_GATE(row.gate, caller))
     .map(([caller, answer]): [string, MatrixCaller, number] => [key, caller, answer as number]),
 );
 
