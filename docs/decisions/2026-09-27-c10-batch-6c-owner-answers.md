@@ -40,3 +40,23 @@ was "Keep sending each one".
 - 3: code and tests on this branch, tests first: resuming a paused automation moves its next date to
   the first date on its cycle after the resume, so nothing is sent for the paused time. No deploy or
   push.
+
+## A fourth question, asked later the same day
+
+Asked after the batch's code commit (`4900a475`), once a probe showed the problem below.
+
+| # | Question (as asked) | Answer |
+|---|---|---|
+| 4 | "When rent is sent with a repeat (weekly, fortnightly, monthly) to a tenant who already has a rent automation, TaptPay starts a second automation and keeps the first. The tenant then gets two rent requests every period. Example: weekly $500, then sending weekly $520 to change the rent, bills $500 AND $520 every week. No screen can change an automation's amount (only pause, resume, cancel), so re-sending is the natural way to change rent. What should happen?" | **"New one replaces old (Recommended)"** — "The new automation takes over: the tenant's running or paused automation is cancelled when the new one starts. A tenant never has two, and changing rent by re-sending works." |
+
+The other options were "Refuse a second one" and "Keep both, as now".
+
+Background: `POST /api/property/tenants/:tenantId/schedules` adds an automation without looking for
+one already running. The phone and desktop terminals call it after every recurring send (the first
+request goes at once, the automation starts one interval on), and both only pause, resume or cancel
+an automation. Shown with the real generate pass: two weekly sends ($500, then $520) left two
+automations running, and the first due date made two rent requests for the same week.
+
+What this authorizes: code and tests on this branch, tests first: creating an automation cancels
+the tenant's other automations that are not already cancelled, each recorded as cancelled with the
+time and an event. No deploy or push.
