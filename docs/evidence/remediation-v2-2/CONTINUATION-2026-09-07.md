@@ -593,10 +593,23 @@ The work itself:
   was kept while the screen said saved; voiding a trades invoice is now in the client's history);
   push; restart the dev server. Server 110/2,009, client 102/822.
 
-**Next:** R1-T3 (plan page 24): the owner / member / admin / public / provider / cron / API-key matrix,
-recorded in the inventory, with a runtime test per API row (allowed principals succeed; the others get
-the P2.2 status with zero side effects) and the client route guards. The route review's recorded P2.2
-mismatches (the admin's 400/401, state refusals answering 400) are its first input.
+- **R1-T3 started (2026-09-27): the plan and its owner answers (`ff4c34cc`), then batch (a), `65f5be26`
+  (server) and `f62149ff` (client); local, awaiting independent review**
+  ([working notes](r1/WORKING-2026-09-27-r1-t3.md); [owner answers](../../decisions/2026-09-27-r1-t3-owner-answers.md)).
+  - **The matrix** (`server/route-matrix.ts`), derived from the reviews and facts; its runtime test drives
+    every route behind the two sign-in gates (115) with every caller the gate refuses: 568 cases, each
+    with nothing changed.
+  - **Fixed (P2.2):** a sign-in that is invalid, expired or disabled is now 401 (it was 403, so the
+    property and trades pages showed an error instead of the sign-in page; owner decision); the platform
+    admin gets 403 on 68 business routes (it was 400 or 401); eight state conflicts are 409 (they were
+    400). Open findings 171 → 99.
+  - **Retired (owner decision):** the unguarded `/smart-terminal` page.
+  - Mutations 18/18. Server 111/2,586, client 103/825, `tsc` clean.
+
+**Next:** R1-T3's batch (b): the routes with their own gates (69: signed-out, cron, provider callbacks,
+the API key, bearer tokens). Then the callers each route serves (owner, teammate, another business's
+owner), family by family, each with a request the allowed caller succeeds with; then the client route
+guards (plan page 24).
 Open for the owner: 0030 in dev (above); the card-free dev write (above). The
 no-board rework's questions are all answered. Release of the rework: when production has no pending
 shared no-board sale (count-only check once production is reopened), with

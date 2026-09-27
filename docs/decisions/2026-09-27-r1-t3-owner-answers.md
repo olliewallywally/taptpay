@@ -37,3 +37,15 @@ screen checked first for a dependence on 400.
 - 2: code and tests on this branch: the `/smart-terminal` route and its component removed. No deploy.
 - 3: nothing to change; R1-T3's client-guard tests record that any business may open any type's
   pages.
+
+## Outcome (same day, local commits, not pushed)
+
+- 1, **`65f5be26`**: `authenticateToken` answers 401 for an invalid or expired token, an invalid admin
+  session, a login disabled or gone, and a business absent, unverified or suspended (messages and codes
+  unchanged). The runtime matrix test drives all 115 gated routes with each of those callers. With it,
+  following P2.2 as the plan said: the platform admin gets 403 "Merchant access required" on the 68
+  business routes that answered it 400 or 401, and eight state conflicts answer 409. Server 111/2,586.
+- 2, **`f62149ff`**: `/smart-terminal` removed (the route, its lazy import, `SmartTransitions`). Client
+  103/825.
+- 3: nothing changed; the client-guard tests to come record that any business may open any type's
+  pages.
