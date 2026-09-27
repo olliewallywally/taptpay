@@ -1,4 +1,4 @@
-# R1-T2 route inventory — generated 2026-09-27 @ `00ec975dbc28e5ea0c6198df6e7b8fc7335a6d65`
+# R1-T2 route inventory — generated 2026-09-27 @ `87c03ff02498e95b9f6dee89759f6a28978ed92e`
 
 Regenerate with `npx tsx scripts/generate-route-policy.ts`. This table is
 evidence for the SHA named above, not a timeless constant — see
@@ -123,7 +123,6 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 - **POST /api/property/tenants:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 - **GET /api/property/tenants/:id:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 - **PUT /api/property/tenants/:id:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
-- **PUT /api/property/tenants/:id:** Clearing a tenant's email, phone or co-tenants changes nothing: the edit screen sends the field empty, the schema turns an empty value into none, and the update leaves out what is none (Drizzle skips undefined), so the old value stays while the screen shows it saved (found in batch 6d).
 - **POST /api/property/tenants/:id/archive:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 - **POST /api/property/tenants/:id/unarchive:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 - **GET /api/property/tenants/:id/events:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
@@ -162,7 +161,6 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 - **POST /api/trades/clients:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 - **GET /api/trades/clients/:id:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 - **PUT /api/trades/clients/:id:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
-- **PUT /api/trades/clients/:id:** Clearing a client's email, phone or notes changes nothing: the edit screen sends the field empty, the schema turns an empty value into none, and the update leaves out what is none (Drizzle skips undefined), so the old value stays while the screen shows it saved (found in batch 6d).
 - **POST /api/trades/clients/:id/archive:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 - **POST /api/trades/clients/:id/archive:** The archive and the cancellations are separate writes: a failure between them leaves the client archived with recurring invoices still running, until the archive is repeated.
 - **POST /api/trades/clients/:id/unarchive:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
@@ -187,7 +185,6 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 - **POST /api/trades/invoices/:id/void:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 - **POST /api/trades/invoices/:id/void:** Voiding while the client is paying: the provider's completion then finds the invoice settled (finalizeTradeInvoice), so a single payment's charge is recorded nowhere; a split share's is logged (split_share_unrecorded). R3 (payment attempts).
 - **POST /api/trades/invoices/:id/void:** A split invoice with shares already paid can be voided: those shares stay collected, with nothing but their events to show for them (R3/R4, refunds).
-- **POST /api/trades/invoices/:id/void:** Voiding logs no event (voiding a rent invoice logs Invoice_Voided), so the client's history shows the invoice sent and nothing after.
 - **POST /api/trades/invoices/:id/void:** Every login of the business, a teammate included, has every trades action and setting but GST (clients, quotes, invoices, cancelling one, marking one paid outside TaptPay, recurring invoices, the reminder switch), as every trades screen offers them; in property the owner kept the same (2026-09-27, batch 6c answer 2).
 - **GET /api/trades/schedules:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 - **POST /api/trades/schedules:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
@@ -376,12 +373,12 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 | POST | `/api/trades/invoices/:id/mark-paid-external` | 8346 | merchant | authenticateToken |
 | POST | `/api/trades/invoices/:id/complete` | 8369 | merchant | authenticateToken |
 | POST | `/api/trades/invoices/:id/void` | 8388 | merchant | authenticateToken |
-| GET | `/api/trades/schedules` | 8402 | merchant | authenticateToken |
-| POST | `/api/trades/schedules` | 8409 | merchant | authenticateToken |
-| PUT | `/api/trades/schedules/:id` | 8434 | merchant | authenticateToken |
-| DELETE | `/api/trades/schedules/:id` | 8457 | merchant | authenticateToken |
-| GET | `/api/internal/cron/status` | 8473 | cron | authorizeCronRequest |
-| POST | `/api/internal/cron` | 8483 | cron | authorizeCronRequest |
+| GET | `/api/trades/schedules` | 8405 | merchant | authenticateToken |
+| POST | `/api/trades/schedules` | 8412 | merchant | authenticateToken |
+| PUT | `/api/trades/schedules/:id` | 8437 | merchant | authenticateToken |
+| DELETE | `/api/trades/schedules/:id` | 8460 | merchant | authenticateToken |
+| GET | `/api/internal/cron/status` | 8476 | cron | authorizeCronRequest |
+| POST | `/api/internal/cron` | 8486 | cron | authorizeCronRequest |
 
 ## Per-route facts
 
@@ -2915,12 +2912,11 @@ Reviewed policy:
 Reviewed policy:
 
 - **Who:** merchant (owner, member). **Tenant (resource):** the tenant read by id (getTenantProfile) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403); the platform admin, with no business, is refused (401 "Authentication required")
-- **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500); body: updateTenantProfileSchema (the create rules, each field optional; other fields are dropped; 400 with the issues)
-- **Idempotency:** sets the given fields (updateTenantProfile), an archived tenant's too; the same again changes nothing but the time changed
+- **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500); body: updateTenantProfileSchema (the create rules, each field optional: one left out stays as it is, and an emptied email, phone or co-tenants is cleared, since 2026-09-27, when the edit screen's emptied field was dropped and the old value kept; other fields are dropped; 400 with the issues)
+- **Idempotency:** sets the given fields and clears the emptied ones (updateTenantProfile), an archived tenant's too; the same again changes nothing but the time changed
 - **Success:** the tenant afterwards, a whole tenant row (names, email, phone, the property address, co-tenants, the preferred channel, whether archived and when, when made and changed)
 - **Error disclosure:** input-issues
 - **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
-- **Finding:** Clearing a tenant's email, phone or co-tenants changes nothing: the edit screen sends the field empty, the schema turns an empty value into none, and the update leaves out what is none (Drizzle skips undefined), so the old value stays while the screen shows it saved (found in batch 6d).
 
 ### POST `/api/property/tenants/:id/archive`
 
@@ -3595,12 +3591,11 @@ Reviewed policy:
 Reviewed policy:
 
 - **Who:** merchant (owner, member). **Tenant (resource):** the client read by id (getClientProfile) must be the session's business's: another business's is 404, the same as a missing one; the platform admin, with no business, is refused (401 "Authentication required")
-- **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500); body: updateClientProfileSchema (the create rules, each field optional; other fields are dropped, so the status cannot be set here; 400 with the first issue)
-- **Idempotency:** sets the given fields (updateClientProfile), an archived client's or a prospect's too; the same again changes nothing but the time changed
+- **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500); body: updateClientProfileSchema (the create rules, each field optional: one left out stays as it is, and an emptied email, phone or notes is cleared, since 2026-09-27, when the edit screen's emptied field was dropped and the old value kept; other fields are dropped, so the status cannot be set here; 400 with the first issue)
+- **Idempotency:** sets the given fields and clears the emptied ones (updateClientProfile), an archived client's or a prospect's too; the same again changes nothing but the time changed
 - **Success:** the client afterwards, a whole client row (names, email, phone, the site address, notes, the preferred channel, the status: active, archived or a hidden quick-invoice prospect, when archived, made and changed)
 - **Error disclosure:** input-issues
 - **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
-- **Finding:** Clearing a client's email, phone or notes changes nothing: the edit screen sends the field empty, the schema turns an empty value into none, and the update leaves out what is none (Drizzle skips undefined), so the old value stays while the screen shows it saved (found in batch 6d).
 
 ### POST `/api/trades/clients/:id/archive`
 
@@ -3907,20 +3902,19 @@ Reviewed policy:
 - middleware: `authenticateToken`
 - params: `id: strictUuidParam`
 - authChecks: `compares inv.merchantId !== merchantId`
-- storageMethods: `getJobInvoice`, `updateJobInvoice`
+- storageMethods: `createJobEvent`, `getJobInvoice`, `updateJobInvoice`
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
 
 Reviewed policy:
 
 - **Who:** merchant (owner, member). **Tenant (resource):** the invoice read by id (getJobInvoice) must be the session's business's: another business's is 404, the same as a missing one, and not paid (409 since 2026-09-27: the screens offer cancelling only an unpaid one); the platform admin, with no business, is refused (401 "Authentication required")
 - **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500)
-- **Idempotency:** voids the invoice with the time; a voided one is voided again, with a new time. Nothing is logged
+- **Idempotency:** voids the invoice with the time and logs it in the client's history (invoice_voided, since 2026-09-27); a voided one is voided again, with a new time, and logged again
 - **Success:** the invoice afterwards, a whole invoice row (the client, quote and recurring invoice, kind, amount, the checkout token, channel, job details, status and its dates, when the job was completed, the external payment reference, reminders sent, when to send, an attached document's reference and name, the provider's session and transaction ids, the split, the WhatsApp message id)
 - **Error disclosure:** fixed
 - **Finding:** The platform admin (signed in, with no business) is refused with 401 "Authentication required"; P2.2 says 403 for a caller without the role or tenant (R1-T3).
 - **Finding:** Voiding while the client is paying: the provider's completion then finds the invoice settled (finalizeTradeInvoice), so a single payment's charge is recorded nowhere; a split share's is logged (split_share_unrecorded). R3 (payment attempts).
 - **Finding:** A split invoice with shares already paid can be voided: those shares stay collected, with nothing but their events to show for them (R3/R4, refunds).
-- **Finding:** Voiding logs no event (voiding a rent invoice logs Invoice_Voided), so the client's history shows the invoice sent and nothing after.
 - **Finding:** Every login of the business, a teammate included, has every trades action and setting but GST (clients, quotes, invoices, cancelling one, marking one paid outside TaptPay, recurring invoices, the reminder switch), as every trades screen offers them; in property the owner kept the same (2026-09-27, batch 6c answer 2).
 
 ### GET `/api/trades/schedules`

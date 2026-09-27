@@ -1158,6 +1158,14 @@ const personNameSchema = z.string().trim().min(1).max(80);
 const optionalEmailSchema = z.string().trim().email().max(200).optional().or(z.literal("")).transform(v => v || undefined);
 const optionalPhoneSchema = z.string().trim().min(1).max(40).optional().or(z.literal("")).transform(v => v || undefined);
 
+// An edit's optional field: left out, it stays as it is (undefined, which the update leaves out);
+// sent empty, it is cleared (null). The edit screens send the whole form, so a field the person
+// emptied arrives as "" and was dropped, the old value kept (owner decision 2026-09-27).
+const clearedWhenEmpty = <T extends z.ZodTypeAny>(field: T) =>
+  field.or(z.literal("")).optional().transform((v) => (v === "" ? null : v));
+const editableEmailSchema = clearedWhenEmpty(z.string().trim().email().max(200));
+const editablePhoneSchema = clearedWhenEmpty(z.string().trim().min(1).max(40));
+
 const tenantProfileFields = z.object({
   firstName: personNameSchema,
   lastName: personNameSchema,
@@ -1169,7 +1177,11 @@ const tenantProfileFields = z.object({
 });
 
 export const createTenantProfileSchema = tenantProfileFields;
-export const updateTenantProfileSchema = tenantProfileFields.partial();
+export const updateTenantProfileSchema = tenantProfileFields.partial().extend({
+  email: editableEmailSchema,
+  phone: editablePhoneSchema,
+  coTenantsText: clearedWhenEmpty(z.string().max(1000)),
+});
 
 export const createActiveScheduleSchema = z.object({
   tenantProfileId: z.string().uuid(),
@@ -1386,7 +1398,11 @@ const clientProfileFields = z.object({
   preferredChannel: z.enum(["email", "whatsapp", "sms"]).default("email"),
 });
 export const createClientProfileSchema = clientProfileFields;
-export const updateClientProfileSchema = clientProfileFields.partial();
+export const updateClientProfileSchema = clientProfileFields.partial().extend({
+  email: editableEmailSchema,
+  phone: editablePhoneSchema,
+  notes: clearedWhenEmpty(z.string().max(1000)),
+});
 
 const quoteLineItemSchema = z.object({
   description: z.string().trim().min(1).max(200),

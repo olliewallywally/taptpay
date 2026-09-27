@@ -56,7 +56,9 @@ function fakeProperty(): PropertyFake {
       fake.writes.push(name);
       return apply(...args);
     });
-  write("updateTenantProfile", (id: string, updates: any) => Object.assign(fake.tenants.get(id), updates));
+  // As Drizzle does (mapUpdateSet), an update leaves out every field whose value is undefined.
+  write("updateTenantProfile", (id: string, updates: any) =>
+    Object.assign(fake.tenants.get(id), Object.fromEntries(Object.entries(updates).filter(([, value]) => value !== undefined))));
   write("archiveTenantProfile", (id: string) => Object.assign(fake.tenants.get(id), { status: "archived" }));
   write("unarchiveTenantProfile", (id: string) => Object.assign(fake.tenants.get(id), { status: "active" }));
   write("createActiveSchedule", (data: any) => {
@@ -542,5 +544,41 @@ describe("a rejected upload says why", () => {
 
     expect(res.status).toBe(400);
     expect(res.body).toEqual({ message: "Invalid upload" });
+  });
+});
+
+/**
+ * The tenant edit screen sends the whole form, so an emptied email or phone arrives as "". The schema
+ * turned "" into undefined and the update left undefined out, so the old value stayed while the screen
+ * said saved. Owner decision 2026-09-27 (docs/decisions/2026-09-27-before-r1-t3-owner-answers.md, 2).
+ */
+describe("an emptied tenant field is cleared (owner decision 2026-09-27)", () => {
+  const FORM = { firstName: "Tess", lastName: "Tenant", propertyAddress: "1 Test Road", email: "tess@example.test", phone: "021 555 0100", preferredChannel: "email" };
+
+  it("the edit screen's emptied phone clears it, and the rest stay", async () => {
+    const { app } = await createTestApp();
+    const owner = await createOwnerPrincipal();
+    const fake = fakeProperty();
+    seed(fake, owner.merchantId, { tenant: { phone: "021 555 0100" } });
+
+    const res = await request(app).put(`/api/property/tenants/${TENANT}`).set(bearer(owner)).send({ ...FORM, phone: "" });
+
+    expect(res.status).toBe(200);
+    expect(fake.tenants.get(TENANT)).toMatchObject({ phone: null, email: "tess@example.test", firstName: "Tess" });
+  });
+
+  it("an emptied email clears it; a field left out is left as it was", async () => {
+    const { app } = await createTestApp();
+    const owner = await createOwnerPrincipal();
+    const fake = fakeProperty();
+    seed(fake, owner.merchantId, { tenant: { phone: "021 555 0100", coTenantsText: "Sam" } });
+
+    const cleared = await request(app).put(`/api/property/tenants/${TENANT}`).set(bearer(owner)).send({ ...FORM, email: "", preferredChannel: "sms" });
+    expect(cleared.status).toBe(200);
+    expect(fake.tenants.get(TENANT)).toMatchObject({ email: null, phone: "021 555 0100", coTenantsText: "Sam" });
+
+    const renamed = await request(app).put(`/api/property/tenants/${TENANT}`).set(bearer(owner)).send({ firstName: "Tessa" });
+    expect(renamed.status).toBe(200);
+    expect(fake.tenants.get(TENANT)).toMatchObject({ firstName: "Tessa", email: null, phone: "021 555 0100", coTenantsText: "Sam" });
   });
 });

@@ -260,8 +260,6 @@ const tradesPaidElsewhereFinding = (action: string) =>
   `${action} while the client is paying: the provider's completion then finds the invoice settled (finalizeTradeInvoice), so a single payment's charge is recorded nowhere; a split share's is logged (split_share_unrecorded). R3 (payment attempts).`;
 const archivedStillFinding = (what: string) =>
   `An archived client can still be ${what} here; no screen offers it (the pickers list only current clients). Only a recurring invoice is refused for one (owner decision 2026-09-27).`;
-const clearedFieldFinding = (fields: string) =>
-  `Clearing ${fields} changes nothing: the edit screen sends the field empty, the schema turns an empty value into none, and the update leaves out what is none (Drizzle skips undefined), so the old value stays while the screen shows it saved (found in batch 6d).`;
 
 function tokenRate(family: string, perMinute: number): string {
   return (
@@ -3013,14 +3011,14 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     branches: [
       { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${propertyRecord("tenant", "getTenantProfile")}; ${PROPERTY_ADMIN}` },
     ],
-    input: `${propertyId("id")}; body: updateTenantProfileSchema (the create rules, each field optional; other fields are dropped; 400 with the issues)`,
+    input: `${propertyId("id")}; body: updateTenantProfileSchema (the create rules, each field optional: one left out stays as it is, and an emptied email, phone or co-tenants is cleared, since 2026-09-27, when the edit screen's emptied field was dropped and the old value kept; other fields are dropped; 400 with the issues)`,
     capability: null,
     entitlement: null,
-    idempotency: "sets the given fields (updateTenantProfile), an archived tenant's too; the same again changes nothing but the time changed",
+    idempotency: "sets the given fields and clears the emptied ones (updateTenantProfile), an archived tenant's too; the same again changes nothing but the time changed",
     sideEffects: null,
     successDto: `the tenant afterwards, ${TENANT_ROW}`,
     errorDisclosure: ["input-issues"],
-    findings: [adminStatusFinding(ADMIN_401), clearedFieldFinding("a tenant's email, phone or co-tenants")],
+    findings: [adminStatusFinding(ADMIN_401)],
   },
 
   "POST /api/property/tenants/:id/archive": {
@@ -3381,14 +3379,14 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     branches: [
       { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${tradesRecord("client", "getClientProfile")}; ${TRADES_ADMIN}` },
     ],
-    input: `${tradesId("id")}; body: updateClientProfileSchema (the create rules, each field optional; other fields are dropped, so the status cannot be set here; 400 with the first issue)`,
+    input: `${tradesId("id")}; body: updateClientProfileSchema (the create rules, each field optional: one left out stays as it is, and an emptied email, phone or notes is cleared, since 2026-09-27, when the edit screen's emptied field was dropped and the old value kept; other fields are dropped, so the status cannot be set here; 400 with the first issue)`,
     capability: null,
     entitlement: null,
-    idempotency: "sets the given fields (updateClientProfile), an archived client's or a prospect's too; the same again changes nothing but the time changed",
+    idempotency: "sets the given fields and clears the emptied ones (updateClientProfile), an archived client's or a prospect's too; the same again changes nothing but the time changed",
     sideEffects: null,
     successDto: `the client afterwards, ${CLIENT_ROW}`,
     errorDisclosure: ["input-issues"],
-    findings: [adminStatusFinding(ADMIN_401), clearedFieldFinding("a client's email, phone or notes")],
+    findings: [adminStatusFinding(ADMIN_401)],
   },
 
   "POST /api/trades/clients/:id/archive": {
@@ -3614,7 +3612,8 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     input: tradesId("id"),
     capability: null,
     entitlement: null,
-    idempotency: "voids the invoice with the time; a voided one is voided again, with a new time. Nothing is logged",
+    idempotency:
+      "voids the invoice with the time and logs it in the client's history (invoice_voided, since 2026-09-27); a voided one is voided again, with a new time, and logged again",
     sideEffects: null,
     successDto: `the invoice afterwards, ${JOB_INVOICE_ROW}`,
     errorDisclosure: ["fixed"],
@@ -3622,7 +3621,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       adminStatusFinding(ADMIN_401),
       tradesPaidElsewhereFinding("Voiding"),
       "A split invoice with shares already paid can be voided: those shares stay collected, with nothing but their events to show for them (R3/R4, refunds).",
-      "Voiding logs no event (voiding a rent invoice logs Invoice_Voided), so the client's history shows the invoice sent and nothing after.",
       TRADES_TEAM,
     ],
   },

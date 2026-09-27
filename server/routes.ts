@@ -8395,7 +8395,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!inv || inv.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
       // A paid invoice stays paid (C10 batch 6d): the screens offer cancelling only an unpaid one.
       if (inv.status === "paid" || inv.status === "paid_external") return res.status(409).json({ message: "This invoice is paid" });
-      res.json(await storage.updateJobInvoice(id, { status: "voided", voidedAt: new Date() }));
+      const row = await storage.updateJobInvoice(id, { status: "voided", voidedAt: new Date() });
+      // The client's history shows the cancellation, as a rent invoice's does (owner decision 2026-09-27).
+      await storage.createJobEvent({ merchantId, clientProfileId: inv.clientProfileId, jobInvoiceId: id, eventType: "invoice_voided" });
+      res.json(row);
     } catch (err) { console.error("[TRADES_INVOICES_VOID]", err); res.status(500).json({ message: "Failed to void invoice" }); }
   });
 

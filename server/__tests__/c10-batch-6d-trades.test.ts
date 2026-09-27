@@ -64,7 +64,9 @@ function fakeTrades(): TradesFake {
     fake.clients.set(row.id, row);
     return row;
   });
-  write("updateClientProfile", (id: string, updates: any) => Object.assign(fake.clients.get(id), updates));
+  // As Drizzle does (mapUpdateSet), an update leaves out every field whose value is undefined.
+  write("updateClientProfile", (id: string, updates: any) =>
+    Object.assign(fake.clients.get(id), Object.fromEntries(Object.entries(updates).filter(([, value]) => value !== undefined))));
   write("archiveClientProfile", (id: string) => Object.assign(fake.clients.get(id), { status: "archived", archivedAt: new Date() }));
   write("unarchiveClientProfile", (id: string) => Object.assign(fake.clients.get(id), { status: "active", archivedAt: null }));
   write("createQuote", (data: any) => {
@@ -701,5 +703,74 @@ describe("a recurring invoice cannot start in the past (owner decision 2026-09-2
 
     expect(res.status).toBe(201);
     expect(fake.schedules.get(res.body.id)).toMatchObject({ startDate, nextRunDate: startDate, status: "active" });
+  });
+});
+
+/**
+ * The client edit screen sends the whole form, so a field the person emptied arrives as "". The schema
+ * turned "" into undefined and the update left undefined out, so the old email, phone or notes stayed
+ * while the screen said saved. Owner decision 2026-09-27 (docs/decisions/2026-09-27-before-r1-t3-owner-answers.md, 2).
+ */
+describe("an emptied client field is cleared (owner decision 2026-09-27)", () => {
+  const FORM = {
+    firstName: "Cal", lastName: "Client", email: "cal@example.test", phone: "021 555 0100",
+    siteAddress: "1 Site Road", preferredChannel: "email", notes: "Gate code 1234",
+  };
+
+  it("the edit screen's emptied email, phone and notes clear them, and the rest stay", async () => {
+    const { app, owner, fake } = await ownerWithTrades({ client: { phone: "021 555 0100", notes: "Gate code 1234" } });
+
+    const res = await request(app).put(`/api/trades/clients/${CLIENT}`).set(bearer(owner))
+      .send({ ...FORM, email: "", phone: "", notes: "" });
+
+    expect(res.status).toBe(200);
+    expect(fake.clients.get(CLIENT)).toMatchObject({ email: null, phone: null, notes: null, firstName: "Cal", siteAddress: "1 Site Road" });
+  });
+
+  it("a field left out is left as it was", async () => {
+    const { app, owner, fake } = await ownerWithTrades({ client: { phone: "021 555 0100", notes: "Gate code 1234" } });
+
+    const res = await request(app).put(`/api/trades/clients/${CLIENT}`).set(bearer(owner)).send({ firstName: "Callum" });
+
+    expect(res.status).toBe(200);
+    expect(fake.clients.get(CLIENT)).toMatchObject({ firstName: "Callum", email: "cal@example.test", phone: "021 555 0100", notes: "Gate code 1234" });
+  });
+
+  it.each([
+    ["an email that is not one", { email: "not-an-email" }],
+    ["a name emptied (a name is required)", { firstName: "" }],
+  ])("%s is still refused (400), and nothing changes", async (_label, change) => {
+    const { app, owner, fake } = await ownerWithTrades();
+
+    const res = await request(app).put(`/api/trades/clients/${CLIENT}`).set(bearer(owner)).send({ ...FORM, ...change });
+
+    expect(res.status).toBe(400);
+    expect(fake.writes).toEqual([]);
+  });
+});
+
+/**
+ * Voiding a trades invoice wrote no event, so the client's history showed the invoice sent and nothing
+ * after; voiding a rent invoice logs Invoice_Voided. Owner decision 2026-09-27, 2.
+ */
+describe("voiding a trades invoice is recorded in the client's history (owner decision 2026-09-27)", () => {
+  it("records an invoice_voided event for the client and the invoice", async () => {
+    const { app, owner } = await ownerWithTrades();
+
+    const res = await request(app).post(`/api/trades/invoices/${INVOICE}/void`).set(bearer(owner));
+
+    expect(res.status).toBe(200);
+    expect(storage.createJobEvent).toHaveBeenCalledWith(expect.objectContaining({
+      merchantId: owner.merchantId, clientProfileId: CLIENT, jobInvoiceId: INVOICE, eventType: "invoice_voided",
+    }));
+  });
+
+  it("a refused void (a paid invoice) records nothing", async () => {
+    const { app, owner, fake } = await ownerWithTrades({ invoice: { status: "paid" } });
+
+    const res = await request(app).post(`/api/trades/invoices/${INVOICE}/void`).set(bearer(owner));
+
+    expect(res.status).toBe(409);
+    expect(fake.writes).toEqual([]);
   });
 });

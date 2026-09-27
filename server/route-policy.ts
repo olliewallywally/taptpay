@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 00ec975dbc28e5ea0c6198df6e7b8fc7335a6d65 on 2026-09-27.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 87c03ff02498e95b9f6dee89759f6a28978ed92e on 2026-09-27.
  *
  * 184 registrations (77 GET, 75 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -2589,7 +2589,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       middleware: ["authenticateToken"],
       params: ["id: strictUuidParam"],
       authChecks: ["compares inv.merchantId !== merchantId"],
-      storageMethods: ["getJobInvoice","updateJobInvoice"],
+      storageMethods: ["createJobEvent","getJobInvoice","updateJobInvoice"],
       statuses: [200,400,401,403,404,409,500,503],
     },
   },
