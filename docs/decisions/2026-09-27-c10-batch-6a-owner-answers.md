@@ -27,3 +27,11 @@ manages boards".
 - 1: code and tests on this branch, tests first: the three routes removed, their reviews with them,
   and the route policy regenerated. No deploy or push.
 - 2: nothing to change; the board reviews record that teammates manage boards by the owner's choice.
+
+## Outcome (same day, local commits, not pushed)
+
+- 1, **`96620657`**: the three routes removed (200 remain), their pending entries with them; an older
+  test of the business-type route replaced by the removal test. Tests first (red 6 of 7; the details
+  route beside them a green guard).
+- 2: nothing changed; the board reviews (**`e6530ab6`**) record that teammates manage boards by the
+  owner's choice.

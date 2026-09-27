@@ -500,8 +500,23 @@ The work itself:
   switches and status. Mutations 11/11; PostgreSQL verifier 5/5 (four breakages caught). Server
   106/1,830, client 102/822, `tsc` clean.
 
-**Next:** R1-T2's review of the signed-in merchant families; 90 routes are pending (batch 6). Then
-R1-T3's runtime matrix, on the audited harness.
+- **C10 continued (2026-09-27): batch 6a, the business's settings, boards and stock (20 routes):
+  `96620657` (code), `e6530ab6` (17 reviews); local, awaiting independent review**
+  ([working notes](r1/WORKING-2026-09-26-r1-t2-c10.md);
+  [owner answers](../../decisions/2026-09-27-c10-batch-6a-owner-answers.md)). 130 of 200 routes are
+  reviewed; 70 are pending.
+  - **Removed (owner decision): the rates, bank-account and business-type routes**; the last let a
+    teammate switch the business between retail and property.
+  - **Fixed:** onboarding stored three of the six details it collects "for KYC" (the website, turnover
+    and description only reached the admin's email); all six are kept now, held to sign-up's rules. A
+    board rename is capped at 60 characters like creation. Change-password refuses the platform admin
+    outright (403). The stock routes use the shared business check.
+  - Teammates keep creating, renaming and deleting boards (owner's choice).
+  - Mutations 11/11. Server 107/1,850, client 102/822, `tsc` clean.
+
+**Next:** R1-T2's review of the signed-in merchant families; 70 routes are pending (batch 6b: the
+business's sales, payments, refunds, analytics and exports, 21 routes). Then R1-T3's runtime matrix,
+on the audited harness.
 Open for the owner: 0030 in dev (above); the card-free dev write (above). The
 no-board rework's questions are all answered. Release of the rework: when production has no pending
 shared no-board sale (count-only check once production is reopened), with
@@ -511,8 +526,9 @@ The phase B live check waits for the owner to set `ADMIN_PASSWORD_HASH`.
 Independent reviews owed (each evidence file ends with its brief):
 - C10 so far (`2ec9d78f..cee1276a`), the 2026-09-26 owner answers (`cee1276a..a419f948`),
   C10's batch 3 (`30c9d8cb..d0d5495b`) and its owner answers (`4ac759d1..1a77530e`), batch 4
-  (`198a8265..4ed2e145`) and its owner answers (`867ef275..51feb200`), and batch 5
-  (`c1889ca3..737018b0`) and its owner answers (`e1feb9b1..b2f2e2a6`);
+  (`198a8265..4ed2e145`) and its owner answers (`867ef275..51feb200`), batch 5
+  (`c1889ca3..737018b0`) and its owner answers (`e1feb9b1..b2f2e2a6`), and batch 6a
+  (`64d2b17f..e6530ab6`);
 - the no-board rework (`da90d1a1..5c2cdb27`), its follow-up (`7051e25e..1fb41d14`), and the
   owner-answer fixes 2a–2c (`aba7b2be..da90d1a1`);
 - R1-T1 (`03c4663b..05195728`) and the live-updates fix (`05195728..3fac8ac8`);
