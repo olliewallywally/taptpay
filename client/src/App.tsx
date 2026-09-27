@@ -648,7 +648,8 @@ export function ProtectedRoute({ children, skipOnboardingCheck = false, tutorial
     : <>{children}</>;
 }
 
-function AdminProtectedRoute({ children }: { children: React.ReactNode }) {
+// Exported for the route-guard tests (R1-T3), as ProtectedRoute is.
+export function AdminProtectedRoute({ children }: { children: React.ReactNode }) {
   // Same three-way split as the merchant provider, and for the same reason: the
   // old version awaited a `fetch` with no timeout and only cleared its loading
   // flag afterwards, so a hung backend left this on PageLoader indefinitely.
