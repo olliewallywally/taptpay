@@ -28,9 +28,22 @@ export type MatrixCaller =
   | "suspended-business" // the owner of a business that is no longer verified or active
   | "owner" // the business's owner
   | "member" // a teammate of the business
-  | "platform-admin"; // the validated platform admin (no business of its own)
+  | "platform-admin" // the validated platform admin (no business of its own)
+  | "link-as-sign-in" // a payment link's token presented as a sign-in (Authorization: Bearer)
+  | "no-secret" // the scheduler's routes without x-cron-secret
+  | "wrong-secret" // ... with a secret that is not the scheduler's
+  | "no-key" // the ecommerce API without a key
+  | "unknown-key" // ... with a key nobody was issued
+  | "key-without-permission" // ... with a live key that lacks the route's permission
+  | "unknown-link" // a link route asked with a token, state or code that is no one's
+  | "sale-with-its-own-link" // a numbered route asked for a sale that has its own payment link
+  | "wrong-webhook-key"; // the WhatsApp webhook with a key that is not the provider's
 
-export type MatrixAnswer = "allowed" | 401 | 403 | 404;
+/**
+ * A refusal's status. A few are answered 200 by design (the WhatsApp webhook acknowledges every call
+ * at once; the reset-link check answers { valid: false }), or 302 (a browser's return is sent home).
+ */
+export type MatrixAnswer = "allowed" | 200 | 302 | 400 | 401 | 403 | 404;
 
 /** Which gate a route sits behind, from its middleware. */
 export type MatrixGate = "session" | "admin" | "own";
@@ -49,8 +62,25 @@ export const ADMIN_SERVED_AT_THE_GATE: Record<string, string> = {
   "GET /api/auth/me": "the session read answers the platform admin too, with no business (its review, batch 5)",
 };
 
-/** Callers every gated route refuses before any route-specific work. */
-export const GATE_REFUSED: readonly MatrixCaller[] = ["signed-out", "invalid-token", "disabled-login", "suspended-business"];
+/**
+ * Callers every gated route refuses before any route-specific work. A payment link's token is never a
+ * sign-in (the plan's safe default: a public checkout token never grants merchant API access).
+ */
+export const GATE_REFUSED: readonly MatrixCaller[] = ["signed-out", "invalid-token", "disabled-login", "suspended-business", "link-as-sign-in"];
+
+/**
+ * A link route's answer to a token, state or code that is no one's, where it is not 404: each is the
+ * route's reviewed answer. The sign-in handoff and the pages that read a token from the body answer as
+ * their screens expect; the checkout's browser return goes home.
+ */
+export const UNKNOWN_LINK_ANSWER: Record<string, MatrixAnswer> = {
+  "POST /api/auth/google/session": 401,
+  "POST /api/auth/reset-password": 400,
+  "GET /api/auth/validate-reset-token/:token": 200,
+  "POST /api/auth/confirm-email": 400,
+  "POST /api/team/accept-invite": 400,
+  "GET /api/checkout/callback": 302,
+};
 
 function gateOf(key: string): MatrixGate {
   const facts = expandFacts(ROUTE_POLICY[key].facts);
@@ -62,7 +92,27 @@ function gateOf(key: string): MatrixGate {
 export function matrixRowFor(key: string): MatrixRow {
   const gate = gateOf(key);
   const answers: MatrixRow["answers"] = {};
-  if (gate === "own") return { gate, answers };
+  if (gate === "own") {
+    // The routes with their own gates, by what their review says selects the caller.
+    const branches = ROUTE_REVIEW[key].branches;
+    const principals = new Set(branches.map((branch) => branch.principal));
+    const tenants = new Set(branches.map((branch) => branch.tenant));
+    if (principals.has("cron")) {
+      answers["no-secret"] = 401;
+      answers["wrong-secret"] = 401;
+    }
+    if (principals.has("api-key")) {
+      answers["no-key"] = 401;
+      answers["unknown-key"] = 401;
+      answers["key-without-permission"] = 403;
+    }
+    if (principals.has("public-bearer") && tenants.has("token")) answers["unknown-link"] = UNKNOWN_LINK_ANSWER[key] ?? 404;
+    // A sale with its own link is answered like a missing one (tenant-safe, P2.2): 404, or for the
+    // Windcave browser return, which sends a missing sale home, the same redirect.
+    if (tenants.has("number")) answers["sale-with-its-own-link"] = key === "GET /api/windcave/callback" ? 302 : 404;
+    if (key === "POST /api/webhooks/whatsapp") answers["wrong-webhook-key"] = 200;
+    return { gate, answers };
+  }
   for (const caller of GATE_REFUSED) answers[caller] = 401;
   if (gate === "admin") {
     // authenticateAdmin: signed in, but not the validated platform admin.

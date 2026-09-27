@@ -1,4 +1,4 @@
-# R1-T2 route inventory — generated 2026-09-27 @ `ff4c34ccd31dcbc11f9c2b2dcfb7d885f41c01c9`
+# R1-T2 route inventory — generated 2026-09-27 @ `568678cdfd72e4cc274d40d35bf88bbf87b1a5fe`
 
 Regenerate with `npx tsx scripts/generate-route-policy.ts`. This table is
 evidence for the SHA named above, not a timeless constant — see
@@ -1750,13 +1750,13 @@ Reviewed policy:
 - authChecks: `isTokenAddressedTransaction`
 - storageMethods: `getNextPendingSplit`, `getTransaction`, `getTransactionByWindcaveSessionId`, `incrementTransactionCount`, `updateSplitPaymentStatus`, `updateTransactionSessionState`, `updateTransactionStatus`
 - sideEffects: `live update: sseBroker.broadcast`, `provider: queryWindcaveSession`, `push: sendPushToMerchant`
-- statuses: `302`, `400`, `404`
+- statuses: `302`, `400`
 - capabilityGates: `isWindcaveConfigured`
 - helpers: `broadcastToStone`
 
 Reviewed policy:
 
-- **Who:** public. **Tenant (number):** the sale's number (transactionId), or else the provider session id, selects the sale; a sale with its own link is 404; a cancel is believed only with the bound session id
+- **Who:** public. **Tenant (number):** the sale's number (transactionId), or else the provider session id, selects the sale; a sale with its own link is sent home as a missing one is (302, since 2026-09-27: its 404 told a caller counting through the numbers which were link sales); a cancel is believed only with the bound session id
 - **Input:** transactionId: read into a variable, then strictPositiveIntegerQueryParam (a malformed one finds nothing, since 2026-09-26); sessionId / sessionid: compared with the bound session before a cancel is believed; result: only 'cancelled' is acted on; any 'sim' key rejects the request (400)
 - **Capability gate:** isWindcaveConfigured(): unconfigured, nothing is settled and the customer sees pending
 - **Idempotency:** an already approved or declined sale only redirects; otherwise pending → processing is a read then a write, like the notification's (R3 / C20)
@@ -3228,7 +3228,7 @@ Reviewed policy:
 
 Reviewed policy:
 
-- **Who:** public-bearer. **Tenant (token):** the invoice's checkout token (20 random bytes, base64url) selects its one invoice, rent or trades (getCheckoutInvoiceByToken); an unknown token is 404; here the token comes in the query
+- **Who:** public-bearer. **Tenant (token):** the invoice's checkout token (20 random bytes, base64url), in the query, selects its one invoice, rent or trades (getCheckoutInvoiceByToken); an unknown one is sent home (302), this being a browser's return (the shared rule's 404 does not apply here; corrected 2026-09-27 by R1-T3's matrix)
 - **Input:** query read raw: token (looked up; unknown goes to /) and result (only "cancelled" is acted on: no query)
 - **Capability gate:** isWindcaveConfigured() (while unconfigured it only redirects)
 - **Idempotency:** a settled invoice only redirects; otherwise the invoice's pinned session is queried and settled (a split invoice pins none, so nothing is)

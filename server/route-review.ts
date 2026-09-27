@@ -904,7 +904,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         principal: "public",
         tenant: "number",
         tenantRule:
-          "the sale's number (transactionId), or else the provider session id, selects the sale; a sale with its own link is 404; a cancel is believed only with the bound session id",
+          "the sale's number (transactionId), or else the provider session id, selects the sale; a sale with its own link is sent home as a missing one is (302, since 2026-09-27: its 404 told a caller counting through the numbers which were link sales); a cancel is believed only with the bound session id",
       },
     ],
     input:
@@ -1055,7 +1055,14 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
   },
 
   "GET /api/checkout/callback": {
-    branches: [{ principal: "public-bearer", tenant: "token", tenantRule: `${CHECKOUT_TENANT_RULE}; here the token comes in the query` }],
+    branches: [
+      {
+        principal: "public-bearer",
+        tenant: "token",
+        tenantRule:
+          "the invoice's checkout token (20 random bytes, base64url), in the query, selects its one invoice, rent or trades (getCheckoutInvoiceByToken); an unknown one is sent home (302), this being a browser's return (the shared rule's 404 does not apply here; corrected 2026-09-27 by R1-T3's matrix)",
+      },
+    ],
     input: "query read raw: token (looked up; unknown goes to /) and result (only \"cancelled\" is acted on: no query)",
     capability: "isWindcaveConfigured() (while unconfigured it only redirects)",
     entitlement: null,

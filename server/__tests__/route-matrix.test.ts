@@ -15,6 +15,7 @@ import {
   createMemberPrincipal,
   createOwnerPrincipal,
   createTestApp,
+  mintPaymentCredential,
   resetTestStorage,
   storage,
   storageSnapshot,
@@ -60,7 +61,7 @@ const WELL_FORMED_BODY: Record<string, Record<string, unknown>> = {
 };
 
 /** [route, caller, the status the matrix says it is refused with] for every refusal of a gated route. */
-const REFUSALS: Array<[string, MatrixCaller, number]> = Object.entries(ROUTE_MATRIX).flatMap(([key, row]) =>
+const REFUSALS: Array<[string, MatrixCaller, number]> = Object.entries(ROUTE_MATRIX).filter(([, row]) => row.gate !== "own").flatMap(([key, row]) =>
   (Object.entries(row.answers) as Array<[MatrixCaller, unknown]>)
     .filter(([, answer]) => typeof answer === "number")
     .map(([caller, answer]): [string, MatrixCaller, number] => [key, caller, answer as number]),
@@ -84,6 +85,13 @@ describe("R1-T3 — every signed-in route's gate refusals (P2.2), with nothing c
     tokens["disabled-login"] = disabled.token;
     tokens["suspended-business"] = suspended.token;
     tokens["invalid-token"] = "not-a-real-token";
+    // A live payment link's token: it opens its one sale, and is never a sign-in.
+    const link = mintPaymentCredential();
+    await storage.createTransaction({
+      merchantId: owner.merchantId, itemName: "Linked sale", price: "5.50", status: "pending",
+      paymentMethod: "qr_code", splitEnabled: false, paymentTokenHash: link.tokenHash,
+    } as any);
+    tokens["link-as-sign-in"] = link.rawToken;
     tokens["platform-admin"] = createAdminPrincipal().token;
   });
 

@@ -4169,12 +4169,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         transaction = await storage.getTransactionByWindcaveSessionId(sessionId);
       }
 
-      if (!transaction) {
+      // A sale with its own link returns through /api/pay/return, never here: it is sent home as a
+      // missing one is (R1-T3, P2.2's tenant-safe answer), where a 404 told a caller counting through
+      // the numbers which ones were link sales.
+      if (!transaction || isTokenAddressedTransaction(transaction)) {
         console.warn(`[WINDCAVE_CALLBACK] No transaction found (txnId=${txnIdParam}, session=${sessionId})`);
         return res.redirect('/');
-      }
-      if (isTokenAddressedTransaction(transaction)) {
-        return res.status(404).json({ message: "Transaction not found" });
       }
 
       const txnId = transaction.id;
