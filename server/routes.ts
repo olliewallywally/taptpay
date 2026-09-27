@@ -7112,6 +7112,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const data = createActiveScheduleSchema.parse({ ...req.body, tenantProfileId: tenantId });
       const schedule = await storage.createActiveSchedule({ ...data, merchantId, nextRunDate: data.startDate });
       await storage.logTransactionEvent({ merchantId, tenantProfileId: tenantId, scheduleId: schedule.id, eventType: "Schedule_Created", payload: { amountCents: schedule.amountCents, frequency: schedule.frequency } });
+      // A tenant has one rent automation (owner decision 2026-09-27): the new one replaces any the
+      // tenant already had, running or paused, which went on billing beside it every period.
+      for (const old of await storage.getActiveSchedulesByTenant(tenantId)) {
+        if (old.id === schedule.id || old.status === "terminated") continue;
+        await storage.terminateActiveSchedule(old.id);
+        await storage.logTransactionEvent({ merchantId, tenantProfileId: tenantId, scheduleId: old.id, eventType: "Schedule_Terminated", payload: { replacedBy: schedule.id } });
+      }
       res.status(201).json(schedule);
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: "Validation error", errors: err.errors });

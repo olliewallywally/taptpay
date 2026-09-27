@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ a7fba524a19d922549e06993126a985bb323e7fb on 2026-09-27.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ a28abff1157777e441372539484e995fa0c27e9f on 2026-09-27.
  *
  * 187 registrations (78 GET, 77 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -1942,7 +1942,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       middleware: ["authenticateToken"],
       params: ["tenantId: strictUuidParam"],
       authChecks: ["compares tenant.merchantId !== merchantId"],
-      storageMethods: ["createActiveSchedule","getOrCreateSubscription","getTenantProfile","logTransactionEvent"],
+      storageMethods: ["createActiveSchedule","getActiveSchedulesByTenant","getOrCreateSubscription","getTenantProfile","logTransactionEvent","terminateActiveSchedule"],
       statuses: [201,400,401,402,403,404,409,500,503],
       entitlementGates: ["BILLING_CARD_REQUIRED","billingCardIsReady","requireBillingCard"],
       helpers: ["requireBillingCard"],

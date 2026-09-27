@@ -44,7 +44,10 @@ function fakeProperty(): PropertyFake {
     });
   list("getTenantProfilesByMerchant", () => [...fake.tenants.values()]);
   list("getActiveSchedulesByMerchant", () => [...fake.schedules.values()]);
-  list("getActiveSchedulesByTenant", () => [...fake.schedules.values()]);
+  jest.spyOn(storage as any, "getActiveSchedulesByTenant").mockImplementation(async (tenantId: unknown) => {
+    fake.reads.push("getActiveSchedulesByTenant");
+    return [...fake.schedules.values()].filter((row) => row.tenantProfileId === tenantId);
+  });
   list("getInvoiceRentRequestsByMerchant", () => [...fake.invoices.values()]);
   list("getTransactionEventsByTenant", () => []);
   jest.spyOn(storage, "getLiveInvoiceByTenant").mockResolvedValue(undefined as any);
@@ -420,6 +423,80 @@ describe("resuming a paused automation skips the paused time (owner decision 202
     expect(fake.schedules.get(SCHEDULE).nextRunDate).toEqual(due);
     expect((await request(app).put(`/api/property/schedules/${SCHEDULE}`).set(bearer(owner)).send({ status: "paused" })).status).toBe(200);
     expect(fake.schedules.get(SCHEDULE).nextRunDate).toEqual(due);
+  });
+});
+
+/**
+ * Sending rent with a repeat to a tenant who already had an automation started a second one, and
+ * the tenant was billed by both every period (two weekly sends, $500 then $520: two requests a week).
+ * The owner chose that the new one replaces the old (docs/decisions/2026-09-27-c10-batch-6c-owner-answers.md, 4).
+ */
+describe("a new rent automation replaces the tenant's old one (owner decision 2026-09-27)", () => {
+  const PAUSED = "77777777-7777-4777-8777-777777777777";
+  const CANCELLED = "88888888-8888-4888-8888-888888888888";
+  const OTHER_TENANT = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const THEIRS = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const cancelledAt = new Date("2026-09-01T00:00:00Z");
+
+  async function withAutomations() {
+    const { app } = await createTestApp();
+    const owner = await createOwnerPrincipal();
+    const fake = fakeProperty();
+    seed(fake, owner.merchantId);
+    fake.schedules.set(PAUSED, { ...fake.schedules.get(SCHEDULE), id: PAUSED, status: "paused", amountCents: 48_000 });
+    fake.schedules.set(CANCELLED, { ...fake.schedules.get(SCHEDULE), id: CANCELLED, status: "terminated", terminatedAt: cancelledAt });
+    fake.tenants.set(OTHER_TENANT, { ...fake.tenants.get(TENANT), id: OTHER_TENANT });
+    fake.schedules.set(THEIRS, { ...fake.schedules.get(SCHEDULE), id: THEIRS, tenantProfileId: OTHER_TENANT });
+    return { app, owner, fake };
+  }
+  const weekly = (amountCents: number) => ({ amountCents, frequency: "weekly", deliveryChannel: "email", startDate: inDays(7).toISOString() });
+
+  it("cancels the tenant's running and paused automations, and records when", async () => {
+    const { app, owner, fake } = await withAutomations();
+
+    const res = await request(app).post(`/api/property/tenants/${TENANT}/schedules`).set(bearer(owner)).send(weekly(52_000));
+
+    expect(res.status).toBe(201);
+    expect(fake.schedules.get(res.body.id)).toMatchObject({ status: "active", amountCents: 52_000 });
+    expect(fake.schedules.get(SCHEDULE)).toMatchObject({ status: "terminated", terminatedAt: expect.any(Date) });
+    expect(fake.schedules.get(PAUSED)).toMatchObject({ status: "terminated", terminatedAt: expect.any(Date) });
+    expect(storage.logTransactionEvent).toHaveBeenCalledWith(expect.objectContaining({ scheduleId: SCHEDULE, eventType: "Schedule_Terminated" }));
+    expect(storage.logTransactionEvent).toHaveBeenCalledWith(expect.objectContaining({ scheduleId: PAUSED, eventType: "Schedule_Terminated" }));
+  });
+
+  it("leaves an automation already cancelled, and another tenant's, as they were", async () => {
+    const { app, owner, fake } = await withAutomations();
+
+    const res = await request(app).post(`/api/property/tenants/${TENANT}/schedules`).set(bearer(owner)).send(weekly(52_000));
+
+    expect(res.status).toBe(201);
+    expect(fake.schedules.get(CANCELLED)).toMatchObject({ status: "terminated", terminatedAt: cancelledAt });
+    expect(fake.schedules.get(THEIRS).status).toBe("active");
+  });
+
+  it("then the tenant gets one rent request a period, at the new amount", async () => {
+    const { app, owner, fake } = await withAutomations();
+    await request(app).post(`/api/property/tenants/${TENANT}/schedules`).set(bearer(owner)).send(weekly(52_000));
+    jest.spyOn(storage, "getSubscription").mockResolvedValue({} as any);
+    jest.spyOn(storage, "getDueActiveSchedules").mockImplementation(async (at: Date) =>
+      [...fake.schedules.values()].filter((s) => s.status === "active" && s.nextRunDate <= at) as any);
+
+    await propertyCron.runGeneratePass(inDays(7.1));
+
+    const made = (storage.createInvoiceRentRequest as jest.Mock).mock.calls.map(([data]) => data);
+    expect(made.filter((data) => data.tenantProfileId === TENANT)).toEqual([expect.objectContaining({ amountCents: 52_000 })]);
+  });
+
+  it("a refused automation cancels nothing", async () => {
+    const { app, owner, fake } = await withAutomations();
+
+    const res = await request(app).post(`/api/property/tenants/${TENANT}/schedules`).set(bearer(owner))
+      .send({ ...weekly(52_000), frequency: "daily" });
+
+    expect(res.status).toBe(400);
+    expect(fake.schedules.get(SCHEDULE).status).toBe("active");
+    expect(fake.schedules.get(PAUSED).status).toBe("paused");
+    expect(fake.writes).toEqual([]);
   });
 });
 
