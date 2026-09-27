@@ -228,7 +228,7 @@ describe("push notification preference storage", () => {
       dailyPayoutSummary: true,
       failedPaymentAlerts: true,
     };
-    await storage.updatePushNotificationPreferences(7, updated);
+    await storage.updatePushNotificationPreferences(7, null, updated);
     await storage.deactivatePushSubscriptionByEndpoint(created.endpoint);
     await storage.createPushSubscription({
       merchantId: 7,
@@ -238,7 +238,7 @@ describe("push notification preference storage", () => {
       auth: "rotated-auth-secret",
     });
 
-    await expect(storage.getPushNotificationPreferences(7)).resolves.toEqual(updated);
+    await expect(storage.getPushNotificationPreferences(7, null)).resolves.toEqual(updated);
     await expect(storage.getPushSubscriptionsByMerchant(7)).resolves.toEqual([
       expect.objectContaining({ preferences: updated, isActive: true }),
     ]);

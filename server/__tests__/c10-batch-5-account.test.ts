@@ -15,7 +15,7 @@ type Principal = Awaited<ReturnType<typeof createOwnerPrincipal>>;
 beforeEach(() => resetTestStorage());
 
 const web = (name: string) => ({
-  endpoint: `https://push.example.test/${name}`,
+  endpoint: `https://fcm.googleapis.com/fcm/send/${name}`,
   keys: { p256dh: `p256dh-${name}`, auth: `auth-${name}` },
 });
 const subscribeWeb = (app: App, who: Principal, name: string) =>
@@ -23,7 +23,7 @@ const subscribeWeb = (app: App, who: Principal, name: string) =>
 const activeEndpoints = async (merchantId: number) =>
   (await storage.getPushSubscriptionsByMerchant(merchantId)).map((s) => s.endpoint).sort();
 const fromBefore = (merchantId: number, name: string) => storage.createPushSubscription({
-  merchantId, endpoint: `https://push.example.test/${name}`, p256dh: "p", auth: "a", userId: null,
+  merchantId, endpoint: `https://fcm.googleapis.com/fcm/send/${name}`, p256dh: "p", auth: "a", userId: null,
 });
 
 /**
@@ -113,7 +113,7 @@ describe("only the account owner changes the plan (guards for isAccountOwner)", 
 
 describe("turning notifications off is never reported done when it failed", () => {
   it.each([
-    ["the web switch", "/api/push/unsubscribe", { endpoint: "https://push.example.test/owner-laptop" }],
+    ["the web switch", "/api/push/unsubscribe", { endpoint: "https://fcm.googleapis.com/fcm/send/owner-laptop" }],
     ["one iPhone", "/api/push/native-unsubscribe", { deviceToken: "owner-phone-token" }],
   ] as const)("%s answers 500 when stopping it fails", async (_what, path, body) => {
     const { app } = await createTestApp();

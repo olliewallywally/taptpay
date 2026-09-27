@@ -24,7 +24,7 @@ type Principal = Awaited<ReturnType<typeof createOwnerPrincipal>>;
 beforeEach(() => resetTestStorage());
 
 const web = (name: string) => ({
-  endpoint: `https://push.example.test/${name}`,
+  endpoint: `https://fcm.googleapis.com/fcm/send/${name}`,
   keys: { p256dh: `p256dh-${name}`, auth: `auth-${name}` },
 });
 const subscribeWeb = (app: App, who: Principal | { token: string }, name: string) =>
@@ -58,7 +58,7 @@ describe("push subscriptions belong to a login", () => {
     await subscribeNative(app, owner, "owner-phone");
     await subscribeWeb(app, member, "member-laptop");
     await storage.createPushSubscription({
-      merchantId: owner.merchantId, endpoint: "https://push.example.test/from-before", p256dh: "p", auth: "a", userId: null,
+      merchantId: owner.merchantId, endpoint: "https://fcm.googleapis.com/fcm/send/from-before", p256dh: "p", auth: "a", userId: null,
     });
 
     expect((await request(app).post("/api/auth/sign-out-everywhere").set(bearer(owner))).status).toBe(204);

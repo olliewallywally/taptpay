@@ -34,7 +34,7 @@ function subscription(id: number, failedPaymentAlerts: boolean) {
   return {
     id,
     merchantId: 42,
-    endpoint: `https://push.example.test/${id}`,
+    endpoint: `https://fcm.googleapis.com/fcm/send/${id}`,
     p256dh: `public-key-${id}`,
     auth: `auth-secret-${id}`,
     userAgent: null,
@@ -73,6 +73,28 @@ describe("push notification preference filtering", () => {
       amount: "14.50",
       transactionId: 99,
     })).resolves.toMatchObject({ eligibleSubscriptions: 2 });
+  });
+
+  // Owner decision 2026-09-26 (docs/decisions/2026-09-26-c10-batch-5-owner-answers.md, answer 1):
+  // a subscription stored before endpoints were checked is never contacted unless it is a browser
+  // push service's; it is turned off instead.
+  test("never contacts a stored endpoint that is not a push service's, and turns it off", async () => {
+    const stored = { ...subscription(5, true), endpoint: "https://169.254.169.254/latest/meta-data" };
+    getPushSubscriptionsByMerchant.mockResolvedValue([subscription(4, true), stored]);
+    (webpush.sendNotification as jest.Mock).mockResolvedValue({ statusCode: 201 });
+    const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await expect(sendPushToMerchant(42, {
+      type: "payment_received",
+      itemName: "Safe sale",
+      amount: "14.50",
+      transactionId: 99,
+    })).resolves.toMatchObject({ attempted: 1, delivered: 1 });
+
+    expect(webpush.sendNotification).toHaveBeenCalledTimes(1);
+    expect((webpush.sendNotification as jest.Mock).mock.calls[0][0].endpoint).toBe(subscription(4, true).endpoint);
+    expect(deactivatePushSubscription).toHaveBeenCalledWith(5);
+    log.mockRestore();
   });
 
   test("payload contains only the event DTO and no subscription secrets", () => {

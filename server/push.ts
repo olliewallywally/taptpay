@@ -7,6 +7,7 @@ import {
   type PushSubscription,
 } from "@shared/schema";
 import { storage } from "./storage";
+import { isPushServiceEndpoint } from "./push-endpoint";
 import { config } from "./config";
 
 const VAPID_PUBLIC_KEY = config.push.vapidPublicKey ?? "";
@@ -281,8 +282,19 @@ export async function sendPushToMerchant(
 
   const payload = buildPushPayload(event);
   const payloadStr = JSON.stringify(payload);
-  const webSubs = eligible.filter((sub) => !sub.endpoint.startsWith("apns://"));
+  const browserSubs = eligible.filter((sub) => !sub.endpoint.startsWith("apns://"));
   const nativeSubs = eligible.filter((sub) => sub.endpoint.startsWith("apns://"));
+  // Owner decision 2026-09-26 (server/push-endpoint.ts): a browser subscription stored before
+  // endpoints were checked is never contacted unless it is a push service's; it is turned off.
+  const webSubs = browserSubs.filter((sub) => isPushServiceEndpoint(sub.endpoint));
+  for (const refused of browserSubs.filter((sub) => !isPushServiceEndpoint(sub.endpoint))) {
+    console.error("[PUSH_ENDPOINT_REFUSED]", { subscriptionId: refused.id });
+    try {
+      await storage.deactivatePushSubscription(refused.id);
+    } catch (error) {
+      console.error("[PUSH_ENDPOINT_REFUSED_DEACTIVATE]", error);
+    }
+  }
 
   if (pushInitialized && webSubs.length > 0) {
     const results = await Promise.allSettled(

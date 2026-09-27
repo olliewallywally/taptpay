@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ fa41de5248c412eed66c8971e86f08b309b1d417 on 2026-09-26.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 2c97a9a2057cc71238b5dd3e0791f55d0d092c9b on 2026-09-26.
  *
  * 203 registrations (85 GET, 82 POST, 3 PATCH, 5 ALL, 20 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -1488,7 +1488,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     markers: ["authenticateToken"],
     facts: {
       middleware: ["authenticateToken"],
-      storageMethods: ["getPushNotificationPreferences","getPushSubscriptionsByMerchant"],
+      storageMethods: ["getPushNotificationPreferences","getPushSubscriptionsForLogin"],
       statuses: [200,401,403,500,503],
       dtos: ["pushNotificationPreferencesDto"],
     },

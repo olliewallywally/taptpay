@@ -39,6 +39,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { sendPushToMerchant } from "./push";
+import { isPushServiceEndpoint } from "./push-endpoint";
 import { resendInvoiceEmail } from "./property-cron";
 import { INVOICE_DOCUMENT_FOLDER, isInvoiceDocumentName, isPublicUploadFolder, parseInvoiceDocumentRef } from "./upload-policy";
 import { INVOICE_DOCUMENT_EXTENSIONS } from "./invoice-document-security";
@@ -5404,6 +5405,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!subscription || !subscription.endpoint || !subscription.keys?.p256dh || !subscription.keys?.auth) {
         return res.status(400).json({ message: "Invalid push subscription" });
       }
+      // Only a browser push service's endpoint (owner decision 2026-09-26): the server POSTs to it
+      // on every payment, so any other address would point the server at a host of the caller's choosing.
+      if (!isPushServiceEndpoint(subscription.endpoint)) {
+        return res.status(400).json({ message: "Notifications can only use a browser's own push service." });
+      }
 
       const merchantId = req.user?.merchantId;
       if (!merchantId) {
@@ -5525,18 +5531,20 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  // Get push notification status for current merchant
+  // The signed-in login's own notifications: its devices and its switches (owner decision
+  // 2026-09-26: each login its own).
   app.get("/api/push/status", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) {
+      const userId = req.user?.userId;
+      if (!merchantId || !userId) {
         return res.status(401).json({ message: "Authentication required" });
       }
 
-      const subs = await storage.getPushSubscriptionsByMerchant(merchantId);
+      const subs = await storage.getPushSubscriptionsForLogin(merchantId, userId);
       const webSubs = subs.filter((s: any) => !s.endpoint.startsWith("apns://"));
       const nativeSubs = subs.filter((s: any) => s.endpoint.startsWith("apns://"));
-      const preferences = await storage.getPushNotificationPreferences(merchantId);
+      const preferences = await storage.getPushNotificationPreferences(merchantId, userId);
 
       res.json({
         subscribed: subs.length > 0,
@@ -5553,10 +5561,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.get("/api/push/preferences", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) {
+      const userId = req.user?.userId;
+      if (!merchantId || !userId) {
         return res.status(401).json({ message: "Authentication required" });
       }
-      const preferences = await storage.getPushNotificationPreferences(merchantId);
+      const preferences = await storage.getPushNotificationPreferences(merchantId, userId);
       res.json({ preferences: pushNotificationPreferencesDto(preferences) });
     } catch (error) {
       console.error("Push preferences get error:", error);
@@ -5567,7 +5576,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.put("/api/push/preferences", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) {
+      const userId = req.user?.userId;
+      if (!merchantId || !userId) {
         return res.status(401).json({ message: "Authentication required" });
       }
       const parsed = pushNotificationPreferencesSchema.safeParse(req.body);
@@ -5579,6 +5589,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
       const preferences = await storage.updatePushNotificationPreferences(
         merchantId,
+        userId,
         parsed.data,
       );
       res.json({ preferences: pushNotificationPreferencesDto(preferences) });

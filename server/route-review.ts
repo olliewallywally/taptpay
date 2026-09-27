@@ -200,8 +200,9 @@ const adminStatusFinding = (refusal: string) =>
 const CREATES_SUBSCRIPTION = "apart from getOrCreateSubscription, which makes the business's subscription row if it has none";
 const TUTORIAL_SHARED =
   "The tutorial is the business's, not the login's: a teammate's progress, dismissal or restart applies to every login of the business, the owner's included (shown in the harness: a teammate's restart moved the business to generation 2). A product choice, recorded.";
-const PUSH_FAULT_AS_NONE =
-  "A database fault reads as nothing: getPushSubscriptionsByMerchant answers [] and getPushNotificationPreferences the defaults on any error, so the page shows no devices and the default switches instead of that it could not check (R1-T9's rule).";
+const PUSH_SWITCHES_FAULT_AS_DEFAULTS =
+  "A database fault reading the switches reads as the defaults (getPushNotificationPreferences answers them on any error), so the page shows the default switches instead of that it could not check (R1-T9's rule).";
+const OWN_SWITCHES = "each login its own (owner decision 2026-09-26)";
 
 function tokenRate(family: string, perMinute: number): string {
   return (
@@ -2300,21 +2301,18 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         principal: "merchant",
         roles: ["owner", "member"],
         tenant: "session",
-        tenantRule: `${sessionBusiness(ADMIN_401)}; the subscription is recorded against the business and this login, and a device already registered moves to them (createPushSubscription, by its endpoint)`,
+        tenantRule: `${sessionBusiness(ADMIN_401)}; the subscription is recorded against the business and this login, and a device already registered moves to them and takes this login's switches (createPushSubscription, by its endpoint; ${OWN_SWITCHES})`,
       },
     ],
     input:
-      "body read without a schema: subscription, whose endpoint, keys.p256dh and keys.auth must be present (400 otherwise); none is checked for type or form, and the endpoint is not checked to be a push service's",
+      "body read without a schema: subscription, whose endpoint, keys.p256dh and keys.auth must be present (400 otherwise); the endpoint must be a browser push service's (isPushServiceEndpoint, server/push-endpoint.ts: https on port 443, no user or password, a host of Google's, Mozilla's, Apple's or Microsoft's push service; 400 otherwise, owner decision 2026-09-26); the keys are not checked for form",
     capability: "the server's push keys must be set (config.push in server/config.ts: 503 otherwise)",
     entitlement: null,
     idempotency: "registers the device, or re-registers it by its endpoint (active again, this login's); the same body again changes nothing",
     sideEffects: null,
     successDto: "{ success: true, preferences: pushNotificationPreferencesDto }",
     errorDisclosure: ["fixed"],
-    findings: [
-      "The endpoint is stored as sent, and on every payment event of the business the server POSTs to it (web-push opens an HTTPS request to whatever host, port and path it names): any signed-in login, a teammate included, can make the server send requests to an address of its choosing, TLS services only (blind request forgery). Put to the owner 2026-09-26: accept only the browser push services.",
-      adminStatusFinding(ADMIN_401),
-    ],
+    findings: [adminStatusFinding(ADMIN_401)],
   },
 
   "POST /api/push/unsubscribe": {
@@ -2346,7 +2344,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         principal: "merchant",
         roles: ["owner", "member"],
         tenant: "session",
-        tenantRule: `${sessionBusiness(ADMIN_401)}; the iPhone is recorded against the business and this login (createPushSubscription, by its endpoint)`,
+        tenantRule: `${sessionBusiness(ADMIN_401)}; the iPhone is recorded against the business and this login, and takes this login's switches (createPushSubscription, by its endpoint; ${OWN_SWITCHES})`,
       },
     ],
     input: "body read without a schema: deviceToken, a string of at least 8 characters once trimmed (400 otherwise), stored as the endpoint apns://<token>",
@@ -2380,43 +2378,62 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
   },
 
   "GET /api/push/status": {
-    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner", "member"],
+        tenant: "session",
+        tenantRule: `${sessionBusiness(ADMIN_401)}; this login's own devices and switches (getPushSubscriptionsForLogin; ${OWN_SWITCHES})`,
+      },
+    ],
     input: "nothing",
     capability: null,
     entitlement: null,
     idempotency: "read-only",
     sideEffects: null,
     successDto:
-      "{ subscribed, deviceCount, webSubscribed, nativeSubscribed, preferences: pushNotificationPreferencesDto }: every active device of the business, not only this login's",
+      "{ subscribed, deviceCount, webSubscribed, nativeSubscribed, preferences: pushNotificationPreferencesDto }: this login's active devices and its switches",
     errorDisclosure: ["fixed"],
-    findings: [PUSH_FAULT_AS_NONE, adminStatusFinding(ADMIN_401)],
+    findings: [PUSH_SWITCHES_FAULT_AS_DEFAULTS, adminStatusFinding(ADMIN_401)],
   },
 
   "GET /api/push/preferences": {
-    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner", "member"],
+        tenant: "session",
+        tenantRule: `${sessionBusiness(ADMIN_401)}; this login's own switches (${OWN_SWITCHES})`,
+      },
+    ],
     input: "nothing",
     capability: null,
     entitlement: null,
     idempotency: "read-only",
     sideEffects: null,
-    successDto: "{ preferences: pushNotificationPreferencesDto }: the business's three switches (read from its newest subscription)",
+    successDto: "{ preferences: pushNotificationPreferencesDto }: this login's three switches, read from its newest device (the defaults with none)",
     errorDisclosure: ["fixed"],
-    findings: [PUSH_FAULT_AS_NONE, adminStatusFinding(ADMIN_401)],
+    findings: [PUSH_SWITCHES_FAULT_AS_DEFAULTS, adminStatusFinding(ADMIN_401)],
   },
 
   "PUT /api/push/preferences": {
-    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_401) }],
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner", "member"],
+        tenant: "session",
+        tenantRule: `${sessionBusiness(ADMIN_401)}; this login's own switches, on its own devices only (${OWN_SWITCHES})`,
+      },
+    ],
     input: "body: pushNotificationPreferencesSchema, strict: the three switches (400 with the issues)",
     capability: null,
     entitlement: null,
-    idempotency: "sets the three switches on every device of the business (updatePushNotificationPreferences); the same body again changes nothing",
+    idempotency:
+      "sets the three switches on each of this login's devices and no other login's (updatePushNotificationPreferences); the same body again changes nothing. The switches live on the devices: a login with none stores nothing, and a device that moves to another login takes that login's",
     sideEffects: null,
     successDto: "{ preferences: pushNotificationPreferencesDto }",
     errorDisclosure: ["input-issues"],
-    findings: [
-      "The switches are the business's: any login, a teammate included, turns payment notifications off on every device of the business, the owner's included (shown in the harness). Put to the owner 2026-09-26: per login.",
-      adminStatusFinding(ADMIN_401),
-    ],
+    findings: [adminStatusFinding(ADMIN_401)],
   },
 };
 

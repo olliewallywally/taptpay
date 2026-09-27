@@ -722,9 +722,17 @@ export interface IStorage extends PaymentAttemptRepository {
   // Push subscription operations
   createPushSubscription(data: PushSubscriptionInput): Promise<PushSubscription | null>;
   getPushSubscriptionsByMerchant(merchantId: number): Promise<PushSubscription[]>;
-  getPushNotificationPreferences(merchantId: number): Promise<PushNotificationPreferences>;
+  /** One login's active devices (owner decision 2026-09-26: each login its own notifications). */
+  getPushSubscriptionsForLogin(merchantId: number, userId: number): Promise<PushSubscription[]>;
+  /**
+   * One login's switches, from its newest subscription (the defaults if it has none); `null`
+   * reads the business's unattributed subscriptions from before 0029.
+   */
+  getPushNotificationPreferences(merchantId: number, userId: number | null): Promise<PushNotificationPreferences>;
+  /** Sets one login's switches on each of its subscriptions, and no other login's. */
   updatePushNotificationPreferences(
     merchantId: number,
+    userId: number | null,
     preferences: PushNotificationPreferences,
   ): Promise<PushNotificationPreferences>;
   deactivatePushSubscription(id: number): Promise<void>;
@@ -2670,10 +2678,11 @@ export class MemStorage implements IStorage {
   }
 
   async createPushSubscription(data: PushSubscriptionInput): Promise<PushSubscription> {
-    const targetPreferences = await this.getPushNotificationPreferences(data.merchantId);
+    // A device takes the switches of the login it is recorded against (owner decision 2026-09-26).
+    const targetPreferences = await this.getPushNotificationPreferences(data.merchantId, data.userId ?? null);
     const existing = this.pushSubs.find(s => s.endpoint === data.endpoint);
     if (existing) {
-      const preferences = existing.merchantId === data.merchantId
+      const preferences = existing.merchantId === data.merchantId && (existing.userId ?? null) === (data.userId ?? null)
         ? normalizePushNotificationPreferences(existing.preferences)
         : targetPreferences;
       existing.isActive = true;
@@ -2701,9 +2710,13 @@ export class MemStorage implements IStorage {
     return this.pushSubs.filter(s => s.merchantId === merchantId && s.isActive);
   }
 
-  async getPushNotificationPreferences(merchantId: number): Promise<PushNotificationPreferences> {
+  async getPushSubscriptionsForLogin(merchantId: number, userId: number): Promise<PushSubscription[]> {
+    return this.pushSubs.filter(s => s.merchantId === merchantId && s.userId === userId && s.isActive);
+  }
+
+  async getPushNotificationPreferences(merchantId: number, userId: number | null): Promise<PushNotificationPreferences> {
     const latest = this.pushSubs
-      .filter((sub) => sub.merchantId === merchantId)
+      .filter((sub) => sub.merchantId === merchantId && (sub.userId ?? null) === userId)
       .sort((a, b) => b.id - a.id)[0];
     return latest
       ? normalizePushNotificationPreferences(latest.preferences)
@@ -2712,11 +2725,12 @@ export class MemStorage implements IStorage {
 
   async updatePushNotificationPreferences(
     merchantId: number,
+    userId: number | null,
     preferences: PushNotificationPreferences,
   ): Promise<PushNotificationPreferences> {
     const safePreferences = normalizePushNotificationPreferences(preferences);
     for (const sub of this.pushSubs) {
-      if (sub.merchantId === merchantId) sub.preferences = { ...safePreferences };
+      if (sub.merchantId === merchantId && (sub.userId ?? null) === userId) sub.preferences = { ...safePreferences };
     }
     return safePreferences;
   }
@@ -5449,22 +5463,15 @@ export class DatabaseStorage implements IStorage {
 
   async createPushSubscription(data: PushSubscriptionInput): Promise<PushSubscription | null> {
     try {
-      const [targetPreferenceRow] = await this.db!
-        .select({ preferences: pushSubscriptions.preferences })
-        .from(pushSubscriptions)
-        .where(eq(pushSubscriptions.merchantId, data.merchantId))
-        .orderBy(desc(pushSubscriptions.id))
-        .limit(1);
-      const targetPreferences = normalizePushNotificationPreferences(
-        targetPreferenceRow?.preferences,
-      );
+      // A device takes the switches of the login it is recorded against (owner decision 2026-09-26).
+      const targetPreferences = await this.getPushNotificationPreferences(data.merchantId, data.userId ?? null);
       const existing = await this.db!
         .select()
         .from(pushSubscriptions)
         .where(eq(pushSubscriptions.endpoint, data.endpoint));
       
       if (existing.length > 0) {
-        const preferences = existing[0].merchantId === data.merchantId
+        const preferences = existing[0].merchantId === data.merchantId && (existing[0].userId ?? null) === (data.userId ?? null)
           ? normalizePushNotificationPreferences(existing[0].preferences)
           : targetPreferences;
         const [updated] = await this.db!
@@ -5515,12 +5522,26 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getPushNotificationPreferences(merchantId: number): Promise<PushNotificationPreferences> {
+  async getPushSubscriptionsForLogin(merchantId: number, userId: number): Promise<PushSubscription[]> {
+    return await this.db!
+      .select()
+      .from(pushSubscriptions)
+      .where(and(
+        eq(pushSubscriptions.merchantId, merchantId),
+        eq(pushSubscriptions.userId, userId),
+        eq(pushSubscriptions.isActive, true),
+      ));
+  }
+
+  async getPushNotificationPreferences(merchantId: number, userId: number | null): Promise<PushNotificationPreferences> {
     try {
       const [row] = await this.db!
         .select({ preferences: pushSubscriptions.preferences })
         .from(pushSubscriptions)
-        .where(eq(pushSubscriptions.merchantId, merchantId))
+        .where(and(
+          eq(pushSubscriptions.merchantId, merchantId),
+          userId === null ? isNull(pushSubscriptions.userId) : eq(pushSubscriptions.userId, userId),
+        ))
         .orderBy(desc(pushSubscriptions.id))
         .limit(1);
       return normalizePushNotificationPreferences(row?.preferences);
@@ -5532,13 +5553,17 @@ export class DatabaseStorage implements IStorage {
 
   async updatePushNotificationPreferences(
     merchantId: number,
+    userId: number | null,
     preferences: PushNotificationPreferences,
   ): Promise<PushNotificationPreferences> {
     const safePreferences = normalizePushNotificationPreferences(preferences);
     await this.db!
       .update(pushSubscriptions)
       .set({ preferences: safePreferences })
-      .where(eq(pushSubscriptions.merchantId, merchantId));
+      .where(and(
+        eq(pushSubscriptions.merchantId, merchantId),
+        userId === null ? isNull(pushSubscriptions.userId) : eq(pushSubscriptions.userId, userId),
+      ));
     return safePreferences;
   }
 
