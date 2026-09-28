@@ -1,103 +1,18 @@
 import "./support/test-env";
 
 import request from "supertest";
-import * as billing from "../billing-card";
 import * as propertyCron from "../property-cron";
 import { ROUTE_POLICY } from "../route-policy";
 import { bearer, createMemberPrincipal, createOwnerPrincipal, createTestApp, resetTestStorage, storage, storageSnapshot } from "./support/http-harness";
+import { INVOICE, MISSING, SCHEDULE, TENANT, fakeProperty, inDays, seedProperty as seed } from "./support/property-fake";
 
 /**
  * C10 route review, batch 6c (the property routes), 2026-09-27. The in-memory storage has no
- * property tables, so the tenants, automations and invoices live in a small fake here (the
- * technique of invoice-document-attach-ownership.test.ts), which records every read and write.
+ * property tables, so the tenants, automations and invoices live in a small fake
+ * (support/property-fake.ts, shared since R1-T3), which records every read and write.
  */
 
-const TENANT = "22222222-2222-4222-8222-222222222222";
-const SCHEDULE = "33333333-3333-4333-8333-333333333333";
-const INVOICE = "44444444-4444-4444-8444-444444444444";
-const MISSING = "99999999-9999-4999-8999-999999999999";
 const DAY = 86_400_000;
-const inDays = (days: number) => new Date(Date.now() + days * DAY);
-
-interface PropertyFake {
-  tenants: Map<string, any>;
-  schedules: Map<string, any>;
-  invoices: Map<string, any>;
-  reads: string[];
-  writes: string[];
-}
-
-function fakeProperty(): PropertyFake {
-  const fake: PropertyFake = { tenants: new Map(), schedules: new Map(), invoices: new Map(), reads: [], writes: [] };
-  const read = (name: string, rows: Map<string, any>) =>
-    jest.spyOn(storage as any, name).mockImplementation(async (id: unknown) => {
-      fake.reads.push(name);
-      return rows.get(id as string);
-    });
-  read("getTenantProfile", fake.tenants);
-  read("getActiveSchedule", fake.schedules);
-  read("getInvoiceRentRequest", fake.invoices);
-  const list = (name: string, rows: () => any[]) =>
-    jest.spyOn(storage as any, name).mockImplementation(async () => {
-      fake.reads.push(name);
-      return rows();
-    });
-  list("getTenantProfilesByMerchant", () => [...fake.tenants.values()]);
-  list("getActiveSchedulesByMerchant", () => [...fake.schedules.values()]);
-  jest.spyOn(storage as any, "getActiveSchedulesByTenant").mockImplementation(async (tenantId: unknown) => {
-    fake.reads.push("getActiveSchedulesByTenant");
-    return [...fake.schedules.values()].filter((row) => row.tenantProfileId === tenantId);
-  });
-  list("getInvoiceRentRequestsByMerchant", () => [...fake.invoices.values()]);
-  list("getTransactionEventsByTenant", () => []);
-  jest.spyOn(storage, "getLiveInvoiceByTenant").mockResolvedValue(undefined as any);
-  const write = (name: string, apply: (...args: any[]) => any) =>
-    jest.spyOn(storage as any, name).mockImplementation(async (...args: any[]) => {
-      fake.writes.push(name);
-      return apply(...args);
-    });
-  // As Drizzle does (mapUpdateSet), an update leaves out every field whose value is undefined.
-  write("updateTenantProfile", (id: string, updates: any) =>
-    Object.assign(fake.tenants.get(id), Object.fromEntries(Object.entries(updates).filter(([, value]) => value !== undefined))));
-  write("archiveTenantProfile", (id: string) => Object.assign(fake.tenants.get(id), { status: "archived" }));
-  write("unarchiveTenantProfile", (id: string) => Object.assign(fake.tenants.get(id), { status: "active" }));
-  write("createActiveSchedule", (data: any) => {
-    const row = { id: "55555555-5555-4555-8555-555555555555", status: "active", ...data };
-    fake.schedules.set(row.id, row);
-    return row;
-  });
-  write("updateActiveSchedule", (id: string, updates: any) => Object.assign(fake.schedules.get(id), updates));
-  write("terminateActiveSchedule", (id: string) => Object.assign(fake.schedules.get(id), { status: "terminated", terminatedAt: new Date() }));
-  write("createInvoiceRentRequest", (data: any) => {
-    const row = { id: "66666666-6666-4666-8666-666666666666", ...data };
-    fake.invoices.set(row.id, row);
-    return row;
-  });
-  write("updateInvoiceRentRequest", (id: string, updates: any) => Object.assign(fake.invoices.get(id), updates));
-  write("logTransactionEvent", () => ({}));
-  jest.spyOn(billing, "billingCardIsReady").mockReturnValue(true);
-  jest.spyOn(propertyCron, "resendInvoiceEmail").mockImplementation(async (id: string) => {
-    fake.writes.push("resendInvoiceEmail");
-    return { ok: true, invoice: fake.invoices.get(id) };
-  });
-  return fake;
-}
-
-/** A business with one tenant, one weekly automation and one sent invoice, all its own. */
-function seed(fake: PropertyFake, merchantId: number, state: { tenant?: object; schedule?: object; invoice?: object } = {}) {
-  fake.tenants.set(TENANT, {
-    id: TENANT, merchantId, firstName: "Tess", lastName: "Tenant", propertyAddress: "1 Test Road",
-    email: "tess@example.test", preferredChannel: "email", status: "active", ...state.tenant,
-  });
-  fake.schedules.set(SCHEDULE, {
-    id: SCHEDULE, merchantId, tenantProfileId: TENANT, amountCents: 50_000, frequency: "weekly",
-    deliveryChannel: "email", status: "active", nextRunDate: inDays(3), ...state.schedule,
-  });
-  fake.invoices.set(INVOICE, {
-    id: INVOICE, merchantId, tenantProfileId: TENANT, amountCents: 50_000, status: "dispatched",
-    token: "checkout-token", deliveryChannel: "email", ...state.invoice,
-  });
-}
 
 beforeEach(() => {
   resetTestStorage();
