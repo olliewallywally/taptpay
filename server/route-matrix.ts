@@ -42,6 +42,7 @@ export const MATRIX_CALLER_MEANING = {
   "unknown-board": "a board's public route asked with a board that is not the business's, or does not exist",
   "sale-with-its-own-link": "a numbered route asked for a sale that has its own payment link",
   "wrong-webhook-key": "the WhatsApp webhook with a key that is not the provider's",
+  "unknown-reference": "a provider's call naming a session, return state or message that is no one's",
   "link-holder": "the holder of the route's own link: its token, return state, handoff code or invite",
   provider: "the payment or messaging provider's servers, naming their own reference",
   scheduler: "the scheduler, with its secret",
@@ -153,6 +154,8 @@ export function matrixRowFor(key: string, recorded: RecordedRouteFacts = ROUTE_P
     // Windcave browser return, which sends a missing sale home, the same redirect.
     if (tenants.has("number")) answers["sale-with-its-own-link"] = key === "GET /api/windcave/callback" ? 302 : 404;
     if (key === "POST /api/webhooks/whatsapp") answers["wrong-webhook-key"] = 200;
+    // A provider's call names its resource: one that is no one's is acknowledged (200) and nothing done.
+    if (principals.has("provider") && (tenants.has("provider-session") || tenants.has("token"))) answers["unknown-reference"] = 200;
     return { gate, answers };
   }
   for (const caller of GATE_REFUSED) answers[caller] = 401;

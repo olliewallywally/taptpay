@@ -1,4 +1,6 @@
 import "./support/test-env";
+// The messaging provider's key is set, so the WhatsApp webhook believes a call that presents it.
+import { HARNESS_EVOLUTION_KEY } from "./support/whatsapp-test-env";
 
 // The ecommerce API is shut (404) unless its flag is on, which needs enforce mode (config.ts).
 process.env.FEATURE_ECOMMERCE_API = "true";
@@ -285,6 +287,46 @@ describe("R1-T3 — a board's public routes answer another business's board as a
     expect(theirs.body).toEqual(missing.body);
     expect(storageSnapshot()).toBe(before);
     expect(ROUTE_MATRIX[key].answers["unknown-board"]).toBe(404);
+  });
+});
+
+describe("R1-T3 — a provider's call naming what is no one's is acknowledged, and changes nothing", () => {
+  // A provider's notification carries no credential: what it names (a session, a payment attempt's return
+  // state, a message) selects the resource, and the provider is then asked for the truth. One that is no
+  // one's is acknowledged at once (200 "OK", so the provider stops retrying) and nothing is done.
+  const NO_ONES: Record<string, Request> = {
+    "ALL /api/pay/notification/:state": { method: "get", path: "/api/pay/notification/no-ones-return-state" },
+    "ALL /api/windcave/notification": { method: "get", path: "/api/windcave/notification?sessionid=no-ones-session" },
+    "ALL /api/windcave/rent-notification": { method: "get", path: "/api/windcave/rent-notification?sessionid=no-ones-session" },
+    "ALL /api/windcave/trades-notification": { method: "get", path: "/api/windcave/trades-notification?sessionid=no-ones-session" },
+    "POST /api/webhooks/whatsapp": {
+      method: "post", path: "/api/webhooks/whatsapp", headers: { apikey: HARNESS_EVOLUTION_KEY! },
+      body: { event: "messages.update", data: { key: { id: "no-ones-message" }, update: { status: "READ" } } },
+    },
+  };
+  const CASES = refusalsOf("unknown-reference");
+
+  beforeAll(async () => {
+    // A board sale waiting on someone's own session: a call naming another must leave it alone.
+    const owner = await createOwnerPrincipal();
+    const sale = await storage.createTransaction({
+      merchantId: owner.merchantId, itemName: "Waiting sale", price: "8.00", status: "pending", paymentMethod: "qr_code", splitEnabled: false,
+    } as any);
+    await storage.updateTransactionWindcaveSession(sale.id, "someones-session", "pending", "someones-x-id");
+  });
+
+  it("has a request for every provider route that names its resource", () => {
+    expect(CASES.map(([key]) => key).sort()).toEqual(Object.keys(NO_ONES).sort());
+  });
+
+  it.each(CASES)("%s acknowledges a call naming what is no one's with %s, and changes nothing", async (key, status) => {
+    const before = storageSnapshot();
+    const res = await send(app, NO_ONES[key]);
+    expect(res.status).toBe(status);
+    expect(res.text).toBe("OK");
+    // The call is answered first and worked on after: let that work finish.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(storageSnapshot()).toBe(before);
   });
 });
 

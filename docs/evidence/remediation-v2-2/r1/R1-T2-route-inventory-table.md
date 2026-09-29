@@ -1,4 +1,4 @@
-# R1-T2 route inventory — generated 2026-09-29 @ `d6be33691a505d6fd7a5776adb581dd6546dd783`
+# R1-T2 route inventory — generated 2026-09-29 @ `2133d1fd59950efe546c57e7ef8dcb761f9eec42`
 
 Regenerate with `npx tsx scripts/generate-route-policy.ts`. This table is
 evidence for the SHA named above, not a timeless constant — see
@@ -148,6 +148,7 @@ The callers:
 - `unknown-board`: a board's public route asked with a board that is not the business's, or does not exist
 - `sale-with-its-own-link`: a numbered route asked for a sale that has its own payment link
 - `wrong-webhook-key`: the WhatsApp webhook with a key that is not the provider's
+- `unknown-reference`: a provider's call naming a session, return state or message that is no one's
 - `link-holder`: the holder of the route's own link: its token, return state, handoff code or invite
 - `provider`: the payment or messaging provider's servers, naming their own reference
 - `scheduler`: the scheduler, with its secret
@@ -199,7 +200,7 @@ its notice (410), which it gives everyone.
 | POST | `/api/pay/t/:token/hosted-fields-complete` | 2011 | public-bearer | prepareTokenCompletion( | `link-holder` | 404: `unknown-link` |
 | POST | `/api/pay/t/:token/googlepay-complete` | 2063 | public-bearer | prepareTokenCompletion(, paymentAttempts.resolveReturnState( | `link-holder` | 404: `unknown-link` |
 | GET | `/api/pay/return/:state` | 2194 | public-bearer | paymentAttempts.resolveReturnState( | `link-holder` | 404: `unknown-link` |
-| ALL | `/api/pay/notification/:state` | 2228 | provider | — | `provider` | — |
+| ALL | `/api/pay/notification/:state` | 2228 | provider | — | `provider` | 200: `unknown-reference` |
 | GET | `/api/merchants/:id/active-transaction` | 2245 | merchant / public | authenticateToken, checkMerchantOwnership, publicTransactionDto(, generatePaymentUrl( | `signed-out`, `owner`, `member`, `platform-admin` | 401: `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner`; 404: `unknown-board` |
 | POST | `/api/transactions` | 2362 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
 | POST | `/api/transactions/cash-sale` | 2443 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
@@ -233,7 +234,7 @@ its notice (410), which it gives everyone.
 | POST | `/api/merchants/:id/tapt-stones` | 3894 | merchant | authenticateToken, checkMerchantOwnership, generatePaymentUrl( | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
 | PUT | `/api/merchants/:merchantId/tapt-stones/:stoneId` | 3945 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
 | DELETE | `/api/merchants/:merchantId/tapt-stones/:stoneId` | 3984 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
-| ALL | `/api/windcave/notification` | 4024 | provider | — | `provider` | — |
+| ALL | `/api/windcave/notification` | 4024 | provider | — | `provider` | 200: `unknown-reference` |
 | GET | `/api/windcave/callback` | 4146 | public | isTokenAddressedTransaction( | `signed-out` | 302: `sale-with-its-own-link` |
 | GET | `/api/admin/analytics` | 4344 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `owner`, `member` |
 | GET | `/api/admin/revenue-over-time` | 4417 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `owner`, `member` |
@@ -313,9 +314,9 @@ its notice (410), which it gives everyone.
 | POST | `/api/checkout/:token/hosted-fields-complete` | 7610 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 404: `unknown-link` |
 | POST | `/api/checkout/:token/googlepay-complete` | 7646 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 404: `unknown-link` |
 | GET | `/api/checkout/callback` | 7704 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 302: `unknown-link` |
-| ALL | `/api/windcave/rent-notification` | 7731 | provider | — | `provider` | — |
-| ALL | `/api/windcave/trades-notification` | 7753 | provider | — | `provider` | — |
-| POST | `/api/webhooks/whatsapp` | 7778 | provider | req.headers["apikey"] | `provider` | 200: `wrong-webhook-key` |
+| ALL | `/api/windcave/rent-notification` | 7731 | provider | — | `provider` | 200: `unknown-reference` |
+| ALL | `/api/windcave/trades-notification` | 7753 | provider | — | `provider` | 200: `unknown-reference` |
+| POST | `/api/webhooks/whatsapp` | 7778 | provider | req.headers["apikey"] | `provider` | 200: `wrong-webhook-key`, `unknown-reference` |
 | GET | `/api/property/reminder-settings` | 7828 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
 | PUT | `/api/property/reminder-settings` | 7838 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
 | GET | `/api/trades/reminder-settings` | 7858 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
