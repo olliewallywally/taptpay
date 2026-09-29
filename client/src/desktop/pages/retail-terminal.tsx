@@ -1,3 +1,4 @@
+import { retailResponse } from "@/lib/response-data";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getCurrentMerchantId } from "@/lib/auth";
@@ -193,7 +194,7 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
     const token = localStorage.getItem("authToken");
     const res = await fetch(path, { headers: { Authorization: `Bearer ${token}` } });
     if (!res.ok) throw new Error(path);
-    return res.json();
+    return retailResponse(path, await res.json());
   };
 
   const merchantQuery = useQuery<any>({

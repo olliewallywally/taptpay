@@ -281,3 +281,10 @@ describe("desktop settings with everything loaded (R1-T9 guard)", () => {
     expect(screen.getByRole("button", { name: "Cancel at period end" })).toBeEnabled();
   });
 });
+
+test('a malformed successful business response does not expose an empty editable form', async () => {
+  renderPage(serve({ profile: () => ok(null) }));
+  await settle();
+  expect(alertSaying("Business details didn't load")).toBeDefined();
+  expect(screen.queryByRole('button', {name: 'Save changes'})).toBeNull();
+});

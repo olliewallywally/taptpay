@@ -38,7 +38,13 @@ export type ActiveTransactionScope =
   | { kind: "merchant-any" }
   | { kind: "board"; stoneId: number };
 
+export class PushSessionEndedError extends Error {
+  constructor() { super("The session registering this device has ended"); }
+}
+
 export type PushSubscriptionInput = {
+  /** Captured by authentication; checked under the users-row lock before activation. */
+  sessionVersion?: number;
   merchantId: number;
   /** R1-T4 (0029): the login registering this device; null only for rows from before. */
   userId: number | null;
@@ -2680,6 +2686,13 @@ export class MemStorage implements IStorage {
   async createPushSubscription(data: PushSubscriptionInput): Promise<PushSubscription> {
     // A device takes the switches of the login it is recorded against (owner decision 2026-09-26).
     const targetPreferences = await this.getPushNotificationPreferences(data.merchantId, data.userId ?? null);
+    if (data.sessionVersion !== undefined) {
+      const user = data.userId === null ? undefined : await this.getUserById(data.userId);
+      if (!user || user.status !== "active" || user.merchantId !== data.merchantId || (user.sessionVersion ?? 0) !== data.sessionVersion) {
+        throw new PushSessionEndedError();
+      }
+    }
+    const { sessionVersion: _sessionVersion, ...subscriptionData } = data;
     const existing = this.pushSubs.find(s => s.endpoint === data.endpoint);
     if (existing) {
       const preferences = existing.merchantId === data.merchantId && (existing.userId ?? null) === (data.userId ?? null)
@@ -2696,7 +2709,7 @@ export class MemStorage implements IStorage {
     }
     const sub: PushSubscription = {
       id: this.pushSubs.length + 1,
-      ...data,
+      ...subscriptionData,
       userAgent: data.userAgent ?? null,
       isActive: true,
       preferences: { ...targetPreferences },
@@ -5463,53 +5476,66 @@ export class DatabaseStorage implements IStorage {
 
   async createPushSubscription(data: PushSubscriptionInput): Promise<PushSubscription | null> {
     try {
-      // A device takes the switches of the login it is recorded against (owner decision 2026-09-26).
-      const targetPreferences = await this.getPushNotificationPreferences(data.merchantId, data.userId ?? null);
-      const existing = await this.db!
-        .select()
-        .from(pushSubscriptions)
-        .where(eq(pushSubscriptions.endpoint, data.endpoint));
-      
-      if (existing.length > 0) {
-        const preferences = existing[0].merchantId === data.merchantId && (existing[0].userId ?? null) === (data.userId ?? null)
-          ? normalizePushNotificationPreferences(existing[0].preferences)
-          : targetPreferences;
-        const [updated] = await this.db!
-          .update(pushSubscriptions)
-          .set({
+      return await this.db!.transaction(async (tx) => {
+        if (data.sessionVersion !== undefined) {
+          const [user] = await tx.select().from(users).where(eq(users.id, data.userId ?? -1)).for("update");
+          if (!user || user.status !== "active" || user.merchantId !== data.merchantId || (user.sessionVersion ?? 0) !== data.sessionVersion) {
+            throw new PushSessionEndedError();
+          }
+        }
+        // A device takes the switches of the login it is recorded against (owner decision 2026-09-26).
+        const [latest] = await tx.select({ preferences: pushSubscriptions.preferences })
+          .from(pushSubscriptions)
+          .where(and(eq(pushSubscriptions.merchantId, data.merchantId),
+            data.userId === null ? isNull(pushSubscriptions.userId) : eq(pushSubscriptions.userId, data.userId)))
+          .orderBy(desc(pushSubscriptions.id)).limit(1);
+        const targetPreferences = normalizePushNotificationPreferences(latest?.preferences);
+        const existing = await tx
+          .select()
+          .from(pushSubscriptions)
+          .where(eq(pushSubscriptions.endpoint, data.endpoint));
+
+        if (existing.length > 0) {
+          const preferences = existing[0].merchantId === data.merchantId && (existing[0].userId ?? null) === (data.userId ?? null)
+            ? normalizePushNotificationPreferences(existing[0].preferences)
+            : targetPreferences;
+          const [updated] = await tx
+            .update(pushSubscriptions)
+            .set({
+              merchantId: data.merchantId,
+              userId: data.userId,
+              p256dh: data.p256dh,
+              auth: data.auth,
+              userAgent: data.userAgent ?? existing[0].userAgent,
+              preferences,
+              isActive: true,
+            })
+            .where(eq(pushSubscriptions.endpoint, data.endpoint))
+            .returning();
+          return updated;
+        }
+
+        const [sub] = await tx
+          .insert(pushSubscriptions)
+          .values({
             merchantId: data.merchantId,
             userId: data.userId,
+            endpoint: data.endpoint,
             p256dh: data.p256dh,
             auth: data.auth,
-            userAgent: data.userAgent ?? existing[0].userAgent,
-            preferences,
+            userAgent: data.userAgent || null,
+            preferences: targetPreferences,
             isActive: true,
           })
-          .where(eq(pushSubscriptions.endpoint, data.endpoint))
           .returning();
-        return updated;
-      }
-
-      const [sub] = await this.db!
-        .insert(pushSubscriptions)
-        .values({
-          merchantId: data.merchantId,
-          userId: data.userId,
-          endpoint: data.endpoint,
-          p256dh: data.p256dh,
-          auth: data.auth,
-          userAgent: data.userAgent || null,
-          preferences: targetPreferences,
-          isActive: true,
-        })
-        .returning();
-      return sub;
+        return sub;
+      });
     } catch (error) {
+      if (error instanceof PushSessionEndedError) throw error;
       console.error("Database error in createPushSubscription:", error);
       return null;
     }
   }
-
   async getPushSubscriptionsByMerchant(merchantId: number): Promise<PushSubscription[]> {
     try {
       return await this.db!

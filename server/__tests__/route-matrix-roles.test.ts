@@ -6,6 +6,7 @@ process.env.FEATURE_REFUND_INITIATION = "true";
 process.env.ENV_VALIDATION_MODE = "enforce";
 
 import crypto from "crypto";
+import { observeRefusalEffects } from "./support/refusal-effects";
 import request from "supertest";
 import { ROUTE_MATRIX } from "../route-matrix";
 import * as windcave from "../windcave";
@@ -180,9 +181,12 @@ describe("R1-T3 — a teammate on an owner-only route, and another business's ow
       const expected = row.answers[caller];
       if (typeof expected !== "number") continue;
       const before = storageSnapshot();
+    const effects = observeRefusalEffects();
       const res = await send(ctx, who, req);
       expect({ caller, status: res.status }).toEqual({ caller, status: expected });
       expect({ caller, changed: storageSnapshot() !== before }).toEqual({ caller, changed: false });
+      effects.assertNone();
+      effects.restore();
     }
 
     // The positive control: the owner's same request passes the role and tenant checks.

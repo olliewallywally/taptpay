@@ -1,3 +1,4 @@
+import { retailResponse } from "@/lib/response-data";
 import {
   useCallback,
   useEffect,
@@ -151,7 +152,7 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
     const token = localStorage.getItem("authToken");
     const res = await fetch(path, { headers: { Authorization: `Bearer ${token}` } });
     if (!res.ok) throw new Error(path);
-    return res.json();
+    return retailResponse(path, await res.json());
   };
 
   const merchantQuery = useQuery<any>({

@@ -20,6 +20,9 @@ export interface SseWritable {
 type Subscriber = {
   audience: SseAudience;
   connection: SseWritable;
+  authorize?: () => Promise<boolean>;
+  pending: Promise<void>;
+  unsubscribe: () => void;
 };
 
 function ownerRefundDto(refund: Record<string, any>) {
@@ -77,9 +80,19 @@ function isTarget(
 export class SseBroker {
   private subscribers = new Map<number, Set<Subscriber>>();
 
-  subscribe(merchantId: number, audience: SseAudience, connection: SseWritable) {
+  subscribe(merchantId: number, audience: SseAudience, connection: SseWritable, authorize?: () => Promise<boolean>) {
     const merchantSubscribers = this.subscribers.get(merchantId) ?? new Set<Subscriber>();
-    const subscriber = { audience, connection };
+    let timer: ReturnType<typeof setInterval> | undefined;
+    const subscriber: Subscriber = { audience, connection, authorize, pending: Promise.resolve(), unsubscribe: () => {
+      if (timer) clearInterval(timer);
+      merchantSubscribers.delete(subscriber);
+      if (merchantSubscribers.size === 0) this.subscribers.delete(merchantId);
+    } };
+    // Shared-storage revalidation closes idle streams on other instances too.
+    if (authorize) {
+      timer = setInterval(() => { void this.deliver(subscriber, merchantSubscribers); }, 5_000);
+      timer.unref?.();
+    }
     merchantSubscribers.add(subscriber);
     this.subscribers.set(merchantId, merchantSubscribers);
 
@@ -89,23 +102,40 @@ export class SseBroker {
       ...(audience.kind === "board" ? { stoneId: audience.stoneId } : {}),
     })}\n\n`);
 
-    return () => {
-      merchantSubscribers.delete(subscriber);
-      if (merchantSubscribers.size === 0) this.subscribers.delete(merchantId);
-    };
+    return subscriber.unsubscribe;
   }
 
-  broadcast(merchantId: number, stoneId: number | null | undefined, data: Record<string, any>) {
+  private deliver(subscriber: Subscriber, members: Set<Subscriber>, message?: string): Promise<void> {
+    subscriber.pending = subscriber.pending.then(async () => {
+      if (!members.has(subscriber)) return;
+      try {
+        if (subscriber.authorize && !await subscriber.authorize()) {
+          subscriber.unsubscribe();
+          subscriber.connection.end?.();
+          return;
+        }
+        if (message && members.has(subscriber)) subscriber.connection.write(message);
+      } catch {
+        subscriber.unsubscribe();
+        try { subscriber.connection.end?.(); } catch { /* already closed */ }
+      }
+    });
+    return subscriber.pending;
+  }
+
+  broadcast(merchantId: number, stoneId: number | null | undefined, data: Record<string, any>): void | Promise<void[]> {
     const merchantSubscribers = this.subscribers.get(merchantId);
     if (!merchantSubscribers) return;
     const canonicalStoneId = stoneId ?? null;
 
+    const pending: Promise<void>[] = [];
     for (const subscriber of merchantSubscribers) {
       if (!isTarget(subscriber.audience, canonicalStoneId, data)) continue;
-      subscriber.connection.write(
-        `data: ${JSON.stringify(projectEvent(data, subscriber.audience))}\n\n`,
-      );
+      const message = `data: ${JSON.stringify(projectEvent(data, subscriber.audience))}\n\n`;
+      if (subscriber.authorize) pending.push(this.deliver(subscriber, merchantSubscribers, message));
+      else subscriber.connection.write(message);
     }
+    return Promise.all(pending);
   }
 
   /**
@@ -126,7 +156,7 @@ export class SseBroker {
       ) {
         continue;
       }
-      merchantSubscribers.delete(subscriber);
+      subscriber.unsubscribe();
       disconnected++;
       try {
         subscriber.connection.end?.();
@@ -147,6 +177,7 @@ export class SseBroker {
   }
 
   clear() {
+    for (const members of this.subscribers.values()) for (const subscriber of members) subscriber.unsubscribe();
     this.subscribers.clear();
   }
 }

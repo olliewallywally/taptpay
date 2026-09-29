@@ -1,3 +1,4 @@
+import { responseRows } from "@/lib/response-data";
 import { useQuery } from "@tanstack/react-query";
 import { tradesFetch } from "@/lib/trades-api";
 import {
@@ -114,8 +115,7 @@ async function loadTradesRows<T>(path: string): Promise<T[]> {
     throw new Error(message || `Couldn't load ${path}`);
   }
   const body: unknown = await response.json();
-  if (!Array.isArray(body)) throw new Error(`Invalid response from ${path}`);
-  return body as T[];
+  return responseRows(body) as T[];
 }
 
 export function useTradesClientsQuery() {

@@ -562,3 +562,15 @@ export async function validateResetToken(token: string): Promise<boolean> {
   const user = await storage.getUserByResetToken(hashResetToken(token));
   return !!user && resetEligible(user, new Date());
 }
+
+/** Reuse the complete HTTP authentication policy for long-lived streams. No
+ * response is sent: revocation, expiry and storage failure all close the stream.
+ */
+export async function isStreamSessionActive(authorization: string): Promise<boolean> {
+  let accepted = false;
+  const response = {
+    status() { return this; }, json() { return this; }, setHeader() { return this; },
+  } as unknown as Response;
+  await authenticateToken({ headers: { authorization } } as AuthenticatedRequest, response, () => { accepted = true; });
+  return accepted;
+}

@@ -207,3 +207,12 @@ describe("redeeming the one-time code", () => {
     }
   });
 });
+
+ test("a retained starting cookie cannot replay a callback, including concurrent requests", async () => {
+  const started = await startSignIn();
+  const url = `/api/auth/google/callback?code=synthetic-code&state=${started.target.searchParams.get("state")}`;
+  const results = await Promise.all([1, 2].map(() => request(started.app).get(url).set("Cookie", `${OAUTH_COOKIE}=${started.cookieValue}`)));
+  expect(tokenRequests).toHaveLength(1);
+  expect(results.filter(result => result.headers.location === "/login?google=complete")).toHaveLength(1);
+  expect(results.filter(result => result.headers.location.startsWith("/login?error="))).toHaveLength(1);
+ });

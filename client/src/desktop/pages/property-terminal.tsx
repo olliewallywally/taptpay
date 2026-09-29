@@ -1,3 +1,4 @@
+import { requireResponseRecord } from "@/lib/response-data";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -210,7 +211,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
     queryFn: () =>
       propFetch("/api/property/reminder-settings").then((r) => {
         if (!r.ok) throw new Error("load failed");
-        return r.json();
+        return r.json().then(requireResponseRecord);
       }),
     staleTime: 60_000,
     retry: false,

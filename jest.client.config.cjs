@@ -1,3 +1,6 @@
+// Calendar fixtures use New Zealand business dates, independent of the runner host.
+process.env.TZ = "Pacific/Auckland";
+
 module.exports = {
   displayName: 'client',
   testEnvironment: 'jsdom',

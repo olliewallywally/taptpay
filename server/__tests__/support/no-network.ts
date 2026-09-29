@@ -17,6 +17,9 @@
 import dgram from "node:dgram";
 import dns from "node:dns";
 import net from "node:net";
+import http from "node:http";
+import https from "node:https";
+import { urlToHttpOptions } from "node:url";
 
 export const NO_NETWORK_GUARD = Symbol.for("taptpay.test.noNetworkGuard");
 const STATE = Symbol.for("taptpay.test.noNetworkState");
@@ -75,6 +78,13 @@ function connectTarget(args: unknown[]): { host?: string; port?: unknown; path?:
 }
 
 function install(): void {
+  // fetch belongs to each Jest environment; install before the worker-wide early return.
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input, init) => {
+    const url = new URL(typeof input === "string" || input instanceof URL ? String(input) : input.url);
+    if (!isLoopback(url.hostname)) throw refuse("connect", `${url.hostname}:${url.port || (url.protocol === "https:" ? 443 : 80)}`);
+    return originalFetch(input, init);
+  };
   const originalConnect = net.Socket.prototype.connect;
   if ((originalConnect as any)[NO_NETWORK_GUARD]) return;
 
@@ -92,12 +102,37 @@ function install(): void {
   Object.defineProperty(guardedConnect, NO_NETWORK_GUARD, { value: true });
   net.Socket.prototype.connect = guardedConnect as typeof originalConnect;
 
+  // Inspect the requested origin before an environment/custom agent can send it
+  // through a loopback proxy. The failed request never creates a connected socket.
+  for (const transport of [http, https]) {
+    for (const method of ["request", "get"] as const) {
+      const original = transport[method];
+      (transport as any)[method] = function (input: any, options?: any, callback?: any) {
+        const opts = typeof input === "string" || input instanceof URL
+          ? { ...urlToHttpOptions(new URL(String(input))), ...(typeof options === "object" ? options : {}) }
+          : { ...input };
+        const host = opts.hostname ?? opts.host;
+        if (isLoopback(host)) return (original as any).apply(this, arguments);
+        const error = refuse("connect", `${host}:${opts.port || (transport === https ? 443 : 80)}`);
+        opts.agent = new transport.Agent();
+        opts.agent.createConnection = () => {
+          const socket = new net.Socket();
+          process.nextTick(() => socket.destroy(error));
+          return socket;
+        };
+        return (original as any).call(this, opts, typeof options === "function" ? options : callback);
+      };
+    }
+  }
+
   const guardName = (target: object, name: string, kind: "dns") => {
     const original = (target as Record<string, unknown>)[name];
     if (typeof original !== "function" || (original as any)[NO_NETWORK_GUARD]) return;
     const guarded = function (this: unknown, hostname: unknown, ...rest: unknown[]) {
-      if (typeof hostname === "string" && !isLoopback(hostname)) {
-        const error = refuse(kind, hostname);
+      // resolve*/reverse use native c-ares, bypassing the socket patches. Even
+      // a query named localhost can be sent to an off-machine nameserver.
+      if (name !== "lookup" || typeof hostname !== "string" || !isLoopback(hostname)) {
+        const error = refuse(kind, String(hostname));
         const callback = rest[rest.length - 1];
         if (typeof callback === "function") {
           process.nextTick(() => (callback as (e: Error) => void)(error));
@@ -105,7 +140,16 @@ function install(): void {
         }
         return Promise.reject(error);
       }
-      return (original as (...a: unknown[]) => unknown).call(this, hostname, ...rest);
+      const options: { family?: unknown; all?: boolean } = typeof rest[0] === "object" && rest[0] !== null ? rest[0] as { family?: number; all?: boolean } : { family: rest[0] };
+      const family = options.family === 6 || net.isIPv6(hostname as string) ? 6 : 4;
+      const address = net.isIP(hostname as string) ? hostname : family === 6 ? "::1" : "127.0.0.1";
+      const answer = options.all ? [{ address, family }] : { address, family };
+      const callback = rest[rest.length - 1];
+      if (typeof callback === "function") {
+        process.nextTick(() => options.all ? callback(null, answer) : callback(null, address, family));
+        return undefined;
+      }
+      return Promise.resolve(answer);
     };
     Object.defineProperty(guarded, NO_NETWORK_GUARD, { value: true });
     (target as Record<string, unknown>)[name] = guarded;

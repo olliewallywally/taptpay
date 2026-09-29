@@ -5,6 +5,7 @@ process.env.FEATURE_REFUND_INITIATION = "true";
 process.env.ENV_VALIDATION_MODE = "enforce";
 
 import crypto from "crypto";
+import { observeRefusalEffects } from "./support/refusal-effects";
 import request from "supertest";
 import { ROUTE_MATRIX } from "../route-matrix";
 import * as windcave from "../windcave";
@@ -118,11 +119,14 @@ describe("R1-T3 — another business's record is answered as a missing one", () 
     const id = await recipe.make(ctx);
 
     const before = storageSnapshot();
+    const effects = observeRefusalEffects();
     const theirs = await send(ctx, other, recipe.ask(id));
     const missing = await send(ctx, other, recipe.ask(recipe.missing));
     expect({ status: theirs.status, body: theirs.body }).toEqual({ status: row.answers["other-owner"], body: missing.body });
     expect(missing.status).toBe(row.answers["other-owner"]);
     expect(storageSnapshot()).toBe(before);
+    effects.assertNone();
+    effects.restore();
 
     // The positive control: the owner's own request for the record is not refused as a stranger's.
     const served = await send(ctx, owner, recipe.ask(id));

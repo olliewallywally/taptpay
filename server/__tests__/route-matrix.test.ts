@@ -3,6 +3,7 @@ import "./support/test-env";
 // role or tenant: with keys set, the caller's answer is the one observed.
 import "./support/push-test-env";
 
+import { observeRefusalEffects } from "./support/refusal-effects";
 import request from "supertest";
 import { expandFacts } from "../route-facts";
 import { ADMIN_SERVED_AT_THE_GATE, GATE_REFUSED, ROUTE_MATRIX, type MatrixCaller } from "../route-matrix";
@@ -131,6 +132,8 @@ describe("R1-T3 — every signed-in route's gate refusals (P2.2), with nothing c
   it.each(REFUSALS)("%s refuses %s with %s, and changes nothing", async (key, caller, status) => {
     const { method, path } = addressOf(key);
     const before = storageSnapshot();
+    const effects = observeRefusalEffects();
+    try {
 
     let pending = request(app)[method](path);
     if (caller !== "signed-out") pending = pending.set(bearer({ token: tokens[caller] }));
@@ -139,5 +142,7 @@ describe("R1-T3 — every signed-in route's gate refusals (P2.2), with nothing c
 
     expect(res.status).toBe(status);
     expect(storageSnapshot()).toBe(before);
+    effects.assertNone();
+    } finally { effects.restore(); }
   });
 });

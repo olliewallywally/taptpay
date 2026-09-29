@@ -4,6 +4,7 @@ import "./support/test-env";
 process.env.FEATURE_ECOMMERCE_API = "true";
 process.env.ENV_VALIDATION_MODE = "enforce";
 
+import { observeRefusalEffects } from "./support/refusal-effects";
 import request from "supertest";
 import { ROUTE_MATRIX, type MatrixCaller } from "../route-matrix";
 import {
@@ -167,9 +168,12 @@ describe("R1-T3 — the scheduler's and the ecommerce API's gates", () => {
 
   it.each(CASES)("%s refuses %s with %s, and changes nothing", async (key, caller, status) => {
     const before = storageSnapshot();
+    const effects = observeRefusalEffects();
     const res = await send(app, CALLER_REQUEST[caller]!(key));
     expect(res.status).toBe(status);
     expect(storageSnapshot()).toBe(before);
+    effects.assertNone();
+    effects.restore();
   });
 });
 
@@ -183,11 +187,14 @@ describe("R1-T3 — a link opens only its own resource: one that is no one's is 
   it.each(CASES)("%s refuses a link that is no one's with %s, and changes nothing", async (key, status) => {
     const req = UNKNOWN_LINK[key];
     const before = storageSnapshot();
+    const effects = observeRefusalEffects();
     const res = await send(app, req);
     expect(res.status).toBe(status);
     if (req.message) expect(JSON.stringify(res.body)).toMatch(req.message);
     if (req.bodyEquals) expect(res.body).toEqual(req.bodyEquals);
     expect(storageSnapshot()).toBe(before);
+    effects.assertNone();
+    effects.restore();
   });
 });
 
@@ -201,6 +208,7 @@ describe("R1-T3 — a sale with its own link is answered by number like a missin
   it.each(CASES)("%s answers a link's sale with %s, the same as a missing sale, and changes nothing", async (key, status) => {
     const ask = (id: number) => ({ ...NUMBERED[key], path: NUMBERED[key].path.replace("{id}", String(id)) });
     const before = storageSnapshot();
+    const effects = observeRefusalEffects();
     const theirs = await send(app, ask(linkSaleId));
     const missing = await send(app, ask(999_999));
     expect(theirs.status).toBe(status);
@@ -208,6 +216,8 @@ describe("R1-T3 — a sale with its own link is answered by number like a missin
     expect(theirs.body).toEqual(missing.body);
     expect(theirs.headers.location).toEqual(missing.headers.location);
     expect(storageSnapshot()).toBe(before);
+    effects.assertNone();
+    effects.restore();
   });
 });
 
@@ -248,9 +258,12 @@ describe("R1-T3 — the two reads a business also makes signed in check the sign
 
   it.each(CASES)("%s refuses %s, and changes nothing", async (key, caller) => {
     const before = storageSnapshot();
+    const effects = observeRefusalEffects();
     const res = await request(app).get(READS[key].replace("{id}", String(merchantId))).set("Authorization", `Bearer ${tokens[caller]}`);
     expect(res.status).toBe(ROUTE_MATRIX[key].answers[caller]);
     expect(storageSnapshot()).toBe(before);
+    effects.assertNone();
+    effects.restore();
   });
 });
 
@@ -258,11 +271,14 @@ describe("R1-T3 — the WhatsApp webhook believes only the provider's key", () =
   it("acknowledges a call with a wrong key (200) and changes nothing", async () => {
     expect(ROUTE_MATRIX["POST /api/webhooks/whatsapp"].answers["wrong-webhook-key"]).toBe(200);
     const before = storageSnapshot();
+    const effects = observeRefusalEffects();
     const res = await send(app, {
       method: "post", path: "/api/webhooks/whatsapp", headers: { apikey: "not-the-providers-key" },
       body: { event: "messages.update", data: { key: { id: "no-ones-message" }, update: { status: "READ" } } },
     });
     expect(res.status).toBe(200);
     expect(storageSnapshot()).toBe(before);
+    effects.assertNone();
+    effects.restore();
   });
 });

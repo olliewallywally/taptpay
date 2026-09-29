@@ -1,3 +1,4 @@
+import { requireResponseRecord } from "@/lib/response-data";
 /* Desktop/tablet settings — design screens 2e/3e/4e, which differ only in the
    left column's branding and the vertical highlighted in the switcher, so all
    three verticals render this one component. Every row drives the same endpoint
@@ -187,7 +188,7 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
     const token = localStorage.getItem("authToken");
     const res = await fetch(path, { headers: { Authorization: `Bearer ${token}` } });
     if (!res.ok) throw new Error(path);
-    return res.json();
+    return res.json().then(requireResponseRecord);
   };
 
   const merchantQuery = useQuery<any>({
@@ -201,7 +202,7 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/subscription");
       if (!res.ok) throw new Error("subscription");
-      return res.json();
+      return res.json().then(requireResponseRecord);
     },
     enabled: !!merchantId,
   });
@@ -211,7 +212,9 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/auth/me");
       if (!res.ok) throw new Error("Failed to load account access");
-      return res.json();
+      const body = requireResponseRecord(await res.json());
+      requireResponseRecord(body.user);
+      return body as { user: { id: number; email: string; role: string } };
     },
     enabled: !!merchantId,
   });
@@ -219,6 +222,7 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
 
   const cardQuery = useQuery<{ ready: boolean; card: { last4: string; brand: string | null; expiry: string | null } | null }>({
     queryKey: ["/api/billing/card"],
+    select: (body) => { requireResponseRecord(body); if (typeof body.ready !== "boolean") throw new Error("Invalid card response"); return body; },
     enabled: !!merchantId && isOwner,
   });
 

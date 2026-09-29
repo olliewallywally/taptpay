@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { config } from "./config";
 import type { CookieOptions, Response } from "express";
 
 /**
@@ -65,7 +66,12 @@ export function startGoogleSignIn(): { state: string; codeChallenge: string; coo
   const state = randomToken();
   const verifier = randomToken();
   const codeChallenge = crypto.createHash("sha256").update(verifier, "ascii").digest("base64url");
-  return { state, codeChallenge, cookieValue: `${state}.${verifier}` };
+  const payload = `${state}.${verifier}.${Date.now()}`;
+  return { state, codeChallenge, cookieValue: `${payload}.${stateSignature(payload)}` };
+}
+
+function stateSignature(payload: string): string {
+  return crypto.createHmac("sha256", config.jwtSecret).update(`taptpay google-state v1\n${payload}`).digest("base64url");
 }
 
 /**
@@ -74,8 +80,12 @@ export function startGoogleSignIn(): { state: string; codeChallenge: string; coo
  */
 export function verifyGoogleSignInState(cookieValue: string | undefined, returnedState: unknown): string | null {
   if (typeof cookieValue !== "string" || typeof returnedState !== "string") return null;
-  const [state, verifier, extra] = cookieValue.split(".");
-  if (extra !== undefined || !RANDOM_TOKEN.test(state ?? "") || !RANDOM_TOKEN.test(verifier ?? "")) return null;
+  const [state, verifier, issued, signature, extra] = cookieValue.split(".");
+  if (extra !== undefined || !RANDOM_TOKEN.test(state ?? "") || !RANDOM_TOKEN.test(verifier ?? "") || !RANDOM_TOKEN.test(signature ?? "")) return null;
+  if (!/^\d{13}$/.test(issued ?? "")) return null;
+  const age = Date.now() - Number(issued);
+  if (age < 0 || age >= OAUTH_STATE_TTL_MS) return null;
+  if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(stateSignature(`${state}.${verifier}.${issued}`)))) return null;
   if (!RANDOM_TOKEN.test(returnedState)) return null;
   const same = crypto.timingSafeEqual(Buffer.from(state), Buffer.from(returnedState));
   return same ? verifier : null;
@@ -95,4 +105,15 @@ export function handoffCodeHash(code: string | undefined): string | null {
 /** Google's answer on whether it verified the address (userinfo v2, or OIDC's spelling). */
 export function googleVerifiedEmail(profile: { verified_email?: unknown; email_verified?: unknown }): boolean {
   return profile.verified_email === true || profile.email_verified === true;
+}
+
+/** A one-use replay marker, using the existing atomic, shared auth_throttle store.
+ * Never settle/refund this bucket. The authenticated cookie expires before it can reopen.
+ * Only hashes are stored; normal throttle reclamation removes it after 24 hours.
+ */
+export function googleStateReplayBucket(state: string) {
+  return { key: `google-state:${sha256Hex(state)}`, policy: {
+    free: 1, firstWaitMs: OAUTH_STATE_TTL_MS, maxWaitMs: OAUTH_STATE_TTL_MS,
+    forgetAfterMs: 2 * OAUTH_STATE_TTL_MS,
+  } };
 }

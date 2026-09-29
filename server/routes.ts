@@ -1,3 +1,5 @@
+import { isStreamSessionActive } from "./auth";
+import { googleStateReplayBucket } from "./google-sign-in";
 import type { Express } from "express";
 import express from "express";
 import { config } from "./config";
@@ -5,7 +7,7 @@ import { strictBoundedIntegerQueryParam, strictPositiveIntegerParam, strictPosit
 import { createServer, type Server } from "http";
 import { installAsyncRouteGuard } from "./async-route-guard";
 import {
-  storage,
+  storage, PushSessionEndedError,
   BillSplitConflictError,
   SubscriptionBillingBusyError,
   TaptStoneCapacityError,
@@ -634,6 +636,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
 
     try {
+      const replay = await storage.takeAuthThrottleSlot([googleStateReplayBucket(state!)], new Date());
+      if (!replay.allowed) return res.redirect(googleSignInError('Google sign in expired. Please try again.'));
       const clientId = config.oauth.googleClientId;
       const clientSecret = config.oauth.googleClientSecret;
       if (!clientId || !clientSecret) {
@@ -5151,7 +5155,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       });
       res.flushHeaders?.();
 
-      const unsubscribe = sseBroker.subscribe(merchantId, audience, res);
+      const unsubscribe = sseBroker.subscribe(merchantId, audience, res,
+        authorization === undefined ? undefined : () => isStreamSessionActive(authorization));
 
       req.on('close', () => {
         unsubscribe();
@@ -5224,6 +5229,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const pushSub = await storage.createPushSubscription({
         merchantId,
         userId: req.user?.userId ?? null,
+        sessionVersion: req.user?.sessionVersion ?? 0,
         endpoint: subscription.endpoint,
         p256dh: subscription.keys.p256dh,
         auth: subscription.keys.auth,
@@ -5236,6 +5242,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         preferences: pushNotificationPreferencesDto(pushSub.preferences),
       });
     } catch (error) {
+      if (error instanceof PushSessionEndedError) {
+        return res.status(401).json({ code: "SESSION_ENDED", message: "You were signed out. Please sign in again." });
+      }
       console.error("Push subscribe error:", error);
       res.status(500).json({ message: "Failed to save push subscription" });
     }
@@ -5285,6 +5294,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const sub = await storage.createPushSubscription({
         merchantId,
         userId: req.user?.userId ?? null,
+        sessionVersion: req.user?.sessionVersion ?? 0,
         endpoint,
         p256dh: "",
         auth: "",
@@ -5297,6 +5307,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         preferences: pushNotificationPreferencesDto(sub.preferences),
       });
     } catch (error) {
+      if (error instanceof PushSessionEndedError) {
+        return res.status(401).json({ code: "SESSION_ENDED", message: "You were signed out. Please sign in again." });
+      }
       console.error("Native push subscribe error:", error);
       res.status(500).json({ message: "Failed to save device token" });
     }
