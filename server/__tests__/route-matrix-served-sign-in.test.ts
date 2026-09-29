@@ -24,9 +24,9 @@ jest.mock("resend", () => ({
 import { VALID_PASSWORD, bearer, resetTestStorage, storage } from "./support/http-harness";
 import {
   expectOwnServed,
+  familyRows,
   ownServedBy,
   ownServedPairs,
-  ownServedRows,
   type OwnServedCaller,
   type OwnServedRecipe,
   type ServedCtx,
@@ -272,8 +272,7 @@ const RECIPES: Record<string, OwnServedRecipe> = {
   },
 };
 
-const FAMILY = /^[A-Z]+ \/api\/(auth\/|admin\/auth\/login$|merchants\/signup$|team\/accept-invite$)/;
-const ROWS = ownServedRows(FAMILY);
+const ROWS = familyRows("sign-in");
 const SERVED = ownServedPairs(ROWS);
 
 /**

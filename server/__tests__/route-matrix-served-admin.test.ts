@@ -11,8 +11,8 @@ import * as emailService from "../email-service-multi";
 import { resetTestStorage, storage } from "./support/http-harness";
 import {
   expectServed,
+  familyRows,
   servedPairs,
-  servedRows,
   servedTo,
   type ServedCtx,
   type ServedRecipe,
@@ -177,7 +177,7 @@ const RECIPES: Record<string, ServedRecipe> = {
   }),
 };
 
-const ROWS = servedRows(/^[A-Z]+ \/api\/admin\//, "admin");
+const ROWS = familyRows("admin");
 const SERVED = servedPairs(ROWS);
 
 beforeEach(() => {

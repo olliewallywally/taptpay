@@ -38,9 +38,9 @@ import * as windcave from "../windcave";
 import { cronHeader, mintPaymentCredential, resetTestStorage, storage, storageSnapshot } from "./support/http-harness";
 import {
   expectOwnServed,
+  familyRows,
   ownServedBy,
   ownServedPairs,
-  ownServedRows,
   paidMonth,
   type OwnServedCaller,
   type OwnServedRecipe,
@@ -276,8 +276,7 @@ const RECIPES: Record<string, OwnServedRecipe> = {
   },
 };
 
-const FAMILY = /^[A-Z]+ \/api\/(pay\/notification\/|windcave\/(notification|rent-notification|trades-notification)$|billing\/card\/notification$|webhooks\/|internal\/cron|v1\/)/;
-const ROWS = ownServedRows(FAMILY);
+const ROWS = familyRows("provider");
 const SERVED = ownServedPairs(ROWS);
 
 /**

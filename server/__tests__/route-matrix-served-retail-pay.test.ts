@@ -32,9 +32,9 @@ import * as windcave from "../windcave";
 import { mintPaymentCredential, resetTestStorage, storage } from "./support/http-harness";
 import {
   expectOwnServed,
+  familyRows,
   ownServedBy,
   ownServedPairs,
-  ownServedRows,
   type OwnServedCaller,
   type OwnServedRecipe,
   type ServedCtx,
@@ -370,8 +370,7 @@ const RECIPES: Record<string, OwnServedRecipe> = {
   },
 };
 
-const FAMILY = /^[A-Z]+ \/api\/(pay\/(t\/|return\/)|transactions\/:id|split-payments\/:id|windcave\/callback)/;
-const ROWS = ownServedRows(FAMILY);
+const ROWS = familyRows("retail-pay");
 const SERVED = ownServedPairs(ROWS);
 
 /**

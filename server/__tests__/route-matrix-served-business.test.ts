@@ -13,10 +13,10 @@ import { resetTestStorage, storage, VALID_PASSWORD } from "./support/http-harnes
 import {
   as,
   expectServed,
+  familyRows,
   paidMonth,
   sendServed,
   servedPairs,
-  servedRows,
   servedTo,
   type ServedCtx,
   type ServedRecipe,
@@ -326,8 +326,7 @@ const RECIPES: Record<string, ServedRecipe> = {
   },
 };
 
-const FAMILY = /^[A-Z]+ \/api\/(merchants|transactions)(\/|$)/;
-const ROWS = servedRows(FAMILY, "session");
+const ROWS = familyRows("business");
 const SERVED = servedPairs(ROWS);
 
 /**

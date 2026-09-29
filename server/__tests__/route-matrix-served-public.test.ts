@@ -29,9 +29,9 @@ import { getWindcaveEnv } from "../windcave";
 import { bearer, resetTestStorage, storage } from "./support/http-harness";
 import {
   expectOwnServed,
+  familyRows,
   ownServedBy,
   ownServedPairs,
-  ownServedRows,
   paidMonth,
   sendServed,
   type OwnServedCaller,
@@ -262,8 +262,7 @@ const RECIPES: Record<string, OwnServedRecipe> = {
   },
 };
 
-const FAMILY = /^[A-Z]+ \/(robots\.txt|sitemap\.xml|\.well-known\/|nfc\/|uploads\/|api\/(merchants\/:id\/|nfc\/capabilities|windcave\/env|push\/(capabilities|vapid-key)|billing\/card\/callback|info-pack-leads))/;
-const ROWS = ownServedRows(FAMILY);
+const ROWS = familyRows("public");
 const SERVED = ownServedPairs(ROWS);
 
 /**

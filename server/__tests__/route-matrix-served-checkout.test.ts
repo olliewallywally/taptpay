@@ -37,9 +37,9 @@ import * as windcave from "../windcave";
 import { resetTestStorage, storage } from "./support/http-harness";
 import {
   expectOwnServed,
+  familyRows,
   ownServedBy,
   ownServedPairs,
-  ownServedRows,
   type OwnServedCaller,
   type OwnServedRecipe,
   type ServedCtx,
@@ -260,8 +260,7 @@ const RECIPES: Record<string, OwnServedRecipe> = {
   },
 };
 
-const FAMILY = /^[A-Z]+ \/api\/(checkout\/|trades\/quotes\/token\/)/;
-const ROWS = ownServedRows(FAMILY);
+const ROWS = familyRows("checkout");
 const SERVED = ownServedPairs(ROWS);
 
 /**

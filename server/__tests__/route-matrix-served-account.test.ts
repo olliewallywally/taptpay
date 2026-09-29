@@ -21,9 +21,9 @@ import {
   CARD,
   as,
   expectServed,
+  familyRows,
   paidMonth,
   servedPairs,
-  servedRows,
   servedTo,
   type ServedCtx as Ctx,
   type ServedRecipe as Recipe,
@@ -360,8 +360,7 @@ const RECIPES: Record<string, Recipe> = {
   },
 };
 
-const FAMILY = /^[A-Z]+ \/api\/(auth\/(me|sign-out-everywhere)$|tutorial\/|push\/|subscription|team|billing\/|board-builder\/|invoice-documents\/)/;
-const ROWS = servedRows(FAMILY, "session");
+const ROWS = familyRows("account");
 const SERVED = servedPairs(ROWS);
 
 /**

@@ -5,8 +5,8 @@ import { resetTestStorage, storage } from "./support/http-harness";
 import {
   as,
   expectServed,
+  familyRows,
   servedPairs,
-  servedRows,
   servedTo,
   type ServedCtx,
   type ServedRecipe,
@@ -295,8 +295,7 @@ const RECIPES: Record<string, ServedRecipe> = {
   },
 };
 
-const FAMILY = /^[A-Z]+ \/api\/trades\//;
-const ROWS = servedRows(FAMILY, "session");
+const ROWS = familyRows("trades");
 const SERVED = servedPairs(ROWS);
 
 beforeEach(() => {

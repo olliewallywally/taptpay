@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 2e09b0f75bb1ef0acbbcc0228987d0905fb488ed on 2026-09-27.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ b0500c5de0e32d8cd6f03faa20c6ec53c8eceb63 on 2026-09-29.
  *
  * 184 registrations (77 GET, 75 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the

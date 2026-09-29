@@ -20,6 +20,7 @@ import {
   storage,
   storageSnapshot,
 } from "./support/http-harness";
+import { SERVED_FAMILIES } from "./support/matrix-served";
 
 /**
  * R1-T3 (plan C10): every API row's refusals, driven at runtime. P2.2: a caller whose authentication
@@ -76,11 +77,27 @@ const REFUSALS: Array<[string, MatrixCaller, number]> = Object.entries(ROUTE_MAT
 );
 
 describe("R1-T3 — the matrix records who each route is for", () => {
+  it("has a row for every route of the policy", () => {
+    expect(Object.keys(ROUTE_MATRIX).sort()).toEqual(Object.keys(ROUTE_POLICY).sort());
+  });
+
   it("serves at least one caller on every route", () => {
     const forNobody = Object.entries(ROUTE_MATRIX)
       .filter(([, row]) => !Object.values(row.answers).includes("allowed"))
       .map(([key]) => key);
     expect(forNobody).toEqual([]);
+  });
+
+  it("has every route that serves a caller in exactly one served test's family", () => {
+    // Each family's test (route-matrix-served-<family>.test.ts) has a request for every one of its routes.
+    const unclaimedOrTwice = Object.entries(ROUTE_MATRIX)
+      .filter(([, row]) => Object.values(row.answers).includes("allowed"))
+      .map(([key, row]) => ({
+        key,
+        families: Object.entries(SERVED_FAMILIES).filter(([, family]) => family.gate === row.gate && family.family.test(key)).map(([name]) => name),
+      }))
+      .filter(({ families }) => families.length !== 1);
+    expect(unclaimedOrTwice).toEqual([]);
   });
 });
 
