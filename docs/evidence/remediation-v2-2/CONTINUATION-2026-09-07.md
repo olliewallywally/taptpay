@@ -677,6 +677,10 @@ the owner prefers. **R1-T3's three owner questions were answered the same day** 
 3. block it."; [decision](../../decisions/2026-09-29-r1-t3-owner-answers.md), `6a7db213`), and 3 is built
 (`c8055341`: a removed board's page no longer shows its open sale; the matrix's new caller
 `removed-board`; red first 4 of 4, mutations 4/4).
+**R1-T4 phase E's design** was written and committed (`1d807c6a`, [design](../../PLAN-2026-09-29-r1-t4-phase-e-sessions.md));
+its three questions answered the same day ([decision](../../decisions/2026-09-29-r1-t4-phase-e-owner-answers.md)):
+a business sign-in lasts 1 day without use and 7 days at most; the admin's 30 minutes and 12 hours; the
+Keychain adapter moves to A-T4. No phase E code yet: building waits for the owner's go on the design.
 Found on the way, for the owner: the admin area's home page shows $0 revenue and 0 sales whatever the
 platform holds (it reads a route that does not exist; the R1-T3 notes, "Where R1-T3 stands" of 2026-09-28).
 Open for the owner: 0030 in dev (above); the card-free dev write (above). The

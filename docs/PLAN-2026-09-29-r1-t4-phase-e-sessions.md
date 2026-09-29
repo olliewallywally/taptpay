@@ -126,6 +126,10 @@ Sign-in screens, the slow-down on wrong passwords (phase C), known devices, Goog
 
 ## 5. Questions for the owner
 
+**Answered 2026-09-29** ([decision](decisions/2026-09-29-r1-t4-phase-e-owner-answers.md)): 1 — **1 day
+without use, 7 days at most** (not the recommendation below); 2 — as recommended; 3 — with A-T4, as
+recommended.
+
 1. **How long does a sign-in last?** Recommended: signed out after **7 days without use**, and in any case
    after **30 days**. (A counter or tablet used every day stays signed in for the 30 days.)
 2. **The admin area?** Recommended: signed out after **30 minutes without use**, and in any case after **12
