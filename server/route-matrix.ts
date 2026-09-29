@@ -11,10 +11,12 @@
  *   403  an authenticated principal without the role or the tenant
  *   404  another business's record, answered like a missing one (tenant-safe)
  *
- * route-matrix.test.ts drives every row at runtime. This first part covers the two sign-in gates
- * (authenticateToken, authenticateAdmin), whose refusals come before any route-specific work; the
- * callers served by a route (and another business's owner) follow family by family, as the reviews
- * did.
+ * Every row is driven at runtime: the two sign-in gates' refusals (route-matrix.test.ts), the own gates'
+ * (route-matrix-own-gates.test.ts), a teammate's and another business's (route-matrix-roles and
+ * -records), and every caller a route serves, family by family (route-matrix-served-*.test.ts). A route
+ * behind a sign-in gate serves the business's logins its review admits; a route with its own gate
+ * serves the callers its review's branches name (anyone, a link's holder, the provider, the scheduler,
+ * an API key).
  */
 import { expandFacts } from "./route-facts";
 import { ROUTE_POLICY } from "./route-policy";
@@ -38,7 +40,12 @@ export type MatrixCaller =
   | "key-without-permission" // ... with a live key that lacks the route's permission
   | "unknown-link" // a link route asked with a token, state or code that is no one's
   | "sale-with-its-own-link" // a numbered route asked for a sale that has its own payment link
-  | "wrong-webhook-key"; // the WhatsApp webhook with a key that is not the provider's
+  | "wrong-webhook-key" // the WhatsApp webhook with a key that is not the provider's
+  // The callers the routes with their own gates serve (with "signed-out": anyone, on a public route):
+  | "link-holder" // the holder of the route's own link: its token, return state, handoff code or invite
+  | "provider" // the payment or messaging provider's servers, naming their own reference
+  | "scheduler" // the scheduler, with its secret
+  | "api-key"; // the ecommerce API with a live key that has the route's permission
 
 /**
  * A refusal's status. A few are answered 200 by design (the WhatsApp webhook acknowledges every call
@@ -106,6 +113,22 @@ export function matrixRowFor(key: string): MatrixRow {
     const branches = ROUTE_REVIEW[key].branches;
     const principals = new Set(branches.map((branch) => branch.principal));
     const tenants = new Set(branches.map((branch) => branch.tenant));
+    // Who it serves: each branch's principal.
+    if (principals.has("public")) answers["signed-out"] = "allowed";
+    if (principals.has("public-bearer")) answers["link-holder"] = "allowed";
+    if (principals.has("provider")) answers.provider = "allowed";
+    if (principals.has("cron")) answers.scheduler = "allowed";
+    if (principals.has("api-key")) answers["api-key"] = "allowed";
+    // A business reading its own board routes signed in (its open sale, its live updates): with an
+    // Authorization header the handler runs the sign-in gate and the business check itself.
+    const signedIn = branches.find((branch) => branch.principal === "merchant");
+    if (signedIn) {
+      for (const caller of GATE_REFUSED) if (caller !== "signed-out") answers[caller] = 401;
+      answers.owner = "allowed";
+      answers.member = signedIn.roles?.includes("member") ? "allowed" : 403;
+      answers["platform-admin"] = signedIn.platformAdmin ? "allowed" : 403;
+      if (signedIn.tenant === "path-merchant") answers["other-owner"] = 403;
+    }
     if (principals.has("cron")) {
       answers["no-secret"] = 401;
       answers["wrong-secret"] = 401;

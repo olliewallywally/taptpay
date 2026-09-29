@@ -75,6 +75,15 @@ const REFUSALS: Array<[string, MatrixCaller, number]> = Object.entries(ROUTE_MAT
     .map(([caller, answer]): [string, MatrixCaller, number] => [key, caller, answer as number]),
 );
 
+describe("R1-T3 — the matrix records who each route is for", () => {
+  it("serves at least one caller on every route", () => {
+    const forNobody = Object.entries(ROUTE_MATRIX)
+      .filter(([, row]) => !Object.values(row.answers).includes("allowed"))
+      .map(([key]) => key);
+    expect(forNobody).toEqual([]);
+  });
+});
+
 describe("R1-T3 — every signed-in route's gate refusals (P2.2), with nothing changed", () => {
   let app: any;
   const tokens = {} as Record<MatrixCaller, string>;

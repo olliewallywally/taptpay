@@ -8,6 +8,7 @@ import request from "supertest";
 import { ROUTE_MATRIX, type MatrixCaller } from "../route-matrix";
 import {
   VALID_PASSWORD,
+  createDisabledMemberPrincipal,
   createOwnerPrincipal,
   createTestApp,
   mintPaymentCredential,
@@ -206,6 +207,49 @@ describe("R1-T3 — a sale with its own link is answered by number like a missin
     expect(missing.status).toBe(status);
     expect(theirs.body).toEqual(missing.body);
     expect(theirs.headers.location).toEqual(missing.headers.location);
+    expect(storageSnapshot()).toBe(before);
+  });
+});
+
+describe("R1-T3 — the two reads a business also makes signed in check the sign-in and the business themselves", () => {
+  // A board's page reads its open sale and its live updates with no sign-in. The business's own screens
+  // read the same two routes signed in: with an Authorization header the handler runs the sign-in gate
+  // (authenticateToken) and the business check (checkMerchantOwnership) itself.
+  const READS: Record<string, string> = {
+    "GET /api/merchants/:id/active-transaction": "/api/merchants/{id}/active-transaction",
+    "GET /api/merchants/:id/events": "/api/merchants/{id}/events",
+  };
+  const REFUSED: MatrixCaller[] = ["invalid-token", "disabled-login", "suspended-business", "link-as-sign-in", "other-owner"];
+  const CASES = Object.keys(READS).flatMap((key) => REFUSED.map((caller): [string, MatrixCaller] => [key, caller]));
+  const tokens = {} as Record<MatrixCaller, string>;
+  let merchantId: number;
+
+  beforeAll(async () => {
+    const owner = await createOwnerPrincipal();
+    merchantId = owner.merchantId;
+    tokens["invalid-token"] = "not-a-real-token";
+    tokens["disabled-login"] = (await createDisabledMemberPrincipal(owner.merchantId)).token;
+    const suspended = await createOwnerPrincipal();
+    await storage.updateMerchant(suspended.merchantId, { status: "suspended" } as any);
+    tokens["suspended-business"] = suspended.token;
+    const link = mintPaymentCredential();
+    await storage.createTransaction({
+      merchantId: owner.merchantId, itemName: "Linked sale", price: "5.50", status: "pending",
+      paymentMethod: "qr_code", splitEnabled: false, paymentTokenHash: link.tokenHash,
+    } as any);
+    tokens["link-as-sign-in"] = link.rawToken;
+    tokens["other-owner"] = (await createOwnerPrincipal()).token;
+  });
+
+  it("refuses a sign-in the server refuses (401) and another business's owner (403)", () => {
+    expect(CASES.map(([key, caller]) => [key, caller, ROUTE_MATRIX[key].answers[caller]]))
+      .toEqual(CASES.map(([key, caller]) => [key, caller, caller === "other-owner" ? 403 : 401]));
+  });
+
+  it.each(CASES)("%s refuses %s, and changes nothing", async (key, caller) => {
+    const before = storageSnapshot();
+    const res = await request(app).get(READS[key].replace("{id}", String(merchantId))).set("Authorization", `Bearer ${tokens[caller]}`);
+    expect(res.status).toBe(ROUTE_MATRIX[key].answers[caller]);
     expect(storageSnapshot()).toBe(before);
   });
 });

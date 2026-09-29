@@ -38,6 +38,8 @@ export interface ServedRequest {
   attach?: { field: string; bytes: Buffer; filename: string; contentType: string };
   /** A download: its bytes are the body. */
   binary?: true;
+  /** A route with its own gate: the credential its caller brings (a cookie, the scheduler's secret, a key). */
+  headers?: Record<string, string>;
 }
 
 export interface Served {
@@ -68,8 +70,11 @@ function bytes(res: any, done: (error: Error | null, body: Buffer) => void) {
   res.on("end", () => done(null, Buffer.concat(chunks)));
 }
 
-export async function sendServed(ctx: ServedCtx, who: Principal, req: ServedRequest) {
-  let pending = request(ctx.app)[req.method](req.path).set(bearer(who));
+/** Sends a recipe's request, as the signed-in caller when there is one. */
+export async function sendServed(ctx: ServedCtx, who: Principal | null, req: ServedRequest) {
+  let pending = request(ctx.app)[req.method](req.path);
+  if (who) pending = pending.set(bearer(who));
+  for (const [name, value] of Object.entries(req.headers ?? {})) pending = pending.set(name, value);
   if (req.attach) pending = pending.attach(req.attach.field, req.attach.bytes, { filename: req.attach.filename, contentType: req.attach.contentType });
   else if (req.body) pending = pending.send(req.body);
   if (req.binary) pending = pending.buffer(true).parse(bytes);
@@ -122,8 +127,56 @@ export async function expectServed(recipes: Record<string, ServedRecipe>, key: s
   const ctx = await servedContext();
   const who = principalFor(ctx, caller);
   const served = await recipes[key](ctx, who, caller);
+  await expectSuccess(ctx, who, caller, served);
+}
+
+async function expectSuccess(ctx: ServedCtx, who: Principal | null, caller: string, served: Served) {
   const res = await sendServed(ctx, who, served.req);
   expect({ caller, status: res.status, body: res.status === served.status ? "…" : res.body })
     .toEqual({ caller, status: served.status, body: "…" });
   await served.check(res);
+}
+
+// ── The routes with their own gates ──
+
+/**
+ * The callers a route with its own gate serves, each named by a branch of its review: anyone with no
+ * sign-in (a public page, a board's page, a sale's number, sign-in itself), a link's holder, the
+ * provider, the scheduler, an ecommerce key; and on the two routes a business also reads signed in
+ * (its open sale, its live updates), the business's logins.
+ */
+export type OwnServedCaller = Extract<
+  MatrixCaller,
+  "signed-out" | "link-holder" | "provider" | "scheduler" | "api-key" | "owner" | "member" | "platform-admin"
+>;
+export const OWN_SERVED_CALLERS: OwnServedCaller[] = [
+  "signed-out", "link-holder", "provider", "scheduler", "api-key", "owner", "member", "platform-admin",
+];
+
+/** An own-gate route's recipe: its request brings the caller's own credential (headers, cookie, token, key). */
+export type OwnServedRecipe = (ctx: ServedCtx, caller: OwnServedCaller) => Promise<Served> | Served;
+
+/** The matrix's own-gate rows of a family (by route key), each served to at least one caller. */
+export function ownServedRows(family: RegExp) {
+  return Object.entries(ROUTE_MATRIX).filter(([key, row]) =>
+    row.gate === "own" && family.test(key) && OWN_SERVED_CALLERS.some((caller) => row.answers[caller] === "allowed"));
+}
+
+/** Every (route, caller) the matrix answers "allowed" among own-gate rows. */
+export function ownServedPairs(rows: ReturnType<typeof ownServedRows>): Array<[string, OwnServedCaller]> {
+  return rows.flatMap(([key, row]) =>
+    OWN_SERVED_CALLERS.filter((caller) => row.answers[caller] === "allowed").map((caller): [string, OwnServedCaller] => [key, caller]));
+}
+
+/** Who each own-gate route among the rows serves, as the matrix records it. */
+export function ownServedBy(rows: ReturnType<typeof ownServedRows>): Record<string, OwnServedCaller[]> {
+  return Object.fromEntries(rows.map(([key, row]) => [key, OWN_SERVED_CALLERS.filter((caller) => row.answers[caller] === "allowed")]));
+}
+
+/** Runs one own-gate (route, caller): signed in only for the business's logins, else as its recipe says. */
+export async function expectOwnServed(recipes: Record<string, OwnServedRecipe>, key: string, caller: OwnServedCaller) {
+  const ctx = await servedContext();
+  const served = await recipes[key](ctx, caller);
+  const who = caller === "owner" || caller === "member" || caller === "platform-admin" ? principalFor(ctx, caller) : null;
+  await expectSuccess(ctx, who, caller, served);
 }
