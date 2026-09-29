@@ -1,12 +1,12 @@
 # Tapt Payment Gateway for WooCommerce
 
-Transform your WooCommerce store with modern payment processing featuring NFC tap-to-pay, QR code payments, and transparent fixed-fee pricing.
+Transform your WooCommerce store with modern payment processing featuring NFC tap-to-pay, QR code payments, and straightforward subscription pricing.
 
 ## ✨ Features
 
 - **🔥 NFC Tap-to-Pay**: Customers tap their phones to pay instantly
 - **📱 QR Code Payments**: Quick scanning for contactless transactions
-- **💰 Fixed Fee Structure**: Just $0.25 per transaction, no percentages
+- **💰 Straightforward Pricing**: TaptPay plans start at $7.99/month with no TaptPay per-transaction fee
 - **🔒 Bank-Level Security**: PCI compliant with encrypted data transmission
 - **⚡ Real-time Processing**: Instant payment confirmation via webhooks
 - **📱 Mobile Optimized**: Perfect for mobile and tablet transactions
@@ -23,19 +23,12 @@ Transform your WooCommerce store with modern payment processing featuring NFC ta
 
 ## 💎 Why Choose Tapt?
 
-### Traditional Payment Processors
-- 2.9% + 30¢ per transaction = **$3.19** on $100 sale ❌
-- Hidden fees and monthly costs ❌
-- Complex percentage calculations ❌
-- Slow settlement times ❌
+- Subscription plans for different team sizes, starting at $7.99/month
+- No TaptPay per-transaction fee
+- No setup fee
+- Instant payment confirmation
 
-### Tapt Payment Gateway  
-- Fixed $0.25 per transaction = **$0.25** on any sale ✅
-- No hidden fees or monthly costs ✅
-- Simple, predictable pricing ✅
-- Instant payment confirmation ✅
-
-**💰 Save $2.94 on every $100 transaction!**
+Payment-processing or acquiring fees governed by your Windcave merchant agreement may still apply.
 
 ## 🛠️ Installation
 
@@ -111,11 +104,11 @@ See [INSTALLATION.md](INSTALLATION.md) for detailed setup instructions.
 ## 📈 Business Benefits
 
 - **Increase Sales**: Faster checkout reduces cart abandonment
-- **Lower Costs**: Fixed fees save money on larger transactions  
+- **Predictable Billing**: Choose a subscription plan for your team size
 - **Better Cash Flow**: Instant payment confirmation
 - **Professional Image**: Modern payment methods build trust
 - **Analytics**: Detailed transaction reporting and insights
-- **Scalability**: Grow without percentage fees eating profits
+- **Scalability**: Move between plans as your team grows
 
 ## 🛡️ Security & Compliance
 
@@ -148,15 +141,15 @@ GPL v2 or later - see [LICENSE](LICENSE) file for details.
 
 ## 🎯 Pricing
 
-**Simple, transparent, and fair:**
+**Simple TaptPay subscription pricing:**
 
-- **Transaction Fee**: $0.25 fixed fee per transaction
-- **Setup Fee**: $0
-- **Monthly Fee**: $0  
-- **Refund Fee**: $0
-- **Hidden Fees**: $0
+- **Solo**: $7.99/month for 1 login
+- **Team**: $8.99/month for up to 5 logins
+- **Crew**: $12.99/month for up to 10 logins
+- **TaptPay transaction fee**: $0 per transaction
+- **Setup fee**: $0
 
-**That's it. No surprises, no small print.**
+Payment-processing or acquiring fees governed by your Windcave merchant agreement may still apply.
 
 ---
 

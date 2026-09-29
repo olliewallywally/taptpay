@@ -573,7 +573,7 @@ export function generateQuotePdf(quote: any, client: any, merchant: any, baseUrl
 import { generateQuotePdf } from '../server/trades-quote-pdf';
 
 const quote = {
-  token: 'abcdef1234567890', createdAt: new Date(), validUntil: new Date(),
+  token: 'fixture-quote-link', createdAt: new Date(), validUntil: new Date(),
   lineItems: [{ description: 'Labour', qty: 8, unitPriceCents: 9000, lineTotalCents: 72000 },
               { description: 'Materials', qty: 1, unitPriceCents: 25000, lineTotalCents: 25000 }],
   subtotalCents: 84348, gstCents: 12652, totalCents: 97000, gstMode: 'inclusive',

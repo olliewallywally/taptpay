@@ -1,0 +1,18 @@
+import { chromium } from "playwright";
+const CHROMIUM_PATH = "/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium";
+const log = (m) => console.log(`[${new Date().toISOString().slice(11,19)}] ${m}`);
+log("launching");
+const browser = await chromium.launch({ executablePath: CHROMIUM_PATH, headless: true });
+log("launched");
+const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+const page = await ctx.newPage();
+page.on("console", (m) => { if (m.type() === "error") log(`console.error: ${m.text().slice(0,140)}`); });
+page.on("pageerror", (e) => log(`pageerror: ${String(e).slice(0,140)}`));
+log("goto /dashboard");
+await page.goto("http://127.0.0.1:5000/dashboard", { waitUntil: "domcontentloaded", timeout: 60000 });
+log("domcontentloaded; title=" + await page.title());
+await page.waitForTimeout(5000);
+log("body chars: " + (await page.evaluate(() => document.body.innerText.length)));
+log("desktop-frame present: " + (await page.locator('[data-testid="desktop-frame"]').count()));
+await browser.close();
+log("done");

@@ -196,7 +196,7 @@ function SheetInput({ label, value, onChange, type = "text" }: {
         type={type}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        style={{ width: "100%", padding: "14px 16px", borderRadius: 14, background: C.gray, border: "none", outline: "none", color: C.ink, fontSize: 15, fontWeight: 500, boxSizing: "border-box", fontFamily: "inherit" }}
+        style={{ width: "100%", padding: "14px 16px", borderRadius: 14, background: C.gray, border: "none", outline: "none", color: C.ink, fontSize: "max(15px, var(--field-floor, 0px))", fontWeight: 500, boxSizing: "border-box", fontFamily: "inherit" }}
       />
     </div>
   );
@@ -209,7 +209,7 @@ function SheetTextArea({ label, value, onChange }: { label: string; value: strin
       <textarea
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        style={{ width: "100%", minHeight: 88, resize: "vertical", padding: "14px 16px", borderRadius: 14, background: C.gray, border: "none", outline: "none", color: C.ink, fontSize: 15, fontWeight: 500, boxSizing: "border-box", fontFamily: "inherit" }}
+        style={{ width: "100%", minHeight: 88, resize: "vertical", padding: "14px 16px", borderRadius: 14, background: C.gray, border: "none", outline: "none", color: C.ink, fontSize: "max(15px, var(--field-floor, 0px))", fontWeight: 500, boxSizing: "border-box", fontFamily: "inherit" }}
       />
     </div>
   );
@@ -270,7 +270,7 @@ function EditClientSheet({ initial, onClose, onSave, onArchive, saving, archivin
       />
 
       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, display: "flex", justifyContent: "center" }}>
-        <div style={{ width: "100%", maxWidth: 390, background: C.cream, borderRadius: "28px 28px 0 0", maxHeight: "92vh", overflowY: "auto", animation: closing ? animOut : animIn }}>
+        <div style={{ width: "100%", maxWidth: "var(--phone-shell-max)", background: C.cream, borderRadius: "28px 28px 0 0", maxHeight: "92vh", overflowY: "auto", animation: closing ? animOut : animIn }}>
           <div style={{ display: "flex", justifyContent: "center", padding: "14px 0 2px" }}>
             <div style={{ width: 36, height: 4, borderRadius: 2, background: "rgba(0,0,0,0.1)" }} />
           </div>
@@ -342,7 +342,7 @@ function EditClientSheet({ initial, onClose, onSave, onArchive, saving, archivin
 }
 
 const screenStyle: CSSProperties = { background: C.white, minHeight: "100svh", display: "flex", justifyContent: "center" };
-const appStyle: CSSProperties = { width: "100%", maxWidth: 390, minHeight: "100svh", background: C.cream, paddingBottom: 130, fontFamily: "'Outfit', system-ui, sans-serif" };
+const appStyle: CSSProperties = { width: "100%", maxWidth: "var(--phone-shell-max)", minHeight: "100svh", background: C.cream, paddingBottom: 130, fontFamily: "'Outfit', system-ui, sans-serif" };
 
 export default function ClientProfile({ clientId: clientIdProp, embedded = false, onClose }: { clientId?: string; embedded?: boolean; onClose?: () => void } = {}) {
   const [, params] = useRoute("/trades/clients/:id");
@@ -539,7 +539,7 @@ export default function ClientProfile({ clientId: clientIdProp, embedded = false
           </div>
         </div>
 
-        <div className="pt-bounce" style={{ "--pt-d": "170ms", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "24px 20px 4px" } as CSSProperties}>
+        <div data-tutorial-id="client-activity" className="pt-bounce" style={{ "--pt-d": "170ms", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "24px 20px 4px" } as CSSProperties}>
           <div style={{ fontWeight: 700, fontSize: 12, color: C.ink, letterSpacing: 0, textTransform: "uppercase" }}>activity timeline</div>
           <div style={{ fontWeight: 700, fontSize: 11, color: C.mute }}>{events.length}</div>
         </div>

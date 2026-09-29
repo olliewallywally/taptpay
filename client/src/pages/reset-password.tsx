@@ -33,7 +33,13 @@ export default function ResetPassword() {
   });
 
   // Validate the reset token
-  const { data: tokenValidation, isLoading: validatingToken, error: tokenError } = useQuery({
+  const {
+    data: tokenValidation,
+    isLoading: validatingToken,
+    error: tokenError,
+    isFetching: checkingToken,
+    refetch: checkTokenAgain,
+  } = useQuery({
     queryKey: ["/api/auth/validate-reset-token", token],
     queryFn: async () => {
       if (!token) throw new Error("No reset token provided");
@@ -123,7 +129,32 @@ export default function ResetPassword() {
     );
   }
 
-  if (tokenError || !tokenValidation?.valid) {
+  // A check that failed says nothing about the link (the server answers a fault with 500,
+  // never { valid: false }), so it is not called expired: sending the user off for another
+  // link would fail the same way. Owner decision 2026-09-26.
+  if (tokenError) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center space-y-4">
+            <div className="w-16 h-16 mx-auto bg-blue-100 rounded-full flex items-center justify-center">
+              <AlertTriangle className="w-8 h-8 text-blue-600" />
+            </div>
+            <CardTitle className="text-2xl font-bold text-gray-900">We couldn't check this link</CardTitle>
+            <CardDescription>Please try again.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={() => void checkTokenAgain()} disabled={checkingToken} className="w-full">
+              {checkingToken && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Try again
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!tokenValidation?.valid) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center p-4">
         <Card className="w-full max-w-md">

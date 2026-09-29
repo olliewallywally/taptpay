@@ -1,0 +1,20 @@
+@font-face { font-family:'Outfit'; src:url('/assets/fonts/Outfit-Light.otf') format('opentype'); font-weight:300; font-style:normal; font-display:swap; }
+@font-face { font-family:'Outfit'; src:url('/assets/fonts/Outfit-Regular.otf') format('opentype'); font-weight:400; font-style:normal; font-display:swap; }
+@font-face { font-family:'Outfit'; src:url('/assets/fonts/Outfit-Medium.otf') format('opentype'); font-weight:500; font-style:normal; font-display:swap; }
+@font-face { font-family:'Outfit'; src:url('/assets/fonts/Outfit-SemiBold.otf') format('opentype'); font-weight:600; font-style:normal; font-display:swap; }
+@font-face { font-family:'Outfit'; src:url('/assets/fonts/Outfit-Bold.otf') format('opentype'); font-weight:700; font-style:normal; font-display:swap; }
+@font-face { font-family:'Outfit'; src:url('/assets/fonts/Outfit-ExtraBold.otf') format('opentype'); font-weight:800; font-style:normal; font-display:swap; }
+@font-face { font-family:'Larken'; src:url('/assets/fonts/LarkenDEMO-Black.otf') format('opentype'); font-weight:900; font-style:normal; font-display:swap; }
+@font-face { font-family:'Larken'; src:url('/assets/fonts/LarkenDEMO-BlackItalic.otf') format('opentype'); font-weight:900; font-style:italic; font-display:swap; }
+html,body{margin:0;padding:0;background:#040D6D;}
+html{scroll-behavior:auto;}
+@media (max-width:879px){html{scrollbar-width:none;-ms-overflow-style:none;}html::-webkit-scrollbar,body::-webkit-scrollbar{display:none;width:0;height:0;}}
+*{box-sizing:border-box;}
+::selection{background:#5E9DFF;color:#040D6D;}
+@keyframes tpHint{0%,100%{transform:translateY(0);opacity:.5;}50%{transform:translateY(9px);opacity:1;}}
+@keyframes tpSpin{to{transform:rotate(360deg);}}
+@keyframes tpPopIn{0%{opacity:0;transform:translateY(52px) scale(0.9);}62%{opacity:1;transform:translateY(-10px) scale(1.02);}82%{transform:translateY(4px) scale(0.995);}100%{opacity:1;transform:translateY(0) scale(1);}}
+@keyframes tpPopOut{0%{opacity:1;transform:translateY(0) scale(1);}28%{opacity:1;transform:translateY(-12px) scale(1.02);}100%{opacity:0;transform:translateY(56px) scale(0.9);}}
+@keyframes tpGlare{0%{transform:translateX(-170%) skewX(-14deg);}100%{transform:translateX(310%) skewX(-14deg);}}
+#tp-contact input::placeholder, #tp-contact textarea::placeholder{color:rgba(244,241,232,0.4);}
+#tp-contact input:focus, #tp-contact textarea:focus{border-color:rgba(94,157,255,0.7) !important;background:rgba(244,241,232,0.09) !important;}

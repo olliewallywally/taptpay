@@ -1,6 +1,7 @@
 import { exec } from "child_process";
 import { promisify } from "util";
 import type { Server } from "http";
+import { config } from "./config";
 
 const execAsync = promisify(exec);
 
@@ -161,16 +162,23 @@ export function setupGracefulShutdown(server: Server, port: number): void {
   process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
   process.on('SIGINT', () => gracefulShutdown('SIGINT'));
   
-  // Handle uncaught exceptions
+  // Handle uncaught exceptions. In development, log and keep serving — the
+  // Replit workflow does NOT auto-restart a dead process, so exiting here
+  // turns one bad request into total downtime. In production the platform
+  // (autoscale) replaces crashed instances, so exit fast on unknown state.
   process.on('uncaughtException', (error) => {
-    console.error('❌ Uncaught exception:', error);
-    gracefulShutdown('UNCAUGHT_EXCEPTION');
+    console.error('❌ Uncaught exception (server kept alive in dev):', error);
+    if (config.isProduction) {
+      gracefulShutdown('UNCAUGHT_EXCEPTION');
+    }
   });
 
-  // Handle unhandled promise rejections
+  // Handle unhandled promise rejections: log loudly but NEVER exit. A rejected
+  // promise belongs to a single request/background task; killing the whole
+  // server over it caused repeated "app is down / timing out" incidents
+  // (previously this called gracefulShutdown → process.exit).
   process.on('unhandledRejection', (reason, promise) => {
     console.error('❌ Unhandled rejection at:', promise, 'reason:', reason);
-    gracefulShutdown('UNHANDLED_REJECTION');
   });
 }
 

@@ -20,6 +20,21 @@ Object.defineProperty(window, 'matchMedia', {
   })),
 });
 
+// Mock EventSource — jsdom has no SSE, and pages that call sseClient.connect()
+// (customer-payment, merchant-terminal*) would otherwise throw "EventSource is
+// not defined" at render.
+global.EventSource = class EventSource {
+  constructor() {
+    this.readyState = 0;
+    this.onopen = null;
+    this.onmessage = null;
+    this.onerror = null;
+  }
+  addEventListener() {}
+  removeEventListener() {}
+  close() {}
+};
+
 // Mock IntersectionObserver
 global.IntersectionObserver = class IntersectionObserver {
   constructor() {}
@@ -62,8 +77,13 @@ Object.defineProperty(global, 'crypto', {
 global.URL.createObjectURL = jest.fn();
 global.URL.revokeObjectURL = jest.fn();
 
-// Suppress console errors during tests unless they're actual test failures
+// R1-T8: a test fails when React reports a problem through console.error — an
+// act(...) warning, any other "Warning: ...", a hook-order error, or an error a
+// component threw during render. A test that provokes one on purpose replaces
+// console.error itself (jest.spyOn) and asserts on what it captured.
+const REACT_PROBLEM = /^Warning: |Rendered (?:fewer|more) hooks than|The above error occurred in the <|Uncaught \[/;
 const originalError = console.error;
+let reactProblems = [];
 beforeAll(() => {
   console.error = (...args) => {
     if (
@@ -72,8 +92,22 @@ beforeAll(() => {
     ) {
       return;
     }
+    const first = args[0] instanceof Error ? args[0].message : String(args[0]);
+    if (REACT_PROBLEM.test(first)) reactProblems.push(first.split('\n')[0]);
     originalError.call(console, ...args);
   };
+});
+
+beforeEach(() => {
+  reactProblems = [];
+});
+
+afterEach(() => {
+  const problems = reactProblems;
+  reactProblems = [];
+  if (problems.length > 0) {
+    throw new Error(`React reported ${problems.length} problem(s) through console.error:\n  ${problems.join('\n  ')}`);
+  }
 });
 
 afterAll(() => {

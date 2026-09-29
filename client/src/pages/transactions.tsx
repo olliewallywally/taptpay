@@ -1,7 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useLocation } from "wouter";
-import { getCurrentMerchantId } from "@/lib/auth";
+import { MerchantGate } from "@/components/merchant-gate";
 import { Download, FileSpreadsheet, RotateCcw, AlertCircle, Mail, MessageCircle, Link2, Check, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { csvCell } from "@/lib/report-utils";
 import QRCode from "qrcode";
 
 interface Transaction {
@@ -87,7 +87,10 @@ function buildChartData(txs: Transaction[], tf: Timeframe) {
 }
 
 export default function Transactions() {
-  const [, setLocation] = useLocation();
+  return <MerchantGate>{(merchantId) => <TransactionsPage merchantId={merchantId} />}</MerchantGate>;
+}
+
+function TransactionsPage({ merchantId }: { merchantId: number }) {
   const [tf, setTf] = useState<Timeframe>('week');
   const [totVis, setTotVis] = useState(true);
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
@@ -103,18 +106,12 @@ export default function Transactions() {
   /* Swipeable sheet */
   const topRef    = useRef<HTMLDivElement>(null);
   const sheetRef  = useRef<HTMLDivElement>(null);
-  const touchStartY   = useRef(0);
-  const touchStartOff = useRef(0);
-  const [sheetOffset, setSheetOffset] = useState<number | null>(null);
-  const [snapped, setSnapped]   = useState<'default' | 'full'>('default');
+  const dragStartY   = useRef(0);
+  const dragStartOff = useRef(0);
+  const [measuredTop, setMeasuredTop] = useState<number | null>(null);
+  const [sheetOffset, setSheetOffset] = useState<number | null>(null); // null = resting at default
   const [dragging, setDragging] = useState(false);
   const { toast } = useToast();
-  const merchantId = getCurrentMerchantId();
-
-  if (!merchantId) {
-    setLocation('/login');
-    return null;
-  }
 
   const { data: transactions = [], isLoading } = useQuery({
     queryKey: ["/api/merchants", merchantId, "transactions"],
@@ -129,10 +126,10 @@ export default function Transactions() {
   });
 
   const { data: merchant } = useQuery({
-    queryKey: ["/api/merchants", merchantId],
+    queryKey: ["/api/merchants", merchantId, "profile"],
     queryFn: async () => {
       const token = localStorage.getItem("authToken");
-      const response = await fetch(`/api/merchants/${merchantId}`, {
+      const response = await fetch(`/api/merchants/${merchantId}/profile`, {
         headers: { "Authorization": `Bearer ${token}` },
       });
       if (!response.ok) throw new Error("Failed to fetch merchant");
@@ -249,10 +246,14 @@ export default function Transactions() {
     [transactions, tf]
   );
 
-  /* Sheet drag measurement */
+  /* ── Freely slidable sheet ──
+     The sheet parks wherever the drag releases it — anywhere between fully
+     covering the graph (0) and fully revealing it (defaultOffset). No snapping;
+     only a spring back inside the bounds if the drag overshot them.
+     Pointer events cover touch AND mouse, so it slides on desktop too. */
   useEffect(() => {
     const measure = () => {
-      if (topRef.current) setSheetOffset(topRef.current.offsetHeight + 12);
+      if (topRef.current) setMeasuredTop(topRef.current.offsetHeight + 12);
     };
     measure();
     const ro = new ResizeObserver(measure);
@@ -260,31 +261,28 @@ export default function Transactions() {
     return () => ro.disconnect();
   }, []);
 
-  const defaultOffset = sheetOffset ?? 340;
+  const defaultOffset = measuredTop ?? 340;
+  const currentOffset = sheetOffset ?? defaultOffset;
 
-  const onTouchStart = useCallback((e: React.TouchEvent) => {
-    touchStartY.current   = e.touches[0].clientY;
-    touchStartOff.current = snapped === 'full' ? 0 : defaultOffset;
+  const onDragStart = useCallback((e: React.PointerEvent) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragStartY.current   = e.clientY;
+    dragStartOff.current = currentOffset;
     setDragging(true);
-  }, [snapped, defaultOffset]);
+  }, [currentOffset]);
 
-  const onTouchMove = useCallback((e: React.TouchEvent) => {
-    const dy  = e.touches[0].clientY - touchStartY.current;
-    const raw = touchStartOff.current + dy;
-    setSheetOffset(Math.max(-24, Math.min(defaultOffset + 60, raw)));
-  }, [defaultOffset]);
+  const onDragMove = useCallback((e: React.PointerEvent) => {
+    if (!dragging) return;
+    const raw = dragStartOff.current + (e.clientY - dragStartY.current);
+    // Small rubber-band past both ends while the finger is down
+    setSheetOffset(Math.max(-24, Math.min(defaultOffset + 40, raw)));
+  }, [dragging, defaultOffset]);
 
-  const onTouchEnd = useCallback(() => {
+  const onDragEnd = useCallback(() => {
     setDragging(false);
-    const effective = sheetOffset ?? defaultOffset;
-    if (effective < defaultOffset / 2) {
-      setSnapped('full');
-      setSheetOffset(0);
-    } else {
-      setSnapped('default');
-      setSheetOffset(defaultOffset);
-    }
-  }, [sheetOffset, defaultOffset]);
+    // Stay put — just spring back inside the bounds if overshot
+    setSheetOffset(o => o === null ? null : Math.max(0, Math.min(defaultOffset, o)));
+  }, [defaultOffset]);
 
   /* QR code for selected transaction */
   useEffect(() => {
@@ -311,8 +309,8 @@ export default function Transactions() {
     });
 
     const csvContent = [
-      headers.join(','),
-      ...rows.map((row: any[]) => row.map((cell: any) => `"${cell}"`).join(',')),
+      headers.map(csvCell).join(','),
+      ...rows.map((row: any[]) => row.map(csvCell).join(',')),
     ].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -358,10 +356,9 @@ export default function Transactions() {
       }
     });
 
-    const escapeCSV = (val: string) => `"${val.replace(/"/g, '""')}"`;
     const csvContent = [
-      headers.join(','),
-      ...rows.map((row) => row.map(escapeCSV).join(',')),
+      headers.map(csvCell).join(','),
+      ...rows.map((row) => row.map(csvCell).join(',')),
     ].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -431,8 +428,8 @@ export default function Transactions() {
   };
 
   return (
-    <div style={{ background: C.navy, minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
-    <div style={{ width: '100%', maxWidth: 430, height: '100svh', fontFamily: "'Outfit', system-ui, sans-serif", background: C.navy, position: 'relative', overflow: 'hidden' }}>
+    <div style={{ background: '#FFFFFF', minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
+    <div style={{ width: '100%', maxWidth: 'var(--phone-shell-max)', height: '100svh', fontFamily: "'Outfit', system-ui, sans-serif", background: C.navy, position: 'relative', overflow: 'hidden' }}>
 
       {/* ── Dark top ── */}
       <div ref={topRef} style={{ padding: '52px 24px 0' }}>
@@ -441,9 +438,9 @@ export default function Transactions() {
         </div>
 
         {/* Period pills */}
-        <div style={{ display: 'flex', gap: 0, background: 'rgba(255,255,255,0.06)', borderRadius: 999, padding: 3, marginBottom: 20 }}>
+        <div data-tutorial-id="tx-period" style={{ display: 'flex', gap: 0, background: 'rgba(255,255,255,0.06)', borderRadius: 999, padding: 3, marginBottom: 20 }}>
           {(['day', 'week', 'month', 'year'] as Timeframe[]).map(p => (
-            <button key={p} onClick={() => switchTf(p)} style={{ flex: 1, padding: '8px 0', borderRadius: 999, border: 'none', fontSize: 13, fontWeight: tf === p ? 600 : 500, textTransform: 'capitalize', background: tf === p ? C.sky : 'transparent', color: tf === p ? C.navy : 'rgba(255,255,255,0.4)', transition: 'all 0.3s cubic-bezier(0.34,1.56,0.64,1)', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
+            <button className="tap-target" key={p} onClick={() => switchTf(p)} style={{ flex: 1, padding: '8px 0', borderRadius: 999, border: 'none', fontSize: 13, fontWeight: tf === p ? 600 : 500, textTransform: 'capitalize', background: tf === p ? C.sky : 'transparent', color: tf === p ? C.navy : 'rgba(255,255,255,0.4)', transition: 'all 0.3s cubic-bezier(0.34,1.56,0.64,1)', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
               {p}
             </button>
           ))}
@@ -500,20 +497,20 @@ export default function Transactions() {
           height: '100svh',
           background: C.sheet,
           borderRadius: '32px 32px 0 0',
-          transform: `translateY(${sheetOffset ?? defaultOffset}px)`,
+          transform: `translateY(${currentOffset}px)`,
           transition: dragging ? 'none' : 'transform 0.38s cubic-bezier(0.34,1.56,0.64,1)',
-          overflowY: snapped === 'full' ? 'auto' : 'hidden',
+          overflowY: currentOffset < 40 ? 'auto' : 'hidden',
           overflowX: 'hidden',
           willChange: 'transform',
         }}
       >
         {/* Drag handle */}
         <div
-          onTouchStart={onTouchStart}
-          onTouchMove={onTouchMove}
-          onTouchEnd={onTouchEnd}
-          onTouchCancel={onTouchEnd}
-          style={{ width: '100%', height: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'grab', flexShrink: 0, touchAction: 'none' }}
+          onPointerDown={onDragStart}
+          onPointerMove={onDragMove}
+          onPointerUp={onDragEnd}
+          onPointerCancel={onDragEnd}
+          style={{ width: '100%', height: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: dragging ? 'grabbing' : 'grab', flexShrink: 0, touchAction: 'none' }}
         >
           <div style={{ width: 40, height: 5, borderRadius: 3, background: C.handle }} />
         </div>
@@ -521,8 +518,9 @@ export default function Transactions() {
         <div style={{ padding: '0 20px 130px', marginTop: 2 }}>
           {/* Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <h2 style={{ fontSize: 20, fontWeight: 700, color: C.dark, margin: 0, letterSpacing: '-0.4px' }}>Transaction History</h2>
-            <button
+            <h2 data-tutorial-id="tx-history" style={{ fontSize: 20, fontWeight: 700, color: C.dark, margin: 0, letterSpacing: '-0.4px' }}>Transaction History</h2>
+            <button className="tap-target"
+              data-tutorial-id="tx-export"
               onClick={() => setShowDownloads(v => !v)}
               style={{ fontSize: 12, fontWeight: 600, color: C.sky, background: 'none', border: 'none', cursor: 'pointer' }}
             >
@@ -790,7 +788,7 @@ export default function Transactions() {
                       <Textarea
                         value={refundReason}
                         onChange={(e) => setRefundReason(e.target.value)}
-                        className="border-red-200 focus:border-red-400 text-sm"
+                        className="border-red-200 focus:border-red-400 text-base md:text-sm"
                         placeholder="e.g. Customer requested refund, item out of stock..."
                         rows={2}
                       />

@@ -1,5 +1,5 @@
-const CACHE_NAME = 'taptpay-v2';
-const STATIC_CACHE = 'taptpay-static-v2';
+const CACHE_NAME = 'taptpay-v4';
+const STATIC_CACHE = 'taptpay-static-v4';
 
 const STATIC_ASSETS = [
   '/icons/icon-192x192.png',
@@ -101,17 +101,42 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
   if (url.pathname.startsWith('/api/')) return;
 
-  if (url.pathname.match(/\.(js|css|woff2?|ttf|eot|svg|png|jpg|jpeg|gif|ico)$/)) {
+  if (url.pathname.startsWith('/assets/')) {
+    // Vite build output is content-hashed (index-B1PJVunW.js), so a cached
+    // copy can never be stale — serve cache-first for instant repeat loads
+    // and only hit the network for files we've never seen.
     event.respondWith(
-      caches.open(STATIC_CACHE).then((cache) => {
-        return cache.match(request).then((cached) => {
-          if (cached) return cached;
-          return fetch(request).then((response) => {
-            if (response.ok) cache.put(request, response.clone());
-            return response;
-          }).catch(() => cached);
-        });
-      })
+      caches.open(STATIC_CACHE).then((cache) =>
+        cache.match(request).then(
+          (hit) =>
+            hit ||
+            fetch(request).then((response) => {
+              if (response.ok) cache.put(request, response.clone());
+              return response;
+            })
+        )
+      )
+    );
+    return;
+  }
+
+  if (url.pathname.match(/\.(js|css|woff2?|ttf|eot|svg|png|jpg|jpeg|gif|ico)$/)) {
+    // Network-first with cache fallback: always try to get the freshest
+    // asset first, only falling back to the cached copy if the network is
+    // unavailable. This avoids serving stale JS/CSS/images indefinitely to
+    // returning visitors after a new deploy (previously this was
+    // cache-first-forever, which caused the landing page to look outdated
+    // for anyone who had visited before, until the cache name was bumped).
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(STATIC_CACHE).then((cache) => cache.put(request, clone));
+          }
+          return response;
+        })
+        .catch(() => caches.open(STATIC_CACHE).then((cache) => cache.match(request)))
     );
     return;
   }

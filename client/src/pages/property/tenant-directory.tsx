@@ -3,31 +3,20 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { startPropertyNavigation, startPropertyBack, signalPropertyReady } from "@/lib/property-transition";
 import { propFetch } from "@/lib/property-api";
+import { usePropertyTenants, usePropertyInvoices } from "@/lib/property-data";
+import { AnimatedListRow } from "@/components/AnimatedScrollList";
 
 /* ── Design tokens ── */
 const C = {
   navy:  '#040D6D',
-  sky:   '#58ABFF',
-  btn:   '#3F9BFF',
+  sky:   '#58AAFD',
+  btn:   '#58AAFD',
   white: '#FFFFFF',
-  gray:  '#E7E6E5',
+  gray:  '#D9D7D7',
+  sheet: '#F4F4F4', // same off-white as the dashboard/terminal sheets
+  row:   '#F7F7F7',
   mute:  '#8C8C8C',
 };
-
-const STATUS_MAP: Record<string, { dot: string; bg: string; fg: string; label: string }> = {
-  paid:     { dot: '#13C29A', bg: 'rgba(19,194,154,0.14)',  fg: '#0B7D63', label: 'paid' },
-  overdue:  { dot: '#FF3B4E', bg: 'rgba(255,59,78,0.12)',   fg: '#C71A2A', label: 'overdue' },
-  dueSoon:  { dot: '#FFB02E', bg: 'rgba(255,176,46,0.18)',  fg: '#9A6A00', label: 'due soon' },
-  upcoming: { dot: '#3F9BFF', bg: 'rgba(63,155,255,0.16)',  fg: '#1A5FCC', label: 'upcoming' },
-};
-
-const GLASS = {
-  background: 'linear-gradient(140deg, rgba(255,255,255,0.92) 0%, rgba(234,238,244,0.72) 50%, rgba(220,227,240,0.62) 100%)',
-  backdropFilter: 'blur(16px) saturate(130%)',
-  WebkitBackdropFilter: 'blur(16px) saturate(130%)',
-  border: '1px solid rgba(255,255,255,0.7)',
-  boxShadow: '0 12px 32px rgba(4,13,109,0.10), inset 0 1px 0 rgba(255,255,255,0.95)',
-} as React.CSSProperties;
 
 function fmtCents(c: number) { return '$' + (c / 100).toLocaleString('en-NZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function propHeaders(): HeadersInit {
@@ -35,14 +24,11 @@ function propHeaders(): HeadersInit {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-function StatusBox({ status }: { status: string }) {
-  const s = STATUS_MAP[status] ?? STATUS_MAP.upcoming;
-  return (
-    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 11px', borderRadius: 8, background: s.bg, color: s.fg, fontWeight: 600, fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-      <span style={{ width: 6, height: 6, borderRadius: 999, background: s.dot, flexShrink: 0 }} />
-      {s.label}
-    </div>
-  );
+function pulse(e: any) {
+  const el = e.currentTarget;
+  el.classList.remove('tdir-pulse');
+  void el.offsetWidth;
+  el.classList.add('tdir-pulse');
 }
 
 /* ── Shared field input ── */
@@ -57,7 +43,7 @@ function Field({ label, value, onChange, placeholder, required, type = 'text' }:
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
-        style={{ width: '100%', padding: '14px 16px', borderRadius: 14, background: C.gray, border: 'none', outline: 'none', color: C.navy, fontSize: 15, fontWeight: 500, boxSizing: 'border-box', fontFamily: 'inherit' }}
+        style={{ width: '100%', padding: '14px 16px', borderRadius: 14, background: C.gray, border: 'none', outline: 'none', color: C.navy, fontSize: "max(15px, var(--field-floor, 0px))", fontWeight: 500, boxSizing: 'border-box', fontFamily: 'inherit' }}
       />
     </div>
   );
@@ -140,7 +126,7 @@ function AddTenantSheet({ onClose, onSave, saving, saveError }: {
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, display: 'flex', justifyContent: 'center' }}>
       {/* Sheet — slides up from bottom */}
       <div style={{
-        width: '100%', maxWidth: 390,
+        width: '100%', maxWidth: 'var(--phone-shell-max)',
         background: '#F4F4F4',
         borderRadius: '28px 28px 0 0',
         maxHeight: '92vh',
@@ -262,34 +248,36 @@ function AddTenantSheet({ onClose, onSave, saving, saveError }: {
   );
 }
 
-/* ── Tenant card pair ── */
+/* ── Tenant list row ── */
+function initials(tenant: any) {
+  return `${tenant.firstName?.[0] ?? ''}${tenant.lastName?.[0] ?? ''}`.toUpperCase() || '?';
+}
+
+function fmtDue(nextInvoice: any) {
+  if (!nextInvoice?.dueAt) return '';
+  return new Date(nextInvoice.dueAt).toLocaleDateString('en-NZ', { day: '2-digit', month: '2-digit' });
+}
+
 function TenantRow({ tenant, nextInvoice, onClick }: { tenant: any; nextInvoice: any; onClick: () => void }) {
-  const fullName = `${tenant.firstName} ${tenant.lastName}`;
-  const status   = nextInvoice ? (nextInvoice.status === 'paid' || nextInvoice.status === 'paid_external' ? 'paid' : nextInvoice.status === 'overdue' ? 'overdue' : 'upcoming') : 'upcoming';
-  const dueDate  = nextInvoice?.dueAt ? new Date(nextInvoice.dueAt).toLocaleDateString('en-NZ', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—';
+  const fullName = `${tenant.firstName} ${tenant.lastName}`.trim();
+  const overdue = nextInvoice?.status === 'overdue';
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1.7fr 1fr', gap: 12 }}>
-      {/* Info card */}
-      <div style={{ ...GLASS, borderRadius: 18, padding: '16px 16px 14px', position: 'relative', display: 'flex', flexDirection: 'column', cursor: 'pointer' }} onClick={onClick}>
-        <button
-          onClick={e => { e.stopPropagation(); onClick(); }}
-          style={{ position: 'absolute', top: 12, right: 12, width: 28, height: 28, borderRadius: 999, background: C.white, border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 1px 3px rgba(4,13,109,0.12)' }}>
-          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={C.navy} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-        </button>
-        <div style={{ fontWeight: 500, fontSize: 14, color: C.navy, textTransform: 'uppercase', letterSpacing: '0.02em', paddingRight: 30, lineHeight: 1.25 }}>{fullName}</div>
-        <div style={{ fontWeight: 400, fontSize: 12.5, color: C.navy, textTransform: 'uppercase', letterSpacing: '0.02em', marginTop: 5, lineHeight: 1.35 }}>{tenant.propertyAddress}</div>
-        <div style={{ marginTop: 12 }}><StatusBox status={status} /></div>
-      </div>
-      {/* Payment card */}
-      <div style={{ ...GLASS, borderRadius: 18, padding: '16px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
-        <div style={{ fontWeight: 900, fontSize: 27, color: C.navy, letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
-          {nextInvoice ? fmtCents(nextInvoice.amountCents) : '—'}
-        </div>
-        <div style={{ fontWeight: 400, fontSize: 11, color: C.mute, marginTop: 8 }}>next payment</div>
-        <div style={{ fontWeight: 500, fontSize: 11, color: C.mute, marginTop: 1, fontVariantNumeric: 'tabular-nums' }}>{dueDate}</div>
-      </div>
-    </div>
+    <AnimatedListRow type="button" className="tdir-row" onClick={onClick}>
+      <span className="tdir-avatar">{initials(tenant)}</span>
+      <span className="tdir-copy">
+        <span className="tdir-name">{fullName}</span>
+        <span className="tdir-address">{tenant.propertyAddress}</span>
+      </span>
+      <span className="tdir-money">
+        <span>{nextInvoice ? fmtCents(nextInvoice.amountCents) : '—'}</span>
+        {nextInvoice ? (
+          <small className={overdue ? 'overdue' : ''}>{overdue ? 'overdue' : 'next payment'}<br />{fmtDue(nextInvoice)}</small>
+        ) : (
+          <small>no invoice</small>
+        )}
+      </span>
+    </AnimatedListRow>
   );
 }
 
@@ -306,19 +294,8 @@ export default function TenantDirectory() {
   // can capture and play (see property-transition.ts).
   useLayoutEffect(() => { signalPropertyReady(); }, []);
 
-  const { data: tenants = [], isLoading } = useQuery<any[]>({
-    queryKey: ['/api/property/tenants'],
-    queryFn: () => propFetch('/api/property/tenants').then(r => r.ok ? r.json() : []),
-    staleTime: 60000,
-    retry: false,
-  });
-
-  const { data: invoices = [] } = useQuery<any[]>({
-    queryKey: ['/api/property/invoices'],
-    queryFn: () => propFetch('/api/property/invoices').then(r => r.ok ? r.json() : []),
-    staleTime: 30000,
-    retry: false,
-  });
+  const { data: tenants = [], isLoading } = usePropertyTenants();
+  const { data: invoices = [] } = usePropertyInvoices();
 
   // Archived tenants — fetched lazily only when the merchant expands the section.
   const { data: archivedTenants = [] } = useQuery<any[]>({
@@ -368,6 +345,7 @@ export default function TenantDirectory() {
   const filtered = activeTenants.filter((t: any) =>
     !term || `${t.firstName} ${t.lastName}`.toLowerCase().includes(term) || t.propertyAddress.toLowerCase().includes(term)
   );
+  const tenantCountLabel = `active tenant${activeTenants.length !== 1 ? 's' : ''}`;
 
   // Return the invoice that represents the worst-case status for this tenant
   // (overdue > dispatched/pending > paid). Fallback to most recent for display.
@@ -383,111 +361,101 @@ export default function TenantDirectory() {
 
   return (
     <div style={{ background: C.white, minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
-    <div style={{ width: '100%', maxWidth: 430, minHeight: '100svh', background: '#F4F4F4', paddingBottom: 130, fontFamily: "'Outfit', system-ui, sans-serif" }}>
-      <div style={{ height: 54 }} />
+    <div style={{ width: '100%', maxWidth: 'var(--phone-shell-max)', minHeight: '100svh', background: C.sheet, paddingBottom: 128, fontFamily: "'Outfit', system-ui, sans-serif", overflow: 'hidden' }}>
+      <style>{DIRECTORY_CSS}</style>
 
       {/* Hero — carries view-transition-name so it morphs into the profile hero */}
-      <div style={{ padding: '0 18px' }}>
-        <div ref={heroRef} className="pt-hero" style={{ background: C.navy, borderRadius: 24, padding: '26px 26px 30px', position: 'relative' }}>
-          <div style={{ fontWeight: 900, fontSize: 64, color: C.sky, letterSpacing: '-0.04em', lineHeight: 0.92, fontVariantNumeric: 'tabular-nums' }}>
-            {activeTenants.length}
-          </div>
-          <div style={{ fontWeight: 500, fontSize: 12, color: C.sky, letterSpacing: '0.16em', textTransform: 'uppercase', marginTop: 6 }}>
-            active tenant{activeTenants.length !== 1 ? 's' : ''}
-          </div>
-          {/* Floating + button */}
+      <section ref={heroRef} className="pt-hero tdir-hero">
+        {/* Contents bounce, not the section — its view-transition morph needs a stable box */}
+        <div className="pt-bounce tdir-hero-count" style={{ '--pt-d': '0ms' } as any}>{activeTenants.length}</div>
+        <div className="pt-bounce tdir-hero-label" style={{ '--pt-d': '60ms' } as any}>{tenantCountLabel}</div>
+      </section>
+
+      <main className="tdir-body">
+        <button type="button" className="tdir-add" onPointerDown={pulse} onClick={() => setShowAdd(true)} aria-label="Add tenant">
+          <svg width={26} height={26} viewBox="0 0 24 24" fill="none" stroke={C.navy} strokeWidth="2.6" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+        </button>
+        <div className="pt-bounce tdir-search-row" style={{ '--pt-d': '140ms' } as any}>
+          <label className="tdir-search">
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="search tenants or address"
+            />
+            {search && (
+              <button type="button" onClick={() => setSearch('')} aria-label="Clear search">
+                <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke={C.mute} strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
+              </button>
+            )}
+          </label>
           <button
-            onClick={() => setShowAdd(true)}
-            style={{ position: 'absolute', right: 24, bottom: -20, width: 46, height: 46, borderRadius: 999, background: C.btn, border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 6px 16px rgba(63,155,255,0.45)' }}>
-            <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={C.navy} strokeWidth="2.6" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            type="button"
+            onClick={() => startPropertyBack(() => setLocation('/property'), { expectHero: false })}
+            aria-label="Go to property dashboard"
+            className="tdir-grid-btn"
+          >
+            <svg width={17} height={17} viewBox="0 0 20 20" fill={C.sky}><rect x="1" y="1" width="7" height="7" rx="1.5" /><rect x="12" y="1" width="7" height="7" rx="1.5" /><rect x="1" y="12" width="7" height="7" rx="1.5" /><rect x="12" y="12" width="7" height="7" rx="1.5" /></svg>
           </button>
         </div>
-      </div>
 
-      {/* Search row */}
-      <div style={{ padding: '38px 18px 0', display: 'flex', gap: 10 }}>
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, background: C.gray, borderRadius: 14, padding: '0 14px', height: 46 }}>
-          <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={C.navy} strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-3.5-3.5"/></svg>
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="search tenants or address"
-            style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontFamily: 'inherit', fontWeight: 500, fontSize: 14, color: C.navy }}
-          />
-          {search && (
-            <button onClick={() => setSearch('')} style={{ border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', padding: 0 }}>
-              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={C.mute} strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
-            </button>
+        <div className="tdir-list">
+          {isLoading ? (
+            <div className="pt-bounce tdir-empty" style={{ '--pt-d': '190ms' } as any}>loading tenants...</div>
+          ) : filtered.length === 0 ? (
+            <div className="pt-bounce tdir-empty" style={{ '--pt-d': '190ms' } as any}>
+              {search ? `no tenants match "${search}"` : 'no tenants yet - tap + to add your first'}
+            </div>
+          ) : (
+            /* No .pt-bounce wrapper: the row owns its entrance now (it pops
+               in/out as it crosses the viewport — see AnimatedScrollList.tsx),
+               and a wrapper entrance on top would run two against each other. */
+            filtered.map((t: any) => (
+              <TenantRow
+                key={t.id}
+                tenant={t}
+                nextInvoice={invoiceByTenant(t.id)}
+                onClick={() => {
+                  const inv = invoiceByTenant(t.id);
+                  startPropertyNavigation(
+                    {
+                      id: t.id,
+                      firstName: t.firstName,
+                      lastName: t.lastName,
+                      propertyAddress: t.propertyAddress,
+                      preferredChannel: t.preferredChannel,
+                      invoiceStatus: inv?.status,
+                    },
+                    () => setLocation(`/property/tenants/${t.id}`)
+                  );
+                }}
+              />
+            ))
           )}
         </div>
-        <button
-          onClick={() => startPropertyBack(() => setLocation('/property'), { expectHero: false })}
-          aria-label="Go to property dashboard"
-          style={{ width: 46, height: 46, borderRadius: 14, background: C.navy, border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer' }}>
-          <svg width={20} height={20} viewBox="0 0 20 20" fill={C.sky}><rect x="1" y="1" width="7" height="7" rx="2"/><rect x="12" y="1" width="7" height="7" rx="2"/><rect x="1" y="12" width="7" height="7" rx="2"/><rect x="12" y="12" width="7" height="7" rx="2"/></svg>
-        </button>
-      </div>
 
-      {/* Tenant list */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '16px 18px 0' }}>
-        {isLoading ? (
-          <div style={{ textAlign: 'center', padding: '48px 0', color: C.mute, fontSize: 13 }}>loading tenants…</div>
-        ) : filtered.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '48px 0', color: C.mute, fontSize: 13 }}>
-            {search ? `no tenants match "${search}"` : 'no tenants yet — tap + to add your first'}
-          </div>
-        ) : (
-          filtered.map((t: any) => (
-            <TenantRow
-              key={t.id}
-              tenant={t}
-              nextInvoice={invoiceByTenant(t.id)}
-              onClick={() => {
-                const inv = invoiceByTenant(t.id);
-                startPropertyNavigation(
-                  {
-                    id: t.id,
-                    firstName: t.firstName,
-                    lastName: t.lastName,
-                    propertyAddress: t.propertyAddress,
-                    preferredChannel: t.preferredChannel,
-                    invoiceStatus: inv?.status,
-                  },
-                  () => setLocation(`/property/tenants/${t.id}`)
-                );
-              }}
-            />
-          ))
-        )}
-      </div>
-
-      {/* Archived tenants — collapsed by default; restore brings them back active */}
-      <div style={{ padding: '22px 18px 0' }}>
-        <button onClick={() => setShowArchived(s => !s)}
-          style={{ background: 'none', border: 'none', color: C.mute, fontSize: 12, fontWeight: 600, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.08em', padding: 0 }}>
-          {showArchived ? 'hide archived' : 'show archived'}
-        </button>
-        {showArchived && (
-          archivedTenants.length === 0 ? (
-            <div style={{ padding: '14px 0', color: C.mute, fontSize: 13 }}>no archived tenants</div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
-              {archivedTenants.map((t: any) => (
-                <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 16, background: '#EDEDED' }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, fontSize: 13.5, color: C.navy, textTransform: 'capitalize', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.firstName} {t.lastName}</div>
-                    <div style={{ fontSize: 11.5, color: C.mute, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.propertyAddress}</div>
+        <div className="pt-bounce tdir-archived" style={{ '--pt-d': `${190 + (Math.min(filtered.length, 12) + 1) * 45}ms` } as any}>
+          <button type="button" onClick={() => setShowArchived(s => !s)}>
+            {showArchived ? 'hide archived' : 'show archived'}
+          </button>
+          {showArchived && (
+            archivedTenants.length === 0 ? (
+              <div className="tdir-archived-empty">no archived tenants</div>
+            ) : (
+              <div className="tdir-archived-list">
+                {archivedTenants.map((t: any) => (
+                  <div key={t.id} className="tdir-archive-row">
+                    <div>
+                      <strong>{t.firstName} {t.lastName}</strong>
+                      <span>{t.propertyAddress}</span>
+                    </div>
+                    <button type="button" onClick={() => restoreMutation.mutate(t.id)} disabled={restoreMutation.isPending}>restore</button>
                   </div>
-                  <button onClick={() => restoreMutation.mutate(t.id)} disabled={restoreMutation.isPending}
-                    style={{ flexShrink: 0, background: C.navy, color: C.white, border: 'none', borderRadius: 10, padding: '8px 14px', fontSize: 12, fontWeight: 700, cursor: restoreMutation.isPending ? 'default' : 'pointer', opacity: restoreMutation.isPending ? 0.6 : 1 }}>
-                    restore
-                  </button>
-                </div>
-              ))}
-            </div>
-          )
-        )}
-      </div>
+                ))}
+              </div>
+            )
+          )}
+        </div>
+      </main>
 
       {/* Add tenant sheet */}
       {showAdd && (
@@ -502,3 +470,302 @@ export default function TenantDirectory() {
     </div>
   );
 }
+const DIRECTORY_CSS = `
+.tdir-hero {
+  position: relative;
+  height: 265px;
+  background: #040D6D;
+  color: #58AAFD;
+  padding: 78px 34px 0;
+  box-sizing: border-box;
+}
+.tdir-hero-count {
+  /* Matches the terminal's .tp-amount metrics so heroes read as one type system */
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: 100px;
+  line-height: 0.95;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+.tdir-hero-label {
+  margin-top: 16px;
+  font-size: 13px;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.tdir-add {
+  position: absolute;
+  left: 50%;
+  top: -34px;
+  width: 68px;
+  height: 68px;
+  transform: translateX(-50%);
+  /* Own bounce keyframes — the generic pt-bounce would wipe the centering translateX */
+  opacity: 0;
+  animation: tdirAddPop 0.52s cubic-bezier(0.34, 1.56, 0.64, 1) 90ms both;
+  border: none;
+  border-radius: 999px;
+  background: #58AAFD;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(4,13,109,0.16);
+  -webkit-tap-highlight-color: transparent;
+}
+.tdir-add::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: 0 0 0 0 rgba(88,170,253,0);
+}
+.tdir-add.tdir-pulse::after {
+  animation: tdirAddRing 0.48s ease-out;
+}
+@keyframes tdirAddPop {
+  0%   { opacity: 0; transform: translateX(-50%) translateY(30px) scale(0.86); }
+  55%  { opacity: 1; transform: translateX(-50%) translateY(-7px) scale(1.045); }
+  74%  { transform: translateX(-50%) translateY(3px) scale(0.983); }
+  88%  { transform: translateX(-50%) translateY(-1.5px) scale(1.007); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+@keyframes tdirAddRing {
+  0% { box-shadow: 0 0 0 0 rgba(88,170,253,0.48); }
+  100% { box-shadow: 0 0 0 10px rgba(88,170,253,0); }
+}
+.tdir-body {
+  position: relative;
+  background: #E8E8E8;
+  margin-top: -28px;
+  border-radius: 28px 28px 0 0;
+  min-height: calc(100svh - 237px);
+  padding: 50px 13px 0;
+  box-sizing: border-box;
+}
+.tdir-search-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 40px;
+  gap: 8px;
+  align-items: center;
+}
+.tdir-search {
+  height: 40px;
+  border-radius: 999px;
+  background: #D9D7D7;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 18px;
+  box-sizing: border-box;
+}
+.tdir-search input {
+  min-width: 0;
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #040D6D;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.tdir-search input::placeholder { color: rgba(4,13,109,0.4); }
+.tdir-search button {
+  border: none;
+  background: transparent;
+  padding: 0;
+  display: flex;
+  cursor: pointer;
+}
+.tdir-grid-btn {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 13px;
+  background: #040D6D;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.tdir-list {
+  display: flex;
+  flex-direction: column;
+  padding-top: 12px;
+}
+.tdir-row {
+  width: 100%;
+  border: none;
+  background: transparent;
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 15px;
+  padding: 15px 4px;
+  box-sizing: border-box;
+  color: #040D6D;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.tdir-row:active { transform: scale(0.99); opacity: 0.75; }
+.tdir-avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  background: transparent;
+  border: 1.5px solid #58AAFD;
+  color: #040D6D;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+.tdir-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.tdir-name {
+  color: #040D6D;
+  font-weight: 700;
+  font-size: 15px;
+  line-height: 1.15;
+  text-transform: lowercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tdir-address {
+  color: rgba(4,13,109,0.75);
+  font-weight: 500;
+  font-size: 13.5px;
+  line-height: 1.2;
+  text-transform: lowercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tdir-money {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 76px;
+  color: #040D6D;
+  justify-self: end;
+}
+.tdir-money span {
+  font-size: 17px;
+  line-height: 1;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.tdir-money small {
+  font-size: 10px;
+  line-height: 1.35;
+  color: rgba(4,13,109,0.75);
+  font-weight: 500;
+  text-align: center;
+  white-space: nowrap;
+}
+.tdir-money small.overdue { color: #C71A2A; font-weight: 700; }
+.tdir-empty {
+  padding: 34px 18px;
+  color: rgba(4,13,109,0.55);
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+}
+.tdir-archived {
+  padding: 23px 2px 0;
+}
+.tdir-archived > button {
+  border: none;
+  background: transparent;
+  color: rgba(4,13,109,0.48);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 850;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0;
+}
+.tdir-archived-empty {
+  padding: 14px 0;
+  color: rgba(4,13,109,0.48);
+  font-size: 13px;
+  font-weight: 650;
+}
+.tdir-archived-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+.tdir-archive-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: #D9D7D7;
+}
+.tdir-archive-row div {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.tdir-archive-row strong {
+  color: #040D6D;
+  font-size: 13px;
+  font-weight: 850;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tdir-archive-row span {
+  color: rgba(4,13,109,0.55);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tdir-archive-row button {
+  border: none;
+  border-radius: 11px;
+  background: #040D6D;
+  color: #FFFFFF;
+  padding: 8px 13px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 850;
+  cursor: pointer;
+}
+@media (max-width: 350px) {
+  .tdir-body { padding-left: 10px; padding-right: 10px; }
+  .tdir-row { grid-template-columns: 42px minmax(0, 1fr) auto; gap: 10px; padding-left: 2px; padding-right: 2px; }
+  .tdir-avatar { width: 42px; height: 42px; }
+  .tdir-money { min-width: 68px; }
+  .tdir-money span { font-size: 15px; }
+}
+`;

@@ -1,0 +1,1 @@
+function n(t){try{const e=t.split(".")[1],r=atob(e);return JSON.parse(r)}catch(e){return console.error("Failed to decode JWT:",e),null}}function o(){const t=localStorage.getItem("authToken");return t?n(t):null}function c(){const t=o();return(t==null?void 0:t.merchantId)||null}export{c as g};

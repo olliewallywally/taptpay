@@ -10,11 +10,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { QRCodeDisplay } from "@/components/qr-code-display";
 import { EnhancedPaymentStatus } from "@/components/enhanced-payment-status";
 import { apiRequest } from "@/lib/queryClient";
+import { apiErrorMessage } from "@/lib/api-error";
 import { sseClient } from "@/lib/sse-client";
 import { useToast } from "@/hooks/use-toast";
 import { useDeviceStatusMonitoring, useSSEConnectionMonitoring } from "@/components/notification-system";
-import { getCurrentMerchantId } from "@/lib/auth";
-import { Send, Loader2, CheckCircle, Clock, XCircle, QrCode, Smartphone, Edit, Split, MoreHorizontal, Menu, X, Waves, ChevronDown, Copy, CreditCard } from "lucide-react";
+import { MerchantGate } from "@/components/merchant-gate";
+import { Send, Loader2, CheckCircle, Clock, XCircle, QrCode, Smartphone, Edit, Split, MoreHorizontal, Menu, X, Waves, ChevronDown, Copy, Check, CreditCard } from "lucide-react";
 import { Link } from "wouter";
 import { isNativeIOS, canTapToPay } from "@/lib/native";
 
@@ -27,6 +28,14 @@ const transactionFormSchema = z.object({
 type TransactionFormData = z.infer<typeof transactionFormSchema>;
 
 export default function MerchantTerminalMobile() {
+  return (
+    <MerchantGate redirect="document" fallback={<div>Redirecting to login...</div>}>
+      {(merchantId) => <MerchantTerminalMobilePage merchantId={merchantId} />}
+    </MerchantGate>
+  );
+}
+
+function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
   const [currentTransaction, setCurrentTransaction] = useState<any>(null);
   const [copiedLink, setCopiedLink] = useState(false);
   const [activeTab, setActiveTab] = useState<"QR" | "NFC" | "TAP">("QR");
@@ -50,6 +59,15 @@ export default function MerchantTerminalMobile() {
   // Tapt Stone states
   const [selectedStoneId, setSelectedStoneId] = useState<number | null>(null);
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
+
+  // Gap 12: the private per-payment share-link overlay, shown after a
+  // successful create when no board was selected (see
+  // createTransactionMutation below). Placed in this, the FIRST hook group
+  // (before the `if (!merchantId) return ...` early return further down) to
+  // preserve hook call order/count exactly — this file is on the program's
+  // R1-T8 hook-order-crash list.
+  const [shareLink, setShareLink] = useState<{ item: string; amount: string; paymentUrl: string; qrCodeUrl: string } | null>(null);
+  const [copiedShareLink, setCopiedShareLink] = useState(false);
   const prevTransactionStatusRef = useRef<string | null>(null);
   const successOverlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -105,7 +123,6 @@ export default function MerchantTerminalMobile() {
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const merchantId = getCurrentMerchantId();
   
   useEffect(() => {
     const checkScreenSize = () => {
@@ -143,12 +160,6 @@ export default function MerchantTerminalMobile() {
     }
   }, [activeTab, nfcCapabilities, toast]);
 
-  // Redirect to login if no merchantId
-  if (!merchantId) {
-    window.location.href = '/login';
-    return <div>Redirecting to login...</div>;
-  }
-
   const form = useForm<TransactionFormData>({
     resolver: zodResolver(transactionFormSchema),
     defaultValues: {
@@ -160,9 +171,11 @@ export default function MerchantTerminalMobile() {
 
   // Get merchant data
   const { data: merchant } = useQuery({
-    queryKey: ["/api/merchants", merchantId],
+    queryKey: ["/api/merchants", merchantId, "profile"],
     queryFn: async () => {
-      const response = await fetch(`/api/merchants/${merchantId}`);
+      const response = await fetch(`/api/merchants/${merchantId}/profile`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
+      });
       if (!response.ok) throw new Error("Failed to fetch merchant");
       return response.json();
     },
@@ -237,12 +250,33 @@ export default function MerchantTerminalMobile() {
         itemName: data.itemName,
         price: data.price,
         status: "pending",
-        selectedStoneId: data.selectedStoneId,
+        // Gap 12: mirror retail-terminal.tsx's destination-kind check — a
+        // board selected means the existing shared standing address
+        // ("legacy"); no board means mint a private per-sale link. NaN from
+        // the "No specific stone" sentinel's parseInt bug (see the
+        // out-of-scope finding) is falsy too, so it correctly still resolves
+        // to "per_payment" here.
+        ...(data.selectedStoneId
+          ? { selectedStoneId: data.selectedStoneId, linkMode: "legacy" as const }
+          : { linkMode: "per_payment" as const }),
       });
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (created, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "active-transaction"] });
+      // Gate on what THIS create call actually sent (variables), never on
+      // response field presence — server/routes.ts populates
+      // paymentUrl/qrCodeUrl unconditionally on every successful create,
+      // board-selected or not, so response-presence would mislabel a
+      // board's standing shared address as a private per-sale link.
+      if (!variables.selectedStoneId) {
+        setShareLink({
+          item: typeof created?.itemName === "string" ? created.itemName : "",
+          amount: typeof created?.price === "string" ? created.price : "",
+          paymentUrl: typeof created?.paymentUrl === "string" ? created.paymentUrl : "",
+          qrCodeUrl: typeof created?.qrCodeUrl === "string" ? created.qrCodeUrl : "",
+        });
+      }
       form.reset();
       toast({
         title: "Transaction Created",
@@ -250,10 +284,10 @@ export default function MerchantTerminalMobile() {
       });
       setActiveAction(null);
     },
-    onError: () => {
+    onError: (error) => {
       toast({
         title: "Error",
-        description: "Failed to create transaction",
+        description: apiErrorMessage(error, "Failed to create transaction"),
         variant: "destructive",
       });
     },
@@ -261,8 +295,10 @@ export default function MerchantTerminalMobile() {
 
   // Set up SSE connection
   useEffect(() => {
-    sseClient.connect(merchantId);
-    
+    const token = localStorage.getItem("authToken");
+    if (!token) return;
+    sseClient.connectMerchant(merchantId, token);
+
     sseClient.subscribe("transaction_updated", (message) => {
       // Route through the query cache only — the [activeTransaction] effect
       // handles all state transitions including completion detection & cleanup.
@@ -288,6 +324,7 @@ export default function MerchantTerminalMobile() {
       playSuccessChime();
       form.reset();
       setCurrentTransaction(null);
+      setShareLink(null);
       setShowSuccessOverlay(true);
       if (successOverlayTimerRef.current) clearTimeout(successOverlayTimerRef.current);
       successOverlayTimerRef.current = setTimeout(() => setShowSuccessOverlay(false), 5000);
@@ -332,22 +369,12 @@ export default function MerchantTerminalMobile() {
     setNfcPaymentStatus("creating");
     
     try {
-      const response = await fetch(`/api/merchants/${merchantId}/nfc-pay`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          amount: parseFloat(transaction.price),
-          itemName: transaction.itemName,
-          deviceId: navigator.userAgent,
-          nfcCapabilities: nfcCapabilities
-        }),
+      const response = await apiRequest("POST", `/api/merchants/${merchantId}/nfc-pay`, {
+        amount: parseFloat(transaction.price),
+        itemName: transaction.itemName,
+        deviceId: navigator.userAgent,
+        nfcCapabilities: nfcCapabilities
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to create NFC payment session');
-      }
 
       const result = await response.json();
       setNfcSession(result.nfcSession);
@@ -513,6 +540,26 @@ export default function MerchantTerminalMobile() {
     setTapToPayApproved(null);
   };
 
+  // Gap 12: copy handler for the private per-payment share-link overlay.
+  const copyShareLinkToClipboard = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedShareLink(true);
+      toast({
+        title: "Link Copied!",
+        description: "Payment link has been copied to clipboard",
+      });
+      setTimeout(() => setCopiedShareLink(false), 2000);
+    } catch (error) {
+      console.error('Failed to copy share link:', error);
+      toast({
+        title: "Copy Failed",
+        description: "Unable to copy payment link to clipboard",
+        variant: "destructive",
+      });
+    }
+  };
+
   const getPaymentStatusIndicator = (status: string) => {
     return (
       <div className="flex items-center justify-center">
@@ -557,6 +604,66 @@ export default function MerchantTerminalMobile() {
       ?? (activeTransaction?.status === 'pending' || activeTransaction?.status === 'processing'
         ? activeTransaction
         : null));
+
+  // Gap 12: computed once and rendered identically in both the isMobile and
+  // desktop/non-mobile branches below, so behavior never silently diverges
+  // by viewport.
+  const shareLinkOverlay = shareLink && (
+    <div
+      className="fixed inset-0 z-[900] flex items-center justify-center p-4"
+      style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}
+      data-testid="share-link-overlay"
+    >
+      <button
+        onClick={() => setShareLink(null)}
+        className="absolute top-6 right-6 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors z-10"
+        data-testid="close-share-link"
+      >
+        <X className="h-4 w-4 text-white/70" />
+      </button>
+      <div
+        className="backdrop-blur-xl rounded-3xl p-8 max-w-sm w-full mx-6 text-center shadow-2xl space-y-4"
+        style={{
+          background: 'linear-gradient(135deg, rgba(0, 255, 102, 0.12) 0%, rgba(0, 255, 102, 0.05) 100%)',
+          border: '1px solid rgba(0, 255, 102, 0.3)',
+        }}
+      >
+        <div>
+          <p className="text-white text-base font-medium">{shareLink.item}</p>
+          <p className="text-3xl font-bold" style={{ color: '#00FF66' }}>
+            ${(parseFloat(shareLink.amount) || 0).toFixed(2)}
+          </p>
+        </div>
+        <div className="w-40 h-40 mx-auto bg-white/90 rounded-xl p-2">
+          <QRCodeDisplay paymentUrl={shareLink.paymentUrl} qrCodeUrl={shareLink.qrCodeUrl} />
+        </div>
+        <div
+          className="bg-black/30 rounded-lg p-3 text-xs text-white break-all"
+          data-testid="share-link-url"
+        >
+          {shareLink.paymentUrl}
+        </div>
+        <Button
+          onClick={() => copyShareLinkToClipboard(shareLink.paymentUrl)}
+          className="w-full text-black font-semibold rounded-lg"
+          style={{ backgroundColor: '#00FF66' }}
+          data-testid="copy-share-link"
+        >
+          {copiedShareLink ? (
+            <>
+              <Check className="w-4 h-4 mr-2" />
+              Copied!
+            </>
+          ) : (
+            <>
+              <Copy className="w-4 h-4 mr-2" />
+              Copy Payment Link
+            </>
+          )}
+        </Button>
+      </div>
+    </div>
+  );
 
   if (isMobile) {
     return (
@@ -1516,6 +1623,7 @@ export default function MerchantTerminalMobile() {
           </div>
         )}
 
+        {shareLinkOverlay}
 
           </div>
           </div>
@@ -2186,6 +2294,8 @@ export default function MerchantTerminalMobile() {
             </div>
           </div>
         )}
+
+        {shareLinkOverlay}
       </div>
     </div>
   );

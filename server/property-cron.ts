@@ -17,6 +17,7 @@ import { storage } from "./storage";
 import { sendEmail } from "./email-service";
 import { isWhatsAppConfigured, sendWhatsApp } from "./whatsapp-service";
 import { isSmsConfigured, sendSms } from "./sms-service";
+import { billingCardIsReady } from "./billing-card";
 
 // Remaining owing on a split invoice (null for non-split). Shares 1..n-1 are
 // each floor(total/n); the remainder lands on the final share, so after k
@@ -35,6 +36,16 @@ function computeNextRunDate(from: Date, frequency: string): Date {
   else if (frequency === "fortnightly") d.setUTCDate(d.getUTCDate() + 14);
   else                                  d.setUTCMonth(d.getUTCMonth() + 1);
   return d;
+}
+
+/**
+ * The first date on an automation's cycle after `now`, counting on from `from`. Resuming a paused
+ * automation starts there (owner decision 2026-09-27): nothing is sent for the paused time.
+ */
+export function nextRunDateAfter(from: Date, frequency: string, now: Date): Date {
+  let next = new Date(from);
+  while (next <= now) next = computeNextRunDate(next, frequency);
+  return next;
 }
 
 function addDaysUTC(from: Date, days: number): Date {
@@ -230,6 +241,9 @@ export async function resendInvoiceEmail(invoiceId: string, baseUrl: string): Pr
   const invoice = await storage.getInvoiceRentRequest(invoiceId);
   if (!invoice) return { ok: false, reason: "not_found" };
   if (["paid", "paid_external", "voided"].includes(invoice.status)) return { ok: false, reason: "not_payable" };
+  if (!billingCardIsReady(await storage.getSubscription(invoice.merchantId))) {
+    return { ok: false, reason: "billing_card_required" };
+  }
 
   const delivery = await deliverInvoice(invoice, baseUrl, deliverOptsFor(invoice, invoice.status === "overdue"));
   if (!delivery.sent) return { ok: false, reason: delivery.reason || "send_failed" };
@@ -255,6 +269,10 @@ export async function runGeneratePass(now: Date = new Date()): Promise<{ generat
 
   for (const schedule of dueSchedules) {
     try {
+      if (!billingCardIsReady(await storage.getSubscription(schedule.merchantId))) {
+        result.skipped++;
+        continue;
+      }
       const billingPeriodStart = schedule.nextRunDate;
       const invoice = await storage.createInvoiceRentRequest({
         merchantId: schedule.merchantId, tenantProfileId: schedule.tenantProfileId,
@@ -290,6 +308,10 @@ export async function runDispatchPass(baseUrl: string): Promise<{ dispatched: nu
 
   for (const invoice of invoices) {
     try {
+      if (!billingCardIsReady(await storage.getSubscription(invoice.merchantId))) {
+        result.failed++;
+        continue;
+      }
       const delivery = await deliverInvoice(invoice, baseUrl);
       // Missing merchant/tenant is transient (data may appear) — leave pending to retry.
       if (delivery.reason === "missing_data") { result.failed++; continue; }

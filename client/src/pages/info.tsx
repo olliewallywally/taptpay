@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Download, Share2, FileText, ArrowRight, CheckCircle, Loader2, Phone, Mail, User } from "lucide-react";
 import logoImage from "@assets/IMG_6592_1755070818452.png";
+import { PLANS, formatPlanPrice } from "@shared/plans";
 
 const LS_KEY = "infoPackUnlocked";
 
@@ -81,7 +82,7 @@ export default function InfoPage() {
 
   const highlights = [
     "100% digital POS system — no hardware needed",
-    "$0.10 per transaction, no lock-in contracts",
+    `From ${formatPlanPrice(PLANS.solo.priceCents)}/month, no transaction fees, no lock-in contracts`,
     "QR code & NFC payment boards",
     "Real-time dashboard & analytics",
     "Split bill & shareable payment requests",
@@ -130,7 +131,7 @@ export default function InfoPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 disabled={submitting}
-                className="w-full bg-white/10 text-white placeholder-white/35 rounded-xl pl-10 pr-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[#00f1d7]/60 disabled:opacity-50"
+                className="w-full bg-white/10 text-white placeholder-white/35 rounded-xl pl-10 pr-4 py-3 text-base md:text-sm outline-none focus:ring-2 focus:ring-[#00f1d7]/60 disabled:opacity-50"
                 style={{ border: "1px solid rgba(255,255,255,0.15)" }}
               />
             </div>
@@ -144,7 +145,7 @@ export default function InfoPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={submitting}
-                className="w-full bg-white/10 text-white placeholder-white/35 rounded-xl pl-10 pr-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[#00f1d7]/60 disabled:opacity-50"
+                className="w-full bg-white/10 text-white placeholder-white/35 rounded-xl pl-10 pr-4 py-3 text-base md:text-sm outline-none focus:ring-2 focus:ring-[#00f1d7]/60 disabled:opacity-50"
                 style={{ border: "1px solid rgba(255,255,255,0.15)" }}
               />
             </div>

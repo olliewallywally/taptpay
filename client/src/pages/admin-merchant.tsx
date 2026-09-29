@@ -16,7 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { updateMerchantDetailsSchema, updateBankAccountSchema } from "@shared/schema";
+import { updateMerchantDetailsSchema } from "@shared/schema";
 import { 
   ArrowLeft, 
   Building2, 
@@ -42,11 +42,6 @@ interface MerchantDetails {
   contactEmail: string;
   contactPhone: string;
   businessAddress: string;
-  currentProviderRate: string;
-  bankName: string;
-  bankAccountNumber: string;
-  bankBranch: string;
-  accountHolderName: string;
   qrCodeUrl: string;
   paymentUrl: string;
   status: 'active' | 'inactive';
@@ -78,7 +73,6 @@ export default function AdminMerchantDetail() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isEditingDetails, setIsEditingDetails] = useState(false);
-  const [isEditingBank, setIsEditingBank] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const isMobile = useIsMobile();
 
@@ -90,16 +84,6 @@ export default function AdminMerchantDetail() {
       contactEmail: "",
       contactPhone: "",
       businessAddress: "",
-    },
-  });
-
-  const bankForm = useForm({
-    resolver: zodResolver(updateBankAccountSchema),
-    defaultValues: {
-      bankName: "",
-      bankAccountNumber: "",
-      bankBranch: "",
-      accountHolderName: "",
     },
   });
 
@@ -118,7 +102,7 @@ export default function AdminMerchantDetail() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/merchants', merchantId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/merchants', merchantId] });
       setIsEditingDetails(false);
       toast({
         title: "Success",
@@ -129,37 +113,6 @@ export default function AdminMerchantDetail() {
       toast({
         title: "Error",
         description: error.message || "Failed to update merchant details",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Update bank account mutation
-  const updateBankMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const response = await fetch(`/api/merchants/${merchantId}/bank-account`, {
-        method: 'PUT',
-        body: JSON.stringify(data),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('adminAuthToken')}`
-        },
-      });
-      if (!response.ok) throw new Error('Failed to update bank account');
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/merchants', merchantId] });
-      setIsEditingBank(false);
-      toast({
-        title: "Success",
-        description: "Bank account updated successfully",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update bank account",
         variant: "destructive",
       });
     },
@@ -195,9 +148,9 @@ export default function AdminMerchantDetail() {
 
   // Fetch merchant details
   const { data: merchant, isLoading: merchantLoading } = useQuery<MerchantDetails>({
-    queryKey: ['/api/merchants', merchantId],
+    queryKey: ['/api/admin/merchants', merchantId],
     queryFn: async () => {
-      const response = await fetch(`/api/merchants/${merchantId}`, {
+      const response = await fetch(`/api/admin/merchants/${merchantId}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('adminAuthToken')}`
         }
@@ -254,23 +207,12 @@ export default function AdminMerchantDetail() {
         contactPhone: merchant.contactPhone || "",
         businessAddress: merchant.businessAddress || "",
       });
-      
-      bankForm.reset({
-        bankName: merchant.bankName || "",
-        bankAccountNumber: merchant.bankAccountNumber || "",
-        bankBranch: merchant.bankBranch || "",
-        accountHolderName: merchant.accountHolderName || "",
-      });
     }
-  }, [merchant, detailsForm, bankForm]);
+  }, [merchant, detailsForm]);
 
   // Form submission handlers
   const onDetailsSubmit = (data: any) => {
     updateDetailsMutation.mutate(data);
-  };
-
-  const onBankSubmit = (data: any) => {
-    updateBankMutation.mutate(data);
   };
 
   const handleDelete = () => {
@@ -468,10 +410,6 @@ export default function AdminMerchantDetail() {
                   <div>
                     <Label className="text-sm font-medium">Contact Phone</Label>
                     <p className="text-gray-900 mt-1">{merchant.contactPhone}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium">Current Provider Rate</Label>
-                    <p className="text-gray-900 mt-1">{merchant.currentProviderRate}%</p>
                   </div>
                 </div>
                 <div>

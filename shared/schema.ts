@@ -1,18 +1,55 @@
-import { pgTable, text, serial, decimal, timestamp, boolean, integer, jsonb, uuid, uniqueIndex, index } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, decimal, timestamp, boolean, integer, jsonb, uuid, uniqueIndex, index, customType, check } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { planIdSchema } from "./plans";
+import { PASSWORD_RULE, meetsPasswordRule } from "./password-rule";
 
+/**
+ * Login identities. One row per person who can sign in, so a merchant on a
+ * multi-seat plan has one row per teammate. `email` is globally unique: a login
+ * addresses exactly one account, which is what makes seat revocation meaningful.
+ */
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
   merchantId: integer("merchant_id").references(() => merchants.id),
-  role: text("role").notNull().default("merchant"), // merchant, admin
+  role: text("role").notNull().default("member"), // owner, member, admin
+  name: text("name"),
+  // active = can sign in; invited = has not accepted yet; disabled = seat revoked.
+  // Invited and active seats both count against the plan's seat limit.
+  status: text("status").notNull().default("active"),
+  inviteTokenHash: text("invite_token_hash"),
+  inviteExpiresAt: timestamp("invite_expires_at"),
+  lastLoginAt: timestamp("last_login_at"),
   resetToken: text("reset_token"),
   resetTokenExpiry: timestamp("reset_token_expiry"),
+  // R1-T4 (0027): account tokens carry the version they were issued under; one
+  // behind this is refused. Raised by a password reset and "sign out everywhere".
+  sessionVersion: integer("session_version").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => ({
+  merchantIdIdx: index("users_merchant_id_idx").on(t.merchantId),
+  emailLowerUnique: uniqueIndex("users_email_lower_uq").on(sql`lower(${t.email})`),
+  inviteTokenHashUnique: uniqueIndex("users_invite_token_hash_uq")
+    .on(t.inviteTokenHash)
+    .where(sql`${t.inviteTokenHash} is not null`),
+  resetTokenHashUnique: uniqueIndex("users_reset_token_hash_uq")
+    .on(t.resetToken)
+    .where(sql`${t.resetToken} is not null`),
+  roleCheck: check("users_role_check", sql`${t.role} in ('owner', 'member', 'admin')`),
+  statusCheck: check("users_status_check", sql`${t.status} in ('active', 'invited', 'disabled')`),
+}));
+
+export const USER_ROLES = ["owner", "member", "admin"] as const;
+export type UserRole = (typeof USER_ROLES)[number];
+
+export const USER_STATUSES = ["active", "invited", "disabled"] as const;
+export type UserStatus = (typeof USER_STATUSES)[number];
+
+/** Seats consumed by a user in this state. Disabled seats are free to reuse. */
+export const SEAT_CONSUMING_STATUSES = ["active", "invited"] as const;
 
 export const merchants = pgTable("merchants", {
   id: serial("id").primaryKey(),
@@ -37,6 +74,9 @@ export const merchants = pgTable("merchants", {
   contactEmail: text("contact_email"),
   contactPhone: text("contact_phone"),
   businessAddress: text("business_address"),
+  businessDescription: text("business_description"),
+  websiteUrl: text("website_url"),
+  estimatedAnnualTurnover: text("estimated_annual_turnover"),
   
   // Bank account details
   bankName: text("bank_name"),
@@ -57,14 +97,6 @@ export const merchants = pgTable("merchants", {
   // Theme customization
   themeId: text("theme_id").default("classic"),
   
-  // Crypto payment settings
-  coinbaseCommerceApiKey: text("coinbase_commerce_api_key"),
-  coinbaseWebhookSecret: text("coinbase_webhook_secret"),
-  cryptoEnabled: boolean("crypto_enabled").default(false),
-  enabledCryptocurrencies: text("enabled_cryptocurrencies").array(),
-  autoConvertToFiat: boolean("auto_convert_to_fiat").default(false),
-  minConfirmations: integer("min_confirmations").default(1),
-  
   // Email verification
   emailVerified: boolean("email_verified").default(false),
 
@@ -79,6 +111,12 @@ export const merchants = pgTable("merchants", {
 
   // Dashboard preferences
   dailyGoal: decimal("daily_goal", { precision: 10, scale: 2 }).default("500.00"), // Daily revenue goal in dollars
+
+  // Page-by-page merchant tutorial. A generation is incremented whenever the
+  // merchant restarts the walkthroughs so stale browser tabs cannot overwrite
+  // the new run.
+  tutorialGeneration: integer("tutorial_generation").notNull().default(1),
+  tutorialAutoEnabled: boolean("tutorial_auto_enabled").notNull().default(true),
   
   // Billing card (stored masked — Windcave will handle live processing when ready)
   billingCardLast4: text("billing_card_last4"),
@@ -101,6 +139,22 @@ export const merchants = pgTable("merchants", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+export const merchantTutorialProgress = pgTable("merchant_tutorial_progress", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  merchantId: integer("merchant_id").references(() => merchants.id, { onDelete: "cascade" }).notNull(),
+  generation: integer("generation").notNull(),
+  pageKey: text("page_key").notNull(),
+  status: text("status").notNull(), // started, completed, dismissed
+  lastStep: integer("last_step").notNull().default(0),
+  startedAt: timestamp("started_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+  dismissedAt: timestamp("dismissed_at"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => ({
+  merchantGenerationPageUnique: uniqueIndex("merchant_tutorial_progress_run_page_idx").on(t.merchantId, t.generation, t.pageKey),
+  merchantGenerationIdx: index("merchant_tutorial_progress_merchant_generation_idx").on(t.merchantId, t.generation),
+}));
 
 export const transactions = pgTable("transactions", {
   id: serial("id").primaryKey(),
@@ -125,7 +179,7 @@ export const transactions = pgTable("transactions", {
   // Fee tracking (Marketplace Model)
   windcaveFeeRate: decimal("windcave_fee_rate", { precision: 5, scale: 4 }).default("0.0290"), // 2.9% typical Windcave rate
   windcaveFeeAmount: decimal("windcave_fee_amount", { precision: 10, scale: 2 }), // Calculated Windcave fee
-  platformFeeRate: decimal("platform_fee_rate", { precision: 5, scale: 4 }).default("0.0050"), // 0.5% platform fee
+  platformFeeRate: decimal("platform_fee_rate", { precision: 5, scale: 4 }).default("0.0000"),
   platformFeeAmount: decimal("platform_fee_amount", { precision: 10, scale: 2 }), // Calculated platform fee
   merchantNet: decimal("merchant_net", { precision: 10, scale: 2 }), // Amount to settle to merchant
   
@@ -138,50 +192,34 @@ export const transactions = pgTable("transactions", {
   windcaveSessionState: text("windcave_session_state"), // pending, processing, approved, declined
   windcaveXId: text("windcave_x_id"), // Idempotency key for session creation
 
+  // SHA-256 digest of the per-payment bearer credential. The raw credential is
+  // returned once by the create service and is never stored on a transaction.
+  paymentTokenHash: text("payment_token_hash"),
+
   // Split bill toggle (set by merchant at transaction creation time)
   splitEnabled: boolean("split_enabled").default(false),
   
   createdAt: timestamp("created_at").defaultNow(),
-});
-
-// Crypto transactions table for cryptocurrency payments
-export const cryptoTransactions = pgTable("crypto_transactions", {
-  id: serial("id").primaryKey(),
-  transactionId: integer("transaction_id").references(() => transactions.id),
-  merchantId: integer("merchant_id").references(() => merchants.id),
-  
-  // Crypto payment details
-  cryptocurrency: text("cryptocurrency").notNull(), // BTC, ETH, USDC, etc.
-  walletAddress: text("wallet_address").notNull(), // Generated unique address for this payment
-  cryptoAmount: text("crypto_amount").notNull(), // Amount in crypto (stored as string for precision)
-  fiatAmount: decimal("fiat_amount", { precision: 10, scale: 2 }).notNull(), // Original amount in fiat
-  exchangeRate: decimal("exchange_rate", { precision: 18, scale: 8 }).notNull(), // Crypto to fiat rate at time of payment
-  
-  // Coinbase Commerce details
-  coinbaseChargeId: text("coinbase_charge_id").unique(), // Coinbase Commerce charge ID
-  coinbaseChargeCode: text("coinbase_charge_code"), // Short code for the charge
-  hostedUrl: text("hosted_url"), // Coinbase hosted payment page URL
-  
-  // Blockchain tracking
-  blockchainTxHash: text("blockchain_tx_hash"), // Transaction hash on blockchain
-  confirmations: integer("confirmations").default(0), // Number of blockchain confirmations
-  requiredConfirmations: integer("required_confirmations").default(1), // Required confirmations for completion
-  
-  // Network fees
-  networkFeeAmount: text("network_fee_amount"), // Gas/network fees (in crypto)
-  networkFeeFiat: decimal("network_fee_fiat", { precision: 10, scale: 2 }), // Network fees in fiat
-  
-  // Status and timing
-  status: text("status").notNull().default("pending"), // pending, confirming, confirmed, completed, failed, expired
-  expiresAt: timestamp("expires_at"), // When the payment request expires
+  // Canonical settlement time for non-split retail payments. Unlike createdAt,
+  // this is written only when payment reaches a completed state and therefore
+  // safely supports date-windowed payout summaries.
   completedAt: timestamp("completed_at"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => ({
+  merchantIdIdx: index("transactions_merchant_id_idx").on(t.merchantId),
+  taptStoneIdIdx: index("transactions_tapt_stone_id_idx").on(t.taptStoneId),
+  paymentTokenHashUnique: uniqueIndex("transactions_payment_token_hash_uq")
+    .on(t.paymentTokenHash)
+    .where(sql`${t.paymentTokenHash} is not null`),
+  paymentTokenHashShape: check(
+    "transactions_payment_token_hash_shape_check",
+    sql`${t.paymentTokenHash} is null or ${t.paymentTokenHash} ~ '^[0-9a-f]{64}$'`,
+  ),
+}));
 
 // Split payments table to track individual payments for split bills
 export const splitPayments = pgTable("split_payments", {
   id: serial("id").primaryKey(),
-  transactionId: integer("transaction_id").references(() => transactions.id),
+  transactionId: integer("transaction_id").references(() => transactions.id).notNull(),
   merchantId: integer("merchant_id").references(() => merchants.id),
   splitIndex: integer("split_index").notNull(), // Which split this is (1, 2, 3, etc.)
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(), // Amount for this split
@@ -196,7 +234,109 @@ export const splitPayments = pgTable("split_payments", {
   
   paidAt: timestamp("paid_at"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => ({
+  transactionIdIdx: index("split_payments_transaction_id_idx").on(t.transactionId),
+  merchantIdIdx: index("split_payments_merchant_id_idx").on(t.merchantId),
+  transactionSplitUnique: uniqueIndex("split_payments_transaction_split_uq")
+    .on(t.transactionId, t.splitIndex),
+  // Gap 11 / C1 (docs/decisions/2026-09-13-gap11-split-session-single-use-design.md):
+  // the same provider transaction cannot fund two split shares. Additive,
+  // defense in depth — see migrations/0022_gap11_session_single_use_indexes.sql.
+  windcaveTransactionIdUnique: uniqueIndex("split_payments_windcave_transaction_id_uq")
+    .on(t.windcaveTransactionId)
+    .where(sql`${t.windcaveTransactionId} is not null`),
+}));
+
+export const paymentAttemptStates = [
+  "claiming",
+  "ready",
+  "finalizing",
+  "approved",
+  "declined",
+  "cancelled",
+  "abandoned",
+] as const;
+
+export type PaymentAttemptState = (typeof paymentAttemptStates)[number];
+
+export const paymentAttemptOutcomes = ["approved", "declined", "cancelled"] as const;
+
+export type PaymentAttemptOutcome = (typeof paymentAttemptOutcomes)[number];
+
+// Phase 3 claim/return services must use these exact bounds; the database checks
+// below are the final guard against accidentally creating longer-lived secrets.
+export const PAYMENT_ATTEMPT_MAX_LEASE_MS = 5 * 60 * 1000;
+export const PAYMENT_RETURN_STATE_MAX_AGE_MS = 30 * 60 * 1000;
+
+// Durable claim/session record for one transaction-local share. A share index of
+// zero addresses an unsplit transaction; configured split shares start at one.
+export const paymentAttempts = pgTable("payment_attempts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  transactionId: integer("transaction_id")
+    .references(() => transactions.id, { onDelete: "cascade" })
+    .notNull(),
+  shareIndex: integer("share_index").notNull().default(0),
+  idempotencyKey: uuid("idempotency_key").notNull(),
+  state: text("state").$type<PaymentAttemptState>().notNull().default("claiming"),
+  leaseExpiresAt: timestamp("lease_expires_at").notNull(),
+  processorSessionId: text("processor_session_id"),
+  processorXId: text("processor_x_id"),
+  returnStateHash: text("return_state_hash"),
+  returnStateExpiresAt: timestamp("return_state_expires_at"),
+  outcome: text("outcome").$type<PaymentAttemptOutcome>(),
+  receiptShare: integer("receipt_share"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  transactionIdx: index("payment_attempts_transaction_idx").on(t.transactionId),
+  transactionShareKeyUnique: uniqueIndex("payment_attempts_transaction_share_key_uq")
+    .on(t.transactionId, t.shareIndex, t.idempotencyKey),
+  liveTransactionShareUnique: uniqueIndex("payment_attempts_live_transaction_share_uq")
+    .on(t.transactionId, t.shareIndex)
+    .where(sql`${t.state} in ('claiming', 'ready', 'finalizing')`),
+  returnStateHashUnique: uniqueIndex("payment_attempts_return_state_hash_uq")
+    .on(t.returnStateHash)
+    .where(sql`${t.returnStateHash} is not null`),
+  // Gap 11 / C1 (docs/decisions/2026-09-13-gap11-split-session-single-use-design.md):
+  // single-use consumption of a provider session at the database level; also
+  // independently required by R2 section 9.4. Additive, defense in depth —
+  // see migrations/0022_gap11_session_single_use_indexes.sql.
+  processorSessionIdUnique: uniqueIndex("payment_attempts_processor_session_id_uq")
+    .on(t.processorSessionId)
+    .where(sql`${t.processorSessionId} is not null`),
+  shareIndexCheck: check(
+    "payment_attempts_share_index_check",
+    sql`${t.shareIndex} >= 0`,
+  ),
+  stateCheck: check(
+    "payment_attempts_state_check",
+    sql`${t.state} in ('claiming', 'ready', 'finalizing', 'approved', 'declined', 'cancelled', 'abandoned')`,
+  ),
+  finiteLeaseCheck: check(
+    "payment_attempts_lease_expiry_check",
+    sql`${t.leaseExpiresAt} > ${t.createdAt} and ${t.leaseExpiresAt} <= ${t.createdAt} + interval '5 minutes'`,
+  ),
+  returnStatePairCheck: check(
+    "payment_attempts_return_state_pair_check",
+    sql`(${t.returnStateHash} is null) = (${t.returnStateExpiresAt} is null)`,
+  ),
+  returnStateHashShapeCheck: check(
+    "payment_attempts_return_state_hash_shape_check",
+    sql`${t.returnStateHash} is null or ${t.returnStateHash} ~ '^[0-9a-f]{64}$'`,
+  ),
+  returnStateExpiryCheck: check(
+    "payment_attempts_return_state_expiry_check",
+    sql`${t.returnStateExpiresAt} is null or (${t.returnStateExpiresAt} > ${t.createdAt} and ${t.returnStateExpiresAt} <= ${t.createdAt} + interval '30 minutes')`,
+  ),
+  outcomeCheck: check(
+    "payment_attempts_outcome_check",
+    sql`${t.outcome} is null or (${t.outcome} in ('approved', 'declined', 'cancelled') and ${t.state} = ${t.outcome})`,
+  ),
+  receiptShareCheck: check(
+    "payment_attempts_receipt_share_check",
+    sql`${t.receiptShare} is null or (${t.shareIndex} >= 1 and ${t.receiptShare} = ${t.shareIndex})`,
+  ),
+}));
 
 // Refunds table to track all refund activities
 export const refunds = pgTable("refunds", {
@@ -217,7 +357,10 @@ export const refunds = pgTable("refunds", {
   customerNotified: boolean("customer_notified").default(false),
   completedAt: timestamp("completed_at"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => ({
+  transactionIdIdx: index("refunds_transaction_id_idx").on(t.transactionId),
+  merchantIdIdx: index("refunds_merchant_id_idx").on(t.merchantId),
+}));
 
 // Platform settlements - tracks money owed to merchants (Marketplace Model)
 export const merchantSettlements = pgTable("merchant_settlements", {
@@ -259,7 +402,7 @@ export const createSplitPaymentSchema = z.object({
     const num = parseFloat(val);
     return !isNaN(num) && num > 0;
   }, "Amount must be a positive number"),
-  paymentMethod: z.enum(["qr_code", "nfc_tap", "card_reader", "manual", "cash", "tap_to_pay", "crypto", "api"]).default("qr_code"),
+  paymentMethod: z.enum(["qr_code", "nfc_tap", "card_reader", "manual", "cash", "tap_to_pay", "api"]).default("qr_code"),
 });
 
 // Bill split creation schema
@@ -276,40 +419,70 @@ export const insertRefundSchema = createInsertSchema(refunds).omit({
 
 export const createRefundSchema = z.object({
   transactionId: z.number().min(1, "Transaction ID is required"),
-  refundAmount: z.string().refine((val) => {
-    const num = parseFloat(val);
-    return !isNaN(num) && num > 0;
-  }, "Refund amount must be a positive number"),
+  // A plain amount of money, like a sale's price (C10 batch 6b): parseFloat let "5abc" through as 5.
+  refundAmount: z.string()
+    .regex(/^\d+(\.\d{1,2})?$/, "Refund amount must be a plain amount, like 5.00")
+    .refine((val) => Number(val) > 0, "Refund amount must be a positive number"),
   refundReason: z.string().min(1, "Refund reason is required").max(500, "Reason must be under 500 characters"),
   refundMethod: z.enum(["original_payment_method", "bank_transfer", "manual"]).default("original_payment_method"),
 });
 
+// Every new password meets the owner's rule (shared/password-rule.ts, 2026-09-23).
+export const newPasswordSchema = z.string().refine(meetsPasswordRule, PASSWORD_RULE);
+
+/** The turnover ranges sign-up and onboarding offer. */
+export const ANNUAL_TURNOVER_RANGES = ["Under $50k", "$50k–$150k", "$150k–$500k", "$500k–$1m", "Over $1m"] as const;
+
 export const publicSignupSchema = z.object({
   name: z.string().min(1, "Full name is required").max(100),
   email: z.string().email("Valid email is required"),
-  password: z.string()
-    .min(8, "Password must be at least 8 characters")
-    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
-    .regex(/[a-z]/, "Password must contain at least one lowercase letter")
-    .regex(/[0-9]/, "Password must contain at least one number"),
+  phone: z.string().min(1, "Phone number is required").max(20),
+  businessName: z.string().min(1, "Business name is required").max(100),
+  businessType: z.enum(["sole-trader", "limited-company", "partnership", "trust", "charity", "other"]),
+  businessAddress: z.string().min(1, "Business address is required").max(200),
+  nzbn: z.string().max(20).default(""),
+  gstNumber: z.string().max(20).default(""),
+  director: z.string().min(1, "Director / owner name is required").max(100),
+  businessDescription: z.string().min(1, "Business description is required").max(500),
+  websiteUrl: z.union([z.string().url("Enter a valid website URL"), z.literal("")]).default(""),
+  estimatedAnnualTurnover: z.enum(ANNUAL_TURNOVER_RANGES),
+  planId: planIdSchema.default("solo"),
+  password: newPasswordSchema,
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
 });
 
-export const businessDetailsSchema = z.object({
-  businessName: z.string().min(1, "Business name is required").max(100),
-  director: z.string().min(1, "Director / responsible person name is required").max(100),
-  contactEmail: z.string().email("Valid email is required"),
-  contactPhone: z.string().min(1, "Phone number is required").max(20),
-  gstNumber: z.string().min(1, "GST number is required").max(20),
-  businessAddress: z.string().max(200).optional(),
-  nzbn: z.string().max(20).optional(),
+/**
+ * The onboarding page's details (client/src/pages/merchant-onboarding.tsx), held to sign-up's
+ * rules; an empty optional detail means none (C10 batch 6, 2026-09-27).
+ */
+export const merchantOnboardingSchema = z.object({
+  director: z.string().trim().min(1, "Director / owner name is required").max(100),
+  nzbn: z.string().trim().max(20).default(""),
+  gstNumber: z.string().trim().max(20).default(""),
+  businessDescription: z.string().trim().max(500).default(""),
+  websiteUrl: z.union([z.string().url("Enter a valid website URL"), z.literal("")]).default(""),
+  estimatedAnnualTurnover: z.union([z.enum(ANNUAL_TURNOVER_RANGES), z.literal("")]).default(""),
+}).strict();
+
+export const inviteTeamMemberSchema = z.object({
+  email: z.string().email("Valid email is required").max(200),
+  name: z.string().max(100).optional(),
+});
+
+export const acceptInviteSchema = z.object({
+  token: z.string().min(1, "Invite token is required"),
+  name: z.string().max(100).optional(),
+  password: newPasswordSchema,
+  confirmPassword: z.string(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
 });
 
 export type PublicSignup = z.infer<typeof publicSignupSchema>;
-export type BusinessDetails = z.infer<typeof businessDetailsSchema>;
 
 export const createMerchantSchema = z.object({
   name: z.string().min(1, "Merchant name is required").max(50),
@@ -321,11 +494,7 @@ export const createMerchantSchema = z.object({
   ),
   phone: z.string().min(1, "Phone number is required").max(20),
   address: z.string().min(1, "Address is required").max(200),
-  password: z.string()
-    .min(8, "Password must be at least 8 characters")
-    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
-    .regex(/[a-z]/, "Password must contain at least one lowercase letter")
-    .regex(/[0-9]/, "Password must contain at least one number"),
+  password: newPasswordSchema,
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
@@ -334,19 +503,11 @@ export const createMerchantSchema = z.object({
 
 export const verifyMerchantSchema = z.object({
   token: z.string().min(1, "Verification token is required"),
-  password: z.string()
-    .min(8, "Password must be at least 8 characters")
-    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
-    .regex(/[a-z]/, "Password must contain at least one lowercase letter")
-    .regex(/[0-9]/, "Password must contain at least one number"),
+  password: newPasswordSchema,
   confirmPassword: z.string().min(1, "Password confirmation is required"),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
-});
-
-export const updateMerchantRatesSchema = z.object({
-  currentProviderRate: z.string().regex(/^\d+(\.\d{1,4})?$/, "Rate must be a valid percentage"),
 });
 
 export const updateMerchantDetailsSchema = z.object({
@@ -354,13 +515,6 @@ export const updateMerchantDetailsSchema = z.object({
   contactEmail: z.string().email("Valid email is required"),
   contactPhone: z.string().min(1, "Phone number is required").max(20),
   businessAddress: z.string().min(1, "Business address is required").max(200),
-});
-
-export const updateBankAccountSchema = z.object({
-  bankName: z.string().min(1, "Bank name is required").max(50),
-  bankAccountNumber: z.string().regex(/^\d{2}-\d{4}-\d{7}-\d{2,3}$/, "Must be valid NZ account format (12-3456-1234567-12)"),
-  bankBranch: z.string().min(1, "Bank branch is required").max(50),
-  accountHolderName: z.string().min(1, "Account holder name is required").max(100),
 });
 
 export const updateThemeSchema = z.object({
@@ -371,17 +525,9 @@ export const updateDailyGoalSchema = z.object({
   dailyGoal: z.string().regex(/^\d+(\.\d{1,2})?$/, "Daily goal must be a valid amount"),
 });
 
-export const updateCryptoSettingsSchema = z.object({
-  coinbaseCommerceApiKey: z.string().optional(),
-  coinbaseWebhookSecret: z.string().optional(),
-  cryptoEnabled: z.boolean(),
-  enabledCryptocurrencies: z.array(z.string()).optional(),
-  minConfirmations: z.number().min(1).max(6).default(1),
-});
-
 export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, "Current password is required"),
-  newPassword: z.string().min(6, "New password must be at least 6 characters"),
+  newPassword: newPasswordSchema,
   confirmPassword: z.string(),
 }).refine((data) => data.newPassword === data.confirmPassword, {
   message: "Passwords don't match",
@@ -391,18 +537,48 @@ export const changePasswordSchema = z.object({
 export const insertTransactionSchema = createInsertSchema(transactions).omit({
   id: true,
   createdAt: true,
+  completedAt: true,
   windcaveTransactionId: true,
   windcaveSessionId: true,
   windcaveSessionState: true,
   windcaveXId: true,
+  paymentTokenHash: true,
 }).extend({
   merchantId: z.number(),
   price: z.string().regex(/^\d+(\.\d{2})?$/, "Price must be a valid decimal"),
   status: z.enum(["pending", "processing", "completed", "failed"]).default("pending"),
-  paymentMethod: z.enum(["qr_code", "nfc_tap", "card_reader", "manual", "cash", "tap_to_pay", "crypto", "api"]).default("qr_code"),
+  paymentMethod: z.enum(["qr_code", "nfc_tap", "card_reader", "manual", "cash", "tap_to_pay", "api"]).default("qr_code"),
   selectedStoneId: z.number().optional(),
   splitEnabled: z.boolean().optional().default(false),
 });
+
+// External merchant-terminal request contract. Keep this separate from the
+// table-derived insert schema so callers can never set database/payment fields.
+// Existing phone clients redundantly send status:"pending"; accept and discard
+// only that literal during the compatibility cutover.
+export const retailTransactionCreateRequestSchema = z.object({
+  merchantId: z.number().int().positive(),
+  itemName: z.string().trim().min(1).max(200),
+  price: z.string()
+    .regex(/^\d+(\.\d{1,2})?$/, "Price must be a valid decimal")
+    .refine((value) => Number(value) > 0, "Price must be greater than zero"),
+  splitEnabled: z.boolean().optional().default(false),
+  selectedStoneId: z.number().int().positive().nullable().optional(),
+  // No default: without a board a sale is per-payment, with one it uses its board's
+  // shared address ("legacy"); server/routes.ts decides when this is omitted.
+  linkMode: z.enum(["legacy", "per_payment"]).optional(),
+  status: z.literal("pending").optional(),
+}).strict();
+
+export type RetailTransactionCreateRequest = z.infer<typeof retailTransactionCreateRequestSchema>;
+
+/** A cash sale from the terminals, held to the rules creating a sale uses (C10 batch 6b, 2026-09-27). */
+export const cashSaleRequestSchema = z.object({
+  merchantId: retailTransactionCreateRequestSchema.shape.merchantId,
+  itemName: retailTransactionCreateRequestSchema.shape.itemName,
+  price: retailTransactionCreateRequestSchema.shape.price,
+  stoneId: z.number().int().positive().nullable().optional(),
+}).strict();
 
 // Password reset schemas
 export const forgotPasswordSchema = z.object({
@@ -411,17 +587,11 @@ export const forgotPasswordSchema = z.object({
 
 export const resetPasswordSchema = z.object({
   token: z.string().min(1, "Reset token is required"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
-  confirmPassword: z.string().min(6, "Password confirmation is required"),
+  password: newPasswordSchema,
+  confirmPassword: z.string().min(1, "Password confirmation is required"),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
-});
-
-export const insertPlatformFeeSchema = createInsertSchema(platformFees).omit({
-  id: true,
-  createdAt: true,
-  collectedAt: true,
 });
 
 // Tapt Stones table - multiple QR codes per merchant
@@ -435,7 +605,11 @@ export const taptStones = pgTable("tapt_stones", {
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (t) => ({
+  activeMerchantNumberUnique: uniqueIndex("tapt_stones_active_merchant_number_uq")
+    .on(t.merchantId, t.stoneNumber)
+    .where(sql`${t.isActive} is true`),
+}));
 
 // Stock Items table - merchant inventory management
 export const stockItems = pgTable("stock_items", {
@@ -505,38 +679,92 @@ export const webhookDeliveries = pgTable("webhook_deliveries", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Merchant Subscriptions table - tracks subscription tier and transaction counts
+/**
+ * One subscription per merchant. Seat-priced monthly plans (see shared/plans.ts);
+ * there are no per-transaction fees.
+ *
+ * `planId` / `seatLimit` / `priceCents` are denormalised from the catalogue on
+ * purpose: a merchant keeps the price they signed up at until they change plan,
+ * so a catalogue price rise cannot silently re-price an existing subscription.
+ */
 export const merchantSubscriptions = pgTable("merchant_subscriptions", {
   id: serial("id").primaryKey(),
   merchantId: integer("merchant_id").references(() => merchants.id).notNull().unique(),
-  tier: text("tier").notNull().default("free"), // free, paid
-  status: text("status").notNull().default("active"), // active, cancelled, past_due, suspended
-  
-  // Transaction tracking
+  planId: text("plan_id").notNull().default("solo"), // solo, team, crew
+  seatLimit: integer("seat_limit").notNull().default(1),
+  priceCents: integer("price_cents").notNull().default(799),
+  status: text("status").notNull().default("pending"), // pending, active, past_due, suspended, cancelled
+
+  // Billing period. The rebill job charges when currentPeriodEnd passes.
+  currentPeriodStart: timestamp("current_period_start"),
+  currentPeriodEnd: timestamp("current_period_end"),
+  nextBillingDate: timestamp("next_billing_date"),
+  lastBillingDate: text("last_billing_date"), // ISO string of last successful billing
+
+  // Queued downgrade — applied by the billing job at period end so nobody loses
+  // seats they have already paid for.
+  pendingPlanId: text("pending_plan_id"),
+  pendingPlanEffectiveAt: timestamp("pending_plan_effective_at"),
+
+  // Cancellation: access continues until currentPeriodEnd, then no renewal.
+  cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
+  cancellationRequestedAt: timestamp("cancellation_requested_at"),
+  cancellationEffectiveDate: timestamp("cancellation_effective_date"),
+  cancellationReason: text("cancellation_reason"),
+
+  // Windcave card-on-file. The PAN never reaches this server: Windcave returns a
+  // card token plus the masked metadata mirrored here for display.
+  windcaveCardId: text("windcave_card_id"),
+  windcaveBillingRef: text("windcave_billing_ref"),
+  cardBrand: text("card_brand"),
+  cardLast4: text("card_last4"),
+  cardExpiry: text("card_expiry"), // MM/YY
+
+  // Dunning
+  failedPaymentCount: integer("failed_payment_count").notNull().default(0),
+  lastPaymentFailureAt: timestamp("last_payment_failure_at"),
+  lastPaymentFailureReason: text("last_payment_failure_reason"),
+
+  // A short lease prevents overlapping cron workers from billing the same row.
+  // Only the worker holding this token may finalise the provider outcome.
+  billingClaimToken: text("billing_claim_token"),
+  billingClaimedAt: timestamp("billing_claimed_at"),
+
+  // Usage statistics only — these no longer gate or price anything.
   currentMonthTransactions: integer("current_month_transactions").default(0),
   totalLifetimeTransactions: integer("total_lifetime_transactions").default(0),
-  monthStartDate: timestamp("month_start_date").defaultNow(), // When current month started (resets monthly)
-  
-  // Billing configuration
-  billingFrequency: text("billing_frequency").default("monthly"), // weekly, bi_weekly, monthly
-  nextBillingDate: timestamp("next_billing_date"),
-  unbilledTransactionCount: integer("unbilled_transaction_count").default(0), // Transactions not yet billed
-  unbilledAmount: decimal("unbilled_amount", { precision: 10, scale: 2 }).default("0.00"), // Total unbilled fees
-  
-  // Cancellation tracking
-  cancellationRequestedAt: timestamp("cancellation_requested_at"),
-  cancellationEffectiveDate: timestamp("cancellation_effective_date"), // 30 days after request
-  cancellationReason: text("cancellation_reason"),
-  
-  // Stripe integration
+  monthStartDate: timestamp("month_start_date").defaultNow(),
+
+  // Superseded columns, retained so historical rows stay readable. Nothing reads
+  // them: `tier`/`billingFrequency` predate seat plans, the unbilled_* pair
+  // accrued the old $0.10 transaction fee, and Stripe was never wired up.
+  // NOT NULL in every database measured (0010a:96 creates it so, and both the
+  // clean build and production agree). The declaration omitted .notNull(), which
+  // made Drizzle type it string | null and accept an explicit null the database
+  // rejects. R0-T6A named this disagreement; resolved toward the database.
+  tier: text("tier").notNull().default("free"),
+  billingFrequency: text("billing_frequency").default("monthly"),
+  unbilledTransactionCount: integer("unbilled_transaction_count").default(0),
+  unbilledAmount: decimal("unbilled_amount", { precision: 10, scale: 2 }).default("0.00"),
   stripeCustomerId: text("stripe_customer_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),
   stripePaymentMethodId: text("stripe_payment_method_id"),
-  lastBillingDate: text("last_billing_date"), // ISO string of last successful billing
-  
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (t) => ({
+  planIdCheck: check("merchant_subscriptions_plan_id_check", sql`${t.planId} in ('solo', 'team', 'crew')`),
+  pendingPlanIdCheck: check(
+    "merchant_subscriptions_pending_plan_id_check",
+    sql`${t.pendingPlanId} is null or ${t.pendingPlanId} in ('solo', 'team', 'crew')`,
+  ),
+  statusCheck: check(
+    "merchant_subscriptions_status_check",
+    sql`${t.status} in ('pending', 'active', 'past_due', 'suspended', 'cancelled')`,
+  ),
+  seatLimitCheck: check("merchant_subscriptions_seat_limit_check", sql`${t.seatLimit} >= 1`),
+  priceCentsCheck: check("merchant_subscriptions_price_cents_check", sql`${t.priceCents} >= 0`),
+}));
 
 // Subscription Billing History table - tracks all billing events
 export const subscriptionBillingHistory = pgTable("subscription_billing_history", {
@@ -544,25 +772,35 @@ export const subscriptionBillingHistory = pgTable("subscription_billing_history"
   merchantId: integer("merchant_id").references(() => merchants.id).notNull(),
   subscriptionId: integer("subscription_id").references(() => merchantSubscriptions.id),
   
-  // Billing details
-  billingType: text("billing_type").notNull(), // tier_upgrade, transaction_fees, monthly_subscription
+  // Billing details. `monthly_subscription` and `plan_change` are the live types;
+  // `transaction_fees` and `tier_upgrade` only appear on pre-2026-08 rows.
+  billingType: text("billing_type").notNull(),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   transactionCount: integer("transaction_count").default(0), // Number of transactions billed
   billingPeriodStart: timestamp("billing_period_start"),
   billingPeriodEnd: timestamp("billing_period_end"),
   
-  // Stripe payment details
+  // Provider reconciliation details. Stripe columns remain for historical rows.
   stripePaymentIntentId: text("stripe_payment_intent_id"),
   stripeChargeId: text("stripe_charge_id"),
+  windcaveTransactionId: text("windcave_transaction_id"),
+  idempotencyKey: text("idempotency_key"),
+  attemptNumber: integer("attempt_number"),
   status: text("status").notNull().default("pending"), // pending, succeeded, failed, refunded
   
   // Details
-  description: text("description"), // e.g., "Transaction fees: 150 transactions @ $0.10 each"
+  description: text("description"), // e.g., "Team plan — 1 Sep to 1 Oct 2026"
   failureReason: text("failure_reason"),
   
   paidAt: timestamp("paid_at"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => ({
+  merchantCreatedIdx: index("subscription_billing_history_merchant_created_idx")
+    .on(t.merchantId, t.createdAt),
+  idempotencyKeyUnique: uniqueIndex("subscription_billing_history_idempotency_key_uq")
+    .on(t.idempotencyKey)
+    .where(sql`${t.idempotencyKey} is not null`),
+}));
 
 // Info pack lead capture table
 export const infoPackLeads = pgTable("info_pack_leads", {
@@ -582,22 +820,92 @@ export const createInfoPackLeadSchema = z.object({
 export type InfoPackLead = typeof infoPackLeads.$inferSelect;
 export type InsertInfoPackLead = z.infer<typeof insertInfoPackLeadSchema>;
 
+export const DEFAULT_PUSH_NOTIFICATION_PREFERENCES = Object.freeze({
+  paymentReceived: true,
+  dailyPayoutSummary: true,
+  failedPaymentAlerts: false,
+});
+
+export const pushNotificationPreferencesSchema = z.object({
+  paymentReceived: z.boolean(),
+  dailyPayoutSummary: z.boolean(),
+  failedPaymentAlerts: z.boolean(),
+}).strict();
+
+export type PushNotificationPreferences = z.infer<typeof pushNotificationPreferencesSchema>;
+
+export function normalizePushNotificationPreferences(
+  value: unknown,
+): PushNotificationPreferences {
+  const parsed = pushNotificationPreferencesSchema.safeParse(value);
+  return parsed.success
+    ? parsed.data
+    : { ...DEFAULT_PUSH_NOTIFICATION_PREFERENCES };
+}
+
+export const PUSH_NOTIFICATION_EVENT_TYPES = [
+  "transaction_created",
+  "payment_received",
+  "payment_failed",
+  "refund_processed",
+  "daily_payout_summary",
+] as const;
+
+export type PushNotificationEventType = typeof PUSH_NOTIFICATION_EVENT_TYPES[number];
+
 // Push notification subscriptions table
 export const pushSubscriptions = pgTable("push_subscriptions", {
   id: serial("id").primaryKey(),
   merchantId: integer("merchant_id").references(() => merchants.id).notNull(),
+  // R1-T4 (0029): the login that made it; NULL for subscriptions from before.
+  userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }),
   endpoint: text("endpoint").notNull(),
   p256dh: text("p256dh").notNull(),
   auth: text("auth").notNull(),
   userAgent: text("user_agent"),
   isActive: boolean("is_active").default(true),
+  preferences: jsonb("preferences")
+    .$type<PushNotificationPreferences>()
+    .notNull()
+    .default(DEFAULT_PUSH_NOTIFICATION_PREFERENCES),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => ({
+  userIdIdx: index("push_subscriptions_user_id_idx").on(t.userId),
+}));
 
 export const insertPushSubscriptionSchema = createInsertSchema(pushSubscriptions).omit({
   id: true,
+  preferences: true,
   createdAt: true,
 });
+
+// Persistent claim records make scheduled push producers safe under cron
+// retries and overlapping processes. No notification payload or endpoint secret
+// is stored here.
+export const pushNotificationDeliveries = pgTable("push_notification_deliveries", {
+  id: serial("id").primaryKey(),
+  merchantId: integer("merchant_id")
+    .references(() => merchants.id, { onDelete: "cascade" })
+    .notNull(),
+  eventType: text("event_type").$type<PushNotificationEventType>().notNull(),
+  eventKey: text("event_key").notNull(),
+  status: text("status").notNull().default("claimed"),
+  claimToken: uuid("claim_token").notNull().defaultRandom(),
+  claimedAt: timestamp("claimed_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  completedAt: timestamp("completed_at"),
+}, (t) => ({
+  merchantEventKeyUnique: uniqueIndex("push_notification_deliveries_merchant_event_key_uq")
+    .on(t.merchantId, t.eventType, t.eventKey),
+  eventTypeCheck: check(
+    "push_notification_deliveries_event_type_check",
+    sql`${t.eventType} in ('transaction_created', 'payment_received', 'payment_failed', 'refund_processed', 'daily_payout_summary')`,
+  ),
+  statusCheck: check(
+    "push_notification_deliveries_status_check",
+    sql`${t.status} in ('claimed', 'processed', 'skipped', 'failed')`,
+  ),
+}));
 
 // API Key schemas
 export const createApiKeySchema = z.object({
@@ -671,38 +979,11 @@ export const insertUserSchema = createInsertSchema(users).omit({
   resetTokenExpiry: true,
 });
 
-// Crypto transaction schemas
-export const insertCryptoTransactionSchema = createInsertSchema(cryptoTransactions).omit({
-  id: true,
-  createdAt: true,
-  completedAt: true,
-});
-
-export const createCryptoTransactionSchema = z.object({
-  itemName: z.string().min(1, "Item name is required"),
-  fiatAmount: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid amount format"),
-  cryptocurrency: z.enum(["BTC", "ETH", "USDC", "USDT", "LTC", "BCH"]).default("BTC"),
-});
-
-// Merchant settings schemas
-export const updateMerchantCryptoSettingsSchema = z.object({
-  coinbaseCommerceApiKey: z.string().min(1, "API key is required"),
-  cryptoEnabled: z.boolean().default(true),
-  enabledCryptocurrencies: z.array(z.string()).min(1, "Select at least one cryptocurrency"),
-  autoConvertToFiat: z.boolean().default(false),
-  minConfirmations: z.number().min(1).max(6).default(1),
-});
-
 // Subscription schemas
 export const insertMerchantSubscriptionSchema = createInsertSchema(merchantSubscriptions).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
-});
-
-export const updateSubscriptionSchema = z.object({
-  tier: z.enum(["free", "paid"]).optional(),
-  billingFrequency: z.enum(["weekly", "bi_weekly", "monthly"]).optional(),
 });
 
 export const cancelSubscriptionSchema = z.object({
@@ -717,13 +998,15 @@ export const insertBillingHistorySchema = createInsertSchema(subscriptionBilling
 
 // Type exports - consolidated to avoid duplicates
 export type Merchant = typeof merchants.$inferSelect;
+export type MerchantTutorialProgress = typeof merchantTutorialProgress.$inferSelect;
 export type InsertMerchant = z.infer<typeof createMerchantSchema>;
 export type CreateMerchant = z.infer<typeof createMerchantSchema>;
 export type VerifyMerchant = z.infer<typeof verifyMerchantSchema>;
 export type Transaction = typeof transactions.$inferSelect;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
-export type PlatformFee = typeof platformFees.$inferSelect;
-export type InsertPlatformFee = z.infer<typeof insertPlatformFeeSchema>;
+export type SplitPayment = typeof splitPayments.$inferSelect;
+export type PaymentAttempt = typeof paymentAttempts.$inferSelect;
+export type InsertPaymentAttempt = typeof paymentAttempts.$inferInsert;
 export type MerchantSettlement = typeof merchantSettlements.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -743,15 +1026,9 @@ export type StockItem = typeof stockItems.$inferSelect;
 export type InsertStockItem = z.infer<typeof insertStockItemSchema>;
 export type CreateStockItem = z.infer<typeof createStockItemSchema>;
 
-// Crypto Transaction types
-export type CryptoTransaction = typeof cryptoTransactions.$inferSelect;
-export type InsertCryptoTransaction = z.infer<typeof insertCryptoTransactionSchema>;
-export type CreateCryptoTransaction = z.infer<typeof createCryptoTransactionSchema>;
-
 // Subscription types
 export type MerchantSubscription = typeof merchantSubscriptions.$inferSelect;
 export type InsertMerchantSubscription = z.infer<typeof insertMerchantSubscriptionSchema>;
-export type UpdateSubscription = z.infer<typeof updateSubscriptionSchema>;
 export type CancelSubscription = z.infer<typeof cancelSubscriptionSchema>;
 
 // Billing History types
@@ -761,6 +1038,7 @@ export type InsertBillingHistory = z.infer<typeof insertBillingHistorySchema>;
 // Push Subscription types
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;
 export type InsertPushSubscription = z.infer<typeof insertPushSubscriptionSchema>;
+export type PushNotificationDelivery = typeof pushNotificationDeliveries.$inferSelect;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PROPERTY MANAGEMENT VERTICAL
@@ -880,6 +1158,14 @@ const personNameSchema = z.string().trim().min(1).max(80);
 const optionalEmailSchema = z.string().trim().email().max(200).optional().or(z.literal("")).transform(v => v || undefined);
 const optionalPhoneSchema = z.string().trim().min(1).max(40).optional().or(z.literal("")).transform(v => v || undefined);
 
+// An edit's optional field: left out, it stays as it is (undefined, which the update leaves out);
+// sent empty, it is cleared (null). The edit screens send the whole form, so a field the person
+// emptied arrives as "" and was dropped, the old value kept (owner decision 2026-09-27).
+const clearedWhenEmpty = <T extends z.ZodTypeAny>(field: T) =>
+  field.or(z.literal("")).optional().transform((v) => (v === "" ? null : v));
+const editableEmailSchema = clearedWhenEmpty(z.string().trim().email().max(200));
+const editablePhoneSchema = clearedWhenEmpty(z.string().trim().min(1).max(40));
+
 const tenantProfileFields = z.object({
   firstName: personNameSchema,
   lastName: personNameSchema,
@@ -891,7 +1177,11 @@ const tenantProfileFields = z.object({
 });
 
 export const createTenantProfileSchema = tenantProfileFields;
-export const updateTenantProfileSchema = tenantProfileFields.partial();
+export const updateTenantProfileSchema = tenantProfileFields.partial().extend({
+  email: editableEmailSchema,
+  phone: editablePhoneSchema,
+  coTenantsText: clearedWhenEmpty(z.string().max(1000)),
+});
 
 export const createActiveScheduleSchema = z.object({
   tenantProfileId: z.string().uuid(),
@@ -903,12 +1193,12 @@ export const createActiveScheduleSchema = z.object({
 });
 
 // Pause/resume is driven by `status` (active ↔ paused); the legacy pauseNextCycle
-// flag is no longer accepted from clients.
+// flag is no longer accepted from clients. Cancelling is DELETE, which records when (C10 batch 6c).
 export const updateActiveScheduleSchema = z.object({
   amountCents: z.number().int().positive().max(100_000_000).optional(),
   frequency: z.enum(["weekly", "fortnightly", "monthly"]).optional(),
   deliveryChannel: z.enum(["email", "whatsapp", "sms"]).optional(),
-  status: z.enum(["active", "paused", "terminated"]).optional(),
+  status: z.enum(["active", "paused"]).optional(),
 });
 
 export const updateRentReminderSettingsSchema = z.object({
@@ -943,8 +1233,10 @@ export const createAdHocInvoiceSchema = z.object({
   documentName: z.string().trim().max(255).optional().or(z.literal("")).transform(v => v || undefined),
 });
 
+// Every "mark received" screen sends null when no reference is typed: none (C10 batch 6d; it was
+// refused, 400).
 export const markInvoicePaidExternalSchema = z.object({
-  externalPaymentReference: z.string().trim().max(200).optional().or(z.literal("")).transform(v => v || undefined),
+  externalPaymentReference: z.string().trim().max(200).nullish().transform(v => v || undefined),
 });
 
 // Property management types
@@ -1106,7 +1398,11 @@ const clientProfileFields = z.object({
   preferredChannel: z.enum(["email", "whatsapp", "sms"]).default("email"),
 });
 export const createClientProfileSchema = clientProfileFields;
-export const updateClientProfileSchema = clientProfileFields.partial();
+export const updateClientProfileSchema = clientProfileFields.partial().extend({
+  email: editableEmailSchema,
+  phone: editablePhoneSchema,
+  notes: clearedWhenEmpty(z.string().max(1000)),
+});
 
 const quoteLineItemSchema = z.object({
   description: z.string().trim().min(1).max(200),
@@ -1116,7 +1412,13 @@ const quoteLineItemSchema = z.object({
 });
 
 export const createQuoteSchema = z.object({
-  clientProfileId: z.string().uuid(),
+  clientProfileId: z.string().uuid().optional(),
+  recipient: z.object({
+    name: z.string().trim().min(1).max(160),
+    email: z.string().trim().email().max(254).optional(),
+    address: z.string().trim().max(200).optional(),
+  }).optional(),
+  skipClient: z.boolean().optional(),
   lineItems: z.array(quoteLineItemSchema).min(1),
   deliveryChannel: z.enum(["email", "whatsapp", "sms"]).default("email"),
   depositEnabled: z.boolean().default(false),
@@ -1126,6 +1428,9 @@ export const createQuoteSchema = z.object({
   notes: z.string().trim().max(1000).optional().or(z.literal("")).transform(v => v || undefined),
   documentUrl: z.string().trim().max(500).optional().or(z.literal("")).transform(v => v || undefined),
   documentName: z.string().trim().max(255).optional().or(z.literal("")).transform(v => v || undefined),
+}).refine(d => Number(!!d.clientProfileId) + Number(!!d.recipient) + Number(d.skipClient === true) === 1, {
+  message: "Choose a client, enter details, or skip",
+  path: ["clientProfileId"],
 });
 
 export const acceptQuoteSchema = z.object({
@@ -1133,12 +1438,22 @@ export const acceptQuoteSchema = z.object({
 });
 
 export const createJobInvoiceSchema = z.object({
-  clientProfileId: z.string().uuid(),
+  // Either an existing client profile OR inline recipient details (quick
+  // invoice — the server creates a hidden 'prospect' profile from these).
+  clientProfileId: z.string().uuid().optional(),
+  recipient: z.object({
+    name: z.string().trim().min(1, "Name is required").max(120),
+    email: optionalEmailSchema,
+    phone: optionalPhoneSchema,
+    channel: z.enum(["email", "sms"]).default("email"),
+  }).optional(),
   amountCents: z.number().int().positive().max(100_000_000),
   deliveryChannel: z.enum(["email", "whatsapp", "sms"]),
   dueAt: z.string().datetime().or(z.date()).transform(v => new Date(v as any)),
   scheduledSendAt: z.string().datetime().or(z.date()).optional().transform(v => v ? new Date(v as any) : undefined),
-  kind: z.enum(["deposit", "balance", "full", "recurring"]).default("full"),
+  // Only what the screens send (C10 batch 6d): a balance is made by send-balance, which checks the
+  // deposit is paid and bills what is left once; a recurring invoice by the cron.
+  kind: z.enum(["deposit", "full"]).default("full"),
   quoteId: z.string().uuid().optional(),
   jobDetails: z.string().trim().max(500).optional().or(z.literal("")).transform(v => v || undefined),
   splitEnabled: z.boolean().optional(),
@@ -1149,11 +1464,28 @@ export const createJobInvoiceSchema = z.object({
   // quote-linked or send-balance can never compute a remaining amount.
   message: "A deposit invoice must be linked to a quote",
   path: ["quoteId"],
+}).refine(d => !!d.clientProfileId !== !!d.recipient, {
+  message: "Provide a client or recipient details",
+  path: ["clientProfileId"],
+}).refine(d => !d.recipient || (d.recipient.channel === "email" ? !!d.recipient.email : !!d.recipient.phone), {
+  message: "Recipient email or phone is required for the chosen channel",
+  path: ["recipient"],
+}).refine(d => !d.recipient || (d.kind === "full" && !d.quoteId), {
+  // Quick invoices are standalone: deposits/balances derive from a quote whose
+  // client already exists, so an inline recipient never makes sense there.
+  message: "Quick invoices must be standalone full invoices",
+  path: ["recipient"],
 });
 
+// As markInvoicePaidExternalSchema: the screens send null for no reference.
 export const markJobPaidExternalSchema = z.object({
-  externalPaymentReference: z.string().trim().max(200).optional().or(z.literal("")).transform(v => v || undefined),
+  externalPaymentReference: z.string().trim().max(200).nullish().transform(v => v || undefined),
 });
+
+// Sending a deposit's balance takes only the split switch (C10 batch 6d: it was read from the raw body).
+export const sendJobBalanceSchema = z.object({
+  splitEnabled: z.boolean().optional(),
+}).strict();
 
 export const createJobScheduleSchema = z.object({
   clientProfileId: z.string().uuid(),
@@ -1164,11 +1496,12 @@ export const createJobScheduleSchema = z.object({
   endDate: z.string().datetime().or(z.date()).optional().transform(v => v ? new Date(v as any) : undefined),
 });
 
+// Cancelling is DELETE, which records when (C10 batch 6d, as for rent).
 export const updateJobScheduleSchema = z.object({
   amountCents: z.number().int().positive().max(100_000_000).optional(),
   frequency: z.enum(["weekly", "fortnightly", "monthly"]).optional(),
   deliveryChannel: z.enum(["email", "whatsapp", "sms"]).optional(),
-  status: z.enum(["active", "paused", "terminated"]).optional(),
+  status: z.enum(["active", "paused"]).optional(),
 });
 
 // Trades types
@@ -1177,3 +1510,114 @@ export type InsertClientProfile = typeof clientProfiles.$inferInsert;
 export type Quote = typeof quotes.$inferSelect;
 export type JobInvoice = typeof jobInvoices.$inferSelect;
 export type JobSchedule = typeof jobSchedules.$inferSelect;
+
+// ── Uploaded files (DB-backed) ───────────────────────────────────────────────
+// Merchant logos and invoice documents used to live on the local filesystem
+// under uploads/. On autoscale deployments the filesystem is ephemeral, so every
+// deploy/restart wiped customer uploads. Files are now stored in Postgres and
+// served from the DB; `path` mirrors the public URL under /uploads/ (e.g.
+// "logos/merchant-5.png") so previously-issued URLs keep resolving.
+const bytea = customType<{ data: Buffer }>({
+  dataType() {
+    return "bytea";
+  },
+});
+
+export const uploadedFiles = pgTable("uploaded_files", {
+  id: serial("id").primaryKey(),
+  path: text("path").notNull().unique(),
+  mimeType: text("mime_type").notNull(),
+  data: bytea("data").notNull(),
+  // Owning tenant (gap 13, docs/decisions/2026-09-14-uploads-tenant-authorization-option-c-disposition.md).
+  // Nullable on purpose: a row that predates migration 0023 and could not be
+  // attributed unambiguously stays NULL, and no tenant-scoped route serves a
+  // NULL-tenant row (fail closed). Plain FK, matching this schema's dominant
+  // convention: a merchant that still owns uploads cannot be hard-deleted until
+  // retention policy (plan A-H3) says what happens to its documents.
+  merchantId: integer("merchant_id").references(() => merchants.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => ({
+  merchantIdIdx: index("uploaded_files_merchant_id_idx").on(t.merchantId),
+}));
+
+export type UploadedFile = typeof uploadedFiles.$inferSelect;
+
+// Gap 13: an admin download is served only after this durable append succeeds.
+// No merchant FK: retaining an audit record must not depend on account lifetime.
+export const invoiceDocumentAccessAudit = pgTable("invoice_document_access_audit", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  adminUserId: integer("admin_user_id").notNull(),
+  documentName: text("document_name").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Ephemeral counters, not audit data. Expired rows are cleaned under the global
+// bucket lock. Keys contain only a constant or the SHA-256 of a checkout token.
+export const invoiceDocumentReadLimits = pgTable("invoice_document_read_limits", {
+  key: text("key").primaryKey(),
+  count: integer("count").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+});
+
+// R1-T4 (0026): Google sign-in's one-time handoff code — only its SHA-256 is
+// stored; single use (consumed_at), 60-second life.
+export const authHandoffCodes = pgTable("auth_handoff_codes", {
+  codeHash: text("code_hash").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  newUser: boolean("new_user").notNull().default(false),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  consumedAt: timestamp("consumed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  expiresAtIdx: index("auth_handoff_codes_expires_at_idx").on(t.expiresAt),
+}));
+
+// R1-T4 (0028): sign-in and recovery throttles shared by every instance. The key
+// is a purpose and an HMAC of the email or client address — neither is stored.
+export const authThrottle = pgTable("auth_throttle", {
+  bucketKey: text("bucket_key").primaryKey(),
+  failures: integer("failures").notNull().default(0),
+  windowStartedAt: timestamp("window_started_at", { withTimezone: true }).notNull().defaultNow(),
+  nextAllowedAt: timestamp("next_allowed_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  updatedAtIdx: index("auth_throttle_updated_at_idx").on(t.updatedAt),
+}));
+
+// Each provider session opened for a split rent or trades invoice (0030; owner decision
+// 2026-09-26): the amount it was opened for and the email its payer gave. A split share is
+// paid only by a session recorded here for its invoice; paid_at marks the share it paid.
+export const invoiceSplitSessions = pgTable("invoice_split_sessions", {
+  windcaveSessionId: text("windcave_session_id").primaryKey(),
+  rentInvoiceId: uuid("rent_invoice_id").references(() => invoicesRentRequests.id, { onDelete: "cascade" }),
+  jobInvoiceId: uuid("job_invoice_id").references(() => jobInvoices.id, { onDelete: "cascade" }),
+  amountCents: integer("amount_cents").notNull(),
+  payerEmail: text("payer_email"),
+  openedAt: timestamp("opened_at", { withTimezone: true }).notNull().defaultNow(),
+  paidAt: timestamp("paid_at", { withTimezone: true }),
+}, (t) => ({
+  rentInvoiceIdx: index("invoice_split_sessions_rent_invoice_idx").on(t.rentInvoiceId),
+  jobInvoiceIdx: index("invoice_split_sessions_job_invoice_idx").on(t.jobInvoiceId),
+}));
+
+export type InvoiceSplitSession = typeof invoiceSplitSessions.$inferSelect;
+
+// Gap 13 (0025): what the operator-approved inventory decided for each legacy
+// invoice document — an owner with its evidence, or locked (admin-only) with a
+// reason. Written once by the migration, never by the app. Audit data: no foreign
+// keys, so the record outlives the file and the account.
+export const uploadedFileOwnershipEvidence = pgTable("uploaded_file_ownership_evidence", {
+  fileId: integer("file_id").primaryKey(),
+  pathSha256: text("path_sha256").notNull(),
+  contentSha256: text("content_sha256").notNull(),
+  disposition: text("disposition").notNull(),
+  merchantId: integer("merchant_id"),
+  evidenceKind: text("evidence_kind"),
+  evidenceRef: text("evidence_ref"),
+  evidenceSha256: text("evidence_sha256"),
+  lockedReason: text("locked_reason"),
+  approvedBy: text("approved_by").notNull(),
+  approvedAt: timestamp("approved_at", { withTimezone: true }).notNull(),
+  inventorySha256: text("inventory_sha256").notNull(),
+  recordedAt: timestamp("recorded_at", { withTimezone: true }).defaultNow().notNull(),
+});

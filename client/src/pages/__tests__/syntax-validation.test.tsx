@@ -199,7 +199,8 @@ describe('Component Import Test', () => {
       throw new Error(`${failed.length} components failed to import: ${failed.map(f => f.path).join(', ')}`);
     }
 
-    expect(importResults).toHaveLength(24);
+    // Count is 23 since verify-merchant was removed in the onboarding consolidation.
+    expect(importResults).toHaveLength(23);
     expect(importResults.every(result => result.success)).toBe(true);
   });
 });

@@ -113,7 +113,6 @@ export async function generateReceiptPdf(
   const breakdown: [string, string][] = [
     ['Subtotal (excl. GST):', `$${netAmount.toFixed(2)}`],
     [`GST (${(gstRate * 100).toFixed(0)}%):`, `$${gstAmount.toFixed(2)}`],
-    ['Processing Fee:', '$0.20'],
   ];
 
   breakdown.forEach(([label, value]) => {

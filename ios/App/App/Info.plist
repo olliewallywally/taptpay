@@ -32,11 +32,14 @@
 	<array>
 		<string>armv7</string>
 	</array>
+	<!-- MD5, settled 2026-08-29: the phone shell is portrait-only, matching
+	     client/public/manifest.json. Three visible stack rows is impossible at
+	     568x320 (docs/PLAN-2026-08-17-mobile-responsive-ui.md 4.2), and a POS
+	     terminal held sideways is not a real use case. The ~ipad key below is
+	     deliberately untouched - the tablet/desktop app is a separate contract. -->
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>

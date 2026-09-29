@@ -1,0 +1,10 @@
+{"rule":"private-key","file":"attached_assets/Pasted--type-service-account-project-id-swift-cursor-492707-t7_1775633514319.txt","commit":"","status":"review-required"}
+{"rule":"generic-api-key","file":"attached_assets/APIManagement_1763168150568.tsx","commit":"","status":"review-required"}
+{"rule":"generic-api-key","file":"attached_assets/APIManagement_1763168150568.tsx","commit":"","status":"review-required"}
+{"rule":"generic-api-key","file":"attached_assets/APIManagement_1763168150568.tsx","commit":"","status":"review-required"}
+{"rule":"generic-api-key","file":"attached_assets/APIManagement_1763168150568.tsx","commit":"","status":"review-required"}
+{"rule":"generic-api-key","file":"attached_assets/APIManagement_1763168150568.tsx","commit":"","status":"review-required"}
+{"rule":"curl-auth-header","file":"client/src/pages/admin-api.tsx","commit":"","status":"review-required"}
+{"rule":"generic-api-key","file":"docs/superpowers/plans/2026-06-23-trades-gst-mode-and-quote-pdf.md","commit":"","status":"review-required"}
+{"rule":"generic-api-key","file":"scripts/smoke-quote-pdf.ts","commit":"","status":"review-required"}
+{"status":"review-required","mode":"tree","findings":9}

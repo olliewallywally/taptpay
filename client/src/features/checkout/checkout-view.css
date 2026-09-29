@@ -1,0 +1,55 @@
+.checkout-view__quote-actions {
+  display: flex;
+  gap: 0;
+  width: 100%;
+  transition: gap 250ms ease;
+}
+
+.checkout-view__quote-actions--expanded {
+  gap: 12px;
+}
+
+.checkout-view__quote-icon-slot {
+  display: block;
+  flex: 0 0 0;
+  width: 0;
+  opacity: 0;
+  overflow: hidden;
+  transform: scale(0.6);
+  transform-origin: center;
+  transition: flex-basis 250ms ease, width 250ms ease, opacity 250ms ease, transform 250ms ease;
+}
+
+.checkout-view__quote-actions--expanded .checkout-view__quote-icon-slot {
+  flex-basis: 52px;
+  width: 52px;
+  opacity: 1;
+  overflow: visible;
+  transform: scale(1);
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.checkout-view__apple-pay-button {
+  -webkit-appearance: -apple-pay-button;
+  -apple-pay-button-type: pay;
+  -apple-pay-button-style: black;
+  display: block;
+  width: 100%;
+  height: 52px;
+  min-height: 44px;
+  border: none;
+  border-radius: 18px;
+  cursor: pointer;
+  margin-bottom: 10px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .checkout-view__quote-actions,
+  .checkout-view__quote-icon-slot {
+    transition: none;
+  }
+}

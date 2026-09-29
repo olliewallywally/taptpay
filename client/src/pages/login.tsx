@@ -6,6 +6,8 @@ import { z } from "zod";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { apiErrorMessage } from "@/lib/api-error";
+import { trackEvent } from "@/lib/analytics";
 import { SEOHead } from "@/components/SEOHead";
 import { ChevronDown, ArrowLeft } from "lucide-react";
 import taptLogoPath from "@assets/IMG_6592_1755070818452.png";
@@ -17,37 +19,69 @@ const loginSchema = z.object({
 
 type LoginFormData = z.infer<typeof loginSchema>;
 
+// Google sign-in's results, removed from the address on arrival. Everything else
+// (returnTo) stays for the password form.
+const GOOGLE_SIGN_IN_PARAMS = ['google', 'error', 'token', 'merchantId', 'newUser'];
+
 export default function Login() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [loginType, setLoginType] = useState<'merchant' | 'admin'>('merchant');
 
-  // Handle Google OAuth callback — token arrives as URL query param
+  // Finish Google sign-in (R1-T4 phase A). The server never puts an account
+  // token in the address: it sets a one-time code in an HttpOnly cookie and
+  // sends the browser to /login?google=complete, and this page redeems the code
+  // once, by POST, for the token in the response body. A token found in the
+  // address (the old hand-back, or a crafted link) is dropped unused.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
-    const merchantId = params.get('merchantId');
+    const googleComplete = params.get('google') === 'complete';
     const error = params.get('error');
-    const newUser = params.get('newUser');
 
-    if (token) {
-      localStorage.setItem('authToken', token);
-      if (merchantId) localStorage.setItem('merchantId', merchantId);
-      window.history.replaceState({}, '', '/login');
-      if (newUser === 'true') {
-        toast({
-          title: 'Welcome to TaptPay!',
-          description: 'Your account has been created. Please complete your profile in Settings.',
-        });
-      } else {
-        toast({ title: 'Welcome back!', description: 'Signed in with Google.' });
-      }
-      // Full-page navigation so AuthProvider re-checks auth with the new token
-      // (it only runs its check once on mount — see the merchant-login path).
-      window.location.href = '/dashboard';
+    if (GOOGLE_SIGN_IN_PARAMS.some((name) => params.has(name))) {
+      GOOGLE_SIGN_IN_PARAMS.forEach((name) => params.delete(name));
+      const rest = params.toString();
+      window.history.replaceState({}, '', `/login${rest ? `?${rest}` : ''}${window.location.hash}`);
+    }
+
+    const signInFailed = (description: string) => {
+      trackEvent("login_failed", { auth_method: "google", login_type: "merchant" });
+      toast({ title: 'Sign in failed', description, variant: 'destructive' });
+    };
+
+    if (googleComplete) {
+      void (async () => {
+        let result: { token?: unknown; merchantId?: unknown; newUser?: unknown; message?: unknown } = {};
+        let ok = false;
+        try {
+          const response = await fetch('/api/auth/google/session', { method: 'POST', credentials: 'same-origin' });
+          ok = response.ok;
+          result = await response.json().catch(() => ({}));
+        } catch {
+          // Network failure: fall through to the generic message.
+        }
+        if (!ok || typeof result.token !== 'string') {
+          signInFailed(typeof result.message === 'string' ? result.message : 'Google sign in failed. Please try again.');
+          return;
+        }
+        const newUser = result.newUser === true;
+        trackEvent("login_succeeded", { auth_method: "google", login_type: "merchant", new_user: newUser });
+        localStorage.setItem('authToken', result.token);
+        if (typeof result.merchantId === 'number') localStorage.setItem('merchantId', String(result.merchantId));
+        if (newUser) {
+          toast({
+            title: 'Welcome to TaptPay!',
+            description: 'Your account has been created. Please complete your profile in Settings.',
+          });
+        } else {
+          toast({ title: 'Welcome back!', description: 'Signed in with Google.' });
+        }
+        // Match password login: force the app-wide AuthProvider to re-mount and
+        // fetch /api/auth/me with the fresh token instead of keeping stale state.
+        window.location.href = '/dashboard';
+      })();
     } else if (error) {
-      window.history.replaceState({}, '', '/login');
-      toast({ title: 'Sign in failed', description: decodeURIComponent(error), variant: 'destructive' });
+      signInFailed(error);
     }
   }, []);
 
@@ -70,6 +104,7 @@ export default function Login() {
       return response.json();
     },
     onSuccess: (result) => {
+      trackEvent("login_succeeded", { auth_method: "password", login_type: loginType });
       if (loginType === 'merchant') {
         localStorage.setItem("authToken", result.token);
         localStorage.setItem("user", JSON.stringify(result.user));
@@ -99,11 +134,14 @@ export default function Login() {
           description: "Welcome to the Tapt Admin Dashboard",
         });
         
-        setLocation("/admin");
+        window.location.href = "/admin";
       }
     },
-    onError: (error: any) => {
-      setErrors({ general: error.message || "Invalid credentials. Please try again." });
+    onError: (error: unknown) => {
+      trackEvent("login_failed", { auth_method: "password", login_type: loginType });
+      // The server's words, not the raw "429: {…}" failure text: a slowed-down
+      // sign-in says how long to wait (R1-T4 phase C).
+      setErrors({ general: apiErrorMessage(error, "Invalid credentials. Please try again.") });
     },
   });
 
@@ -134,10 +172,12 @@ export default function Login() {
 
     if (!validateForm()) return;
 
+    trackEvent("login_attempted", { auth_method: "password", login_type: loginType });
     loginMutation.mutate(formData);
   };
 
   const handleGoogleLogin = () => {
+    trackEvent("login_attempted", { auth_method: "google", login_type: "merchant" });
     window.location.href = '/api/auth/google';
   };
 
@@ -155,7 +195,7 @@ export default function Login() {
       <div className="w-full max-w-xs md:max-w-sm lg:max-w-md mb-3 flex items-center">
         <button
           onClick={() => setLocation("/")}
-          className="flex items-center gap-1.5 text-gray-500 hover:text-[#0055FF] transition-colors group"
+          className="tap-target flex items-center gap-1.5 text-gray-500 hover:text-[#0055FF] transition-colors group"
           data-testid="button-back-to-landing"
         >
           <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
@@ -193,7 +233,7 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setLoginType('merchant')}
-                  className={`px-4 py-1 rounded-full text-xs transition-all ${
+                  className={`tap-target px-4 py-1 rounded-full text-xs transition-all ${
                     loginType === 'merchant'
                       ? 'bg-[#00E5CC] text-[#0055FF] font-medium'
                       : 'text-[#00E5CC] hover:text-white'
@@ -204,7 +244,7 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setLoginType('admin')}
-                  className={`px-4 py-1 rounded-full text-xs transition-all ${
+                  className={`tap-target px-4 py-1 rounded-full text-xs transition-all ${
                     loginType === 'admin'
                       ? 'bg-[#00E5CC] text-[#0055FF] font-medium'
                       : 'text-[#00E5CC] hover:text-white'

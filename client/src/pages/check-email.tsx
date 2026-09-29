@@ -22,15 +22,16 @@ export default function CheckEmail() {
   const email = params.get("email") || "";
   const id = params.get("id") || "";
 
+  // Only the address can ask: resending by account number was removed (2026-09-26). Old
+  // links that carry only ?id= have no address to ask with.
   const handleResend = async () => {
-    if (!id && !email) return;
+    if (!email) return;
     setResending(true);
     try {
-      const body = id ? { merchantId: id } : { email };
       const res = await fetch("/api/auth/resend-confirmation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ email }),
       });
       if (res.ok) {
         setResent(true);
@@ -84,7 +85,7 @@ export default function CheckEmail() {
 
         <div className="bg-white/10 rounded-2xl p-5 text-left mb-6 border border-white/15">
           <p className="text-white/80 text-sm leading-relaxed">
-            Click the link in the email to confirm your address, then you'll be taken to the next step to complete your business details.
+            Click the link in the email to confirm your address and submit your completed application to the TaptPay team.
           </p>
         </div>
 
@@ -107,10 +108,10 @@ export default function CheckEmail() {
           <p className="text-white/25 text-xs mt-8 leading-relaxed">
             Already confirmed?{" "}
             <button
-              onClick={() => setLocation(`/business-details?id=${id}`)}
+              onClick={() => setLocation("/login")}
               className="text-[#00f1d7]/60 hover:text-[#00f1d7] underline"
             >
-              Continue to business details
+              Continue to sign in
             </button>
           </p>
         )}

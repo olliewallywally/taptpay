@@ -6,15 +6,87 @@ id = "d-_suBMyENzCD09gZlyGW"
 uri = "file://client/public/qr-taptpay-info.png"
 type = "image"
 title = "TaptPay Info QR Code — transparent background"
+logical_id = "1e8d7af0-9487-46ee-8ca2-570630da1c79"
 
 [[outputs]]
 id = "dxmwfboCom0O4I3i20BeL"
 uri = "file://taptpay-ios.zip"
 type = "unspecified"
 title = "TaptPay iOS Xcode Project"
+logical_id = "738bbe07-57a2-4ae0-871b-35fde47d471e"
 
 [[outputs]]
 id = "Y_SWle-dI1VC2yw3qUbjE"
 uri = "file://attached_assets/taptpay-property-management-v2.zip"
 type = "unspecified"
 title = "TaptPay Property Management v2 (SMS fix applied)"
+logical_id = "f3b36ef7-0416-49f0-925b-03deb4f7eea8"
+
+[[outputs]]
+id = "uENFXhSjCm6pyiFobdVUU"
+uri = "file://attached_assets/taptpay-phone-3d-model.html"
+type = "text"
+title = "TaptPay phone 3D model"
+description = "Standalone self-contained HTML phone model extracted from the landing page style. Drag to rotate."
+logical_id = "087de9ca-0ab6-479a-bffb-b9e7d7e72629"
+content_type = "text/html"
+
+[[outputs]]
+id = "a4oo6AhQzG_5petQ9uh5J"
+uri = "file://docs/plans/RXA%20plan.txt"
+type = "text"
+title = "RXA plan"
+description = "Saved copy of the attached TaptPay to Xero integration plan."
+logical_id = "21a46cb6-6f99-4d46-895f-8ec104242375"
+
+[[outputs]]
+id = "Bg4vxDQ5TjjOhJvpy5xpY"
+uri = "file://attached_assets/full_intergration_plan_-_taptpay_1787816180424.txt"
+type = "text"
+title = "Full RXA plan"
+description = "Authoritative owner-decisions revision of the full TaptPay implementation plan, updated 2026-08-31."
+logical_id = "0c57eb9a-bbbb-4c85-a5df-623452bd460e"
+
+[[outputs]]
+id = "rxa-plan-corrected-pdf-20260829"
+uri = "file://attached_assets/full_intergration_plan_-_taptpay_1787816180424.pdf"
+type = "unspecified"
+title = "Full RXA plan — owner-decisions PDF"
+description = "Generated convenience rendering of the authoritative owner-decisions revision updated 2026-08-31."
+logical_id = "8d06b669-ea18-4097-977b-eaa14a5728cd"
+
+[[outputs]]
+id = "fY8muXXKNi3l_spulv-7O"
+uri = "file://docs/designs/settings-page-design.png"
+type = "image"
+title = "Settings page design"
+description = "Saved settings-page reference image for future use."
+logical_id = "21baaa20-8cd8-4b07-8827-8c8f63c72f6b"
+
+[[outputs]]
+id = "LrQ3w6oPdqzn7-pVeFqyJ"
+uri = "file://exports/taptpay-production-backup-verification.sql.gpg"
+type = "unspecified"
+title = "Encrypted production backup"
+description = "Temporary encrypted copy for owner-controlled Windows decrypt and restore verification. Requires the matching private GPG key."
+logical_id = "b3cc0b12-95ff-4c1b-8593-1afc91d7b827"
+content_hash = "sha256:088e17b0c3adec992d3fbf93115446f3613ea77489556dad6e98967c319482ce"
+size = 79823
+mtime_ms = 1788919767376
+storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:3c12b37b-0b73-46ab-9533-ef32b681c563/b3cc0b12-95ff-4c1b-8593-1afc91d7b827/bbd2902f-9e0f-4062-85d4-d97401284795"
+storage_version_token = "1788919772059940"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "7780FhYO-J-0KZqOhgmnz"
+uri = "file://exports/taptpay-one-time-restore-transfer-public-key.asc"
+type = "unspecified"
+title = "One-time restore transfer public key"
+description = "Public-only GPG key for encrypting the decrypted SQL before uploading it for isolated restore verification. Expires in one day."
+logical_id = "44cf4a80-ae67-49a9-a545-f6dd632634f5"
+content_hash = "sha256:d90cc46a0b14c825b9a422d170507cc1ebc4e85c6c5586862381288980fff032"
+size = 1310
+mtime_ms = 1788921899612
+storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:3c12b37b-0b73-46ab-9533-ef32b681c563/44cf4a80-ae67-49a9-a545-f6dd632634f5/bc695dc8-571f-45e0-b644-c7ef31c9a45c"
+storage_version_token = "1788921906225899"
+content_type = "application/octet-stream"

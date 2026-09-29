@@ -1,7 +1,7 @@
 import { generateQuotePdf } from "../server/trades-quote-pdf";
 
 const quote = {
-  token: "abcdef1234567890",
+  token: "fixture-quote-link",
   createdAt: new Date(),
   validUntil: new Date(),
   lineItems: [

@@ -11,10 +11,12 @@ export default function SettingsSimple() {
 
   // Get merchant data
   const { data: merchant, isLoading: merchantLoading } = useQuery({
-    queryKey: ["/api/merchants", merchantId],
+    queryKey: ["/api/merchants", merchantId, "profile"],
     queryFn: async () => {
       if (!merchantId) throw new Error("No merchant ID available");
-      const response = await fetch(`/api/merchants/${merchantId}`);
+      const response = await fetch(`/api/merchants/${merchantId}/profile`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
+      });
       if (!response.ok) throw new Error("Failed to fetch merchant");
       return response.json();
     },

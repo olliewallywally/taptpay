@@ -2,6 +2,8 @@ import { render } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Router } from 'wouter';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { NotificationProvider } from '@/components/notification-system';
+import { TutorialProvider } from '@/features/tutorial/tutorial';
 
 // Type definitions for Jest globals
 declare const jest: any;
@@ -47,6 +49,8 @@ jest.mock('@/lib/auth', () => ({
 jest.mock('@/lib/sse-client', () => ({
   sseClient: {
     connect: jest.fn(),
+    connectCustomer: jest.fn(),
+    connectMerchant: jest.fn(),
     disconnect: jest.fn(),
     subscribe: jest.fn(),
     unsubscribe: jest.fn(),
@@ -97,9 +101,13 @@ const TestWrapper = ({ children }: { children: React.ReactNode }) => {
   return (
     <QueryClientProvider client={queryClient}>
       <Router>
-        <TooltipProvider>
-          {children}
-        </TooltipProvider>
+        <TutorialProvider enabled={false}>
+          <NotificationProvider>
+            <TooltipProvider>
+              {children}
+            </TooltipProvider>
+          </NotificationProvider>
+        </TutorialProvider>
       </Router>
     </QueryClientProvider>
   );
@@ -159,13 +167,19 @@ describe('Page Components Smoke Tests', () => {
 
   basicComponents.forEach(({ name, component: Component }) => {
     it(`should render ${name} without crashing`, () => {
+      let view: ReturnType<typeof render> | undefined;
       expect(() => {
-        render(
+        view = render(
           <TestWrapper>
             <Component />
           </TestWrapper>
         );
       }).not.toThrow();
+      // R1-T8: this checks the first render only. Unmount before any request
+      // resolves — the mocked responses are not shaped for every page, and a
+      // response landing after the test is an update outside act(), which
+      // jest.setup.js now fails.
+      view?.unmount();
     });
   });
 
@@ -231,8 +245,9 @@ describe('JSX Syntax Validation', () => {
       StockManagement, Transactions
     ];
 
-    // If we reach this point, all imports succeeded (no syntax errors)
-    expect(allComponents).toHaveLength(24);
+    // If we reach this point, all imports succeeded (no syntax errors).
+    // Count is 23 since verify-merchant was removed in the onboarding consolidation.
+    expect(allComponents).toHaveLength(23);
     allComponents.forEach(component => {
       expect(typeof component).toBe('function');
     });

@@ -1,12 +1,24 @@
 import { getDb } from './database';
 import { merchants, transactions } from '@shared/schema';
 import { createUser } from './auth';
+import { config, type AppConfig } from './config';
 
-export async function seedDatabase() {
+type DemoSeedConfig = Pick<AppConfig, 'seedDemoData' | 'appEnv'>;
+
+export function assertDemoSeedAllowed(runtimeConfig: DemoSeedConfig): void {
+  if (!runtimeConfig.seedDemoData) {
+    throw new Error('SEED_DEMO_DATA must be true before demo data can be created');
+  }
+  if (runtimeConfig.appEnv !== 'development' && runtimeConfig.appEnv !== 'test') {
+    throw new Error('Demo seeding is restricted to development and test');
+  }
+}
+
+export async function seedDatabase(runtimeConfig: DemoSeedConfig = config) {
+  assertDemoSeedAllowed(runtimeConfig);
   const db = getDb();
   if (!db) {
-    console.log('Database not available for seeding');
-    return;
+    throw new Error('Database not available for requested demo seed');
   }
 
   try {
@@ -28,8 +40,13 @@ export async function seedDatabase() {
       name: "Demo Store",
       businessName: "Demo Store",
       email: "demo@tapt.co.nz",
+      // Demo account must be login-capable: merchant auth requires a verified/active
+      // status (createUser below sets the passwordHash).
+      status: "active",
       qrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=https://tapt.co.nz/pay/1",
-      paymentUrl: `https://${process.env.REPLIT_DOMAINS?.split(',')[0] || 'localhost:5000'}/pay/1`,
+      paymentUrl: `${config.publicOrigin || (config.legacyDomains.replitDomains
+        ? `https://${config.legacyDomains.replitDomains.split(',')[0]}`
+        : "http://localhost:5000")}/pay/1`,
       currentProviderRate: "2.9000", // 2.9%
       ourRate: "0.2000", // 0.2%
     }).returning();
@@ -47,9 +64,4 @@ export async function seedDatabase() {
     console.error('Database seeding failed:', error);
     throw error;
   }
-}
-
-// Auto-seed if this file is run directly
-if (import.meta.url === `file://${process.argv[1]}`) {
-  seedDatabase().catch(console.error);
 }

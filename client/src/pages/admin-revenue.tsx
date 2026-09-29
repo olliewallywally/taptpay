@@ -1,16 +1,25 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { DollarSign, TrendingUp, Users, CreditCard } from "lucide-react";
+import { AlertTriangle, DollarSign, TrendingUp, Users } from "lucide-react";
+import { PLAN_LIST, formatPlanPrice, planForOrDefault } from "@shared/plans";
 
-interface PlatformFees {
-  totalFees: number;
-  totalTransactions: number;
+interface SubscriptionRevenue {
+  monthlyRecurringRevenue: number;
+  payingSubscriptions: number;
+  totalSubscriptions: number;
+  byPlan: Record<string, { count: number; monthlyRevenue: number }>;
+  pastDue: number;
+  suspended: number;
+  cancelling: number;
 }
 
+const money = (value: number) =>
+  new Intl.NumberFormat("en-NZ", { style: "currency", currency: "NZD" }).format(value);
+
 export default function AdminRevenue() {
-  const { data: platformFees, isLoading } = useQuery<PlatformFees>({
-    queryKey: ["/api/admin/platform-fees"],
+  const { data: revenue, isLoading } = useQuery<SubscriptionRevenue>({
+    queryKey: ["/api/admin/subscription-revenue"],
     retry: false,
   });
 
@@ -22,6 +31,10 @@ export default function AdminRevenue() {
     );
   }
 
+  const mrr = revenue?.monthlyRecurringRevenue ?? 0;
+  const paying = revenue?.payingSubscriptions ?? 0;
+  const atRisk = (revenue?.pastDue ?? 0) + (revenue?.suspended ?? 0) + (revenue?.cancelling ?? 0);
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
@@ -29,65 +42,55 @@ export default function AdminRevenue() {
           Platform Revenue Dashboard
         </h1>
         <p className="text-gray-600 dark:text-gray-400 mt-2">
-          Track platform earnings from transaction fees
+          Recurring subscription revenue. TaptPay takes no cut of merchant turnover.
         </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+            <CardTitle className="text-sm font-medium">Monthly Recurring Revenue</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              ${platformFees?.totalFees?.toFixed(2) || "0.00"}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              From platform fees
-            </p>
+            <div className="text-2xl font-bold">{money(mrr)}</div>
+            <p className="text-xs text-muted-foreground">Committed for next period</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Transactions</CardTitle>
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {platformFees?.totalTransactions || 0}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Completed payments
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Platform Fee Rate</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">0.5%</div>
-            <p className="text-xs text-muted-foreground">
-              Of transaction amount
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Average Monthly</CardTitle>
+            <CardTitle className="text-sm font-medium">Paying Subscriptions</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              ${((platformFees?.totalFees || 0) / Math.max(1, Math.ceil((platformFees?.totalTransactions || 1) / 30))).toFixed(2)}
-            </div>
+            <div className="text-2xl font-bold">{paying}</div>
             <p className="text-xs text-muted-foreground">
-              Estimated monthly revenue
+              of {revenue?.totalSubscriptions ?? 0} total
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Annual Run Rate</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{money(mrr * 12)}</div>
+            <p className="text-xs text-muted-foreground">MRR × 12</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">At Risk</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{atRisk}</div>
+            <p className="text-xs text-muted-foreground">
+              Past due, suspended or cancelling
             </p>
           </CardContent>
         </Card>
@@ -96,63 +99,79 @@ export default function AdminRevenue() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Revenue Model</CardTitle>
+            <CardTitle>Revenue by Plan</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <div className="flex justify-between items-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                <span className="font-medium">Windcave Fee</span>
-                <Badge variant="secondary">2.9% of transaction</Badge>
-              </div>
-              <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                <span className="font-medium">Platform Fee</span>
-                <Badge variant="default">0.5% of transaction</Badge>
-              </div>
-              <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                <span className="font-medium">Merchant Receives</span>
-                <Badge variant="outline">96.6% of transaction</Badge>
-              </div>
-            </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">
-              Marketplace Model: Platform collects all payments, deducts processing fees (2.9%) and platform fees (0.5%), then settles net amount to merchants.
+          <CardContent className="space-y-2">
+            {PLAN_LIST.map((plan) => {
+              const bucket = revenue?.byPlan?.[plan.id];
+              return (
+                <div
+                  key={plan.id}
+                  className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg"
+                >
+                  <div>
+                    <span className="font-medium">{plan.name}</span>
+                    <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">
+                      {formatPlanPrice(plan.priceCents)}/mo · {plan.seats}{" "}
+                      {plan.seats === 1 ? "login" : "logins"}
+                    </span>
+                  </div>
+                  <Badge variant={bucket?.count ? "default" : "outline"}>
+                    {bucket?.count ?? 0} · {money(bucket?.monthlyRevenue ?? 0)}
+                  </Badge>
+                </div>
+              );
+            })}
+            <div className="text-sm text-gray-600 dark:text-gray-400 pt-2">
+              MRR counts active subscriptions that are not cancelling. Past-due rows are
+              excluded — that is money not yet collected.
             </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Fee Collection Status</CardTitle>
+            <CardTitle>Billing Health</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <span>Collection Status</span>
-                <Badge variant="default" className="bg-green-600">
-                  Automatic
+                <span>Past due</span>
+                <Badge variant={revenue?.pastDue ? "destructive" : "outline"}>
+                  {revenue?.pastDue ?? 0}
                 </Badge>
               </div>
               <div className="flex items-center justify-between">
-                <span>Payment Processor</span>
-                <Badge variant="secondary">Windcave</Badge>
+                <span>Suspended</span>
+                <Badge variant={revenue?.suspended ? "destructive" : "outline"}>
+                  {revenue?.suspended ?? 0}
+                </Badge>
               </div>
               <div className="flex items-center justify-between">
-                <span>Fee Deduction</span>
-                <Badge variant="outline">Real-time</Badge>
+                <span>Cancelling at period end</span>
+                <Badge variant={revenue?.cancelling ? "secondary" : "outline"}>
+                  {revenue?.cancelling ?? 0}
+                </Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Payment processor</span>
+                <Badge variant="secondary">Windcave</Badge>
               </div>
               <div className="text-sm text-gray-600 dark:text-gray-400 mt-4">
-                Platform acts as Merchant of Record, collecting all customer payments. 
-                Fees are automatically calculated and merchants receive settled amounts.
+                Subscriptions are charged monthly to a Windcave card-on-file. A declined
+                charge moves the merchant to past due, retries, then suspends.
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {platformFees?.totalTransactions === 0 && (
+      {revenue?.totalSubscriptions === 0 && (
         <Card className="mt-6">
           <CardContent className="text-center py-8">
             <div className="text-gray-500 dark:text-gray-400">
-              No transactions processed yet. Revenue tracking will appear here once merchants start processing payments.
+              No subscriptions yet. Revenue will appear here once merchants sign up on the{" "}
+              {planForOrDefault(undefined).name} plan or above.
             </div>
           </CardContent>
         </Card>

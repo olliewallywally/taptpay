@@ -1,0 +1,23 @@
+PASS  customer 320: notice shown
+PASS  customer 320: no sale read, no feed
+PASS  customer 320: no sideways scroll
+PASS  customer 320: no page errors
+PASS  customer 390: notice shown
+PASS  customer 390: no sale read, no feed
+PASS  customer 390: no sideways scroll
+PASS  customer 390: no page errors
+PASS  board page: waits for its sale
+PASS  board page: reads its board's sale
+PASS  board page: no page errors
+PASS  terminal 320: current sale read signed in
+PASS  terminal 320: share screen says there is no link yet
+PASS  terminal 320: no copy button, no demo link
+PASS  terminal 320: never the business-wide address
+PASS  terminal 320: no page errors
+PASS  terminal 390: current sale read signed in
+PASS  terminal 390: share screen says there is no link yet
+PASS  terminal 390: no copy button, no demo link
+PASS  terminal 390: never the business-wide address
+PASS  terminal 390: no page errors
+
+21/21 passed

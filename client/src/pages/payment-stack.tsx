@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getCurrentMerchantId } from "@/lib/auth";
+import { MerchantGate } from "@/components/merchant-gate";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Clock, Loader2, Plus, Copy, X, ChevronRight, Layers, ArrowLeft } from "lucide-react";
@@ -27,22 +27,26 @@ function timeAgo(dateStr: string | Date): string {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
+function authHeaders(): Record<string, string> {
+  const authToken = localStorage.getItem("authToken");
+  return authToken ? { Authorization: `Bearer ${authToken}` } : {};
+}
+
 export default function PaymentStack() {
-  const merchantId = getCurrentMerchantId();
+  return <MerchantGate redirect="document">{(merchantId) => <PaymentStackPage merchantId={merchantId} />}</MerchantGate>;
+}
+
+function PaymentStackPage({ merchantId }: { merchantId: number }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [copiedId, setCopiedId] = useState<number | null>(null);
 
-  if (!merchantId) {
-    window.location.href = "/login";
-    return null;
-  }
-
   const { data: allTransactions = [], isLoading } = useQuery<Transaction[]>({
     queryKey: ["/api/merchants", merchantId, "transactions"],
     queryFn: async () => {
-      const r = await fetch(`/api/merchants/${merchantId}/transactions`);
+      // Both reads are signed in (authenticateToken reads only this header).
+      const r = await fetch(`/api/merchants/${merchantId}/transactions`, { headers: authHeaders() });
       if (!r.ok) throw new Error("Failed to fetch transactions");
       return r.json();
     },
@@ -52,7 +56,7 @@ export default function PaymentStack() {
   const { data: taptStones = [] } = useQuery({
     queryKey: ["/api/merchants", merchantId, "tapt-stones"],
     queryFn: async () => {
-      const r = await fetch(`/api/merchants/${merchantId}/tapt-stones`);
+      const r = await fetch(`/api/merchants/${merchantId}/tapt-stones`, { headers: authHeaders() });
       if (!r.ok) throw new Error();
       return r.json();
     },
@@ -78,11 +82,15 @@ export default function PaymentStack() {
     (tx) => tx.status === "pending" || tx.status === "processing"
   );
 
-  const copyPaymentLink = (tx: Transaction) => {
+  // A board sale's link is its board's (in its NFC-tag form). A sale without a board has its
+  // own link, shown when it was made and not kept (only its hash is), so there is none to
+  // copy; the business-wide /pay/<merchant> it used to copy was retired on 2026-09-25.
+  const boardLinkFor = (tx: Transaction): string | null => {
     const stone = taptStones.find((s: any) => s.id === (tx as any).taptStoneId);
-    const url = stone?.paymentUrl
-      ? stone.paymentUrl.replace(/\/pay\//, "/nfc/")
-      : `${window.location.origin}/pay/${merchantId}`;
+    return stone?.paymentUrl ? stone.paymentUrl.replace(/\/pay\//, "/nfc/") : null;
+  };
+
+  const copyPaymentLink = (tx: Transaction, url: string) => {
     navigator.clipboard.writeText(url);
     setCopiedId(tx.id);
     setTimeout(() => setCopiedId(null), 2000);
@@ -101,7 +109,7 @@ export default function PaymentStack() {
           </Link>
           <div className="flex items-center gap-2">
             <Layers size={20} className="text-white/60" />
-            <h1 className="text-lg font-semibold text-white">Payment Stack</h1>
+            <h1 data-tutorial-id="ps-header" className="text-lg font-semibold text-white">Payment Stack</h1>
           </div>
           {activeStack.length > 0 && (
             <span className="ml-1 px-2 py-0.5 rounded-full text-xs font-bold text-black"
@@ -129,7 +137,7 @@ export default function PaymentStack() {
             <p className="text-white/40 text-base font-medium">No active payments</p>
             <p className="text-white/20 text-sm mt-1">New transactions will appear here</p>
             <Link href="/terminal">
-              <button className="mt-6 px-6 py-3 rounded-2xl text-sm font-semibold text-black flex items-center gap-2"
+              <button data-tutorial-id="ps-new" className="mt-6 px-6 py-3 rounded-2xl text-sm font-semibold text-black flex items-center gap-2"
                 style={{ backgroundColor: BRAND }}>
                 <Plus size={16} />
                 New Transaction
@@ -143,6 +151,7 @@ export default function PaymentStack() {
           const sc = statusConfig[tx.status] ?? statusConfig.pending;
           const isExpanded = expandedId === tx.id;
           const amount = parseFloat(tx.price as string);
+          const boardLink = boardLinkFor(tx);
 
           return (
             <motion.div
@@ -205,15 +214,17 @@ export default function PaymentStack() {
                     )}
 
                     <div className="flex gap-2 pt-1">
+                      {boardLink && (
                       <motion.button
                         whileTap={{ scale: 0.95 }}
                         transition={{ type: "spring", stiffness: 600, damping: 26 }}
-                        onClick={() => copyPaymentLink(tx)}
+                        onClick={() => copyPaymentLink(tx, boardLink)}
                         className="flex-1 py-3 rounded-xl text-sm font-semibold text-black flex items-center justify-center gap-2"
                         style={{ backgroundColor: BRAND }}>
                         <Copy size={14} />
                         {copiedId === tx.id ? "Copied!" : "Copy Link"}
                       </motion.button>
+                      )}
                       <motion.button
                         whileTap={{ scale: 0.95 }}
                         transition={{ type: "spring", stiffness: 600, damping: 26 }}
@@ -236,7 +247,7 @@ export default function PaymentStack() {
 
         {activeStack.length > 0 && (
           <Link href="/terminal">
-            <button className="w-full py-4 rounded-2xl text-sm font-semibold text-black flex items-center justify-center gap-2 mt-2 transition-all hover:scale-[1.01]"
+            <button data-tutorial-id="ps-new" className="w-full py-4 rounded-2xl text-sm font-semibold text-black flex items-center justify-center gap-2 mt-2 transition-all hover:scale-[1.01]"
               style={{ backgroundColor: BRAND, boxShadow: `0 4px 20px ${BRAND}33` }}>
               <Plus size={16} />
               New Transaction

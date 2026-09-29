@@ -4,3 +4,26 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+db-backups/
+
+# @playwright/test run artefacts (tests/golden/** is the committed baseline)
+test-results
+playwright-report
+
+# local Claude Code state — credentials, session transcripts, local permission overrides
+.claude-home/
+.claude/settings.local.json
+
+# Local configuration; the reviewed example contains blank values only.
+.env
+.env.*
+!.env.example
+
+# Runtime/private artifacts. Existing tracked assets still require owner disposition.
+*.sql.gz
+*.sql.gpg
+*.dump
+*.backup
+/uploads/
+/traces/
+/provider-fixtures/live/

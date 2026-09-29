@@ -1,8 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-import { getCurrentMerchantId } from "@/lib/auth";
+import { MerchantGate } from "@/components/merchant-gate";
 import {
   type LucideIcon,
   Search, Plus, Package, Trash2, X, ChevronDown, ChevronUp,
@@ -134,7 +133,7 @@ function VariationsBuilder({
               value={group.name}
               onChange={(e) => updateGroup(gi, { name: e.target.value })}
               placeholder="e.g. Size, Colour"
-              className="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#0055FF] bg-white"
+              className="flex-1 text-base md:text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#0055FF] bg-white"
             />
             <button
               type="button"
@@ -152,7 +151,7 @@ function VariationsBuilder({
                   value={opt.label}
                   onChange={(e) => updateOption(gi, oi, { label: e.target.value })}
                   placeholder="e.g. Large, Red"
-                  className="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#0055FF] bg-white"
+                  className="flex-1 text-base md:text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#0055FF] bg-white"
                 />
                 <div className="relative flex items-center">
                   <span className="absolute left-2.5 text-gray-400 text-xs">+$</span>
@@ -165,7 +164,7 @@ function VariationsBuilder({
                       updateOption(gi, oi, { priceModifier: parseFloat(e.target.value) || 0 })
                     }
                     placeholder="0.00"
-                    className="w-20 pl-7 text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#0055FF] bg-white"
+                    className="w-20 pl-7 text-base md:text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#0055FF] bg-white"
                   />
                 </div>
                 <button
@@ -350,7 +349,10 @@ function ProductSheet({
 const blankItem = () => ({ name: "", cost: "", description: "", emoji: "", variations: [] as VariationGroup[] });
 
 export default function StockManagement() {
-  const [, setLocation] = useLocation();
+  return <MerchantGate>{(merchantId) => <StockManagementPage merchantId={merchantId} />}</MerchantGate>;
+}
+
+function StockManagementPage({ merchantId }: { merchantId: number }) {
   const [sheetItem, setSheetItem] = useState<(Partial<StockItem> & { name: string; cost: string; variations: VariationGroup[] }) | null>(null);
   const [isAdd, setIsAdd] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -358,18 +360,12 @@ export default function StockManagement() {
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const merchantId = getCurrentMerchantId();
-
-  if (!merchantId) {
-    setLocation("/login");
-    return null;
-  }
 
   const { data: merchant } = useQuery({
-    queryKey: ["/api/merchants", merchantId],
+    queryKey: ["/api/merchants", merchantId, "profile"],
     queryFn: async () => {
       const token = localStorage.getItem("authToken");
-      const response = await fetch(`/api/merchants/${merchantId}`, {
+      const response = await fetch(`/api/merchants/${merchantId}/profile`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok) throw new Error("Failed to fetch merchant");
@@ -514,7 +510,8 @@ export default function StockManagement() {
   const initials = businessName.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2);
 
   return (
-    <div className="min-h-screen pb-32" style={{ background: '#F4F4F4', fontFamily: "'Outfit', system-ui, sans-serif" }}>
+    <div style={{ background: '#FFFFFF', minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
+    <div className="min-h-screen pb-32 w-full" style={{ maxWidth: 'var(--phone-shell-max)', background: '#F4F4F4', fontFamily: "'Outfit', system-ui, sans-serif" }}>
       {/* Safe-area spacer */}
       <div style={{ height: 54 }} />
 
@@ -545,17 +542,19 @@ export default function StockManagement() {
 
       {/* White rounded-top content area */}
       <div style={{ background: '#FFFFFF', borderRadius: '40px 40px 0 0', marginTop: 16 }}>
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-6 sm:pt-8">
+        <div className="px-4 sm:px-6 pt-6 sm:pt-8">
 
         {/* Search row with + button */}
         <div className="relative flex items-center gap-3 mb-4">
           <div className="relative flex-1">
+            {/* text-base under md — a field below 16px zooms iOS on focus, and
+                index.css no longer forces one on every field (A1 §4.4). */}
             <input
               type="text"
               placeholder="Search products…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 rounded-full px-5 py-3 pl-11 text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#040D6D] text-sm"
+              className="w-full bg-gray-50 border border-gray-200 rounded-full px-5 py-3 pl-11 text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#040D6D] text-base md:text-sm"
               data-testid="input-search"
             />
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
@@ -575,7 +574,7 @@ export default function StockManagement() {
             <button
               key={key}
               onClick={() => setSortKey(key)}
-              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors ${
+              className={`tap-target flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors ${
                 sortKey === key
                   ? "bg-[#040D6D] text-white shadow-sm"
                   : "bg-white text-gray-500 border border-gray-200 hover:border-[#040D6D] hover:text-[#040D6D]"
@@ -679,6 +678,7 @@ export default function StockManagement() {
           )}
         </SheetContent>
       </Sheet>
+    </div>
     </div>
   );
 }

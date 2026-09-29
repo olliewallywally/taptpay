@@ -1,4 +1,6 @@
 import bcrypt from 'bcrypt';
+import { config } from './config';
+import { isDemoAccountLoginBlocked } from './demo-safety';
 import jwt from 'jsonwebtoken';
 import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
@@ -20,31 +22,53 @@ export interface User {
   email: string;
   password: string;
   merchantId: number;
-  role: 'merchant' | 'admin';
+  /**
+   * `owner` holds the account (billing, plan, team); `member` is a teammate on
+   * one of the plan's extra seats. `merchant` is the pre-team-logins spelling of
+   * owner and is retained so old code paths still typecheck.
+   */
+  role: 'owner' | 'member' | 'merchant' | 'admin';
+  /** Identity of the users row this principal came from, when there is one. */
+  userId?: number;
+  /**
+   * R1-T4 phase D: the users row's session version. Tokens carry the version they
+   * were issued under; a password reset or "sign out everywhere" advances it.
+   */
+  sessionVersion?: number;
   resetToken?: string;
   resetTokenExpiry?: Date;
   createdAt: Date;
 }
 
-// ============================================
-// LOGIN SECURITY - Brute Force Protection
-// ============================================
-interface LoginAttempt {
-  count: number;
-  lastAttempt: number;
-  lockoutUntil: number | null;
+/** Owner-equivalent roles. Members are excluded from billing and team writes. */
+export function isAccountOwner(user: Pick<User, 'role'> | undefined | null): boolean {
+  return user?.role === 'owner' || user?.role === 'merchant' || user?.role === 'admin';
 }
 
-// Email-based lockout (prevents account enumeration attacks)
-const loginAttempts = new Map<string, LoginAttempt>();
-// IP-based rate limiting (prevents distributed attacks)
-const ipLoginAttempts = new Map<string, LoginAttempt>();
+/**
+ * Claim marking a token as issued by the team-logins scheme.
+ *
+ * Before team logins, `userId` in a JWT was the *merchant* id and
+ * authenticateToken ignored it entirely. Now that real `users.id` values exist,
+ * an old token's `userId` would address a different row, so tokens without this
+ * claim are rejected outright. The 1h TTL caps the disruption at one re-login.
+ */
+export const TOKEN_PRINCIPAL = 'user' as const;
+const ADMIN_TOKEN_PRINCIPAL = 'admin' as const;
 
-const MAX_LOGIN_ATTEMPTS = 5;
-const MAX_IP_LOGIN_ATTEMPTS = 20; // Allow more attempts per IP (multiple users may share)
-const LOCKOUT_DURATION = 15 * 60 * 1000; // 15 minutes
-const IP_LOCKOUT_DURATION = 30 * 60 * 1000; // 30 minutes for IP-based lockout
-const ATTEMPT_WINDOW = 60 * 60 * 1000; // 1 hour
+function isMerchantUserRole(role: unknown): role is 'owner' | 'member' {
+  return role === 'owner' || role === 'member';
+}
+
+function isPositiveInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
+}
+
+// ============================================
+// LOGIN SECURITY
+// ============================================
+// Sign-in and password-reset attempts are throttled in shared storage — slowed
+// down, never locked (R1-T4 phase C): server/auth-throttle.ts, server/sign-in-device.ts.
 
 // Security audit logging - writes to dedicated file with PII redaction
 export function logSecurityEvent(event: string, details: Record<string, any>) {
@@ -78,216 +102,206 @@ export function logSecurityEvent(event: string, details: Record<string, any>) {
   }
 }
 
-// Check if account is locked out (by email)
-export function isAccountLocked(email: string): { locked: boolean; remainingTime?: number } {
-  const normalizedEmail = email.toLowerCase();
-  const attempt = loginAttempts.get(normalizedEmail);
-  
-  if (!attempt || !attempt.lockoutUntil) {
-    return { locked: false };
-  }
-  
-  const now = Date.now();
-  if (now < attempt.lockoutUntil) {
-    const remainingTime = Math.ceil((attempt.lockoutUntil - now) / 1000 / 60);
-    return { locked: true, remainingTime };
-  }
-  
-  // Lockout expired, reset
-  loginAttempts.delete(normalizedEmail);
-  return { locked: false };
-}
-
-// Check if IP is rate limited
-export function isIPRateLimited(ip: string): { limited: boolean; remainingTime?: number } {
-  const attempt = ipLoginAttempts.get(ip);
-  
-  if (!attempt || !attempt.lockoutUntil) {
-    return { limited: false };
-  }
-  
-  const now = Date.now();
-  if (now < attempt.lockoutUntil) {
-    const remainingTime = Math.ceil((attempt.lockoutUntil - now) / 1000 / 60);
-    return { limited: true, remainingTime };
-  }
-  
-  // Lockout expired, reset
-  ipLoginAttempts.delete(ip);
-  return { limited: false };
-}
-
-// Record failed login attempt (both email and IP tracking)
-export function recordFailedLogin(email: string, ip: string): { locked: boolean; ipLimited?: boolean; attemptsRemaining?: number } {
-  const normalizedEmail = email.toLowerCase();
-  const now = Date.now();
-  
-  // Track by email
-  let emailAttempt = loginAttempts.get(normalizedEmail);
-  if (!emailAttempt || now - emailAttempt.lastAttempt > ATTEMPT_WINDOW) {
-    emailAttempt = { count: 1, lastAttempt: now, lockoutUntil: null };
-  } else {
-    emailAttempt.count++;
-    emailAttempt.lastAttempt = now;
-  }
-  
-  // Track by IP
-  let ipAttempt = ipLoginAttempts.get(ip);
-  if (!ipAttempt || now - ipAttempt.lastAttempt > ATTEMPT_WINDOW) {
-    ipAttempt = { count: 1, lastAttempt: now, lockoutUntil: null };
-  } else {
-    ipAttempt.count++;
-    ipAttempt.lastAttempt = now;
-  }
-  
-  logSecurityEvent('FAILED_LOGIN', { 
-    email: normalizedEmail, 
-    ip, 
-    emailAttemptCount: emailAttempt.count,
-    ipAttemptCount: ipAttempt.count 
-  });
-  
-  // Check IP lockout first (affects all users from that IP)
-  if (ipAttempt.count >= MAX_IP_LOGIN_ATTEMPTS) {
-    ipAttempt.lockoutUntil = now + IP_LOCKOUT_DURATION;
-    ipLoginAttempts.set(ip, ipAttempt);
-    logSecurityEvent('IP_RATE_LIMITED', { ip, lockoutMinutes: IP_LOCKOUT_DURATION / 60000 });
-    return { locked: false, ipLimited: true };
-  }
-  ipLoginAttempts.set(ip, ipAttempt);
-  
-  // Check email lockout
-  if (emailAttempt.count >= MAX_LOGIN_ATTEMPTS) {
-    emailAttempt.lockoutUntil = now + LOCKOUT_DURATION;
-    loginAttempts.set(normalizedEmail, emailAttempt);
-    logSecurityEvent('ACCOUNT_LOCKED', { email: normalizedEmail, ip, lockoutMinutes: LOCKOUT_DURATION / 60000 });
-    return { locked: true };
-  }
-  
-  loginAttempts.set(normalizedEmail, emailAttempt);
-  return { locked: false, attemptsRemaining: MAX_LOGIN_ATTEMPTS - emailAttempt.count };
-}
-
-// Clear failed attempts on successful login
-export function clearFailedAttempts(email: string) {
-  const normalizedEmail = email.toLowerCase();
-  loginAttempts.delete(normalizedEmail);
-  // Note: IP attempts are NOT cleared on successful login to prevent abuse
-}
-
-// Cleanup old login attempts periodically
-setInterval(() => {
-  const now = Date.now();
-  
-  // Clean email-based attempts
-  const emailEntries = Array.from(loginAttempts.entries());
-  for (const [email, attempt] of emailEntries) {
-    if (now - attempt.lastAttempt > ATTEMPT_WINDOW && (!attempt.lockoutUntil || now > attempt.lockoutUntil)) {
-      loginAttempts.delete(email);
-    }
-  }
-  
-  // Clean IP-based attempts
-  const ipEntries = Array.from(ipLoginAttempts.entries());
-  for (const [ip, attempt] of ipEntries) {
-    if (now - attempt.lastAttempt > ATTEMPT_WINDOW && (!attempt.lockoutUntil || now > attempt.lockoutUntil)) {
-      ipLoginAttempts.delete(ip);
-    }
-  }
-}, 10 * 60 * 1000); // Clean up every 10 minutes
-
 export interface AuthenticatedRequest extends Request {
   user?: User;
 }
 
-// In-memory user storage (replace with database in production)
-const users: Map<number, User> = new Map();
-let currentUserId = 2; // Start at 2; slot 1 is reserved but admin is verified via token, not this Map.
-
-export function clearAllUsers() {
-  // Clear all users except admin
-  const adminUser = users.get(1);
-  users.clear();
-  if (adminUser) {
-    users.set(1, adminUser);
-  }
-  currentUserId = 2;
-  console.log("All user accounts cleared except admin");
+// Retained for backwards compatibility with startup and verification call sites.
+// User rows are synchronised by the storage write that sets an owner's password.
+export async function syncVerifiedMerchants(): Promise<void> {
+  // no-op — authentication reads live from the users table
 }
 
-// Function to recreate auth users for verified merchants
-export async function syncVerifiedMerchants() {
-  let synced = 0;
-  let alreadyPresent = 0;
-  let failed = 0;
-  try {
-    const { storage } = await import('./storage');
-    const allMerchants = await storage.getAllMerchants();
+export const JWT_SECRET = config.jwtSecret;
 
-    for (const merchant of allMerchants) {
-      if ((merchant.status === 'verified' || merchant.status === 'active') && merchant.passwordHash) {
-        const existingUser = getUserByEmail(merchant.email);
-        if (!existingUser) {
-          try {
-            const id = currentUserId++;
-            const user: User = {
-              id,
-              email: merchant.email,
-              password: merchant.passwordHash,
-              merchantId: merchant.id,
-              role: 'merchant',
-              createdAt: new Date(),
-            };
-            users.set(id, user);
-            synced++;
-          } catch {
-            failed++;
-            console.error(`Failed to recreate auth user for merchant: ${merchant.email} (ID: ${merchant.id})`);
-          }
-        } else {
-          alreadyPresent++;
-        }
-      }
-    }
-
-    const total = synced + alreadyPresent + failed;
-    if (failed > 0) {
-      console.error(`⚠️  Auth sync: ${total} verified merchants — ${synced} registered, ${alreadyPresent} already present, ${failed} FAILED`);
-    } else {
-      console.log(`✅ Auth sync: ${total} verified merchants — ${synced} registered, ${alreadyPresent} already present`);
-    }
-  } catch (error) {
-    console.error('❌ Auth sync failed entirely — merchants may not be able to log in:', error);
+function userRowToUser(row: {
+  id: number;
+  email: string;
+  password: string;
+  merchantId: number | null;
+  role: string;
+  sessionVersion?: number | null;
+  createdAt?: Date | null;
+}): User | null {
+  // Admins are environment-backed, never merchant-scoped database users. Unknown
+  // roles fail closed instead of silently inheriting member access.
+  if (
+    !isPositiveInteger(row.id) ||
+    !isPositiveInteger(row.merchantId) ||
+    !isMerchantUserRole(row.role) ||
+    typeof row.email !== 'string' ||
+    typeof row.password !== 'string'
+  ) {
+    return null;
   }
+  return {
+    id: row.id,
+    userId: row.id,
+    email: row.email,
+    password: row.password,
+    merchantId: row.merchantId,
+    role: row.role,
+    sessionVersion: row.sessionVersion ?? 0,
+    createdAt: row.createdAt ?? new Date(),
+  };
 }
 
-// Initialize auth system by syncing verified merchants
-syncVerifiedMerchants();
+// ============================================
+// PASSWORD CHECKS THAT DO NOT TELL WHO HAS A LOGIN
+// ============================================
+// Owner decision 2026-09-23: how long a sign-in takes must not tell whether the
+// email has a login. bcrypt's work doubles with each step of cost, and it answers
+// a malformed hash at once, so a check here always spends the work of one check at
+// PASSWORD_HASH_COST, whatever the stored hash is.
 
-export const JWT_SECRET = process.env.JWT_SECRET ?? (() => {
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error('JWT_SECRET environment variable must be set in production');
+/** The bcrypt cost of every password hash the app writes. */
+export const PASSWORD_HASH_COST = 12;
+
+const BCRYPT_HASH = /^\$2[aby]\$(\d{2})\$[./A-Za-z0-9]{53}$/;
+
+/** The cost of a well-formed bcrypt hash; null for anything else. */
+function bcryptCost(hash: string | null | undefined): number | null {
+  const match = hash ? BCRYPT_HASH.exec(hash) : null;
+  const cost = match ? Number(match[1]) : Number.NaN;
+  return cost >= 4 && cost <= 31 ? cost : null;
+}
+
+// Costs what a real hash of the same cost does, and matches no password: a fresh
+// salt with a result no password produces. Nothing is hashed to make one.
+function standInHash(cost: number): string {
+  return bcrypt.genSaltSync(cost) + '.'.repeat(31);
+}
+
+/** The work a check against `hash` must spend: a full check, or the hash's own if dearer. */
+export function passwordCheckBudget(hash: string | null | undefined): number {
+  return Math.max(PASSWORD_HASH_COST, bcryptCost(hash) ?? 0);
+}
+
+/**
+ * Whether `password` matches `storedHash`, after the work of one check at
+ * `budgetCost` whatever the hash: missing, malformed, or made at a lower cost
+ * (most older accounts carry cost 10). A lower-cost check is topped up with
+ * stand-ins at costs c, c+1, …, budget−1: 2^c + 2^c + 2^(c+1) + … = 2^budget.
+ */
+export async function checkPasswordEvenly(
+  password: string,
+  storedHash: string | null | undefined,
+  budgetCost = PASSWORD_HASH_COST,
+): Promise<boolean> {
+  const cost = bcryptCost(storedHash);
+  if (cost === null) {
+    await bcrypt.compare(password, standInHash(budgetCost));
+    return false;
   }
-  return 'dev-only-jwt-secret-not-for-production';
-})();
+  const matches = await bcrypt.compare(password, storedHash!);
+  for (let topUp = cost; topUp < budgetCost; topUp += 1) {
+    await bcrypt.compare(password, standInHash(topUp));
+  }
+  return matches;
+}
 
+/**
+ * Resolves a login against the `users` table — one row per person, so a seat can
+ * be revoked without disturbing anyone else's access.
+ *
+ * Three gates, all of which must pass: the user row is active, the parent
+ * merchant is verified/active, and the password matches. A disabled teammate
+ * fails the first gate even though their password is still correct. The password
+ * is checked first, at full cost, for every attempt — an email with no login
+ * included — so how long a refusal takes tells nothing.
+ */
 export async function authenticateUser(email: string, password: string): Promise<User | null> {
-  const user = Array.from(users.values()).find(u => u.email === email);
+  const { storage } = await import('./storage');
+
+  const userRow = await storage.getUserByEmail(email);
+  const candidate = userRow && !isDemoAccountLoginBlocked(config.appEnv, email) ? userRow : undefined;
+  const isValid = await checkPasswordEvenly(password, candidate?.password);
+  if (!candidate || !isValid || candidate.status !== 'active') return null;
+
+  const user = userRowToUser(candidate);
   if (!user) return null;
-  
-  const isValid = await bcrypt.compare(password, user.password);
-  if (!isValid) return null;
-  
+
+  const merchant = await storage.getMerchant(user.merchantId);
+  if (!merchant) return null;
+  if (merchant.status !== 'verified' && merchant.status !== 'active') return null;
+
+  if (!(await memberWithinSeatLimit(user))) return null;
+
+  await storage.recordUserLogin(candidate.id, new Date()).catch(() => {});
   return user;
 }
 
+/**
+ * Downgrades are normally blocked while too many seats are occupied, but this
+ * second gate covers races, manual repairs and future migrations. The owner
+ * always retains access so the account can remove seats or fix billing.
+ */
+async function memberWithinSeatLimit(user: User): Promise<boolean> {
+  if (user.role !== 'member') return true;
+  const { storage } = await import('./storage');
+  const subscription = await storage.getSubscription(user.merchantId);
+  const seatLimit = subscription?.seatLimit;
+  if (!isPositiveInteger(seatLimit)) return false;
+  const seatsInUse = await storage.countSeatsInUse(user.merchantId);
+  return seatsInUse <= seatLimit;
+}
+
+/**
+ * R1-T4 phase A: an account token for a users row that has just proved itself
+ * without a password — Google sign-in's one-time code. Every other gate of a
+ * password login applies: the row is active, the merchant verified or active, a
+ * member within the seat limit.
+ */
+export async function issueTokenForUserId(userId: number): Promise<{ token: string; merchantId: number } | null> {
+  if (!isPositiveInteger(userId)) return null;
+  const { storage } = await import('./storage');
+  const userRow = await storage.getUserById(userId);
+  if (!userRow || userRow.status !== 'active') return null;
+  const user = userRowToUser(userRow);
+  if (!user) return null;
+  const merchant = await storage.getMerchant(user.merchantId);
+  if (!merchant || (merchant.status !== 'verified' && merchant.status !== 'active')) return null;
+  if (!(await memberWithinSeatLimit(user))) return null;
+  await storage.recordUserLogin(userRow.id, new Date()).catch(() => {});
+  return { token: generateToken(user), merchantId: user.merchantId };
+}
+
+/** A token for a users row just read or updated, under its current session version; null if it is not a merchant login. */
+export function tokenForUserRow(row: Parameters<typeof userRowToUser>[0]): string | null {
+  const user = userRowToUser(row);
+  return user ? generateToken(user) : null;
+}
+
 export function generateToken(user: User): string {
+  const userId = user.userId ?? user.id;
+  if (!isPositiveInteger(userId) || typeof user.email !== 'string' || !user.email) {
+    throw new Error('Cannot issue a token for an invalid principal');
+  }
+
+  if (user.role === 'admin') {
+    const adminEmail = config.admin.email;
+    if (!adminEmail || user.email.toLowerCase() !== adminEmail.toLowerCase() || user.merchantId !== 0) {
+      throw new Error('Cannot issue an admin token for an unconfigured principal');
+    }
+    return jwt.sign(
+      { principal: ADMIN_TOKEN_PRINCIPAL, userId, email: adminEmail, merchantId: 0, role: 'admin' },
+      JWT_SECRET,
+      { expiresIn: '1h' },
+    );
+  }
+
+  if (!isMerchantUserRole(user.role) || !isPositiveInteger(user.merchantId)) {
+    throw new Error('Cannot issue a token without a users-row principal');
+  }
+
   return jwt.sign(
-    { 
-      userId: user.id, 
-      email: user.email, 
+    {
+      principal: TOKEN_PRINCIPAL,
+      userId,
+      email: user.email,
       merchantId: user.merchantId,
-      role: user.role 
+      role: user.role,
+      sv: user.sessionVersion ?? 0,
     },
     JWT_SECRET,
     { expiresIn: '1h' } // 1 hour as requested
@@ -302,92 +316,177 @@ export function verifyToken(token: string): any {
   }
 }
 
+/**
+ * Marks a storage read that never answered, as opposed to one that answered
+ * "no such row".
+ *
+ * Collapsing the two is how a database outage came to be reported to every
+ * signed-in merchant as `404 User not found` — indistinguishable from a deleted
+ * account. Reads on the authentication path go through `readForAuth`, which
+ * returns this marker instead of throwing, so the caller has to decide which of
+ * the two it is rather than falling through to the same answer for both.
+ */
+const STORAGE_UNAVAILABLE = Symbol('auth.storageUnavailable');
+
+async function readForAuth<T>(
+  what: string,
+  read: () => Promise<T>,
+): Promise<T | typeof STORAGE_UNAVAILABLE> {
+  try {
+    return await read();
+  } catch (error) {
+    // Never logged through logSecurityEvent: an outage makes this fire on every
+    // request, and the audit log is an append-only file on the same box.
+    console.error(`[AUTH_STORAGE_UNAVAILABLE] failed to ${what}:`, error);
+    return STORAGE_UNAVAILABLE;
+  }
+}
+
+/**
+ * The honest answer when we cannot tell whether a session is valid. 503 (not
+ * 401/403/404) so the client keeps the credentials it holds: nothing about them
+ * has been disproved, we simply could not check.
+ */
+function respondAuthBackendUnavailable(res: Response) {
+  res.setHeader('Retry-After', '5');
+  return res.status(503).json({
+    code: 'AUTH_BACKEND_UNAVAILABLE',
+    message: 'Could not verify your session right now. This is a problem on our side — please retry.',
+  });
+}
+
 export async function authenticateToken(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+  const match = typeof authHeader === 'string' ? authHeader.match(/^Bearer ([^\s]+)$/i) : null;
 
-  if (!token) {
+  if (!match) {
     return res.status(401).json({ message: 'Access token required' });
   }
-
+  const token = match[1];
   const decoded = verifyToken(token);
+  // P2.2 (R1-T3, owner decision 2026-09-27): a credential that is missing, invalid, expired or disabled
+  // is 401, so every page sends the person to sign in again (it was 403 here and below).
   if (!decoded) {
-    return res.status(403).json({ message: 'Invalid or expired token' });
+    return res.status(401).json({ message: 'Invalid or expired token' });
   }
 
-  // Handle admin users (not stored in users Map)
+  // A role string alone is not admin authority. Require the dedicated principal,
+  // the configured email, and a zero merchant scope.
   if (decoded.role === 'admin') {
+    const adminEmail = config.admin.email;
+    if (
+      decoded.principal !== ADMIN_TOKEN_PRINCIPAL ||
+      !adminEmail ||
+      typeof decoded.email !== 'string' ||
+      decoded.email.toLowerCase() !== adminEmail.toLowerCase() ||
+      decoded.merchantId !== 0 ||
+      !isPositiveInteger(decoded.userId)
+    ) {
+      return res.status(401).json({ message: 'Invalid admin session' });
+    }
     req.user = {
       id: decoded.userId,
-      email: decoded.email,
-      password: '', // Admin doesn't need password stored
-      merchantId: decoded.merchantId,
-      role: decoded.role,
+      email: adminEmail,
+      password: '',
+      merchantId: 0,
+      role: 'admin',
       createdAt: new Date(),
     };
     return next();
   }
 
-  // For regular users, check if user exists. If not, do a targeted single-merchant lookup
-  // rather than syncing all merchants (which is O(N) and a DoS vector).
-  let user = users.get(decoded.userId);
-  if (!user && decoded.merchantId) {
-    try {
-      const { storage } = await import('./storage');
-      const merchant = await storage.getMerchant(decoded.merchantId);
-      if (merchant && (merchant.status === 'verified' || merchant.status === 'active') && merchant.passwordHash) {
-        user = {
-          id: decoded.userId,
-          email: merchant.email,
-          password: merchant.passwordHash,
-          merchantId: merchant.id,
-          role: 'merchant',
-          createdAt: new Date(),
-        };
-        users.set(decoded.userId, user);
-      }
-    } catch {
-      // fall through to user not found below
-    }
-  }
-  if (!user) {
-    return res.status(404).json({ message: 'User not found' });
+  // Reject pre-team-logins tokens: their `userId` is a merchant id, so honouring
+  // one would resolve the wrong users row. See TOKEN_PRINCIPAL.
+  if (decoded.principal !== TOKEN_PRINCIPAL) {
+    return res.status(401).json({ message: 'Session expired. Please sign in again.' });
   }
 
+  // R1-T4 phase D: tokens issued before session versions carry none and count as
+  // version 0, so they last only until the login's sessions are first ended.
+  const tokenSessionVersion = decoded.sv === undefined ? 0 : decoded.sv;
+  if (
+    !isPositiveInteger(decoded.merchantId) ||
+    !isPositiveInteger(decoded.userId) ||
+    !isMerchantUserRole(decoded.role) ||
+    !Number.isInteger(tokenSessionVersion) ||
+    tokenSessionVersion < 0
+  ) {
+    return res.status(401).json({ code: 'INVALID_SESSION', message: 'Invalid session' });
+  }
+
+  // Each read is guarded on its own, and the decisions sit outside the guard, so
+  // that only a genuine answer from the database can produce a 401 — a rejection
+  // here is a statement about this principal, never about our uptime.
+  const storageModule = await readForAuth('load the storage module', () => import('./storage'));
+  if (storageModule === STORAGE_UNAVAILABLE) return respondAuthBackendUnavailable(res);
+  const { storage } = storageModule;
+
+  const userRow = await readForAuth('read the users row', () => storage.getUserById(decoded.userId));
+  if (userRow === STORAGE_UNAVAILABLE) return respondAuthBackendUnavailable(res);
+
+  const user = userRow ? userRowToUser(userRow) : null;
+
+  // Re-check the identity on every request so disabling a teammate takes effect
+  // within the token's remaining lifetime rather than at its natural expiry.
+  if (!userRow || !user || userRow.status !== 'active' || user.merchantId !== decoded.merchantId) {
+    return res.status(401).json({ message: 'Access revoked' });
+  }
+
+  // A password reset or "sign out everywhere" advanced the version: every token
+  // issued before it is spent. 401, so the client drops it and signs in again.
+  if (tokenSessionVersion !== (userRow.sessionVersion ?? 0)) {
+    return res.status(401).json({ code: 'SESSION_ENDED', message: 'You were signed out. Please sign in again.' });
+  }
+
+  const merchant = await readForAuth('read the merchant row', () => storage.getMerchant(decoded.merchantId));
+  if (merchant === STORAGE_UNAVAILABLE) return respondAuthBackendUnavailable(res);
+
+  // A row that is absent, unverified or suspended — the database answered, and
+  // the answer is that this login has no usable account behind it.
+  if (!merchant || (merchant.status !== 'verified' && merchant.status !== 'active')) {
+    return res.status(401).json({ code: 'ACCESS_REVOKED', message: 'Access revoked' });
+  }
+
+  // The database role is authoritative; stale JWT role claims are ignored.
   req.user = user;
-  next();
+  return next();
 }
 
+// Enable the owner's login and return the real users-row principal. The merchant
+// hash writer synchronises/creates that owner row; re-reading it prevents Google
+// OAuth from minting a token whose uid is accidentally the merchant id.
 export async function createUser(email: string, password: string, merchantId: number, role: 'merchant' | 'admin' = 'merchant'): Promise<User> {
-  // Check if user already exists
-  const existingUser = getUserByEmail(email);
-  if (existingUser) {
-    throw new Error(`User with email ${email} already exists`);
+  if (role === 'admin') {
+    throw new Error('Admin identities cannot be created in the merchant users table');
   }
 
-  const hashedPassword = await bcrypt.hash(password, 12);
-  const id = currentUserId++;
-  
-  const user: User = {
-    id,
-    email,
-    password: hashedPassword,
-    merchantId,
-    role,
-    createdAt: new Date(),
-  };
-  
-  users.set(id, user);
-  console.log(`User created successfully: ${email} with ID ${id} for merchant ${merchantId}`);
+  const { storage } = await import('./storage');
+  const merchant = await storage.getMerchant(merchantId);
+  if (!merchant) {
+    throw new Error(`Cannot create login for unknown merchant ${merchantId}`);
+  }
+  if (merchant.email.trim().toLowerCase() !== email.trim().toLowerCase()) {
+    throw new Error(`Cannot create login with an email that does not match merchant ${merchantId}`);
+  }
+
+  const passwordHash = merchant.passwordHash || await bcrypt.hash(password, 12);
+  const updated = await storage.updateMerchantPasswordHash(merchantId, passwordHash);
+  if (!updated) {
+    throw new Error(`Failed to enable login for merchant ${merchantId}`);
+  }
+
+  const userRow = await storage.getUserByEmail(merchant.email);
+  const user = userRow ? userRowToUser(userRow) : null;
+  if (!userRow || !user || userRow.status !== 'active' || user.role !== 'owner' || user.merchantId !== merchantId) {
+    throw new Error(`Merchant ${merchantId} does not have a unique active owner login`);
+  }
   return user;
 }
 
-export function getUserByEmail(email: string): User | undefined {
-  return Array.from(users.values()).find(u => u.email === email);
-}
-
-export function getUserById(id: number): User | undefined {
-  return users.get(id);
+export async function getUserByEmail(email: string): Promise<User | undefined> {
+  const { storage } = await import('./storage');
+  const userRow = await storage.getUserByEmail(email);
+  return userRow ? userRowToUser(userRow) ?? undefined : undefined;
 }
 
 // Password reset functionality
@@ -395,87 +494,71 @@ export function generateResetToken(): string {
   return crypto.randomBytes(32).toString('hex');
 }
 
+function hashResetToken(token: string): string {
+  return crypto.createHash('sha256').update(token, 'utf8').digest('hex');
+}
+
+function resetEligible(user: {
+  merchantId: number | null;
+  role: string;
+  status: string;
+  resetTokenExpiry?: Date | null;
+}, now: Date): boolean {
+  const expiry = user.resetTokenExpiry ? new Date(user.resetTokenExpiry).getTime() : Number.NaN;
+  return isPositiveInteger(user.merchantId)
+    && isMerchantUserRole(user.role)
+    && user.status === 'active'
+    && Number.isFinite(expiry)
+    && expiry > now.getTime();
+}
+
 export async function requestPasswordReset(email: string, baseUrl?: string): Promise<boolean> {
-  const resetToken = generateResetToken();
-  const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour from now
-
-  // Look up merchant in database (single source of truth)
   try {
     const { storage } = await import('./storage');
-    const merchant = await storage.getMerchantByEmail(email);
-    
-    if (!merchant) {
-      return true; // Don't reveal if email exists
+    const user = await storage.getUserByEmail(email);
+    if (!user || !isPositiveInteger(user.merchantId) || !isMerchantUserRole(user.role) || user.status !== 'active') {
+      return true; // Do not reveal whether a usable login exists.
     }
 
-    await storage.updateMerchant(merchant.id, {
-      resetToken,
-      resetTokenExpiry,
-    } as any);
+    const resetToken = generateResetToken();
+    const resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000);
+    await storage.setUserResetToken(user.id, hashResetToken(resetToken), resetTokenExpiry);
 
-    // Also update in-memory user if exists
-    const memUser = getUserByEmail(email);
-    if (memUser) {
-      memUser.resetToken = resetToken;
-      memUser.resetTokenExpiry = resetTokenExpiry;
-      users.set(memUser.id, memUser);
-    }
+    return await sendPasswordResetEmail(user.email, resetToken, baseUrl);
   } catch (error) {
-    console.error('Failed to store reset token in database:', error);
-    return false;
-  }
-
-  try {
-    await sendPasswordResetEmail(email, resetToken, baseUrl);
-    return true;
-  } catch (error) {
-    console.error('Failed to send password reset email:', error);
+    console.error('Failed to process password reset request:', error);
     return false;
   }
 }
 
-export async function resetPassword(token: string, newPassword: string): Promise<boolean> {
-  try {
-    const { storage } = await import('./storage');
-    const merchant = await storage.getMerchantByResetToken(token);
-    
-    if (!merchant || !merchant.resetTokenExpiry || new Date(merchant.resetTokenExpiry) < new Date()) {
-      return false;
-    }
+/**
+ * The login whose password was reset, or null. The reset also ends every session
+ * of that login (R1-T4 phase D); the caller closes its live streams.
+ *
+ * A storage fault is thrown, never answered as null: null tells the user the link
+ * is bad, and a good link must not be called expired because the database did not
+ * answer (C10 route review, 2026-09-26). The route answers a fault with 500.
+ */
+export async function resetPassword(
+  token: string,
+  newPassword: string,
+): Promise<{ userId: number; merchantId: number } | null> {
+  const { storage } = await import('./storage');
+  const tokenHash = hashResetToken(token);
+  const now = new Date();
+  const candidate = await storage.getUserByResetToken(tokenHash);
+  if (!candidate || !resetEligible(candidate, now)) return null;
 
-    const hashedPassword = await bcrypt.hash(newPassword, 12);
-    
-    await storage.updateMerchant(merchant.id, {
-      passwordHash: hashedPassword,
-      resetToken: null,
-      resetTokenExpiry: null,
-    } as any);
-
-    // Also update in-memory user if exists
-    const memUser = getUserByEmail(merchant.email);
-    if (memUser) {
-      memUser.password = hashedPassword;
-      memUser.resetToken = undefined;
-      memUser.resetTokenExpiry = undefined;
-      users.set(memUser.id, memUser);
-    }
-
-    return true;
-  } catch (error) {
-    console.error('Failed to reset password:', error);
-    return false;
-  }
+  const hashedPassword = await bcrypt.hash(newPassword, 12);
+  const updated = await storage.resetUserPasswordByToken(tokenHash, hashedPassword, now);
+  if (!updated || !isMerchantUserRole(updated.role) || updated.status !== 'active') return null;
+  if (!isPositiveInteger(updated.id) || !isPositiveInteger(updated.merchantId)) return null;
+  return { userId: updated.id, merchantId: updated.merchantId };
 }
 
+/** Whether a reset link is live. A storage fault is thrown, never answered false (see resetPassword). */
 export async function validateResetToken(token: string): Promise<boolean> {
-  try {
-    const { storage } = await import('./storage');
-    const merchant = await storage.getMerchantByResetToken(token);
-    if (merchant && merchant.resetTokenExpiry && new Date(merchant.resetTokenExpiry) > new Date()) {
-      return true;
-    }
-  } catch (error) {
-    console.error('Failed to validate reset token:', error);
-  }
-  return false;
+  const { storage } = await import('./storage');
+  const user = await storage.getUserByResetToken(hashResetToken(token));
+  return !!user && resetEligible(user, new Date());
 }

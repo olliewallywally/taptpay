@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="2480" height="3508" viewBox="0 0 2480 3508">
+  <defs>
+    
+  </defs>
+  <image id="Background" width="2480" height="3508"></image>
+  <image width="2480" height="3508"></image>
+  <rect id="bg-fill" width="2480" height="3508" fill="var(--background, transparent)"></rect>
+  <path class="cls-1" d="M354.442,2461.69H2089.56a98,98,0,0,1,98,98v538.23a98.005,98.005,0,0,1-98,98H354.442a98,98,0,0,1-98-98V2559.69A98,98,0,0,1,354.442,2461.69Z"></path>
+  <text id="logo" class="cls-2" style="fill: #00f1d7" transform="translate(974.635 644.721) scale(1.672)">logo</text>
+  <image id="logo-placeholder" x="550" y="380" width="1380" height="450" href="" preserveAspectRatio="xMidYMid meet"></image>
+  <path id="Rectangle_1.svg" data-name="Rectangle 1.svg" class="cls-1" d="M385,1219H847a123,123,0,0,1,123,123v462a123,123,0,0,1-123,123H385a123,123,0,0,1-123-123V1342A123,123,0,0,1,385,1219Zm0,0H847a123,123,0,0,1,123,123v462a123,123,0,0,1-123,123H385a123,123,0,0,1-123-123V1342A123,123,0,0,1,385,1219Zm0,0H847a123,123,0,0,1,123,123v462a123,123,0,0,1-123,123H385a123,123,0,0,1-123-123V1342A123,123,0,0,1,385,1219Z"></path>
+  <path id="Rectangle_1_copy.svg" data-name="Rectangle 1 copy.svg" class="cls-1" d="M1597,1219h462a123,123,0,0,1,123,123v462a123,123,0,0,1-123,123H1597a123,123,0,0,1-123-123V1342A123,123,0,0,1,1597,1219Zm0,0h462a123,123,0,0,1,123,123v462a123,123,0,0,1-123,123H1597a123,123,0,0,1-123-123V1342A123,123,0,0,1,1597,1219Zm0,0h462a123,123,0,0,1,123,123v462a123,123,0,0,1-123,123H1597a123,123,0,0,1-123-123V1342A123,123,0,0,1,1597,1219Z"></path>
+  <text id="scan.svg" class="cls-3" x="335.906" y="2174.209">scan</text>
+  <text id="tap.svg" class="cls-4" x="1646.894" y="2176.623">tap</text>
+  <image id="Rectangle_3.svg" data-name="Rectangle 3.svg" x="818" y="2970" width="308" height="138"></image>
+  <image id="Rectangle_3.svg-2" data-name="Rectangle 3.svg" x="1296" y="2967" width="319" height="143"></image>
+  <image id="Layer_6.svg" data-name="Layer 6.svg" x="1647" y="1339" width="362" height="460"></image>
+  <text id="text-instructions" data-name="simply scan or tap to pay.svg" class="cls-5" x="1192.22" y="2680.056"><tspan x="1192.22">simply scan or tap</tspan><tspan x="1192.22" dy="188.384">to pay</tspan></text>
+  <image id="qr-placeholder" x="366" y="1323" width="500" height="500" href="" preserveAspectRatio="xMidYMid meet"></image>
+</svg>

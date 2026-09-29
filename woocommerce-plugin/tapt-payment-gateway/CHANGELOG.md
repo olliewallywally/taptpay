@@ -2,13 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.0] - 2026-08-07
+
+### Changed
+- Updated checkout, plugin-directory, and translation-template pricing copy for subscription plans
+- Removed references to the retired per-transaction fee
+- Clarified that external payment-processing or acquiring fees may still apply
+
 ## [1.0.0] - 2025-01-28
 
 ### Added
 - Initial release of Tapt Payment Gateway for WooCommerce
 - NFC tap-to-pay payment support
 - QR code payment functionality
-- Fixed fee pricing structure ($0.25 per transaction)
+- Original pricing model documentation
 - Real-time webhook support for order status updates
 - Comprehensive admin interface with status monitoring
 - Test mode for development and testing
@@ -22,7 +29,7 @@ All notable changes to this project will be documented in this file.
 
 ### Features
 - **Payment Methods**: NFC, QR codes, and secure web payments
-- **Pricing**: Transparent fixed fee of $0.25 per transaction
+- **Pricing**: Pricing details included with the initial release
 - **Security**: PCI compliant processing with bank-level encryption
 - **Integration**: Full WooCommerce payment gateway API implementation
 - **Webhooks**: Real-time order updates via secure webhooks

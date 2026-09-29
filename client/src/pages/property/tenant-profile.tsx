@@ -166,7 +166,7 @@ export default function TenantProfile() {
   if (!isLoading && !tenant && !snap) {
     return (
       <div style={{ minHeight: '100svh', background: C.white, display: 'flex', justifyContent: 'center' }}>
-        <div style={{ width: '100%', maxWidth: 390, background: '#F4F4F4', paddingTop: 100, textAlign: 'center' }}>
+        <div style={{ width: '100%', maxWidth: 'var(--phone-shell-max)', background: '#F4F4F4', paddingTop: 100, textAlign: 'center' }}>
           <p style={{ color: C.mute }}>tenant not found</p>
           <button onClick={() => startPropertyBack(() => setLocation('/property/tenants'))} style={{ marginTop: 16, color: C.btn, background: 'none', border: 'none', cursor: 'pointer', fontSize: 14 }}>← back to tenants</button>
         </div>
@@ -218,7 +218,7 @@ export default function TenantProfile() {
 
   return (
     <div style={{ background: C.white, minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
-    <div style={{ width: '100%', maxWidth: 390, minHeight: '100svh', background: '#F4F4F4', paddingBottom: 130, fontFamily: "'Outfit', system-ui, sans-serif" }}>
+    <div style={{ width: '100%', maxWidth: 'var(--phone-shell-max)', minHeight: '100svh', background: '#F4F4F4', paddingBottom: 130, fontFamily: "'Outfit', system-ui, sans-serif" }}>
       <div style={{ height: 56 }} />
 
       {/* Top bar — slides down from above as the hero morphs into place */}
@@ -228,7 +228,7 @@ export default function TenantProfile() {
             <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={C.navy} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 6-6 6 6 6"/></svg>
           </button>
           <div style={{ fontWeight: 600, fontSize: 11, color: C.navy, letterSpacing: '0.16em', textTransform: 'uppercase' }}>tenant profile</div>
-          <button onClick={startEdit} disabled={!tenant} style={{ width: 34, height: 34, borderRadius: 999, background: C.gray, border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: tenant ? 'pointer' : 'default', opacity: tenant ? 1 : 0.35 }}>
+          <button onClick={startEdit} disabled={!tenant} aria-label="Edit tenant" data-tutorial-id="tenant-edit" style={{ width: 34, height: 34, borderRadius: 999, background: C.gray, border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: tenant ? 'pointer' : 'default', opacity: tenant ? 1 : 0.35 }}>
             <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke={C.navy} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
           </button>
         </div>
@@ -290,7 +290,7 @@ export default function TenantProfile() {
       </div>
 
       {/* Activity Timeline — header bounces in after hero settles */}
-      <div className="pt-bounce" style={{ '--pt-d': '170ms', display: 'flex', alignItems: 'center', padding: '24px 20px 4px' } as any}>
+      <div data-tutorial-id="tenant-activity" className="pt-bounce" style={{ '--pt-d': '170ms', display: 'flex', alignItems: 'center', padding: '24px 20px 4px' } as any}>
         <div style={{ fontWeight: 600, fontSize: 12, color: C.navy, letterSpacing: '0.12em', textTransform: 'uppercase' }}>activity timeline</div>
       </div>
 
@@ -357,7 +357,7 @@ export default function TenantProfile() {
       {/* Edit sheet */}
       {editing && editForm && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(4,13,109,0.55)', backdropFilter: 'blur(8px)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }}>
-          <div style={{ width: '100%', maxWidth: 390, margin: '0 auto', background: '#F4F4F4', borderRadius: '28px 28px 0 0', padding: '24px 24px 48px' }}>
+          <div style={{ width: '100%', maxWidth: 'var(--phone-shell-max)', margin: '0 auto', background: '#F4F4F4', borderRadius: '28px 28px 0 0', padding: '24px 24px 48px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
               <span style={{ fontWeight: 700, fontSize: 18, color: C.navy }}>edit tenant</span>
               <button onClick={() => setEditing(false)} style={{ width: 32, height: 32, borderRadius: 999, background: C.gray, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -377,7 +377,7 @@ export default function TenantProfile() {
                   type={type}
                   value={editForm[k] ?? ''}
                   onChange={e => setEditForm((f: any) => ({ ...f, [k]: e.target.value }))}
-                  style={{ width: '100%', padding: '14px 16px', borderRadius: 14, background: C.gray, border: 'none', outline: 'none', color: C.navy, fontSize: 15, fontWeight: 500, boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '14px 16px', borderRadius: 14, background: C.gray, border: 'none', outline: 'none', color: C.navy, fontSize: "max(15px, var(--field-floor, 0px))", fontWeight: 500, boxSizing: 'border-box' }}
                 />
               </div>
             ))}

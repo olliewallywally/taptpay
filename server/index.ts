@@ -1,9 +1,8 @@
-import express, { type Request, Response, NextFunction } from "express";
+import { config } from "./config";
 import fs from "fs";
 import path from "path";
-import helmet from "helmet";
-import compression from "compression";
 import { spawnSync } from "child_process";
+import { createApp } from "./app";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { seedDatabase } from "./seed";
@@ -14,106 +13,17 @@ import {
   setupGracefulShutdown, 
   getPortConflictHelp 
 } from "./port-manager";
+import { createGlobalErrorHandler } from "./http-error-handler";
 
-const app = express();
+const isProduction = config.isProduction;
 
-// ============================================
-// SECURITY HEADERS - Payment Processor Grade
-// ============================================
-const isProduction = process.env.NODE_ENV === 'production';
-
-// Security headers - CSP enabled in production, disabled in dev for Replit webview compatibility
-app.use(helmet({
-  contentSecurityPolicy: isProduction ? {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "https://pay.google.com", "https://applepay.cdn-apple.com", "https://uat.windcave.com", "https://sec.windcave.com"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      imgSrc: ["'self'", "data:", "blob:", "https:"],
-      connectSrc: ["'self'", "https://uat.windcave.com", "https://sec.windcave.com", "https://pay.google.com"],
-      frameSrc: ["'self'", "https://sec.windcave.com", "https://uat.windcave.com", "https://pay.google.com"],
-      objectSrc: ["'none'"],
-      baseUri: ["'self'"],
-      formAction: ["'self'"],
-      upgradeInsecureRequests: [],
-    },
-  } : false,
-  frameguard: isProduction ? { action: 'deny' } : false,
-  hidePoweredBy: true,
-  hsts: isProduction ? {
-    maxAge: 31536000,
-    includeSubDomains: true,
-    preload: true,
-  } : false,
-  noSniff: true,
-  xssFilter: true,
-  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
-  dnsPrefetchControl: { allow: false },
-  crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
-}));
-
-// Gzip compression for all responses — skips already-compressed assets and
-// very small payloads (< 1 KB) where compression overhead outweighs savings.
-app.use(compression({ threshold: 1024 }));
-
-// Skip JSON parsing for webhook routes to preserve raw body for signature verification
-app.use((req, res, next) => {
-  if (req.path === '/api/crypto-transactions/webhook/coinbase' || req.path === '/api/windcave/notification') {
-    next();
-  } else {
-    express.json()(req, res, next);
-  }
-});
-
-app.use(express.urlencoded({ extended: false }));
-
-app.use((req, res, next) => {
-  const start = Date.now();
-  const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
-
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
-
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-
-      log(logLine);
-    }
-  });
-
-  next();
-});
+// Security headers, compression, bearer-page caching, body parsing and the
+// request log: the same app the server tests build (server/app.ts).
+const app = createApp({ writeRequestLog: log });
 
 (async () => {
-  // ── JWT_SECRET validation ────────────────────────────────────────────────
-  if (!process.env.JWT_SECRET) {
-    if (isProduction) {
-      console.error('');
-      console.error('[FATAL] JWT_SECRET is NOT set in production.');
-      console.error('  Set JWT_SECRET in your deployment secrets to a strong random value.');
-      console.error('  Refusing to start — running without JWT_SECRET in production is insecure.');
-      console.error('');
-      process.exit(1);
-    } else {
-      console.warn('⚠️  JWT_SECRET not set — using development fallback (acceptable in dev only).');
-      process.env.JWT_SECRET = 'dev-secret-key-change-in-production';
-    }
-  } else {
-    console.log('✅ JWT_SECRET: configured');
+  for (const diagnostic of config.diagnostics) {
+    console.warn(`[CONFIG] ${diagnostic.group}: ${diagnostic.key}`);
   }
 
   // ── Database connectivity verification ───────────────────────────────────
@@ -137,6 +47,26 @@ app.use((req, res, next) => {
     }
   }
 
+  // Admin sign-in refuses everyone without ADMIN_PASSWORD_HASH: say so where it shows.
+  if (config.admin.email && !config.admin.passwordHash) {
+    console.warn('⚠️  Admin sign-in is off: ADMIN_PASSWORD_HASH is not set. Run `npm run admin:password` in the Shell to make one.');
+  }
+
+  // ── Read-only migration gate ─────────────────────────────────────────────
+  // Production must never accept traffic against pending, drifted, orphaned,
+  // or out-of-order schema history. Development reports the same issues loudly.
+  try {
+    const { reportPendingMigrations } = await import("./migrate");
+    await reportPendingMigrations({ failOnIssues: isProduction });
+  } catch (error) {
+    if (isProduction) {
+      console.error("[FATAL] Database migration gate failed.");
+      console.error(error);
+      process.exit(1);
+    }
+    log(`⚠️  Migration check unavailable (non-fatal in development): ${error}`);
+  }
+
   // ── Schema push (drizzle-kit push) ───────────────────────────────────────
   // Never run schema sync as a normal app-start side effect. The trades branch
   // must use reviewed additive SQL, and drizzle-kit push can propose destructive
@@ -147,7 +77,11 @@ app.use((req, res, next) => {
   // a non-zero exit code instead of silently destroying live data. If you need
   // to apply schema changes, run `npm run db:push` manually after reviewing
   // exactly what will be changed, or start with RUN_SCHEMA_PUSH=true.
-  const runSchemaPush = process.env.RUN_SCHEMA_PUSH === 'true' || process.env.RUN_MIGRATIONS === 'true';
+  if (config.retiredRunMigrations) {
+    console.error('[FATAL] RUN_MIGRATIONS is retired; run `npm run db:migrate` as a deliberate deploy step.');
+    process.exit(1);
+  }
+  const runSchemaPush = config.runSchemaPush;
   if (isDatabaseConnected() && runSchemaPush) {
     log('Running schema push to sync database...');
     try {
@@ -161,7 +95,6 @@ app.use((req, res, next) => {
             stdio: 'pipe',
             encoding: 'utf8',
             timeout: 30_000,
-            env: { ...process.env },
           }
         );
         if (push.status === 0) {
@@ -180,15 +113,13 @@ app.use((req, res, next) => {
     }
   }
 
+
   const server = await registerRoutes(app);
 
-  // Initialize database with seed data if connected
-  if (isDatabaseConnected()) {
-    try {
-      await seedDatabase();
-    } catch (error) {
-      log(`⚠️ Database seeding failed: ${error}`);
-    }
+  // Demo data is an explicit development/test action. A requested seed failure
+  // is fatal instead of being hidden behind a warning.
+  if (config.seedDemoData) {
+    await seedDatabase();
   }
 
   // Sync verified merchants to recreate auth users
@@ -199,56 +130,8 @@ app.use((req, res, next) => {
     log(`⚠️ Failed to sync verified merchants: ${error}`);
   }
 
-  // Ensure info_pack_leads table exists (additive migration, safe to re-run)
-  if (isDatabaseConnected()) {
-    try {
-      const { getDb } = await import("./database");
-      const { sql } = await import("drizzle-orm");
-      const pgDb = getDb();
-      if (pgDb) {
-        await pgDb.execute(sql`
-          CREATE TABLE IF NOT EXISTS info_pack_leads (
-            id serial PRIMARY KEY,
-            name text NOT NULL,
-            email text NOT NULL,
-            created_at timestamp DEFAULT now()
-          )
-        `);
-        log("✅ info_pack_leads table ready");
-      }
-    } catch (error) {
-      log(`⚠️ Failed to ensure info_pack_leads table: ${error}`);
-    }
-  }
 
-  // Mark all pre-existing verified/active merchants as onboarding completed
-  // so they aren't forced through the new onboarding flow
-  if (isDatabaseConnected()) {
-    try {
-      const { db } = await import("./db");
-      const { merchants } = await import("../shared/schema");
-      const { eq, or } = await import("drizzle-orm");
-      await db.update(merchants)
-        .set({ onboardingCompleted: true })
-        .where(
-          or(
-            eq(merchants.status, 'verified'),
-            eq(merchants.status, 'active')
-          )
-        );
-      log("✅ Existing verified merchants marked as onboarding completed");
-    } catch (error) {
-      log(`⚠️ Failed to mark existing merchants as onboarded: ${error}`);
-    }
-  }
-
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    res.status(status).json({ message });
-    throw err;
-  });
+  app.use(createGlobalErrorHandler());
 
 
   const CRAWLER_UA_PATTERN = /bot|crawl|spider|slurp|facebookexternalhit|linkedinbot|twitterbot|whatsapp|telegram|pinterest|googlebot|bingbot|yandex|baiduspider|duckduckbot|applebot|ia_archiver|semrush|ahrefs|mj12bot/i;
@@ -310,7 +193,7 @@ app.use((req, res, next) => {
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
+  if (config.appEnv === "development") {
     await setupVite(app, server);
   } else {
     serveStatic(app);
@@ -337,9 +220,9 @@ app.use((req, res, next) => {
   log(`✅ Server successfully running on ${host}:${port}`);
 
   // Keep Neon database endpoint alive — ping every 4 minutes to prevent auto-suspension
-  if (process.env.DATABASE_URL) {
+  if (config.databaseUrl) {
     const { neon } = await import("@neondatabase/serverless");
-    const keepAliveSql = neon(process.env.DATABASE_URL);
+    const keepAliveSql = neon(config.databaseUrl);
     setInterval(async () => {
       try {
         await keepAliveSql`SELECT 1`;

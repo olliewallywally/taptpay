@@ -2,68 +2,172 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
+import { SIGN_OUT_EVERYWHERE_CONFIRMATION, signOutEverywhere } from "@/lib/sign-out-everywhere";
+import { stopThisDevicePush } from "@/lib/push-device";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
-import { getCurrentMerchantId } from "@/lib/auth";
+import { MerchantGate } from "@/components/merchant-gate";
+import { apiErrorMessage } from "@/lib/api-error";
 import { apiRequest } from "@/lib/queryClient";
-import { isNativeApp, isNativeIOS } from "@/lib/native";
+import { isNativeApp } from "@/lib/native";
+import { usePushNotifications } from "@/hooks/use-push-notifications";
+import {
+  BILLING_CARD_SESSION_KEY,
+  useBillingCardReturn,
+} from "@/hooks/use-billing-card-return";
 import { TRADES_THEME } from "@/lib/trades-theme";
 import { Switch } from "@/components/ui/switch";
-import { 
-  Upload, CheckCircle, XCircle, LogOut, AlertCircle, Bell, BellOff, ChevronDown, Printer, ArrowRight, CreditCard, Building2, Wrench
+import { WireframeLiquidButton } from "@/components/wireframe-liquid-button";
+import { useTutorial } from "@/features/tutorial/tutorial";
+import { PLAN_LIST, formatPlanPrice, planForOrDefault, type PlanId } from "@shared/plans";
+import {
+  cardSetupBillingDisclosure,
+  hasPaidCurrentSubscriptionPeriod,
+  planChangeBillingDisclosure,
+  subscriptionCancellationState,
+} from "@/lib/subscription-ui";
+
+interface TeamMember {
+  id: number;
+  email: string;
+  name: string | null;
+  role: string;
+  status: string;
+  lastLoginAt: string | null;
+}
+
+interface BillingHistoryEntry {
+  id: number;
+  billingType: string;
+  amount: string | number;
+  status: string;
+  description: string | null;
+  failureReason: string | null;
+  paidAt: string | null;
+  createdAt: string | null;
+}
+
+interface AuthMeResponse {
+  user: {
+    id: number;
+    email: string;
+    role: string;
+  };
+}
+
+const billingMoney = (value: string | number) =>
+  new Intl.NumberFormat("en-NZ", { style: "currency", currency: "NZD" })
+    .format(Number(value) || 0);
+
+const billingDate = (value: string | null) => value
+  ? new Date(value).toLocaleDateString("en-NZ", { day: "numeric", month: "short", year: "numeric" })
+  : "—";
+
+const BILLING_TYPE_LABELS: Record<string, string> = {
+  monthly_subscription: "Monthly subscription",
+  plan_change: "Plan change",
+  transaction_fees: "Legacy transaction fees",
+  tier_upgrade: "Legacy tier upgrade",
+};
+
+const billingTypeLabel = (value: string) =>
+  BILLING_TYPE_LABELS[value] ?? value.replace(/_/g, " ");
+import {
+  Upload, CheckCircle, XCircle, LogOut, AlertCircle, Bell, BellOff, Printer, ArrowRight, ArrowLeft, CreditCard, Building2, Wrench, BookOpen, RotateCcw, SlidersHorizontal, UserCircle
 } from "lucide-react";
 
-function SettingsSection({ title, isOpen, onToggle, children }: {
+type SectionKey = "business" | "prefs" | "billing" | "account" | "notifs" | "tutorial";
+
+/* Neutral grayscale for the redesigned list/detail chrome only (identity card,
+   grouped rows, sub-page header) — the reference image has no blue anywhere.
+   The app's brand navy/sky-blue (#040D6D/#58ABFF) stays exactly where it already
+   was: inside the untouched sub-page body content and the untouched bottom
+   cluster (payment button, mode buttons, log out). */
+const APPLE_INK = '#1C1C1E';
+const APPLE_MUTED = '#8E8E93';
+const APPLE_FILL = '#F2F2F7';
+
+/* iOS-style push/pop: the entering page slides in from the right over
+   SETTINGS_ENTER_MS (a plain mount animation, `both`-filled); the leaving page
+   slides back out over SETTINGS_LEAVE_MS before its state actually clears — see
+   `closeSection`. Curve matches the platform's own navigation transition. */
+const SETTINGS_ENTER_MS = 300;
+const SETTINGS_LEAVE_MS = 260;
+const SETTINGS_SLIDE_EASE = 'cubic-bezier(0.32, 0.72, 0, 1)';
+
+const SETTINGS_TRANSITION_CSS = `
+@keyframes settingsPushIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@keyframes settingsPushOut { from { transform: translateX(0); } to { transform: translateX(100%); } }
+.settings-detail-pane {
+  animation: settingsPushIn ${SETTINGS_ENTER_MS}ms ${SETTINGS_SLIDE_EASE} both;
+  box-shadow: -14px 0 32px rgba(0,0,0,0.10);
+  position: relative;
+  z-index: 1;
+}
+.settings-detail-pane.settings-detail-leaving {
+  animation: settingsPushOut ${SETTINGS_LEAVE_MS}ms ${SETTINGS_SLIDE_EASE} forwards;
+}
+`;
+
+const SECTION_META: Record<SectionKey, { title: string; icon: React.ReactNode }> = {
+  business: { title: "Business Details", icon: <Building2 className="w-5 h-5" style={{ color: APPLE_INK }} /> },
+  prefs: { title: "Dashboard Preferences", icon: <SlidersHorizontal className="w-5 h-5" style={{ color: APPLE_INK }} /> },
+  billing: { title: "Subscription & Billing", icon: <CreditCard className="w-5 h-5" style={{ color: APPLE_INK }} /> },
+  account: { title: "Account", icon: <UserCircle className="w-5 h-5" style={{ color: APPLE_INK }} /> },
+  notifs: { title: "Transaction Notifications", icon: <Bell className="w-5 h-5" style={{ color: APPLE_INK }} /> },
+  tutorial: { title: "Tutorial & Help", icon: <BookOpen className="w-5 h-5" style={{ color: APPLE_INK }} /> },
+};
+
+/* Apple-style grouped-list row: icon badge, label, optional trailing value,
+   chevron. Same anatomy the Payment Board Builder card already used, generalized
+   so it can also stack inside a group with a hairline between rows. */
+function SettingsItem({ icon, title, value, onClick, delay = 0, testId, tutorialId, settingsSection, last }: {
+  icon: React.ReactNode;
   title: string;
-  isOpen: boolean;
-  onToggle: () => void;
-  children: React.ReactNode;
+  value?: string;
+  onClick: () => void;
+  delay?: number;
+  testId?: string;
+  tutorialId?: string;
+  settingsSection?: string;
+  last?: boolean;
 }) {
   return (
-    <div
-      className="bg-white rounded-3xl mb-4 overflow-hidden transition-shadow"
-      style={{ boxShadow: isOpen ? '0 10px 30px rgba(4,13,109,0.10)' : '0 4px 16px rgba(4,13,109,0.06)' }}
+    <button
+      type="button"
+      onClick={onClick}
+      data-testid={testId}
+      data-tutorial-id={tutorialId}
+      data-settings-section={settingsSection}
+      aria-label={title}
+      className="pt-bounce w-full flex items-center justify-between px-5 py-4 text-left"
+      style={{ '--pt-d': `${delay}ms`, borderBottom: last ? 'none' : '1px solid rgba(0,0,0,0.06)' } as any}
     >
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center justify-between px-5 sm:px-6 py-5 text-left"
-      >
-        <h2 style={{ fontWeight: 600, fontSize: 17, color: '#040D6D', letterSpacing: '-0.01em' }}>{title}</h2>
-        <div
-          style={{
-            width: 30, height: 30, borderRadius: 999, flexShrink: 0, marginLeft: 8,
-            background: isOpen ? '#040D6D' : 'rgba(4,13,109,0.07)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            transition: 'background 0.25s ease',
-          }}
-        >
-          <ChevronDown
-            size={17}
-            style={{
-              color: isOpen ? '#58ABFF' : '#040D6D',
-              transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-              transition: 'transform 0.3s ease, color 0.25s ease',
-            }}
-          />
-        </div>
-      </button>
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateRows: isOpen ? '1fr' : '0fr',
-          transition: 'grid-template-rows 0.3s ease',
-        }}
-      >
-        <div style={{ overflow: 'hidden' }}>
-          <div className="px-5 sm:px-6 pb-5 sm:pb-6">
-            {children}
-          </div>
-        </div>
-      </div>
+      <span className="flex items-center gap-4 min-w-0">
+        <span className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: APPLE_FILL }}>
+          {icon}
+        </span>
+        <span style={{ fontWeight: 600, fontSize: 16, color: APPLE_INK, lineHeight: 1.2 }}>{title}</span>
+      </span>
+      <span className="flex items-center gap-2 flex-shrink-0 ml-3">
+        {value && <span className="text-sm text-gray-400">{value}</span>}
+        <ArrowRight className="w-5 h-5" style={{ color: APPLE_MUTED }} />
+      </span>
+    </button>
+  );
+}
+
+function SettingsGroup({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
+  return (
+    <div
+      className="pt-bounce bg-white mb-4 overflow-hidden"
+      style={{ '--pt-d': `${delay}ms`, borderRadius: 22, boxShadow: '0 4px 14px rgba(4,13,109,0.08)' } as any}
+    >
+      {children}
     </div>
   );
 }
@@ -79,17 +183,42 @@ interface MerchantDetails {
 }
 
 export default function Settings() {
+  return <MerchantGate>{(merchantId) => <SettingsPage merchantId={merchantId} />}</MerchantGate>;
+}
+
+function SettingsPage({ merchantId }: { merchantId: number }) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const merchantId = getCurrentMerchantId();
+  const { confirmingCard } = useBillingCardReturn();
+  const {
+    restartTutorials,
+    visitedPages: tutorialVisitedPages,
+    pageCount: tutorialPageCount,
+    isRestarting: tutorialRestarting,
+    canRestart: tutorialReady,
+  } = useTutorial();
 
-  const [openSections, setOpenSections] = useState<Set<string>>(new Set());
-  const toggle = (id: string) => setOpenSections(prev => {
-    const next = new Set(prev);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    return next;
-  });
+  /* Apple-style list → detail: null shows the grouped row list, otherwise the
+     matching section renders as its own full-screen page (see render). The
+     Windcave hosted-card return still lands on /settings?section=billing&card=…
+     (server/routes.ts:7014, not changed here) — landing straight on the billing
+     page instead of an inline scroll target is the same behavior, new shape. */
+  const [activeSection, setActiveSection] = useState<SectionKey | null>(() =>
+    new URLSearchParams(window.location.search).get("section") === "billing" ? "billing" : null,
+  );
+  /* Slide-out is a real CSS animation, not an instant unmount — `leaving` keeps
+     the section rendered (with the exit class applied) for the animation's
+     duration, then the state actually clears. 260ms matches SETTINGS_LEAVE_MS
+     below and the animation's own duration. */
+  const [leaving, setLeaving] = useState(false);
+  const closeSection = () => {
+    setLeaving(true);
+    window.setTimeout(() => {
+      setActiveSection(null);
+      setLeaving(false);
+    }, SETTINGS_LEAVE_MS);
+  };
 
   const [businessDetails, setBusinessDetails] = useState<MerchantDetails>({
     businessName: '',
@@ -101,30 +230,30 @@ export default function Settings() {
     gstNumber: '',
   });
 
-  const [windcaveApi, setWindcaveApi] = useState('');
-  const [apiActive, setApiActive] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [dailyGoal, setDailyGoal] = useState('500');
   
   // Subscription state
-  const [billingFrequency, setBillingFrequency] = useState('monthly');
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancellationReason, setCancellationReason] = useState('');
 
-  // Billing card state
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardExpiry, setCardExpiry] = useState('');
-  const [cardCvc, setCardCvc] = useState('');
-  const [showCardForm, setShowCardForm] = useState(false);
+  // Team invites
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteName, setInviteName] = useState('');
+
+  // Billing card state. The card itself is entered on Windcave's hosted page —
+  // no PAN, expiry or CVC is ever held in this component.
   const [cardSaving, setCardSaving] = useState(false);
   const [cardRemoving, setCardRemoving] = useState(false);
 
-  // Push notification state
-  const [pushEnabled, setPushEnabled] = useState(false);
-  const [pushLoading, setPushLoading] = useState(false);
-  const [pushSupported, setPushSupported] = useState(false);
-  const [vapidAvailable, setVapidAvailable] = useState(false);
+  const {
+    enabled: pushEnabled,
+    loading: pushLoading,
+    supported: pushSupported,
+    available: vapidAvailable,
+    toggle: togglePushNotifications,
+  } = usePushNotifications();
 
   const [gstRegistered, setGstRegistered] = useState(false);
   const [tradeGstMode, setTradeGstMode] = useState<"inclusive" | "exclusive">("inclusive");
@@ -147,221 +276,11 @@ export default function Settings() {
     });
   };
 
-  useEffect(() => {
-    if (isNativeIOS()) {
-      setPushSupported(true);
-      fetch('/api/push/capabilities')
-        .then(r => r.json())
-        .then(caps => {
-          setVapidAvailable(!!caps?.nativePush?.available);
-          checkNativePushStatus();
-        })
-        .catch(() => {
-          setVapidAvailable(false);
-        });
-    } else {
-      const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
-      setPushSupported(supported);
-      if (supported) {
-        fetch('/api/push/capabilities')
-          .then(r => r.json())
-          .then(caps => {
-            const webReady = !!caps?.webPush?.available;
-            setVapidAvailable(webReady);
-            if (webReady) checkPushStatus();
-          })
-          .catch(() => setVapidAvailable(false));
-      }
-    }
-  }, []);
-
-  async function checkNativePushStatus() {
-    try {
-      const { PushNotifications } = await import('@capacitor/push-notifications');
-      const { receive } = await PushNotifications.checkPermissions();
-      if (receive !== 'granted') {
-        setPushEnabled(false);
-        return;
-      }
-      const token = localStorage.getItem("authToken");
-      if (token) {
-        const statusResp = await fetch('/api/push/status', {
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
-        if (statusResp.ok) {
-          const status = await statusResp.json();
-          setPushEnabled(!!status.nativeSubscribed);
-          return;
-        }
-      }
-      setPushEnabled(true);
-    } catch {
-      setPushSupported(false);
-    }
-  }
-
-  async function checkPushStatus() {
-    try {
-      const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.getSubscription();
-      setPushEnabled(!!subscription);
-    } catch {
-      setPushEnabled(false);
-    }
-  }
-
-  async function togglePushNotifications(enable: boolean) {
-    if (isNativeIOS()) {
-      return toggleNativePushNotifications(enable);
-    }
-    return toggleWebPushNotifications(enable);
-  }
-
-  async function toggleNativePushNotifications(enable: boolean) {
-    setPushLoading(true);
-    try {
-      const { PushNotifications } = await import('@capacitor/push-notifications');
-      if (enable) {
-        const permStatus = await PushNotifications.requestPermissions();
-        if (permStatus.receive !== 'granted') {
-          toast({ title: "Notification permission denied", description: "Please enable in iOS Settings > TaptPay", variant: "destructive" });
-          setPushLoading(false);
-          return;
-        }
-        await new Promise<void>((resolve, reject) => {
-          const timer = setTimeout(() => reject(new Error('Registration timed out')), 15000);
-          const regHandle = PushNotifications.addListener('registration', async (token) => {
-            clearTimeout(timer);
-            regHandle.then(h => h.remove());
-            errHandle.then(h => h.remove());
-            try {
-              const authToken = localStorage.getItem("authToken");
-              const resp = await fetch('/api/push/native-subscribe', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
-                body: JSON.stringify({ deviceToken: token.value }),
-              });
-              if (resp.ok) {
-                setPushEnabled(true);
-                toast({ title: "Notifications enabled", description: "You'll receive alerts for transaction updates" });
-                resolve();
-              } else {
-                reject(new Error("Server rejected device token"));
-              }
-            } catch (e) { reject(e); }
-          });
-          const errHandle = PushNotifications.addListener('registrationError', async (err) => {
-            clearTimeout(timer);
-            regHandle.then(h => h.remove());
-            errHandle.then(h => h.remove());
-            reject(new Error(err.error));
-          });
-          PushNotifications.register();
-        });
-      } else {
-        const authToken = localStorage.getItem("authToken");
-        const unsubResp = await fetch('/api/push/native-unsubscribe', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
-        });
-        if (!unsubResp.ok) {
-          throw new Error("Server failed to remove notification subscription");
-        }
-        setPushEnabled(false);
-        toast({ title: "Notifications disabled" });
-      }
-    } catch (error) {
-      console.error("Native push toggle error:", error);
-      toast({ title: "Failed to update notification settings", variant: "destructive" });
-    }
-    setPushLoading(false);
-  }
-
-  async function toggleWebPushNotifications(enable: boolean) {
-    setPushLoading(true);
-    try {
-      if (enable) {
-        const permission = await Notification.requestPermission();
-        if (permission !== 'granted') {
-          toast({ title: "Notification permission denied", description: "Please enable notifications in your browser settings", variant: "destructive" });
-          setPushLoading(false);
-          return;
-        }
-
-        const registration = await navigator.serviceWorker.ready;
-        const vapidResponse = await fetch('/api/push/vapid-key');
-        if (!vapidResponse.ok) {
-          setVapidAvailable(false);
-          throw new Error("VAPID key unavailable — push notifications not configured on server");
-        }
-        const { publicKey } = await vapidResponse.json();
-        if (!publicKey) throw new Error("Invalid VAPID public key received from server");
-
-        const subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(publicKey),
-        });
-
-        const token = localStorage.getItem("authToken");
-        const response = await fetch('/api/push/subscribe', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({ subscription: subscription.toJSON() }),
-        });
-
-        if (!response.ok) {
-          await subscription.unsubscribe();
-          throw new Error("Server rejected subscription");
-        }
-
-        setPushEnabled(true);
-        toast({ title: "Notifications enabled", description: "You'll receive alerts for transaction updates" });
-      } else {
-        const registration = await navigator.serviceWorker.ready;
-        const subscription = await registration.pushManager.getSubscription();
-        if (subscription) {
-          const endpoint = subscription.endpoint;
-          await subscription.unsubscribe();
-
-          const token = localStorage.getItem("authToken");
-          await fetch('/api/push/unsubscribe', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ endpoint }),
-          });
-        }
-
-        setPushEnabled(false);
-        toast({ title: "Notifications disabled" });
-      }
-    } catch (error) {
-      console.error("Push notification toggle error:", error);
-      toast({ title: "Failed to update notification settings", variant: "destructive" });
-    }
-    setPushLoading(false);
-  }
-
-  function urlBase64ToUint8Array(base64String: string): Uint8Array {
-    const padding = '='.repeat((4 - base64String.length % 4) % 4);
-    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-    const rawData = window.atob(base64);
-    const outputArray = new Uint8Array(rawData.length);
-    for (let i = 0; i < rawData.length; ++i) {
-      outputArray[i] = rawData.charCodeAt(i);
-    }
-    return outputArray;
-  }
-
-  if (!merchantId) {
-    setLocation('/login');
-    return null;
-  }
-
   const { data: merchant, isLoading } = useQuery({
-    queryKey: ["/api/merchants", merchantId],
+    queryKey: ["/api/merchants", merchantId, "profile"],
     queryFn: async () => {
       const token = localStorage.getItem("authToken");
-      const response = await fetch(`/api/merchants/${merchantId}`, {
+      const response = await fetch(`/api/merchants/${merchantId}/profile`, {
         headers: { "Authorization": `Bearer ${token}` },
       });
       if (!response.ok) throw new Error("Failed to fetch merchant");
@@ -375,8 +294,6 @@ export default function Settings() {
         email: data.email || '',
         gstNumber: data.gstNumber || '',
       });
-      setWindcaveApi(data.windcaveApiKey || '');
-      setApiActive(!!data.windcaveApiKey);
       setDailyGoal(data.dailyGoal || '500.00');
       if (data.customLogoUrl) {
         setLogoPreview(data.customLogoUrl);
@@ -385,8 +302,26 @@ export default function Settings() {
     },
   });
 
+  const { data: authData } = useQuery<AuthMeResponse>({
+    queryKey: ["/api/auth/me"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/auth/me");
+      if (!response.ok) throw new Error("Failed to load account access");
+      return response.json();
+    },
+  });
+  const isOwner = authData?.user?.role === "owner" || authData?.user?.role === "admin";
+
+  const { data: billingCardStatus } = useQuery<{
+    ready: boolean;
+    card: { last4: string; brand: string | null; expiry: string | null } | null;
+  }>({
+    queryKey: ["/api/billing/card"],
+    enabled: isOwner,
+  });
+
   const updateMerchantMutation = useMutation({
-    mutationFn: async (details: MerchantDetails & { windcaveApiKey?: string }) => {
+    mutationFn: async (details: MerchantDetails) => {
       const token = localStorage.getItem("authToken");
       const response = await fetch(`/api/merchants/${merchantId}`, {
         method: "PUT",
@@ -400,7 +335,7 @@ export default function Settings() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "profile"] });
       toast({ title: "Business details saved successfully" });
     },
     onError: () => {
@@ -423,7 +358,7 @@ export default function Settings() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "profile"] });
       toast({ title: "Daily goal updated successfully" });
     },
     onError: () => {
@@ -448,7 +383,7 @@ export default function Settings() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "profile"] });
       setLogoFile(null);
       setLogoPreview(null);
       toast({ title: "Logo uploaded successfully" });
@@ -471,7 +406,7 @@ export default function Settings() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "profile"] });
       setLogoPreview(null);
       toast({ title: "Logo deleted successfully" });
     },
@@ -490,42 +425,168 @@ export default function Settings() {
     },
   });
 
-  useEffect(() => {
-    if (subscriptionData?.subscription) {
-      setBillingFrequency(subscriptionData.subscription.billingFrequency || 'monthly');
-    }
-  }, [subscriptionData]);
+  const subscription = subscriptionData?.subscription;
+  const currentPlan = planForOrDefault(subscription?.planId);
 
-  const updateBillingFrequencyMutation = useMutation({
-    mutationFn: async (frequency: string) => {
-      const response = await apiRequest('PUT', '/api/subscription/billing-frequency', { frequency });
-      if (!response.ok) throw new Error("Failed to update billing frequency");
-      return response.json();
+  const {
+    data: teamData,
+    isLoading: teamLoading,
+    error: teamError,
+  } = useQuery<{ members: TeamMember[]; seatLimit: number; seatsInUse: number }>({
+    queryKey: ["/api/team"],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/team');
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body?.message || "Failed to fetch team");
+      return body;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/subscription"] });
-      toast({ title: "Billing frequency updated successfully" });
+    enabled: isOwner && currentPlan.id !== "solo",
+  });
+
+  const {
+    data: billingHistoryData,
+    isLoading: billingHistoryLoading,
+    error: billingHistoryError,
+  } = useQuery<{ history: BillingHistoryEntry[] }>({
+    queryKey: ["/api/subscription/billing-history"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/subscription/billing-history?limit=12");
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body?.message || "Failed to load billing history");
+      return body;
     },
-    onError: () => {
-      toast({ title: "Failed to update billing frequency", variant: "destructive" });
+    enabled: isOwner,
+  });
+
+  const refreshBilling = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/subscription"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/subscription/billing-history"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/team"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/billing/card"] });
+  };
+
+  // Reads the server's message so a refused downgrade explains itself ("Crew ->
+  // Solo needs 1 login; you have 4") instead of showing a generic failure.
+  const changePlanMutation = useMutation({
+    mutationFn: async (planId: PlanId) => {
+      const response = await apiRequest('PUT', '/api/subscription/plan', { planId });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body?.message || "Failed to change plan");
+      return body;
+    },
+    onSuccess: (data: any) => {
+      refreshBilling();
+      toast({ title: data?.message || "Plan updated" });
+    },
+    onError: (error: unknown) => {
+      toast({ title: apiErrorMessage(error, "Failed to change plan"), variant: "destructive" });
     },
   });
 
   const cancelSubscriptionMutation = useMutation({
     mutationFn: async (reason: string) => {
       const response = await apiRequest('POST', '/api/subscription/cancel', { reason });
-      if (!response.ok) throw new Error("Failed to cancel subscription");
-      return response.json();
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body?.message || "Failed to cancel subscription");
+      return body;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/subscription"] });
+    onSuccess: (data: any) => {
+      refreshBilling();
       setShowCancelDialog(false);
       setCancellationReason('');
-      toast({ title: "Subscription cancellation requested. Will be effective in 30 days." });
+      toast({ title: data?.message || "Your subscription will not renew." });
     },
-    onError: () => {
-      toast({ title: "Failed to cancel subscription", variant: "destructive" });
+    onError: (error: unknown) => {
+      toast({ title: apiErrorMessage(error, "Failed to cancel subscription"), variant: "destructive" });
     },
+  });
+
+  const resumeSubscriptionMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/subscription/resume', {});
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body?.message || "Failed to resume subscription");
+      return body;
+    },
+    onSuccess: (data: any) => {
+      refreshBilling();
+      toast({ title: data?.message || "Your subscription will renew as normal." });
+    },
+    onError: (error: unknown) => toast({ title: apiErrorMessage(error, "Failed to resume subscription"), variant: "destructive" }),
+  });
+
+  const inviteMutation = useMutation({
+    mutationFn: async (payload: { email: string; name: string }) => {
+      const response = await apiRequest('POST', '/api/team/invite', payload);
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body?.message || "Failed to send invite");
+      return body;
+    },
+    onSuccess: () => {
+      refreshBilling();
+      setInviteEmail('');
+      setInviteName('');
+      toast({ title: "Invite sent" });
+    },
+    onError: (error: unknown) => {
+      toast({ title: apiErrorMessage(error, "Failed to send invite"), variant: "destructive" });
+    },
+  });
+
+  const memberStatusMutation = useMutation({
+    mutationFn: async (payload: { userId: number; status: 'active' | 'disabled' }) => {
+      const response = await apiRequest('PUT', `/api/team/${payload.userId}/status`, { status: payload.status });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body?.message || "Failed to update login");
+      return body;
+    },
+    onSuccess: (_data, variables) => {
+      refreshBilling();
+      toast({ title: variables.status === "active" ? "Login enabled" : "Login disabled" });
+    },
+    onError: (error: unknown) => toast({ title: apiErrorMessage(error, "Failed to update login"), variant: "destructive" }),
+  });
+
+  const removeMemberMutation = useMutation({
+    mutationFn: async (userId: number) => {
+      const response = await apiRequest('DELETE', `/api/team/${userId}`, undefined);
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body?.message || "Failed to remove login");
+      return body;
+    },
+    onSuccess: () => {
+      refreshBilling();
+      toast({ title: "Login removed" });
+    },
+    onError: (error: unknown) => toast({ title: apiErrorMessage(error, "Failed to remove login"), variant: "destructive" }),
+  });
+
+  const resendInviteMutation = useMutation({
+    mutationFn: async (userId: number) => {
+      const response = await apiRequest("POST", `/api/team/${userId}/resend`, {});
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body?.message || "Failed to resend invite");
+      return body;
+    },
+    onSuccess: () => {
+      refreshBilling();
+      toast({ title: "Invite resent" });
+    },
+    onError: (error: unknown) => toast({ title: apiErrorMessage(error, "Failed to resend invite"), variant: "destructive" }),
+  });
+
+  const revokeInviteMutation = useMutation({
+    mutationFn: async (userId: number) => {
+      const response = await apiRequest("DELETE", `/api/team/${userId}/invite`, undefined);
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body?.message || "Failed to revoke invite");
+      return body;
+    },
+    onSuccess: () => {
+      refreshBilling();
+      toast({ title: "Invite revoked" });
+    },
+    onError: (error: unknown) => toast({ title: apiErrorMessage(error, "Failed to revoke invite"), variant: "destructive" }),
   });
 
   const handleBusinessChange = (field: keyof MerchantDetails, value: string) => {
@@ -556,15 +617,6 @@ export default function Settings() {
     }
   };
 
-  const handleApiSave = () => {
-    if (windcaveApi.trim()) {
-      updateMerchantMutation.mutate({ ...businessDetails, windcaveApiKey: windcaveApi });
-      setApiActive(true);
-    } else {
-      toast({ title: "Please enter an API key", variant: "destructive" });
-    }
-  };
-
   const handleUploadLogo = () => {
     if (logoFile) {
       uploadLogoMutation.mutate(logoFile);
@@ -575,14 +627,55 @@ export default function Settings() {
     deleteLogoMutation.mutate();
   };
 
-  const handleLogout = () => {
+  const signOutThisDevice = () => {
     localStorage.removeItem("authToken");
     setLocation('/login');
   };
 
-  const handleBillingFrequencyChange = (frequency: string) => {
-    setBillingFrequency(frequency);
-    updateBillingFrequencyMutation.mutate(frequency);
+  // R1-T4 (owner decision 2026-09-22): Log Out also stops this device's
+  // notifications, with the token it is discarding.
+  const handleLogout = () => {
+    void stopThisDevicePush(localStorage.getItem("authToken"));
+    signOutThisDevice();
+  };
+
+  const handleSignOutAllDevices = async () => {
+    if (!window.confirm(SIGN_OUT_EVERYWHERE_CONFIRMATION)) return;
+    try {
+      const outcome = await signOutEverywhere();
+      toast(outcome === "ended"
+        ? { title: "Signed out of all devices" }
+        : { title: "Already signed out", description: "Sign in again to sign out your other devices." });
+      // The server stopped every device of this login; this one resumes if it signs in again.
+      signOutThisDevice();
+    } catch (error) {
+      toast({
+        title: "Couldn't sign out of all devices",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleRestartTutorials = async () => {
+    const confirmed = window.confirm(
+      "Restart all page tutorials? Settings will begin now, and every other tutorial will appear as you visit that page.",
+    );
+    if (!confirmed) return;
+    try {
+      await restartTutorials();
+      setActiveSection("tutorial");
+      toast({
+        title: "Tutorials restarted",
+        description: "Open each page normally to see its tutorial again.",
+      });
+    } catch (error) {
+      toast({
+        title: "Could not restart tutorials",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleCancelSubscription = () => {
@@ -593,53 +686,24 @@ export default function Settings() {
     cancelSubscriptionMutation.mutate(cancellationReason);
   };
 
-  const formatCardNumber = (value: string) => {
-    const digits = value.replace(/\D/g, '').slice(0, 19);
-    return digits.replace(/(.{4})/g, '$1 ').trim();
-  };
-
-  const formatExpiry = (value: string) => {
-    const digits = value.replace(/\D/g, '').slice(0, 4);
-    if (digits.length >= 3) return digits.slice(0, 2) + '/' + digits.slice(2);
-    return digits;
-  };
-
-  const handleSaveCard = async () => {
-    const rawNumber = cardNumber.replace(/\s/g, '');
-    if (rawNumber.length < 13 || rawNumber.length > 19) {
-      toast({ title: "Please enter a valid card number", variant: "destructive" });
-      return;
-    }
-    if (!/^\d{2}\/\d{2}$/.test(cardExpiry)) {
-      toast({ title: "Please enter expiry in MM/YY format", variant: "destructive" });
-      return;
-    }
-    if (cardCvc.length < 3) {
-      toast({ title: "Please enter a valid CVC", variant: "destructive" });
-      return;
-    }
+  /**
+   * Opens Windcave's hosted card page in this tab. We come back to
+   * /settings?section=billing&card=… where the shared return handler confirms
+   * the browser-held session, so the PAN is never handled by our JavaScript.
+   */
+  const handleStartCardSetup = async () => {
     setCardSaving(true);
     try {
-      const authToken = localStorage.getItem("authToken");
-      const resp = await fetch('/api/billing/card', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
-        body: JSON.stringify({ cardNumber: rawNumber, expiry: cardExpiry, cvc: cardCvc }),
-      });
-      if (!resp.ok) {
-        const err = await resp.json().catch(() => ({}));
-        throw new Error((err as { message?: string }).message || 'Failed to save card');
+      const resp = await apiRequest('POST', '/api/billing/card/session', {});
+      const body = await resp.json().catch(() => ({}));
+      if (!resp.ok || !body?.redirectUrl) {
+        throw new Error(body?.message || 'Could not start card setup');
       }
-      queryClient.invalidateQueries({ queryKey: ['/api/merchants', merchantId] });
-      setShowCardForm(false);
-      setCardNumber('');
-      setCardExpiry('');
-      setCardCvc('');
-      toast({ title: "Card saved successfully" });
+      sessionStorage.setItem(BILLING_CARD_SESSION_KEY, body.sessionId);
+      window.location.href = body.redirectUrl;
     } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : "Failed to save card";
+      const msg = apiErrorMessage(error, "Could not start card setup");
       toast({ title: msg, variant: "destructive" });
-    } finally {
       setCardSaving(false);
     }
   };
@@ -652,25 +716,43 @@ export default function Settings() {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${authToken}` },
       });
-      if (!resp.ok) throw new Error('Failed to remove card');
-      queryClient.invalidateQueries({ queryKey: ['/api/merchants', merchantId] });
+      const body = await resp.json().catch(() => ({}));
+      if (!resp.ok) throw new Error(body?.message || 'Failed to remove card');
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['/api/billing/card'] }),
+        queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] }),
+      ]);
       toast({ title: "Card removed" });
-    } catch {
-      toast({ title: "Failed to remove card", variant: "destructive" });
+    } catch (error: unknown) {
+      toast({
+        title: error instanceof Error ? error.message : "Failed to remove card",
+        variant: "destructive",
+      });
     } finally {
       setCardRemoving(false);
     }
   };
 
-  const subscription = subscriptionData?.subscription;
-  const transactionProgress = subscription ? Math.min((subscription.currentMonthTransactions / 100) * 100, 100) : 0;
-  const isFreeTier = subscription?.tier === 'free';
-  const isCancelled = subscription?.status === 'cancelled';
+  const seatLimit = subscription?.seatLimit ?? currentPlan.seats;
+  const seatsInUse = teamData?.seatsInUse ?? subscription?.seatsInUse ?? 0;
+  const cancellationState = subscriptionCancellationState(subscription);
+  const isCancelling = cancellationState === 'scheduled';
+  const isCancelled = cancellationState === 'cancelled';
+  const hasPaidCurrentPeriod = hasPaidCurrentSubscriptionPeriod(subscription);
+  const cardBillingDisclosure = cardSetupBillingDisclosure(
+    subscription,
+    formatPlanPrice(subscription?.priceCents ?? currentPlan.priceCents),
+  );
+  const planBillingDisclosure = planChangeBillingDisclosure(subscription);
+  const isPastDue = subscription?.status === 'past_due';
+  const isSuspended = subscription?.status === 'suspended';
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: '#F4F4F4' }}>
-        <div className="w-8 h-8 border-2 border-[#040D6D] border-t-transparent rounded-full animate-spin"></div>
+      <div style={{ background: '#FFFFFF', minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
+        <div className="flex items-center justify-center" style={{ width: '100%', maxWidth: 'var(--phone-shell-max)', minHeight: '100svh', background: '#F4F4F4' }}>
+          <div className="w-8 h-8 border-2 border-[#040D6D] border-t-transparent rounded-full animate-spin"></div>
+        </div>
       </div>
     );
   }
@@ -680,55 +762,35 @@ export default function Settings() {
   const statusActive = merchant?.status === 'active';
 
   return (
-    <div className="min-h-screen pb-32" style={{ background: '#F4F4F4', fontFamily: "'Outfit', system-ui, sans-serif" }}>
-      {/* Safe-area spacer */}
-      <div style={{ height: 54 }} />
+    <div style={{ background: '#FFFFFF', minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
+    <div className="pb-32" style={{ width: '100%', maxWidth: 'var(--phone-shell-max)', minHeight: '100svh', background: APPLE_FILL, fontFamily: "'Outfit', system-ui, sans-serif", overflowX: 'hidden' }}>
+      <style>{SETTINGS_TRANSITION_CSS}</style>
 
-      {/* Navy header card */}
-      <div style={{ padding: '0 18px' }}>
-        <div style={{ background: '#040D6D', borderRadius: 24, padding: '24px 26px 26px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <div style={{ width: 56, height: 56, borderRadius: 999, background: '#58ABFF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <span style={{ fontWeight: 700, fontSize: 20, color: '#040D6D' }}>{initials}</span>
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: 700, fontSize: 18, color: '#FFFFFF', letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {businessName}
-              </div>
-              <div style={{ fontWeight: 500, fontSize: 11, color: '#58ABFF', letterSpacing: '0.16em', textTransform: 'uppercase', marginTop: 3 }}>
-                settings
-              </div>
-            </div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 11px', borderRadius: 10, background: statusActive ? 'rgba(19,194,154,0.18)' : 'rgba(255,176,46,0.20)', color: statusActive ? '#13C29A' : '#FFB02E', fontWeight: 600, fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase', flexShrink: 0 }}>
-              <span style={{ width: 6, height: 6, borderRadius: 999, background: statusActive ? '#13C29A' : '#FFB02E', flexShrink: 0 }} />
-              {statusActive ? 'active' : 'pending'}
-            </div>
+      <div style={{ padding: '20px 18px 0' }}>
+        {activeSection && (
+          <div
+            className={`settings-detail-pane${leaving ? ' settings-detail-leaving' : ''}`}
+            style={{ background: APPLE_FILL }}
+          >
+          <div className="pt-bounce" style={{ '--pt-d': '0ms', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 } as any}>
+            <button
+              type="button"
+              onClick={closeSection}
+              aria-label="back to settings"
+              style={{ width: 36, height: 36, borderRadius: 999, background: '#FFFFFF', border: '1px solid rgba(0,0,0,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
+            >
+              <ArrowLeft size={17} style={{ color: APPLE_INK }} />
+            </button>
+            <h1 style={{ fontWeight: 700, fontSize: 19, color: APPLE_INK, letterSpacing: '-0.01em' }}>{SECTION_META[activeSection].title}</h1>
           </div>
-        </div>
-      </div>
 
-      {/* Content */}
-      <div className="max-w-md mx-auto px-4 sm:px-6" style={{ paddingTop: 20 }}>
-        {/* Payment Board Builder Shortcut */}
-        <button
-          onClick={() => setLocation('/board-builder')}
-          className="w-full bg-white rounded-3xl p-5 flex items-center justify-between mb-4 transition-all hover:shadow-lg text-left"
-          style={{ boxShadow: '0 4px 16px rgba(4,13,109,0.06)' }}
-        >
-          <div className="flex items-center gap-4">
-            <div className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(4,13,109,0.08)' }}>
-              <Printer className="w-5 h-5" style={{ color: '#040D6D' }} />
+        {activeSection === "business" && (
+        <div className="pt-bounce bg-white mb-4 px-5 sm:px-6 pt-5 pb-5 sm:pb-6" style={{ '--pt-d': '40ms', borderRadius: 22, boxShadow: '0 4px 14px rgba(4,13,109,0.08)' } as any}>
+          {!isOwner && (
+            <div className="mb-4 p-3 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-800">
+              Business details are managed by the account owner.
             </div>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 16, color: '#040D6D', lineHeight: 1.2 }}>Payment Board Builder</div>
-              <div className="text-gray-400 text-sm mt-0.5">Design & print your custom payment sign</div>
-            </div>
-          </div>
-          <ArrowRight className="w-5 h-5 flex-shrink-0 ml-3" style={{ color: 'rgba(4,13,109,0.5)' }} />
-        </button>
-
-        {/* Business Details Section */}
-        <SettingsSection title="Business Details" isOpen={openSections.has('business')} onToggle={() => toggle('business')}>
+          )}
           <div className="space-y-4 mt-1">
             <div>
               <Label htmlFor="businessName" className="!text-[#040D6D] font-semibold text-base mb-2 block">Company Name</Label>
@@ -736,6 +798,7 @@ export default function Settings() {
                 id="businessName"
                 value={businessDetails.businessName}
                 onChange={(e) => handleBusinessChange('businessName', e.target.value)}
+                disabled={!isOwner}
                 className="!border !border-gray-200 focus:!border-[#040D6D] focus:!ring-[#040D6D]"
                 data-testid="input-business-name"
               />
@@ -747,6 +810,7 @@ export default function Settings() {
                 id="director"
                 value={businessDetails.director}
                 onChange={(e) => handleBusinessChange('director', e.target.value)}
+                disabled={!isOwner}
                 className="!border !border-gray-200 focus:!border-[#040D6D] focus:!ring-[#040D6D]"
                 data-testid="input-director"
               />
@@ -758,6 +822,7 @@ export default function Settings() {
                 id="address"
                 value={businessDetails.address}
                 onChange={(e) => handleBusinessChange('address', e.target.value)}
+                disabled={!isOwner}
                 className="!border !border-gray-200 focus:!border-[#040D6D] focus:!ring-[#040D6D]"
                 data-testid="input-address"
               />
@@ -769,6 +834,7 @@ export default function Settings() {
                 id="nzbn"
                 value={businessDetails.nzbn}
                 onChange={(e) => handleBusinessChange('nzbn', e.target.value)}
+                disabled={!isOwner}
                 className="!border !border-gray-200 focus:!border-[#040D6D] focus:!ring-[#040D6D]"
                 data-testid="input-nzbn"
               />
@@ -781,6 +847,7 @@ export default function Settings() {
                 type="tel"
                 value={businessDetails.phone}
                 onChange={(e) => handleBusinessChange('phone', e.target.value)}
+                disabled={!isOwner}
                 className="!border !border-gray-200 focus:!border-[#040D6D] focus:!ring-[#040D6D]"
                 data-testid="input-phone"
               />
@@ -793,6 +860,7 @@ export default function Settings() {
                 type="email"
                 value={businessDetails.email}
                 onChange={(e) => handleBusinessChange('email', e.target.value)}
+                disabled={!isOwner}
                 className="!border !border-gray-200 focus:!border-[#040D6D] focus:!ring-[#040D6D]"
                 data-testid="input-email"
               />
@@ -804,6 +872,7 @@ export default function Settings() {
                 id="gstNumber"
                 value={businessDetails.gstNumber}
                 onChange={(e) => handleBusinessChange('gstNumber', e.target.value)}
+                disabled={!isOwner}
                 className="!border !border-gray-200 focus:!border-[#040D6D] focus:!ring-[#040D6D]"
                 data-testid="input-gst-number"
               />
@@ -818,6 +887,7 @@ export default function Settings() {
                 <Switch
                   checked={gstRegistered}
                   onCheckedChange={(value) => saveGst({ gstRegistered: value })}
+                  disabled={!isOwner}
                   data-testid="switch-gst-registered"
                 />
               </div>
@@ -830,6 +900,7 @@ export default function Settings() {
                         key={mode}
                         type="button"
                         onClick={() => saveGst({ tradeGstMode: mode })}
+                        disabled={!isOwner}
                         className="rounded-xl py-2 text-sm font-semibold transition-colors"
                         style={{ background: tradeGstMode === mode ? TRADES_THEME.INK : "#F3F4F6", color: tradeGstMode === mode ? TRADES_THEME.OFFW : "#4B5563" }}
                         data-testid={`button-gst-mode-${mode}`}
@@ -843,18 +914,23 @@ export default function Settings() {
             </div>
           </div>
 
-          <Button
-            className="w-full bg-[#040D6D] hover:bg-[#0a1580] text-[#58ABFF] mt-5"
-            onClick={handleSaveDetails}
-            disabled={updateMerchantMutation.isPending}
-            data-testid="button-save"
-          >
-            {updateMerchantMutation.isPending ? "Saving..." : "Save Business Details"}
-          </Button>
-        </SettingsSection>
+          {isOwner && (
+            <WireframeLiquidButton
+              onClick={handleSaveDetails}
+              busy={updateMerchantMutation.isPending}
+              accent="#040D6D"
+              filledTextColor="#58ABFF"
+              style={{ width: '100%', marginTop: 20, padding: '12px 27px', fontSize: 14 }}
+              data-testid="button-save"
+            >
+              {updateMerchantMutation.isPending ? "Saving..." : "Save Business Details"}
+            </WireframeLiquidButton>
+          )}
+        </div>
+        )}
 
-        {/* Dashboard Preferences Section */}
-        <SettingsSection title="Dashboard Preferences" isOpen={openSections.has('preferences')} onToggle={() => toggle('preferences')}>
+        {activeSection === "prefs" && (
+        <div className="pt-bounce bg-white mb-4 px-5 sm:px-6 pt-5 pb-5 sm:pb-6" style={{ '--pt-d': '40ms', borderRadius: 22, boxShadow: '0 4px 14px rgba(4,13,109,0.08)' } as any}>
           <div className="space-y-4 mt-1">
             <div>
               <Label htmlFor="dailyGoal" className="text-gray-700 text-sm mb-1.5 block">
@@ -871,142 +947,289 @@ export default function Settings() {
                   min="0"
                   value={dailyGoal}
                   onChange={(e) => setDailyGoal(e.target.value)}
+                  disabled={!isOwner}
                   className="flex-1"
                   placeholder="500.00"
                   data-testid="input-daily-goal"
                 />
-                <Button
-                  onClick={() => updateDailyGoalMutation.mutate(dailyGoal)}
-                  disabled={updateDailyGoalMutation.isPending}
-                  className="bg-[#040D6D] hover:bg-[#0a1580]"
-                  data-testid="button-save-daily-goal"
-                >
-                  {updateDailyGoalMutation.isPending ? "Saving..." : "Save"}
-                </Button>
+                {isOwner && (
+                  <WireframeLiquidButton
+                    onClick={() => updateDailyGoalMutation.mutate(dailyGoal)}
+                    busy={updateDailyGoalMutation.isPending}
+                    accent="#040D6D"
+                    filledTextColor="#58ABFF"
+                    style={{ padding: '10px 20px', fontSize: 13 }}
+                    data-testid="button-save-daily-goal"
+                  >
+                    {updateDailyGoalMutation.isPending ? "Saving..." : "Save"}
+                  </WireframeLiquidButton>
+                )}
               </div>
             </div>
           </div>
-        </SettingsSection>
+        </div>
+        )}
 
-        {/* Subscription & Billing Section */}
+        {activeSection === "billing" && (
+        <>
         {isNativeApp() ? (
-          <div className="bg-white rounded-3xl mb-4 overflow-hidden" style={{ boxShadow: '0 4px 16px rgba(4,13,109,0.06)' }}>
+          <div className="pt-bounce bg-white mb-4 overflow-hidden" style={{ '--pt-d': '40ms', borderRadius: 22, boxShadow: '0 4px 14px rgba(4,13,109,0.08)' } as any}>
             <div className="px-5 sm:px-6 py-5">
-              <h2 style={{ fontWeight: 600, fontSize: 17, color: '#040D6D', letterSpacing: '-0.01em' }} className="mb-4">Subscription &amp; Billing</h2>
               <div className="p-5 rounded-xl text-center space-y-3" style={{ background: 'rgba(4,13,109,0.05)' }}>
                 <p className="text-gray-700 text-sm leading-relaxed">
-                  To add or update your payment method, visit
+                  {isOwner
+                    ? "To manage your plan or payment method, visit"
+                    : "The account owner manages the plan, team logins and payment method."}
                 </p>
-                <a
+                {isOwner && <a
                   href="https://taptpay.co.nz/settings"
                   className="font-semibold text-base underline block"
                   style={{ color: '#040D6D' }}
                 >
                   taptpay.co.nz
-                </a>
+                </a>}
               </div>
             </div>
           </div>
         ) : (
-        <SettingsSection title="Subscription & Billing" isOpen={openSections.has('billing')} onToggle={() => toggle('billing')}>
+        <div className="pt-bounce bg-white mb-4 px-5 sm:px-6 pt-5 pb-5 sm:pb-6" style={{ '--pt-d': '40ms', borderRadius: 22, boxShadow: '0 4px 14px rgba(4,13,109,0.08)' } as any}>
           <div className="space-y-5 mt-1">
-            {/* Current Tier */}
-            <div className="flex items-center justify-between p-4 bg-gradient-to-r from-[#040D6D]/10 to-[#58ABFF]/12 rounded-xl">
+            {/* Current plan */}
+            <div className="flex items-start justify-between p-4 bg-gradient-to-r from-[#040D6D]/10 to-[#58ABFF]/12 rounded-xl">
               <div>
-                <p className="text-gray-700 font-medium">Current Plan</p>
+                <p className="text-gray-700 font-medium">Current plan</p>
                 <p className="text-2xl font-bold text-[#040D6D] mt-1">
-                  {isFreeTier ? 'Free Tier' : 'Paid ($19.99/month)'}
+                  {currentPlan.name} · {formatPlanPrice(subscription?.priceCents ?? currentPlan.priceCents)}/mo
+                </p>
+                <p className="text-xs text-gray-600 mt-1">
+                  {seatsInUse} of {seatLimit} {seatLimit === 1 ? 'login' : 'logins'} in use
+                  {subscription?.nextBillingDate && cancellationState === 'active'
+                    ? ` · renews ${new Date(subscription.nextBillingDate).toLocaleDateString('en-NZ')}`
+                    : ''}
                 </p>
               </div>
-              {isCancelled && (
-                <AlertCircle className="text-orange-500" size={24} />
+              {(isCancelling || isCancelled || isPastDue || isSuspended) && (
+                <AlertCircle className="text-orange-500 shrink-0" size={24} />
               )}
             </div>
 
-            {/* Transaction Counter */}
-            <div className="p-4 bg-gray-50 rounded-xl">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-gray-700 font-medium">Monthly Transaction Usage</p>
-                <p className="text-sm font-medium text-gray-600">
-                  {subscription?.currentMonthTransactions || 0} / 100
+            {isPastDue && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-xs text-red-700 font-medium">
+                  Your last subscription payment failed. Update your card below — we'll retry automatically.
                 </p>
               </div>
-              <Progress value={transactionProgress} className="h-3 mb-2" />
-              <p className="text-xs text-gray-500">
-                {isFreeTier 
-                  ? 'Free tier includes up to 100 transactions per month. Additional charges of $0.10 per transaction apply after that.'
-                  : 'You will be charged 10 cents per transaction at your selected billing frequency.'}
-              </p>
-              {isFreeTier && subscription && subscription.currentMonthTransactions >= 100 && (
-                <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-xs text-red-600 font-medium">
-                    ⚠️ You've reached your free tier limit. Your card will be charged $0.10 per additional transaction.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Billing Frequency */}
-            <div>
-              <Label className="text-gray-700 text-sm mb-2 block">
-                Transaction Fee Billing Frequency
-              </Label>
-              <p className="text-xs text-gray-500 mb-3">
-                Choose how often you want to be charged for transaction fees (10 cents per transaction)
-              </p>
-              <Select value={billingFrequency} onValueChange={handleBillingFrequencyChange}>
-                <SelectTrigger className="border-gray-200 focus:border-[#040D6D]" data-testid="select-billing-frequency">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="weekly">Weekly</SelectItem>
-                  <SelectItem value="bi_weekly">Bi-Weekly</SelectItem>
-                  <SelectItem value="monthly">Monthly</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Unbilled Transactions */}
-            {subscription && subscription.unbilledTransactionCount > 0 && (
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
-                <p className="text-sm font-medium text-blue-900 mb-1">
-                  Unbilled Transactions
+            )}
+            {isSuspended && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-xs text-red-700 font-medium">
+                  Your subscription is suspended and payment requests are blocked. Add a working card to reactivate.
                 </p>
-                <p className="text-xs text-blue-700">
-                  {subscription.unbilledTransactionCount} transactions totaling ${Number(subscription.unbilledAmount).toFixed(2)} will be charged on your next billing date
+              </div>
+            )}
+            {subscription?.pendingPlanName && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-xs text-blue-800">
+                  Changing to <strong>{subscription.pendingPlanName}</strong> on{' '}
+                  {subscription.pendingPlanEffectiveAt
+                    ? new Date(subscription.pendingPlanEffectiveAt).toLocaleDateString('en-NZ')
+                    : 'your next billing date'}.
                 </p>
               </div>
             )}
 
-            {/* Billing Card */}
-            <div>
-              <Label className="text-gray-700 text-sm mb-2 block">Payment Card</Label>
-              <div className="p-3 mb-3 bg-amber-50 border border-amber-200 rounded-lg">
-                <p className="text-xs text-amber-800 font-medium">
-                  Payment processing coming soon via Windcave. Saving your card details now will allow automatic billing once the integration goes live.
+            {!isOwner ? (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-xs text-blue-800">
+                  The account owner manages plans, team logins, payment methods and billing history.
                 </p>
               </div>
-              {merchant?.billingCardLast4 && !showCardForm ? (
-                <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-7 bg-white border border-gray-300 rounded flex items-center justify-center">
-                      <span className="text-[9px] font-bold text-gray-600">{merchant.billingCardBrand?.toUpperCase()}</span>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-800">
-                        {merchant.billingCardBrand} ending in {merchant.billingCardLast4}
+            ) : (
+            <>
+            {/* Change plan */}
+            <div>
+              <Label className="text-gray-700 text-sm mb-2 block">Change plan</Label>
+              <p className="text-xs text-gray-600 mb-3" data-testid="plan-change-billing-disclosure">
+                {planBillingDisclosure}
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {PLAN_LIST.map(plan => {
+                  const active = plan.id === currentPlan.id;
+                  return (
+                    <button
+                      key={plan.id}
+                      type="button"
+                      disabled={active || changePlanMutation.isPending}
+                      onClick={() => changePlanMutation.mutate(plan.id)}
+                      data-testid={`settings-plan-${plan.id}`}
+                      className={`text-left p-3 rounded-xl border transition-colors ${
+                        active
+                          ? 'border-[#040D6D] bg-[#040D6D]/5 cursor-default'
+                          : 'border-gray-200 hover:border-[#58ABFF] hover:bg-[#58ABFF]/5'
+                      }`}
+                    >
+                      <span className="block text-sm font-semibold text-[#040D6D]">{plan.name}</span>
+                      <span className="block text-lg font-bold text-gray-900">
+                        {formatPlanPrice(plan.priceCents)}
+                        <span className="text-xs font-normal text-gray-500">/mo</span>
+                      </span>
+                      <span className="block text-xs text-gray-500 mt-0.5">{plan.blurb}</span>
+                      {active && <span className="block text-[10px] font-semibold text-[#040D6D] mt-1">CURRENT</span>}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Need more than 10 logins? <a href="/#tp-contact" className="underline">Talk to us about Enterprise.</a>
+              </p>
+            </div>
+
+            {/* Team logins are intentionally absent on Solo, which has one owner seat. */}
+            {currentPlan.id !== "solo" && (
+            <div>
+              <Label className="text-gray-700 text-sm mb-2 block">
+                Team logins ({seatsInUse} of {seatLimit})
+              </Label>
+              {teamLoading && (
+                <p className="text-xs text-gray-500 mb-2">Loading team logins…</p>
+              )}
+              {teamError && (
+                <p className="text-xs text-red-600 mb-2">
+                  {apiErrorMessage(teamError, "Failed to load team logins")}
+                </p>
+              )}
+              <div className="space-y-2">
+                {(teamData?.members ?? []).map(member => (
+                  <div key={member.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-800 truncate">{member.name || member.email}</p>
+                      <p className="text-xs text-gray-500 truncate">
+                        {member.email} · {member.role === 'owner' ? 'Owner' : member.status === 'invited' ? 'Invite sent' : member.status === 'disabled' ? 'Disabled' : 'Member'}
                       </p>
-                      <p className="text-xs text-gray-500">Expires {merchant.billingCardExpiry}</p>
+                    </div>
+                    {member.role !== 'owner' && member.status === 'invited' && (
+                      <div className="flex gap-2 shrink-0">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs"
+                          disabled={resendInviteMutation.isPending}
+                          onClick={() => resendInviteMutation.mutate(member.id)}
+                        >
+                          Resend
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs border-red-300 text-red-600 hover:bg-red-50"
+                          disabled={revokeInviteMutation.isPending}
+                          onClick={() => revokeInviteMutation.mutate(member.id)}
+                        >
+                          Revoke
+                        </Button>
+                      </div>
+                    )}
+                    {member.role !== 'owner' && member.status !== 'invited' && (
+                      <div className="flex gap-2 shrink-0">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs"
+                          disabled={memberStatusMutation.isPending}
+                          onClick={() => memberStatusMutation.mutate({
+                            userId: member.id,
+                            status: member.status === 'disabled' ? 'active' : 'disabled',
+                          })}
+                        >
+                          {member.status === 'disabled' ? 'Enable' : 'Disable'}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs border-red-300 text-red-600 hover:bg-red-50"
+                          disabled={removeMemberMutation.isPending}
+                          onClick={() => removeMemberMutation.mutate(member.id)}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {seatsInUse < seatLimit ? (
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2">
+                  <Input
+                    placeholder="Name (optional)"
+                    value={inviteName}
+                    onChange={(e) => setInviteName(e.target.value)}
+                    className="border-gray-200 focus:border-[#040D6D]"
+                  />
+                  <Input
+                    type="email"
+                    placeholder="teammate@business.co.nz"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    className="border-gray-200 focus:border-[#040D6D]"
+                    data-testid="input-invite-email"
+                  />
+                  <Button
+                    onClick={() => inviteMutation.mutate({ email: inviteEmail.trim(), name: inviteName.trim() })}
+                    disabled={inviteMutation.isPending || !inviteEmail.trim()}
+                    className="bg-[#040D6D] hover:bg-[#0a1580] text-[#58ABFF]"
+                    data-testid="button-invite-member"
+                  >
+                    {inviteMutation.isPending ? 'Sending…' : 'Invite'}
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-xs text-gray-500 mt-3">
+                  All of your plan's logins are in use. Upgrade to add more.
+                </p>
+              )}
+            </div>
+            )}
+
+            {/* Payment method — Windcave card-on-file */}
+            <div>
+              <Label className="text-gray-700 text-sm mb-2 block">Payment method</Label>
+              <div className="p-3 mb-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <p className="text-xs text-amber-900 font-semibold" data-testid="billing-card-charge-disclosure">
+                  {cardBillingDisclosure}
+                </p>
+                <p className="text-xs text-amber-800 mt-1">
+                  Your card is entered on Windcave's secure page. TaptPay only stores the last
+                  four digits, and a payment method is required before you can send payment requests.
+                </p>
+              </div>
+              {billingCardStatus?.card && !billingCardStatus.ready && (
+                <div className="p-3 mb-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-xs text-red-700 font-medium">
+                    This card can no longer be charged. Please replace it.
+                  </p>
+                </div>
+              )}
+              {billingCardStatus?.card ? (
+                <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-7 bg-white border border-gray-300 rounded flex items-center justify-center shrink-0">
+                      <span className="text-[9px] font-bold text-gray-600">
+                        {(billingCardStatus.card.brand || 'CARD').toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-800 truncate">
+                        {billingCardStatus.card.brand || "Card"} ending in {billingCardStatus.card.last4}
+                      </p>
+                      {billingCardStatus.card.expiry && (
+                        <p className="text-xs text-gray-500">Expires {billingCardStatus.card.expiry}</p>
+                      )}
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setShowCardForm(true)}
-                      className="text-xs"
-                    >
-                      Replace
+                  <div className="flex gap-2 shrink-0">
+                    <Button size="sm" variant="outline" onClick={handleStartCardSetup} disabled={cardSaving || confirmingCard} className="text-xs">
+                      {confirmingCard ? "Confirming…" : cardSaving ? "Opening…" : isCancelled ? "Restart" : "Replace"}
                     </Button>
                     <Button
                       size="sm"
@@ -1019,136 +1242,169 @@ export default function Settings() {
                     </Button>
                   </div>
                 </div>
-              ) : showCardForm || !merchant?.billingCardLast4 ? (
-                <div className="space-y-3">
-                  <div>
-                    <Label className="text-xs text-gray-600 mb-1 block">Card Number</Label>
-                    <Input
-                      type="text"
-                      inputMode="numeric"
-                      placeholder="1234 5678 9012 3456"
-                      value={cardNumber}
-                      onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
-                      className="border-gray-200 focus:border-[#040D6D] font-mono"
-                      maxLength={23}
-                      data-testid="input-card-number"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label className="text-xs text-gray-600 mb-1 block">Expiry (MM/YY)</Label>
-                      <Input
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="MM/YY"
-                        value={cardExpiry}
-                        onChange={(e) => setCardExpiry(formatExpiry(e.target.value))}
-                        className="border-gray-200 focus:border-[#040D6D] font-mono"
-                        maxLength={5}
-                        data-testid="input-card-expiry"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs text-gray-600 mb-1 block">CVC</Label>
-                      <Input
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="123"
-                        value={cardCvc}
-                        onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                        className="border-gray-200 focus:border-[#040D6D] font-mono"
-                        maxLength={4}
-                        data-testid="input-card-cvc"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    {showCardForm && (
-                      <Button
-                        variant="outline"
-                        onClick={() => { setShowCardForm(false); setCardNumber(''); setCardExpiry(''); setCardCvc(''); }}
-                        className="flex-1"
-                      >
-                        Cancel
-                      </Button>
-                    )}
-                    <Button
-                      onClick={handleSaveCard}
-                      disabled={cardSaving}
-                      className="flex-1 bg-[#040D6D] hover:bg-[#0a1580] text-[#58ABFF]"
-                      data-testid="button-save-card"
-                    >
-                      {cardSaving ? "Saving..." : "Save Card"}
-                    </Button>
-                  </div>
-                </div>
-              ) : null}
+              ) : (
+                <Button
+                  onClick={handleStartCardSetup}
+                  disabled={cardSaving || confirmingCard}
+                  className="w-full bg-[#040D6D] hover:bg-[#0a1580] text-[#58ABFF]"
+                  data-testid="button-add-card"
+                >
+                  {confirmingCard ? "Confirming payment method…" : cardSaving ? "Opening secure page…" : "Add payment method"}
+                </Button>
+              )}
             </div>
 
-            {/* Cancellation Section */}
-            {!isCancelled ? (
-              !showCancelDialog ? (
+            {/* Billing history */}
+            <div>
+              <Label className="text-gray-700 text-sm mb-2 block">Billing history</Label>
+              {billingHistoryLoading ? (
+                <p className="text-xs text-gray-500 p-3 bg-gray-50 rounded-xl">
+                  Loading billing history…
+                </p>
+              ) : billingHistoryError ? (
+                <p className="text-xs text-red-600 p-3 bg-red-50 rounded-xl">
+                  {apiErrorMessage(billingHistoryError, "Failed to load billing history")}
+                </p>
+              ) : (billingHistoryData?.history ?? []).length === 0 ? (
+                <p className="text-xs text-gray-500 p-3 bg-gray-50 rounded-xl">
+                  No subscription invoices yet.
+                </p>
+              ) : (
+                <div className="space-y-2" data-testid="billing-history">
+                  {(billingHistoryData?.history ?? []).map((entry) => (
+                    <div key={entry.id} className="flex items-start justify-between gap-3 p-3 bg-gray-50 rounded-xl">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-800">
+                          {entry.description || billingTypeLabel(entry.billingType)}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {billingDate(entry.paidAt || entry.createdAt)} · {billingTypeLabel(entry.billingType)}
+                        </p>
+                        {entry.failureReason && (
+                          <p className="text-xs text-red-600 mt-1">{entry.failureReason}</p>
+                        )}
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-sm font-semibold text-gray-900">{billingMoney(entry.amount)}</p>
+                        <p className={`text-[10px] font-semibold uppercase mt-0.5 ${entry.status === "succeeded" ? "text-green-600" : entry.status === "failed" ? "text-red-600" : "text-gray-500"}`}>
+                          {entry.status}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Cancellation */}
+            {isCancelled ? (
+              <div className="p-4 bg-orange-50 border border-orange-200 rounded-xl space-y-3">
+                <div>
+                  <p className="text-sm font-medium text-orange-900 mb-1">Subscription ended</p>
+                  <p className="text-xs text-orange-700">
+                    This subscription is no longer active. Restart securely with your payment method
+                    to restore access.
+                  </p>
+                </div>
+                <p className="text-xs font-semibold text-orange-900" data-testid="restart-billing-disclosure">
+                  {cardBillingDisclosure}
+                </p>
+                <Button
+                  className="w-full bg-[#040D6D] hover:bg-[#0a1580] text-[#58ABFF]"
+                  disabled={cardSaving || confirmingCard}
+                  onClick={handleStartCardSetup}
+                  data-testid="button-restart-subscription"
+                >
+                  {confirmingCard ? "Confirming payment method…" : cardSaving ? "Opening secure page…" : "Restart subscription"}
+                </Button>
+              </div>
+            ) : isCancelling ? (
+              <div className="p-4 bg-orange-50 border border-orange-200 rounded-xl space-y-3">
+                <div>
+                  <p className="text-sm font-medium text-orange-900 mb-1">Subscription ending</p>
+                  <p className="text-xs text-orange-700">
+                    Your access continues until{' '}
+                    {subscription?.cancellationEffectiveDate
+                      ? new Date(subscription.cancellationEffectiveDate).toLocaleDateString('en-NZ')
+                      : 'the end of your current period'}
+                    . You won't be charged again.
+                  </p>
+                </div>
                 <Button
                   variant="outline"
-                  className="w-full border-red-500 text-red-500 hover:bg-red-50"
-                  onClick={() => setShowCancelDialog(true)}
-                  data-testid="button-cancel-subscription"
+                  className="w-full"
+                  disabled={resumeSubscriptionMutation.isPending}
+                  onClick={() => resumeSubscriptionMutation.mutate()}
+                  data-testid="button-resume-subscription"
                 >
-                  Cancel Subscription
+                  {resumeSubscriptionMutation.isPending ? "Resuming…" : "Keep my subscription"}
                 </Button>
-              ) : (
-                <div className="p-4 bg-red-50 border border-red-200 rounded-xl space-y-3">
-                  <p className="text-sm font-medium text-red-900">
-                    Cancel Subscription (30-day notice required)
-                  </p>
-                  <p className="text-xs text-red-700">
-                    Your subscription will remain active for 30 days after cancellation request. Please provide a reason:
-                  </p>
-                  <Textarea
-                    value={cancellationReason}
-                    onChange={(e) => setCancellationReason(e.target.value)}
-                    placeholder="Please tell us why you're cancelling..."
-                    className="border-red-300 focus:border-red-500"
-                    data-testid="textarea-cancel-reason"
-                  />
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setShowCancelDialog(false);
-                        setCancellationReason('');
-                      }}
-                      className="flex-1"
-                    >
-                      Keep Subscription
-                    </Button>
-                    <Button
-                      onClick={handleCancelSubscription}
-                      disabled={cancelSubscriptionMutation.isPending || !cancellationReason.trim()}
-                      className="flex-1 bg-red-500 hover:bg-red-600 text-white"
-                      data-testid="button-confirm-cancel"
-                    >
-                      {cancelSubscriptionMutation.isPending ? "Processing..." : "Confirm Cancellation"}
-                    </Button>
-                  </div>
-                </div>
-              )
+              </div>
+            ) : !showCancelDialog ? (
+              <Button
+                variant="outline"
+                className="w-full border-red-500 text-red-500 hover:bg-red-50"
+                onClick={() => setShowCancelDialog(true)}
+                data-testid="button-cancel-subscription"
+              >
+                Cancel subscription
+              </Button>
             ) : (
-              <div className="p-4 bg-orange-50 border border-orange-200 rounded-xl">
-                <p className="text-sm font-medium text-orange-900 mb-1">
-                  Subscription Cancelled
+              <div className="p-4 bg-red-50 border border-red-200 rounded-xl space-y-3">
+                <p className="text-sm font-medium text-red-900">Cancel subscription</p>
+                <p className="text-xs text-red-700">
+                  {hasPaidCurrentPeriod ? (
+                    <>
+                      You'll keep full access until{' '}
+                      {subscription?.currentPeriodEnd
+                        ? new Date(subscription.currentPeriodEnd).toLocaleDateString('en-NZ')
+                        : 'the end of your current period'}
+                      , and you won't be charged again. You can undo this any time before then.
+                    </>
+                  ) : (
+                    <>Your subscription will end immediately, and you won't be charged again.</>
+                  )}{' '}
+                  Please tell us why you're leaving:
                 </p>
-                <p className="text-xs text-orange-700">
-                  Your subscription will end on {subscription?.cancellationEffectiveDate ? new Date(subscription.cancellationEffectiveDate).toLocaleDateString() : 'N/A'}
-                </p>
+                <Textarea
+                  value={cancellationReason}
+                  onChange={(e) => setCancellationReason(e.target.value)}
+                  placeholder="Please tell us why you're cancelling..."
+                  className="border-red-300 focus:border-red-500"
+                  data-testid="textarea-cancel-reason"
+                />
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowCancelDialog(false);
+                      setCancellationReason('');
+                    }}
+                    className="flex-1"
+                  >
+                    Keep subscription
+                  </Button>
+                  <Button
+                    onClick={handleCancelSubscription}
+                    disabled={cancelSubscriptionMutation.isPending || !cancellationReason.trim()}
+                    className="flex-1 bg-red-500 hover:bg-red-600 text-white"
+                    data-testid="button-confirm-cancel"
+                  >
+                    {cancelSubscriptionMutation.isPending ? "Processing..." : "Confirm cancellation"}
+                  </Button>
+                </div>
               </div>
             )}
+            </>
+            )}
           </div>
-        </SettingsSection>
+        </div>
+        )}
+        </>
         )}
 
-        {/* Account Section */}
-        <SettingsSection title="Account" isOpen={openSections.has('account')} onToggle={() => toggle('account')}>
+        {activeSection === "account" && (
+        <div className="pt-bounce bg-white mb-4 px-5 sm:px-6 pt-5 pb-5 sm:pb-6" style={{ '--pt-d': '40ms', borderRadius: 22, boxShadow: '0 4px 14px rgba(4,13,109,0.08)' } as any}>
           <div className="space-y-3 mt-1">
             <div className={`flex items-center justify-between p-4 rounded-xl ${merchant?.status === 'active' ? 'bg-green-50' : 'bg-amber-50 border border-amber-200'}`}>
               <div>
@@ -1168,10 +1424,11 @@ export default function Settings() {
               )}
             </div>
           </div>
-        </SettingsSection>
+        </div>
+        )}
 
-        {/* Push Notifications */}
-        <SettingsSection title="Transaction Notifications" isOpen={openSections.has('notifications')} onToggle={() => toggle('notifications')}>
+        {activeSection === "notifs" && (
+        <div className="pt-bounce bg-white mb-4 px-5 sm:px-6 pt-5 pb-5 sm:pb-6" style={{ '--pt-d': '40ms', borderRadius: 22, boxShadow: '0 4px 14px rgba(4,13,109,0.08)' } as any}>
           <div className="mt-1">
             {pushSupported ? (
               !vapidAvailable ? (
@@ -1202,12 +1459,144 @@ export default function Settings() {
               <p className="text-sm text-gray-500">Push notifications are not supported in this browser.</p>
             )}
           </div>
-        </SettingsSection>
+        </div>
+        )}
 
-        {/* Customer Payment Page Button */}
-        <div className="mb-5">
+        {activeSection === "tutorial" && (
+        <div className="pt-bounce bg-white mb-4 px-5 sm:px-6 pt-5 pb-5 sm:pb-6" style={{ '--pt-d': '40ms', borderRadius: 22, boxShadow: '0 4px 14px rgba(4,13,109,0.08)' } as any}>
+            <div className="mt-1">
+              <div className="flex items-start gap-3">
+                <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0" style={{ background: 'rgba(88,171,255,0.16)' }}>
+                  <BookOpen size={21} style={{ color: '#040D6D' }} />
+                </div>
+                <div>
+                  <p className="font-semibold text-[#040D6D]">Page-by-page walkthroughs</p>
+                  <p className="text-sm text-gray-500 mt-1 leading-relaxed">
+                    Tutorials appear only when you open each page. They never move you between pages or change your data.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-5 p-4 rounded-2xl" style={{ background: 'rgba(4,13,109,0.05)' }}>
+                <div className="flex items-center justify-between gap-3 mb-2">
+                  <span className="text-sm font-medium text-[#040D6D]">Tutorial progress</span>
+                  <span className="text-xs font-semibold text-[#58ABFF]">
+                    {tutorialVisitedPages} of {tutorialPageCount || 20} pages introduced
+                  </span>
+                </div>
+                <Progress value={tutorialPageCount ? (tutorialVisitedPages / tutorialPageCount) * 100 : 0} className="h-2" />
+              </div>
+
+              <Button
+                type="button"
+                onClick={handleRestartTutorials}
+                disabled={!tutorialReady || tutorialRestarting}
+                className="w-full mt-4 bg-[#58ABFF] hover:bg-[#73B9FF] text-[#040D6D] py-6 rounded-2xl font-semibold flex items-center justify-center gap-2"
+                data-testid="button-restart-tutorials"
+              >
+                <RotateCcw size={18} className={tutorialRestarting ? "animate-spin" : ""} />
+                {tutorialRestarting ? "Restarting..." : tutorialVisitedPages ? "Restart Tutorials" : "Start Tutorials"}
+              </Button>
+            </div>
+        </div>
+        )}
+          </div>
+        )}
+
+        {!activeSection && (
+          <>
+            {/* Identity — tap through to Account, replacing the old static navy hero */}
+            <button
+              type="button"
+              onClick={() => setActiveSection('account')}
+              aria-label="Account"
+              data-testid="settings-row-account"
+              className="pt-bounce w-full bg-white p-5 flex items-center justify-between mb-4 text-left"
+              style={{ '--pt-d': '0ms', borderRadius: 22, boxShadow: '0 4px 14px rgba(4,13,109,0.08)' } as any}
+            >
+              <div className="flex items-center gap-4 min-w-0">
+                <div style={{ width: 52, height: 52, borderRadius: 999, background: APPLE_FILL, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <span style={{ fontWeight: 700, fontSize: 17, color: APPLE_INK }}>{initials}</span>
+                </div>
+                <div className="min-w-0">
+                  <div style={{ fontWeight: 700, fontSize: 16, color: APPLE_INK, letterSpacing: '-0.2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {businessName}
+                  </div>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 4, fontWeight: 600, fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase', color: statusActive ? '#13C29A' : '#FFB02E' }}>
+                    <span style={{ width: 6, height: 6, borderRadius: 999, background: statusActive ? '#13C29A' : '#FFB02E', flexShrink: 0 }} />
+                    {statusActive ? 'active' : 'pending'}
+                  </div>
+                </div>
+              </div>
+              <ArrowRight className="w-5 h-5 flex-shrink-0 ml-3" style={{ color: APPLE_MUTED }} />
+            </button>
+
+            <SettingsGroup delay={45}>
+              <SettingsItem
+                icon={SECTION_META.business.icon}
+                title={SECTION_META.business.title}
+                onClick={() => setActiveSection('business')}
+                tutorialId="set-business"
+                testId="settings-row-business"
+                last
+              />
+            </SettingsGroup>
+
+            <SettingsGroup delay={90}>
+              <SettingsItem
+                icon={SECTION_META.billing.icon}
+                title={SECTION_META.billing.title}
+                value={currentPlan.name}
+                onClick={() => setActiveSection('billing')}
+                settingsSection="billing"
+                testId="settings-row-billing"
+              />
+              <SettingsItem
+                icon={<Printer className="w-5 h-5" style={{ color: APPLE_INK }} />}
+                title="Payment Board Builder"
+                onClick={() => setLocation('/board-builder')}
+                testId="settings-row-board-builder"
+                last
+              />
+            </SettingsGroup>
+
+            <SettingsGroup delay={135}>
+              <SettingsItem
+                icon={SECTION_META.prefs.icon}
+                title={SECTION_META.prefs.title}
+                onClick={() => setActiveSection('prefs')}
+                tutorialId="set-goal"
+                testId="settings-row-prefs"
+              />
+              <SettingsItem
+                icon={SECTION_META.notifs.icon}
+                title={SECTION_META.notifs.title}
+                onClick={() => setActiveSection('notifs')}
+                testId="settings-row-notifications"
+                last
+              />
+            </SettingsGroup>
+
+            <SettingsGroup delay={180}>
+              <SettingsItem
+                icon={SECTION_META.tutorial.icon}
+                title={SECTION_META.tutorial.title}
+                onClick={() => setActiveSection('tutorial')}
+                tutorialId="settings-tutorial-help"
+                testId="settings-row-tutorial"
+                last
+              />
+            </SettingsGroup>
+          </>
+        )}
+
+        {/* Customer Payment Page Button — unchanged per Oliver's instruction, except where it
+            goes: the boards (owner decision 2026-09-26; the business-wide page was retired) */}
+        {!activeSection && (
+        <>
+        <div className="pt-bounce mb-5" style={{ '--pt-d': '365ms' } as any}>
           <Button
-            onClick={() => setLocation(`/pay/${merchantId}`)}
+            onClick={() => setLocation('/board-builder')}
             className="w-full bg-[#040D6D] hover:bg-[#0a1580] text-[#58ABFF] py-6 rounded-2xl text-lg"
             data-testid="button-customer-page"
           >
@@ -1215,48 +1604,48 @@ export default function Settings() {
           </Button>
         </div>
 
-        {/* Mode switcher: Retail / Property / Trades */}
-        <div className="mb-5 flex" style={{ gap: 8 }}>
+        {/* Mode switcher: Retail · Property · Trades */}
+        <div className="pt-bounce mb-5 flex" style={{ '--pt-d': '405ms', gap: 6 } as any}>
           <button
             onClick={() => setLocation('/dashboard')}
-            style={{ flex: 1, background: '#0055FF', borderRadius: 16, padding: '14px 10px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
+            style={{ flex: 1, minWidth: 0, background: '#0055FF', borderRadius: 16, padding: '14px 6px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
           >
-            <div style={{ width: 34, height: 34, borderRadius: 11, background: 'rgba(0,229,204,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <CreditCard size={18} color="#00E5CC" strokeWidth={1.9} />
+            <div style={{ width: 30, height: 30, borderRadius: 10, background: 'rgba(0,229,204,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#00E5CC" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M4 12h10M4 17h7"/><rect x="14" y="13" width="7" height="7" rx="1.5"/></svg>
             </div>
             <div style={{ textAlign: 'left', minWidth: 0 }}>
-              <div style={{ fontWeight: 700, fontSize: 13, color: '#00E5CC', letterSpacing: 0 }}>Retail</div>
-              <div style={{ fontWeight: 400, fontSize: 10, color: 'rgba(0,229,204,0.65)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>terminal / sales</div>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#00E5CC', letterSpacing: '-0.2px' }}>Retail</div>
+              <div style={{ fontWeight: 400, fontSize: 10, color: 'rgba(0,229,204,0.65)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>terminal · sales</div>
             </div>
           </button>
           <button
             onClick={() => setLocation('/property')}
-            style={{ flex: 1, background: '#040D6D', borderRadius: 16, padding: '14px 10px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
+            style={{ flex: 1, minWidth: 0, background: '#040D6D', borderRadius: 16, padding: '14px 6px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
           >
-            <div style={{ width: 34, height: 34, borderRadius: 11, background: 'rgba(88,171,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Building2 size={18} color="#58ABFF" strokeWidth={1.9} />
+            <div style={{ width: 30, height: 30, borderRadius: 10, background: 'rgba(88,171,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#58ABFF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1.5 1.5 0 01-1.5 1.5h-15A1.5 1.5 0 013 20V9.5z"/><path d="M9 21.5V14h6v7.5"/></svg>
             </div>
             <div style={{ textAlign: 'left', minWidth: 0 }}>
-              <div style={{ fontWeight: 700, fontSize: 13, color: '#FFFFFF', letterSpacing: 0 }}>Property</div>
-              <div style={{ fontWeight: 400, fontSize: 10, color: 'rgba(88,171,255,0.65)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>tenants / rent</div>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#FFFFFF', letterSpacing: '-0.2px' }}>Property</div>
+              <div style={{ fontWeight: 400, fontSize: 10, color: 'rgba(88,171,255,0.65)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>tenants · rent</div>
             </div>
           </button>
           <button
             onClick={() => setLocation('/trades')}
-            style={{ flex: 1, background: TRADES_THEME.INK, borderRadius: 16, padding: '14px 10px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
+            style={{ flex: 1, minWidth: 0, background: TRADES_THEME.INK, borderRadius: 16, padding: '14px 6px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
           >
-            <div style={{ width: 34, height: 34, borderRadius: 11, background: 'rgba(244,244,244,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Wrench size={18} color={TRADES_THEME.OFFW} strokeWidth={1.9} />
+            <div style={{ width: 30, height: 30, borderRadius: 10, background: 'rgba(244,244,244,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={TRADES_THEME.OFFW} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a4 4 0 00-5.4 5.4l-6 6a1.5 1.5 0 002.1 2.1l6-6a4 4 0 005.4-5.4l-2.3 2.3-2.1-2.1z"/></svg>
             </div>
             <div style={{ textAlign: 'left', minWidth: 0 }}>
-              <div style={{ fontWeight: 700, fontSize: 13, color: TRADES_THEME.OFFW, letterSpacing: 0 }}>Trades</div>
-              <div style={{ fontWeight: 400, fontSize: 10, color: 'rgba(244,244,244,0.72)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>quotes / jobs</div>
+              <div style={{ fontWeight: 700, fontSize: 13, color: TRADES_THEME.OFFW, letterSpacing: '-0.2px' }}>Trades</div>
+              <div style={{ fontWeight: 400, fontSize: 10, color: 'rgba(244,244,244,0.72)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>quotes · jobs</div>
             </div>
           </button>
         </div>
 
         {/* Logout Button */}
-        <div className="mb-8">
+        <div className="pt-bounce mb-8" style={{ '--pt-d': '445ms' } as any}>
           <Button
             onClick={handleLogout}
             className="w-full bg-red-500 hover:bg-red-600 text-white py-6 rounded-2xl text-lg flex items-center justify-center gap-2"
@@ -1265,8 +1654,20 @@ export default function Settings() {
             <LogOut size={20} />
             Log Out
           </Button>
+          <button
+            type="button"
+            onClick={handleSignOutAllDevices}
+            className="w-full mt-2 py-3 text-sm font-semibold"
+            style={{ color: APPLE_MUTED, background: 'transparent', border: 'none', minHeight: 44 }}
+            data-testid="button-sign-out-everywhere"
+          >
+            Sign out of all devices
+          </button>
         </div>
+        </>
+        )}
       </div>
+    </div>
     </div>
   );
 }

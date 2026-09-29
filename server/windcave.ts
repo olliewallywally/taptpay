@@ -1,27 +1,38 @@
 // Windcave RESTful API Integration
 import crypto from "crypto";
+import { redactSensitive } from "./request-log";
+import { config } from "./config";
 
-const WINDCAVE_ENDPOINT = process.env.WINDCAVE_ENDPOINT || "https://uat.windcave.com/api/v1";
+const WINDCAVE_ENDPOINT = config.windcave.endpoint || "";
 const SESSION_URL = `${WINDCAVE_ENDPOINT}/sessions`;
 const TRANSACTION_URL = `${WINDCAVE_ENDPOINT}/transactions`;
 const REQUEST_TIMEOUT = 15000;
 const RETRY_LIMIT = 5;
 
 export function getWindcaveEnv(): "uat" | "sec" {
-  const endpoint = process.env.WINDCAVE_ENDPOINT || "";
+  const endpoint = config.windcave.endpoint || "";
   return endpoint.includes("sec.windcave.com") ? "sec" : "uat";
 }
 
+const PROCESSOR_AUDIT_VALUE_KEY = /(?:session|x[-_]?id|transactionId|txId|refundTxId|merchantReference|url|href|body)/i;
+
+export function sanitizeWindcaveAuditDetails(details: Record<string, any>) {
+  return Object.fromEntries(
+    Object.entries(details).map(([key, value]) => [
+      key,
+      PROCESSOR_AUDIT_VALUE_KEY.test(key) ? "[REDACTED]" : redactSensitive(value, key),
+    ]),
+  );
+}
+
 function logAudit(action: string, details: Record<string, any>) {
-  const sanitized = { ...details };
-  if (sanitized.apiKey) sanitized.apiKey = "***";
-  if (sanitized.authorization) sanitized.authorization = "***";
+  const sanitized = sanitizeWindcaveAuditDetails(details);
   console.log(`[WINDCAVE] [${new Date().toISOString()}] ${action}:`, JSON.stringify(sanitized));
 }
 
 function buildAuthHeader(): string {
-  const username = process.env.WINDCAVE_USERNAME || "";
-  const apiKey = process.env.WINDCAVE_API_KEY || "";
+  const username = config.windcave.username || "";
+  const apiKey = config.windcave.apiKey || "";
   return `Basic ${Buffer.from(`${username}:${apiKey}`).toString("base64")}`;
 }
 
@@ -194,7 +205,8 @@ export async function queryWindcaveSession(
 
   let response: Response;
   try {
-    response = await fetchWithTimeout(`${SESSION_URL}/${sessionId}`, {
+    // One encoded path segment: a split invoice passes on the id its page sent.
+    response = await fetchWithTimeout(`${SESSION_URL}/${encodeURIComponent(sessionId)}`, {
       method: "GET",
       headers: { Authorization: buildAuthHeader() },
     });
@@ -208,7 +220,16 @@ export async function queryWindcaveSession(
   }
 
   if (response.status === 200) {
-    const data = await response.json();
+    // A 200 carrying a truncated or non-JSON body must be an unknown outcome,
+    // not a thrown exception: callers treat a throw as a crash and would strand
+    // the session mid-transition rather than leaving it reconcilable.
+    let data: any;
+    try {
+      data = await response.json();
+    } catch (err: any) {
+      logAudit("QUERY_SESSION_BODY_ERROR", { sessionId, error: err.message });
+      return { success: false, error: "Unreadable provider response body" };
+    }
     const tx = data.transactions?.[0];
     const approved = tx?.authorised === true;
     logAudit("QUERY_SESSION_RESULT", { sessionId, approved, txId: tx?.id });
@@ -242,6 +263,426 @@ export async function queryWindcaveSession(
   }
 
   return { success: false, error: `Unexpected status ${response.status}` };
+}
+
+// ---------------------------------------------------------------------------
+// Card-on-file — TaptPay's own subscription billing
+// ---------------------------------------------------------------------------
+//
+// These calls bill the *merchant* for their TaptPay subscription, so they run on
+// TaptPay's platform Windcave credentials (WINDCAVE_USERNAME / WINDCAVE_API_KEY),
+// not on any merchant's own Windcave account. The merchant is the cardholder.
+//
+// These values follow Windcave REST v1's Stored Card Implementation contract for
+// a fixed monthly recurring sequence. A real UAT run is still required before
+// production credentials are used: the REST user must have stored cards and
+// non-payment authentication enabled.
+const CARD_ON_FILE_FIELDS = {
+  /** Zero-dollar validation stores the card without placing a hold. */
+  storeSessionType: "validate",
+  storeCardFlag: "storeCard",
+  initialStoredCardIndicator: "recurringfixedinitial",
+  establishedStoredCardIndicator: "recurringfixed",
+  recurringExpiry: "9999-12-31",
+  recurringFrequency: "monthly",
+} as const;
+
+const TRANSACTION_POLL_LIMIT = 5;
+const TRANSACTION_POLL_INTERVAL_MS = 5000;
+
+type WindcaveRequest = (url: string, options: RequestInit) => Promise<Response>;
+
+interface CardOnFileRequestOptions {
+  /** Injectable transport/wait hooks keep the provider contract deterministic in tests. */
+  request?: WindcaveRequest;
+  wait?: (ms: number) => Promise<void>;
+  transactionPollLimit?: number;
+}
+
+export interface StoreCardSessionResult {
+  success: boolean;
+  sessionId?: string;
+  hppUrl?: string;
+  error?: string;
+}
+
+export interface StoredCard {
+  cardId: string;
+  brand: string | null;
+  last4: string | null;
+  /** MM/YY */
+  expiry: string | null;
+}
+
+export interface StoredCardSessionResult {
+  success: boolean;
+  /** True once the shopper has completed the hosted card form. */
+  complete?: boolean;
+  approved?: boolean;
+  card?: StoredCard;
+  error?: string;
+}
+
+export interface ChargeStoredCardResult {
+  success: boolean;
+  approved?: boolean;
+  windcaveTransactionId?: string;
+  /** Windcave's decline text, safe to log; never shown verbatim to a merchant. */
+  declineReason?: string;
+  error?: string;
+}
+
+/** Maps Windcave's card type strings onto the brands we display. */
+function normaliseCardBrand(raw: unknown): string | null {
+  const value = String(raw || "").toLowerCase();
+  if (!value) return null;
+  if (value.includes("visa")) return "Visa";
+  if (value.includes("master")) return "Mastercard";
+  if (value.includes("amex") || value.includes("american")) return "Amex";
+  return String(raw);
+}
+
+function extractStoredCard(tx: any): StoredCard | undefined {
+  const card = tx?.card;
+  const cardId = String(card?.id ?? "").trim();
+  if (!cardId) return undefined;
+
+  const expiryMonth = Number(card?.dateExpiryMonth);
+  const expiryYear = String(card?.dateExpiryYear ?? "").trim();
+  const month = Number.isInteger(expiryMonth) && expiryMonth >= 1 && expiryMonth <= 12
+    ? String(expiryMonth).padStart(2, "0")
+    : "";
+  const year = /^\d{2}(?:\d{2})?$/.test(expiryYear) ? expiryYear.slice(-2) : "";
+  const masked = String(card?.cardNumber ?? "");
+  const last4 = masked.replace(/\D/g, "").slice(-4) || null;
+  return {
+    cardId,
+    brand: normaliseCardBrand(card?.type ?? card?.cardType),
+    last4,
+    expiry: month && year ? `${month}/${year}` : null,
+  };
+}
+
+/**
+ * Opens a hosted Windcave page that captures a card and stores it for reuse. The
+ * PAN never reaches this server, which is the whole point: we keep only the
+ * token and the masked metadata Windcave hands back.
+ */
+export async function createCardStorageSession(
+  xId: string,
+  merchantReference: string,
+  customerEmail: string,
+  callbackBase: string,
+  notificationUrl: string,
+  options: CardOnFileRequestOptions = {},
+): Promise<StoreCardSessionResult> {
+  const body = {
+    type: CARD_ON_FILE_FIELDS.storeSessionType,
+    amount: "0.00",
+    currency: "NZD",
+    merchantReference,
+    methods: ["card"],
+    [CARD_ON_FILE_FIELDS.storeCardFlag]: true,
+    storedCardIndicator: CARD_ON_FILE_FIELDS.initialStoredCardIndicator,
+    recurringExpiry: CARD_ON_FILE_FIELDS.recurringExpiry,
+    recurringFrequency: CARD_ON_FILE_FIELDS.recurringFrequency,
+    customer: { email: customerEmail },
+    callbackUrls: {
+      approved: `${callbackBase}&result=approved`,
+      declined: `${callbackBase}&result=declined`,
+      cancelled: `${callbackBase}&result=cancelled`,
+    },
+    notificationUrl,
+  };
+
+  logAudit("STORE_CARD_SESSION_REQUEST", { xId, merchantReference });
+
+  let response: Response;
+  try {
+    const request = options.request ?? fetchWithTimeout;
+    response = await request(SESSION_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: buildAuthHeader(),
+        "X-ID": xId,
+      },
+      body: JSON.stringify(body),
+    });
+  } catch (err: any) {
+    logAudit("STORE_CARD_SESSION_NETWORK_ERROR", { xId, error: err.message });
+    return { success: false, error: err.message };
+  }
+
+  const text = await response.text();
+  if (response.status === 202 || response.status === 200) {
+    let data: any = {};
+    try { data = JSON.parse(text); } catch {}
+    const links: any[] = data.links || [];
+    const hppUrl =
+      links.find((l) => l.rel === "hpp")?.href ||
+      links.find((l) => l.method === "REDIRECT")?.href;
+    logAudit("STORE_CARD_SESSION_CREATED", { xId, sessionId: data.id, hppUrl });
+    return { success: true, sessionId: data.id, hppUrl };
+  }
+
+  logAudit("STORE_CARD_SESSION_ERROR", { xId, status: response.status, body: text.slice(0, 300) });
+  return { success: false, error: `Windcave ${response.status}: ${text.slice(0, 200)}` };
+}
+
+/** Reads back the card token once the shopper has finished the hosted form. */
+export async function queryStoredCardSession(
+  sessionId: string,
+  options: Pick<CardOnFileRequestOptions, "request"> = {},
+): Promise<StoredCardSessionResult> {
+  logAudit("STORE_CARD_QUERY", { sessionId });
+  // Provider ids are opaque path segments, never paths. Reject traversal-like
+  // values here as a second line of defence behind the API request schema.
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$/.test(sessionId)) {
+    return { success: false, error: "Invalid Windcave session id" };
+  }
+
+  let response: Response;
+  try {
+    const request = options.request ?? fetchWithTimeout;
+    response = await request(`${SESSION_URL}/${encodeURIComponent(sessionId)}`, {
+      method: "GET",
+      headers: { Authorization: buildAuthHeader() },
+    });
+  } catch (err: any) {
+    logAudit("STORE_CARD_QUERY_NETWORK_ERROR", { sessionId, error: err.message });
+    return { success: false, error: err.message };
+  }
+
+  const text = await response.text();
+  if (response.status === 202) {
+    // Shopper has not finished yet — not an error, just not ready.
+    return { success: true, complete: false };
+  }
+  if (response.status !== 200) {
+    logAudit("STORE_CARD_QUERY_ERROR", { sessionId, status: response.status });
+    return { success: false, error: `Windcave ${response.status}: ${text.slice(0, 200)}` };
+  }
+
+  const data = parseWindcaveJson(text);
+  const tx = Array.isArray(data?.transactions) ? data.transactions[0] : undefined;
+  if (!tx || typeof tx.authorised !== "boolean") {
+    logAudit("STORE_CARD_QUERY_INVALID_RESULT", { sessionId });
+    return {
+      success: false,
+      error: "Windcave stored-card session response did not include a final transaction result",
+    };
+  }
+
+  const approved = tx.authorised;
+  const card = approved ? extractStoredCard(tx) : undefined;
+  logAudit("STORE_CARD_QUERY_RESULT", { sessionId, approved, hasCard: !!card });
+
+  if (!approved) {
+    return { success: true, complete: true, approved: false };
+  }
+  if (!card) {
+    return {
+      success: false,
+      error: "Windcave stored-card session response did not include a stored card",
+    };
+  }
+  return { success: true, complete: true, approved: true, card };
+}
+
+/**
+ * Charges a stored card for a subscription period.
+ *
+ * `xId` MUST be stable for a given subscription period — it is Windcave's
+ * idempotency key, and it is the only thing standing between a retried request
+ * and a double charge. Callers derive it from the subscription id plus the
+ * period start, never from a random value.
+ *
+ * Retries are deliberately NOT automatic here. An ambiguous timeout on a charge
+ * is safer to resolve by re-running the billing job (same X-ID) than by
+ * hammering the endpoint inside one request.
+ */
+export async function chargeStoredCard(
+  xId: string,
+  cardId: string,
+  amount: string,
+  merchantReference: string,
+  options: CardOnFileRequestOptions = {},
+): Promise<ChargeStoredCardResult> {
+  const body = {
+    type: "purchase",
+    amount,
+    currency: "NZD",
+    merchantReference,
+    cardId,
+    storedCardIndicator: CARD_ON_FILE_FIELDS.establishedStoredCardIndicator,
+    recurringExpiry: CARD_ON_FILE_FIELDS.recurringExpiry,
+    recurringFrequency: CARD_ON_FILE_FIELDS.recurringFrequency,
+  };
+
+  logAudit("CHARGE_STORED_CARD_REQUEST", { xId, merchantReference, amount });
+
+  let response: Response;
+  try {
+    const request = options.request ?? fetchWithTimeout;
+    response = await request(TRANSACTION_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: buildAuthHeader(),
+        "X-ID": xId,
+      },
+      body: JSON.stringify(body),
+    });
+  } catch (err: any) {
+    logAudit("CHARGE_STORED_CARD_NETWORK_ERROR", { xId, error: err.message });
+    return { success: false, error: err.message };
+  }
+
+  const text = await response.text();
+  if (response.status === 202) {
+    const pending = parseWindcaveJson(text);
+    const pollUrl = transactionPollUrl(pending);
+    if (!pollUrl) {
+      logAudit("CHARGE_STORED_CARD_PENDING_INVALID", { xId, body: text.slice(0, 300) });
+      return { success: false, error: "Windcave returned a pending transaction without an id" };
+    }
+    return pollStoredCardCharge(xId, pollUrl, pending?.id ?? pending?.transactionId, options);
+  }
+
+  if (response.status !== 200 && response.status !== 201) {
+    logAudit("CHARGE_STORED_CARD_ERROR", { xId, status: response.status, body: text.slice(0, 300) });
+    return { success: false, error: `Windcave ${response.status}: ${text.slice(0, 200)}` };
+  }
+
+  return finalStoredCardChargeResult(xId, parseWindcaveJson(text));
+}
+
+function parseWindcaveJson(text: string): any | undefined {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+}
+
+function finalStoredCardChargeResult(
+  xId: string,
+  data: any,
+  fallbackTransactionId?: string,
+): ChargeStoredCardResult {
+  const rawTransactionId = data?.id ?? data?.transactionId ?? fallbackTransactionId;
+  const windcaveTransactionId = rawTransactionId ? String(rawTransactionId) : undefined;
+
+  // `authorised` is Windcave's documented final outcome. A final response without it is an
+  // incomplete/malformed provider response, not a card decline (which would burn
+  // a dunning attempt).
+  if (typeof data?.authorised !== "boolean") {
+    logAudit("CHARGE_STORED_CARD_INVALID_RESULT", { xId, txId: windcaveTransactionId });
+    return {
+      success: false,
+      windcaveTransactionId,
+      error: "Windcave transaction response did not include an authorised result",
+    };
+  }
+
+  const approved = data.authorised;
+  logAudit("CHARGE_STORED_CARD_RESULT", { xId, approved, txId: windcaveTransactionId });
+  return {
+    success: true,
+    approved,
+    windcaveTransactionId,
+    declineReason: approved
+      ? undefined
+      : String(data.responseText || data.reCo || data.responseCode || "Declined"),
+  };
+}
+
+/**
+ * Windcave says to poll the 202 response's `rel=self` transaction URL. Only send
+ * platform credentials back to the configured Windcave origin/path; if a
+ * malformed response supplies another host, reconstruct the URL from its id.
+ */
+function transactionPollUrl(data: any): string | undefined {
+  const selfHref = Array.isArray(data?.links)
+    ? data.links.find((link: any) => link?.rel === "self" && (!link.method || link.method === "GET"))?.href
+    : undefined;
+
+  if (typeof selfHref === "string") {
+    try {
+      const candidate = new URL(selfHref);
+      const configured = new URL(TRANSACTION_URL);
+      const transactionPath = `${configured.pathname.replace(/\/+$/, "")}/`;
+      if (candidate.origin === configured.origin && candidate.pathname.startsWith(transactionPath)) {
+        return candidate.toString();
+      }
+    } catch {
+      // Fall through to the provider transaction id below.
+    }
+  }
+
+  const transactionId = data?.id ?? data?.transactionId;
+  if (typeof transactionId !== "string" && typeof transactionId !== "number") return undefined;
+  const value = String(transactionId).trim();
+  return value ? `${TRANSACTION_URL}/${encodeURIComponent(value)}` : undefined;
+}
+
+async function pollStoredCardCharge(
+  xId: string,
+  pollUrl: string,
+  fallbackTransactionId: unknown,
+  options: CardOnFileRequestOptions,
+): Promise<ChargeStoredCardResult> {
+  const request = options.request ?? fetchWithTimeout;
+  const wait = options.wait ?? delay;
+  const configuredLimit = options.transactionPollLimit ?? TRANSACTION_POLL_LIMIT;
+  const pollLimit = Number.isFinite(configuredLimit)
+    ? Math.max(0, Math.floor(configuredLimit))
+    : TRANSACTION_POLL_LIMIT;
+  const fallbackId = fallbackTransactionId == null ? undefined : String(fallbackTransactionId);
+
+  for (let attempt = 1; attempt <= pollLimit; attempt += 1) {
+    await wait(TRANSACTION_POLL_INTERVAL_MS);
+
+    let response: Response;
+    try {
+      response = await request(pollUrl, {
+        method: "GET",
+        headers: { Authorization: buildAuthHeader() },
+      });
+    } catch (err: any) {
+      logAudit("CHARGE_STORED_CARD_POLL_NETWORK_ERROR", { xId, pollAttempt: attempt, error: err.message });
+      return { success: false, windcaveTransactionId: fallbackId, error: err.message };
+    }
+
+    const text = await response.text();
+    if (response.status === 202) {
+      logAudit("CHARGE_STORED_CARD_PENDING", { xId, pollAttempt: attempt, txId: fallbackId });
+      continue;
+    }
+    if (response.status !== 200) {
+      logAudit("CHARGE_STORED_CARD_POLL_ERROR", {
+        xId,
+        pollAttempt: attempt,
+        status: response.status,
+        body: text.slice(0, 300),
+      });
+      return {
+        success: false,
+        windcaveTransactionId: fallbackId,
+        error: `Windcave ${response.status}: ${text.slice(0, 200)}`,
+      };
+    }
+
+    return finalStoredCardChargeResult(xId, parseWindcaveJson(text), fallbackId);
+  }
+
+  logAudit("CHARGE_STORED_CARD_POLL_EXHAUSTED", { xId, pollLimit, txId: fallbackId });
+  return {
+    success: false,
+    windcaveTransactionId: fallbackId,
+    error: `Windcave transaction still processing after ${pollLimit} polls`,
+  };
 }
 
 // Submit a Google Pay token to Windcave's ajaxSubmitGooglePay endpoint
@@ -348,51 +789,16 @@ export async function createWindcaveRefund(
 }
 
 export function isWindcaveConfigured(): boolean {
-  return !!(process.env.WINDCAVE_USERNAME && process.env.WINDCAVE_API_KEY);
+  return !!(
+    (config.paymentMode === "uat" || config.paymentMode === "production") &&
+    config.windcave.endpoint &&
+    config.windcave.username &&
+    config.windcave.apiKey
+  );
 }
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-// ── Simulation mode (used when credentials are not set) ──────────────────────
-
-export function simulateCreateSession(merchantReference: string, baseUrl: string): CreateSessionResult {
-  const sessionId = `sim_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  logAudit("SIMULATE_SESSION", { sessionId, merchantReference });
-  const hppUrl = `${baseUrl}/api/windcave/callback?result=approved&sessionid=${sessionId}&sim=1`;
-  return {
-    success: true,
-    sessionId,
-    hppUrl,
-    // Fake AJAX submit URLs — the checkout page will detect sim mode and handle accordingly
-    ajaxSubmitCardUrl: `${baseUrl}/api/windcave/sim-submit?sessionId=${sessionId}&method=card`,
-    ajaxSubmitApplePayUrl: `${baseUrl}/api/windcave/sim-submit?sessionId=${sessionId}&method=applepay`,
-    ajaxSubmitGooglePayUrl: `${baseUrl}/api/windcave/sim-submit?sessionId=${sessionId}&method=googlepay`,
-    alreadyComplete: false,
-  };
-}
-
-// Simulated session for the property rent checkout — points the HPP redirect at
-// the rent callback (/api/checkout/callback) instead of the retail one.
-export function simulateRentSession(token: string, baseUrl: string): CreateSessionResult {
-  const sessionId = `sim_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  logAudit("SIMULATE_RENT_SESSION", { sessionId, token });
-  return {
-    success: true,
-    sessionId,
-    hppUrl: `${baseUrl}/api/checkout/callback?token=${token}&result=approved&sim=1`,
-    alreadyComplete: false,
-  };
-}
-
-export function simulateQuerySession(sessionId: string): QuerySessionResult {
-  const approved = !sessionId.includes("decline");
-  return {
-    success: true,
-    approved,
-    windcaveTransactionId: approved ? `SIMTXN_${Date.now()}` : undefined,
-  };
 }
 
 // ── Attended (Tap to Pay on iPhone) ──────────────────────────────────────────
@@ -424,9 +830,12 @@ export interface AttendedPaymentResult {
 export async function createAttendedSession(
   amount: string,
   merchantReference: string,
-  retries = 0
+  retries = 0,
+  // X-ID is Windcave's idempotency key. It MUST stay constant across retries so a
+  // request that actually reached Windcave (but whose response we lost to a timeout)
+  // is de-duplicated instead of creating a second session/charge.
+  xId = crypto.randomBytes(8).toString("hex")
 ): Promise<AttendedSessionResult> {
-  const xId = crypto.randomBytes(8).toString("hex");
   logAudit("ATTENDED_SESSION_CREATE", { merchantReference, amount, xId, retries });
 
   const body = {
@@ -452,7 +861,7 @@ export async function createAttendedSession(
     logAudit("ATTENDED_SESSION_NETWORK_ERROR", { xId, error: err.message });
     if (retries < RETRY_LIMIT) {
       await delay(5000);
-      return createAttendedSession(amount, merchantReference, retries + 1);
+      return createAttendedSession(amount, merchantReference, retries + 1, xId);
     }
     return { success: false, error: err.message };
   }
@@ -470,7 +879,7 @@ export async function createAttendedSession(
 
   if (response.status >= 500 && retries < RETRY_LIMIT) {
     await delay(5000);
-    return createAttendedSession(amount, merchantReference, retries + 1);
+    return createAttendedSession(amount, merchantReference, retries + 1, xId);
   }
 
   return { success: false, error: `Windcave ${response.status}: ${text.slice(0, 200)}` };
@@ -486,9 +895,11 @@ export async function createAttendedSession(
 export async function submitTapToPayToken(
   sessionId: string,
   windcaveToken: string,
-  retries = 0
+  retries = 0,
+  // Stable idempotency key across retries — prevents a lost-response retry from
+  // submitting (and charging) the same card twice.
+  xId = crypto.randomBytes(8).toString("hex")
 ): Promise<AttendedPaymentResult> {
-  const xId = crypto.randomBytes(8).toString("hex");
   logAudit("TAP_TO_PAY_SUBMIT", { sessionId, xId, retries });
 
   const body = {
@@ -513,7 +924,7 @@ export async function submitTapToPayToken(
     logAudit("TAP_TO_PAY_NETWORK_ERROR", { xId, error: err.message });
     if (retries < RETRY_LIMIT) {
       await delay(5000);
-      return submitTapToPayToken(sessionId, windcaveToken, retries + 1);
+      return submitTapToPayToken(sessionId, windcaveToken, retries + 1, xId);
     }
     return { success: false, error: err.message };
   }
@@ -530,24 +941,10 @@ export async function submitTapToPayToken(
 
   if (response.status >= 500 && retries < RETRY_LIMIT) {
     await delay(5000);
-    return submitTapToPayToken(sessionId, windcaveToken, retries + 1);
+    return submitTapToPayToken(sessionId, windcaveToken, retries + 1, xId);
   }
 
   return { success: false, error: `Windcave ${response.status}: ${text.slice(0, 200)}` };
-}
-
-/**
- * Simulation-only helper — only called when Windcave credentials are NOT configured.
- * Never used in production (isWindcaveConfigured() guards all real paths).
- */
-export function simulateAttendedTapToPay(merchantReference: string): AttendedPaymentResult {
-  const approved = !merchantReference.includes("decline");
-  logAudit("SIMULATE_TAP_TO_PAY", { merchantReference, approved });
-  return {
-    success: true,
-    approved,
-    windcaveTransactionId: approved ? `SIMTXN_TTP_${Date.now()}` : undefined,
-  };
 }
 
 // Legacy service wrapper kept for backward compatibility with NFC routes

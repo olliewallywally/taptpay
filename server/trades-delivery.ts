@@ -4,6 +4,7 @@ import { isWhatsAppConfigured, sendWhatsApp } from './whatsapp-service';
 import { isSmsConfigured, sendSms } from './sms-service';
 import { GST_RATE } from '@shared/schema';
 import { generateQuotePdf } from './trades-quote-pdf';
+import { billingCardIsReady } from './billing-card';
 
 type DeliveryResult = {
   sent: boolean;
@@ -123,6 +124,9 @@ export async function sendTradeQuote(
     storage.getMerchant(quote.merchantId),
   ]);
   if (!client || !merchant) return { sent: false, reason: 'missing_data' };
+  if (!billingCardIsReady(await storage.getSubscription(merchant.id))) {
+    return { sent: false, reason: 'billing_card_required' };
+  }
   const ref = String(quote.token || quote.id).slice(0, 8).toUpperCase();
   const pdf = generateQuotePdf(quote, client, merchant, baseUrl);
   const result = await deliver(
@@ -239,9 +243,14 @@ export async function runTradesReminderPass(
   now: Date = new Date()
 ): Promise<{ sent: number; skipped: number; errors: number }> {
   const result = { sent: 0, skipped: 0, errors: 0 };
+  const merchantCache = new Map<number, any>();
   for (const invoice of await storage.getReminderEligibleJobInvoices()) {
     try {
-      const merchant = await storage.getMerchant(invoice.merchantId);
+      let merchant = merchantCache.get(invoice.merchantId);
+      if (!merchant) {
+        merchant = await storage.getMerchant(invoice.merchantId);
+        if (merchant) merchantCache.set(invoice.merchantId, merchant);
+      }
       if (!merchant || merchant.tradeRemindersEnabled === false) {
         result.skipped++;
         continue;

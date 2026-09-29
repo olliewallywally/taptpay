@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { getCurrentMerchantId } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
+import { apiErrorMessage } from "@/lib/api-error";
 import {
   ArrowLeft, Upload, Palette, Type, QrCode, Image as ImageIcon,
   Layout, CheckCircle, Loader2, ChevronDown
@@ -114,6 +115,25 @@ function hexToIconFilter(hex: string): string {
     const bri = Math.round(l * 200); // 50% lightness = 100% brightness
     return `sepia(1) hue-rotate(${rot}deg) saturate(${sat}%) brightness(${Math.max(bri, 15)}%)`;
   } catch { return ""; }
+}
+
+/** The largest PDF the print route takes (BOARD_PRINT_PDF_MAX_BYTES, server/board-print.ts). */
+const PRINT_PDF_MAX_BYTES = 2 * 1024 * 1024;
+const JPEG_QUALITIES = [0.92, 0.85, 0.75, 0.6];
+
+/** The board as a one-page PDF in base64, at the best JPEG quality that fits; null if none does. */
+function boardPdfBase64(
+  canvas: HTMLCanvasElement,
+  orientation: "landscape" | "portrait",
+  dim: { mmW: number; mmH: number },
+): string | null {
+  for (const quality of JPEG_QUALITIES) {
+    const pdf = new jsPDF({ orientation, unit: "mm", format: [dim.mmW, dim.mmH] });
+    pdf.addImage(canvas.toDataURL("image/jpeg", quality), "JPEG", 0, 0, dim.mmW, dim.mmH);
+    const base64 = pdf.output("datauristring").split(",")[1];
+    if ((base64.length * 3) / 4 <= PRINT_PDF_MAX_BYTES) return base64;
+  }
+  return null;
 }
 
 function buildModifiedSvg(opts: BuildSvgOpts): string {
@@ -295,9 +315,9 @@ export default function BoardBuilder() {
   }, [merchantId, setLocation]);
 
   const merchantQuery = useQuery<MerchantData>({
-    queryKey: ["/api/merchants", merchantId],
+    queryKey: ["/api/merchants", merchantId, "profile"],
     queryFn: async () => {
-      const res = await fetch(`/api/merchants/${merchantId}`, {
+      const res = await fetch(`/api/merchants/${merchantId}/profile`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error("Failed to fetch merchant");
@@ -336,7 +356,9 @@ export default function BoardBuilder() {
   const [logoDataUrl, setLogoDataUrl] = useState("");
   const [selectedFont, setSelectedFont] = useState("Outfit");
   const [customFontDataUrl, setCustomFontDataUrl] = useState("");
-  const [selectedStoneId, setSelectedStoneId] = useState<string>("main");
+  // A payment board's id. The business-wide "Main Payment Link" QR was retired on 2026-09-25
+  // (server/no-board-address.ts): a printed board carries a board's own QR.
+  const [selectedStoneId, setSelectedStoneId] = useState<string>("");
   const [qrDataUrl, setQrDataUrl] = useState("");
   const [fetchingQr, setFetchingQr] = useState(false);
   const [svgTemplate, setSvgTemplate] = useState("");
@@ -382,14 +404,21 @@ export default function BoardBuilder() {
     }
   }, [merchantQuery.data]);
 
-  // Fetch QR code as data URL when stone selection changes
+  // Choose the first active board once they load, and again if the chosen one goes.
   useEffect(() => {
-    if (!merchantId) return;
+    const active = (stonesQuery.data ?? []).filter((stone) => stone.isActive);
+    if (active.some((stone) => String(stone.id) === selectedStoneId)) return;
+    setSelectedStoneId(active[0] ? String(active[0].id) : "");
+  }, [stonesQuery.data]);
+
+  // Fetch the chosen board's QR code as a data URL
+  useEffect(() => {
+    if (!merchantId || !selectedStoneId) {
+      setQrDataUrl("");
+      return;
+    }
     setFetchingQr(true);
-    const url =
-      selectedStoneId === "main"
-        ? `/api/merchants/${merchantId}/qr?size=600`
-        : `/api/merchants/${merchantId}/stone/${selectedStoneId}/qr?size=600`;
+    const url = `/api/merchants/${merchantId}/stone/${selectedStoneId}/qr?size=600`;
     fetchAsDataUrl(url, token)
       .then(setQrDataUrl)
       .catch(() => setQrDataUrl(""))
@@ -480,6 +509,10 @@ export default function BoardBuilder() {
       toast({ title: "Template not loaded yet, please wait.", variant: "destructive" });
       return;
     }
+    if (!selectedStoneId) {
+      toast({ title: "Choose a payment board for the QR code first.", variant: "destructive" });
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -495,44 +528,42 @@ export default function BoardBuilder() {
       await document.fonts.ready;
       await new Promise<void>((resolve) => setTimeout(resolve, 150));
 
-      // Capture with html2canvas at 2× resolution
+      // Capture with html2canvas at 2× resolution, on white: the board is painted edge to edge,
+      // so white only shows where the design leaves the paper clear. JPEG, not PNG: a PNG made a
+      // 7 MB PDF that no send could carry.
       const { default: html2canvas } = await import("html2canvas");
       const canvas = await html2canvas(captureEl, {
         scale: 2,
         useCORS: true,
         allowTaint: true,
-        backgroundColor: null,
+        backgroundColor: "#ffffff",
         logging: false,
         width: dim.pxW,
         height: dim.pxH,
       });
 
-      const imgData = canvas.toDataURL("image/png");
       const orientation = dim.mmW > dim.mmH ? "landscape" : "portrait";
-      const pdf = new jsPDF({ orientation, unit: "mm", format: [dim.mmW, dim.mmH] });
-      pdf.addImage(imgData, "PNG", 0, 0, dim.mmW, dim.mmH);
-      const pdfBase64 = pdf.output("datauristring").split(",")[1];
+      const pdfBase64 = boardPdfBase64(canvas, orientation, dim);
+      if (!pdfBase64) throw new Error("This board is too detailed to send. Try a smaller background image.");
 
-      const response = await apiRequest("POST", "/api/board-builder/submit", {
+      // The business comes from the sign-in; the board is one of its own (server/board-print.ts).
+      await apiRequest("POST", "/api/board-builder/submit", {
         pdf: pdfBase64,
-        businessName: businessName || "Business",
+        stoneId: Number(selectedStoneId),
+        layout: dim.label,
         submitterName,
         submitterEmail,
-        stoneId: selectedStoneId,
-        layout: dim.label,
       });
-
-      if (!response.ok) {
-        const err = (await response.json()) as { message?: string };
-        throw new Error(err.message ?? "Submission failed");
-      }
 
       setSubmitted(true);
       toast({ title: "Sent! We'll get your board printed and in touch soon." });
     } catch (error: unknown) {
-      console.error("PDF generation error:", error);
-      const message = error instanceof Error ? error.message : "Unknown error";
-      toast({ title: "Failed to generate PDF", description: message, variant: "destructive" });
+      console.error("Board send error:", error);
+      toast({
+        title: "Couldn't send your board",
+        description: apiErrorMessage(error, "Please try again."),
+        variant: "destructive",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -579,7 +610,7 @@ export default function BoardBuilder() {
 
         {/* LEFT: Live Preview */}
         <div className="w-full lg:flex-1 bg-white rounded-2xl border border-gray-200 shadow-sm flex flex-col items-center p-4 lg:p-6 gap-5 min-w-0">
-          <div className="w-full text-center">
+          <div data-tutorial-id="bb-preview" className="w-full text-center">
             <p className="text-sm text-gray-500 mb-3 font-medium">
               Live Preview — {dim.label} ({dim.mmW}×{dim.mmH}mm)
             </p>
@@ -614,7 +645,7 @@ export default function BoardBuilder() {
           </div>
 
           {/* Submit section */}
-          <div className="w-full max-w-md bg-gray-50 rounded-2xl border border-gray-200 p-4 lg:p-5">
+          <div data-tutorial-id="bb-submit" className="w-full max-w-md bg-gray-50 rounded-2xl border border-gray-200 p-4 lg:p-5">
             <h3 className="font-semibold text-gray-900 mb-1">Ready to print?</h3>
             <p className="text-sm text-gray-500 mb-4">We'll email your board design as a PDF ready for printing.</p>
             <div className="space-y-3">
@@ -622,7 +653,7 @@ export default function BoardBuilder() {
               <Input placeholder="Your email" type="email" value={submitterEmail} onChange={(e) => setSubmitterEmail(e.target.value)} className="border-gray-200 focus:border-[#0055FF]" />
               <Button
                 onClick={handleGeneratePdf}
-                disabled={isSubmitting || templateLoading}
+                disabled={isSubmitting || templateLoading || !selectedStoneId}
                 className="w-full bg-[#0055FF] hover:bg-[#0044DD] text-white font-medium py-3 rounded-xl"
               >
                 {isSubmitting ? (
@@ -642,15 +673,17 @@ export default function BoardBuilder() {
         <div className="w-full lg:w-[360px] xl:w-[400px] bg-white rounded-2xl border border-gray-200 shadow-sm overflow-y-auto flex-shrink-0 max-h-[calc(100vh-90px)] lg:sticky lg:top-[73px]">
           <div className="p-4 space-y-1">
 
-            <ControlSection icon={<QrCode size={16} />} title="Payment QR Code" isOpen={openSection === "stone"} onToggle={() => toggle("stone")}>
+            <ControlSection anchor="bb-qr" icon={<QrCode size={16} />} title="Payment QR Code" isOpen={openSection === "stone"} onToggle={() => toggle("stone")}>
               <div className="space-y-2">
-                <Label className="text-xs text-gray-500">Select which Tapt Stone or payment link to show</Label>
+                <Label className="text-xs text-gray-500">Select which Tapt Stone's QR code to show</Label>
+                {stonesQuery.isSuccess && !stones.some((s) => s.isActive) && (
+                  <p className="text-xs text-gray-500">No payment boards yet. Add one from the terminal first; its QR code goes on your print.</p>
+                )}
                 <Select value={selectedStoneId} onValueChange={setSelectedStoneId}>
                   <SelectTrigger className="border-gray-200 focus:border-[#0055FF]">
                     <SelectValue placeholder="Select stone…" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="main">Main Payment Link</SelectItem>
                     {stones.filter((s) => s.isActive).map((stone) => (
                       <SelectItem key={stone.id} value={String(stone.id)}>
                         {stone.name} (Stone {stone.stoneNumber})
@@ -691,7 +724,7 @@ export default function BoardBuilder() {
               </div>
             </ControlSection>
 
-            <ControlSection icon={<Palette size={16} />} title="Colour" isOpen={openSection === "colour"} onToggle={() => toggle("colour")}>
+            <ControlSection anchor="bb-colour" icon={<Palette size={16} />} title="Colour" isOpen={openSection === "colour"} onToggle={() => toggle("colour")}>
               <div className="space-y-4">
 
                 {/* Accent colour */}
@@ -710,7 +743,7 @@ export default function BoardBuilder() {
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-7 h-7 rounded-full border border-gray-200 flex-shrink-0" style={{ backgroundColor: primaryColor }} />
-                    <Input value={hexInput} onChange={(e) => handleHexInput(e.target.value)} placeholder="#00f1d7" className="font-mono text-xs border-gray-200 focus:border-[#0055FF]" maxLength={7} />
+                    <Input value={hexInput} onChange={(e) => handleHexInput(e.target.value)} placeholder="#00f1d7" className="font-mono text-base md:text-xs border-gray-200 focus:border-[#0055FF]" maxLength={7} />
                   </div>
                 </div>
 
@@ -738,7 +771,7 @@ export default function BoardBuilder() {
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="w-7 h-7 rounded-full border border-gray-200 flex-shrink-0" style={{ backgroundColor: backgroundColor || "transparent" }} />
-                      <Input value={bgHexInput} onChange={(e) => { setBgHexInput(e.target.value); if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value) || e.target.value === "") setBackgroundColor(e.target.value); }} placeholder="None" className="font-mono text-xs border-gray-200 focus:border-[#0055FF]" maxLength={7} />
+                      <Input value={bgHexInput} onChange={(e) => { setBgHexInput(e.target.value); if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value) || e.target.value === "") setBackgroundColor(e.target.value); }} placeholder="None" className="font-mono text-base md:text-xs border-gray-200 focus:border-[#0055FF]" maxLength={7} />
                     </div>
                   </div>
 
@@ -786,7 +819,7 @@ export default function BoardBuilder() {
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-7 h-7 rounded-full border border-gray-200 flex-shrink-0" style={{ backgroundColor: textColor }} />
-                    <Input value={textHexInput} onChange={(e) => { setTextHexInput(e.target.value); if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) setTextColor(e.target.value); }} placeholder="#888888" className="font-mono text-xs border-gray-200 focus:border-[#0055FF]" maxLength={7} />
+                    <Input value={textHexInput} onChange={(e) => { setTextHexInput(e.target.value); if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) setTextColor(e.target.value); }} placeholder="#888888" className="font-mono text-base md:text-xs border-gray-200 focus:border-[#0055FF]" maxLength={7} />
                   </div>
                 </div>
 
@@ -813,7 +846,7 @@ export default function BoardBuilder() {
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-7 h-7 rounded-full border border-gray-200 flex-shrink-0" style={{ backgroundColor: iconColor || primaryColor }} />
-                    <Input value={iconHexInput} onChange={(e) => { setIconHexInput(e.target.value); if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) setIconColor(e.target.value); }} placeholder="Same as Accent" className="font-mono text-xs border-gray-200 focus:border-[#0055FF]" maxLength={7} />
+                    <Input value={iconHexInput} onChange={(e) => { setIconHexInput(e.target.value); if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) setIconColor(e.target.value); }} placeholder="Same as Accent" className="font-mono text-base md:text-xs border-gray-200 focus:border-[#0055FF]" maxLength={7} />
                   </div>
                   <p className="text-[10px] text-gray-400 mt-1">Tints the QR code and Paywave/NFC icon images</p>
                 </div>
@@ -838,7 +871,7 @@ export default function BoardBuilder() {
               </div>
             </ControlSection>
 
-            <ControlSection icon={<Type size={16} />} title="Text" isOpen={openSection === "text"} onToggle={() => toggle("text")}>
+            <ControlSection anchor="bb-text" icon={<Type size={16} />} title="Text" isOpen={openSection === "text"} onToggle={() => toggle("text")}>
               <div className="space-y-3">
                 <div>
                   <Label className="text-xs text-gray-500 mb-1 block">Business Name</Label>
@@ -855,7 +888,7 @@ export default function BoardBuilder() {
                     onChange={(e) => setInstructions(e.target.value)}
                     placeholder="simply tap or scan to pay"
                     rows={3}
-                    className="border-gray-200 focus:border-[#0055FF] resize-none text-sm"
+                    className="border-gray-200 focus:border-[#0055FF] resize-none text-base md:text-sm"
                   />
                   <p className="text-[10px] text-gray-400 mt-1">Press Enter to add a new line — text will be centred</p>
                 </div>
@@ -921,16 +954,17 @@ export default function BoardBuilder() {
 }
 
 function ControlSection({
-  icon, title, isOpen, onToggle, children,
+  icon, title, isOpen, onToggle, children, anchor,
 }: {
   icon: React.ReactNode;
   title: string;
   isOpen: boolean;
   onToggle: () => void;
   children: React.ReactNode;
+  anchor?: string;
 }) {
   return (
-    <div className="border border-gray-100 rounded-xl overflow-hidden">
+    <div data-tutorial-id={anchor} className="border border-gray-100 rounded-xl overflow-hidden">
       <button
         onClick={onToggle}
         className="w-full flex items-center justify-between px-4 py-3 text-left bg-white hover:bg-gray-50 transition-colors"

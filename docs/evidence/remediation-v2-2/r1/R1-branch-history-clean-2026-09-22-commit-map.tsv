@@ -1,0 +1,175 @@
+original	cleaned	subject
+830141350d8ef6cf7f3008576d53a72a24acfcdd	392db3a04c5b4e6ed21cfb7ae2685db3520bed48	Update agent metadata and perform system maintenance cleanup
+c7587865448ca8477153d18839a3727af197efe0	3df8c2c4f4dec4cdd87d00fe29b54901c626c3c7	Add the full integration plan and rendered preview pages for RXA.
+e8e2bb512d71e257980f980ccb88b831c85e716f	d9f4b1cd1046a86ca66386632ad629732569dab2	fix(mobile): close the ratcheted tapCentreMiss defects
+377f6c50a31eb9bad19eda1cab7dcf35c36a38b2	ca7e249619c970c2ac6a5e20f242ef80976b3122	fix(ios): lock the native phone shell to portrait (MD5)
+53d3e2871b03262537a01d7a4fabff3a3ce4c271	056f7803d199b0cfe29eba7ddf49554a5bf8db3b	feat(ci): add the golden-test suite and a CI workflow (§7.1, §7.5)
+fd243465f77c700d4f9cfa53d8999514b85e5abd	690e3f946252a1c210abb2a9a916d6899e011c56	docs: record the 2026-08-29 landings in the mobile plan
+407b6d26163cae4c860017f3f958e71cbccc61ae	19f3b2bce0eed7a2e732ae3d3eb7bb6912b510bf	docs(mobile): phase 10 diagnosis for non-terminal merchant routes
+17073878356bf95e91dc22a63706d7be5acfd243	5f70b4bb62751f98baebc92b5196355c68f5447c	Update RXA plan rendering script and regenerate plan preview assets.
+30f58914cd85975af564a5ce10ea85ed30405e96	38f39b778d19e1cfa9e04248b218254ee73965af	chore(git): stop tracking local Claude Code state and credentials
+f6391f122c3a0fd988344293d9c69dc62f51933e	6437e88d6ef384150df9702cde898a23ec195df5	docs: lock full integration owner decisions
+76c7f807d48084decf99f0312e37be270e96b494	0322dd6d1bdd042288aeaf53e5f10f9e8a7218fd	Update terminal property view styles and settings page configuration
+a1e205d0dc8233ea0df53a4045842a4a04734c1c	bdd62551fead80bbe53d35c89d018d4b38a05b2c	Remove ollama.tar.zst archive
+a765882fd9531bd4ddc94267e82448a32683c28c	(dropped: touched only .claude-home/)	Published your App
+9b56e71b8c569bf57d2aac65b086c3d279532551	15beee06d367ac65f6ddd6c613a37ad9cf6dee05	fix(ui): hide the wireframe-liquid-button wave until pressed
+c2b8693dacb32bec4da1a74f505fbc6035e9f68a	82a7d1900187ef415e07848ee2f1bb1bef6b583e	fix(property): stop the dashboard hero resizing across timeframes
+4e2fcb57be38a1e3cae5c38658b816a9ddda7596	e6a80ebc5497b3d31fbe4661d7e4585379848d4c	fix(property): let the ChooseTenant list run off the bottom edge
+86c2318b60931326767706374c615614464b3d3f	00956db62dc03c0e0cf89f2f9416604ae1c28b22	feat(desktop): make the popup menus actual liquid glass
+b00054f9bab40c6ba5f2364124d8b7f668073674	166c7b2a0da24a368fea343c2f64b7ed15ba2f55	fix(deps): override blocked vulnerable transitive packages
+a8d713d54668f2de8a6559ecf69ba98064cc2ab8	fd7320ef3d2d6bbf85fc113656a65871042cee46	docs(r0): complete the approved execution baseline
+695052aa2f42baff59341af9e940a18e7ed2e2ae	46a4003d3c8f4222ae525bdd0d975b96d521694c	test(mobile): distinguish the property stack exception
+ce11de6be052a63d7f9d92a67c38feb7c9fe8bcf	0a59780159b93d3e8c28dd0293576d9609cd769b	test(r0): prove the containment holes before fixes
+06744aeafe45caf72007c7f8cee0733d62beb6b9	2f931f8c2f2926aac7787404c9558c6597471e02	fix(push): recover automatically after VAPID rotation
+eca1e987d261a3661542b4153702a2ab068808aa	3bf096cf343cf8f8073846304bb93a573263d1a4	security: centralise fail-closed runtime configuration
+93cd300c3d838de01f1d857b24b05e1ad5031e4f	4bcd44eb4795c33877c6acc0d4842b275483ccac	security: retire transaction clearing and production demo seed
+7b14c49d53c552c990a40bd1707513cd46ada82b	701d4f96c626fb6f746418d274a588d63ae99314	docs(r0): correct the authorized branch ancestry
+5b024f32c93de58c31f852a91b2c0af956189092	33a2ee48a8c3b06f81c9ccc6fc8c6d11f5e12766	security: keep startup and builds database-read-only
+d9eae21fa7133bcf1e9568f9000d83c4b5c7c764	6239e699d40d219e6dd885626971fe672ca6d6f8	fix(payments): gate unfinished capabilities
+f55cc66ebc954f9f38df7e3e76d512be6f264ce0	c7d99c8832f09709dac5140cc6050e218a6299cd	fix(payments): remove production simulation fallbacks
+6d62b572a8ded107171486f9c2d648fa1fba6c39	318dfbacbf9878ef2a8c700c8e5d439c6cfe3e3a	security(config): remove tracked runtime secrets
+de753501c4c7c4ce9efc59c2079ed726c6ce45a4	3a5d28c205a58e4fcfd3af0da484bc5ed44c103c	test(remediation): record R0 containment evidence
+318fa4afad2c3c9bbcae50df752fe10ef50084c7	b5251fdd8f0026d5f05876e0a5252bfc0e43071a	test(remediation): R1-H1 device baseline (D10) and R1-T1 HTTP harness
+fa7e31c42ac750bacdfcacce87f920f3d4d94c28	0a764ecdc668770d10b6b15043d4135730e2623d	test(remediation): R1-T2 checked-in route policy inventory
+f24dbfacab00dde067fe45be36988d67523ebf65	2887aeeae13633cef8189f7a8e88254ff10c78b1	fix(security): R1-T3 owner-only safe defaults for merchant config + refunds
+e2991bf3ca715179707a49b6a02763c09f665162	6415fe53051363321128b9715a5d3534d2d80bb8	fix(security): R1-T6 batch 1/7 — strict numeric parsing for /api/merchants
+5d8db2ca7baf5fe0e93d88feb0b201b091c88a39	8a5c01ffe73abce403e350a639525bb1d6095e25	fix(security): R1-T7 uploaded files behind storage; consolidate T6 parser
+6a94846b2ab6356a0fcb8c0f579df0e21ef01aa8	13cb3e6a0d4f4c5e8acf8e79784f6dde6879cd07	fix(security): R1-T6 nfc + tapt-stone identifiers; bound revenue days
+8826fdfd41a6dba005d6f85eb918c5c4f5046f88	b83422e1e94277301f26e9276214e41352731690	fix(security): R1-T6 strict numeric parsing for /api/transactions + refunds
+7e1f19a725e8c83f3e72e5bd2bf0012f316890b4	8a7b153cfde924fee5f004303409c1011e5fad34	fix(security): R1-T6 strict numeric parsing for /api/admin
+ec2072795fa3adc48b508e227884b3837685a3aa	3e35dcfb034c7ffc350e2db541382de4319ba234	fix(security): R1-T6 strict numeric parsing for /api/team (final sweep)
+7dfc6befd1be8c19be97f65e4c384452de4036bf	8d7ce8a2e84c7a9762a683350ebd5a17f1b16025	security(r0): T6 encrypted backup and T7 secret-scan safeguards
+75c65c4a256fda743613e7f0b5d80303787b08e9	e59415ef5b86ed54eaf732d7bc777127ff75ec84	security(r0): T6A migration runner hardening and convergence gate
+ba8a5bd55319dbd5f4f7aa0fc0468c93893feac9	14731f3a94da5384b179987d2bd5b3c0cb9a8eca	Add attached asset image
+897a0144a47b1ea66b3da49d6cbb7f4c1237e477	d4a94df15561484c2cee22215b6501c091f141f1	fix(r0): T6A workspace target class so dev migrations work again
+29f6b3d965ee1dbadc3ebdc1c8c74dbf26ac9389	3ae839baaa696db0ca4af94086e2164ff63558be	docs(r0): record the Neon URI edits the migration target boundary requires
+082e5e90b22f02aea703e32e21c2980bbbe8967d	506dc554f0f3f199fbf4e26043524cb65ac97ee5	Add image asset to attached assets
+feeed6c4de324f99dcd91d0355fbf2f86cf07ba8	019e5ac12862630ec18aefa93a0809fc3f3f62c3	Add image asset to repository
+aa41d844ec2b46d554429321f247ddd79e59ec10	17a764ba410ff729c7e4c53a3d06773565e89bad	Add asset image 1788916636665
+1519ba776b95a7e56ea6c5f948ec2fef6f80424c	b3195f3cd5546ae83069250352844c67fc775d98	Add image asset
+95c36b3af164c3722a5546fed397494e41af1641	65c0b20f047a90902eac03759bf543061423f21e	Add image asset
+abda58886f1752f83e157a4d479576a1bd1edffc	29a47573d518ef216bf2833c32beba1ef52a10e8	Add image asset
+4612e7ae8da27be8e52703ced3cba92bb6882ac3	26dee97eee73d156f6d58babc72097f3910b7924	Add image asset
+aee954b1499290088ecb2149fec225b9ed66a795	bb5f420de3446685378c6042682723c9d8fd3e2b	Add image asset
+69cf51847dfc176ee439ddbece3a94679614e4f1	136000659ec6a87d16a82a329fce0cef994bbeaf	Add image asset
+b96fc42a50a725d733343e6eac24f71a56bf0509	78601abd435fd7daebe592e093f0a6c749fbd33b	Add documentation images to attached assets
+d80f7c7a05675b1cf51139e76b3b1e255a3d52a7	f48c5ff6d1464bf3f68ef3bd9625e5e10ea24297	Add image asset to storage
+bb31911d5556b73006d5207d42f8af29c7dbcfda	85faacbd854a5fff9d4908eb7192f6b783ca2dd1	Add image asset
+505e01f129144d837bc1c472a8cff8b498437fee	4cb25d25f3cc6ae4f4eee96c800dbddc43821a64	Add attached asset image
+9a4da23040949fa8c908b3d6b6b877671855af40	184349ef86dce502199e3a888874a745f5a3eccc	Add image asset to repository
+cf7cdd2dac1446d80f207b398fd4e0a880831894	c5eb2566dd017916c37b90bbb10c57e02906e475	Add image asset
+cf54b985d6dcfee3685c543cc8c7c01ddb6323ac	f162b2a6d761845a4c369f5596fd9494414cdba4	Add image asset
+c5e6079286db2e3b9e9abd71d30721d95c797cbf	ce3961966ac588488bbd03f4a9b0a01c332a38dc	Add image asset
+dec72a5bea02bed9ddd1ae3b22f135b2617a625d	022a9b0f1a25b3f33b2922724d88b6fc2022c57f	Add image asset
+6b9fdbee7503fe30ec58db4ff4c064deee4a4979	a6dc25122e18014a67aa4116ca5649fbe43c49e4	Add attached asset image
+8d65fa19715acbb0ab0b1b2fa1bcd4651d145f00	e8470f33ecb57134b9b2646ea9c2f931bbd4cb7c	Add image asset
+f50da8d3f95ca8e8e14debb8985e0c2050eb65f6	942a3095c43e1ab26905b674f071b747c6698a59	Add image asset
+33d3da2ca705e592bbec647a26c67be76ba90e3f	7bb787b15c7181abdea800b6d0acb2c0c71fcdee	Add image asset
+275862a8ce98a64465ebd00e33b521a2f9dd6bea	ac825004df422427be5dcb79ef99e7a64908954d	Update Replit configuration file
+8c845a93437dbb03ee30eabc5ec31f4f883b8fd8	4a08201396059fba07060be5febb709e4af710b7	Add image asset
+2b56bb22c5b30b0d5d9cfa2c538817af1a7c52a5	8278786cb9f12ceb8bc1c59ac6aea09d757c76ae	Add asset image for documentation
+9b6016046bd95507f13f42d3c12ff14d0b518eb5	71c7ce1b8f66769db325f457778e1518f7567610	Add image asset to storage
+a8fec9108c6094684eaedbb3f69013a640462ad7	923d2275f0acfc009d6f6230821793707f0ba2da	Add image asset
+947b3b656614e9c1edd2b92478ae9c084ae818b3	8f9227f5e4ca0de74ab1320c9a16d023585fc35d	Add image asset to attachments
+2eea9cd35e6d473311308da1cd00bc4c396b5ee4	bd2608433160472c8f95478b5ad766c9ad42e85d	Add TaptPay backup public key
+a9af8d8e7dac865471a279a77e030b58afce7f76	8f1104da041dd64e5940705123fcfc94e4994505	Enhance database backup safety and update validation tests
+d4c2d7b51110894bc5bbfe0cb0980cf326f2346b	16c9be7d89d0bf37fcbc60905a54bdafb96a86ae	Update database backup script and add safety tests
+2383880dcb1b7c857a6401023ad11e7404ae7060	1da467e1f24fee15e9ab1cf0a4d62d61e11d808c	Register new asset and update metadata
+d616225203b560cb0821d69ec380d3c5a228e104	a78f858652c149a710e08600d520e3237956d466	Add image asset to storage
+54e39bf374cda5bed0d32a841310334746667f7a	6a66867a9a2290a81f45073ac1442ee9fd974194	Add images to attached assets
+0fa2e92f05d09e5b843d99545d055a5732d4444e	defe41a4c86bc86d0f9d6bb1898c80505bae808c	Add image asset
+f43ced5acf89214bae810c56b62a0be593aa49af	d6018ebc0a89e0d41571bb8574da0841eb6b7e26	Add TaptPay public key and update agent assets metadata
+ca59f0c9852c8f4d9ce78c2d5871c2b0a8817f2b	f3e5f4ddedc7527605ca93d09dca894e5f0596e2	Add image asset
+6ca74708d3e43690dd535f3e28d8b899cb087856	3b32507a60f960c57cf1d9cd38eda821bf11f050	Remove taptpay public key export
+20d16bbcebae41bec97cdfc37cde2189cefd561f	120fd8fed78b838ea00a9afde75abf6a43d79e83	Add verification documentation for owner-controlled restores
+998ad55324b4e49fbf9b0e0512eaa17fa4c13c88	58d51cce042014eb262df5c656880dfddb32fbf6	security(r0): record public repository exposure and reopen R0-H2
+e061853687305e37417c13b7c4e9687ff9dafa3a	31ce8318bf5510042fb99a9e40eff7e0aa7c083f	Add image asset
+6d6f7e7688d97aa6001cd8bbdb096b94fc8a238a	ca33e60e5aa5c12965aca77fb0eb2e0ca36ed446	security(r0): two public GCP service-account keys found classifying R0-T7
+2da15bfdb887a5ac4f3b51d756579925dd897ad6	3edd16d9e082519716218af0a432da15a16be272	Add image asset to attachments
+a53c9c2f331231d09bf436d0e028ac9eab8b81ab	76f735e53dfd303d67bffe131a1877e03fc96481	security(r0): JWT_SECRET was public in .replit for seven months
+971d2541544e70b4c451991d8489a942b4be2cfe	bb720a16ad8cb2b640446655cb91272568054f23	security(r0): R0-T7 disposition gate so the scan reports what is new
+42dd3d3a7f84a6fc64f3b025b9dc8083ade6daf2	a8e01e1010ca65c0275b68e9f2a62d9317bb3f04	security(r0): classify 96 findings; Figma OAuth client secret is still live
+a78eba956c5b6d27c1023daff78ba37e45ac77d6	7d66345fc830dfbd1650d1b32509d7a0bbd50d75	security(r0): the production database password was public, and no scan saw it
+b42d35ec010d9c5b3d7ce44b7b9108f639eb7b14	66da285cdba5ebdf007191a7e1f855eadaa35876	security(r0): disposition the connection-URI findings; keep the tree gate clean
+6924cd82debb7f313b1ffb62b9d2f2f062245880	8bea840b498be2790af59dd0a3d9a15355f02bdb	security(r0): R0-T7 backlog classified — 283 triples, 0 unreviewed
+30c08d8dd2856f90cbb4786fa7a11c59695d9dd9	7d2b775bfe23eaacb67e5e11ee1bc5fe17a69f31	Add image asset
+d38fe0f13f783dfffd78a0964795a92a705b806f	d11995ba55ef5e84fbdcda2d5af18588c9a0f701	security(r0): R0-T6A redact migration error paths; record the restore rehearsal
+ff715876cfdc1d0b5e0b91a4d328d557ea49ac77	d4ab8ec3b1d818579a89db421aecc93cba561622	Add new asset image
+d0e2090be63b5162c4e0f7aef59a0c7c72e33274	65b82a09e93da96227efe90fb982cd737dfcb7c3	docs(r0): reconcile the restore delta — one orphan table, not four
+33701728549a1109694556aac3cbe2abd54cc847	f2747a09129f44cd0f331b56434607f8aaf26705	security(r0): adopt the orphan crypto_transactions table into the history
+e5d7ce95d4e589c0b790256a777306a00c2bdff3	c185e37a5274be9009cc33f55db76c34ef709c96	security(r0): widen the schema fingerprint to views, triggers and permissions
+bfa31d9c987bf5c803cdc9e8c925b53839d3a3bf	1b71dc637b500101171cbf02f5b870558c053d06	security(r0): the live database does not match the migration history
+69c3d5760c567f5a409beef449c3d3556932bc15	f3694fadcc819a9b089a219ba758f5637a732c15	docs(r0): trace the seventh orphan column to a withdrawn push
+2e9566b87f919041e7657e609ff4eb5ee7b26e97	2ca5222d0df7e5542ac88f49298c0bc26f8af895	feat(analytics): instrument checkout, login and merchant onboarding
+c047a76bfabae379979c067f5036ff0d4049b6cc	e57e2b34633b2bc402cc4a25a15e7b78f6b62179	chore(landing): landing runtime updates and .replit config
+8d530f4419f6ad54027ca063edbe656d8b4e123d	1720ca4622a60c97231d6d03af534923e84ca03e	security(r0): teach the baseline contract to see a column default and 0010a's index
+41e4e756e22e1f576848e6b5fbfd87f1161699c4	e6cfa9ba03301ee958bc5518cf78d019be5d7780	docs(r0): record the baseline contract's closed blind spots
+4758cc412b3dc03cb675f8cff4773b6aabb480d1	a6abf22a10bfa9d2b91c7b108827b1546139c0c3	docs(r0): record how the baseline-contract work reached the branch, and how it was split
+cbdb9a2e45d89992c1069804ca9e0d31e30316c2	8c50fc6b551ae87bb77d9b78abbf577ea1eb03ff	security(r0): repair the foreign-key defaults nothing could repair, adopt the orphan columns
+20880c7a0361b39f3b8a07041b1eddd6ae479812	ed27807afd5f441fccb6522835f6988b032af856	test(env): make the server suite independent of the operator's shell
+9c95c1f64e984dd4b2997f71a1ce5749041f0311	c45b5d99be75747eb9e5a94eedc087b67db1a284	security(r0): production carries the defect, and 0020 matched it exactly
+0eb34be182677590e3978fa76244f92f93528aec	cea731bddfb420c30bbc46657a5d3c0871bbcacd	docs: the two-reasons note covers column_nullable too
+d781ec1bba827e06989266b06710e76a7bc2699e	e01ff1a0574fd4c2e98329d43737202c3e2e9581	security(r0): delete the Figma OAuth credential; the app itself still must go
+bf5915e538a15dedffbfa48b5f0f67ecbe2aa4f7	3fc49708d0ae0fb2b2a776526d27d7b8767b6ea9	security(r0): resolve the merchant_subscriptions.tier disagreement toward the database
+03d7915689f2c763c23353dd910f5e391502a01e	4cea09bd406a74f03fae26a5116e881efa0cbbd5	security(r0): close R0-T6A - convergence, N/N+1, budgets and the restore ACL gap
+ed8ef1eaeb114c98ae5bdeee4a33ed8aef4dd88a	4fbca4a24f54e88fc397ae7bff82b1cd8dd7a4c8	security(r0): create the index 0010a was recorded as creating but never did
+5c2384360f0c1dccaa39d011c46b45e7b0be0bfd	6c444d6569fff9a3dcec865fe19540d22735b14c	security(r0): apply the schema repair to development; correct two stale tracker claims
+39521a4bdbffa0109b2012aeeac5418682be30db	bbcb45dff5e0d9d125e208d8591d13f60ce57907	security(r0): fix the R0-T5 defects a failing-tests-first checkpoint proved
+c658cac4e61a27b44da890925a333a1de14fcf04	46e3659c4349469bc32faa93417b71b00fb186e4	security(r0): count the historical merchant credentials R0-T5 asks for
+707cdb44b162d39b7894f46654d8c0f1580dfcad	75c30d4b509220ba9b93ad58df7ea59573d90e0b	security(r0,r1): client containment, the first device smoke, R1-T3 and R1-T6
+5d30caf628c8d316aed012fc007eabf29a67aeb8	af827b351e3adc18bf1e9b947ed7e8828a77b2b4	security(r0): auth-gate apple-pay/validate, delete dead wallet fake-success code
+f7f7aba7ac7ac45dde3cbc90df31001d646bb8ba	d7be7ef16d25f5ac5f7237f1db61385b68d4e043	chore(r1): regenerate route-policy inventory against 5d30caf6
+4183e24118d75014cd5dfa63d2c10c6b6d2d390d	aa3c0c8ac18f2adf29c6e85b6602bc866c3ea399	security(r1): reject foreign Windcave sessions on unbound transactions
+3d9736cf397d23fa0073f40704302d91a449a835	29e255bbbe1473a04356743d0ba0c72fc0d6b9e4	docs(r0,r1): record the three unlogged commits and the split-session-replay finding
+e07f9df3b4a0edd3fc4a188e500893e058f7a844	61d3d2d02e6e925ea8b924f91839deeec501af2b	Update configuration tests and document source guard remediation steps
+5631ef44ee3ef030bfe089c0b44fe6e2906482de	242920a4c35c89c99c73317db4ca8fd982070f9c	Add asset image to attached assets
+c879094c2ad70a1eab8936630e31c3219b96fddc	048120e5a6fe1da7b98a0659858c5f6fc02c4980	Add image asset for documentation
+a454775f9276bb498c99ad52a7da8d6ccbb09738	4ddc0145aa00ba58f702e0b1b769c447701baea2	Add image asset
+7e23353aa4503ccff7736822705abdeb37ca78b0	4d4d64bf6636fab9c4547844c35712e27d596616	Update remediation documentation and add Google Analytics key revocation decision
+ada0d5bd61285b4450cbb7ec35199833a71ac7fa	07ab6e29e03f7509f60284b7dd48a949c3177970	Update remediation evidence and add figma owner disposition decision
+024e33622818bf2796359d0e5a88bd78093f3ab4	e70a91f5d531ef59b03412bf47fb7efe35435a5e	security(r0): correct R0-T5 desktop-frame verifier selector; record JWT/admin owner disposition
+2e75a2784b20b50dd4d6a430a732593c7c2ac170	9efc3e3e752b9001de909c6b086661c505dd944b	docs(r0): record the database password rotation and walk the R0 exit gate
+e59ac4a9be8d4abdc28a59352f4fde6e60614d97	25a3f30412098fea7ee156e357d42f8325ae88f4	security(r1): recover crashed session — extend R1-T2 classifier, capture R1-H1 baseline, log SSE gap 12
+c1e42db106b1b14ed678d3acc65582cdc906ae96	a0954be168bc31d56c8397fd5df544fccfac5242	security(r1): rate-limit the unauthenticated legacy-no-board SSE branch (gap 12)
+1269e644a8b15f58e85495b815a2885bb1f2dfca	5ca6924d34a7205d9e577ce7603d17de5877ddd3	security(r1): investigate transactions/refunds tenant-scoping (R1-T3) — no gap found, no code change
+7d3681cab87427ccb15196d6deed869ce7c6fe31	e4bbb676659618dcb635b18f1d542e25a3d3d788	security(r1): investigate boards/stock tenant-scoping (R1-T3) — no gap found, no code change
+b06c42eb7067e9c4a01f940637a9522e64c950c0	7e2aa215c19028e5fef19e09212174e4e8d86858	security(r1): investigate property tenant-scoping (R1-T3) — no gap found, no code change
+d8dd8c95f2f298b2d66d994993a390bcbc4846cf	e54f7df07a629d485b5d45864b25d26bb5d9ba7a	docs(r1): record the stopped tenant-scoping pass and its exact resume point
+0b144592978a2b63dc340c5aac8ecee57bbd595e	3f7369c8b67eca2115ea306a56ad541721ca5296	docs(r1): escalate gaps 11 and 12 with decision memos — both are worse than filed
+06e4001224d93fe4aa6f0c256ed24c939cc4deda	c1f8d04300be28614b1f129df155e3180d1747be	security(r1): investigate trades tenant-scoping (R1-T3) — no gap found, no code change
+0f616d4cee3cf8bb451df72a772347f290c177ca	c8b43372e1e1c61669373750d3ac115ffdd90085	docs(r1): record owner input and the linkMode finding that reframes gap 12
+8837b2ee18722b6c5c09241f85092e2869bced92	1b371485f8092c152c8efa9fd37e41ceac4c50f0	feat(trades): add mobile quote creation flow
+a1cca2c55e5cbbc1960a997ee4acadc25fe4e43c	ce8a292ed5a037d4b3be16f06e055de0703eef47	security(r1): checkpoint — UPL-1/UPL-2/UPL-5 upload fixes mid-flight, session handoff
+dd3df77cbe51b6fcbd68d5d814da5d38aecd1a51	0224e5e49648ac4ec7b32ff198b9cd3e90302f7e	docs(r0,r1): transcribe R0-H1/R0-H4/R1-H1 owner decisions, close R0-H5
+cd51f3b97a80b9018d685c377e87922e41252d1d	b67db5fef77a887ebc32c2dd78b14ebf4cb30c92	docs(r1): record in-flight background workflows and owner decisions
+5318496b14e8e0b214937a5437a38680af107aec	1758e26508c877d947a044ede579219a09dd2d4d	security(r1): gap 11 C0 preflight + C1 partial unique indexes
+4ba429af1620eef2991c337d77505c81842d07db	342ed5c5bec7c1b6ec7c9746362259f49258b534	docs(r1): transcribe owner decisions, record redo workflow after lost state
+eec654629f85584443eec86e94f3328e5133a291	fe5ab5869b78ac391df65240e9925af64b5c5590	docs(r1): record round-1 review-blocked results and round-2 redo IDs
+35ec1b96c40e79cbafcb94f99bb3d1c417809d14	6544af485f22c19426fa8b513c26ff8fafd44a5c	docs: point CLAUDE.md and AGENTS.md at the active remediation branch
+ab15647a9ff14048371a05e535b6bcfc0da62aec	49236852e4912d0f334d12cc2adebe3e57c8be4c	docs(r1): fix review-quorum bug, record resumed workflow IDs
+72230602bb4fd3767a2e8bcb7832219118df24a1	9ac752df8e5ba439ff23e34cbe1c8f1f12b4af5d	security(r1): gap 12 Option C — fail closed on legacy-no-board ambiguity
+8666dafcffe8a7c21993e91d5e64f4b7514129a1	38d349fce48da3a295c8dd76737bb5cb569593fe	security(r1): gap 12 — migrate three legacy terminals to per-payment links
+4c05046b6eb40015c2a9b197f4e40a4befdf3244	41375be30e7bdfb36ed261a6725a5d3b549cb752	docs(r1): record gap 12's two landed commits in the continuation ledger
+454f4120756e3ba26c966659f847280b102a452f	d7da94acb5ff5c7083fff5f4a3dc81e9dae7f818	docs(r1): record two more missed paperwork items from prior sessions
+94f246355090a93605a63d5a60123a39ecf71188	23b5a8eb2bbd6efe001ee551e8137c7b78ab9ae7	security(r1): gap 13 — tenant-scoped uploads (Option C): migration 0023, storage, routes
+f2bc001551b8b0fa93e6568e70bcfe6bd4ebd43d	a5a834dc3799486483ea35b78dba2ee5449ec271	docs(r1): gap 13 — evidence, decision records, ledger; retire the superseded handoff
+b0da2f08594447ea4685dec0a80019e2c5bb6e4a	dd245d537db9f40caca04892deab74c79ced31ed	security(r1): gap 13 S1 — the platform admin may open merchant invoice documents (audited)
+acef4e42582374782a01eaec48a01080f1dee734	4779ace9bcc00236f7df62161aa43212e2c8e667	docs(r1): gap 13 — S1 decision, owner confirmations, and the independent-review brief
+8d27173303653e97d45f9add91f3be156360a651	25717adcfbb9d3940691f2c6747b07ed1c086428	security(r1): gap 13 review fixes — atomic merchant delete, durable admin audit, shared document budget
+e268d91ec71df5d351e179c3c11ff5f1fdfca19a	77b0ae724cd4622e50ee9b961f7c19b0ed9cba02	security(r1): gap 13 — migrations 0023–0025 run only with a verified ownership inventory
+165fd605a22cadc0996cfca5979c068f822743e8	19e798926553c11cc479143682316ec71e0ef2db	test(harness): never reach a live email or SMS provider; simulate test email
+d0e99c2398aa238b49f57f51fd224257d0c555b1	251488e35e155afe03ccde6ae446f89783a36a24	security(r1): gap 13 — count only real invoices against the document budget
+60a2ca0bbad9248a53506ec50e416b82b75906cb	aac667ad74f3008f4dd982df16f62a95b5b1b109	security(r1): gap 13 — automatic ownership from TaptPay's records; lock, don't block
+a25aaf094130dce8c5a96667c1ce82263f8b0650	9ee57916f823726fd332deb0a5a352a17168334f	fix(r1): gap 13 — the drafting tool never hands out a list the runner refuses
+4a9129df62235014640300d4d1b5449e2f0dad04	186056612f506875dbd97032aef0e3c432dd17f1	docs(r1): gap 13 — re-verification after the reboot, and a refreshed review brief
+7822b19a1a15c9c776c1e6764f6ad84e670b12b7	4fe793c494e3df5820f61f4a97fd91909066387f	docs(r0): production is private by choice; R0 exit established
+c66679858b0d65b608efca09d1cf6b9cdfbe0ab5	e3390394dc010e1832064bd1f153dd8e8508ec0d	docs(r0): correct the act() warning attribution — 12 Settings, 6 MerchantTerminal
+387d189dd398e2bfeb1b02bed48842305e219366	53f5a8b9ca689b8b92dc951d6a69e86dd13dd51e	fix(r1-t8): merchant pages keep their hooks in order when the session ends
+20bea52b8e4fb76047d0b4fe7a599e10861ad245	55a10f4d796173323a9a4e0032dc464addd4aafd	docs(r1-t8): evidence for the hook-order fix; ledger entry and row
+d7edd7496fc5be21315d384e1df5feea2b088a87	c37f160234cce65308bc81b4caae43465231a134	docs(r1-t8): independent-review brief for 387d189d
+2c013f33d63454581cb9f5e7c26b172fbb8ded86	025d638da3745fa8bbb622004cae607051e1cd2f	feat(r1-t9): a failed load never reads as a quiet day — retail analytics (pilot)
+107d1264af86f6142578e292db7a830c29c72ed3	0f9d4160c88d852767a04468e171238aa6b83d1e	docs(r1-t9): the failure-state proposal, pilot evidence and rollout scope
+eba45c5eb63a7d3139f18c95a5e68504e2b008bd	0c0323c0e87f27660a28c019258d9f7a2c084eed	docs(r1-t4): sign-in security — current state, phases A–E, owner questions
+8f574dc9a6b3259525362f1b0ef1e12f434be9c7	ed847cda48ffc54aee1a459c496afa5c914192f6	docs(decisions): R1-T4 and R1-T9 owner answers — all recommendations accepted
+7ba8bc7dfc174f5a9da33cd3030b78eca7612edd	662371ba347389d2eeab0d8d90e2b2c7f05ecac4	db(r1-t4): additive schema for sign-in hardening — 0026–0028
+31f0ba1d42ca9894feed813088387dead7ec86cd	f650590fb2d677304bbc31c2daf6d0bdd926a13e	WIP(r1-t4): phase A sign-in hardening — server done, login page not yet (do not push/merge)

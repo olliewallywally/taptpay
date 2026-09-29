@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { propFetch } from "@/lib/property-api";
+import { usePropertyInvoices } from "@/lib/property-data";
+import { periodWindow, collectedCents, type Timeframe } from "@/lib/property-dashboard-data";
+import { PropertyReportsButton } from "@/components/reports/PropertyReportsButton";
 
 /* ── Design tokens (matches AnalyticsScreen_(2)) ── */
 const C = {
@@ -15,8 +16,6 @@ const C = {
   green:    '#22C55E',
   red:      '#EF4444',
 };
-
-type Timeframe = 'day' | 'week' | 'month' | 'year';
 
 /* ── SVG chart helpers ── */
 function toSmooth(pts: number[], W: number, H: number, pad = 8) {
@@ -122,32 +121,30 @@ function TxRow({ inv, delay = 0 }: { inv: any; delay?: number }) {
   );
 }
 
-/* ── Compute chart series from invoices ── */
+/* ── Compute chart series from invoices ──
+   Windows come from periodWindow so this chart and the dashboard's always agree.
+   Invoices outside the window are SKIPPED (never clamped into the edge bucket —
+   that used to pile all history onto the left edge of the chart). */
 function buildChartData(invoices: any[], tf: Timeframe) {
   const now = new Date();
-  let buckets: number;
-  let getKey: (d: Date) => number;
-
-  if (tf === 'day') {
-    buckets = 10; getKey = d => Math.floor((now.getTime() - d.getTime()) / (2.4 * 3600000));
-  } else if (tf === 'week') {
-    buckets = 10; getKey = d => Math.floor((now.getTime() - d.getTime()) / (16.8 * 3600000));
-  } else if (tf === 'month') {
-    buckets = 10; getKey = d => Math.floor((now.getTime() - d.getTime()) / (72 * 3600000));
-  } else {
-    buckets = 10; getKey = d => Math.floor((now.getTime() - d.getTime()) / (876 * 3600000));
-  }
+  const { start } = periodWindow(tf, now);
+  const buckets = 10;
+  const spanMs = Math.max(now.getTime() - start.getTime(), 1);
+  const getKey = (d: Date) => Math.floor(((d.getTime() - start.getTime()) / spanMs) * buckets);
 
   const paid: number[] = Array(buckets).fill(0);
   const outstanding: number[] = Array(buckets).fill(0);
 
   invoices.forEach((inv: any) => {
     if (inv.status === 'voided') return; // cancelled requests aren't revenue or outstanding
-    const date = new Date(inv.paidAt ?? inv.createdAt);
-    const bucket = Math.max(0, Math.min(buckets - 1, getKey(date)));
+    const isPaid = inv.status === 'paid' || inv.status === 'paid_external';
+    // Paid revenue sits at its paid date; outstanding at its sent date.
+    const date = new Date(isPaid ? (inv.paidAt ?? inv.createdAt) : inv.createdAt);
+    const bucket = getKey(date);
+    if (bucket < 0 || bucket > buckets - 1) return; // outside the window
     const val = Math.round((inv.amountCents ?? 0) / 100);
-    if (inv.status === 'paid' || inv.status === 'paid_external') paid[buckets - 1 - bucket] += val;
-    else outstanding[buckets - 1 - bucket] += val;
+    if (isPaid) paid[bucket] += val;
+    else outstanding[bucket] += val;
   });
 
   const maxVal = Math.max(...paid, ...outstanding, 1);
@@ -162,30 +159,20 @@ export default function PropertyAnalytics() {
   const [tf, setTf] = useState<Timeframe>('week');
   const [totVis, setTotVis] = useState(true);
 
-  const { data: invoices = [] } = useQuery<any[]>({
-    queryKey: ['/api/property/invoices'],
-    queryFn: () => propFetch('/api/property/invoices').then(r => r.ok ? r.json() : []),
-    staleTime: 30000,
-    retry: false,
-  });
+  const { data: invoices = [] } = usePropertyInvoices();
 
-  /* Filter invoices by timeframe */
+  /* Filter invoices by timeframe — same calendar windows as the dashboard */
   const now = new Date();
-  const cutoff = {
-    day:   new Date(now.getTime() - 24 * 3600000),
-    week:  new Date(now.getTime() - 7 * 86400000),
-    month: new Date(now.getTime() - 30 * 86400000),
-    year:  new Date(now.getTime() - 365 * 86400000),
-  }[tf];
+  const win = periodWindow(tf, now);
+  const cutoff = win.start;
 
   // Voided (cancelled) invoices are never revenue or history — drop them up front.
   const liveInvoices = invoices.filter((i: any) => i.status !== 'voided');
   const filtered = liveInvoices.filter((i: any) => new Date(i.createdAt) >= cutoff);
 
-  /* Revenue total */
-  const totalRevenue = filtered
-    .filter((i: any) => i.status === 'paid' || i.status === 'paid_external')
-    .reduce((s: number, i: any) => s + (i.amountCents ?? 0), 0);
+  /* Revenue total — collectedCents is the same math the dashboard hero uses,
+     so the two pages can never disagree on what was collected this period. */
+  const totalRevenue = collectedCents(invoices, win.start, win.end);
   const totalStr = '$' + (totalRevenue / 100).toLocaleString('en-NZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   /* Chart — only built from real property invoice data, never retail transactions */
@@ -217,19 +204,22 @@ export default function PropertyAnalytics() {
   // which made "week/month/year" show an empty history. Capped for performance.
   const earlierInvoices = filtered.filter((i: any) => new Date(i.createdAt) < yesterday).sort(byNewest).slice(0, 50);
 
-  /* ── Swipeable sheet state ── */
+  /* ── Freely slidable sheet state ──
+     The sheet parks wherever the drag releases it — anywhere between fully
+     covering the graph (0) and fully revealing it (defaultOffset). No snapping;
+     only a spring back inside the bounds if the drag overshot them. */
   const topRef   = useRef<HTMLDivElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
-  const touchStartY  = useRef(0);
-  const touchStartOff = useRef(0);
-  const [sheetOffset, setSheetOffset] = useState<number | null>(null); // null = not yet measured
-  const [snapped, setSnapped]   = useState<'default' | 'full'>('default');
+  const dragStartY   = useRef(0);
+  const dragStartOff = useRef(0);
+  const [measuredTop, setMeasuredTop] = useState<number | null>(null);
+  const [sheetOffset, setSheetOffset] = useState<number | null>(null); // null = resting at default
   const [dragging, setDragging] = useState(false);
 
-  // Measure the top section height once to set the default sheet offset
+  // Track the dark top section's height — that's the "fully revealed" position.
   useEffect(() => {
     const measure = () => {
-      if (topRef.current) setSheetOffset(topRef.current.offsetHeight + 12);
+      if (topRef.current) setMeasuredTop(topRef.current.offsetHeight + 12);
     };
     measure();
     const ro = new ResizeObserver(measure);
@@ -237,36 +227,32 @@ export default function PropertyAnalytics() {
     return () => ro.disconnect();
   }, []);
 
-  const defaultOffset = sheetOffset ?? 320;
-  const snapFull = 0; // fully covers the screen
+  const defaultOffset = measuredTop ?? 320;
+  const currentOffset = sheetOffset ?? defaultOffset;
 
-  const onTouchStart = useCallback((e: React.TouchEvent) => {
-    touchStartY.current   = e.touches[0].clientY;
-    touchStartOff.current = snapped === 'full' ? snapFull : defaultOffset;
+  const onDragStart = useCallback((e: React.PointerEvent) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragStartY.current   = e.clientY;
+    dragStartOff.current = currentOffset;
     setDragging(true);
-  }, [snapped, defaultOffset]);
+  }, [currentOffset]);
 
-  const onTouchMove = useCallback((e: React.TouchEvent) => {
-    const dy  = e.touches[0].clientY - touchStartY.current;
-    const raw = touchStartOff.current + dy;
-    setSheetOffset(Math.max(snapFull - 24, Math.min(defaultOffset + 60, raw)));
-  }, [defaultOffset]);
+  const onDragMove = useCallback((e: React.PointerEvent) => {
+    if (!dragging) return;
+    const raw = dragStartOff.current + (e.clientY - dragStartY.current);
+    // Small rubber-band past both ends while the finger is down
+    setSheetOffset(Math.max(-24, Math.min(defaultOffset + 40, raw)));
+  }, [dragging, defaultOffset]);
 
-  const onTouchEnd = useCallback(() => {
+  const onDragEnd = useCallback(() => {
     setDragging(false);
-    const effective = sheetOffset ?? defaultOffset;
-    if (effective < defaultOffset / 2) {
-      setSnapped('full');
-      setSheetOffset(snapFull);
-    } else {
-      setSnapped('default');
-      setSheetOffset(defaultOffset);
-    }
-  }, [sheetOffset, defaultOffset]);
+    // Stay put — just spring back inside the bounds if overshot
+    setSheetOffset(o => o === null ? null : Math.max(0, Math.min(defaultOffset, o)));
+  }, [defaultOffset]);
 
   return (
     <div style={{ background: C.white, minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
-    <div style={{ width: '100%', maxWidth: 430, height: '100svh', fontFamily: "'Outfit', system-ui, sans-serif", background: C.base, position: 'relative', overflow: 'hidden' }}>
+    <div style={{ width: '100%', maxWidth: 'var(--phone-shell-max)', height: '100svh', fontFamily: "'Outfit', system-ui, sans-serif", background: C.base, position: 'relative', overflow: 'hidden' }}>
 
       {/* ── Dark top ── */}
       <div ref={topRef} style={{ padding: '52px 24px 0' }}>
@@ -276,7 +262,7 @@ export default function PropertyAnalytics() {
         </div>
 
         {/* Period pills */}
-        <div style={{ display: 'flex', gap: 0, background: 'rgba(255,255,255,0.06)', borderRadius: 999, padding: 3, marginBottom: 20 }}>
+        <div data-tutorial-id="pa-period" style={{ display: 'flex', gap: 0, background: 'rgba(255,255,255,0.06)', borderRadius: 999, padding: 3, marginBottom: 20 }}>
           {(['day', 'week', 'month', 'year'] as Timeframe[]).map(p => (
             <button key={p} onClick={() => switchTf(p)} style={{ flex: 1, padding: '8px 0', borderRadius: 999, border: 'none', fontSize: 13, fontWeight: tf === p ? 600 : 500, textTransform: 'capitalize', background: tf === p ? C.accent : 'transparent', color: tf === p ? C.base : 'rgba(255,255,255,0.4)', transition: 'all 0.3s cubic-bezier(0.34,1.56,0.64,1)', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
               {p}
@@ -285,15 +271,16 @@ export default function PropertyAnalytics() {
         </div>
 
         {/* Total */}
-        <div style={{ textAlign: 'center', marginBottom: 4 }}>
+        <div data-tutorial-id="pa-total" style={{ textAlign: 'center', marginBottom: 4 }}>
           <p style={{ fontSize: 13, fontWeight: 400, color: 'rgba(255,255,255,0.4)', margin: 0, letterSpacing: '0.04em' }}>Total Revenue</p>
           <p style={{ fontSize: 46, fontWeight: 700, color: C.white, margin: 0, letterSpacing: '-2px', marginTop: 6, fontVariantNumeric: 'tabular-nums', opacity: totVis ? 1 : 0, transform: totVis ? 'translateY(0)' : 'translateY(6px)', transition: 'all 0.45s cubic-bezier(0.34,1.56,0.64,1)' }}>
             {totalStr}
           </p>
         </div>
 
-        {/* Chart — bleeds past horizontal padding to fill full width */}
-        <div style={{ margin: '8px -32px 4px', overflow: 'visible' }}>
+        {/* Chart — bleeds exactly to the column edges (matches the 24px side
+            padding) so it stays symmetric instead of clipping off one side */}
+        <div style={{ margin: '8px -24px 4px' }}>
           <RevenueChart primary={chart.primary} secondary={chart.secondary} tipIdx={tipIdx} animKey={tf} tipLabel={tipLabel} />
         </div>
       </div>
@@ -306,23 +293,24 @@ export default function PropertyAnalytics() {
           height: '100svh',
           background: C.sheet,
           borderRadius: '32px 32px 0 0',
-          transform: `translateY(${sheetOffset ?? defaultOffset}px)`,
+          transform: `translateY(${currentOffset}px)`,
           transition: dragging ? 'none' : 'transform 0.38s cubic-bezier(0.34,1.56,0.64,1)',
-          overflowY: snapped === 'full' ? 'auto' : 'hidden',
+          overflowY: currentOffset < 40 ? 'auto' : 'hidden',
           overflowX: 'hidden',
           willChange: 'transform',
           msOverflowStyle: 'none' as any,
           scrollbarWidth: 'none' as any,
         }}
       >
-        {/* Drag handle — touch events live here only, not on the full sheet,
-            so scrolling the transaction list when expanded works normally */}
+        {/* Drag handle — pointer events live here only, not on the full sheet,
+            so scrolling the transaction list when expanded works normally.
+            Pointer events cover touch AND mouse, so it slides on desktop too. */}
         <div
-          onTouchStart={onTouchStart}
-          onTouchMove={onTouchMove}
-          onTouchEnd={onTouchEnd}
-          onTouchCancel={onTouchEnd}
-          style={{ width: '100%', height: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'grab', flexShrink: 0, touchAction: 'none' }}
+          onPointerDown={onDragStart}
+          onPointerMove={onDragMove}
+          onPointerUp={onDragEnd}
+          onPointerCancel={onDragEnd}
+          style={{ width: '100%', height: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: dragging ? 'grabbing' : 'grab', flexShrink: 0, touchAction: 'none' }}
         >
           <div style={{ width: 40, height: 5, borderRadius: 3, background: C.handle }} />
         </div>
@@ -330,7 +318,8 @@ export default function PropertyAnalytics() {
         <div style={{ padding: '0 24px 130px', marginTop: 2 }}>
           {/* Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-            <h2 style={{ fontSize: 20, fontWeight: 700, color: C.textDark, margin: 0, letterSpacing: '-0.4px' }}>Payment History</h2>
+            <h2 data-tutorial-id="pa-history" style={{ fontSize: 20, fontWeight: 700, color: C.textDark, margin: 0, letterSpacing: '-0.4px' }}>Payment History</h2>
+            <span data-tutorial-id="pa-reports"><PropertyReportsButton tone="onLight" /></span>
           </div>
 
           {filtered.length === 0 ? (

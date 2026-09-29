@@ -9,8 +9,12 @@
 // Dynamic imports to test JSX syntax - syntax errors will cause import failures
 import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { NotificationProvider } from '@/components/notification-system';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { TutorialProvider } from '@/features/tutorial/tutorial';
 
-// Test wrapper for React Query
+// Test wrapper for React Query. NotificationProvider/TooltipProvider are required
+// by the terminal pages (useNotifications / tooltip) or they throw at render.
 const createTestWrapper = () => {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -22,7 +26,13 @@ const createTestWrapper = () => {
   return function TestWrapper({ children }: { children: React.ReactNode }) {
     return (
       <QueryClientProvider client={queryClient}>
-        {children}
+        <TutorialProvider enabled={false}>
+          <NotificationProvider>
+            <TooltipProvider>
+              {children}
+            </TooltipProvider>
+          </NotificationProvider>
+        </TutorialProvider>
       </QueryClientProvider>
     );
   };
@@ -34,10 +44,23 @@ jest.mock('@/lib/auth', () => ({
   isAuthenticated: () => true,
 }));
 
+jest.mock('@/lib/sse-client', () => ({
+  sseClient: {
+    connect: jest.fn(),
+    connectCustomer: jest.fn(),
+    connectMerchant: jest.fn(),
+    disconnect: jest.fn(),
+    subscribe: jest.fn(),
+    unsubscribe: jest.fn(),
+  },
+}));
+
 jest.mock('wouter', () => ({
   Router: ({ children }: any) => <div>{children}</div>,
   useParams: () => ({ merchantId: '1', transactionId: '1' }),
   useLocation: () => ['/', jest.fn()],
+  // reset-password / receipt read query params via useSearch.
+  useSearch: () => '',
   Link: ({ children }: any) => <div>{children}</div>,
 }));
 
@@ -48,6 +71,16 @@ jest.mock('@/hooks/use-mobile', () => ({
 jest.mock('@/hooks/use-toast', () => ({
   useToast: () => ({ toast: jest.fn() }),
 }));
+
+// R1-T8: these check the first render only (JSX and hooks). Unmount before any
+// request resolves — the mocked responses are not shaped for every page, and a
+// response landing after the test is an update outside act(), which
+// jest.setup.js now fails.
+function rendersFirstFrame(ui: React.ReactElement, wrapper: React.ComponentType<{ children: React.ReactNode }>) {
+  let view: { unmount: () => void } | undefined;
+  expect(() => { view = render(ui, { wrapper }); }).not.toThrow();
+  view?.unmount();
+}
 
 describe('JSX Syntax Smoke Tests', () => {
   let TestWrapper: ReturnType<typeof createTestWrapper>;
@@ -70,123 +103,123 @@ describe('JSX Syntax Smoke Tests', () => {
     
     test('NotFound component has valid JSX', async () => {
       const { default: NotFound } = await import('../not-found');
-      expect(() => render(<NotFound />, { wrapper: TestWrapper })).not.toThrow();
+      rendersFirstFrame(<NotFound />, TestWrapper);
     });
 
     test('Login component has valid JSX', async () => {
       const { default: Login } = await import('../login');
-      expect(() => render(<Login />, { wrapper: TestWrapper })).not.toThrow();
+      rendersFirstFrame(<Login />, TestWrapper);
     });
 
     test('ForgotPassword component has valid JSX', async () => {
       const { default: ForgotPassword } = await import('../forgot-password');
-      expect(() => render(<ForgotPassword />, { wrapper: TestWrapper })).not.toThrow();
+      rendersFirstFrame(<ForgotPassword />, TestWrapper);
     });
 
     test('ResetPassword component has valid JSX', async () => {
       const { default: ResetPassword } = await import('../reset-password');
-      expect(() => render(<ResetPassword />, { wrapper: TestWrapper })).not.toThrow();
+      rendersFirstFrame(<ResetPassword />, TestWrapper);
     });
 
     test('MerchantSignup component has valid JSX', async () => {
       const { default: MerchantSignup } = await import('../merchant-signup');
-      expect(() => render(<MerchantSignup />, { wrapper: TestWrapper })).not.toThrow();
+      rendersFirstFrame(<MerchantSignup />, TestWrapper);
     });
 
     test('CreateMerchant component has valid JSX', async () => {
       const { default: CreateMerchant } = await import('../create-merchant');
-      expect(() => render(<CreateMerchant />, { wrapper: TestWrapper })).not.toThrow();
+      rendersFirstFrame(<CreateMerchant />, TestWrapper);
     });
   });
 
   describe('Authenticated Page Components JSX Syntax', () => {
     test('Dashboard component has valid JSX', async () => {
       const { default: Dashboard } = await import('../dashboard');
-      expect(() => render(<Dashboard />, { wrapper: TestWrapper })).not.toThrow();
+      rendersFirstFrame(<Dashboard />, TestWrapper);
     });
 
     test('Transactions component has valid JSX', async () => {
       const { default: Transactions } = await import('../transactions');
-      expect(() => render(<Transactions />, { wrapper: TestWrapper })).not.toThrow();
+      rendersFirstFrame(<Transactions />, TestWrapper);
     });
 
     test('Settings component has valid JSX', async () => {
       const { default: Settings } = await import('../settings');
-      expect(() => render(<Settings />, { wrapper: TestWrapper })).not.toThrow();
+      rendersFirstFrame(<Settings />, TestWrapper);
     });
 
     test('SettingsSimple component has valid JSX', async () => {
       const { default: SettingsSimple } = await import('../settings-simple');
-      expect(() => render(<SettingsSimple />, { wrapper: TestWrapper })).not.toThrow();
+      rendersFirstFrame(<SettingsSimple />, TestWrapper);
     });
 
     test('StockManagement component has valid JSX', async () => {
       const { default: StockManagement } = await import('../stock-management');
-      expect(() => render(<StockManagement />, { wrapper: TestWrapper })).not.toThrow();
+      rendersFirstFrame(<StockManagement />, TestWrapper);
     });
 
     test('Exports component has valid JSX', async () => {
       const { default: Exports } = await import('../exports');
-      expect(() => render(<Exports />, { wrapper: TestWrapper })).not.toThrow();
+      rendersFirstFrame(<Exports />, TestWrapper);
     });
   });
 
   describe('Terminal Components JSX Syntax', () => {
     test('MerchantTerminal component has valid JSX', async () => {
       const { default: MerchantTerminal } = await import('../merchant-terminal');
-      expect(() => render(<MerchantTerminal />, { wrapper: TestWrapper })).not.toThrow();
+      rendersFirstFrame(<MerchantTerminal />, TestWrapper);
     });
 
     test('MerchantTerminalMobile component has valid JSX', async () => {
       const { default: MerchantTerminalMobile } = await import('../merchant-terminal-mobile');
-      expect(() => render(<MerchantTerminalMobile />, { wrapper: TestWrapper })).not.toThrow();
+      rendersFirstFrame(<MerchantTerminalMobile />, TestWrapper);
     });
 
     test('CustomerPayment component has valid JSX', async () => {
       const { default: CustomerPayment } = await import('../customer-payment');
-      expect(() => render(<CustomerPayment />, { wrapper: TestWrapper })).not.toThrow();
+      rendersFirstFrame(<CustomerPayment />, TestWrapper);
     });
 
     test('NfcPayment component has valid JSX', async () => {
       const { default: NfcPayment } = await import('../nfc-payment');
-      expect(() => render(<NfcPayment />, { wrapper: TestWrapper })).not.toThrow();
+      rendersFirstFrame(<NfcPayment />, TestWrapper);
     });
 
     test('Receipt component has valid JSX', async () => {
       const { default: Receipt } = await import('../receipt');
-      expect(() => render(<Receipt />, { wrapper: TestWrapper })).not.toThrow();
+      rendersFirstFrame(<Receipt />, TestWrapper);
     });
   });
 
   describe('Admin Components JSX Syntax', () => {
     test('AdminLogin component has valid JSX', async () => {
       const { default: AdminLogin } = await import('../admin-login');
-      expect(() => render(<AdminLogin />, { wrapper: TestWrapper })).not.toThrow();
+      rendersFirstFrame(<AdminLogin />, TestWrapper);
     });
 
     test('AdminDashboard component has valid JSX', async () => {
       const { default: AdminDashboard } = await import('../admin-dashboard');
-      expect(() => render(<AdminDashboard />, { wrapper: TestWrapper })).not.toThrow();
+      rendersFirstFrame(<AdminDashboard />, TestWrapper);
     });
 
     test('AdminMerchant component has valid JSX', async () => {
       const { default: AdminMerchant } = await import('../admin-merchant');
-      expect(() => render(<AdminMerchant />, { wrapper: TestWrapper })).not.toThrow();
+      rendersFirstFrame(<AdminMerchant />, TestWrapper);
     });
 
     test('AdminMerchantBroken component has valid JSX', async () => {
       const { default: AdminMerchantBroken } = await import('../admin-merchant-broken');
-      expect(() => render(<AdminMerchantBroken />, { wrapper: TestWrapper })).not.toThrow();
+      rendersFirstFrame(<AdminMerchantBroken />, TestWrapper);
     });
 
     test('AdminRevenue component has valid JSX', async () => {
       const { default: AdminRevenue } = await import('../admin-revenue');
-      expect(() => render(<AdminRevenue />, { wrapper: TestWrapper })).not.toThrow();
+      rendersFirstFrame(<AdminRevenue />, TestWrapper);
     });
 
     test('AdminApi component has valid JSX', async () => {
       const { default: AdminApi } = await import('../admin-api');
-      expect(() => render(<AdminApi />, { wrapper: TestWrapper })).not.toThrow();
+      rendersFirstFrame(<AdminApi />, TestWrapper);
     });
   });
 });
@@ -246,8 +279,9 @@ describe('Import Validation', () => {
       throw new Error(`${failures.length} components failed to import, likely due to JSX syntax errors`);
     }
 
-    // All components should import successfully and have default exports
-    expect(results).toHaveLength(24);
+    // All components should import successfully and have default exports.
+    // Count is 23 since verify-merchant was removed in the onboarding consolidation.
+    expect(results).toHaveLength(23);
     expect(results.every(result => result.success && result.hasDefault)).toBe(true);
   });
 });

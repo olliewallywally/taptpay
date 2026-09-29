@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@font-face { font-family:'Outfit'; src:url('fonts/Outfit-Light.otf') format('opentype'); font-weight:300; font-style:normal; font-display:swap; }
+@font-face { font-family:'Outfit'; src:url('fonts/Outfit-Regular.otf') format('opentype'); font-weight:400; font-style:normal; font-display:swap; }
+@font-face { font-family:'Outfit'; src:url('fonts/Outfit-Medium.otf') format('opentype'); font-weight:500; font-style:normal; font-display:swap; }
+@font-face { font-family:'Outfit'; src:url('fonts/Outfit-SemiBold.otf') format('opentype'); font-weight:600; font-style:normal; font-display:swap; }
+@font-face { font-family:'Outfit'; src:url('fonts/Outfit-Bold.otf') format('opentype'); font-weight:700; font-style:normal; font-display:swap; }
+@font-face { font-family:'Larken'; src:url('fonts/LarkenDEMO-Black.otf') format('opentype'); font-weight:900; font-style:normal; font-display:swap; }
+@font-face { font-family:'Larken'; src:url('fonts/LarkenDEMO-BlackItalic.otf') format('opentype'); font-weight:900; font-style:italic; font-display:swap; }
+html,body{margin:0;padding:0;background:#040D6D;}
+a{color:#5E9DFF;text-decoration:none;}
+a:hover{color:#F4F1E8;}
+:root{ --t-huge:132px; --t-title:96px; --t-div:100px; --t-sub:33px; --t-body:29px; --t-small:24px; --t-kick:24px; --t-stat:58px; --pad-x:120px; --pad-top:104px; --pad-bottom:96px; }
+.glass{position:relative;isolation:isolate;}
+.glass::before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:3;background:linear-gradient(115deg,rgba(255,255,255,0.15) 0%,rgba(255,255,255,0.04) 20%,rgba(255,255,255,0) 46%,rgba(255,255,255,0) 100%);}
+.glass::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:-1;backdrop-filter:url(#tpRefract);}
+@keyframes kUp{from{opacity:0;transform:translateY(48px);}to{opacity:1;transform:translateY(0);}}
+@keyframes kPop{from{opacity:0;transform:translateY(26px) scale(0.94);}to{opacity:1;transform:translateY(0) scale(1);}}
+@keyframes kLine{from{transform:scaleX(0);}to{transform:scaleX(1);}}
+@keyframes kFloat{0%,100%{transform:translateY(0) rotate(0.0001deg);}50%{transform:translateY(-14px) rotate(0.0001deg);}}
+@keyframes kGlow{from{opacity:0;transform:scale(0.85);}to{opacity:1;transform:scale(1);}}
+@keyframes kPhoneIn{from{opacity:0;transform:perspective(1600px) translateX(150px) rotateY(-26deg) translateZ(-140px);}to{opacity:1;transform:perspective(1600px) translateX(0) rotateY(0deg) translateZ(0);}}
+@keyframes kPhoneInL{from{opacity:0;transform:perspective(1600px) translateX(-150px) rotateY(26deg) translateZ(-140px);}to{opacity:1;transform:perspective(1600px) translateX(0) rotateY(0deg) translateZ(0);}}
+@keyframes tpGlare{0%{transform:translateX(-170%) skewX(-14deg);}100%{transform:translateX(310%) skewX(-14deg);}}
+@media (prefers-reduced-motion:no-preference){
+  [data-deck-active] .aU{animation:kUp .85s cubic-bezier(.22,1,.36,1) both;}
+  [data-deck-active] .aP{animation:kPop .75s cubic-bezier(.22,1,.36,1) both;}
+  [data-deck-active] .aG{animation:kGlow 1.4s cubic-bezier(.22,1,.36,1) both;}
+  [data-deck-active] .aL{transform-origin:left center;animation:kLine .8s .2s cubic-bezier(.22,1,.36,1) both;}
+  [data-deck-active] .aF{animation:kFloat 7s ease-in-out 1.3s infinite;}
+  [data-deck-active] .aPh{animation:kPhoneIn 1.15s .12s cubic-bezier(.22,1,.36,1) both;}
+  [data-deck-active] .aPhL{animation:kPhoneInL 1.15s .12s cubic-bezier(.22,1,.36,1) both;}
+  [data-deck-active] .d1{animation-delay:.08s;}
+  [data-deck-active] .d2{animation-delay:.18s;}
+  [data-deck-active] .d3{animation-delay:.28s;}
+  [data-deck-active] .d4{animation-delay:.38s;}
+  [data-deck-active] .d5{animation-delay:.48s;}
+  [data-deck-active] .d6{animation-delay:.58s;}
+  [data-deck-active] .d7{animation-delay:.7s;}
+  [data-deck-active] .d8{animation-delay:.82s;}
+  [data-deck-active] .aF.d5{animation-delay:1.3s;}
+  body[data-motion="subtle"] .aF{animation:none;}
+  body[data-motion="off"] .aU,body[data-motion="off"] .aP,body[data-motion="off"] .aG,body[data-motion="off"] .aL,body[data-motion="off"] .aF,body[data-motion="off"] .aPh,body[data-motion="off"] .aPhL{animation:none;}
+}
+</style>
+<link rel="preload" href="fonts/Outfit-Light.otf" as="font" type="font/otf" crossorigin="anonymous">
+<link rel="preload" href="fonts/Outfit-Medium.otf" as="font" type="font/otf" crossorigin="anonymous">
+<link rel="preload" href="fonts/LarkenDEMO-Black.otf" as="font" type="font/otf" crossorigin="anonymous">
+<script src="assets/three.min.js"></script>
+</helmet>
+
+<x-import component-from-global-scope="deck-stage" from="./deck-stage.js" width="1920" height="1080" hint-size="100%,100%">
+
+  <!-- ══════ 01 · title ══════ -->
+  <section data-label="title" data-speaker-notes="Welcome. Taptpay turns the phone you already own into a full payment terminal — and the entire billing system behind it. No hardware, ever." style="background:#040D6D;color:#F4F1E8;font-family:'Outfit',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;transition:opacity .55s cubic-bezier(.4,0,.2,1),visibility .55s cubic-bezier(.4,0,.2,1);">
+    <svg aria-hidden="true" width="0" height="0" style="position:absolute;"><filter id="tpRefract" x="-20%" y="-20%" width="140%" height="140%"><feTurbulence type="fractalNoise" baseFrequency="0.009 0.02" numOctaves="2" seed="7" result="n"></feTurbulence><feDisplacementMap in="SourceGraphic" in2="n" scale="34" xChannelSelector="R" yChannelSelector="G"></feDisplacementMap></filter></svg>
+    <div class="aG" style="position:absolute;top:-30%;right:-12%;width:1200px;height:1200px;border-radius:50%;background:radial-gradient(circle,rgba(47,87,255,0.30) 0%,rgba(47,87,255,0) 65%);pointer-events:none;"></div>
+    <div class="aG d2" style="position:absolute;bottom:-38%;left:-14%;width:1100px;height:1100px;border-radius:50%;background:radial-gradient(circle,rgba(94,157,255,0.16) 0%,rgba(94,157,255,0) 65%);pointer-events:none;"></div>
+    <canvas data-coins style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:0.6;"></canvas>
+    <div style="position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;">
+      <div class="aU" style="display:flex;align-items:center;gap:16px;">
+        <span class="aL" style="width:44px;height:2px;background:#5E9DFF;display:inline-block;"></span>
+        <span style="font-weight:500;font-size:var(--t-kick);letter-spacing:0.32em;text-transform:uppercase;color:#5E9DFF;">digital multi-stack payment system</span>
+        <span class="aL" style="width:44px;height:2px;background:#5E9DFF;display:inline-block;"></span>
+      </div>
+      <div class="aU d2" style="margin-top:44px;display:flex;align-items:baseline;font-size:230px;line-height:1;">
+        <span style="font-family:'Larken';font-weight:900;color:#5E9DFF;">tapt</span><span style="font-family:'Larken';font-weight:900;font-style:italic;color:#5E9DFF;">pay.</span>
+      </div>
+      <p class="aU d4" style="margin:46px 0 0;font-weight:300;font-size:52px;line-height:1.2;letter-spacing:-0.02em;color:#F4F1E8;">payments without <span style="font-weight:500;color:#5E9DFF;">the bullsh*t.</span></p>
+      <div class="aU d6" style="margin-top:72px;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:16px 30px;font-weight:500;font-size:var(--t-small);letter-spacing:0.18em;text-transform:uppercase;color:rgba(244,241,232,0.45);">
+        <span>apple pay</span><span style="opacity:.4;">·</span><span>google pay</span><span style="opacity:.4;">·</span><span>afterpay</span><span style="opacity:.4;">·</span><span>credit &amp; debit cards</span><span style="opacity:.4;">·</span><span>same-day payouts by windcave</span>
+      </div>
+    </div>
+    <div style="position:absolute;bottom:52px;right:64px;font-weight:500;font-size:var(--t-small);color:rgba(244,241,232,0.35);z-index:2;">01 / 20</div>
+  </section>
+
+  <!-- ══════ 02 · the problem ══════ -->
+  <section data-label="the problem" data-speaker-notes="Every small business is paying a middleman: leased hardware, percentage fees, and a pile of disconnected tools that don't talk to each other." style="background:#040D6D;color:#F4F1E8;font-family:'Outfit',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-start;padding:var(--pad-top) var(--pad-x) var(--pad-bottom);transition:opacity .55s cubic-bezier(.4,0,.2,1),visibility .55s cubic-bezier(.4,0,.2,1);">
+    <div class="aG" style="position:absolute;top:-25%;left:-15%;width:1100px;height:1100px;border-radius:50%;background:radial-gradient(circle,rgba(47,87,255,0.22) 0%,rgba(47,87,255,0) 65%);pointer-events:none;"></div>
+    <div style="position:absolute;left:430px;top:660px;width:400px;height:400px;border-radius:50%;background:radial-gradient(circle,rgba(94,157,255,0.38) 0%,rgba(94,157,255,0) 68%);filter:blur(36px);pointer-events:none;"></div>
+    <div style="position:absolute;left:1170px;top:580px;width:360px;height:360px;border-radius:50%;background:radial-gradient(circle,rgba(47,87,255,0.34) 0%,rgba(47,87,255,0) 68%);filter:blur(36px);pointer-events:none;"></div>
+    <div class="aU" style="display:flex;align-items:center;gap:16px;position:relative;z-index:2;">
+      <span class="aL" style="width:44px;height:2px;background:#5E9DFF;display:inline-block;"></span>
+      <span style="font-weight:500;font-size:var(--t-kick);letter-spacing:0.32em;text-transform:uppercase;color:#5E9DFF;">the problem</span>
+    </div>
+    <h2 class="aU d1" style="margin:44px 0 0;font-weight:300;font-size:var(--t-title);line-height:1.04;letter-spacing:-0.025em;color:#F4F1E8;max-width:1400px;position:relative;z-index:2;">the eftpos machine is<br><span style="font-weight:500;color:#5E9DFF;">a middleman you rent.</span></h2>
+    <div style="margin-top:92px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:28px;position:relative;z-index:2;">
+      <div class="glass aP d3" style="padding:52px 48px;border-radius:28px;background:linear-gradient(160deg,rgba(255,255,255,0.10) 0%,rgba(255,255,255,0.03) 100%);border:1px solid rgba(255,255,255,0.16);backdrop-filter:blur(22px) saturate(1.4) brightness(1.08);box-shadow:0 30px 70px rgba(2,5,46,0.5),inset 0 1px 0 rgba(255,255,255,0.22),inset 0 -1px 0 rgba(255,255,255,0.04);">
+        <div style="font-weight:300;font-size:var(--t-stat);letter-spacing:-0.03em;color:#F4F1E8;">$40+<span style="font-size:0.55em;color:#5E9DFF;">/mo</span></div>
+        <div style="margin-top:18px;font-weight:600;font-size:var(--t-body);color:#F4F1E8;">leased hardware</div>
+        <p style="margin:14px 0 0;font-weight:400;font-size:var(--t-small);line-height:1.55;color:rgba(244,241,232,0.6);">a terminal you never own, that breaks, and queues your customers when it does.</p>
+      </div>
+      <div class="glass aP d4" style="padding:52px 48px;border-radius:28px;background:linear-gradient(160deg,rgba(255,255,255,0.10) 0%,rgba(255,255,255,0.03) 100%);border:1px solid rgba(255,255,255,0.16);backdrop-filter:blur(22px) saturate(1.4) brightness(1.08);box-shadow:0 30px 70px rgba(2,5,46,0.5),inset 0 1px 0 rgba(255,255,255,0.22),inset 0 -1px 0 rgba(255,255,255,0.04);">
+        <div style="font-weight:300;font-size:var(--t-stat);letter-spacing:-0.03em;color:#F4F1E8;">1.5–2<span style="font-size:0.55em;color:#5E9DFF;">%</span></div>
+        <div style="margin-top:18px;font-weight:600;font-size:var(--t-body);color:#F4F1E8;">of every sale</div>
+        <p style="margin:14px 0 0;font-weight:400;font-size:var(--t-small);line-height:1.55;color:rgba(244,241,232,0.6);">percentage fees that scale with your success — a $500 saturday costs $10 in clip.</p>
+      </div>
+      <div class="glass aP d5" style="padding:52px 48px;border-radius:28px;background:linear-gradient(160deg,rgba(255,255,255,0.10) 0%,rgba(255,255,255,0.03) 100%);border:1px solid rgba(255,255,255,0.16);backdrop-filter:blur(22px) saturate(1.4) brightness(1.08);box-shadow:0 30px 70px rgba(2,5,46,0.5),inset 0 1px 0 rgba(255,255,255,0.22),inset 0 -1px 0 rgba(255,255,255,0.04);">
+        <div style="font-weight:300;font-size:var(--t-stat);letter-spacing:-0.03em;color:#F4F1E8;">3–4</div>
+        <div style="margin-top:18px;font-weight:600;font-size:var(--t-body);color:#F4F1E8;">disconnected tools</div>
+        <p style="margin:14px 0 0;font-weight:400;font-size:var(--t-small);line-height:1.55;color:rgba(244,241,232,0.6);">pos, invoicing, rent platform, spreadsheets — none of them talk to each other.</p>
+      </div>
+    </div>
+    <div style="position:absolute;bottom:52px;left:var(--pad-x);display:flex;align-items:baseline;font-size:26px;line-height:1;z-index:2;"><span style="font-family:'Larken';font-weight:900;color:#5E9DFF;">tapt</span><span style="font-family:'Larken';font-weight:900;font-style:italic;color:#5E9DFF;">pay.</span></div>
+    <div style="position:absolute;bottom:52px;right:64px;font-weight:500;font-size:var(--t-small);color:rgba(244,241,232,0.35);z-index:2;">02 / 20</div>
+  </section>
+
+  <!-- ══════ 03 · what taptpay is ══════ -->
+  <section data-label="what taptpay is" data-speaker-notes="Taptpay is three things in one app: the terminal, the billing system behind it, and the customer-facing payment link. All software, no hardware." style="background:#040D6D;color:#F4F1E8;font-family:'Outfit',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-start;padding:var(--pad-top) var(--pad-x) var(--pad-bottom);transition:opacity .55s cubic-bezier(.4,0,.2,1),visibility .55s cubic-bezier(.4,0,.2,1);">
+    <div class="aG" style="position:absolute;bottom:-35%;right:-15%;width:1200px;height:1200px;border-radius:50%;background:radial-gradient(circle,rgba(94,157,255,0.18) 0%,rgba(94,157,255,0) 65%);pointer-events:none;"></div>
+    <div style="position:absolute;left:260px;top:700px;width:380px;height:380px;border-radius:50%;background:radial-gradient(circle,rgba(94,157,255,0.34) 0%,rgba(94,157,255,0) 68%);filter:blur(36px);pointer-events:none;"></div>
+    <div style="position:absolute;left:960px;top:640px;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(47,87,255,0.30) 0%,rgba(47,87,255,0) 68%);filter:blur(36px);pointer-events:none;"></div>
+    <div class="aU" style="display:flex;align-items:center;gap:16px;position:relative;z-index:2;">
+      <span class="aL" style="width:44px;height:2px;background:#5E9DFF;display:inline-block;"></span>
+      <span style="font-weight:500;font-size:var(--t-kick);letter-spacing:0.32em;text-transform:uppercase;color:#5E9DFF;">what taptpay is</span>
+    </div>
+    <h2 class="aU d1" style="margin:44px 0 0;font-weight:300;font-size:var(--t-title);line-height:1.04;letter-spacing:-0.025em;color:#F4F1E8;position:relative;z-index:2;">your phone is the terminal.<br><span style="font-weight:500;color:#5E9DFF;">taptpay is everything behind it.</span></h2>
+    <p class="aU d2" style="margin:38px 0 0;font-weight:400;font-size:var(--t-sub);line-height:1.55;color:rgba(244,241,232,0.62);max-width:36em;position:relative;z-index:2;">one app: charge in person, send payment links, quote, invoice, collect rent — every dollar reconciled the moment it lands.</p>
+    <div style="margin-top:76px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:28px;position:relative;z-index:2;">
+      <div class="glass aP d3" style="padding: 46px 44px; border-radius: 28px; background: linear-gradient(160deg,rgba(255,255,255,0.10) 0%,rgba(255,255,255,0.03) 100%); border: 1px solid rgba(255,255,255,0.16); backdrop-filter: blur(22px) saturate(1.4) brightness(1.08); box-shadow: 0 30px 70px rgba(2,5,46,0.5),inset 0 1px 0 rgba(255,255,255,0.22),inset 0 -1px 0 rgba(255,255,255,0.04); opacity: 1">
+        <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="#5E9DFF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="10" height="19" rx="2.5"></rect><path d="M11 18.5h2"></path></svg>
+        <div style="margin-top:22px;font-weight:600;font-size:var(--t-body);color:#F4F1E8;">the terminal</div>
+        <p style="margin:12px 0 0;font-weight:400;font-size:var(--t-small);line-height:1.55;color:rgba(244,241,232,0.6);">keypad, tap or scan to pay, splits — a full point of sale in your pocket.</p>
+      </div>
+      <div class="glass aP d4" style="padding:46px 44px;border-radius:28px;background:linear-gradient(160deg,rgba(255,255,255,0.10) 0%,rgba(255,255,255,0.03) 100%);border:1px solid rgba(255,255,255,0.16);backdrop-filter:blur(22px) saturate(1.4) brightness(1.08);box-shadow:0 30px 70px rgba(2,5,46,0.5),inset 0 1px 0 rgba(255,255,255,0.22),inset 0 -1px 0 rgba(255,255,255,0.04);">
+        <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="#5E9DFF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"></path><path d="M9.5 8.5h5M9.5 12h5"></path></svg>
+        <div style="margin-top:22px;font-weight:600;font-size:var(--t-body);color:#F4F1E8;">the billing system</div>
+        <p style="margin:12px 0 0;font-weight:400;font-size:var(--t-small);line-height:1.55;color:rgba(244,241,232,0.6);">quotes, invoices, rent schedules, gst receipts — the paperwork does itself.</p>
+      </div>
+      <div class="glass aP d5" style="padding:46px 44px;border-radius:28px;background:linear-gradient(160deg,rgba(255,255,255,0.10) 0%,rgba(255,255,255,0.03) 100%);border:1px solid rgba(255,255,255,0.16);backdrop-filter:blur(22px) saturate(1.4) brightness(1.08);box-shadow:0 30px 70px rgba(2,5,46,0.5),inset 0 1px 0 rgba(255,255,255,0.22),inset 0 -1px 0 rgba(255,255,255,0.04);">
+        <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="#5E9DFF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1 1"></path><path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1-1"></path></svg>
+        <div style="margin-top:22px;font-weight:600;font-size:var(--t-body);color:#F4F1E8;">the customer link</div>
+        <p style="margin:12px 0 0;font-weight:400;font-size:var(--t-small);line-height:1.55;color:rgba(244,241,232,0.6);">a secure checkout that opens in any browser — no app for the customer, ever.</p>
+      </div>
+    </div>
+    <div style="position:absolute;bottom:52px;left:var(--pad-x);display:flex;align-items:baseline;font-size:26px;line-height:1;z-index:2;"><span style="font-family:'Larken';font-weight:900;color:#5E9DFF;">tapt</span><span style="font-family:'Larken';font-weight:900;font-style:italic;color:#5E9DFF;">pay.</span></div>
+    <div style="position:absolute;bottom:52px;right:64px;font-weight:500;font-size:var(--t-small);color:rgba(244,241,232,0.35);z-index:2;">03 / 20</div>
+  </section>
+
+  <!-- ══════ 04 · how it works ══════ -->
+  <section data-label="how it works" data-speaker-notes="The whole payment is three moves: enter the amount, customer scans or taps, money lands. Same-day payout by Windcave." style="background:#040D6D;color:#F4F1E8;font-family:'Outfit',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-start;padding:var(--pad-top) var(--pad-x) var(--pad-bottom);transition:opacity .55s cubic-bezier(.4,0,.2,1),visibility .55s cubic-bezier(.4,0,.2,1);">
+    <div class="aG" style="position:absolute;top:-20%;right:-14%;width:1150px;height:1150px;border-radius:50%;background:radial-gradient(circle,rgba(47,87,255,0.24) 0%,rgba(47,87,255,0) 65%);pointer-events:none;"></div>
+    <div style="position:absolute;left:320px;top:620px;width:400px;height:400px;border-radius:50%;background:radial-gradient(circle,rgba(94,157,255,0.36) 0%,rgba(94,157,255,0) 68%);filter:blur(36px);pointer-events:none;"></div>
+    <div style="position:absolute;left:1240px;top:560px;width:360px;height:360px;border-radius:50%;background:radial-gradient(circle,rgba(47,87,255,0.32) 0%,rgba(47,87,255,0) 68%);filter:blur(36px);pointer-events:none;"></div>
+    <div class="aU" style="display:flex;align-items:center;gap:16px;position:relative;z-index:2;">
+      <span class="aL" style="width:44px;height:2px;background:#5E9DFF;display:inline-block;"></span>
+      <span style="font-weight:500;font-size:var(--t-kick);letter-spacing:0.32em;text-transform:uppercase;color:#5E9DFF;">how it works</span>
+    </div>
+    <h2 class="aU d1" style="margin:44px 0 0;font-weight:300;font-size:var(--t-title);line-height:1.04;letter-spacing:-0.025em;color:#F4F1E8;position:relative;z-index:2;">charge. scan or tap. <span style="font-weight:500;color:#5E9DFF;">paid.</span></h2>
+    <div style="margin-top:90px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:28px;position:relative;z-index:2;">
+      <div class="glass aP d3" style="padding:52px 48px;border-radius:28px;background:linear-gradient(160deg,rgba(255,255,255,0.10) 0%,rgba(255,255,255,0.03) 100%);border:1px solid rgba(255,255,255,0.16);backdrop-filter:blur(22px) saturate(1.4) brightness(1.08);box-shadow:0 30px 70px rgba(2,5,46,0.5),inset 0 1px 0 rgba(255,255,255,0.22),inset 0 -1px 0 rgba(255,255,255,0.04);">
+        <div style="width:64px;height:64px;border-radius:9999px;border:1.5px solid #5E9DFF;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:26px;color:#5E9DFF;">01</div>
+        <div style="margin-top:26px;font-weight:600;font-size:var(--t-body);color:#F4F1E8;">enter the amount</div>
+        <p style="margin:12px 0 0;font-weight:400;font-size:var(--t-small);line-height:1.55;color:rgba(244,241,232,0.6);">keypad or saved stock item — from your phone, or any staff phone on your team.</p>
+      </div>
+      <div class="glass aP d4" style="padding:52px 48px;border-radius:28px;background:linear-gradient(160deg,rgba(255,255,255,0.10) 0%,rgba(255,255,255,0.03) 100%);border:1px solid rgba(255,255,255,0.16);backdrop-filter:blur(22px) saturate(1.4) brightness(1.08);box-shadow:0 30px 70px rgba(2,5,46,0.5),inset 0 1px 0 rgba(255,255,255,0.22),inset 0 -1px 0 rgba(255,255,255,0.04);">
+        <div style="width:64px;height:64px;border-radius:9999px;border:1.5px solid #5E9DFF;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:26px;color:#5E9DFF;">02</div>
+        <div style="margin-top:26px;font-weight:600;font-size:var(--t-body);color:#F4F1E8;">customer scans or taps</div>
+        <p style="margin:12px 0 0;font-weight:400;font-size:var(--t-small);line-height:1.55;color:rgba(244,241,232,0.6);">qr on your screen, nfc on the counter board, or a link by text — straight to checkout.</p>
+      </div>
+      <div class="glass aP d5" style="padding:52px 48px;border-radius:28px;background:linear-gradient(160deg,rgba(255,255,255,0.10) 0%,rgba(255,255,255,0.03) 100%);border:1px solid rgba(255,255,255,0.16);backdrop-filter:blur(22px) saturate(1.4) brightness(1.08);box-shadow:0 30px 70px rgba(2,5,46,0.5),inset 0 1px 0 rgba(255,255,255,0.22),inset 0 -1px 0 rgba(255,255,255,0.04);">
+        <div style="width:64px;height:64px;border-radius:9999px;border:1.5px solid #5E9DFF;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:26px;color:#5E9DFF;">03</div>
+        <div style="margin-top:26px;font-weight:600;font-size:var(--t-body);color:#F4F1E8;">money lands</div>
+        <p style="margin:12px 0 0;font-weight:400;font-size:var(--t-small);line-height:1.55;color:rgba(244,241,232,0.6);">reconciled live in your dashboard, paid out same-day by windcave.</p>
+      </div>
+    </div>
+    <div class="aU d6" style="margin-top:64px;display:flex;align-items:center;gap:14px;color:#5E9DFF;font-weight:500;font-size:var(--t-small);position:relative;z-index:2;">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="m8.5 12 2.5 2.5 4.5-5"></path></svg>
+      <span>no app for the customer, ever</span>
+    </div>
+    <div style="position:absolute;bottom:52px;left:var(--pad-x);display:flex;align-items:baseline;font-size:26px;line-height:1;z-index:2;"><span style="font-family:'Larken';font-weight:900;color:#5E9DFF;">tapt</span><span style="font-family:'Larken';font-weight:900;font-style:italic;color:#5E9DFF;">pay.</span></div>
+    <div style="position:absolute;bottom:52px;right:64px;font-weight:500;font-size:var(--t-small);color:rgba(244,241,232,0.35);z-index:2;">04 / 20</div>
+  </section>
+
+  <!-- ══════ 05 · three verticals ══════ -->
+  <section data-label="three industries" data-speaker-notes="One system, three verticals: retail and hospitality at 10 cents flat, trades and services, and property management at 0.3%." style="background:#040D6D;color:#F4F1E8;font-family:'Outfit',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-start;padding:var(--pad-top) var(--pad-x) var(--pad-bottom);transition:opacity .55s cubic-bezier(.4,0,.2,1),visibility .55s cubic-bezier(.4,0,.2,1);">
+    <div class="aG" style="position:absolute;top:10%;right:-20%;width:1300px;height:1300px;border-radius:50%;background:radial-gradient(circle,rgba(47,87,255,0.22) 0%,rgba(47,87,255,0) 65%);pointer-events:none;"></div>
+    <div style="position:absolute;left:200px;top:600px;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(94,157,255,0.34) 0%,rgba(94,157,255,0) 68%);filter:blur(36px);pointer-events:none;"></div>
+    <div style="position:absolute;left:840px;top:700px;width:380px;height:380px;border-radius:50%;background:radial-gradient(circle,rgba(47,87,255,0.32) 0%,rgba(47,87,255,0) 68%);filter:blur(36px);pointer-events:none;"></div>
+    <div style="position:absolute;left:1440px;top:600px;width:360px;height:360px;border-radius:50%;background:radial-gradient(circle,rgba(94,157,255,0.30) 0%,rgba(94,157,255,0) 68%);filter:blur(36px);pointer-events:none;"></div>
+    <div class="aU" style="display:flex;align-items:center;gap:16px;position:relative;z-index:2;">
+      <span class="aL" style="width:44px;height:2px;background:#5E9DFF;display:inline-block;"></span>
+      <span style="font-weight:500;font-size:var(--t-kick);letter-spacing:0.32em;text-transform:uppercase;color:#5E9DFF;">industries</span>
+    </div>
+    <h2 class="aU d1" style="margin:44px 0 0;font-weight:300;font-size:var(--t-title);line-height:1.04;letter-spacing:-0.025em;color:#F4F1E8;position:relative;z-index:2;">one system, <span style="font-weight:500;color:#5E9DFF;">three ways to get paid.</span></h2>
+    <div style="margin-top:84px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:28px;position:relative;z-index:2;">
+      <div class="glass aP d3" style="padding:50px 46px;border-radius:28px;background:linear-gradient(160deg,rgba(255,255,255,0.10) 0%,rgba(255,255,255,0.03) 100%);border:1px solid rgba(255,255,255,0.16);backdrop-filter:blur(22px) saturate(1.4) brightness(1.08);box-shadow:0 30px 70px rgba(2,5,46,0.5),inset 0 1px 0 rgba(255,255,255,0.22),inset 0 -1px 0 rgba(255,255,255,0.04);display:flex;flex-direction:column;">
+        <div style="font-weight:500;font-size:var(--t-small);letter-spacing:0.24em;text-transform:uppercase;color:rgba(244,241,232,0.5);">01 · retail &amp; hospitality</div>
+        <div style="margin-top:22px;font-weight:300;font-size:44px;line-height:1.1;letter-spacing:-0.02em;color:#F4F1E8;">a terminal in<br>every pocket.</div>
+        <p style="margin:18px 0 0;font-weight:400;font-size:var(--t-small);line-height:1.55;color:rgba(244,241,232,0.6);">cafés, markets, food trucks — charge from the keypad, split the table.</p>
+        <div style="margin-top:auto;padding-top:34px;font-weight:600;font-size:38px;color:#5E9DFF;">10¢ <span style="font-weight:400;font-size:24px;color:rgba(244,241,232,0.55);">flat, per transaction</span></div>
+      </div>
+      <div class="glass aP d4" style="padding:50px 46px;border-radius:28px;background:linear-gradient(160deg,rgba(255,255,255,0.10) 0%,rgba(255,255,255,0.03) 100%);border:1px solid rgba(255,255,255,0.16);backdrop-filter:blur(22px) saturate(1.4) brightness(1.08);box-shadow:0 30px 70px rgba(2,5,46,0.5),inset 0 1px 0 rgba(255,255,255,0.22),inset 0 -1px 0 rgba(255,255,255,0.04);display:flex;flex-direction:column;">
+        <div style="font-weight:500;font-size:var(--t-small);letter-spacing:0.24em;text-transform:uppercase;color:rgba(244,241,232,0.5);">02 · trades &amp; services</div>
+        <div style="margin-top:22px;font-weight:300;font-size:44px;line-height:1.1;letter-spacing:-0.02em;color:#F4F1E8;">the quote pays<br>for itself.</div>
+        <p style="margin:18px 0 0;font-weight:400;font-size:var(--t-small);line-height:1.55;color:rgba(244,241,232,0.6);">quote → deposit → balance → done. the job and the money, one object.</p>
+        <div style="margin-top:auto;padding-top:34px;font-weight:600;font-size:38px;color:#5E9DFF;">0.3% <span style="font-weight:400;font-size:24px;color:rgba(244,241,232,0.55);">platform fee</span></div>
+      </div>
+      <div class="glass aP d5" style="padding:50px 46px;border-radius:28px;background:linear-gradient(160deg,rgba(255,255,255,0.10) 0%,rgba(255,255,255,0.03) 100%);border:1px solid rgba(255,255,255,0.16);backdrop-filter:blur(22px) saturate(1.4) brightness(1.08);box-shadow:0 30px 70px rgba(2,5,46,0.5),inset 0 1px 0 rgba(255,255,255,0.22),inset 0 -1px 0 rgba(255,255,255,0.04);display:flex;flex-direction:column;">
+        <div style="font-weight:500;font-size:var(--t-small);letter-spacing:0.24em;text-transform:uppercase;color:rgba(244,241,232,0.5);">03 · property management</div>
+        <div style="margin-top:22px;font-weight:300;font-size:44px;line-height:1.1;letter-spacing:-0.02em;color:#F4F1E8;">rent that<br>collects itself.</div>
+        <p style="margin:18px 0 0;font-weight:400;font-size:var(--t-small);line-height:1.55;color:rgba(244,241,232,0.6);">schedules invoice every cycle, reminders chase the stragglers.</p>
+        <div style="margin-top:auto;padding-top:34px;font-weight:600;font-size:38px;color:#5E9DFF;">0.3% <span style="font-weight:400;font-size:24px;color:rgba(244,241,232,0.55);">platform fee</span></div>
+      </div>
+    </div>
+    <div style="position:absolute;bottom:52px;left:var(--pad-x);display:flex;align-items:baseline;font-size:26px;line-height:1;z-index:2;"><span style="font-family:'Larken';font-weight:900;color:#5E9DFF;">tapt</span><span style="font-family:'Larken';font-weight:900;font-style:italic;color:#5E9DFF;">pay.</span></div>
+    <div style="position:absolute;bottom:52px;right:64px;font-weight:500;font-size:var(--t-small);color:rgba(244,241,232,0.35);z-index:2;">05 / 20</div>
+  </section>
+
+  <!-- ══════ 06 · divider retail — live terminal ══════ -->
+  <section data-label="retail & hospitality" data-speaker-notes="First vertical: retail and hospitality. This is the live app — the phone is a full point of sale. 10 cents flat, unlimited simultaneous payments, splits built in." style="background:#040D6D;color:#F4F1E8;font-family:'Outfit',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden;display:flex;align-items:center;padding:0 var(--pad-x);transition:opacity .55s cubic-bezier(.4,0,.2,1),visibility .55s cubic-bezier(.4,0,.2,1);">
+    <div class="aG" style="position:absolute;top:-20%;right:-10%;width:1300px;height:1300px;border-radius:50%;background:radial-gradient(circle,rgba(47,87,255,0.30) 0%,rgba(47,87,255,0) 65%);pointer-events:none;"></div>
+    <div style="position:absolute;right:240px;top:180px;width:520px;height:520px;border-radius:50%;background:radial-gradient(circle,rgba(94,157,255,0.30) 0%,rgba(94,157,255,0) 68%);filter:blur(40px);pointer-events:none;"></div>
+    <div style="flex:1 1 55%;position:relative;z-index:2;">
+      <div class="aU" style="display:flex;align-items:center;gap:16px;">
+        <span class="aL" style="width:44px;height:2px;background:#5E9DFF;display:inline-block;"></span>
+        <span style="font-weight:500;font-size:var(--t-kick);letter-spacing:0.32em;text-transform:uppercase;color:#5E9DFF;">industries · 01 · retail &amp; hospitality</span>
+      </div>
+      <h2 class="aU d1" style="margin:44px 0 0;font-weight:300;font-size:var(--t-div);line-height:1.02;letter-spacing:-0.025em;color:#F4F1E8;">a terminal in<br><span style="font-weight:500;color:#5E9DFF;">every pocket.</span></h2>
+      <p class="aU d2" style="margin:36px 0 0;font-weight:400;font-size:var(--t-sub);line-height:1.55;color:rgba(244,241,232,0.62);max-width:24em;">cafés, markets, food trucks — keypad to charge, tap or scan to pay, split the table without maths at the counter. <span style="color:#F4F1E8;font-weight:500;">this is the live app →</span></p>
+      <div style="margin-top:60px;display:flex;gap:72px;">
+        <div class="aU d4"><div data-count="10¢" style="font-weight:500;font-size:var(--t-stat);letter-spacing:-0.02em;color:#5E9DFF;">10¢</div><div style="margin-top:8px;font-weight:400;font-size:var(--t-small);color:rgba(244,241,232,0.5);">per transaction, flat</div></div>
+        <div class="aU d5"><div style="font-weight:500;font-size:var(--t-stat);letter-spacing:-0.02em;color:#5E9DFF;">multi</div><div style="margin-top:8px;font-weight:400;font-size:var(--t-small);color:rgba(244,241,232,0.5);">stack — unlimited payments at once</div></div>
+        <div class="aU d6"><div data-count="2–10" style="font-weight:500;font-size:var(--t-stat);letter-spacing:-0.02em;color:#5E9DFF;">2–10</div><div style="margin-top:8px;font-weight:400;font-size:var(--t-small);color:rgba(244,241,232,0.5);">way bill splits</div></div>
+      </div>
+    </div>
+    <div style="flex:1 1 45%;display:flex;justify-content:center;position:relative;z-index:2;">
+      <div class="aPh" data-phone data-route="#/terminal" style="filter:drop-shadow(0 60px 90px rgba(0,0,0,0.55));">
+        <div class="aF" style="position:relative;width:400px;height:842px;border-radius:56px;background:#0b0b14;padding:10px;box-shadow:inset 0 0 0 2px rgba(120,140,220,0.35);">
+          <div style="position:absolute;inset:10px;border-radius:47px;overflow:hidden;background:#fff;">
+            <iframe data-defer-src="app/embed.html?mode=retail&amp;route=/terminal" title="taptpay live app — terminal" style="width:390px;height:844px;border:none;transform:scale(0.9744);transform-origin:top left;pointer-events:none;display:block;background:#fff;"></iframe>
+            <div style="position:absolute;top:11px;left:50%;transform:translateX(-50%);width:112px;height:28px;border-radius:15px;background:#0b0b14;"></div>
+            <div data-glare style="position:absolute;top:0;bottom:0;left:0;width:45%;background:linear-gradient(105deg,rgba(255,255,255,0) 0%,rgba(255,255,255,0.15) 50%,rgba(255,255,255,0) 100%);transform:translateX(-170%) skewX(-14deg);pointer-events:none;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="position:absolute;bottom:52px;right:64px;font-weight:500;font-size:var(--t-small);color:rgba(244,241,232,0.35);z-index:2;">06 / 20</div>
+  </section>
+
+  <!-- ══════ 07 · retail features ══════ -->
+  <section data-label="retail features" data-speaker-notes="Everything the counter needs: keypad charging, the multi-stack for rush hour, payment boards, and live analytics with stock." style="background:#040D6D;color:#F4F1E8;font-family:'Outfit',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-start;padding:var(--pad-top) var(--pad-x) var(--pad-bottom);transition:opacity .55s cubic-bezier(.4,0,.2,1),visibility .55s cubic-bezier(.4,0,.2,1);">
+    <div class="aG" style="position:absolute;bottom:-30%;left:-14%;width:1200px;height:1200px;border-radius:50%;background:radial-gradient(circle,rgba(47,87,255,0.22) 0%,rgba(47,87,255,0) 65%);pointer-events:none;"></div>
+    <div style="position:absolute;left:420px;top:520px;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(94,157,255,0.34) 0%,rgba(94,157,255,0) 68%);filter:blur(38px);pointer-events:none;"></div>
+    <div style="position:absolute;left:1180px;top:680px;width:380px;height:380px;border-radius:50%;background:radial-gradient(circle,rgba(47,87,255,0.32) 0%,rgba(47,87,255,0) 68%);filter:blur(38px);pointer-events:none;"></div>
+    <div class="aU" style="display:flex;align-items:center;gap:16px;position:relative;z-index:2;">
+      <span class="aL" style="width:44px;height:2px;background:#5E9DFF;display:inline-block;"></span>
+      <span style="font-weight:500;font-size:var(--t-kick);letter-spacing:0.32em;text-transform:uppercase;color:#5E9DFF;">retail &amp; hospitality · features</span>
+    </div>
+    <h2 class="aU d1" style="margin:44px 0 0;font-weight:300;font-size:var(--t-title);line-height:1.04;letter-spacing:-0.025em;color:#F4F1E8;position:relative;z-index:2;">everything <span style="font-weight:500;color:#5E9DFF;">the counter needs.</span></h2>
+    <div style="margin-top:80px;display:grid;grid-template-columns:1fr 1fr;gap:28px;position:relative;z-index:2;">
+      <div class="glass aP d3" style="padding:44px 46px;border-radius:28px;background:linear-gradient(160deg,rgba(255,255,255,0.10) 0%,rgba(255,255,255,0.03) 100%);border:1px solid rgba(255,255,255,0.16);backdrop-filter:blur(22px) saturate(1.4) brightness(1.08);box-shadow:0 30px 70px rgba(2,5,46,0.5),inset 0 1px 0 rgba(255,255,255,0.22),inset 0 -1px 0 rgba(255,255,255,0.04);display:flex;gap:30px;align-items:flex-start;">
+        <div style="flex:0 0 auto;width:72px;height:72px;border-radius:9999px;border:1.5px solid rgba(94,157,255,0.65);display:flex;align-items:center;justify-content:center;"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#5E9DFF" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="1.4"></circle><circle cx="12" cy="7" r="1.4"></circle><circle cx="17" cy="7" r="1.4"></circle><circle cx="7" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="17" cy="12" r="1.4"></circle><circle cx="7" cy="17" r="1.4"></circle><circle cx="12" cy="17" r="1.4"></circle><circle cx="17" cy="17" r="1.4"></circle></svg></div>
+        <div><div style="font-weight:600;font-size:var(--t-body);color:#F4F1E8;">charge in seconds</div><p style="margin:10px 0 0;font-weight:400;font-size:var(--t-small);line-height:1.55;color:rgba(244,241,232,0.6);">keypad or saved stock items — amount to qr in two taps.</p></div>
+      </div>
+      <div class="glass aP d4" style="padding:44px 46px;border-radius:28px;background:linear-gradient(160deg,rgba(255,255,255,0.10) 0%,rgba(255,255,255,0.03) 100%);border:1px solid rgba(255,255,255,0.16);backdrop-filter:blur(22px) saturate(1.4) brightness(1.08);box-shadow:0 30px 70px rgba(2,5,46,0.5),inset 0 1px 0 rgba(255,255,255,0.22),inset 0 -1px 0 rgba(255,255,255,0.04);display:flex;gap:30px;align-items:flex-start;">
+        <div style="flex:0 0 auto;width:72px;height:72px;border-radius:9999px;border:1.5px solid rgba(94,157,255,0.65);display:flex;align-items:center;justify-content:center;"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#5E9DFF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9 5-9 5-9-5z"></path><path d="m3 13 9 5 9-5"></path></svg></div>
+        <div><div style="font-weight:600;font-size:var(--t-body);color:#F4F1E8;">the multi-stack</div><p style="margin:10px 0 0;font-weight:400;font-size:var(--t-small);line-height:1.55;color:rgba(244,241,232,0.6);">unlimited payments live at once — the rush-hour queue pays in parallel, not in line.</p></div>
+      </div>
+      <div class="glass aP d5" style="padding:44px 46px;border-radius:28px;background:linear-gradient(160deg,rgba(255,255,255,0.10) 0%,rgba(255,255,255,0.03) 100%);border:1px solid rgba(255,255,255,0.16);backdrop-filter:blur(22px) saturate(1.4) brightness(1.08);box-shadow:0 30px 70px rgba(2,5,46,0.5),inset 0 1px 0 rgba(255,255,255,0.22),inset 0 -1px 0 rgba(255,255,255,0.04);display:flex;gap:30px;align-items:flex-start;">
+        <div style="flex:0 0 auto;width:72px;height:72px;border-radius:9999px;border:1.5px solid rgba(94,157,255,0.65);display:flex;align-items:center;justify-content:center;"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#5E9DFF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"></rect><rect x="8" y="7" width="8" height="8" rx="1"></rect></svg></div>
+        <div><div style="font-weight:600;font-size:var(--t-body);color:#F4F1E8;">payment boards</div><p style="margin:10px 0 0;font-weight:400;font-size:var(--t-small);line-height:1.55;color:rgba(244,241,232,0.6);">customers scan or tap the counter board — no staff phone needed at all.</p></div>
+      </div>
+      <div class="glass aP d6" style="padding:44px 46px;border-radius:28px;background:linear-gradient(160deg,rgba(255,255,255,0.10) 0%,rgba(255,255,255,0.03) 100%);border:1px solid rgba(255,255,255,0.16);backdrop-filter:blur(22px) saturate(1.4) brightness(1.08);box-shadow:0 30px 70px rgba(2,5,46,0.5),inset 0 1px 0 rgba(255,255,255,0.22),inset 0 -1px 0 rgba(255,255,255,0.04);display:flex;gap:30px;align-items:flex-start;">
+        <div style="flex:0 0 auto;width:72px;height:72px;border-radius:9999px;border:1.5px solid rgba(94,157,255,0.65);display:flex;align-items:center;justify-content:center;"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#5E9DFF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16"></path><path d="M7 16v-5M12 16V7M17 16v-8"></path></svg></div>
+        <div><div style="font-weight:600;font-size:var(--t-body);color:#F4F1E8;">stock &amp; live analytics</div><p style="margin:10px 0 0;font-weight:400;font-size:var(--t-small);line-height:1.55;color:rgba(244,241,232,0.6);">transaction history, daily revenue and stock levels — live on every device.</p></div>
+      </div>
+    </div>
+    <div style="position:absolute;bottom:52px;left:var(--pad-x);display:flex;align-items:baseline;font-size:26px;line-height:1;z-index:2;"><span style="font-family:'Larken';font-weight:900;color:#5E9DFF;">tapt</span><span style="font-family:'Larken';font-weight:900;font-style:italic;color:#5E9DFF;">pay.</span></div>
+    <div style="position:absolute;bottom:52px;right:64px;font-weight:500;font-size:var(--t-small);color:rgba(244,241,232,0.35);z-index:2;">07 / 20</div>
+  </section>
+
+  <!-- ══════ 08 · payment board ══════ -->
+  <section data-label="the payment board" data-speaker-notes="The only 'hardware' — an A5 board with QR and NFC embedded. Fully white-labeled to the venue, unlimited boards, nothing electronic to break." style="background:#040D6D;color:#F4F1E8;font-family:'Outfit',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden;display:flex;align-items:center;padding:0 var(--pad-x);transition:opacity .55s cubic-bezier(.4,0,.2,1),visibility .55s cubic-bezier(.4,0,.2,1);">
+    <div class="aG" style="position:absolute;bottom:-30%;left:-12%;width:1200px;height:1200px;border-radius:50%;background:radial-gradient(circle,rgba(47,87,255,0.26) 0%,rgba(47,87,255,0) 65%);pointer-events:none;"></div>
+    <div style="position:absolute;left:240px;top:200px;width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(94,157,255,0.28) 0%,rgba(94,157,255,0) 68%);filter:blur(40px);pointer-events:none;"></div>
+    <div style="flex:1 1 45%;display:flex;justify-content:center;position:relative;z-index:2;">
+      <div class="aPhL" style="filter:drop-shadow(0 60px 90px rgba(0,0,0,0.55));">
+        <img class="aF" src="app/assets/payment_board_3d_v2_1774674925840-Di6_PbF5.png" alt="taptpay payment board — scan or tap" style="width:520px;height:auto;display:block;">
+      </div>
+    </div>
+    <div style="flex:1 1 55%;position:relative;z-index:2;padding-left:60px;">
+      <div class="aU" style="display:flex;align-items:center;gap:16px;">
+        <span class="aL" style="width:44px;height:2px;background:#5E9DFF;display:inline-block;"></span>
+        <span style="font-weight:500;font-size:var(--t-kick);letter-spacing:0.32em;text-transform:uppercase;color:#5E9DFF;">retail &amp; hospitality · the board</span>
+      </div>
+      <h2 class="aU d1" style="margin:44px 0 0;font-weight:300;font-size:var(--t-div);line-height:1.02;letter-spacing:-0.025em;color:#F4F1E8;">hardware, <span style="font-weight:500;color:#5E9DFF;">sort of.</span></h2>
+      <p class="aU d2" style="margin:36px 0 0;font-weight:400;font-size:var(--t-sub);line-height:1.55;color:rgba(244,241,232,0.62);max-width:22em;">an a5 board with qr + nfc embedded. it sits on the counter, and it is the terminal — <span style="color:#F4F1E8;font-weight:500;">no tech to go wrong.</span></p>
+      <div style="margin-top:52px;display:flex;flex-direction:column;gap:22px;">
+        <div class="aU d4" style="display:flex;align-items:center;gap:18px;font-weight:400;font-size:var(--t-body);color:rgba(244,241,232,0.78);"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#5E9DFF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="m8.5 12 2.5 2.5 4.5-5"></path></svg><span>fully white-labeled — your logo, your colours</span></div>
+        <div class="aU d5" style="display:flex;align-items:center;gap:18px;font-weight:400;font-size:var(--t-body);color:rgba(244,241,232,0.78);"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#5E9DFF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="m8.5 12 2.5 2.5 4.5-5"></path></svg><span>unlimited boards, unlimited payment points</span></div>
+        <div class="aU d6" style="display:flex;align-items:center;gap:18px;font-weight:400;font-size:var(--t-body);color:rgba(244,241,232,0.78);"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#5E9DFF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="m8.5 12 2.5 2.5 4.5-5"></path></svg><span>nothing leased, nothing to update, nothing to break</span></div>
+      </div>
+    </div>
+    <div style="position:absolute;bottom:52px;right:64px;font-weight:500;font-size:var(--t-small);color:rgba(244,241,232,0.35);z-index:2;">08 / 20</div>
+  </section>
+
+  <!-- ══════ 09 · divider trades — live app ══════ -->
+  <section data-label="trades & services" data-speaker-notes="Second vertical: trades. The quote and the money are one object — the customer accepting the job IS the deposit hitting your account. Live app on the right." style="background:#040D6D;color:#F4F1E8;font-family:'Outfit',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden;display:flex;align-items:center;padding:0 var(--pad-x);transition:opacity .55s cubic-bezier(.4,0,.2,1),visibility .55s cubic-bezier(.4,0,.2,1);">
+    <div class="aG" style="position:absolute;top:-25%;right:-15%;width:1300px;height:1300px;border-radius:50%;background:radial-gradient(circle,rgba(47,87,255,0.28) 0%,rgba(47,87,255,0) 65%);pointer-events:none;"></div>
+    <div style="position:absolute;right:240px;top:200px;width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(94,157,255,0.28) 0%,rgba(94,157,255,0) 68%);filter:blur(40px);pointer-events:none;"></div>
+    <div style="flex:1 1 55%;position:relative;z-index:2;">
+      <div class="aU" style="display:flex;align-items:center;gap:16px;">
+        <span class="aL" style="width:44px;height:2px;background:#5E9DFF;display:inline-block;"></span>
+        <span style="font-weight:500;font-size:var(--t-kick);letter-spacing:0.32em;text-transform:uppercase;color:#5E9DFF;">industries · 02 · trades &amp; services</span>
+      </div>
+      <h2 class="aU d1" style="margin:44px 0 0;font-weight:300;font-size:var(--t-div);line-height:1.02;letter-spacing:-0.025em;color:#F4F1E8;">the quote and the money<br><span style="font-weight:500;color:#5E9DFF;">are one object.</span></h2>
+      <p class="aU d2" style="margin:36px 0 0;font-weight:400;font-size:var(--t-sub);line-height:1.55;color:rgba(244,241,232,0.62);max-width:26em;">the customer accepting the job is the deposit hitting your account. no chasing, no re-keying into a second app.</p>
+      <div style="margin-top:56px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+        <div class="aP d3" style="padding:18px 32px;border-radius:9999px;border:1.5px solid #5E9DFF;color:#5E9DFF;font-weight:500;font-size:var(--t-small);">quote</div>
+        <svg class="aP d4" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="rgba(244,241,232,0.45)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+        <div class="aP d4" style="padding:18px 32px;border-radius:9999px;border:1.5px solid #5E9DFF;color:#5E9DFF;font-weight:500;font-size:var(--t-small);">deposit on accept</div>
+        <svg class="aP d5" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="rgba(244,241,232,0.45)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+        <div class="aP d5" style="padding:18px 32px;border-radius:9999px;border:1.5px solid #5E9DFF;color:#5E9DFF;font-weight:500;font-size:var(--t-small);">balance</div>
+        <svg class="aP d6" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="rgba(244,241,232,0.45)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+        <div class="aP d6" style="padding:18px 32px;border-radius:9999px;background:#5E9DFF;color:#040D6D;font-weight:600;font-size:var(--t-small);">done</div>
+      </div>
+      <div style="margin-top:60px;display:flex;gap:64px;">
+        <div class="aU d6"><div data-count="0.3%" style="font-weight:500;font-size:var(--t-stat);letter-spacing:-0.02em;color:#5E9DFF;">0.3%</div><div style="margin-top:8px;font-weight:400;font-size:var(--t-small);color:rgba(244,241,232,0.5);">platform fee — the whole bill</div></div>
+        <div class="aU d7"><div style="font-weight:500;font-size:var(--t-stat);letter-spacing:-0.02em;color:#5E9DFF;">on accept</div><div style="margin-top:8px;font-weight:400;font-size:var(--t-small);color:rgba(244,241,232,0.5);">deposit link presented instantly</div></div>
+        <div class="aU d8"><div style="font-weight:500;font-size:var(--t-stat);letter-spacing:-0.02em;color:#5E9DFF;">auto</div><div style="margin-top:8px;font-weight:400;font-size:var(--t-small);color:rgba(244,241,232,0.5);">gst receipts emailed</div></div>
+      </div>
+    </div>
+    <div style="flex:1 1 45%;display:flex;justify-content:center;position:relative;z-index:2;">
+      <div class="aPh" data-phone data-route="#/trades" style="filter:drop-shadow(0 60px 90px rgba(0,0,0,0.55));">
+        <div class="aF" style="position:relative;width:400px;height:842px;border-radius:56px;background:#0b0b14;padding:10px;box-shadow:inset 0 0 0 2px rgba(120,140,220,0.35);">
+          <div style="position:absolute;inset:10px;border-radius:47px;overflow:hidden;background:#fff;">
+            <iframe data-defer-src="app/embed.html?mode=trades&amp;route=/trades" title="taptpay live app — trades" style="width:390px;height:844px;border:none;transform:scale(0.9744);transform-origin:top left;pointer-events:none;display:block;background:#fff;"></iframe>
+            <div style="position:absolute;top:11px;left:50%;transform:translateX(-50%);width:112px;height:28px;border-radius:15px;background:#0b0b14;"></div>
+            <div data-glare style="position:absolute;top:0;bottom:0;left:0;width:45%;background:linear-gradient(105deg,rgba(255,255,255,0) 0%,rgba(255,255,255,0.15) 50%,rgba(255,255,255,0) 100%);transform:translateX(-170%) skewX(-14deg);pointer-events:none;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="position:absolute;bottom:52px;right:64px;font-weight:500;font-size:var(--t-small);color:rgba(244,241,232,0.35);z-index:2;">09 / 20</div>
+  </section>
+
+  <!-- ══════ 10 · trades features — live quote builder ══════ -->
+  <section data-label="trades features" data-speaker-notes="The trades toolkit: line-item quotes with deposit toggles, quick invoices for callouts, GST handled per quote, client profiles. The phone is building a quote live." style="background:#040D6D;color:#F4F1E8;font-family:'Outfit',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden;display:flex;align-items:center;padding:0 var(--pad-x);transition:opacity .55s cubic-bezier(.4,0,.2,1),visibility .55s cubic-bezier(.4,0,.2,1);">
+    <div class="aG" style="position:absolute;top:-20%;left:-14%;width:1200px;height:1200px;border-radius:50%;background:radial-gradient(circle,rgba(47,87,255,0.24) 0%,rgba(47,87,255,0) 65%);pointer-events:none;"></div>
+    <div style="position:absolute;left:300px;top:560px;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(94,157,255,0.30) 0%,rgba(94,157,255,0) 68%);filter:blur(38px);pointer-events:none;"></div>
+    <div style="flex:1 1 55%;position:relative;z-index:2;">
+      <div class="aU" style="display:flex;align-items:center;gap:16px;">
+        <span class="aL" style="width:44px;height:2px;background:#5E9DFF;display:inline-block;"></span>
+        <span style="font-weight:500;font-size:var(--t-kick);letter-spacing:0.32em;text-transform:uppercase;color:#5E9DFF;">trades &amp; services · features</span>
+      </div>
+      <h2 class="aU d1" style="margin:40px 0 0;font-weight:300;font-size:84px;line-height:1.04;letter-spacing:-0.025em;color:#F4F1E8;">the job and the money, <span style="font-weight:500;color:#5E9DFF;">one place.</span></h2>
+      <div style="margin-top:56px;display:flex;flex-direction:column;gap:20px;max-width:900px;">
+        <div class="glass aP d3" style="display:flex;align-items:center;gap:32px;padding:30px 40px;border-radius:24px;background:linear-gradient(160deg,rgba(255,255,255,0.10) 0%,rgba(255,255,255,0.03) 100%);border:1px solid rgba(255,255,255,0.16);backdrop-filter:blur(22px) saturate(1.4) brightness(1.08);box-shadow:0 24px 60px rgba(2,5,46,0.45),inset 0 1px 0 rgba(255,255,255,0.22),inset 0 -1px 0 rgba(255,255,255,0.04);">
+          <div style="flex:0 0 auto;font-weight:300;font-size:46px;letter-spacing:-0.02em;color:#5E9DFF;">01</div>
+          <div><div style="font-weight:600;font-size:var(--t-body);color:#F4F1E8;">line-item quote builder</div><p style="margin:6px 0 0;font-weight:400;font-size:var(--t-small);line-height:1.5;color:rgba(244,241,232,0.6);">labour, materials, margins — with a deposit toggle per quote.</p></div>
+        </div>
+        <div class="glass aP d4" style="display:flex;align-items:center;gap:32px;padding:30px 40px;border-radius:24px;background:linear-gradient(160deg,rgba(255,255,255,0.10) 0%,rgba(255,255,255,0.03) 100%);border:1px solid rgba(255,255,255,0.16);backdrop-filter:blur(22px) saturate(1.4) brightness(1.08);box-shadow:0 24px 60px rgba(2,5,46,0.45),inset 0 1px 0 rgba(255,255,255,0.22),inset 0 -1px 0 rgba(255,255,255,0.04);">
+          <div style="flex:0 0 auto;font-weight:300;font-size:46px;letter-spacing:-0.02em;color:#5E9DFF;">02</div>
+          <div><div style="font-weight:600;font-size:var(--t-body);color:#F4F1E8;">quick invoice for callouts</div><p style="margin:6px 0 0;font-weight:400;font-size:var(--t-small);line-height:1.5;color:rgba(244,241,232,0.6);">keypad, client, send — invoiced from the driveway before you've left it.</p></div>
+        </div>
+        <div class="glass aP d5" style="display:flex;align-items:center;gap:32px;padding:30px 40px;border-radius:24px;background:linear-gradient(160deg,rgba(255,255,255,0.10) 0%,rgba(255,255,255,0.03) 100%);border:1px solid rgba(255,255,255,0.16);backdrop-filter:blur(22px) saturate(1.4) brightness(1.08);box-shadow:0 24px 60px rgba(2,5,46,0.45),inset 0 1px 0 rgba(255,255,255,0.22),inset 0 -1px 0 rgba(255,255,255,0.04);">
+          <div style="flex:0 0 auto;font-weight:300;font-size:46px;letter-spacing:-0.02em;color:#5E9DFF;">03</div>
+          <div><div style="font-weight:600;font-size:var(--t-body);color:#F4F1E8;">gst, snapshotted per quote</div><p style="margin:6px 0 0;font-weight:400;font-size:var(--t-small);line-height:1.5;color:rgba(244,241,232,0.6);">incl gst or + gst, locked at quote time — receipts emailed automatically.</p></div>
+        </div>
+        <div class="glass aP d6" style="display:flex;align-items:center;gap:32px;padding:30px 40px;border-radius:24px;background:linear-gradient(160deg,rgba(255,255,255,0.10) 0%,rgba(255,255,255,0.03) 100%);border:1px solid rgba(255,255,255,0.16);backdrop-filter:blur(22px) saturate(1.4) brightness(1.08);box-shadow:0 24px 60px rgba(2,5,46,0.45),inset 0 1px 0 rgba(255,255,255,0.22),inset 0 -1px 0 rgba(255,255,255,0.04);">
+          <div style="flex:0 0 auto;font-weight:300;font-size:46px;letter-spacing:-0.02em;color:#5E9DFF;">04</div>
+          <div><div style="font-weight:600;font-size:var(--t-body);color:#F4F1E8;">client profiles with full timeline</div><p style="margin:6px 0 0;font-weight:400;font-size:var(--t-small);line-height:1.5;color:rgba(244,241,232,0.6);">every quote, invoice and payment per client — one scrollable history.</p></div>
+        </div>
+      </div>
+    </div>
+    <div style="flex:1 1 45%;display:flex;justify-content:center;position:relative;z-index:2;">
+      <div class="aPh" data-phone data-route="#/trades/quote" style="filter:drop-shadow(0 60px 90px rgba(0,0,0,0.55));">
+        <div class="aF" style="position:relative;width:400px;height:842px;border-radius:56px;background:#0b0b14;padding:10px;box-shadow:inset 0 0 0 2px rgba(120,140,220,0.35);">
+          <div style="position:absolute;inset:10px;border-radius:47px;overflow:hidden;background:#fff;">
+            <iframe data-defer-src="app/embed.html?mode=trades&amp;route=/trades/quote" title="taptpay live app — quote builder" style="width:390px;height:844px;border:none;transform:scale(0.9744);transform-origin:top left;pointer-events:none;display:block;background:#fff;"></iframe>
+            <div style="position:absolute;top:11px;left:50%;transform:translateX(-50%);width:112px;height:28px;border-radius:15px;background:#0b0b14;"></div>
+            <div data-glare style="position:absolute;top:0;bottom:0;left:0;width:45%;background:linear-gradient(105deg,rgba(255,255,255,0) 0%,rgba(255,255,255,0.15) 50%,rgba(255,255,255,0) 100%);transform:translateX(-170%) skewX(-14deg);pointer-events:none;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="position:absolute;bottom:52px;right:64px;font-weight:500;font-size:var(--t-small);color:rgba(244,241,232,0.35);z-index:2;">10 / 20</div>
+  </section>
+
+  <!-- ══════ 11 · divider property — live rent ══════ -->
+  <section data-label="property management" data-speaker-notes="Third vertical: property. Set the schedule once — taptpay invoices every cycle, chases every late payment, and reconciles every dollar as it lands. Live rent screen on the right." style="background:#040D6D;color:#F4F1E8;font-family:'Outfit',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden;display:flex;align-items:center;padding:0 var(--pad-x);transition:opacity .55s cubic-bezier(.4,0,.2,1),visibility .55s cubic-bezier(.4,0,.2,1);">
+    <div class="aG" style="position:absolute;top:-20%;right:-10%;width:1300px;height:1300px;border-radius:50%;background:radial-gradient(circle,rgba(47,87,255,0.30) 0%,rgba(47,87,255,0) 65%);pointer-events:none;"></div>
+    <div style="position:absolute;right:240px;top:180px;width:520px;height:520px;border-radius:50%;background:radial-gradient(circle,rgba(94,157,255,0.30) 0%,rgba(94,157,255,0) 68%);filter:blur(40px);pointer-events:none;"></div>
+    <div style="flex:1 1 55%;position:relative;z-index:2;">
+      <div class="aU" style="display:flex;align-items:center;gap:16px;">
+        <span class="aL" style="width:44px;height:2px;background:#5E9DFF;display:inline-block;"></span>
+        <span style="font-weight:500;font-size:var(--t-kick);letter-spacing:0.32em;text-transform:uppercase;color:#5E9DFF;">industries · 03 · property management</span>
+      </div>
+      <h2 class="aU d1" style="margin:44px 0 0;font-weight:300;font-size:var(--t-div);line-height:1.02;letter-spacing:-0.025em;color:#F4F1E8;">rent that<br><span style="font-weight:500;color:#5E9DFF;">collects itself.</span></h2>
+      <p class="aU d2" style="margin:36px 0 0;font-weight:400;font-size:var(--t-sub);line-height:1.55;color:rgba(244,241,232,0.62);max-width:24em;">set the schedule once. taptpay invoices every cycle, chases every late payment, and marks every dollar the moment it lands.</p>
+      <div style="margin-top:60px;display:flex;gap:72px;">
+        <div class="aU d4"><div data-count="0.3%" style="font-weight:500;font-size:var(--t-stat);letter-spacing:-0.02em;color:#5E9DFF;">0.3%</div><div style="margin-top:8px;font-weight:400;font-size:var(--t-small);color:rgba(244,241,232,0.5);">platform fee</div></div>
+        <div class="aU d5"><div data-count="2–10" style="font-weight:500;font-size:var(--t-stat);letter-spacing:-0.02em;color:#5E9DFF;">2–10</div><div style="margin-top:8px;font-weight:400;font-size:var(--t-small);color:rgba(244,241,232,0.5);">way rent splits between tenants</div></div>
+        <div class="aU d6"><div style="font-weight:500;font-size:var(--t-stat);letter-spacing:-0.02em;color:#5E9DFF;">auto</div><div style="margin-top:8px;font-weight:400;font-size:var(--t-small);color:rgba(244,241,232,0.5);">reminders, never duplicated</div></div>
+      </div>
+    </div>
+    <div style="flex:1 1 45%;display:flex;justify-content:center;position:relative;z-index:2;">
+      <div class="aPh" data-phone data-route="#/property" style="filter:drop-shadow(0 60px 90px rgba(0,0,0,0.55));">
+        <div class="aF" style="position:relative;width:400px;height:842px;border-radius:56px;background:#0b0b14;padding:10px;box-shadow:inset 0 0 0 2px rgba(120,140,220,0.35);">
+          <div style="position:absolute;inset:10px;border-radius:47px;overflow:hidden;background:#fff;">
+            <iframe data-defer-src="app/embed.html?mode=property&amp;route=/property" title="taptpay live app — property" style="width:390px;height:844px;border:none;transform:scale(0.9744);transform-origin:top left;pointer-events:none;display:block;background:#fff;"></iframe>
+            <div style="position:absolute;top:11px;left:50%;transform:translateX(-50%);width:112px;height:28px;border-radius:15px;background:#0b0b14;"></div>
+            <div data-glare style="position:absolute;top:0;bottom:0;left:0;width:45%;background:linear-gradient(105deg,rgba(255,255,255,0) 0%,rgba(255,255,255,0.15) 50%,rgba(255,255,255,0) 100%);transform:translateX(-170%) skewX(-14deg);pointer-events:none;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="position:absolute;bottom:52px;right:64px;font-weight:500;font-size:var(--t-small);color:rgba(244,241,232,0.35);z-index:2;">11 / 20</div>
+  </section>
+
+  <!-- ══════ 12 · property features — live send bill ══════ -->
+  <section data-label="property features" data-speaker-notes="Beyond rent: recurring schedules, reminders that never double-send, utility bills sent as payment links, automatic GST receipts. Watch the phone send a bill." style="background:#040D6D;color:#F4F1E8;font-family:'Outfit',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden;display:flex;align-items:center;padding:0 var(--pad-x);transition:opacity .55s cubic-bezier(.4,0,.2,1),visibility .55s cubic-bezier(.4,0,.2,1);">
+    <div class="aG" style="position:absolute;bottom:-25%;left:-14%;width:1200px;height:1200px;border-radius:50%;background:radial-gradient(circle,rgba(47,87,255,0.24) 0%,rgba(47,87,255,0) 65%);pointer-events:none;"></div>
+    <div style="position:absolute;left:280px;top:540px;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(94,157,255,0.30) 0%,rgba(94,157,255,0) 68%);filter:blur(38px);pointer-events:none;"></div>
+    <div style="flex:1 1 55%;position:relative;z-index:2;">
+      <div class="aU" style="display:flex;align-items:center;gap:16px;">
+        <span class="aL" style="width:44px;height:2px;background:#5E9DFF;display:inline-block;"></span>
+        <span style="font-weight:500;font-size:var(--t-kick);letter-spacing:0.32em;text-transform:uppercase;color:#5E9DFF;">property management · features</span>
+      </div>
+      <h2 class="aU d1" style="margin:44px 0 0;font-weight:300;font-size:var(--t-title);line-height:1.04;letter-spacing:-0.025em;color:#F4F1E8;">more <span style="font-weight:500;color:#5E9DFF;">than rent.</span></h2>
+      <div style="margin-top:60px;display:flex;flex-direction:column;gap:26px;max-width:820px;">
+        <div class="aU d3" style="display:flex;align-items:flex-start;gap:20px;"><svg style="flex:0 0 auto;margin-top:4px;" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#5E9DFF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="m8.5 12 2.5 2.5 4.5-5"></path></svg><div style="font-weight:400;font-size:var(--t-body);line-height:1.45;color:rgba(244,241,232,0.78);"><span style="font-weight:600;color:#F4F1E8;">recurring schedules on autopilot</span> — weekly, fortnightly, monthly, per tenant.</div></div>
+        <div class="aU d4" style="display:flex;align-items:flex-start;gap:20px;"><svg style="flex:0 0 auto;margin-top:4px;" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#5E9DFF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="m8.5 12 2.5 2.5 4.5-5"></path></svg><div style="font-weight:400;font-size:var(--t-body);line-height:1.45;color:rgba(244,241,232,0.78);"><span style="font-weight:600;color:#F4F1E8;">overdue reminders that never double-send</span> — polite, automatic, tracked.</div></div>
+        <div class="aU d5" style="display:flex;align-items:flex-start;gap:20px;"><svg style="flex:0 0 auto;margin-top:4px;" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#5E9DFF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="m8.5 12 2.5 2.5 4.5-5"></path></svg><div style="font-weight:400;font-size:var(--t-body);line-height:1.45;color:rgba(244,241,232,0.78);"><span style="font-weight:600;color:#F4F1E8;">utility bills &amp; expenses as payment links</span> — water, late fees, damages — watch it happen live →</div></div>
+        <div class="aU d6" style="display:flex;align-items:flex-start;gap:20px;"><svg style="flex:0 0 auto;margin-top:4px;" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#5E9DFF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="m8.5 12 2.5 2.5 4.5-5"></path></svg><div style="font-weight:400;font-size:var(--t-body);line-height:1.45;color:rgba(244,241,232,0.78);"><span style="font-weight:600;color:#F4F1E8;">gst receipts emailed automatically</span> — tenants and your accountant both covered.</div></div>
+      </div>
+    </div>
+    <div style="flex:1 1 45%;display:flex;justify-content:center;position:relative;z-index:2;">
+      <div class="aPh" data-phone data-route="#/property/terminal" data-drive="bill" style="filter:drop-shadow(0 60px 90px rgba(0,0,0,0.55));">
+        <div class="aF" style="position:relative;width:400px;height:842px;border-radius:56px;background:#0b0b14;padding:10px;box-shadow:inset 0 0 0 2px rgba(120,140,220,0.35);">
+          <div style="position:absolute;inset:10px;border-radius:47px;overflow:hidden;background:#fff;">
+            <iframe data-defer-src="app/embed.html?mode=property&amp;route=/property/terminal" title="taptpay live app — send a bill" style="width:390px;height:844px;border:none;transform:scale(0.9744);transform-origin:top left;pointer-events:none;display:block;background:#fff;"></iframe>
+            <div style="position:absolute;top:11px;left:50%;transform:translateX(-50%);width:112px;height:28px;border-radius:15px;background:#0b0b14;"></div>
+            <div data-glare style="position:absolute;top:0;bottom:0;left:0;width:45%;background:linear-gradient(105deg,rgba(255,255,255,0) 0%,rgba(255,255,255,0.15) 50%,rgba(255,255,255,0) 100%);transform:translateX(-170%) skewX(-14deg);pointer-events:none;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="position:absolute;bottom:52px;right:64px;font-weight:500;font-size:var(--t-small);color:rgba(244,241,232,0.35);z-index:2;">12 / 20</div>
+  </section>
+
+  <!-- ══════ 13 · divider customer side ══════ -->
+  <section data-label="the customer side" data-speaker-notes="Now flip to the person paying. There is nothing to install and nothing to sign up for — the link just opens." style="background:#040D6D;color:#F4F1E8;font-family:'Outfit',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden;display:flex;flex-direction:column;justify-content:center;padding:0 var(--pad-x);transition:opacity .55s cubic-bezier(.4,0,.2,1),visibility .55s cubic-bezier(.4,0,.2,1);">
+    <div class="aG" style="position:absolute;top:20%;left:-15%;width:1300px;height:1300px;border-radius:50%;background:radial-gradient(circle,rgba(47,87,255,0.24) 0%,rgba(47,87,255,0) 65%);pointer-events:none;"></div>
+    <div class="aU" style="display:flex;align-items:center;gap:16px;position:relative;z-index:2;">
+      <span class="aL" style="width:44px;height:2px;background:#5E9DFF;display:inline-block;"></span>
+      <span style="font-weight:500;font-size:var(--t-kick);letter-spacing:0.32em;text-transform:uppercase;color:#5E9DFF;">the customer side</span>
+    </div>
+    <div style="margin-top:56px;position:relative;z-index:2;">
+      <div class="aU d1" style="font-weight:300;font-size:var(--t-huge);line-height:1.05;letter-spacing:-0.035em;color:#F4F1E8;">no app.</div>
+      <div class="aU d3" style="font-weight:300;font-size:var(--t-huge);line-height:1.05;letter-spacing:-0.035em;color:#F4F1E8;">no download.</div>
+      <div class="aU d5" style="font-weight:500;font-size:var(--t-huge);line-height:1.05;letter-spacing:-0.035em;color:#5E9DFF;">no signup.</div>
+    </div>
+    <p class="aU d7" style="margin:56px 0 0;font-weight:400;font-size:var(--t-sub);line-height:1.55;color:rgba(244,241,232,0.62);max-width:30em;position:relative;z-index:2;">the link opens straight to checkout in any browser, on any phone. paying takes seconds — <span style="color:#F4F1E8;font-weight:500;">simply scan or tap to pay.</span></p>
+    <div style="position:absolute;bottom:52px;right:64px;font-weight:500;font-size:var(--t-small);color:rgba(244,241,232,0.35);z-index:2;">13 / 20</div>
+  </section>
+
+  <!-- ══════ 14 · customer checkout — live ══════ -->
+  <section data-label="customer checkout" data-speaker-notes="What the customer sees, live: your branding, the amount, one button. Apple Pay, Google Pay or card — receipt on screen and by email." style="background:#040D6D;color:#F4F1E8;font-family:'Outfit',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden;display:flex;align-items:center;padding:0 var(--pad-x);transition:opacity .55s cubic-bezier(.4,0,.2,1),visibility .55s cubic-bezier(.4,0,.2,1);">
+    <div class="aG" style="position:absolute;top:-20%;left:-12%;width:1200px;height:1200px;border-radius:50%;background:radial-gradient(circle,rgba(47,87,255,0.26) 0%,rgba(47,87,255,0) 65%);pointer-events:none;"></div>
+    <div style="position:absolute;left:240px;top:180px;width:520px;height:520px;border-radius:50%;background:radial-gradient(circle,rgba(94,157,255,0.30) 0%,rgba(94,157,255,0) 68%);filter:blur(40px);pointer-events:none;"></div>
+    <div style="flex:1 1 45%;display:flex;justify-content:center;position:relative;z-index:2;">
+      <div class="aPhL" data-phone data-route="#/pay/1" style="filter:drop-shadow(0 60px 90px rgba(0,0,0,0.55));">
+        <div class="aF" style="position:relative;width:400px;height:842px;border-radius:56px;background:#0b0b14;padding:10px;box-shadow:inset 0 0 0 2px rgba(120,140,220,0.35);">
+          <div style="position:absolute;inset:10px;border-radius:47px;overflow:hidden;background:#fff;">
+            <iframe data-defer-src="app/embed.html?mode=retail&amp;route=/pay/1" title="taptpay live app — customer checkout" style="width:390px;height:844px;border:none;transform:scale(0.9744);transform-origin:top left;pointer-events:none;display:block;background:#fff;"></iframe>
+            <div style="position:absolute;top:11px;left:50%;transform:translateX(-50%);width:112px;height:28px;border-radius:15px;background:#0b0b14;"></div>
+            <div data-glare style="position:absolute;top:0;bottom:0;left:0;width:45%;background:linear-gradient(105deg,rgba(255,255,255,0) 0%,rgba(255,255,255,0.15) 50%,rgba(255,255,255,0) 100%);transform:translateX(-170%) skewX(-14deg);pointer-events:none;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="flex:1 1 55%;position:relative;z-index:2;padding-left:60px;">
+      <div class="aU" style="display:flex;align-items:center;gap:16px;">
+        <span class="aL" style="width:44px;height:2px;background:#5E9DFF;display:inline-block;"></span>
+        <span style="font-weight:500;font-size:var(--t-kick);letter-spacing:0.32em;text-transform:uppercase;color:#5E9DFF;">the customer side · checkout</span>
+      </div>
+      <h2 class="aU d1" style="margin:44px 0 0;font-weight:300;font-size:var(--t-div);line-height:1.02;letter-spacing:-0.025em;color:#F4F1E8;">the link opens,<br><span style="font-weight:500;color:#5E9DFF;">the money moves.</span></h2>
+      <div style="margin-top:54px;display:flex;flex-direction:column;gap:26px;max-width:760px;">
+        <div class="aU d3" style="display:flex;align-items:flex-start;gap:20px;"><svg style="flex:0 0 auto;margin-top:4px;" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#5E9DFF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="m8.5 12 2.5 2.5 4.5-5"></path></svg><div style="font-weight:400;font-size:var(--t-body);line-height:1.45;color:rgba(244,241,232,0.78);"><span style="font-weight:600;color:#F4F1E8;">opens in the browser</span> — nothing to install, nothing to create.</div></div>
+        <div class="aU d4" style="display:flex;align-items:flex-start;gap:20px;"><svg style="flex:0 0 auto;margin-top:4px;" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#5E9DFF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="m8.5 12 2.5 2.5 4.5-5"></path></svg><div style="font-weight:400;font-size:var(--t-body);line-height:1.45;color:rgba(244,241,232,0.78);"><span style="font-weight:600;color:#F4F1E8;">your branding, the amount, one button</span> — nothing else to read.</div></div>
+        <div class="aU d5" style="display:flex;align-items:flex-start;gap:20px;"><svg style="flex:0 0 auto;margin-top:4px;" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#5E9DFF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="m8.5 12 2.5 2.5 4.5-5"></path></svg><div style="font-weight:400;font-size:var(--t-body);line-height:1.45;color:rgba(244,241,232,0.78);"><span style="font-weight:600;color:#F4F1E8;">wallet or card, one tap</span> — apple pay, google pay, afterpay, or card details.</div></div>
+        <div class="aU d6" style="display:flex;align-items:flex-start;gap:20px;"><svg style="flex:0 0 auto;margin-top:4px;" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#5E9DFF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="m8.5 12 2.5 2.5 4.5-5"></path></svg><div style="font-weight:400;font-size:var(--t-body);line-height:1.45;color:rgba(244,241,232,0.78);"><span style="font-weight:600;color:#F4F1E8;">receipt on screen &amp; by email</span> — secured by windcave, pci dss compliant.</div></div>
+      </div>
+    </div>
+    <div style="position:absolute;bottom:52px;right:64px;font-weight:500;font-size:var(--t-small);color:rgba(244,241,232,0.35);z-index:2;">14 / 20</div>
+  </section>
+
+  <!-- ══════ 15 · split bills — live ══════ -->
+  <section data-label="split bills" data-speaker-notes="Splitting is a customer feature, not a calculator exercise. Two to ten ways, each person pays on their own card and gets their own receipt. The phone is doing it live." style="background:#040D6D;color:#F4F1E8;font-family:'Outfit',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden;display:flex;align-items:center;padding:0 var(--pad-x);transition:opacity .55s cubic-bezier(.4,0,.2,1),visibility .55s cubic-bezier(.4,0,.2,1);">
+    <div class="aG" style="position:absolute;bottom:-25%;right:-12%;width:1200px;height:1200px;border-radius:50%;background:radial-gradient(circle,rgba(94,157,255,0.20) 0%,rgba(94,157,255,0) 65%);pointer-events:none;"></div>
+    <div style="position:absolute;right:240px;top:200px;width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(94,157,255,0.28) 0%,rgba(94,157,255,0) 68%);filter:blur(40px);pointer-events:none;"></div>
+    <div style="flex:1 1 55%;position:relative;z-index:2;">
+      <div class="aU" style="display:flex;align-items:center;gap:16px;">
+        <span class="aL" style="width:44px;height:2px;background:#5E9DFF;display:inline-block;"></span>
+        <span style="font-weight:500;font-size:var(--t-kick);letter-spacing:0.32em;text-transform:uppercase;color:#5E9DFF;">the customer side · splits</span>
+      </div>
+      <h2 class="aU d1" style="margin:44px 0 0;font-weight:300;font-size:var(--t-div);line-height:1.02;letter-spacing:-0.025em;color:#F4F1E8;">they split the bill,<br><span style="font-weight:500;color:#5E9DFF;">not you.</span></h2>
+      <p class="aU d2" style="margin:36px 0 0;font-weight:400;font-size:var(--t-sub);line-height:1.55;color:rgba(244,241,232,0.62);max-width:24em;">tap split, pick the ways, done. each person pays their share on their own card — no maths at the counter, no one owing anyone.</p>
+      <div style="margin-top:60px;display:flex;gap:72px;">
+        <div class="aU d4"><div data-count="2–10" style="font-weight:500;font-size:var(--t-stat);letter-spacing:-0.02em;color:#5E9DFF;">2–10</div><div style="margin-top:8px;font-weight:400;font-size:var(--t-small);color:rgba(244,241,232,0.5);">ways, even or custom amounts</div></div>
+        <div class="aU d5"><div style="font-weight:500;font-size:var(--t-stat);letter-spacing:-0.02em;color:#5E9DFF;">per-person</div><div style="margin-top:8px;font-weight:400;font-size:var(--t-small);color:rgba(244,241,232,0.5);">receipts, automatically</div></div>
+        <div class="aU d6"><div style="font-weight:500;font-size:var(--t-stat);letter-spacing:-0.02em;color:#5E9DFF;">one</div><div style="margin-top:8px;font-weight:400;font-size:var(--t-small);color:rgba(244,241,232,0.5);">reconciled total on your side</div></div>
+      </div>
+    </div>
+    <div style="flex:1 1 45%;display:flex;justify-content:center;position:relative;z-index:2;">
+      <div class="aPh" data-phone data-route="#/terminal" data-drive="split" style="filter:drop-shadow(0 60px 90px rgba(0,0,0,0.55));">
+        <div class="aF" style="position:relative;width:400px;height:842px;border-radius:56px;background:#0b0b14;padding:10px;box-shadow:inset 0 0 0 2px rgba(120,140,220,0.35);">
+          <div style="position:absolute;inset:10px;border-radius:47px;overflow:hidden;background:#fff;">
+            <iframe data-defer-src="app/embed.html?mode=retail&amp;route=/terminal&amp;v=split" title="taptpay live app — split bill" style="width:390px;height:844px;border:none;transform:scale(0.9744);transform-origin:top left;pointer-events:none;display:block;background:#fff;"></iframe>
+            <div style="position:absolute;top:11px;left:50%;transform:translateX(-50%);width:112px;height:28px;border-radius:15px;background:#0b0b14;"></div>
+            <div data-glare style="position:absolute;top:0;bottom:0;left:0;width:45%;background:linear-gradient(105deg,rgba(255,255,255,0) 0%,rgba(255,255,255,0.15) 50%,rgba(255,255,255,0) 100%);transform:translateX(-170%) skewX(-14deg);pointer-events:none;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="position:absolute;bottom:52px;right:64px;font-weight:500;font-size:var(--t-small);color:rgba(244,241,232,0.35);z-index:2;">15 / 20</div>
+  </section>
+
+  <!-- ══════ 16 · every way to pay ══════ -->
+  <section data-label="every way to pay" data-speaker-notes="One checkout, every method — wallets, cards, and Afterpay. With Afterpay the customer splits into four; the merchant is paid in full up front." style="background:#040D6D;color:#F4F1E8;font-family:'Outfit',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-start;padding:var(--pad-top) var(--pad-x) var(--pad-bottom);transition:opacity .55s cubic-bezier(.4,0,.2,1),visibility .55s cubic-bezier(.4,0,.2,1);">
+    <div class="aG" style="position:absolute;top:-25%;right:-14%;width:1200px;height:1200px;border-radius:50%;background:radial-gradient(circle,rgba(47,87,255,0.24) 0%,rgba(47,87,255,0) 65%);pointer-events:none;"></div>
+    <div style="position:absolute;left:300px;top:480px;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(94,157,255,0.32) 0%,rgba(94,157,255,0) 68%);filter:blur(38px);pointer-events:none;"></div>
+    <div style="position:absolute;left:1100px;top:560px;width:400px;height:400px;border-radius:50%;background:radial-gradient(circle,rgba(47,87,255,0.30) 0%,rgba(47,87,255,0) 68%);filter:blur(38px);pointer-events:none;"></div>
+    <div class="aU" style="display:flex;align-items:center;gap:16px;position:relative;z-index:2;">
+      <span class="aL" style="width:44px;height:2px;background:#5E9DFF;display:inline-block;"></span>
+      <span style="font-weight:500;font-size:var(--t-kick);letter-spacing:0.32em;text-transform:uppercase;color:#5E9DFF;">payment methods</span>
+    </div>
+    <h2 class="aU d1" style="margin:44px 0 0;font-weight:300;font-size:var(--t-title);line-height:1.04;letter-spacing:-0.025em;color:#F4F1E8;position:relative;z-index:2;">every way <span style="font-weight:500;color:#5E9DFF;">to pay.</span></h2>
+    <div style="margin-top:72px;display:flex;flex-wrap:wrap;gap:24px;max-width:1600px;position:relative;z-index:2;">
+      <div class="aP d2" style="display:inline-flex;align-items:center;gap:14px;padding:28px 50px;border-radius:9999px;background:#FFFFFF;box-shadow:0 24px 55px rgba(2,5,46,0.5);"><span style="font-family:-apple-system,'Outfit',sans-serif;font-weight:600;font-size:38px;letter-spacing:-0.01em;color:#000;">&#63743; Pay</span></div>
+      <div class="aP d3" style="display:inline-flex;align-items:center;padding:28px 50px;border-radius:9999px;background:#FFFFFF;box-shadow:0 24px 55px rgba(2,5,46,0.5);"><img src="app/assets/Google_Pay_Logo.svg_1773556576322-DufliZL0.png" alt="google pay" style="height:38px;width:auto;display:block;"></div>
+      <div class="aP d4" style="display:inline-flex;align-items:center;padding:28px 50px;border-radius:9999px;background:#B2FCE4;box-shadow:0 24px 55px rgba(2,5,46,0.5);"><span style="font-weight:700;font-size:36px;letter-spacing:-0.02em;color:#000;">afterpay</span></div>
+      <div class="aP d5" style="display:inline-flex;align-items:center;padding:28px 50px;border-radius:9999px;background:#FFFFFF;box-shadow:0 24px 55px rgba(2,5,46,0.5);"><span style="font-weight:700;font-style:italic;font-size:38px;letter-spacing:0.04em;color:#1434CB;">VISA</span></div>
+      <div class="aP d6" style="display:inline-flex;align-items:center;gap:16px;padding:28px 50px;border-radius:9999px;background:#FFFFFF;box-shadow:0 24px 55px rgba(2,5,46,0.5);"><span style="display:inline-flex;"><span style="width:40px;height:40px;border-radius:50%;background:#EB001B;display:inline-block;"></span><span style="width:40px;height:40px;border-radius:50%;background:#F79E1B;display:inline-block;margin-left:-16px;mix-blend-mode:multiply;"></span></span><span style="font-weight:500;font-size:32px;color:#000;">mastercard</span></div>
+      <div class="aP d7" style="display:inline-flex;align-items:center;padding:28px 50px;border-radius:9999px;background:#2E77BC;box-shadow:0 24px 55px rgba(2,5,46,0.5);"><span style="font-weight:700;font-size:32px;letter-spacing:0.14em;color:#FFFFFF;">AMEX</span></div>
+      <div class="aP d8" style="display:inline-flex;align-items:center;padding:28px 50px;border-radius:9999px;border:1.5px solid rgba(244,241,232,0.35);"><span style="font-weight:500;font-size:32px;color:rgba(244,241,232,0.8);">credit &amp; debit cards</span></div>
+    </div>
+    <div style="margin-top:64px;display:grid;grid-template-columns:1fr 1fr;gap:28px;max-width:1600px;position:relative;z-index:2;">
+      <div class="glass aU d7" style="padding:40px 46px;border-radius:28px;background:linear-gradient(160deg,rgba(255,255,255,0.10) 0%,rgba(255,255,255,0.03) 100%);border:1px solid rgba(255,255,255,0.16);backdrop-filter:blur(22px) saturate(1.4) brightness(1.08);box-shadow:0 30px 70px rgba(2,5,46,0.5),inset 0 1px 0 rgba(255,255,255,0.22),inset 0 -1px 0 rgba(255,255,255,0.04);">
+        <div style="font-weight:600;font-size:var(--t-body);color:#F4F1E8;">one checkout, every wallet</div>
+        <p style="margin:10px 0 0;font-weight:400;font-size:var(--t-small);line-height:1.55;color:rgba(244,241,232,0.6);">the customer's phone offers whatever they already use — no setup per method on your side.</p>
+      </div>
+      <div class="glass aU d8" style="padding:40px 46px;border-radius:28px;background:linear-gradient(160deg,rgba(255,255,255,0.10) 0%,rgba(255,255,255,0.03) 100%);border:1px solid rgba(255,255,255,0.16);backdrop-filter:blur(22px) saturate(1.4) brightness(1.08);box-shadow:0 30px 70px rgba(2,5,46,0.5),inset 0 1px 0 rgba(255,255,255,0.22),inset 0 -1px 0 rgba(255,255,255,0.04);">
+        <div style="font-weight:600;font-size:var(--t-body);color:#F4F1E8;">afterpay: they split, you don't wait</div>
+        <p style="margin:10px 0 0;font-weight:400;font-size:var(--t-small);line-height:1.55;color:rgba(244,241,232,0.6);">the customer pays in four — you're paid in full, up front, same as any other sale.</p>
+      </div>
+    </div>
+    <div style="position:absolute;bottom:52px;left:var(--pad-x);display:flex;align-items:baseline;font-size:26px;line-height:1;z-index:2;"><span style="font-family:'Larken';font-weight:900;color:#5E9DFF;">tapt</span><span style="font-family:'Larken';font-weight:900;font-style:italic;color:#5E9DFF;">pay.</span></div>
+    <div style="position:absolute;bottom:52px;right:64px;font-weight:500;font-size:var(--t-small);color:rgba(244,241,232,0.35);z-index:2;">16 / 20</div>
+  </section>
+
+  <!-- ══════ 17 · dashboard ══════ -->
+  <section data-label="behind the counter" data-speaker-notes="Everything reconciles into one live dashboard — transactions as they happen, revenue by day, week, month, and same-day payouts by Windcave." style="background:#040D6D;color:#F4F1E8;font-family:'Outfit',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden;display:flex;align-items:center;padding:0 var(--pad-x) 0 80px;transition:opacity .55s cubic-bezier(.4,0,.2,1),visibility .55s cubic-bezier(.4,0,.2,1);">
+    <div class="aG" style="position:absolute;top:-25%;left:-12%;width:1200px;height:1200px;border-radius:50%;background:radial-gradient(circle,rgba(47,87,255,0.24) 0%,rgba(47,87,255,0) 65%);pointer-events:none;"></div>
+    <div style="position:absolute;left:200px;top:220px;width:520px;height:520px;border-radius:50%;background:radial-gradient(circle,rgba(94,157,255,0.28) 0%,rgba(94,157,255,0) 68%);filter:blur(40px);pointer-events:none;"></div>
+    <div style="flex:1 1 48%;display:flex;justify-content:center;position:relative;z-index:2;">
+      <div class="aPhL d2" style="filter:drop-shadow(0 60px 90px rgba(0,0,0,0.5));">
+        <img class="aF" src="app/assets/dashboard_3d_1774258691269-Dg9sJhyP.png" alt="taptpay merchant dashboard" style="width:820px;height:auto;display:block;">
+      </div>
+    </div>
+    <div style="flex:1 1 52%;position:relative;z-index:2;">
+      <div class="aU" style="display:flex;align-items:center;gap:16px;">
+        <span class="aL" style="width:44px;height:2px;background:#5E9DFF;display:inline-block;"></span>
+        <span style="font-weight:500;font-size:var(--t-kick);letter-spacing:0.32em;text-transform:uppercase;color:#5E9DFF;">behind the counter</span>
+      </div>
+      <h2 class="aU d1" style="margin:44px 0 0;font-weight:300;font-size:var(--t-div);line-height:1.02;letter-spacing:-0.025em;color:#F4F1E8;">watch it land, <span style="font-weight:500;color:#5E9DFF;">live.</span></h2>
+      <div style="margin-top:52px;display:flex;flex-direction:column;gap:24px;max-width:760px;">
+        <div class="aU d3" style="display:flex;align-items:center;gap:18px;font-weight:400;font-size:var(--t-body);color:rgba(244,241,232,0.78);"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#5E9DFF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="m8.5 12 2.5 2.5 4.5-5"></path></svg><span>every transaction, the second it happens</span></div>
+        <div class="aU d4" style="display:flex;align-items:center;gap:18px;font-weight:400;font-size:var(--t-body);color:rgba(244,241,232,0.78);"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#5E9DFF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="m8.5 12 2.5 2.5 4.5-5"></path></svg><span>revenue by day, week and month — per venue, per board</span></div>
+        <div class="aU d5" style="display:flex;align-items:center;gap:18px;font-weight:400;font-size:var(--t-body);color:rgba(244,241,232,0.78);"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#5E9DFF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="m8.5 12 2.5 2.5 4.5-5"></path></svg><span>same-day payouts by windcave</span></div>
+        <div class="aU d6" style="display:flex;align-items:center;gap:18px;font-weight:400;font-size:var(--t-body);color:rgba(244,241,232,0.78);"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#5E9DFF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="m8.5 12 2.5 2.5 4.5-5"></path></svg><span>pci dss compliant, end to end</span></div>
+      </div>
+    </div>
+    <div style="position:absolute;bottom:52px;right:64px;font-weight:500;font-size:var(--t-small);color:rgba(244,241,232,0.35);z-index:2;">17 / 20</div>
+  </section>
+
+  <!-- ══════ 18 · pricing ══════ -->
+  <section data-label="pricing" data-speaker-notes="Ten cents flat for retail. 0.3% for property and trades. Plus one small subscription — from $7.99. No terminal, no lock-in, same-day payouts." style="background:#040D6D;color:#F4F1E8;font-family:'Outfit',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-start;padding:var(--pad-top) var(--pad-x) var(--pad-bottom);transition:opacity .55s cubic-bezier(.4,0,.2,1),visibility .55s cubic-bezier(.4,0,.2,1);">
+    <div class="aG" style="position:absolute;bottom:-30%;right:-15%;width:1300px;height:1300px;border-radius:50%;background:radial-gradient(circle,rgba(94,157,255,0.16) 0%,rgba(94,157,255,0) 65%);pointer-events:none;"></div>
+    <canvas data-coins style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:0.4;"></canvas>
+    <div style="position:absolute;left:340px;top:420px;width:440px;height:440px;border-radius:50%;background:radial-gradient(circle,rgba(94,157,255,0.30) 0%,rgba(94,157,255,0) 68%);filter:blur(38px);pointer-events:none;"></div>
+    <div style="position:absolute;left:1160px;top:420px;width:400px;height:400px;border-radius:50%;background:radial-gradient(circle,rgba(47,87,255,0.30) 0%,rgba(47,87,255,0) 68%);filter:blur(38px);pointer-events:none;"></div>
+    <div class="aU" style="display:flex;align-items:center;gap:16px;position:relative;z-index:2;">
+      <span class="aL" style="width:44px;height:2px;background:#5E9DFF;display:inline-block;"></span>
+      <span style="font-weight:500;font-size:var(--t-kick);letter-spacing:0.32em;text-transform:uppercase;color:#5E9DFF;">pricing</span>
+    </div>
+    <h2 class="aU d1" style="margin:40px 0 0;font-weight:300;font-size:84px;line-height:1.04;letter-spacing:-0.025em;color:#F4F1E8;position:relative;z-index:2;">numbers that <span style="font-weight:500;color:#5E9DFF;">end the argument.</span></h2>
+    <div style="margin-top:56px;display:grid;grid-template-columns:1fr 1fr;gap:28px;position:relative;z-index:2;">
+      <div class="glass aP d3" style="padding:48px 52px;border-radius:28px;background:linear-gradient(160deg,rgba(255,255,255,0.10) 0%,rgba(255,255,255,0.03) 100%);border:1px solid rgba(255,255,255,0.16);backdrop-filter:blur(22px) saturate(1.4) brightness(1.08);box-shadow:0 30px 70px rgba(2,5,46,0.5),inset 0 1px 0 rgba(255,255,255,0.22),inset 0 -1px 0 rgba(255,255,255,0.04);">
+        <div style="font-weight:500;font-size:var(--t-small);letter-spacing:0.26em;text-transform:uppercase;color:rgba(244,241,232,0.5);">retail &amp; hospitality</div>
+        <div data-count="10¢" style="margin-top:16px;font-weight:300;font-size:130px;line-height:0.95;letter-spacing:-0.04em;color:#F4F1E8;">10¢</div>
+        <div style="margin-top:14px;font-weight:500;font-size:var(--t-body);color:#5E9DFF;">per transaction. flat. not a percentage.</div>
+      </div>
+      <div class="glass aP d4" style="padding:48px 52px;border-radius:28px;background:linear-gradient(160deg,rgba(255,255,255,0.10) 0%,rgba(255,255,255,0.03) 100%);border:1px solid rgba(255,255,255,0.16);backdrop-filter:blur(22px) saturate(1.4) brightness(1.08);box-shadow:0 30px 70px rgba(2,5,46,0.5),inset 0 1px 0 rgba(255,255,255,0.22),inset 0 -1px 0 rgba(255,255,255,0.04);">
+        <div style="font-weight:500;font-size:var(--t-small);letter-spacing:0.26em;text-transform:uppercase;color:rgba(244,241,232,0.5);">property &amp; trades</div>
+        <div data-count="0.3%" style="margin-top:16px;font-weight:300;font-size:130px;line-height:0.95;letter-spacing:-0.04em;color:#F4F1E8;">0.3%</div>
+        <div style="margin-top:14px;font-weight:500;font-size:var(--t-body);color:#5E9DFF;">platform fee. that's the whole bill.</div>
+      </div>
+    </div>
+    <div class="aU d5" style="margin-top:40px;display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:20px;position:relative;z-index:2;">
+      <div class="glass" style="padding:30px 34px;border-radius:22px;background:linear-gradient(160deg,rgba(255,255,255,0.08) 0%,rgba(255,255,255,0.02) 100%);border:1px solid rgba(255,255,255,0.13);backdrop-filter:blur(20px) saturate(1.4) brightness(1.06);box-shadow:0 20px 50px rgba(2,5,46,0.4),inset 0 1px 0 rgba(255,255,255,0.18);"><div style="font-weight:600;font-size:var(--t-small);color:#F4F1E8;">solo</div><div style="margin-top:10px;font-weight:300;font-size:48px;letter-spacing:-0.02em;color:#F4F1E8;">$7.99<span style="font-size:24px;color:rgba(244,241,232,0.5);">/mo</span></div><div style="margin-top:8px;font-weight:400;font-size:var(--t-small);color:rgba(244,241,232,0.55);">1 login · the full stack</div></div>
+      <div class="glass" style="padding:30px 34px;border-radius:22px;background:linear-gradient(160deg,rgba(255,255,255,0.13) 0%,rgba(255,255,255,0.04) 100%);border:1px solid rgba(255,255,255,0.22);backdrop-filter:blur(20px) saturate(1.4) brightness(1.1);box-shadow:0 20px 50px rgba(2,5,46,0.45),inset 0 1px 0 rgba(255,255,255,0.25);"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;"><span style="font-weight:600;font-size:var(--t-small);color:#F4F1E8;">team</span><span style="padding:6px 14px;border-radius:9999px;border:1px solid rgba(94,157,255,0.5);font-weight:600;font-size:24px;color:#5E9DFF;">popular</span></div><div style="margin-top:10px;font-weight:300;font-size:48px;letter-spacing:-0.02em;color:#F4F1E8;">$8.99<span style="font-size:24px;color:rgba(244,241,232,0.5);">/mo</span></div><div style="margin-top:8px;font-weight:400;font-size:var(--t-small);color:rgba(244,241,232,0.55);">5 logins · one dollar more</div></div>
+      <div class="glass" style="padding:30px 34px;border-radius:22px;background:linear-gradient(160deg,rgba(255,255,255,0.08) 0%,rgba(255,255,255,0.02) 100%);border:1px solid rgba(255,255,255,0.13);backdrop-filter:blur(20px) saturate(1.4) brightness(1.06);box-shadow:0 20px 50px rgba(2,5,46,0.4),inset 0 1px 0 rgba(255,255,255,0.18);"><div style="font-weight:600;font-size:var(--t-small);color:#F4F1E8;">crew</div><div style="margin-top:10px;font-weight:300;font-size:48px;letter-spacing:-0.02em;color:#F4F1E8;">$12.99<span style="font-size:24px;color:rgba(244,241,232,0.5);">/mo</span></div><div style="margin-top:8px;font-weight:400;font-size:var(--t-small);color:rgba(244,241,232,0.55);">10 logins · whole crew covered</div></div>
+      <div class="glass" style="padding:30px 34px;border-radius:22px;background:linear-gradient(160deg,rgba(255,255,255,0.08) 0%,rgba(255,255,255,0.02) 100%);border:1px solid rgba(255,255,255,0.13);backdrop-filter:blur(20px) saturate(1.4) brightness(1.06);box-shadow:0 20px 50px rgba(2,5,46,0.4),inset 0 1px 0 rgba(255,255,255,0.18);"><div style="font-weight:600;font-size:var(--t-small);color:#F4F1E8;">enterprise</div><div style="margin-top:10px;font-weight:300;font-size:48px;letter-spacing:-0.02em;color:#F4F1E8;">let's talk</div><div style="margin-top:8px;font-weight:400;font-size:var(--t-small);color:rgba(244,241,232,0.55);">10+ logins · tailored setup</div></div>
+    </div>
+    <div class="aU d6" style="margin-top:38px;display:flex;flex-wrap:wrap;gap:14px 40px;font-weight:500;font-size:var(--t-small);color:rgba(244,241,232,0.55);position:relative;z-index:2;">
+      <span style="display:inline-flex;align-items:center;gap:10px;"><span style="color:#5E9DFF;">✓</span><span>no terminal to buy</span></span>
+      <span style="display:inline-flex;align-items:center;gap:10px;"><span style="color:#5E9DFF;">✓</span><span>no lock-in contract</span></span>
+      <span style="display:inline-flex;align-items:center;gap:10px;"><span style="color:#5E9DFF;">✓</span><span>same-day payouts</span></span>
+      <span style="display:inline-flex;align-items:center;gap:10px;"><span style="color:#5E9DFF;">✓</span><span>unlimited payment points</span></span>
+    </div>
+    <div style="position:absolute;bottom:52px;right:64px;font-weight:500;font-size:var(--t-small);color:rgba(244,241,232,0.35);z-index:2;">18 / 20</div>
+  </section>
+
+  <!-- ══════ 19 · why taptpay ══════ -->
+  <section data-label="why taptpay" data-speaker-notes="The whole pitch in three lines: no hardware, no contracts, no tech to go wrong. All software, no hardware." style="background:#040D6D;color:#F4F1E8;font-family:'Outfit',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;transition:opacity .55s cubic-bezier(.4,0,.2,1),visibility .55s cubic-bezier(.4,0,.2,1);">
+    <div class="aG" style="position:absolute;top:-20%;left:-15%;width:1300px;height:1300px;border-radius:50%;background:radial-gradient(circle,rgba(47,87,255,0.24) 0%,rgba(47,87,255,0) 65%);pointer-events:none;"></div>
+    <canvas data-coins style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:0.45;"></canvas>
+    <div class="aU d1" style="font-weight:300;font-size:var(--t-huge);line-height:1.08;letter-spacing:-0.035em;color:#F4F1E8;position:relative;z-index:2;">no hardware.</div>
+    <div class="aU d3" style="font-weight:300;font-size:var(--t-huge);line-height:1.08;letter-spacing:-0.035em;color:#F4F1E8;position:relative;z-index:2;">no contracts.</div>
+    <div class="aU d5" style="font-weight:500;font-size:var(--t-huge);line-height:1.08;letter-spacing:-0.035em;color:#5E9DFF;position:relative;z-index:2;">no tech to go wrong.</div>
+    <div class="aU d7" style="margin-top:64px;display:flex;align-items:center;gap:16px;position:relative;z-index:2;">
+      <span class="aL" style="width:44px;height:2px;background:#5E9DFF;display:inline-block;"></span>
+      <span style="font-weight:500;font-size:var(--t-kick);letter-spacing:0.32em;text-transform:uppercase;color:rgba(244,241,232,0.55);">all software, no hardware</span>
+      <span class="aL" style="width:44px;height:2px;background:#5E9DFF;display:inline-block;"></span>
+    </div>
+    <div style="position:absolute;bottom:52px;right:64px;font-weight:500;font-size:var(--t-small);color:rgba(244,241,232,0.35);z-index:2;">19 / 20</div>
+  </section>
+
+  <!-- ══════ 20 · get started ══════ -->
+  <section data-label="get started" data-speaker-notes="Ready to throw out the old EFTPOS machine? Call or email Oliver and you'll be set up the same day." style="background:#040D6D;color:#F4F1E8;font-family:'Outfit',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;transition:opacity .55s cubic-bezier(.4,0,.2,1),visibility .55s cubic-bezier(.4,0,.2,1);">
+    <div class="aG" style="position:absolute;top:5%;left:-18%;width:1200px;height:1200px;border-radius:50%;background:radial-gradient(circle,rgba(47,87,255,0.20) 0%,rgba(47,87,255,0) 65%);pointer-events:none;"></div>
+    <canvas data-coins style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:0.4;"></canvas>
+    <div class="aU" style="display:flex;align-items:center;gap:16px;position:relative;z-index:2;">
+      <span class="aL" style="width:44px;height:2px;background:#5E9DFF;display:inline-block;"></span>
+      <span style="font-weight:500;font-size:var(--t-kick);letter-spacing:0.32em;text-transform:uppercase;color:#5E9DFF;">get in touch</span>
+      <span class="aL" style="width:44px;height:2px;background:#5E9DFF;display:inline-block;"></span>
+    </div>
+    <h2 class="aU d1" style="margin:44px 0 0;font-weight:300;font-size:150px;line-height:1;letter-spacing:-0.03em;color:#F4F1E8;position:relative;z-index:2;">let's talk.</h2>
+    <p class="aU d3" style="margin:40px 0 0;font-weight:400;font-size:var(--t-sub);line-height:1.55;color:rgba(244,241,232,0.66);max-width:24em;position:relative;z-index:2;">ready to throw out your old eftpos machine? <span style="color:#F4F1E8;font-weight:500;">we'll get you set up.</span></p>
+    <div class="aU d4" style="margin-top:56px;font-weight:500;font-size:44px;letter-spacing:-0.01em;color:#F4F1E8;position:relative;z-index:2;">oliver leonard</div>
+    <div class="aU d5" style="margin-top:32px;display:flex;flex-wrap:wrap;gap:20px;justify-content:center;position:relative;z-index:2;">
+      <span style="display:inline-flex;align-items:center;gap:14px;padding:22px 40px;border-radius:9999px;border:1.5px solid #5E9DFF;color:#5E9DFF;font-weight:500;font-size:var(--t-body);"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h3l2 5-2.5 1.5a11 11 0 0 0 5 5L16 13l5 2v3a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"></path></svg><span>021 209 4672</span></span>
+      <span style="display:inline-flex;align-items:center;gap:14px;padding:22px 40px;border-radius:9999px;border:1.5px solid #5E9DFF;color:#5E9DFF;font-weight:500;font-size:var(--t-body);"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m3 7 9 6 9-6"></path></svg><span>oliverleonard@taptpay.co.nz</span></span>
+    </div>
+    <div class="aU d6" style="margin-top:80px;display:flex;align-items:baseline;font-size:34px;line-height:1;position:relative;z-index:2;">
+      <span style="font-family:'Larken';font-weight:900;color:#5E9DFF;">tapt</span><span style="font-family:'Larken';font-weight:900;font-style:italic;color:#5E9DFF;">pay.</span>
+    </div>
+    <div style="position:absolute;bottom:52px;right:64px;font-weight:500;font-size:var(--t-small);color:rgba(244,241,232,0.35);z-index:2;">20 / 20</div>
+  </section>
+
+</x-import>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;motion&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;full&quot;,&quot;subtle&quot;,&quot;off&quot;],&quot;default&quot;:&quot;full&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;animation&quot;},&quot;coinDensity&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:2,&quot;min&quot;:0,&quot;max&quot;:2,&quot;step&quot;:0.1,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;animation&quot;}}">
+class Component extends DCLogic {
+  componentDidMount() {
+    this._applyMotion();
+    this._coinSystems = [];
+    this._phoneTimers = [];
+    this._onSlide = (e) => {
+      const d = e.detail || {};
+      this._handleSlide(d.slide, d.previousSlide);
+    };
+    document.addEventListener('slidechange', this._onSlide);
+    const active = document.querySelector('section[data-deck-active]');
+    if (active) this._handleSlide(active, null);
+    // preload the live-app phones after first paint, staggered
+    this._preT = setTimeout(() => {
+      const frames = Array.from(document.querySelectorAll('iframe[data-defer-src]'));
+      frames.forEach((f, i) => {
+        setTimeout(() => {
+          if (!f.getAttribute('src')) f.setAttribute('src', f.getAttribute('data-defer-src'));
+        }, i * 800);
+      });
+    }, 1500);
+  }
+
+  componentWillUnmount() {
+    document.removeEventListener('slidechange', this._onSlide);
+    clearTimeout(this._preT);
+    this._clearPhoneTimers();
+    (this._coinSystems || []).forEach((s) => { s.dead = true; });
+  }
+
+  componentDidUpdate() {
+    this._applyMotion();
+  }
+
+  _applyMotion() {
+    document.body.dataset.motion = this.props.motion ?? 'full';
+  }
+
+  _clearPhoneTimers() {
+    (this._phoneTimers || []).forEach(clearTimeout);
+    this._phoneTimers = [];
+  }
+
+  _handleSlide(slide, prev) {
+    if (!slide) return;
+    this._animateCounts(slide);
+    this._coinsFor(slide);
+    this._clearPhoneTimers();
+    const T = (fn, ms) => { this._phoneTimers.push(setTimeout(fn, ms)); };
+
+    // leaving a driven slide → close its overlay so it resets
+    if (prev) {
+      const pw = prev.querySelector('[data-phone]');
+      if (pw && pw.getAttribute('data-drive')) {
+        const pf = pw.querySelector('iframe');
+        T(() => this._closeOverlay(pf), 250);
+      }
+    }
+
+    const wrap = slide.querySelector('[data-phone]');
+    if (wrap) {
+      const frame = wrap.querySelector('iframe');
+      if (frame && !frame.getAttribute('src')) frame.setAttribute('src', frame.getAttribute('data-defer-src'));
+      const route = wrap.getAttribute('data-route');
+      const driveKind = wrap.getAttribute('data-drive');
+      if (route) T(() => {
+        try {
+          if (frame.contentWindow && frame.contentWindow.location.hash !== route) frame.contentWindow.location.hash = route;
+        } catch (e) {}
+      }, 550);
+      if (driveKind) T(() => this._drive(frame, driveKind), 2100);
+      const glare = wrap.querySelector('[data-glare]');
+      if (glare && (this.props.motion ?? 'full') === 'full') T(() => {
+        glare.style.animation = 'none';
+        void glare.offsetWidth;
+        glare.style.animation = 'tpGlare 1.5s cubic-bezier(.5,.06,.3,1) 1';
+      }, 1200);
+    }
+  }
+
+  // click the live app's own controls (same-origin iframe)
+  _drive(frame, kind) {
+    try {
+      const doc = frame && frame.contentDocument;
+      if (!doc) return;
+      const btns = Array.from(doc.querySelectorAll('button'));
+      const find = (re) => btns.find((x) => re.test((x.getAttribute('aria-label') || '') + ' ' + (x.getAttribute('data-testid') || '') + ' ' + (x.textContent || '')));
+      let b = null;
+      if (kind === 'bill') b = find(/bill/i);
+      if (kind === 'split') b = find(/split/i);
+      if (b) b.click();
+    } catch (e) {}
+  }
+
+  _closeOverlay(frame) {
+    try {
+      const doc = frame && frame.contentDocument;
+      if (!doc) return;
+      const b = Array.from(doc.querySelectorAll('button')).find((x) => /close|back|cancel/i.test(x.getAttribute('aria-label') || ''));
+      if (b) b.click();
+    } catch (e) {}
+  }
+
+  // ---- three.js falling brand coins (subtle) ----
+  _coinsFor(slide) {
+    (this._coinSystems || []).forEach((s) => {
+      s.active = s.section === slide && (this.props.motion ?? 'full') === 'full';
+    });
+    const canvas = slide.querySelector('canvas[data-coins]');
+    if (canvas && !canvas.__tpInit) this._initCoins(canvas, slide);
+  }
+
+  _initCoins(canvas, section) {
+    if (!window.THREE || canvas.__tpInit) return;
+    canvas.__tpInit = true;
+    const THREE = window.THREE;
+    const density = this.props.coinDensity ?? 1;
+    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: 'low-power' });
+    renderer.setPixelRatio(1);
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(42, 16 / 9, 0.1, 100);
+    camera.position.set(0, 0, 26);
+    scene.add(new THREE.HemisphereLight(0x8fb8ff, 0x02063a, 0.85));
+    const key = new THREE.DirectionalLight(0xdfe9ff, 0.75); key.position.set(6, 10, 8); scene.add(key);
+    const rim = new THREE.PointLight(0x5e9dff, 1.0, 60); rim.position.set(-10, -4, 8); scene.add(rim);
+
+    // coin faces: brand symbol (bevelled) + wordmark
+    const symbolImg = new Image();
+    symbolImg.src = 'uploads/tapt pay symbol logo.png';
+    const mkFace = (kind) => {
+      const c = document.createElement('canvas'); c.width = c.height = 512;
+      const g = c.getContext('2d');
+      const rad = g.createRadialGradient(200, 190, 40, 256, 256, 300);
+      rad.addColorStop(0, '#2445b8'); rad.addColorStop(0.55, '#152e96'); rad.addColorStop(1, '#091862');
+      const tinted = (color) => {
+        const t = document.createElement('canvas'); t.width = t.height = 512;
+        const tg = t.getContext('2d');
+        if (kind === 'symbol' && symbolImg.complete && symbolImg.naturalWidth) {
+          tg.drawImage(symbolImg, 116, 116, 280, 280);
+          tg.globalCompositeOperation = 'source-in';
+          tg.fillStyle = color; tg.fillRect(0, 0, 512, 512);
+        } else {
+          tg.textBaseline = 'middle';
+          const upr = '900 96px Larken, Georgia, serif';
+          const ita = 'italic 900 96px Larken, Georgia, serif';
+          tg.font = upr; const w1 = tg.measureText('tapt').width;
+          tg.font = ita; const w2 = tg.measureText('pay.').width;
+          const x0 = 256 - (w1 + w2) / 2;
+          tg.textAlign = 'left'; tg.fillStyle = color;
+          tg.font = upr; tg.fillText('tapt', x0, 268);
+          tg.font = ita; tg.fillText('pay.', x0 + w1, 268);
+        }
+        return t;
+      };
+      const draw = () => {
+        g.clearRect(0, 0, 512, 512);
+        g.fillStyle = rad; g.fillRect(0, 0, 512, 512);
+        g.strokeStyle = 'rgba(148,178,238,0.55)'; g.lineWidth = 10;
+        g.beginPath(); g.arc(256, 256, 225, 0, Math.PI * 2); g.stroke();
+        g.strokeStyle = 'rgba(110,148,230,0.28)'; g.lineWidth = 3;
+        g.beginPath(); g.arc(256, 256, 205, 0, Math.PI * 2); g.stroke();
+        g.drawImage(tinted('rgba(10,20,90,0.55)'), 5, 9);
+        g.drawImage(tinted('#a7c2f0'), 0, 0);
+      };
+      draw();
+      const tex = new THREE.CanvasTexture(c);
+      const b = document.createElement('canvas'); b.width = b.height = 512;
+      const bg2 = b.getContext('2d');
+      const drawBump = () => {
+        bg2.filter = 'none';
+        bg2.fillStyle = '#000'; bg2.fillRect(0, 0, 512, 512);
+        bg2.filter = 'blur(3px)';
+        bg2.strokeStyle = '#fff'; bg2.lineWidth = 13;
+        bg2.beginPath(); bg2.arc(256, 256, 225, 0, Math.PI * 2); bg2.stroke();
+        bg2.drawImage(tinted('#ffffff'), 0, 0);
+        bg2.filter = 'none';
+        bg2.strokeStyle = '#fff'; bg2.lineWidth = 10;
+        bg2.beginPath(); bg2.arc(256, 256, 225, 0, Math.PI * 2); bg2.stroke();
+        bg2.drawImage(tinted('#ffffff'), 0, 0);
+      };
+      drawBump();
+      const btex = new THREE.CanvasTexture(b);
+      return { tex, btex, redraw: () => { draw(); drawBump(); tex.needsUpdate = true; btex.needsUpdate = true; } };
+    };
+    const faceSym = mkFace('symbol');
+    const faceWord = mkFace('word');
+    symbolImg.onload = () => { faceSym.redraw(); };
+    try { document.fonts.load('900 96px Larken').then(() => { faceWord.redraw(); }); } catch (e) {}
+    try { document.fonts.load('italic 900 96px Larken'); } catch (e) {}
+
+    const matSym = new THREE.MeshStandardMaterial({ map: faceSym.tex, bumpMap: faceSym.btex, bumpScale: 0.065, metalness: 0.15, roughness: 0.8 });
+    const matWord = new THREE.MeshStandardMaterial({ map: faceWord.tex, bumpMap: faceWord.btex, bumpScale: 0.065, metalness: 0.15, roughness: 0.8 });
+    const sideMat = new THREE.MeshStandardMaterial({ color: 0x1b34a0, metalness: 0.2, roughness: 0.82 });
+    const geo = new THREE.CylinderGeometry(1, 1, 0.14, 64);
+    const group = new THREE.Group();
+    scene.add(group);
+    const coins = [];
+    const N = Math.round(8 * density);
+    for (let i = 0; i < N; i++) {
+      const fm = (i % 2 === 0) ? matSym : matWord;
+      const mesh = new THREE.Mesh(geo, [sideMat, fm, fm]);
+      const s = 0.55 + Math.random() * 0.85;
+      mesh.scale.setScalar(s);
+      mesh.position.set((Math.random() * 2 - 1) * 15, (Math.random() * 2 - 1) * 11, -6 + Math.random() * 9);
+      mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+      group.add(mesh);
+      coins.push({
+        mesh, r: s,
+        vy: 0.005 + Math.random() * 0.009,
+        rx: (Math.random() - 0.5) * 0.01,
+        ry: (Math.random() - 0.5) * 0.01,
+        rz: (Math.random() - 0.5) * 0.006,
+        px: Math.random() * Math.PI * 2,
+        sway: 0.3 + Math.random() * 0.7
+      });
+    }
+    const resize = () => {
+      const w = canvas.clientWidth || 1920, h = canvas.clientHeight || 1080;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    };
+    resize();
+
+    const sys = { canvas, section, active: true, dead: false };
+    this._coinSystems.push(sys);
+    let t0 = performance.now();
+    const loop = () => {
+      if (sys.dead) return;
+      requestAnimationFrame(loop);
+      const now = performance.now();
+      const dt = Math.min((now - t0) / 16.6, 3); t0 = now;
+      if (document.hidden || !sys.active) return;
+      const t = now / 1000;
+      coins.forEach((c) => {
+        const p = c.mesh.position;
+        p.y -= c.vy * dt * 1.9;
+        p.x += Math.sin(t * c.sway + c.px) * 0.003 * dt;
+        c.mesh.rotation.x += c.rx * dt;
+        c.mesh.rotation.y += c.ry * dt;
+        c.mesh.rotation.z += c.rz * dt;
+        if (p.y < -13) { p.y = 13; p.x = (Math.random() * 2 - 1) * 15; }
+      });
+      renderer.render(scene, camera);
+    };
+    loop();
+  }
+
+  _animateCounts(slide) {
+    if (!slide || !slide.querySelectorAll) return;
+    const motion = this.props.motion ?? 'full';
+    slide.querySelectorAll('[data-count]').forEach((el) => {
+      const final = el.getAttribute('data-count') || '';
+      if (motion === 'off') { el.textContent = final; return; }
+      const m = final.match(/(\d+(?:\.\d+)?)/);
+      if (!m) { el.textContent = final; return; }
+      const target = parseFloat(m[1]);
+      const decimals = (m[1].split('.')[1] || '').length;
+      const prefix = final.slice(0, m.index);
+      const suffix = final.slice(m.index + m[1].length);
+      const dur = 950;
+      const t0 = performance.now();
+      const tick = (t) => {
+        const p = Math.min(1, (t - t0) / dur);
+        const ease = 1 - Math.pow(1 - p, 3);
+        el.textContent = prefix + (target * ease).toFixed(decimals) + suffix;
+        if (p < 1 && el.isConnected) requestAnimationFrame(tick);
+        else el.textContent = final;
+      };
+      requestAnimationFrame(tick);
+    });
+  }
+
+  renderVals() {
+    return {};
+  }
+}
+
+</script>
+</body>
+</html>

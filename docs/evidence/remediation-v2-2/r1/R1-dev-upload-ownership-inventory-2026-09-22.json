@@ -1,0 +1,31 @@
+{
+  "version": 2,
+  "target": {
+    "host": "helium",
+    "port": 5432,
+    "database": "heliumdb"
+  },
+  "approvedBy": "Oliver (owner), used as drafted - decision 2026-09-22",
+  "approvedAt": "2026-09-22T06:42:08.897Z",
+  "entries": [
+    {
+      "fileId": 1,
+      "pathSha256": "e94409df8d15e67e8476b9e30c04c1797cb5e6368c5e088fb10505eb30611bea",
+      "contentSha256": "854f9f1a349dcad09876c9e315e743e2fdf4763d1afbe4f3cecf372afc0c421f",
+      "disposition": "locked",
+      "reason": "never-attached"
+    },
+    {
+      "fileId": 2,
+      "pathSha256": "0e6d19266ef1c327f0e55baa30274f29193deb5cd91f981a0a65f284d84d5916",
+      "contentSha256": "7df2ec90d143be78ee7a6c6fc2b03a080bd96877dae89571b1f53a3265bedca8",
+      "disposition": "owner",
+      "merchantId": 22,
+      "evidence": {
+        "kind": "system-record",
+        "reference": "TaptPay records: one merchant, first attached 19s after upload",
+        "sha256": "f3537f583268fc26f9e1cbb5d1117e1f74b78fbd9ec3b92f38650b80b1f04005"
+      }
+    }
+  ]
+}

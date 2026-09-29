@@ -35,7 +35,6 @@ interface MerchantDetails {
   contactEmail: string;
   contactPhone: string;
   businessAddress: string;
-  currentProviderRate: string;
   bankName: string;
   bankAccountNumber: string;
   bankBranch: string;
@@ -71,9 +70,9 @@ export default function AdminMerchantDetail() {
 
   // Fetch merchant details
   const { data: merchant, isLoading: merchantLoading } = useQuery<MerchantDetails>({
-    queryKey: ['/api/merchants', merchantId],
+    queryKey: ['/api/admin/merchants', merchantId],
     queryFn: async () => {
-      const response = await fetch(`/api/merchants/${merchantId}`, {
+      const response = await fetch(`/api/admin/merchants/${merchantId}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('adminAuthToken')}`
         }
@@ -118,7 +117,7 @@ export default function AdminMerchantDetail() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/merchants', merchantId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/merchants', merchantId] });
       setIsEditing(false);
       setEditedMerchant({});
       toast({
@@ -407,18 +406,6 @@ export default function AdminMerchantDetail() {
                   )}
                 </div>
 
-                <div>
-                  <Label htmlFor="currentProviderRate">Current Provider Rate (%)</Label>
-                  {isEditing ? (
-                    <Input
-                      id="currentProviderRate"
-                      value={editedMerchant.currentProviderRate || ''}
-                      onChange={(e) => handleInputChange('currentProviderRate', e.target.value)}
-                    />
-                  ) : (
-                    <p className="text-sm text-gray-900 mt-1">{merchant.currentProviderRate}%</p>
-                  )}
-                </div>
               </CardContent>
             </Card>
 

@@ -1,0 +1,30 @@
+PASS  390x844: sending opens the share page with that sale chosen
+PASS  390x844: the page shows that sale's amount and name
+PASS  390x844: its real QR code shows on the page
+PASS  390x844: every share control can be reached and tapped
+PASS  390x844: copy link copies that sale's own link
+PASS  390x844: download QR saves a real PNG
+PASS  390x844: a newly sent sale becomes the chosen one
+PASS  390x844: choosing another sale shows it
+PASS  390x844: coming back keeps the chosen sale
+PASS  390x844: the cash sale is recorded
+PASS  390x844: its success screen shows what was recorded
+PASS  390x844: copy receipt link copies its own receipt
+PASS  390x844: never the demo address
+PASS  390x844: no page errors
+PASS  320x568: sending opens the share page with that sale chosen
+PASS  320x568: the page shows that sale's amount and name
+PASS  320x568: its real QR code shows on the page
+PASS  320x568: every share control can be reached and tapped
+PASS  320x568: copy link copies that sale's own link
+PASS  320x568: download QR saves a real PNG
+PASS  320x568: a newly sent sale becomes the chosen one
+PASS  320x568: choosing another sale shows it
+PASS  320x568: coming back keeps the chosen sale
+PASS  320x568: the cash sale is recorded
+PASS  320x568: its success screen shows what was recorded
+PASS  320x568: copy receipt link copies its own receipt
+PASS  320x568: never the demo address
+PASS  320x568: no page errors
+
+28/28 passed

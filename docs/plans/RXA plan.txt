@@ -1,0 +1,243 @@
+﻿Integration plan · TaptPay → Xero
+Wiring TaptPay into Xero
+A build plan for connecting merchant accounts to their own Xero organisation over OAuth2 — pushing Trades and Property invoices, contacts and payments across automatically, without touching the existing Windcave payment path or breaking anything for merchants who never connect.
+Prepared 24 Aug 2026Scope Opt-in, per-merchantStatus Ready to scope Phase 0
+Contents
+* 00The pricing reality check
+* 01Where this fits in TaptPay today
+* 02How the connection works
+* 03Data model changes
+* 04Server module design
+* 05Sync logic, entity by entity
+* 06Compliance & branding
+* 07Rollout without breakage
+* 08Phased build plan
+* 09Decisions needed from you
+00
+The pricing reality check
+Worth pinning down precisely, because an earlier draft of this plan got it wrong: checked directly against Xero's own OAuth2 documentation, a standard Code flow or PKCE integration — what §02 already recommends for a multi-merchant SaaS — is free to create and use, no monthly fee, with a 25-organisation connection cap that lifts once the app passes Xero's certification review.
+The only paid option is Custom Connections, a separate integration type built for single-organisation, machine-to-machine use (client credentials grant) — not eligible for the Xero Marketplace and capped at one connection regardless. It isn't relevant here: TaptPay needs each merchant to authorise their own Xero organisation, which is exactly what the Code flow is for.
+Description
+	Code flow
+	PKCE flow
+	Custom Connection
+	Best for
+	Web server apps that can securely store a client secret — TaptPay's case
+	Mobile/desktop apps that can't store a secret
+	Back-end, machine-to-machine, single org
+	Connection limit
+	25 (unlimited after certification)
+	25 (unlimited after certification)
+	1
+	Eligible for Marketplace
+	Yes
+	Yes
+	No
+	Cost
+	Free
+	Free
+	~$10 AUD/NZD · $5 USD · £5 GBP per month
+	Where I got this wrong, and what's still worth confirming
+My first pass leaned on third-party accounting-industry blogs (Truto, Accounting Today, Databuzz, Codat) describing a tiered, usage-based Xero developer pricing model — a $0 "Starter" tier capped at just 5 connections, then paid tiers billed on data egress — supposedly effective 2 March 2026. That story is not what's currently published on Xero's own OAuth2 docs, which state plainly that regular OAuth2 apps remain free, with a 25-connection cap rather than 5. I don't have full certainty on why those sources disagree with Xero's current page — possibly a proposal that changed before shipping, possibly reporting on a different program — so treat Xero's own docs (above) as the reliable baseline, and worth a direct check with Xero developer support as part of Phase 0 before this goes to General Availability, particularly on exactly what "certification" requires once TaptPay nears 25 connected merchants.
+01
+Where this fits in TaptPay today
+TaptPay already produces three kinds of revenue documents that a merchant's accountant cares about, and none of them currently reach Xero except by hand:
+* Trades job invoices (jobInvoices) — quoted or quick invoices sent to a clientProfile, with GST computed via trades-gst.ts at the merchant's chosen inclusive/exclusive mode.
+* Property rent invoices (invoicesRentRequests) — recurring charges to a tenantProfile, same 15% NZ GST logic.
+* Core terminal transactions — one-off Windcave-processed payments at the payment stone/QR terminal.
+The only existing bridge to Xero is a manual one: the Transactions page has an "Export for Xero" CSV button that formats completed transactions as a bank-statement import file, for merchants to upload themselves under Bank Accounts → Import a Statement. It's a real feature already in production — nothing here should remove it. It stays as the fallback for merchants who never connect, or who prefer it.
+What OAuth2 sync adds on top
+TaptPay record
+	Xero object
+	When it's created
+	clientProfiles / tenantProfiles
+	Contact
+	First time that client/tenant is invoiced after connecting
+	jobInvoices / invoicesRentRequests
+	Invoice (ACCREC)
+	On send, or on payment — merchant's choice, see §09
+	transaction / invoice marked paid
+	Payment, allocated to a Clearing account
+	On Windcave settlement success
+	refunds
+	Credit Note + reversing entry
+	On refund issued
+	Windcave + platform fee
+	Spend Money (bank transaction), optional
+	Alongside the Payment, if merchant opts in
+	The Clearing-account pattern in row three is the same one Stripe, GoCardless and other PSPs use when they integrate with Xero directly: payments land against a dedicated "Tapt Clearing" bank account inside Xero rather than the merchant's real trading account, so when their actual bank feed later brings in the net settlement deposit, it reconciles cleanly against the clearing balance instead of double-counting the invoice.
+02
+How the connection works
+Xero's OAuth2 is the standard authorization-code flow, documented at developer.xero.com/documentation/guides/oauth2/overview. TaptPay registers as a Web app integration (not a Custom Connection — those are single-organisation and against Xero's terms for a multi-merchant SaaS like this one).
+* Merchant clicks "Connect to Xero"
+* in Settings → Integrations. Server builds the authorize URL with a random state value (CSRF protection) and a PKCE code_challenge.
+* Redirect to login.xero.com
+* Merchant signs in with their own Xero credentials and picks which organisation(s) to authorise — TaptPay never sees their Xero password.
+* Callback with an authorization code
+* Xero redirects back to our registered callback URL. Server verifies state, then exchanges the code at identity.xero.com/connect/token for an access token, refresh token and ID token.
+* Discover the connected organisation
+* A call to GET api.xero.com/connections returns the tenant ID(s) the merchant just authorised. For v1, if more than one org comes back, the merchant picks one to sync against.
+* Store, encrypted
+* Access token, refresh token, tenant ID and expiry are written to the new xero_connections table, tokens encrypted at rest (see §03).
+Token and rate-limit facts that shape the design
+Access token life
+30 minutes
+Refresh token
+Single-use — rotates on every refresh; expires after 60 days of not being used
+Required header
+Authorization: Bearer … plus xero-tenant-id: … on every Accounting API call
+Rate limit
+60 calls/minute per organisation (hard cap, every tier)
+Daily cap
+1,000 calls/day/org on Starter · 5,000/day/org on paid tiers
+Scopes
+Granular since 2 Mar 2026 — new apps must use them from day one
+Because TaptPay's app will be registered fresh, it requests Xero's new granular scopes rather than the deprecated broad ones:
+Scope
+	Grants
+	accounting.contacts
+	Create / read contacts (clients, tenants)
+	accounting.invoices
+	Create / read invoices & payments against them
+	accounting.payments
+	Allocate payments to invoices
+	accounting.banktransactions
+	Spend Money entries for fees (optional, §05)
+	accounting.settings.read
+	Tax rates, chart of accounts, org currency & GST basis
+	offline_access
+	Issue a refresh token so the merchant isn't re-prompted every 30 minutes
+	openid profile email
+	Identify which Xero user connected the account
+	No payroll, files, projects, assets or reporting scopes — TaptPay only needs the sales-and-payments slice of the ledger, and Xero's own guidance is to request the minimum a working integration needs.
+03
+Data model changes
+Everything here is additive — new tables and new nullable columns only, in line with the project's existing rule in replit.md that schema changes never drop data and drizzle-kit push runs without --force.
+New table: xero_connections
+One row per merchant-to-Xero-organisation link: merchantId, xeroTenantId, xeroTenantName, xeroUserEmail, accessTokenEncrypted, refreshTokenEncrypted, tokenExpiresAt, scopes, status (connected · expired · revoked · error), lastError, connectedAt, disconnectedAt.
+New table: xero_sync_log
+Mirrors the retry shape the codebase already uses for webhookDeliveries: entityType (contact · invoice · payment · credit_note), localTable / localId, xeroId, status, attemptCount, maxAttempts, nextRetryAt, lastError, payloadHash (for idempotency), timestamps. Doubles as the audit trail shown to merchants in Settings.
+New nullable columns
+Table
+	New columns
+	clientProfiles
+	xero_contact_id
+	tenantProfiles
+	xero_contact_id
+	jobInvoices
+	xero_invoice_id, xero_invoice_number
+	invoicesRentRequests
+	xero_invoice_id, xero_invoice_number
+	refunds
+	xero_credit_note_id
+	merchants
+	xero_clearing_account_code, xero_sales_account_code, xero_sync_trigger, xero_fee_tracking_enabled
+	A gap worth closing alongside this
+The merchants.windcaveApiKey column is commented "Encrypted Windcave API key" in the schema, but no encrypt/decrypt call turned up anywhere it's read or written in routes.ts — it appears to be stored as plain text today. Xero's platform terms require access and refresh tokens to be encrypted at rest, so this plan adds a real AES-256-GCM utility either way. Fixing the Windcave field to use the same utility would be a natural, low-risk follow-up — called out here as optional and separately scoped so it doesn't expand this project's blast radius.
+04
+Server module design
+The codebase already has a clean template for "external payment processor integration" in server/windcave.ts: a typed result interface per operation, a timeout-wrapped fetch helper, an audit logger that redacts secrets before writing to the console. server/xero.ts follows the same shape — connect/refresh/create-contact/create-invoice/create-payment as typed functions, not a generic client, so every call site knows exactly what it's sending.
+One structural change: routes.ts is already over 7,000 lines. Rather than adding another dozen routes to that file, the Xero endpoints get their own router — server/routes/xero.ts, mounted from the main router — so this integration is easy to find, review and (if needed) rip out cleanly:
+* GET /api/merchants/:id/xero/connect — builds the authorize URL, redirects
+* GET /api/xero/callback — exchanges the code, stores the connection
+* POST /api/merchants/:id/xero/disconnect — revokes via DELETE /connections/{id}, wipes stored tokens
+* GET /api/merchants/:id/xero/status — connection state for the Settings UI
+* GET/PUT /api/merchants/:id/xero/settings — clearing account, sales account, sync trigger
+* GET /api/merchants/:id/xero/sync-log — last 20 sync attempts, for in-product transparency
+A background worker — xero-sync-cron.ts, following the same pattern as the existing property-cron.ts and trades-cron.ts — drains pending/retry rows from xero_sync_log on a short interval, respecting the 60-calls-a-minute-per-tenant ceiling and backing off on a 429 using Xero's Retry-After header.
+05
+Sync logic, entity by entity
+Contacts
+Search before create — GET /Contacts?where=EmailAddress="…" — before posting a new one. Xero has no built-in de-duplication, and creating a fresh Contact on every invoice is the single most common mistake in PSP-to-Xero integrations. The returned ContactID is cached on clientProfiles/tenantProfiles so it's a one-time lookup per client.
+Invoices
+Built from the same lineItems and totals already computed by trades-gst.ts — reusing that math (rather than recalculating GST independently for Xero) is what guarantees the invoice total in Xero always matches the receipt TaptPay already emailed the customer, to the cent. TaxType is resolved from the organisation's actual tax rates (fetched once per connection via accounting.settings.read and cached, refreshed weekly) rather than hard-coded — GST treatment can differ between Xero organisations even within New Zealand. Every create call carries an Idempotency-Key header and is guarded locally by the presence of xero_invoice_id, so a retried request can never create a duplicate invoice.
+Payments
+On Windcave settlement success, a Payment is allocated against the Xero invoice — into the merchant's chosen Clearing account, not their real trading account (see §01). This is what lets their actual bank feed reconcile the net deposit later without double-booking the gross invoice amount.
+Fees (optional)
+If the merchant opts in, the Windcave processing fee and Tapt platform fee are posted as a Spend Money transaction out of the Clearing account into a merchant-chosen expense account. Once that's on, the Clearing account balance nets to exactly what actually lands in the merchant's bank — a fully reconciled picture for their accountant, at their choice rather than by default.
+Refunds
+A Credit Note against the original invoice, plus a reversing entry in the Clearing account.
+The non-negotiable rule
+Every one of the above runs after the real TaptPay action has already succeeded, asynchronously, best-effort. A Xero timeout, an expired token, or a 429 can only ever affect the Xero copy of a record — never the payment itself, the invoice being sent, or the receipt email. Failures land in xero_sync_log for retry and show up as a status badge in Settings, not as an error in the merchant's actual workflow.
+06
+Compliance & branding
+"Compliant with Xero's standards" splits into two separate things worth tracking separately: Xero's own developer-platform rules, and the accounting/tax correctness of what gets written into a merchant's real ledger.
+Requirement
+	How this plan meets it
+	OAuth2 only
+	Xero API keys are deprecated; this plan is OAuth2 from the start (§02)
+	Web app, not Custom Connection
+	Custom Connections are single-tenant and against Xero's terms for a multi-merchant SaaS
+	Granular scopes
+	Mandatory for any app registered after 2 Mar 2026 — used from day one (§02)
+	Minimum necessary scope
+	No payroll, files, assets or reporting scopes requested
+	Official "Connect to Xero" button
+	Use Xero's supplied brand asset and blue (Connect to Xero) per Xero's branding guide — not a custom-styled button
+	No unearned claims
+	Never described as "Xero-certified" or "Xero-endorsed" — that requires the separate, optional App Partner Program review, out of scope for a private opt-in integration
+	Tokens encrypted at rest
+	New AES-256-GCM utility, §03
+	Rate-limit respectful
+	No polling loops — architecture in §05 is write-heavy, read-light by design
+	Disconnect & data removal
+	Settings action deletes the stored connection and tokens; data already pushed into the merchant's own Xero org is theirs to manage there
+	Privacy Policy update
+	Disclose the new data flow (contact names/emails, invoice lines, GST numbers) to Xero before launch — a NZ Privacy Act 2020 obligation distinct from Xero's own terms
+	07
+Rollout without breakage
+Everything in this plan is additive and opt-in. A merchant who never clicks "Connect to Xero" has zero code path change — same Windcave flow, same receipts, same CSV export, unchanged.
+* Kill switch. An XERO_INTEGRATION_ENABLED flag gates whether the new routes even register, so the whole feature can be turned off without a rollback.
+* Pilot with a small, hand-picked group first. There's real runway here — the Code flow is free up to 25 connected organisations (§00) — but starting with a handful of merchants keeps the first real-world syncs easy to watch closely before opening it up more broadly.
+* Schema discipline. New tables and nullable columns only — consistent with the project's existing Data Safety Policy (no forced pushes, no touching the seed guard).
+* Graceful degradation. As in §05 — a Xero-side failure delays the Xero copy of a record; it never blocks or reverses the underlying TaptPay action.
+08
+Phased build plan
+Phase
+	Scope
+	Estimate
+	0
+	Register the app in the Xero Developer Portal, set redirect URIs per environment, confirm scopes
+	1–2 days
+	1
+	New tables/columns, AES-256-GCM token encryption utility, env vars
+	2–3 days
+	2
+	OAuth2 connect / callback / refresh / disconnect (server/xero.ts)
+	3–4 days
+	3
+	Settings UI — connect button, account mapping, sync log
+	2–3 days
+	4
+	Contact sync (search-before-create, ID caching)
+	2 days
+	5
+	Invoice sync — Trades first, then Property
+	4–6 days
+	6
+	Payment reconciliation, Clearing account, optional fee postings, credit notes
+	3–5 days
+	7
+	Retry queue, rate-limit handling, merchant-facing status/monitoring
+	2–3 days
+	8
+	Testing against Xero's Demo Company, security review, compliance pass
+	3–4 days
+	≈ 3.5–5 weeks of focused solo-developer work end to end. Every Xero developer account includes a free Demo Company automatically — that's where Phases 2–8 get exercised before any real merchant connects.
+09
+Decisions needed from you
+Everything above is buildable as written, but five product calls are genuinely yours to make before Phase 2 starts:
+Open questions
+* Sync trigger. Push an invoice to Xero when it's sent (accrual-friendly) or only once it's paid (simpler, cash-basis)? This plan makes it a per-merchant setting, but the default matters.
+* Which vertical first. Trades job invoices are the cleaner one-off shape; Property rent invoices are recurring and slightly more involved. Recommend Trades first, Property as a fast-follow.
+* The pilot list. With 25 free connections available, who are the first merchants worth hand-picking for early access?
+* Fee visibility. Is posting Windcave/platform fees into the merchant's Xero ledger (§05) a v1 feature, or does it wait until merchants ask for it?
+* Certification timing. Who owns confirming Xero's certification requirements with them directly, and when — ideally well before TaptPay is approaching the 25-connection cap, not after?
+Sources
+* Xero Developer — OAuth2 overview
+* Xero Developer — Scopes
+* Xero Developer — Pricing
+* Xero Developer — Pricing & Policy Updates FAQ
+* Xero Developer — Granular Scopes FAQ
+* Xero Developer — Branding your integration
+* Truto — Xero API Pricing Changes 2026

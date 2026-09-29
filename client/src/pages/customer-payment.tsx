@@ -3,7 +3,7 @@ import { useParams, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { sseClient } from "@/lib/sse-client";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { CheckCircle, XCircle, Loader2, QrCode } from "lucide-react";
 import taptLogo from "@assets/IMG_6592_1755070818452.png";
 
 function redirectToRealBrowser() {
@@ -36,8 +36,88 @@ function redirectToRealBrowser() {
   return false;
 }
 
+/**
+ * A board's page shows the business's name and logo as the printed board does, read from the
+ * board (owner decision 2026-09-26: the by-number business read is retired).
+ */
+function useBoardBrand(merchantId: number, stoneNumber: number) {
+  return useQuery<{ businessName?: string; customLogoUrl?: string | null }>({
+    queryKey: ["/api/merchants", merchantId, "stone", stoneNumber, "brand"],
+    queryFn: async () => {
+      const response = await fetch(`/api/merchants/${merchantId}/stone/${stoneNumber}/brand`);
+      if (!response.ok) throw new Error("Failed to fetch the board");
+      return response.json();
+    },
+  });
+}
+
+function MerchantLogo({ customLogoUrl }: { customLogoUrl?: string | null }) {
+  return (
+    <div className="text-center mb-8">
+      <img
+        src={customLogoUrl || taptLogo}
+        alt="merchant logo"
+        className="h-12 sm:h-14 mx-auto object-contain"
+        style={
+          customLogoUrl
+            ? {}
+            : { filter: "brightness(0) saturate(100%) invert(78%) sepia(96%) saturate(2453%) hue-rotate(131deg) brightness(97%) contrast(101%)" }
+        }
+      />
+    </div>
+  );
+}
+
 export default function CustomerPayment() {
   const { merchantId, stoneId } = useParams<{ merchantId: string; stoneId?: string }>();
+  const id = merchantId ? parseInt(merchantId) : null;
+  const stoneNumber = stoneId ? parseInt(stoneId) : null;
+
+  if (!id) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-200">
+        <div className="text-center space-y-4 bg-white rounded-2xl p-8">
+          <h2 className="text-2xl font-bold text-red-600">Invalid Payment Link</h2>
+          <p className="text-gray-600">Please use a valid payment link from your merchant.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Owner decision 2026-09-25 (docs/decisions/2026-09-25-no-board-rework-402-and-batch-owner-answers.md):
+  // without a payment board, every sale has its own private link (/pay/t/<token>). This
+  // business-wide address no longer waits for "the business's current sale" — that let anyone
+  // watch a business's no-board sales (gap 12) — so it reads no sale and opens no feed.
+  if (!stoneNumber) return <NoBoardNotice merchantId={id} />;
+
+  return <BoardPayment merchantId={id} stoneNumber={stoneNumber} />;
+}
+
+// No board and no sale: nothing to give the business's details with, so TaptPay's logo shows.
+function NoBoardNotice(_props: { merchantId: number }) {
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="w-full max-w-sm md:max-w-md">
+        <div className="rounded-[48px] overflow-hidden shadow-2xl">
+          <div className="bg-[#0055FF] px-8 pt-8 pb-20 rounded-b-[48px]">
+            <MerchantLogo customLogoUrl={null} />
+            <div className="text-center">
+              <QrCode className="w-8 h-8 text-[#00E5CC] mx-auto mb-4" />
+              <h2 className="text-xl font-bold text-white mb-2">Ask for your payment link</h2>
+              <p className="text-white/70">
+                Each sale now has its own payment link. Ask the business to show you the QR code for your sale.
+              </p>
+            </div>
+          </div>
+          <div className="bg-[#00E5CC] px-8 py-4 -mt-4" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** A payment board's customer page: waits for that board's current sale. */
+function BoardPayment({ merchantId: id, stoneNumber }: { merchantId: number; stoneNumber: number }) {
   const [, setLocation] = useLocation();
   const [currentTransaction, setCurrentTransaction] = useState<any>(null);
   const [paymentStatus, setPaymentStatus] = useState<"loading" | "redirecting" | "success" | "error">("loading");
@@ -46,26 +126,14 @@ export default function CustomerPayment() {
   // Immediately redirect to Chrome/Safari if opened in an in-app browser
   useEffect(() => { redirectToRealBrowser(); }, []);
 
-  const id = merchantId ? parseInt(merchantId) : null;
-  const stoneNumber = stoneId ? parseInt(stoneId) : null;
-
-  const { data: merchant } = useQuery({
-    queryKey: ["/api/merchants", id],
-    queryFn: async () => {
-      const response = await fetch(`/api/merchants/${id}`);
-      if (!response.ok) throw new Error("Failed to fetch merchant");
-      return response.json();
-    },
-    enabled: !!id,
-  });
+  const { data: merchant } = useBoardBrand(id, stoneNumber);
 
   const { data: activeTransaction, isLoading } = useQuery({
     queryKey: ["/api/merchants", id, "active-transaction", stoneNumber],
     queryFn: async () => {
-      const url = stoneNumber
-        ? `/api/merchants/${id}/active-transaction?stoneId=${stoneNumber}`
-        : `/api/merchants/${id}/active-transaction`;
-      const response = await fetch(url, { headers: { "Cache-Control": "no-cache" } });
+      const response = await fetch(`/api/merchants/${id}/active-transaction?stoneId=${stoneNumber}`, {
+        headers: { "Cache-Control": "no-cache" },
+      });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return response.json();
     },
@@ -78,11 +146,11 @@ export default function CustomerPayment() {
   });
 
   useEffect(() => {
-    if (!id) return;
-    sseClient.connect(id, stoneNumber);
+    sseClient.connectCustomer(id, stoneNumber);
 
     const handleTransactionUpdate = (message: any) => {
-      if (stoneNumber && message.transaction.taptStoneId !== stoneNumber) return;
+      if (message.addressingMode !== "board") return;
+      if (message.stoneId !== stoneNumber || message.transaction.taptStoneId !== stoneNumber) return;
       setCurrentTransaction(message.transaction);
       queryClient.setQueryData(["/api/merchants", id, "active-transaction", stoneNumber], message.transaction);
 
@@ -131,31 +199,7 @@ export default function CustomerPayment() {
     queryClient.invalidateQueries({ queryKey: ["/api/merchants", id, "active-transaction", stoneNumber] });
   };
 
-  const logo = (
-    <div className="text-center mb-8">
-      <img
-        src={merchant?.customLogoUrl || taptLogo}
-        alt="merchant logo"
-        className="h-12 sm:h-14 mx-auto object-contain"
-        style={
-          merchant?.customLogoUrl
-            ? {}
-            : { filter: "brightness(0) saturate(100%) invert(78%) sepia(96%) saturate(2453%) hue-rotate(131deg) brightness(97%) contrast(101%)" }
-        }
-      />
-    </div>
-  );
-
-  if (!id) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-200">
-        <div className="text-center space-y-4 bg-white rounded-2xl p-8">
-          <h2 className="text-2xl font-bold text-red-600">Invalid Payment Link</h2>
-          <p className="text-gray-600">Please use a valid payment link from your merchant.</p>
-        </div>
-      </div>
-    );
-  }
+  const logo = <MerchantLogo customLogoUrl={merchant?.customLogoUrl} />;
 
   // Waiting for a transaction to be created by the merchant
   if (isLoading || (!currentTransaction && paymentStatus === "loading")) {

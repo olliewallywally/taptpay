@@ -7,26 +7,25 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { getCurrentMerchantId } from "@/lib/auth";
+import { MerchantGate } from "@/components/merchant-gate";
 import { Download, FileText, FileSpreadsheet, Calendar, TrendingUp } from "lucide-react";
 import { format } from "date-fns";
 
 type DateRange = "7days" | "30days" | "90days" | "1year" | "lifetime" | "custom";
 
 export default function Exports() {
+  return (
+    <MerchantGate redirect="document" fallback={<div>Redirecting to login...</div>}>
+      {(merchantId) => <ExportsPage merchantId={merchantId} />}
+    </MerchantGate>
+  );
+}
+
+function ExportsPage({ merchantId }: { merchantId: number }) {
   const { toast } = useToast();
   const [dateRange, setDateRange] = useState<DateRange>("30days");
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
-
-  // Get current user's merchant ID from authentication
-  const merchantId = getCurrentMerchantId();
-  
-  // Redirect to login if no merchantId
-  if (!merchantId) {
-    window.location.href = '/login';
-    return <div>Redirecting to login...</div>;
-  }
 
   // Calculate date range based on selection
   const getDateRange = () => {
@@ -268,10 +267,6 @@ export default function Exports() {
                 <p className="text-2xl font-bold text-green-600">${analytics.totalRevenue.toFixed(2)}</p>
                 <p className="text-sm text-gray-600">Revenue</p>
               </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-orange-600">${analytics.savings.toFixed(2)}</p>
-                <p className="text-sm text-gray-600">Savings with Tapt</p>
-              </div>
             </div>
           </CardContent>
         </Card>
@@ -337,7 +332,6 @@ export default function Exports() {
               <p><strong>Includes:</strong></p>
               <ul className="list-disc list-inside mt-2">
                 <li>Executive summary with key metrics</li>
-                <li>Cost comparison and savings</li>
                 <li>Transaction breakdown by status</li>
                 <li>Recent transaction details</li>
               </ul>

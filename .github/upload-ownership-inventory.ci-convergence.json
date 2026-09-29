@@ -1,0 +1,7 @@
+{
+  "version": 2,
+  "target": { "host": "127.0.0.1", "port": 5432, "database": "convergence" },
+  "approvedBy": "repository review: CI's disposable convergence database starts empty and holds no uploads",
+  "approvedAt": "2026-09-21T00:00:00Z",
+  "entries": []
+}

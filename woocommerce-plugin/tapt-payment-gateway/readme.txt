@@ -4,7 +4,7 @@ Tags: payment, gateway, nfc, qr code, ecommerce, woocommerce
 Requires at least: 5.0
 Tested up to: 6.4
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 1.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -16,7 +16,7 @@ Tapt Payment Gateway brings modern payment processing to your WooCommerce store 
 
 * **NFC Tap-to-Pay**: Customers can tap their phones to pay instantly
 * **QR Code Payments**: Quick scanning for contactless transactions  
-* **Fixed Fee Structure**: Just $0.25 per transaction, no percentages
+* **Straightforward Pricing**: TaptPay plans start at $7.99/month with no TaptPay per-transaction fee
 * **Bank-Level Security**: PCI compliant with encrypted data transmission
 * **Real-time Processing**: Instant payment confirmation via webhooks
 * **Mobile Optimized**: Perfect for mobile and tablet transactions
@@ -29,9 +29,10 @@ Tapt Payment Gateway brings modern payment processing to your WooCommerce store 
 - Traditional card payments with enhanced security
 
 **Transparent Pricing**
-- Fixed $0.25 fee per transaction
-- No monthly fees or setup costs
-- No percentage-based charges
+- Subscription plans start at $7.99/month
+- No TaptPay per-transaction fee
+- No setup fee
+- Payment-processing or acquiring fees under your Windcave merchant agreement may still apply
 
 **Secure & Reliable**
 - PCI DSS compliant payment processing
@@ -64,11 +65,11 @@ Tapt Payment Gateway brings modern payment processing to your WooCommerce store 
 
 = What is Tapt? =
 
-Tapt is a modern payment processing platform that specializes in NFC and QR code payments with transparent, fixed-fee pricing.
+Tapt is a modern payment platform that specializes in NFC and QR code payments with straightforward subscription pricing.
 
 = How much does it cost? =
 
-Tapt charges a fixed fee of $0.25 per transaction. No monthly fees, no percentage charges, no hidden costs.
+TaptPay subscription plans start at $7.99/month and do not add a TaptPay per-transaction fee. Payment-processing or acquiring fees under your Windcave merchant agreement may still apply.
 
 = Do I need special hardware? =
 
@@ -100,6 +101,11 @@ Refunds can be processed directly from your Tapt dashboard. The plugin will mark
 
 == Changelog ==
 
+= 1.1.0 =
+* Updated checkout and plugin-directory pricing copy for subscription plans
+* Removed references to the retired per-transaction fee
+* Clarified that external payment-processing or acquiring fees may still apply
+
 = 1.0.0 =
 * Initial release
 * NFC and QR code payment support
@@ -109,6 +115,9 @@ Refunds can be processed directly from your Tapt dashboard. The plugin will mark
 * Refund notification system
 
 == Upgrade Notice ==
+
+= 1.1.0 =
+Updates public pricing copy to match TaptPay subscription plans.
 
 = 1.0.0 =
 Initial release of Tapt Payment Gateway for WooCommerce.

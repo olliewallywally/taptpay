@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<style>
+@font-face { font-family:'Outfit'; src:url('fonts/Outfit-Light.otf') format('opentype'); font-weight:300; font-style:normal; font-display:swap; }
+@font-face { font-family:'Outfit'; src:url('fonts/Outfit-Regular.otf') format('opentype'); font-weight:400; font-style:normal; font-display:swap; }
+@font-face { font-family:'Outfit'; src:url('fonts/Outfit-Medium.otf') format('opentype'); font-weight:500; font-style:normal; font-display:swap; }
+@font-face { font-family:'Outfit'; src:url('fonts/Outfit-SemiBold.otf') format('opentype'); font-weight:600; font-style:normal; font-display:swap; }
+@font-face { font-family:'Outfit'; src:url('fonts/Outfit-Bold.otf') format('opentype'); font-weight:700; font-style:normal; font-display:swap; }
+@font-face { font-family:'Larken'; src:url('fonts/LarkenDEMO-Black.otf') format('opentype'); font-weight:900; font-style:normal; font-display:swap; }
+@font-face { font-family:'Larken'; src:url('fonts/LarkenDEMO-BlackItalic.otf') format('opentype'); font-weight:900; font-style:italic; font-display:swap; }
+html,body{margin:0;padding:0;background:#0A1030;}
+a{color:#58ABFF;text-decoration:none;}
+a:hover{color:#F4F1E8;}
+.tnav{background:transparent;color:rgba(244,241,232,0.6);}
+.tnav[data-on="true"]{background:#58ABFF;color:#040D6D;}
+.tnav[data-on="true"] svg{stroke:#040D6D;}
+.tchip{background:rgba(255,255,255,0.12);color:#F4F1E8;border:1.5px solid transparent;}
+.tchip[data-on="true"]{background:#58ABFF;color:#040D6D;border-color:#58ABFF;}
+.lchip{background:#FFFFFF;color:#040D6D;border:1.5px solid rgba(4,13,109,0.18);}
+.lchip[data-on="true"]{background:#040D6D;color:#FFFFFF;border-color:#040D6D;}
+.tglTrack{background:rgba(4,13,109,0.15);}
+.tglTrack[data-on="true"]{background:#1BBF85;}
+.tglKnob{transform:translateX(0);}
+.tglKnob[data-on="true"]{transform:translateX(20px);}
+.setrow{background:transparent;}
+.setrow[data-on="true"]{background:#040D6D;}
+.setrow[data-on="true"] .setlbl{color:#FFFFFF;}
+.setrow[data-on="true"] svg{stroke:#58ABFF;}
+.krow:active{opacity:.7;}
+button{font-family:'Outfit',sans-serif;}
+input::placeholder{color:rgba(4,13,109,0.35);}
+</style>
+<link rel="preload" href="fonts/Outfit-Medium.otf" as="font" type="font/otf" crossorigin="anonymous">
+<link rel="preload" href="fonts/Outfit-SemiBold.otf" as="font" type="font/otf" crossorigin="anonymous">
+</helmet>
+
+<section style="display:flex;flex-direction:column;gap:56px;padding:80px;background:#0A1030;font-family:'Outfit',system-ui,sans-serif;-webkit-font-smoothing:antialiased;min-height:100vh;box-sizing:border-box;">
+
+  <!-- turn header -->
+  <div style="display:flex;flex-direction:column;gap:10px;">
+    <div style="display:flex;align-items:center;gap:14px;">
+      <span style="display:flex;align-items:baseline;font-size:30px;line-height:1;"><span style="font-family:'Larken';font-weight:900;color:#58ABFF;">tapt</span><span style="font-family:'Larken';font-weight:900;font-style:italic;color:#58ABFF;">pay.</span></span>
+      <span style="font-weight:500;font-size:15px;letter-spacing:0.28em;text-transform:uppercase;color:rgba(244,241,232,0.5);">tablet · ipad 11″ landscape · 1180×820</span>
+    </div>
+    <div style="font-weight:400;font-size:15px;color:rgba(244,241,232,0.55);max-width:880px;line-height:1.6;"><a href="#1a">1a</a> is the full clickable prototype (nav rail) — tap through terminal, property, trades, stock, analytics &amp; settings; the keypad, splits, bills, quote builder and toggles all work. <a href="#1b">1b</a>–<a href="#1e">1e</a> are alternate layout &amp; nav directions, static.</div>
+  </div>
+
+  <!-- ═══════════ 1a · HERO — interactive prototype, nav rail ═══════════ -->
+  <div id="1a" style="position:relative;align-self:flex-start;">
+    <div style="position:absolute;top:-46px;left:0;display:flex;align-items:center;gap:12px;">
+      <span style="padding:8px 18px;border-radius:9999px;background:#58ABFF;color:#040D6D;font-weight:700;font-size:14px;">1a</span>
+      <span style="font-weight:500;font-size:15px;color:rgba(244,241,232,0.75);">interactive prototype — left nav rail · split-view layouts</span>
+    </div>
+    <!-- ipad bezel -->
+    <div style="position:relative;border-radius:42px;background:#10131C;padding:20px;box-shadow:0 60px 120px rgba(0,0,0,0.6),inset 0 0 0 2px rgba(255,255,255,0.07);">
+      <div style="position:absolute;top:9px;left:50%;transform:translateX(-50%);width:7px;height:7px;border-radius:50%;background:#2A3142;"></div>
+      <!-- screen -->
+      <div style="position:relative;width:1180px;height:820px;border-radius:24px;overflow:hidden;background:#EDEFF4;display:flex;">
+
+        <!-- ── nav rail ── -->
+        <div style="flex:0 0 208px;background:#040D6D;display:flex;flex-direction:column;padding:22px 14px 18px;box-sizing:border-box;">
+          <div style="display:flex;align-items:baseline;padding:0 12px;font-size:24px;line-height:1;">
+            <span style="font-family:'Larken';font-weight:900;color:#58ABFF;">tapt</span><span style="font-family:'Larken';font-weight:900;font-style:italic;color:#58ABFF;">pay.</span>
+          </div>
+          <div style="margin-top:6px;padding:0 12px;font-weight:400;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(244,241,232,0.35);">the corner café</div>
+          <div style="margin-top:26px;display:flex;flex-direction:column;gap:6px;">
+            <button class="tnav" data-key="terminal" data-on="{{ navTerminal }}" onClick="{{ navTap }}" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;border:none;cursor:pointer;font-weight:600;font-size:15px;text-align:left;transition:background .18s ease,color .18s ease;">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#58ABFF" stroke-width="1.8" stroke-linecap="round" style="transition:stroke .18s ease;"><circle cx="7" cy="7" r="1.3"></circle><circle cx="12" cy="7" r="1.3"></circle><circle cx="17" cy="7" r="1.3"></circle><circle cx="7" cy="12" r="1.3"></circle><circle cx="12" cy="12" r="1.3"></circle><circle cx="17" cy="12" r="1.3"></circle><circle cx="7" cy="17" r="1.3"></circle><circle cx="12" cy="17" r="1.3"></circle><circle cx="17" cy="17" r="1.3"></circle></svg>
+              <span>terminal</span>
+            </button>
+            <button class="tnav" data-key="property" data-on="{{ navProperty }}" onClick="{{ navTap }}" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;border:none;cursor:pointer;font-weight:600;font-size:15px;text-align:left;transition:background .18s ease,color .18s ease;">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#58ABFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="transition:stroke .18s ease;"><path d="M4 11l8-7 8 7"></path><path d="M6 9.5V20h12V9.5"></path></svg>
+              <span>property</span>
+            </button>
+            <button class="tnav" data-key="trades" data-on="{{ navTrades }}" onClick="{{ navTap }}" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;border:none;cursor:pointer;font-weight:600;font-size:15px;text-align:left;transition:background .18s ease,color .18s ease;">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#58ABFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="transition:stroke .18s ease;"><path d="M14 4l6 6-9 9H5v-6z"></path><path d="M12 6l6 6"></path></svg>
+              <span>trades</span>
+            </button>
+            <button class="tnav" data-key="stock" data-on="{{ navStock }}" onClick="{{ navTap }}" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;border:none;cursor:pointer;font-weight:600;font-size:15px;text-align:left;transition:background .18s ease,color .18s ease;">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#58ABFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="transition:stroke .18s ease;"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"></path><path d="M4 7.5l8 4.5 8-4.5M12 12v9"></path></svg>
+              <span>stock</span>
+            </button>
+            <button class="tnav" data-key="analytics" data-on="{{ navAnalytics }}" onClick="{{ navTap }}" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;border:none;cursor:pointer;font-weight:600;font-size:15px;text-align:left;transition:background .18s ease,color .18s ease;">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#58ABFF" stroke-width="1.8" stroke-linecap="round" style="transition:stroke .18s ease;"><path d="M4 19h16"></path><path d="M7 16v-5M12 16V7M17 16v-8"></path></svg>
+              <span>analytics</span>
+            </button>
+            <button class="tnav" data-key="settings" data-on="{{ navSettings }}" onClick="{{ navTap }}" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;border:none;cursor:pointer;font-weight:600;font-size:15px;text-align:left;transition:background .18s ease,color .18s ease;">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#58ABFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="transition:stroke .18s ease;"><circle cx="12" cy="12" r="3"></circle><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3 1a7 7 0 0 0-2-1.2L14.2 3h-4l-.4 2.5a7 7 0 0 0-2 1.2l-2.3-1-2 3.4 2 1.5a7 7 0 0 0 0 2.4l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 2 1.2l.4 2.5h4l.4-2.5a7 7 0 0 0 2-1.2l2.3 1 2-3.4-2-1.5c.06-.4.1-.8.1-1.2z"></path></svg>
+              <span>settings</span>
+            </button>
+          </div>
+          <div style="margin-top:auto;display:flex;flex-direction:column;gap:14px;">
+            <div style="display:flex;align-items:center;gap:10px;padding:0 12px;">
+              <span style="width:8px;height:8px;border-radius:50%;background:#1BBF85;"></span>
+              <span style="font-weight:500;font-size:12px;color:rgba(244,241,232,0.6);">boards live · payouts ok</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:14px;background:rgba(255,255,255,0.06);">
+              <span style="width:34px;height:34px;border-radius:50%;background:#58ABFF;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#040D6D;">ol</span>
+              <span style="display:flex;flex-direction:column;">
+                <span style="font-weight:600;font-size:13px;color:#F4F1E8;">oliver leonard</span>
+                <span style="font-weight:400;font-size:11px;color:rgba(244,241,232,0.45);">owner · 3 logins</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── page area ── -->
+        <div style="flex:1 1 auto;position:relative;display:flex;min-width:0;">
+
+          <!-- ════ TERMINAL ════ -->
+          <sc-if value="{{ pgTerminal }}" hint-placeholder-val="{{ true }}">
+            <div style="position:absolute;inset:0;display:flex;">
+              <!-- keypad zone -->
+              <div style="flex:0 0 432px;background:#040D6D;display:flex;flex-direction:column;padding:26px 30px 24px;box-sizing:border-box;">
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                  <span style="font-weight:500;font-size:13px;letter-spacing:0.2em;text-transform:uppercase;color:rgba(244,241,232,0.45);">new payment</span>
+                  <span style="display:inline-flex;align-items:center;gap:7px;padding:7px 14px;border-radius:9999px;background:rgba(88,171,255,0.14);font-weight:600;font-size:12px;color:#58ABFF;"><span style="width:6px;height:6px;border-radius:50%;background:#58ABFF;"></span><span>paywave · boards</span></span>
+                </div>
+                <div style="margin-top:22px;font-weight:700;font-size:64px;letter-spacing:-0.02em;color:#58ABFF;line-height:1;">{{ amountDisplay }}</div>
+                <div style="margin-top:10px;font-weight:500;font-size:14px;color:rgba(244,241,232,0.5);">{{ selectedItemLabel }}</div>
+                <div style="margin-top:18px;display:flex;flex-wrap:wrap;gap:8px;">
+                  <button class="tchip" data-item="custom" data-on="{{ chipCustom }}" onClick="{{ pickItem }}" style="padding:9px 16px;border-radius:9999px;border:none;cursor:pointer;font-weight:600;font-size:13px;transition:background .15s ease,color .15s ease;">custom</button>
+                  <button class="tchip" data-item="latte" data-on="{{ chipLatte }}" onClick="{{ pickItem }}" style="padding:9px 16px;border-radius:9999px;border:none;cursor:pointer;font-weight:600;font-size:13px;transition:background .15s ease,color .15s ease;">latte · $6.50</button>
+                  <button class="tchip" data-item="brunch" data-on="{{ chipBrunch }}" onClick="{{ pickItem }}" style="padding:9px 16px;border-radius:9999px;border:none;cursor:pointer;font-weight:600;font-size:13px;transition:background .15s ease,color .15s ease;">big brunch · $24.00</button>
+                  <button class="tchip" data-item="muffin" data-on="{{ chipMuffin }}" onClick="{{ pickItem }}" style="padding:9px 16px;border-radius:9999px;border:none;cursor:pointer;font-weight:600;font-size:13px;transition:background .15s ease,color .15s ease;">muffin · $5.00</button>
+                </div>
+                <div style="margin-top:auto;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+                  <button class="krow" data-k="1" onClick="{{ keyTap }}" style="height:62px;border-radius:16px;border:none;background:rgba(255,255,255,0.07);color:#F4F1E8;font-weight:600;font-size:26px;cursor:pointer;">1</button>
+                  <button class="krow" data-k="2" onClick="{{ keyTap }}" style="height:62px;border-radius:16px;border:none;background:rgba(255,255,255,0.07);color:#F4F1E8;font-weight:600;font-size:26px;cursor:pointer;">2</button>
+                  <button class="krow" data-k="3" onClick="{{ keyTap }}" style="height:62px;border-radius:16px;border:none;background:rgba(255,255,255,0.07);color:#F4F1E8;font-weight:600;font-size:26px;cursor:pointer;">3</button>
+                  <button class="krow" data-k="4" onClick="{{ keyTap }}" style="height:62px;border-radius:16px;border:none;background:rgba(255,255,255,0.07);color:#F4F1E8;font-weight:600;font-size:26px;cursor:pointer;">4</button>
+                  <button class="krow" data-k="5" onClick="{{ keyTap }}" style="height:62px;border-radius:16px;border:none;background:rgba(255,255,255,0.07);color:#F4F1E8;font-weight:600;font-size:26px;cursor:pointer;">5</button>
+                  <button class="krow" data-k="6" onClick="{{ keyTap }}" style="height:62px;border-radius:16px;border:none;background:rgba(255,255,255,0.07);color:#F4F1E8;font-weight:600;font-size:26px;cursor:pointer;">6</button>
+                  <button class="krow" data-k="7" onClick="{{ keyTap }}" style="height:62px;border-radius:16px;border:none;background:rgba(255,255,255,0.07);color:#F4F1E8;font-weight:600;font-size:26px;cursor:pointer;">7</button>
+                  <button class="krow" data-k="8" onClick="{{ keyTap }}" style="height:62px;border-radius:16px;border:none;background:rgba(255,255,255,0.07);color:#F4F1E8;font-weight:600;font-size:26px;cursor:pointer;">8</button>
+                  <button class="krow" data-k="9" onClick="{{ keyTap }}" style="height:62px;border-radius:16px;border:none;background:rgba(255,255,255,0.07);color:#F4F1E8;font-weight:600;font-size:26px;cursor:pointer;">9</button>
+                  <button class="krow" data-k="c" onClick="{{ keyTap }}" style="height:62px;border-radius:16px;border:none;background:rgba(255,255,255,0.04);color:rgba(244,241,232,0.55);font-weight:600;font-size:20px;cursor:pointer;">C</button>
+                  <button class="krow" data-k="0" onClick="{{ keyTap }}" style="height:62px;border-radius:16px;border:none;background:rgba(255,255,255,0.07);color:#F4F1E8;font-weight:600;font-size:26px;cursor:pointer;">0</button>
+                  <button class="krow" data-k="b" onClick="{{ keyTap }}" style="height:62px;border-radius:16px;border:none;background:rgba(255,255,255,0.04);color:rgba(244,241,232,0.55);font-weight:600;font-size:20px;cursor:pointer;">⌫</button>
+                </div>
+                <div style="margin-top:14px;display:flex;gap:10px;">
+                  <button onClick="{{ openSplit }}" style="flex:0 0 auto;display:inline-flex;align-items:center;gap:9px;padding:0 22px;height:56px;border-radius:9999px;border:1.5px solid #58ABFF;background:transparent;color:#58ABFF;font-weight:600;font-size:15px;cursor:pointer;">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v7M12 10l-5.5 8M12 10l5.5 8"></path></svg>
+                    <span>split</span>
+                  </button>
+                  <button onClick="{{ charge }}" style="flex:1 1 auto;height:56px;border-radius:9999px;border:none;background:#58ABFF;color:#040D6D;font-weight:700;font-size:17px;cursor:pointer;">charge</button>
+                </div>
+              </div>
+              <!-- stack zone -->
+              <div style="flex:1 1 auto;background:#EDEFF4;display:flex;flex-direction:column;padding:26px 30px 24px;box-sizing:border-box;min-width:0;">
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                  <div style="display:flex;flex-direction:column;gap:2px;">
+                    <span style="font-weight:700;font-size:22px;color:#040D6D;">active stack</span>
+                    <span style="font-weight:400;font-size:13px;color:rgba(4,13,109,0.5);">{{ stackSummary }}</span>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:10px;">
+                    <span style="display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border-radius:9999px;background:#FFFFFF;font-weight:600;font-size:13px;color:#040D6D;box-shadow:0 2px 8px rgba(4,13,109,0.06);"><span style="width:7px;height:7px;border-radius:50%;background:#1BBF85;"></span><span>today · {{ todayTotal }}</span></span>
+                  </div>
+                </div>
+                <div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;flex:1 1 auto;padding-bottom:6px;">
+                  <sc-for list="{{ stackItems }}" as="it" hint-placeholder-count="4">
+                    <div data-id="{{ it.id }}" onClick="{{ stackTap }}" style="display:flex;align-items:center;gap:16px;padding:16px 20px;border-radius:18px;background:#FFFFFF;box-shadow:0 2px 10px rgba(4,13,109,0.05);cursor:pointer;">
+                      <span style="width:9px;height:9px;border-radius:50%;background:{{ it.dot }};flex:0 0 auto;"></span>
+                      <span style="display:flex;flex-direction:column;gap:2px;min-width:0;flex:1 1 auto;">
+                        <span style="font-weight:600;font-size:16px;color:#040D6D;">{{ it.label }}</span>
+                        <span style="font-weight:400;font-size:12.5px;color:rgba(4,13,109,0.45);">{{ it.statusLabel }}</span>
+                      </span>
+                      <span style="font-weight:700;font-size:18px;color:#040D6D;">{{ it.amt }}</span>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(4,13,109,0.3)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"></path></svg>
+                    </div>
+                  </sc-for>
+                </div>
+                <div style="margin-top:12px;display:flex;align-items:center;gap:10px;font-weight:400;font-size:12.5px;color:rgba(4,13,109,0.45);">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(4,13,109,0.4)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v4l2.5 2.5"></path></svg>
+                  <span>tap a payment to mark it paid · unlimited payments can sit live at once</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- qr overlay -->
+            <sc-if value="{{ qrOpen }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;inset:0;background:rgba(4,9,50,0.55);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:20;">
+                <div style="width:400px;border-radius:28px;background:#FFFFFF;padding:34px 36px;display:flex;flex-direction:column;align-items:center;box-shadow:0 40px 90px rgba(0,0,0,0.4);">
+                  <span style="font-weight:500;font-size:13px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(4,13,109,0.45);">{{ qrLabel }}</span>
+                  <span style="margin-top:8px;font-weight:700;font-size:46px;color:#040D6D;">{{ qrAmount }}</span>
+                  <div style="margin-top:20px;width:190px;height:190px;border-radius:18px;background:#040D6D;display:flex;align-items:center;justify-content:center;">
+                    <svg width="132" height="132" viewBox="0 0 33 33" fill="#58ABFF"><rect x="1" y="1" width="9" height="9" rx="1.4" fill="none" stroke="#58ABFF" stroke-width="2"></rect><rect x="4" y="4" width="3" height="3"></rect><rect x="23" y="1" width="9" height="9" rx="1.4" fill="none" stroke="#58ABFF" stroke-width="2"></rect><rect x="26" y="4" width="3" height="3"></rect><rect x="1" y="23" width="9" height="9" rx="1.4" fill="none" stroke="#58ABFF" stroke-width="2"></rect><rect x="4" y="26" width="3" height="3"></rect><rect x="13" y="2" width="2" height="2"></rect><rect x="17" y="2" width="3" height="3"></rect><rect x="14" y="6" width="2" height="2"></rect><rect x="18" y="7" width="2" height="2"></rect><rect x="13" y="11" width="3" height="3"></rect><rect x="18" y="12" width="2" height="2"></rect><rect x="2" y="13" width="2" height="2"></rect><rect x="6" y="14" width="3" height="3"></rect><rect x="11" y="15" width="2" height="2"></rect><rect x="22" y="13" width="3" height="3"></rect><rect x="27" y="14" width="2" height="2"></rect><rect x="30" y="12" width="2" height="2"></rect><rect x="13" y="18" width="2" height="2"></rect><rect x="16" y="17" width="3" height="3"></rect><rect x="21" y="18" width="2" height="2"></rect><rect x="25" y="17" width="3" height="3"></rect><rect x="30" y="18" width="2" height="2"></rect><rect x="13" y="22" width="3" height="3"></rect><rect x="18" y="23" width="2" height="2"></rect><rect x="22" y="22" width="2" height="2"></rect><rect x="26" y="23" width="3" height="3"></rect><rect x="13" y="27" width="2" height="2"></rect><rect x="17" y="27" width="3" height="3"></rect><rect x="22" y="27" width="2" height="2"></rect><rect x="27" y="28" width="2" height="2"></rect></svg>
+                  </div>
+                  <div style="margin-top:18px;display:flex;align-items:center;gap:9px;font-weight:500;font-size:14px;color:rgba(4,13,109,0.55);">
+                    <span style="width:8px;height:8px;border-radius:50%;background:#FFB02E;"></span>
+                    <span>{{ qrStatus }}</span>
+                  </div>
+                  <button onClick="{{ cancelQr }}" style="margin-top:20px;padding:12px 28px;border-radius:9999px;border:none;background:rgba(4,13,109,0.07);color:#040D6D;font-weight:600;font-size:14px;cursor:pointer;">close</button>
+                </div>
+              </div>
+            </sc-if>
+
+            <!-- split overlay -->
+            <sc-if value="{{ splitOpen }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;inset:0;background:rgba(4,9,50,0.55);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:20;">
+                <div style="width:430px;border-radius:28px;background:#040D6D;padding:36px 38px;display:flex;flex-direction:column;align-items:center;box-shadow:0 40px 90px rgba(0,0,0,0.5);">
+                  <span style="font-weight:500;font-size:13px;letter-spacing:0.2em;text-transform:uppercase;color:rgba(244,241,232,0.5);">split bill</span>
+                  <span style="margin-top:10px;font-weight:700;font-size:44px;color:#58ABFF;">{{ splitTotal }}</span>
+                  <div style="margin-top:26px;display:flex;align-items:center;gap:26px;">
+                    <button onClick="{{ splitMinus }}" style="width:54px;height:54px;border-radius:50%;border:none;background:#58ABFF;color:#040D6D;font-weight:700;font-size:26px;cursor:pointer;">−</button>
+                    <span style="font-weight:700;font-size:64px;color:#F4F1E8;min-width:70px;text-align:center;">{{ splitWays }}</span>
+                    <button onClick="{{ splitPlus }}" style="width:54px;height:54px;border-radius:50%;border:none;background:#58ABFF;color:#040D6D;font-weight:700;font-size:26px;cursor:pointer;">+</button>
+                  </div>
+                  <div style="margin-top:18px;font-weight:500;font-size:15px;color:rgba(244,241,232,0.6);">{{ splitEach }} each · per-person receipts</div>
+                  <div style="margin-top:28px;display:flex;gap:12px;width:100%;">
+                    <button onClick="{{ closeSplit }}" style="flex:1;height:52px;border-radius:9999px;border:1.5px solid rgba(244,241,232,0.3);background:transparent;color:rgba(244,241,232,0.7);font-weight:600;font-size:15px;cursor:pointer;">cancel</button>
+                    <button onClick="{{ confirmSplit }}" style="flex:1.4;height:52px;border-radius:9999px;border:none;background:#58ABFF;color:#040D6D;font-weight:700;font-size:15px;cursor:pointer;">confirm split</button>
+                  </div>
+                </div>
+              </div>
+            </sc-if>
+          </sc-if>
+
+          <!-- ════ PROPERTY ════ -->
+          <sc-if value="{{ pgProperty }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;inset:0;display:flex;">
+              <!-- tenants list -->
+              <div style="flex:0 0 372px;background:#FFFFFF;border-right:1px solid rgba(4,13,109,0.08);display:flex;flex-direction:column;padding:24px 20px;box-sizing:border-box;">
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:0 6px;">
+                  <span style="font-weight:700;font-size:22px;color:#040D6D;">rent requests</span>
+                  <span style="padding:7px 14px;border-radius:9999px;background:rgba(88,171,255,0.15);font-weight:700;font-size:13px;color:#0055FF;">{{ propOutstanding }}</span>
+                </div>
+                <div style="margin-top:6px;padding:0 6px;font-weight:400;font-size:13px;color:rgba(4,13,109,0.45);">outstanding across 4 tenancies</div>
+                <div style="margin-top:16px;display:flex;align-items:center;gap:10px;padding:11px 16px;border-radius:14px;background:#EDEFF4;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(4,13,109,0.4)" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+                  <span style="font-weight:400;font-size:14px;color:rgba(4,13,109,0.4);">search tenants</span>
+                </div>
+                <div style="margin-top:14px;display:flex;flex-direction:column;gap:8px;overflow-y:auto;">
+                  <sc-for list="{{ tenants }}" as="tn" hint-placeholder-count="4">
+                    <div data-id="{{ tn.id }}" onClick="{{ tenantTap }}" data-on="{{ tn.on }}" class="setrow" style="display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:16px;cursor:pointer;transition:background .15s ease;">
+                      <span style="width:42px;height:42px;border-radius:50%;background:{{ tn.avBg }};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:{{ tn.avFg }};flex:0 0 auto;">{{ tn.initials }}</span>
+                      <span style="display:flex;flex-direction:column;gap:2px;min-width:0;flex:1;">
+                        <span class="setlbl" style="font-weight:600;font-size:15px;color:#040D6D;">{{ tn.name }}</span>
+                        <span style="display:inline-flex;align-items:center;gap:6px;font-weight:400;font-size:12px;color:rgba(4,13,109,0.45);"><span style="width:6px;height:6px;border-radius:50%;background:{{ tn.dot }};"></span><span style="color:{{ tn.stColor }};">{{ tn.status }}</span></span>
+                      </span>
+                      <span style="font-weight:700;font-size:16px;color:{{ tn.amtColor }};">{{ tn.amt }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+              <!-- tenant detail -->
+              <div style="flex:1 1 auto;background:#EDEFF4;display:flex;flex-direction:column;padding:26px 30px;box-sizing:border-box;min-width:0;">
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;">
+                  <div style="display:flex;flex-direction:column;gap:4px;">
+                    <span style="font-weight:700;font-size:26px;color:#040D6D;">{{ selName }}</span>
+                    <span style="font-weight:400;font-size:14px;color:rgba(4,13,109,0.5);">{{ selAddress }}</span>
+                  </div>
+                  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;">
+                    <span style="font-weight:700;font-size:34px;color:#0055FF;">{{ selAmt }}</span>
+                    <span style="font-weight:500;font-size:12.5px;color:rgba(4,13,109,0.5);">{{ selSchedule }}</span>
+                  </div>
+                </div>
+                <div style="margin-top:20px;display:flex;gap:10px;">
+                  <button onClick="{{ openBill }}" style="display:inline-flex;align-items:center;gap:9px;padding:13px 24px;border-radius:9999px;border:none;background:#040D6D;color:#FFFFFF;font-weight:600;font-size:14px;cursor:pointer;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"></path></svg>
+                    <span>send bill</span>
+                  </button>
+                  <button onClick="{{ sendReminder }}" style="display:inline-flex;align-items:center;gap:9px;padding:13px 24px;border-radius:9999px;border:1.5px solid rgba(4,13,109,0.25);background:transparent;color:#040D6D;font-weight:600;font-size:14px;cursor:pointer;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"></path><path d="M10 21h4"></path></svg>
+                    <span>send reminder</span>
+                  </button>
+                  <span style="margin-left:auto;display:inline-flex;align-items:center;gap:8px;padding:0 16px;border-radius:9999px;background:#FFFFFF;font-weight:500;font-size:12.5px;color:rgba(4,13,109,0.55);box-shadow:0 2px 8px rgba(4,13,109,0.05);"><span style="width:7px;height:7px;border-radius:50%;background:#1BBF85;"></span><span>auto-reminders on · never duplicated</span></span>
+                </div>
+                <div style="margin-top:24px;font-weight:600;font-size:15px;color:rgba(4,13,109,0.55);">activity</div>
+                <div style="margin-top:10px;display:flex;flex-direction:column;gap:8px;overflow-y:auto;flex:1 1 auto;">
+                  <sc-for list="{{ selTimeline }}" as="ev" hint-placeholder-count="4">
+                    <div style="display:flex;align-items:center;gap:14px;padding:14px 18px;border-radius:16px;background:#FFFFFF;box-shadow:0 2px 8px rgba(4,13,109,0.04);">
+                      <span style="width:34px;height:34px;border-radius:12px;background:rgba(88,171,255,0.14);display:flex;align-items:center;justify-content:center;flex:0 0 auto;">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0055FF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"></path></svg>
+                      </span>
+                      <span style="display:flex;flex-direction:column;gap:1px;flex:1;min-width:0;">
+                        <span style="font-weight:600;font-size:14px;color:#040D6D;">{{ ev.label }}</span>
+                        <span style="font-weight:400;font-size:12px;color:rgba(4,13,109,0.45);">{{ ev.t }}</span>
+                      </span>
+                      <span style="font-weight:600;font-size:14px;color:{{ ev.amtColor }};">{{ ev.amt }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </div>
+
+            <!-- send bill overlay -->
+            <sc-if value="{{ billOpen }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;inset:0;background:rgba(4,9,50,0.55);backdrop-filter:blur(6px);display:flex;align-items:stretch;justify-content:flex-end;z-index:20;">
+                <div style="width:430px;background:#040D6D;padding:32px 34px;display:flex;flex-direction:column;box-shadow:-30px 0 80px rgba(0,0,0,0.4);">
+                  <div style="display:flex;align-items:center;justify-content:space-between;">
+                    <span style="font-weight:700;font-size:21px;color:#F4F1E8;">send a bill</span>
+                    <button onClick="{{ closeBill }}" style="width:38px;height:38px;border-radius:50%;border:1.5px solid rgba(244,241,232,0.3);background:transparent;color:#F4F1E8;font-size:16px;cursor:pointer;">✕</button>
+                  </div>
+                  <div style="margin-top:6px;font-weight:400;font-size:13.5px;color:rgba(244,241,232,0.5);">{{ selName }} · {{ selAddress }}</div>
+                  <div style="margin-top:26px;font-weight:500;font-size:12px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(244,241,232,0.45);">amount</div>
+                  <div style="margin-top:8px;font-weight:700;font-size:46px;color:#58ABFF;">$250.00</div>
+                  <div style="margin-top:22px;font-weight:500;font-size:12px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(244,241,232,0.45);">what for</div>
+                  <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;">
+                    <button class="tchip" data-item="water / utilities" data-on="{{ bfUtilities }}" onClick="{{ pickBillFor }}" style="padding:10px 16px;border-radius:9999px;border:none;cursor:pointer;font-weight:600;font-size:13px;transition:background .15s ease,color .15s ease;">water / utilities</button>
+                    <button class="tchip" data-item="late fee" data-on="{{ bfLate }}" onClick="{{ pickBillFor }}" style="padding:10px 16px;border-radius:9999px;border:none;cursor:pointer;font-weight:600;font-size:13px;transition:background .15s ease,color .15s ease;">late fee</button>
+                    <button class="tchip" data-item="cleaning" data-on="{{ bfCleaning }}" onClick="{{ pickBillFor }}" style="padding:10px 16px;border-radius:9999px;border:none;cursor:pointer;font-weight:600;font-size:13px;transition:background .15s ease,color .15s ease;">cleaning</button>
+                    <button class="tchip" data-item="damages" data-on="{{ bfDamages }}" onClick="{{ pickBillFor }}" style="padding:10px 16px;border-radius:9999px;border:none;cursor:pointer;font-weight:600;font-size:13px;transition:background .15s ease,color .15s ease;">damages</button>
+                    <button class="tchip" data-item="other" data-on="{{ bfOther }}" onClick="{{ pickBillFor }}" style="padding:10px 16px;border-radius:9999px;border:none;cursor:pointer;font-weight:600;font-size:13px;transition:background .15s ease,color .15s ease;">other</button>
+                  </div>
+                  <div style="margin-top:22px;font-weight:500;font-size:12px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(244,241,232,0.45);">invoice · optional</div>
+                  <div style="margin-top:10px;display:flex;align-items:center;justify-content:center;gap:10px;padding:18px;border-radius:16px;border:1.5px dashed rgba(244,241,232,0.3);font-weight:600;font-size:13.5px;color:#58ABFF;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"></path><path d="M5 20h14"></path></svg>
+                    <span>attach invoice (pdf / image)</span>
+                  </div>
+                  <button onClick="{{ sendBill }}" style="margin-top:auto;height:56px;border-radius:9999px;border:none;background:#58ABFF;color:#040D6D;font-weight:700;font-size:16px;cursor:pointer;">send bill · payment link by text</button>
+                </div>
+              </div>
+            </sc-if>
+          </sc-if>
+
+          <!-- ════ TRADES ════ -->
+          <sc-if value="{{ pgTrades }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;inset:0;display:flex;">
+              <!-- jobs list -->
+              <div style="flex:0 0 372px;background:#FFFFFF;border-right:1px solid rgba(4,13,109,0.08);display:flex;flex-direction:column;padding:24px 20px;box-sizing:border-box;">
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:0 6px;">
+                  <span style="font-weight:700;font-size:22px;color:#040D6D;">jobs</span>
+                  <span style="padding:7px 14px;border-radius:9999px;background:rgba(27,191,133,0.14);font-weight:700;font-size:13px;color:#0E8A61;">$4,820 due</span>
+                </div>
+                <div style="margin-top:14px;display:flex;flex-direction:column;gap:8px;overflow-y:auto;">
+                  <div style="display:flex;flex-direction:column;gap:6px;padding:16px 18px;border-radius:16px;background:#040D6D;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;"><span style="font-weight:600;font-size:15px;color:#FFFFFF;">deck rebuild — s. patel</span><span style="font-weight:700;font-size:15px;color:#58ABFF;">$3,720</span></div>
+                    <div style="display:flex;align-items:center;gap:6px;font-weight:500;font-size:12px;color:rgba(244,241,232,0.55);"><span style="width:6px;height:6px;border-radius:50%;background:#FFB02E;"></span><span>quote open · deposit 20% on accept</span></div>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:6px;padding:16px 18px;border-radius:16px;background:#EDEFF4;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;"><span style="font-weight:600;font-size:15px;color:#040D6D;">hot water cylinder — j. wu</span><span style="font-weight:700;font-size:15px;color:#040D6D;">$860</span></div>
+                    <div style="display:flex;align-items:center;gap:6px;font-weight:500;font-size:12px;color:rgba(4,13,109,0.5);"><span style="width:6px;height:6px;border-radius:50%;background:#1BBF85;"></span><span>deposit paid · balance due</span></div>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:6px;padding:16px 18px;border-radius:16px;background:#EDEFF4;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;"><span style="font-weight:600;font-size:15px;color:#040D6D;">callout — m. king</span><span style="font-weight:700;font-size:15px;color:#040D6D;">$240</span></div>
+                    <div style="display:flex;align-items:center;gap:6px;font-weight:500;font-size:12px;color:rgba(4,13,109,0.5);"><span style="width:6px;height:6px;border-radius:50%;background:#1BBF85;"></span><span>paid · gst receipt emailed</span></div>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:6px;padding:16px 18px;border-radius:16px;background:#EDEFF4;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;"><span style="font-weight:600;font-size:15px;color:#040D6D;">fence repair — t. ngata</span><span style="font-weight:700;font-size:15px;color:#040D6D;">$1,420</span></div>
+                    <div style="display:flex;align-items:center;gap:6px;font-weight:500;font-size:12px;color:rgba(4,13,109,0.5);"><span style="width:6px;height:6px;border-radius:50%;background:#8C8C8C;"></span><span>draft quote</span></div>
+                  </div>
+                </div>
+                <button style="margin-top:12px;height:50px;border-radius:9999px;border:1.5px solid rgba(4,13,109,0.25);background:transparent;color:#040D6D;font-weight:600;font-size:14px;cursor:pointer;">+ new job</button>
+              </div>
+              <!-- quote builder -->
+              <div style="flex:1 1 auto;background:#EDEFF4;display:flex;flex-direction:column;padding:26px 30px;box-sizing:border-box;min-width:0;">
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                  <div style="display:flex;flex-direction:column;gap:2px;">
+                    <span style="font-weight:700;font-size:24px;color:#040D6D;">quote — deck rebuild</span>
+                    <span style="font-weight:400;font-size:13.5px;color:rgba(4,13,109,0.5);">s. patel · 41 marine parade · quote #q-118</span>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:10px;">
+                    <button data-k="gst" onClick="{{ toggleGst }}" style="display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:9999px;border:1.5px solid rgba(4,13,109,0.22);background:#FFFFFF;color:#040D6D;font-weight:600;font-size:13px;cursor:pointer;">{{ gstLabel }}</button>
+                    <button onClick="{{ toggleDeposit }}" style="display:inline-flex;align-items:center;gap:9px;padding:10px 18px;border-radius:9999px;border:none;background:{{ depBg }};color:{{ depFg }};font-weight:600;font-size:13px;cursor:pointer;">{{ depLabel }}</button>
+                  </div>
+                </div>
+                <div style="margin-top:20px;display:flex;flex-direction:column;gap:8px;overflow-y:auto;flex:1 1 auto;">
+                  <sc-for list="{{ quoteLines }}" as="ln" hint-placeholder-count="3">
+                    <div style="display:flex;align-items:center;gap:16px;padding:15px 20px;border-radius:16px;background:#FFFFFF;box-shadow:0 2px 8px rgba(4,13,109,0.04);">
+                      <span style="width:34px;height:34px;border-radius:12px;background:rgba(88,171,255,0.14);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#0055FF;flex:0 0 auto;">{{ ln.n }}</span>
+                      <span style="display:flex;flex-direction:column;gap:1px;flex:1;min-width:0;">
+                        <span style="font-weight:600;font-size:15px;color:#040D6D;">{{ ln.desc }}</span>
+                        <span style="font-weight:400;font-size:12.5px;color:rgba(4,13,109,0.45);">{{ ln.meta }}</span>
+                      </span>
+                      <span style="font-weight:700;font-size:16px;color:#040D6D;">{{ ln.total }}</span>
+                      <button data-id="{{ ln.id }}" onClick="{{ removeLine }}" style="width:32px;height:32px;border-radius:50%;border:none;background:rgba(255,59,78,0.1);color:#FF3B4E;font-weight:600;font-size:14px;cursor:pointer;flex:0 0 auto;">✕</button>
+                    </div>
+                  </sc-for>
+                  <div style="display:flex;gap:8px;margin-top:4px;">
+                    <button data-k="labour" onClick="{{ addLine }}" style="padding:11px 18px;border-radius:9999px;border:1.5px dashed rgba(4,13,109,0.3);background:transparent;color:#040D6D;font-weight:600;font-size:13px;cursor:pointer;">+ labour · $95/hr</button>
+                    <button data-k="materials" onClick="{{ addLine }}" style="padding:11px 18px;border-radius:9999px;border:1.5px dashed rgba(4,13,109,0.3);background:transparent;color:#040D6D;font-weight:600;font-size:13px;cursor:pointer;">+ materials</button>
+                    <button data-k="callout" onClick="{{ addLine }}" style="padding:11px 18px;border-radius:9999px;border:1.5px dashed rgba(4,13,109,0.3);background:transparent;color:#040D6D;font-weight:600;font-size:13px;cursor:pointer;">+ callout fee · $80</button>
+                  </div>
+                </div>
+                <!-- totals bar -->
+                <div style="margin-top:14px;display:flex;align-items:center;gap:28px;padding:20px 26px;border-radius:20px;background:#040D6D;">
+                  <span style="display:flex;flex-direction:column;gap:1px;"><span style="font-weight:400;font-size:12px;color:rgba(244,241,232,0.5);">subtotal</span><span style="font-weight:600;font-size:17px;color:#F4F1E8;">{{ subTotal }}</span></span>
+                  <span style="display:flex;flex-direction:column;gap:1px;"><span style="font-weight:400;font-size:12px;color:rgba(244,241,232,0.5);">{{ gstRowLabel }}</span><span style="font-weight:600;font-size:17px;color:#F4F1E8;">{{ gstAmt }}</span></span>
+                  <span style="display:flex;flex-direction:column;gap:1px;"><span style="font-weight:400;font-size:12px;color:rgba(244,241,232,0.5);">{{ depRowLabel }}</span><span style="font-weight:600;font-size:17px;color:#58ABFF;">{{ depositAmt }}</span></span>
+                  <span style="margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:1px;"><span style="font-weight:400;font-size:12px;color:rgba(244,241,232,0.5);">total</span><span style="font-weight:700;font-size:24px;color:#58ABFF;">{{ grandTotal }}</span></span>
+                  <button onClick="{{ sendQuote }}" style="height:52px;padding:0 30px;border-radius:9999px;border:none;background:#58ABFF;color:#040D6D;font-weight:700;font-size:15px;cursor:pointer;">send quote</button>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <!-- ════ STOCK ════ -->
+          <sc-if value="{{ pgStock }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;inset:0;display:flex;flex-direction:column;background:#EDEFF4;padding:26px 30px;box-sizing:border-box;">
+              <div style="display:flex;align-items:center;justify-content:space-between;">
+                <div style="display:flex;flex-direction:column;gap:2px;">
+                  <span style="font-weight:700;font-size:24px;color:#040D6D;">stock</span>
+                  <span style="font-weight:400;font-size:13.5px;color:rgba(4,13,109,0.5);">tap ± to adjust · items appear as keypad chips on the terminal</span>
+                </div>
+                <button style="display:inline-flex;align-items:center;gap:9px;padding:13px 24px;border-radius:9999px;border:none;background:#0055FF;color:#FFFFFF;font-weight:600;font-size:14px;cursor:pointer;">+ add item</button>
+              </div>
+              <div style="margin-top:18px;display:flex;gap:8px;">
+                <button class="lchip" data-item="all" data-on="{{ catAll }}" onClick="{{ catTap }}" style="padding:10px 18px;border-radius:9999px;cursor:pointer;font-weight:600;font-size:13px;transition:background .15s ease,color .15s ease;">all</button>
+                <button class="lchip" data-item="coffee" data-on="{{ catCoffee }}" onClick="{{ catTap }}" style="padding:10px 18px;border-radius:9999px;cursor:pointer;font-weight:600;font-size:13px;transition:background .15s ease,color .15s ease;">coffee</button>
+                <button class="lchip" data-item="food" data-on="{{ catFood }}" onClick="{{ catTap }}" style="padding:10px 18px;border-radius:9999px;cursor:pointer;font-weight:600;font-size:13px;transition:background .15s ease,color .15s ease;">food</button>
+                <button class="lchip" data-item="retail" data-on="{{ catRetail }}" onClick="{{ catTap }}" style="padding:10px 18px;border-radius:9999px;cursor:pointer;font-weight:600;font-size:13px;transition:background .15s ease,color .15s ease;">retail</button>
+              </div>
+              <div style="margin-top:18px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;overflow-y:auto;align-content:start;flex:1 1 auto;">
+                <sc-for list="{{ stockView }}" as="st" hint-placeholder-count="6">
+                  <div style="display:flex;flex-direction:column;gap:10px;padding:20px 22px;border-radius:18px;background:#FFFFFF;box-shadow:0 2px 10px rgba(4,13,109,0.05);">
+                    <div style="display:flex;align-items:center;justify-content:space-between;">
+                      <span style="font-weight:600;font-size:16px;color:#040D6D;">{{ st.name }}</span>
+                      <span style="padding:5px 12px;border-radius:9999px;background:rgba(88,171,255,0.14);font-weight:600;font-size:12px;color:#0055FF;">{{ st.cat }}</span>
+                    </div>
+                    <div style="display:flex;align-items:center;justify-content:space-between;">
+                      <span style="font-weight:700;font-size:20px;color:#040D6D;">{{ st.price }}</span>
+                      <div style="display:flex;align-items:center;gap:10px;">
+                        <button data-id="{{ st.id }}" onClick="{{ stockMinus }}" style="width:34px;height:34px;border-radius:50%;border:none;background:#EDEFF4;color:#040D6D;font-weight:700;font-size:16px;cursor:pointer;">−</button>
+                        <span style="font-weight:600;font-size:15px;color:{{ st.qtyColor }};min-width:52px;text-align:center;">{{ st.qtyLabel }}</span>
+                        <button data-id="{{ st.id }}" onClick="{{ stockPlus }}" style="width:34px;height:34px;border-radius:50%;border:none;background:#040D6D;color:#FFFFFF;font-weight:700;font-size:16px;cursor:pointer;">+</button>
+                      </div>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+          <!-- ════ ANALYTICS ════ -->
+          <sc-if value="{{ pgAnalytics }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;inset:0;display:flex;flex-direction:column;background:#EDEFF4;padding:26px 30px;box-sizing:border-box;overflow-y:auto;">
+              <div style="display:flex;align-items:center;justify-content:space-between;">
+                <div style="display:flex;flex-direction:column;gap:2px;">
+                  <span style="font-weight:700;font-size:24px;color:#040D6D;">analytics</span>
+                  <span style="font-weight:400;font-size:13.5px;color:rgba(4,13,109,0.5);">friday 10 july · live</span>
+                </div>
+                <div style="display:flex;gap:8px;">
+                  <span class="lchip" data-on="true" style="padding:10px 18px;border-radius:9999px;font-weight:600;font-size:13px;">today</span>
+                  <span class="lchip" style="padding:10px 18px;border-radius:9999px;font-weight:600;font-size:13px;">week</span>
+                  <span class="lchip" style="padding:10px 18px;border-radius:9999px;font-weight:600;font-size:13px;">month</span>
+                </div>
+              </div>
+              <div style="margin-top:18px;display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:14px;">
+                <div style="padding:24px 26px;border-radius:20px;background:#040D6D;display:flex;flex-direction:column;gap:4px;">
+                  <span style="font-weight:500;font-size:12.5px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(244,241,232,0.5);">today's revenue</span>
+                  <span style="font-weight:700;font-size:42px;color:#58ABFF;">$1,284.50</span>
+                  <span style="display:inline-flex;align-items:center;gap:7px;font-weight:600;font-size:13px;color:#1BBF85;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"></path></svg><span>+18% vs last friday</span></span>
+                </div>
+                <div style="padding:24px 26px;border-radius:20px;background:#FFFFFF;box-shadow:0 2px 10px rgba(4,13,109,0.05);display:flex;flex-direction:column;gap:4px;">
+                  <span style="font-weight:500;font-size:12.5px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(4,13,109,0.45);">transactions</span>
+                  <span style="font-weight:700;font-size:42px;color:#040D6D;">142</span>
+                  <span style="font-weight:500;font-size:13px;color:rgba(4,13,109,0.5);">$9.04 average</span>
+                </div>
+                <div style="padding:24px 26px;border-radius:20px;background:#FFFFFF;box-shadow:0 2px 10px rgba(4,13,109,0.05);display:flex;flex-direction:column;gap:4px;">
+                  <span style="font-weight:500;font-size:12.5px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(4,13,109,0.45);">fees paid</span>
+                  <span style="font-weight:700;font-size:42px;color:#040D6D;">$14.20</span>
+                  <span style="font-weight:500;font-size:13px;color:#0E8A61;">10¢ × 142 · would be ~$25.70 at 2%</span>
+                </div>
+              </div>
+              <div style="margin-top:14px;display:grid;grid-template-columns:1.6fr 1fr;gap:14px;">
+                <div style="padding:24px 26px;border-radius:20px;background:#FFFFFF;box-shadow:0 2px 10px rgba(4,13,109,0.05);">
+                  <div style="display:flex;align-items:center;justify-content:space-between;">
+                    <span style="font-weight:600;font-size:15px;color:#040D6D;">last 7 days</span>
+                    <span style="font-weight:500;font-size:12.5px;color:rgba(4,13,109,0.45);">$8,412 total</span>
+                  </div>
+                  <div style="margin-top:18px;display:flex;align-items:flex-end;gap:14px;height:150px;">
+                    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end;"><div style="width:100%;height:38%;border-radius:8px 8px 4px 4px;background:rgba(88,171,255,0.35);"></div><span style="font-weight:500;font-size:11.5px;color:rgba(4,13,109,0.45);">sat</span></div>
+                    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end;"><div style="width:100%;height:30%;border-radius:8px 8px 4px 4px;background:rgba(88,171,255,0.35);"></div><span style="font-weight:500;font-size:11.5px;color:rgba(4,13,109,0.45);">sun</span></div>
+                    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end;"><div style="width:100%;height:46%;border-radius:8px 8px 4px 4px;background:rgba(88,171,255,0.55);"></div><span style="font-weight:500;font-size:11.5px;color:rgba(4,13,109,0.45);">mon</span></div>
+                    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end;"><div style="width:100%;height:54%;border-radius:8px 8px 4px 4px;background:rgba(88,171,255,0.55);"></div><span style="font-weight:500;font-size:11.5px;color:rgba(4,13,109,0.45);">tue</span></div>
+                    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end;"><div style="width:100%;height:62%;border-radius:8px 8px 4px 4px;background:rgba(88,171,255,0.7);"></div><span style="font-weight:500;font-size:11.5px;color:rgba(4,13,109,0.45);">wed</span></div>
+                    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end;"><div style="width:100%;height:74%;border-radius:8px 8px 4px 4px;background:rgba(88,171,255,0.85);"></div><span style="font-weight:500;font-size:11.5px;color:rgba(4,13,109,0.45);">thu</span></div>
+                    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end;"><div style="width:100%;height:100%;border-radius:8px 8px 4px 4px;background:#0055FF;"></div><span style="font-weight:600;font-size:11.5px;color:#0055FF;">fri</span></div>
+                  </div>
+                </div>
+                <div style="padding:24px 26px;border-radius:20px;background:#FFFFFF;box-shadow:0 2px 10px rgba(4,13,109,0.05);display:flex;flex-direction:column;">
+                  <span style="font-weight:600;font-size:15px;color:#040D6D;">payment methods</span>
+                  <div style="margin-top:16px;display:flex;align-items:center;gap:20px;">
+                    <div style="width:110px;height:110px;border-radius:50%;background:conic-gradient(#0055FF 0 46%, #58ABFF 46% 74%, #040D6D 74% 90%, #B2FCE4 90% 100%);display:flex;align-items:center;justify-content:center;">
+                      <div style="width:66px;height:66px;border-radius:50%;background:#FFFFFF;"></div>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:8px;font-weight:500;font-size:12.5px;color:rgba(4,13,109,0.65);">
+                      <span style="display:flex;align-items:center;gap:8px;"><span style="width:9px;height:9px;border-radius:3px;background:#0055FF;"></span><span>apple pay · 46%</span></span>
+                      <span style="display:flex;align-items:center;gap:8px;"><span style="width:9px;height:9px;border-radius:3px;background:#58ABFF;"></span><span>google pay · 28%</span></span>
+                      <span style="display:flex;align-items:center;gap:8px;"><span style="width:9px;height:9px;border-radius:3px;background:#040D6D;"></span><span>card · 16%</span></span>
+                      <span style="display:flex;align-items:center;gap:8px;"><span style="width:9px;height:9px;border-radius:3px;background:#B2FCE4;"></span><span>afterpay · 10%</span></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div style="margin-top:14px;padding:20px 26px;border-radius:20px;background:#FFFFFF;box-shadow:0 2px 10px rgba(4,13,109,0.05);">
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                  <span style="font-weight:600;font-size:15px;color:#040D6D;">recent</span>
+                  <span style="font-weight:500;font-size:12.5px;color:#0055FF;">payout today · 5:00pm · windcave</span>
+                </div>
+                <div style="margin-top:12px;display:flex;flex-direction:column;">
+                  <div style="display:flex;align-items:center;gap:14px;padding:11px 0;border-bottom:1px solid rgba(4,13,109,0.06);"><span style="width:8px;height:8px;border-radius:50%;background:#1BBF85;"></span><span style="font-weight:600;font-size:14px;color:#040D6D;flex:1;">latte &amp; muffin</span><span style="font-weight:400;font-size:12.5px;color:rgba(4,13,109,0.45);">2:41pm · apple pay</span><span style="font-weight:700;font-size:14px;color:#040D6D;min-width:80px;text-align:right;">$11.50</span></div>
+                  <div style="display:flex;align-items:center;gap:14px;padding:11px 0;border-bottom:1px solid rgba(4,13,109,0.06);"><span style="width:8px;height:8px;border-radius:50%;background:#1BBF85;"></span><span style="font-weight:600;font-size:14px;color:#040D6D;flex:1;">big brunch × 2 · split 2 ways</span><span style="font-weight:400;font-size:12.5px;color:rgba(4,13,109,0.45);">2:38pm · google pay</span><span style="font-weight:700;font-size:14px;color:#040D6D;min-width:80px;text-align:right;">$48.00</span></div>
+                  <div style="display:flex;align-items:center;gap:14px;padding:11px 0;"><span style="width:8px;height:8px;border-radius:50%;background:#FFB02E;"></span><span style="font-weight:600;font-size:14px;color:#040D6D;flex:1;">t-shirt</span><span style="font-weight:400;font-size:12.5px;color:rgba(4,13,109,0.45);">2:36pm · awaiting</span><span style="font-weight:700;font-size:14px;color:#040D6D;min-width:80px;text-align:right;">$35.00</span></div>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <!-- ════ SETTINGS ════ -->
+          <sc-if value="{{ pgSettings }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;inset:0;display:flex;">
+              <div style="flex:0 0 372px;background:#FFFFFF;border-right:1px solid rgba(4,13,109,0.08);display:flex;flex-direction:column;padding:24px 20px;box-sizing:border-box;">
+                <span style="padding:0 6px;font-weight:700;font-size:22px;color:#040D6D;">settings</span>
+                <div style="margin-top:16px;display:flex;flex-direction:column;gap:6px;">
+                  <button class="setrow" data-item="business" data-on="{{ setBusinessOn }}" onClick="{{ setTap }}" style="display:flex;align-items:center;gap:13px;padding:14px 16px;border-radius:16px;border:none;background:transparent;cursor:pointer;text-align:left;transition:background .15s ease;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0055FF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V8l8-5 8 5v13"></path><path d="M9 21v-6h6v6"></path></svg>
+                    <span class="setlbl" style="font-weight:600;font-size:15px;color:#040D6D;">business details</span>
+                  </button>
+                  <button class="setrow" data-item="boards" data-on="{{ setBoardsOn }}" onClick="{{ setTap }}" style="display:flex;align-items:center;gap:13px;padding:14px 16px;border-radius:16px;border:none;background:transparent;cursor:pointer;text-align:left;transition:background .15s ease;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0055FF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"></rect><rect x="8" y="7" width="8" height="8" rx="1"></rect></svg>
+                    <span class="setlbl" style="font-weight:600;font-size:15px;color:#040D6D;">payment boards</span>
+                  </button>
+                  <button class="setrow" data-item="team" data-on="{{ setTeamOn }}" onClick="{{ setTap }}" style="display:flex;align-items:center;gap:13px;padding:14px 16px;border-radius:16px;border:none;background:transparent;cursor:pointer;text-align:left;transition:background .15s ease;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0055FF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.4"></circle><path d="M3.5 20a5.5 5.5 0 0 1 11 0"></path><circle cx="17" cy="9" r="2.6"></circle><path d="M15.5 14.6a5 5 0 0 1 5 4.9"></path></svg>
+                    <span class="setlbl" style="font-weight:600;font-size:15px;color:#040D6D;">team &amp; logins</span>
+                  </button>
+                  <button class="setrow" data-item="payouts" data-on="{{ setPayoutsOn }}" onClick="{{ setTap }}" style="display:flex;align-items:center;gap:13px;padding:14px 16px;border-radius:16px;border:none;background:transparent;cursor:pointer;text-align:left;transition:background .15s ease;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0055FF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2.5"></rect><path d="M3 10h18"></path></svg>
+                    <span class="setlbl" style="font-weight:600;font-size:15px;color:#040D6D;">payouts &amp; gst</span>
+                  </button>
+                </div>
+                <div style="margin-top:auto;padding:16px;border-radius:16px;background:#EDEFF4;display:flex;flex-direction:column;gap:4px;">
+                  <span style="font-weight:600;font-size:13px;color:#040D6D;">plan · team</span>
+                  <span style="font-weight:400;font-size:12.5px;color:rgba(4,13,109,0.5);">$8.99/mo · 5 logins · 0.3% / 10¢ fees</span>
+                </div>
+              </div>
+              <div style="flex:1 1 auto;background:#EDEFF4;display:flex;flex-direction:column;padding:26px 30px;box-sizing:border-box;overflow-y:auto;">
+                <sc-if value="{{ setBusiness }}" hint-placeholder-val="{{ true }}">
+                  <span style="font-weight:700;font-size:24px;color:#040D6D;">business details</span>
+                  <div style="margin-top:18px;display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                    <div style="padding:20px 22px;border-radius:18px;background:#FFFFFF;box-shadow:0 2px 8px rgba(4,13,109,0.04);display:flex;flex-direction:column;gap:4px;"><span style="font-weight:500;font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(4,13,109,0.4);">trading name</span><span style="font-weight:600;font-size:16px;color:#040D6D;">the corner café</span></div>
+                    <div style="padding:20px 22px;border-radius:18px;background:#FFFFFF;box-shadow:0 2px 8px rgba(4,13,109,0.04);display:flex;flex-direction:column;gap:4px;"><span style="font-weight:500;font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(4,13,109,0.4);">gst number</span><span style="font-weight:600;font-size:16px;color:#040D6D;">123-456-789</span></div>
+                    <div style="padding:20px 22px;border-radius:18px;background:#FFFFFF;box-shadow:0 2px 8px rgba(4,13,109,0.04);display:flex;flex-direction:column;gap:4px;"><span style="font-weight:500;font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(4,13,109,0.4);">payout account</span><span style="font-weight:600;font-size:16px;color:#040D6D;">02-0123-0456789-00 · same-day</span></div>
+                    <div style="padding:20px 22px;border-radius:18px;background:#FFFFFF;box-shadow:0 2px 8px rgba(4,13,109,0.04);display:flex;flex-direction:column;gap:4px;"><span style="font-weight:500;font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(4,13,109,0.4);">receipt email</span><span style="font-weight:600;font-size:16px;color:#040D6D;">hello@cornercafe.co.nz</span></div>
+                  </div>
+                  <span style="margin-top:26px;font-weight:600;font-size:15px;color:rgba(4,13,109,0.55);">preferences</span>
+                  <div style="margin-top:10px;display:flex;flex-direction:column;gap:10px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-radius:18px;background:#FFFFFF;box-shadow:0 2px 8px rgba(4,13,109,0.04);">
+                      <span style="display:flex;flex-direction:column;gap:2px;"><span style="font-weight:600;font-size:15px;color:#040D6D;">gst receipts emailed automatically</span><span style="font-weight:400;font-size:12.5px;color:rgba(4,13,109,0.45);">every paid transaction sends a receipt</span></span>
+                      <button data-k="t1" onClick="{{ flipToggle }}" class="tglTrack" data-on="{{ tg1 }}" style="position:relative;width:52px;height:32px;border-radius:9999px;border:none;cursor:pointer;transition:background .18s ease;"><span class="tglKnob" data-on="{{ tg1 }}" style="position:absolute;top:4px;left:4px;width:24px;height:24px;border-radius:50%;background:#FFFFFF;box-shadow:0 1px 4px rgba(0,0,0,0.2);transition:transform .18s ease;"></span></button>
+                    </div>
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-radius:18px;background:#FFFFFF;box-shadow:0 2px 8px rgba(4,13,109,0.04);">
+                      <span style="display:flex;flex-direction:column;gap:2px;"><span style="font-weight:600;font-size:15px;color:#040D6D;">tipping on customer checkout</span><span style="font-weight:400;font-size:12.5px;color:rgba(4,13,109,0.45);">optional 5 / 10 / 15% before payment</span></span>
+                      <button data-k="t2" onClick="{{ flipToggle }}" class="tglTrack" data-on="{{ tg2 }}" style="position:relative;width:52px;height:32px;border-radius:9999px;border:none;cursor:pointer;transition:background .18s ease;"><span class="tglKnob" data-on="{{ tg2 }}" style="position:absolute;top:4px;left:4px;width:24px;height:24px;border-radius:50%;background:#FFFFFF;box-shadow:0 1px 4px rgba(0,0,0,0.2);transition:transform .18s ease;"></span></button>
+                    </div>
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-radius:18px;background:#FFFFFF;box-shadow:0 2px 8px rgba(4,13,109,0.04);">
+                      <span style="display:flex;flex-direction:column;gap:2px;"><span style="font-weight:600;font-size:15px;color:#040D6D;">afterpay at checkout</span><span style="font-weight:400;font-size:12.5px;color:rgba(4,13,109,0.45);">customers split in 4 — you're paid in full</span></span>
+                      <button data-k="t3" onClick="{{ flipToggle }}" class="tglTrack" data-on="{{ tg3 }}" style="position:relative;width:52px;height:32px;border-radius:9999px;border:none;cursor:pointer;transition:background .18s ease;"><span class="tglKnob" data-on="{{ tg3 }}" style="position:absolute;top:4px;left:4px;width:24px;height:24px;border-radius:50%;background:#FFFFFF;box-shadow:0 1px 4px rgba(0,0,0,0.2);transition:transform .18s ease;"></span></button>
+                    </div>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ setBoards }}" hint-placeholder-val="{{ false }}">
+                  <span style="font-weight:700;font-size:24px;color:#040D6D;">payment boards</span>
+                  <div style="margin-top:18px;display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                    <div style="padding:22px;border-radius:18px;background:#FFFFFF;box-shadow:0 2px 8px rgba(4,13,109,0.04);display:flex;align-items:center;gap:16px;">
+                      <span style="width:44px;height:58px;border-radius:8px;background:#0055FF;display:flex;align-items:center;justify-content:center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00E5CC" stroke-width="1.8"><rect x="5" y="5" width="6" height="6" rx="1"></rect><path d="M15 5h4v4M15 15h4v4" stroke-linecap="round"></path></svg></span>
+                      <span style="display:flex;flex-direction:column;gap:2px;flex:1;"><span style="font-weight:600;font-size:15px;color:#040D6D;">counter board · main till</span><span style="display:inline-flex;align-items:center;gap:6px;font-weight:500;font-size:12.5px;color:#0E8A61;"><span style="width:6px;height:6px;border-radius:50%;background:#1BBF85;"></span><span>live · 64 taps today</span></span></span>
+                      <button style="padding:9px 16px;border-radius:9999px;border:1.5px solid rgba(4,13,109,0.2);background:transparent;color:#040D6D;font-weight:600;font-size:12.5px;cursor:pointer;">manage</button>
+                    </div>
+                    <div style="padding:22px;border-radius:18px;background:#FFFFFF;box-shadow:0 2px 8px rgba(4,13,109,0.04);display:flex;align-items:center;gap:16px;">
+                      <span style="width:44px;height:58px;border-radius:8px;background:#0055FF;display:flex;align-items:center;justify-content:center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00E5CC" stroke-width="1.8"><rect x="5" y="5" width="6" height="6" rx="1"></rect><path d="M15 5h4v4M15 15h4v4" stroke-linecap="round"></path></svg></span>
+                      <span style="display:flex;flex-direction:column;gap:2px;flex:1;"><span style="font-weight:600;font-size:15px;color:#040D6D;">table board · courtyard</span><span style="display:inline-flex;align-items:center;gap:6px;font-weight:500;font-size:12.5px;color:#0E8A61;"><span style="width:6px;height:6px;border-radius:50%;background:#1BBF85;"></span><span>live · 21 taps today</span></span></span>
+                      <button style="padding:9px 16px;border-radius:9999px;border:1.5px solid rgba(4,13,109,0.2);background:transparent;color:#040D6D;font-weight:600;font-size:12.5px;cursor:pointer;">manage</button>
+                    </div>
+                  </div>
+                  <button style="margin-top:14px;align-self:flex-start;padding:13px 24px;border-radius:9999px;border:none;background:#0055FF;color:#FFFFFF;font-weight:600;font-size:14px;cursor:pointer;">+ order another board · white-labeled</button>
+                </sc-if>
+                <sc-if value="{{ setTeam }}" hint-placeholder-val="{{ false }}">
+                  <span style="font-weight:700;font-size:24px;color:#040D6D;">team &amp; logins</span>
+                  <div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">
+                    <div style="display:flex;align-items:center;gap:14px;padding:16px 20px;border-radius:18px;background:#FFFFFF;box-shadow:0 2px 8px rgba(4,13,109,0.04);"><span style="width:40px;height:40px;border-radius:50%;background:#58ABFF;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#040D6D;">ol</span><span style="display:flex;flex-direction:column;gap:1px;flex:1;"><span style="font-weight:600;font-size:15px;color:#040D6D;">oliver leonard</span><span style="font-weight:400;font-size:12.5px;color:rgba(4,13,109,0.45);">owner · full access</span></span><span style="padding:6px 14px;border-radius:9999px;background:rgba(88,171,255,0.15);font-weight:600;font-size:12px;color:#0055FF;">owner</span></div>
+                    <div style="display:flex;align-items:center;gap:14px;padding:16px 20px;border-radius:18px;background:#FFFFFF;box-shadow:0 2px 8px rgba(4,13,109,0.04);"><span style="width:40px;height:40px;border-radius:50%;background:#040D6D;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#58ABFF;">mk</span><span style="display:flex;flex-direction:column;gap:1px;flex:1;"><span style="font-weight:600;font-size:15px;color:#040D6D;">mia kereama</span><span style="font-weight:400;font-size:12.5px;color:rgba(4,13,109,0.45);">terminal only · no payouts</span></span><span style="padding:6px 14px;border-radius:9999px;background:#EDEFF4;font-weight:600;font-size:12px;color:rgba(4,13,109,0.6);">staff</span></div>
+                    <div style="display:flex;align-items:center;gap:14px;padding:16px 20px;border-radius:18px;background:#FFFFFF;box-shadow:0 2px 8px rgba(4,13,109,0.04);"><span style="width:40px;height:40px;border-radius:50%;background:#040D6D;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#58ABFF;">tj</span><span style="display:flex;flex-direction:column;gap:1px;flex:1;"><span style="font-weight:600;font-size:15px;color:#040D6D;">tom jacobs</span><span style="font-weight:400;font-size:12.5px;color:rgba(4,13,109,0.45);">terminal only · no payouts</span></span><span style="padding:6px 14px;border-radius:9999px;background:#EDEFF4;font-weight:600;font-size:12px;color:rgba(4,13,109,0.6);">staff</span></div>
+                  </div>
+                  <button style="margin-top:14px;align-self:flex-start;padding:13px 24px;border-radius:9999px;border:1.5px solid rgba(4,13,109,0.25);background:transparent;color:#040D6D;font-weight:600;font-size:14px;cursor:pointer;">+ invite login · 2 of 5 remaining</button>
+                </sc-if>
+                <sc-if value="{{ setPayouts }}" hint-placeholder-val="{{ false }}">
+                  <span style="font-weight:700;font-size:24px;color:#040D6D;">payouts &amp; gst</span>
+                  <div style="margin-top:18px;display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                    <div style="padding:22px;border-radius:18px;background:#040D6D;display:flex;flex-direction:column;gap:4px;"><span style="font-weight:500;font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(244,241,232,0.5);">next payout</span><span style="font-weight:700;font-size:30px;color:#58ABFF;">$1,284.50</span><span style="font-weight:500;font-size:12.5px;color:rgba(244,241,232,0.55);">today 5:00pm · windcave · same-day</span></div>
+                    <div style="padding:22px;border-radius:18px;background:#FFFFFF;box-shadow:0 2px 8px rgba(4,13,109,0.04);display:flex;flex-direction:column;gap:4px;"><span style="font-weight:500;font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(4,13,109,0.4);">gst collected · this quarter</span><span style="font-weight:700;font-size:30px;color:#040D6D;">$3,412.80</span><span style="font-weight:500;font-size:12.5px;color:rgba(4,13,109,0.5);">export for your accountant anytime</span></div>
+                  </div>
+                </sc-if>
+              </div>
+            </div>
+          </sc-if>
+
+          <!-- toast -->
+          <sc-if value="{{ toastOn }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;bottom:24px;left:50%;transform:translateX(-50%);z-index:40;display:flex;align-items:center;gap:10px;padding:14px 24px;border-radius:9999px;background:#040D6D;box-shadow:0 16px 40px rgba(0,0,0,0.35);">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#1BBF85" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="m8.5 12 2.5 2.5 4.5-5"></path></svg>
+              <span style="font-weight:600;font-size:14px;color:#F4F1E8;">{{ toastMsg }}</span>
+            </div>
+          </sc-if>
+
+        </div>
+      </div>
+      <!-- home indicator -->
+      <div style="position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:220px;height:4px;border-radius:2px;background:rgba(255,255,255,0.22);"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════ options row — alternates ═══════════ -->
+  <div style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start;">
+
+    <!-- 1b · terminal option B -->
+    <div id="1b" style="position:relative;">
+      <div style="position:absolute;top:-46px;left:0;display:flex;align-items:center;gap:12px;">
+        <span style="padding:8px 18px;border-radius:9999px;background:rgba(244,241,232,0.14);color:#F4F1E8;font-weight:700;font-size:14px;">1b</span>
+        <span style="font-weight:500;font-size:15px;color:rgba(244,241,232,0.75);">terminal — option b · stack board first, keypad as slide-over · mini icon rail</span>
+      </div>
+      <div style="width:1180px;height:820px;border-radius:24px;overflow:hidden;background:#EDEFF4;display:flex;box-shadow:0 40px 90px rgba(0,0,0,0.5);">
+        <!-- mini rail -->
+        <div style="flex:0 0 76px;background:#040D6D;display:flex;flex-direction:column;align-items:center;padding:20px 0;gap:8px;">
+          <span style="font-family:'Larken';font-weight:900;font-style:italic;font-size:22px;color:#58ABFF;">t.</span>
+          <div style="margin-top:16px;display:flex;flex-direction:column;gap:6px;">
+            <span style="width:48px;height:48px;border-radius:14px;background:#58ABFF;display:flex;align-items:center;justify-content:center;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#040D6D" stroke-width="1.8" stroke-linecap="round"><circle cx="7" cy="7" r="1.3"></circle><circle cx="12" cy="7" r="1.3"></circle><circle cx="17" cy="7" r="1.3"></circle><circle cx="7" cy="12" r="1.3"></circle><circle cx="12" cy="12" r="1.3"></circle><circle cx="17" cy="12" r="1.3"></circle><circle cx="7" cy="17" r="1.3"></circle><circle cx="12" cy="17" r="1.3"></circle><circle cx="17" cy="17" r="1.3"></circle></svg></span>
+            <span style="width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="rgba(244,241,232,0.55)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11l8-7 8 7"></path><path d="M6 9.5V20h12V9.5"></path></svg></span>
+            <span style="width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="rgba(244,241,232,0.55)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4l6 6-9 9H5v-6z"></path></svg></span>
+            <span style="width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="rgba(244,241,232,0.55)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"></path></svg></span>
+            <span style="width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="rgba(244,241,232,0.55)" stroke-width="1.8" stroke-linecap="round"><path d="M4 19h16"></path><path d="M7 16v-5M12 16V7M17 16v-8"></path></svg></span>
+          </div>
+          <span style="margin-top:auto;width:36px;height:36px;border-radius:50%;background:#58ABFF;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#040D6D;">ol</span>
+        </div>
+        <!-- stack board -->
+        <div style="flex:1 1 auto;display:flex;flex-direction:column;padding:26px 30px;box-sizing:border-box;">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div style="display:flex;flex-direction:column;gap:2px;">
+              <span style="font-weight:700;font-size:24px;color:#040D6D;">active stack · 6 live</span>
+              <span style="font-weight:400;font-size:13.5px;color:rgba(4,13,109,0.5);">rush-hour board — every payment visible at once, oldest left</span>
+            </div>
+            <span style="display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border-radius:9999px;background:#FFFFFF;font-weight:600;font-size:13px;color:#040D6D;box-shadow:0 2px 8px rgba(4,13,109,0.06);"><span style="width:7px;height:7px;border-radius:50%;background:#1BBF85;"></span><span>today · $1,284.50</span></span>
+          </div>
+          <div style="margin-top:20px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;align-content:start;flex:1;">
+            <div style="padding:22px;border-radius:20px;background:#FFFFFF;box-shadow:0 2px 10px rgba(4,13,109,0.05);display:flex;flex-direction:column;gap:8px;"><div style="display:flex;align-items:center;justify-content:space-between;"><span style="font-weight:600;font-size:15px;color:#040D6D;">latte &amp; muffin</span><span style="width:9px;height:9px;border-radius:50%;background:#FFB02E;"></span></div><span style="font-weight:700;font-size:30px;color:#040D6D;">$11.50</span><span style="font-weight:400;font-size:12.5px;color:rgba(4,13,109,0.45);">awaiting · 0:42 · counter board</span></div>
+            <div style="padding:22px;border-radius:20px;background:#FFFFFF;box-shadow:0 2px 10px rgba(4,13,109,0.05);display:flex;flex-direction:column;gap:8px;"><div style="display:flex;align-items:center;justify-content:space-between;"><span style="font-weight:600;font-size:15px;color:#040D6D;">table 4 · split 3 ways</span><span style="width:9px;height:9px;border-radius:50%;background:#FFB02E;"></span></div><span style="font-weight:700;font-size:30px;color:#040D6D;">$96.00</span><span style="font-weight:400;font-size:12.5px;color:rgba(4,13,109,0.45);">2 of 3 paid · $32.00 each</span></div>
+            <div style="padding:22px;border-radius:20px;background:#FFFFFF;box-shadow:0 2px 10px rgba(4,13,109,0.05);display:flex;flex-direction:column;gap:8px;"><div style="display:flex;align-items:center;justify-content:space-between;"><span style="font-weight:600;font-size:15px;color:#040D6D;">flat white × 2</span><span style="width:9px;height:9px;border-radius:50%;background:#1BBF85;"></span></div><span style="font-weight:700;font-size:30px;color:#040D6D;">$11.00</span><span style="font-weight:400;font-size:12.5px;color:rgba(4,13,109,0.45);">paid · apple pay · just now</span></div>
+            <div style="padding:22px;border-radius:20px;background:#FFFFFF;box-shadow:0 2px 10px rgba(4,13,109,0.05);display:flex;flex-direction:column;gap:8px;"><div style="display:flex;align-items:center;justify-content:space-between;"><span style="font-weight:600;font-size:15px;color:#040D6D;">t-shirt</span><span style="width:9px;height:9px;border-radius:50%;background:#FFB02E;"></span></div><span style="font-weight:700;font-size:30px;color:#040D6D;">$35.00</span><span style="font-weight:400;font-size:12.5px;color:rgba(4,13,109,0.45);">awaiting · 1:18 · qr link</span></div>
+            <div style="padding:22px;border-radius:20px;background:#FFFFFF;box-shadow:0 2px 10px rgba(4,13,109,0.05);display:flex;flex-direction:column;gap:8px;"><div style="display:flex;align-items:center;justify-content:space-between;"><span style="font-weight:600;font-size:15px;color:#040D6D;">big brunch</span><span style="width:9px;height:9px;border-radius:50%;background:#1BBF85;"></span></div><span style="font-weight:700;font-size:30px;color:#040D6D;">$24.00</span><span style="font-weight:400;font-size:12.5px;color:rgba(4,13,109,0.45);">paid · google pay · 2m ago</span></div>
+            <div style="padding:22px;border-radius:20px;border:2px dashed rgba(4,13,109,0.2);display:flex;align-items:center;justify-content:center;"><span style="font-weight:600;font-size:15px;color:rgba(4,13,109,0.45);">+ new payment</span></div>
+          </div>
+        </div>
+        <!-- keypad slide-over -->
+        <div style="flex:0 0 330px;background:#040D6D;border-radius:28px 0 0 28px;display:flex;flex-direction:column;padding:24px 26px;box-sizing:border-box;box-shadow:-20px 0 50px rgba(4,13,109,0.25);">
+          <span style="font-weight:500;font-size:12px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(244,241,232,0.45);">new payment</span>
+          <span style="margin-top:12px;font-weight:700;font-size:46px;color:#58ABFF;">$24.00</span>
+          <span style="margin-top:6px;font-weight:500;font-size:13px;color:rgba(244,241,232,0.5);">big brunch</span>
+          <div style="margin-top:auto;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+            <span style="height:52px;border-radius:14px;background:rgba(255,255,255,0.07);color:#F4F1E8;font-weight:600;font-size:22px;display:flex;align-items:center;justify-content:center;">1</span><span style="height:52px;border-radius:14px;background:rgba(255,255,255,0.07);color:#F4F1E8;font-weight:600;font-size:22px;display:flex;align-items:center;justify-content:center;">2</span><span style="height:52px;border-radius:14px;background:rgba(255,255,255,0.07);color:#F4F1E8;font-weight:600;font-size:22px;display:flex;align-items:center;justify-content:center;">3</span>
+            <span style="height:52px;border-radius:14px;background:rgba(255,255,255,0.07);color:#F4F1E8;font-weight:600;font-size:22px;display:flex;align-items:center;justify-content:center;">4</span><span style="height:52px;border-radius:14px;background:rgba(255,255,255,0.07);color:#F4F1E8;font-weight:600;font-size:22px;display:flex;align-items:center;justify-content:center;">5</span><span style="height:52px;border-radius:14px;background:rgba(255,255,255,0.07);color:#F4F1E8;font-weight:600;font-size:22px;display:flex;align-items:center;justify-content:center;">6</span>
+            <span style="height:52px;border-radius:14px;background:rgba(255,255,255,0.07);color:#F4F1E8;font-weight:600;font-size:22px;display:flex;align-items:center;justify-content:center;">7</span><span style="height:52px;border-radius:14px;background:rgba(255,255,255,0.07);color:#F4F1E8;font-weight:600;font-size:22px;display:flex;align-items:center;justify-content:center;">8</span><span style="height:52px;border-radius:14px;background:rgba(255,255,255,0.07);color:#F4F1E8;font-weight:600;font-size:22px;display:flex;align-items:center;justify-content:center;">9</span>
+            <span style="height:52px;border-radius:14px;background:rgba(255,255,255,0.04);color:rgba(244,241,232,0.5);font-weight:600;font-size:18px;display:flex;align-items:center;justify-content:center;">C</span><span style="height:52px;border-radius:14px;background:rgba(255,255,255,0.07);color:#F4F1E8;font-weight:600;font-size:22px;display:flex;align-items:center;justify-content:center;">0</span><span style="height:52px;border-radius:14px;background:rgba(255,255,255,0.04);color:rgba(244,241,232,0.5);font-weight:600;font-size:18px;display:flex;align-items:center;justify-content:center;">⌫</span>
+          </div>
+          <span style="margin-top:12px;height:54px;border-radius:9999px;background:#58ABFF;color:#040D6D;font-weight:700;font-size:16px;display:flex;align-items:center;justify-content:center;">charge</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1c · property option B -->
+    <div id="1c" style="position:relative;">
+      <div style="position:absolute;top:-46px;left:0;display:flex;align-items:center;gap:12px;">
+        <span style="padding:8px 18px;border-radius:9999px;background:rgba(244,241,232,0.14);color:#F4F1E8;font-weight:700;font-size:14px;">1c</span>
+        <span style="font-weight:500;font-size:15px;color:rgba(244,241,232,0.75);">property — option b · navy summary band + three-pane (tenants · detail · activity)</span>
+      </div>
+      <div style="width:1180px;height:820px;border-radius:24px;overflow:hidden;background:#EDEFF4;display:flex;flex-direction:column;box-shadow:0 40px 90px rgba(0,0,0,0.5);">
+        <!-- summary band -->
+        <div style="flex:0 0 148px;background:#040D6D;display:flex;align-items:center;padding:0 34px;gap:44px;">
+          <div style="display:flex;align-items:baseline;font-size:22px;line-height:1;"><span style="font-family:'Larken';font-weight:900;color:#58ABFF;">tapt</span><span style="font-family:'Larken';font-weight:900;font-style:italic;color:#58ABFF;">pay.</span></div>
+          <div style="display:flex;flex-direction:column;gap:2px;"><span style="font-weight:400;font-size:12px;letter-spacing:0.16em;text-transform:uppercase;color:rgba(244,241,232,0.5);">outstanding rent</span><span style="font-weight:700;font-size:40px;color:#58ABFF;">$6,057.00</span></div>
+          <div style="display:flex;flex-direction:column;gap:2px;"><span style="font-weight:400;font-size:12px;letter-spacing:0.16em;text-transform:uppercase;color:rgba(244,241,232,0.5);">collected this month</span><span style="font-weight:700;font-size:40px;color:#F4F1E8;">$18,240</span></div>
+          <div style="display:flex;flex-direction:column;gap:2px;"><span style="font-weight:400;font-size:12px;letter-spacing:0.16em;text-transform:uppercase;color:rgba(244,241,232,0.5);">overdue</span><span style="font-weight:700;font-size:40px;color:#FF8A94;">2</span></div>
+          <div style="margin-left:auto;display:flex;gap:10px;">
+            <span style="padding:12px 22px;border-radius:9999px;background:#58ABFF;color:#040D6D;font-weight:700;font-size:14px;">+ rent request</span>
+            <span style="padding:12px 22px;border-radius:9999px;border:1.5px solid rgba(244,241,232,0.3);color:#F4F1E8;font-weight:600;font-size:14px;">send bill</span>
+          </div>
+        </div>
+        <div style="flex:1 1 auto;display:flex;min-height:0;">
+          <div style="flex:0 0 320px;background:#FFFFFF;border-right:1px solid rgba(4,13,109,0.08);padding:20px 16px;display:flex;flex-direction:column;gap:6px;overflow:hidden;">
+            <span style="padding:0 8px 8px;font-weight:600;font-size:14px;color:rgba(4,13,109,0.5);">tenancies · 6</span>
+            <span style="display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:14px;background:#040D6D;"><span style="width:36px;height:36px;border-radius:50%;background:#58ABFF;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#040D6D;">hr</span><span style="display:flex;flex-direction:column;flex:1;"><span style="font-weight:600;font-size:14px;color:#FFFFFF;">hone reweti</span><span style="font-weight:400;font-size:11.5px;color:rgba(255,255,255,0.5);">overdue 3 days</span></span><span style="font-weight:700;font-size:14px;color:#FF8A94;">$650</span></span>
+            <span style="display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:14px;"><span style="width:36px;height:36px;border-radius:50%;background:#EDEFF4;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#040D6D;">im</span><span style="display:flex;flex-direction:column;flex:1;"><span style="font-weight:600;font-size:14px;color:#040D6D;">isla murphy</span><span style="font-weight:400;font-size:11.5px;color:rgba(4,13,109,0.45);">sent · due friday</span></span><span style="font-weight:700;font-size:14px;color:#040D6D;">$150</span></span>
+            <span style="display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:14px;"><span style="width:36px;height:36px;border-radius:50%;background:#EDEFF4;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#040D6D;">tw</span><span style="display:flex;flex-direction:column;flex:1;"><span style="font-weight:600;font-size:14px;color:#040D6D;">te whare flat</span><span style="font-weight:400;font-size:11.5px;color:rgba(4,13,109,0.45);">split 4 ways · 3 paid</span></span><span style="font-weight:700;font-size:14px;color:#040D6D;">$920</span></span>
+            <span style="display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:14px;"><span style="width:36px;height:36px;border-radius:50%;background:#EDEFF4;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#040D6D;">bp</span><span style="display:flex;flex-direction:column;flex:1;"><span style="font-weight:600;font-size:14px;color:#040D6D;">ben porter</span><span style="font-weight:400;font-size:11.5px;color:rgba(4,13,109,0.45);">paid · this week</span></span><span style="font-weight:700;font-size:14px;color:#0E8A61;">✓</span></span>
+          </div>
+          <div style="flex:1 1 auto;padding:24px 28px;display:flex;flex-direction:column;min-width:0;">
+            <span style="font-weight:700;font-size:22px;color:#040D6D;">hone reweti · 12 rata st</span>
+            <span style="margin-top:2px;font-weight:400;font-size:13px;color:rgba(4,13,109,0.5);">$650/wk · fridays · auto-reminders on</span>
+            <div style="margin-top:16px;padding:22px;border-radius:18px;background:#FFFFFF;box-shadow:0 2px 10px rgba(4,13,109,0.05);display:flex;align-items:center;gap:20px;">
+              <span style="display:flex;flex-direction:column;gap:2px;flex:1;"><span style="font-weight:400;font-size:12px;color:rgba(4,13,109,0.45);">outstanding</span><span style="font-weight:700;font-size:32px;color:#FF3B4E;">$650.00</span><span style="font-weight:500;font-size:12px;color:rgba(4,13,109,0.5);">3 days overdue · reminder sent tue</span></span>
+              <span style="padding:12px 22px;border-radius:9999px;background:#040D6D;color:#FFFFFF;font-weight:600;font-size:13.5px;">request again</span>
+            </div>
+            <div style="margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+              <div style="padding:18px 20px;border-radius:16px;background:#FFFFFF;box-shadow:0 2px 8px rgba(4,13,109,0.04);display:flex;flex-direction:column;gap:2px;"><span style="font-weight:400;font-size:12px;color:rgba(4,13,109,0.45);">on-time rate</span><span style="font-weight:700;font-size:24px;color:#040D6D;">92%</span></div>
+              <div style="padding:18px 20px;border-radius:16px;background:#FFFFFF;box-shadow:0 2px 8px rgba(4,13,109,0.04);display:flex;flex-direction:column;gap:2px;"><span style="font-weight:400;font-size:12px;color:rgba(4,13,109,0.45);">tenancy length</span><span style="font-weight:700;font-size:24px;color:#040D6D;">2.4 yrs</span></div>
+            </div>
+          </div>
+          <div style="flex:0 0 300px;background:#FFFFFF;border-left:1px solid rgba(4,13,109,0.08);padding:24px 20px;display:flex;flex-direction:column;gap:10px;overflow:hidden;">
+            <span style="font-weight:600;font-size:14px;color:rgba(4,13,109,0.5);">activity</span>
+            <span style="display:flex;flex-direction:column;gap:2px;padding:12px 14px;border-radius:14px;background:#EDEFF4;"><span style="font-weight:600;font-size:13px;color:#040D6D;">reminder sent</span><span style="font-weight:400;font-size:11.5px;color:rgba(4,13,109,0.45);">tue 7 jul · auto</span></span>
+            <span style="display:flex;flex-direction:column;gap:2px;padding:12px 14px;border-radius:14px;background:#EDEFF4;"><span style="font-weight:600;font-size:13px;color:#040D6D;">rent request sent · $650</span><span style="font-weight:400;font-size:11.5px;color:rgba(4,13,109,0.45);">fri 4 jul · schedule</span></span>
+            <span style="display:flex;flex-direction:column;gap:2px;padding:12px 14px;border-radius:14px;background:#EDEFF4;"><span style="font-weight:600;font-size:13px;color:#040D6D;">rent paid · $650</span><span style="font-weight:400;font-size:11.5px;color:rgba(4,13,109,0.45);">fri 27 jun · visa · receipt emailed</span></span>
+            <span style="display:flex;flex-direction:column;gap:2px;padding:12px 14px;border-radius:14px;background:#EDEFF4;"><span style="font-weight:600;font-size:13px;color:#040D6D;">water bill paid · $84.20</span><span style="font-weight:400;font-size:11.5px;color:rgba(4,13,109,0.45);">tue 24 jun · apple pay</span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1d · nav option — bottom dock -->
+    <div id="1d" style="position:relative;">
+      <div style="position:absolute;top:-46px;left:0;display:flex;align-items:center;gap:12px;">
+        <span style="padding:8px 18px;border-radius:9999px;background:rgba(244,241,232,0.14);color:#F4F1E8;font-weight:700;font-size:14px;">1d</span>
+        <span style="font-weight:500;font-size:15px;color:rgba(244,241,232,0.75);">nav — option b · floating bottom dock (phone-familiar), terminal centred like the mobile app</span>
+      </div>
+      <div style="position:relative;width:1180px;height:820px;border-radius:24px;overflow:hidden;background:#040D6D;display:flex;flex-direction:column;box-shadow:0 40px 90px rgba(0,0,0,0.5);">
+        <div style="flex:1 1 auto;display:flex;">
+          <div style="flex:1 1 50%;display:flex;flex-direction:column;justify-content:center;padding:0 60px;">
+            <span style="font-weight:500;font-size:13px;letter-spacing:0.2em;text-transform:uppercase;color:rgba(244,241,232,0.45);">new payment</span>
+            <span style="margin-top:14px;font-weight:700;font-size:88px;letter-spacing:-0.02em;color:#58ABFF;line-height:1;">$15.00</span>
+            <div style="margin-top:18px;display:flex;gap:8px;">
+              <span style="padding:10px 20px;border-radius:9999px;border:1.5px solid #58ABFF;color:#58ABFF;font-weight:600;font-size:14px;">paywave</span>
+              <span style="padding:10px 20px;border-radius:9999px;border:1.5px solid rgba(244,241,232,0.25);color:rgba(244,241,232,0.6);font-weight:600;font-size:14px;">boards</span>
+            </div>
+            <span style="margin-top:22px;font-weight:500;font-size:15px;color:rgba(244,241,232,0.55);">latte &amp; muffin · tap send to share payment</span>
+            <div style="margin-top:30px;display:flex;gap:12px;">
+              <span style="display:inline-flex;align-items:center;gap:10px;height:58px;padding:0 26px;border-radius:9999px;background:#58ABFF;color:#040D6D;font-weight:700;font-size:16px;">send →</span>
+              <span style="display:inline-flex;align-items:center;height:58px;padding:0 26px;border-radius:9999px;border:1.5px solid rgba(244,241,232,0.3);color:#F4F1E8;font-weight:600;font-size:15px;">split</span>
+            </div>
+          </div>
+          <div style="flex:1 1 50%;background:#EDEFF4;border-radius:36px 0 0 0;padding:30px 34px 110px;display:flex;flex-direction:column;">
+            <span style="font-weight:700;font-size:20px;color:#040D6D;">active stack</span>
+            <div style="margin-top:14px;display:flex;flex-direction:column;gap:10px;">
+              <div style="display:flex;align-items:center;gap:14px;padding:16px 20px;border-radius:16px;background:#FFFFFF;box-shadow:0 2px 8px rgba(4,13,109,0.05);"><span style="width:8px;height:8px;border-radius:50%;background:#FFB02E;"></span><span style="font-weight:600;font-size:15px;color:#040D6D;flex:1;">test</span><span style="font-weight:700;font-size:16px;color:#040D6D;">$15.00</span></div>
+              <div style="display:flex;align-items:center;gap:14px;padding:16px 20px;border-radius:16px;background:#FFFFFF;box-shadow:0 2px 8px rgba(4,13,109,0.05);"><span style="width:8px;height:8px;border-radius:50%;background:#FFB02E;"></span><span style="font-weight:600;font-size:15px;color:#040D6D;flex:1;">t-shirt</span><span style="font-weight:700;font-size:16px;color:#040D6D;">$35.00</span></div>
+              <div style="display:flex;align-items:center;gap:14px;padding:16px 20px;border-radius:16px;background:#FFFFFF;box-shadow:0 2px 8px rgba(4,13,109,0.05);"><span style="width:8px;height:8px;border-radius:50%;background:#1BBF85;"></span><span style="font-weight:600;font-size:15px;color:#040D6D;flex:1;">flat white × 2</span><span style="font-weight:700;font-size:16px;color:#040D6D;">$11.00</span></div>
+            </div>
+          </div>
+        </div>
+        <!-- floating dock -->
+        <div style="position:absolute;bottom:22px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;padding:10px;border-radius:9999px;background:rgba(9,16,84,0.9);border:1px solid rgba(88,171,255,0.25);box-shadow:0 20px 50px rgba(0,0,0,0.45);">
+          <span style="display:flex;align-items:center;gap:9px;padding:12px 22px;border-radius:9999px;background:#58ABFF;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#040D6D" stroke-width="1.8" stroke-linecap="round"><circle cx="7" cy="7" r="1.3"></circle><circle cx="12" cy="7" r="1.3"></circle><circle cx="17" cy="7" r="1.3"></circle><circle cx="7" cy="12" r="1.3"></circle><circle cx="12" cy="12" r="1.3"></circle><circle cx="17" cy="12" r="1.3"></circle><circle cx="7" cy="17" r="1.3"></circle><circle cx="12" cy="17" r="1.3"></circle><circle cx="17" cy="17" r="1.3"></circle></svg><span style="font-weight:700;font-size:13px;color:#040D6D;">terminal</span></span>
+          <span style="width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(244,241,232,0.6)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11l8-7 8 7"></path><path d="M6 9.5V20h12V9.5"></path></svg></span>
+          <span style="width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(244,241,232,0.6)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"></path></svg></span>
+          <span style="width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(244,241,232,0.6)" stroke-width="1.8" stroke-linecap="round"><path d="M4 19h16"></path><path d="M7 16v-5M12 16V7M17 16v-8"></path></svg></span>
+          <span style="width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(244,241,232,0.6)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3 1a7 7 0 0 0-2-1.2L14.2 3h-4l-.4 2.5a7 7 0 0 0-2 1.2l-2.3-1-2 3.4 2 1.5a7 7 0 0 0 0 2.4l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 2 1.2l.4 2.5h4l.4-2.5a7 7 0 0 0 2-1.2l2.3 1 2-3.4-2-1.5c.06-.4.1-.8.1-1.2z"></path></svg></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1e · trades option B -->
+    <div id="1e" style="position:relative;">
+      <div style="position:absolute;top:-46px;left:0;display:flex;align-items:center;gap:12px;">
+        <span style="padding:8px 18px;border-radius:9999px;background:rgba(244,241,232,0.14);color:#F4F1E8;font-weight:700;font-size:14px;">1e</span>
+        <span style="font-weight:500;font-size:15px;color:rgba(244,241,232,0.75);">trades — option b · full-width quote canvas, client card right, floating total</span>
+      </div>
+      <div style="position:relative;width:1180px;height:820px;border-radius:24px;overflow:hidden;background:#EDEFF4;display:flex;flex-direction:column;box-shadow:0 40px 90px rgba(0,0,0,0.5);">
+        <div style="flex:0 0 88px;background:#FFFFFF;border-bottom:1px solid rgba(4,13,109,0.08);display:flex;align-items:center;padding:0 30px;gap:18px;">
+          <span style="display:flex;align-items:baseline;font-size:20px;line-height:1;"><span style="font-family:'Larken';font-weight:900;color:#0055FF;">tapt</span><span style="font-family:'Larken';font-weight:900;font-style:italic;color:#0055FF;">pay.</span></span>
+          <span style="width:1px;height:28px;background:rgba(4,13,109,0.12);"></span>
+          <span style="font-weight:700;font-size:18px;color:#040D6D;">quote #q-118 · deck rebuild</span>
+          <span style="padding:6px 14px;border-radius:9999px;background:rgba(255,176,46,0.15);font-weight:600;font-size:12px;color:#B45309;">draft</span>
+          <span style="margin-left:auto;display:flex;gap:8px;">
+            <span style="padding:11px 20px;border-radius:9999px;border:1.5px solid rgba(4,13,109,0.22);color:#040D6D;font-weight:600;font-size:13px;">preview as customer</span>
+            <span style="padding:11px 20px;border-radius:9999px;background:#0055FF;color:#FFFFFF;font-weight:700;font-size:13px;">send quote</span>
+          </span>
+        </div>
+        <div style="flex:1 1 auto;display:flex;min-height:0;">
+          <div style="flex:1 1 auto;padding:26px 30px;display:flex;flex-direction:column;gap:10px;min-width:0;">
+            <div style="display:grid;grid-template-columns:44px 1fr 130px 110px 130px 40px;gap:12px;align-items:center;padding:0 20px;font-weight:500;font-size:11.5px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(4,13,109,0.4);"><span>#</span><span>item</span><span>qty / hrs</span><span>rate</span><span style="text-align:right;">total</span><span></span></div>
+            <div style="display:grid;grid-template-columns:44px 1fr 130px 110px 130px 40px;gap:12px;align-items:center;padding:18px 20px;border-radius:16px;background:#FFFFFF;box-shadow:0 2px 8px rgba(4,13,109,0.04);"><span style="font-weight:700;font-size:14px;color:#0055FF;">01</span><span style="font-weight:600;font-size:15px;color:#040D6D;">demolition &amp; site prep — labour</span><span style="font-weight:500;font-size:14px;color:rgba(4,13,109,0.6);">8 hrs</span><span style="font-weight:500;font-size:14px;color:rgba(4,13,109,0.6);">$95</span><span style="font-weight:700;font-size:15px;color:#040D6D;text-align:right;">$760.00</span><span style="color:#FF3B4E;font-weight:600;text-align:center;">✕</span></div>
+            <div style="display:grid;grid-template-columns:44px 1fr 130px 110px 130px 40px;gap:12px;align-items:center;padding:18px 20px;border-radius:16px;background:#FFFFFF;box-shadow:0 2px 8px rgba(4,13,109,0.04);"><span style="font-weight:700;font-size:14px;color:#0055FF;">02</span><span style="font-weight:600;font-size:15px;color:#040D6D;">kwila decking timber + fixings</span><span style="font-weight:500;font-size:14px;color:rgba(4,13,109,0.6);">1</span><span style="font-weight:500;font-size:14px;color:rgba(4,13,109,0.6);">$1,840</span><span style="font-weight:700;font-size:15px;color:#040D6D;text-align:right;">$1,840.00</span><span style="color:#FF3B4E;font-weight:600;text-align:center;">✕</span></div>
+            <div style="display:grid;grid-template-columns:44px 1fr 130px 110px 130px 40px;gap:12px;align-items:center;padding:18px 20px;border-radius:16px;background:#FFFFFF;box-shadow:0 2px 8px rgba(4,13,109,0.04);"><span style="font-weight:700;font-size:14px;color:#0055FF;">03</span><span style="font-weight:600;font-size:15px;color:#040D6D;">build &amp; finish — labour</span><span style="font-weight:500;font-size:14px;color:rgba(4,13,109,0.6);">12 hrs</span><span style="font-weight:500;font-size:14px;color:rgba(4,13,109,0.6);">$95</span><span style="font-weight:700;font-size:15px;color:#040D6D;text-align:right;">$1,140.00</span><span style="color:#FF3B4E;font-weight:600;text-align:center;">✕</span></div>
+            <span style="align-self:flex-start;padding:12px 20px;border-radius:9999px;border:1.5px dashed rgba(4,13,109,0.3);font-weight:600;font-size:13px;color:#040D6D;">+ add line</span>
+            <!-- floating total -->
+            <div style="margin-top:auto;display:flex;align-items:center;gap:26px;padding:20px 26px;border-radius:20px;background:#040D6D;box-shadow:0 20px 50px rgba(4,13,109,0.35);">
+              <span style="display:flex;flex-direction:column;"><span style="font-weight:400;font-size:11.5px;color:rgba(244,241,232,0.5);">subtotal</span><span style="font-weight:600;font-size:16px;color:#F4F1E8;">$3,740.00</span></span>
+              <span style="display:flex;flex-direction:column;"><span style="font-weight:400;font-size:11.5px;color:rgba(244,241,232,0.5);">gst 15% · added</span><span style="font-weight:600;font-size:16px;color:#F4F1E8;">$561.00</span></span>
+              <span style="display:flex;flex-direction:column;"><span style="font-weight:400;font-size:11.5px;color:rgba(244,241,232,0.5);">deposit on accept · 20%</span><span style="font-weight:600;font-size:16px;color:#58ABFF;">$860.20</span></span>
+              <span style="margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;"><span style="font-weight:400;font-size:11.5px;color:rgba(244,241,232,0.5);">total incl gst</span><span style="font-weight:700;font-size:26px;color:#58ABFF;">$4,301.00</span></span>
+            </div>
+          </div>
+          <div style="flex:0 0 300px;background:#FFFFFF;border-left:1px solid rgba(4,13,109,0.08);padding:24px 22px;display:flex;flex-direction:column;gap:12px;">
+            <span style="font-weight:600;font-size:14px;color:rgba(4,13,109,0.5);">client</span>
+            <div style="display:flex;align-items:center;gap:12px;"><span style="width:44px;height:44px;border-radius:50%;background:#040D6D;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#58ABFF;">sp</span><span style="display:flex;flex-direction:column;"><span style="font-weight:600;font-size:15px;color:#040D6D;">sam patel</span><span style="font-weight:400;font-size:12px;color:rgba(4,13,109,0.45);">41 marine parade</span></span></div>
+            <div style="padding:16px 18px;border-radius:14px;background:#EDEFF4;display:flex;flex-direction:column;gap:2px;"><span style="font-weight:400;font-size:11.5px;color:rgba(4,13,109,0.45);">history</span><span style="font-weight:600;font-size:13.5px;color:#040D6D;">3 jobs · $6,240 lifetime</span><span style="font-weight:400;font-size:12px;color:rgba(4,13,109,0.5);">always pays on accept</span></div>
+            <div style="padding:16px 18px;border-radius:14px;background:#EDEFF4;display:flex;flex-direction:column;gap:6px;">
+              <span style="font-weight:400;font-size:11.5px;color:rgba(4,13,109,0.45);">on accept</span>
+              <span style="font-weight:600;font-size:13.5px;color:#040D6D;">deposit link presented instantly</span>
+              <span style="display:flex;align-items:center;gap:6px;font-weight:500;font-size:12px;color:#0E8A61;"><span style="width:6px;height:6px;border-radius:50%;background:#1BBF85;"></span><span>gst receipt automatic</span></span>
+            </div>
+            <span style="margin-top:auto;font-weight:400;font-size:12px;color:rgba(4,13,109,0.45);line-height:1.5;">the customer accepting this quote is the deposit hitting your account — no second app, no re-keying.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 1400, &quot;height&quot;: 1000}}">
+class Component extends DCLogic {
+  state = {
+    page: 'terminal',
+    // terminal
+    amount: '',
+    selectedItem: 'custom',
+    stack: [
+      { id: 1, label: 'latte & muffin', cents: 1150, status: 'awaiting' },
+      { id: 2, label: 't-shirt', cents: 3500, status: 'awaiting' },
+      { id: 3, label: 'flat white × 2', cents: 1100, status: 'paid' },
+    ],
+    nextId: 4,
+    qrOpen: false, qrCents: 0, qrLabel: '', qrPaid: false, qrItemId: null,
+    splitOpen: false, splitWays: 2,
+    // property
+    tenantSel: 1,
+    billOpen: false, billFor: 'water / utilities',
+    // trades
+    quoteLines: [
+      { id: 1, kind: 'labour', desc: 'demolition & site prep — labour', qty: 8, rate: 95 },
+      { id: 2, kind: 'materials', desc: 'kwila decking timber + fixings', qty: 1, rate: 1840 },
+      { id: 3, kind: 'labour', desc: 'build & finish — labour', qty: 12, rate: 95 },
+    ],
+    nextLine: 4,
+    gstIncl: false, depositOn: true,
+    // stock
+    cat: 'all',
+    stock: [
+      { id: 1, name: 'latte', price: 6.5, qty: 0, cat: 'coffee' },
+      { id: 2, name: 'flat white', price: 5.5, qty: 0, cat: 'coffee' },
+      { id: 3, name: 'big brunch', price: 24, qty: 14, cat: 'food' },
+      { id: 4, name: 'muffin', price: 5, qty: 9, cat: 'food' },
+      { id: 5, name: 't-shirt', price: 35, qty: 22, cat: 'retail' },
+      { id: 6, name: 'keep cup', price: 18, qty: 4, cat: 'retail' },
+    ],
+    // settings
+    setSel: 'business', tg1: true, tg2: false, tg3: true,
+    toast: '', toastOn: false,
+  };
+
+  _fmt(cents) {
+    return '$' + (cents / 100).toFixed(2);
+  }
+  _money(n) {
+    return '$' + n.toLocaleString('en-NZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  _toast(msg) {
+    clearTimeout(this._toastT);
+    this.setState({ toast: msg, toastOn: true });
+    this._toastT = setTimeout(() => this.setState({ toastOn: false }), 2400);
+  }
+  componentWillUnmount() {
+    clearTimeout(this._toastT);
+    clearTimeout(this._qrT);
+  }
+
+  renderVals() {
+    const s = this.state;
+    const itemPrices = { latte: 650, brunch: 2400, muffin: 500 };
+    const itemNames = { custom: 'custom amount — type on the keypad', latte: 'latte', brunch: 'big brunch', muffin: 'muffin' };
+    const amtCents = s.selectedItem !== 'custom' ? itemPrices[s.selectedItem] : (s.amount === '' ? 0 : parseInt(s.amount, 10));
+    const awaiting = s.stack.filter((x) => x.status === 'awaiting').length;
+    const todayCents = 128450;
+
+    const tenantsData = [
+      { id: 1, initials: 'hr', name: 'hone reweti', address: '12 rata st, mount maunganui', cents: 65000, status: 'overdue 3 days', kind: 'over', schedule: '$650/wk · fridays · auto-reminders on' },
+      { id: 2, initials: 'im', name: 'isla murphy', address: '16 beach rd, mount maunganui', cents: 15000, status: 'sent · due friday', kind: 'sent', schedule: '$150/wk board · fridays' },
+      { id: 3, initials: 'tw', name: 'te whare flat', address: '3/41 pacific ave', cents: 92000, status: 'split 4 ways · 3 paid', kind: 'sent', schedule: '$920/wk · split between 4 tenants' },
+      { id: 4, initials: 'bp', name: 'ben porter', address: '77 oceanbeach rd', cents: 0, status: 'paid · this week', kind: 'paid', schedule: '$540/wk · wednesdays' },
+    ];
+    const sel = tenantsData.find((t) => t.id === s.tenantSel) || tenantsData[0];
+    const timelines = {
+      1: [
+        { t: 'tue 7 jul · automatic', label: 'reminder sent — never duplicated', amt: '', amtColor: 'rgba(4,13,109,0.4)' },
+        { t: 'fri 4 jul · schedule', label: 'rent request sent', amt: '$650.00', amtColor: '#040D6D' },
+        { t: 'fri 27 jun · visa · receipt emailed', label: 'rent paid', amt: '$650.00', amtColor: '#0E8A61' },
+        { t: 'tue 24 jun · apple pay', label: 'water bill paid', amt: '$84.20', amtColor: '#0E8A61' },
+      ],
+      2: [
+        { t: 'today · schedule', label: 'rent request sent', amt: '$150.00', amtColor: '#040D6D' },
+        { t: 'fri 4 jul · google pay', label: 'rent paid', amt: '$150.00', amtColor: '#0E8A61' },
+      ],
+      3: [
+        { t: 'today · 3 of 4 paid', label: 'rent split — awaiting 1 share', amt: '$230.00', amtColor: '#B45309' },
+        { t: 'fri 4 jul', label: 'rent split paid in full', amt: '$920.00', amtColor: '#0E8A61' },
+      ],
+      4: [
+        { t: 'wed 9 jul · apple pay', label: 'rent paid', amt: '$540.00', amtColor: '#0E8A61' },
+        { t: 'wed 2 jul · apple pay', label: 'rent paid', amt: '$540.00', amtColor: '#0E8A61' },
+      ],
+    };
+
+    // trades totals
+    const sub = s.quoteLines.reduce((a, l) => a + l.qty * l.rate, 0);
+    const gst = s.gstIncl ? sub * 3 / 23 : sub * 0.15;
+    const total = s.gstIncl ? sub : sub + gst;
+    const dep = s.depositOn ? total * 0.2 : 0;
+
+    const stockView = s.stock
+      .filter((x) => s.cat === 'all' || x.cat === s.cat)
+      .map((x) => ({
+        id: x.id, name: x.name, cat: x.cat,
+        price: this._money(x.price),
+        qtyLabel: x.qty === 0 ? 'unlimited' : x.qty + ' left',
+        qtyColor: x.qty > 0 && x.qty <= 4 ? '#B45309' : 'rgba(4,13,109,0.6)',
+      }));
+
+    return {
+      // nav
+      pgTerminal: s.page === 'terminal', pgProperty: s.page === 'property', pgTrades: s.page === 'trades',
+      pgStock: s.page === 'stock', pgAnalytics: s.page === 'analytics', pgSettings: s.page === 'settings',
+      navTerminal: s.page === 'terminal', navProperty: s.page === 'property', navTrades: s.page === 'trades',
+      navStock: s.page === 'stock', navAnalytics: s.page === 'analytics', navSettings: s.page === 'settings',
+      navTap: (e) => {
+        const k = e.currentTarget.getAttribute('data-key');
+        this.setState({ page: k });
+      },
+
+      // terminal
+      amountDisplay: this._fmt(amtCents),
+      selectedItemLabel: itemNames[s.selectedItem],
+      chipCustom: s.selectedItem === 'custom', chipLatte: s.selectedItem === 'latte',
+      chipBrunch: s.selectedItem === 'brunch', chipMuffin: s.selectedItem === 'muffin',
+      pickItem: (e) => this.setState({ selectedItem: e.currentTarget.getAttribute('data-item'), amount: '' }),
+      keyTap: (e) => {
+        const k = e.currentTarget.getAttribute('data-k');
+        let a = this.state.amount;
+        if (k === 'c') a = '';
+        else if (k === 'b') a = a.slice(0, -1);
+        else if (a.length < 7) a = (a === '' && k === '0') ? a : a + k;
+        this.setState({ amount: a, selectedItem: 'custom' });
+      },
+      charge: () => {
+        if (amtCents <= 0) { this._toast('enter an amount first'); return; }
+        const id = this.state.nextId;
+        const label = s.selectedItem === 'custom' ? 'custom sale' : itemNames[s.selectedItem];
+        this.setState({
+          stack: [{ id, label, cents: amtCents, status: 'awaiting' }, ...this.state.stack],
+          nextId: id + 1, amount: '', selectedItem: 'custom',
+          qrOpen: true, qrCents: amtCents, qrLabel: label, qrPaid: false, qrItemId: id,
+        });
+        clearTimeout(this._qrT);
+        this._qrT = setTimeout(() => {
+          this.setState({
+            qrPaid: true,
+            stack: this.state.stack.map((x) => x.id === id ? { ...x, status: 'paid' } : x),
+          });
+        }, 3200);
+      },
+      qrOpen: s.qrOpen,
+      qrAmount: this._fmt(s.qrCents),
+      qrLabel: s.qrLabel,
+      qrStatus: s.qrPaid ? 'paid — receipt sent ✓' : 'awaiting payment — scan or tap',
+      cancelQr: () => this.setState({ qrOpen: false }),
+      stackItems: s.stack.map((x) => ({
+        id: x.id, label: x.label, amt: this._fmt(x.cents),
+        statusLabel: x.status === 'paid' ? 'paid · receipt emailed' : 'awaiting payment · tap to mark paid',
+        dot: x.status === 'paid' ? '#1BBF85' : '#FFB02E',
+      })),
+      stackTap: (e) => {
+        const id = parseInt(e.currentTarget.getAttribute('data-id'), 10);
+        this.setState({ stack: this.state.stack.map((x) => x.id === id ? { ...x, status: x.status === 'paid' ? 'awaiting' : 'paid' } : x) });
+      },
+      stackSummary: awaiting + ' awaiting · ' + (s.stack.length - awaiting) + ' paid · unlimited live at once',
+      todayTotal: this._fmt(todayCents),
+
+      // split
+      splitOpen: s.splitOpen, splitWays: s.splitWays,
+      splitTotal: this._fmt(amtCents > 0 ? amtCents : 9176),
+      splitEach: this._fmt(Math.ceil((amtCents > 0 ? amtCents : 9176) / s.splitWays)),
+      openSplit: () => this.setState({ splitOpen: true }),
+      closeSplit: () => this.setState({ splitOpen: false }),
+      splitMinus: () => this.setState({ splitWays: Math.max(2, this.state.splitWays - 1) }),
+      splitPlus: () => this.setState({ splitWays: Math.min(10, this.state.splitWays + 1) }),
+      confirmSplit: () => {
+        const ways = this.state.splitWays;
+        const cents = amtCents > 0 ? amtCents : 9176;
+        const each = Math.ceil(cents / ways);
+        const id = this.state.nextId;
+        this.setState({
+          splitOpen: false,
+          stack: [{ id, label: 'split ' + ways + ' ways · ' + this._fmt(each) + ' each', cents, status: 'awaiting' }, ...this.state.stack],
+          nextId: id + 1, amount: '', selectedItem: 'custom',
+        });
+        this._toast('split created — ' + ways + ' payment links live');
+      },
+
+      // property
+      propOutstanding: '$6,057.00',
+      tenants: tenantsData.map((t) => ({
+        id: t.id, initials: t.initials, name: t.name,
+        on: t.id === s.tenantSel,
+        avBg: t.id === s.tenantSel ? '#58ABFF' : '#EDEFF4',
+        avFg: t.id === s.tenantSel ? '#040D6D' : '#040D6D',
+        amt: t.cents === 0 ? '✓' : this._fmt(t.cents),
+        amtColor: t.id === s.tenantSel ? '#58ABFF' : (t.kind === 'over' ? '#FF3B4E' : t.kind === 'paid' ? '#0E8A61' : '#040D6D'),
+        status: t.status,
+        stColor: t.kind === 'over' ? '#FF3B4E' : 'rgba(4,13,109,0.45)',
+        dot: t.kind === 'over' ? '#FF3B4E' : t.kind === 'paid' ? '#1BBF85' : '#FFB02E',
+      })),
+      tenantTap: (e) => this.setState({ tenantSel: parseInt(e.currentTarget.getAttribute('data-id'), 10) }),
+      selName: sel.name, selAddress: sel.address,
+      selAmt: sel.cents === 0 ? 'paid ✓' : this._fmt(sel.cents),
+      selSchedule: sel.schedule,
+      selTimeline: timelines[sel.id] || [],
+      sendReminder: () => this._toast('reminder sent to ' + sel.name + ' — tracked, never duplicated'),
+
+      // bill overlay
+      billOpen: s.billOpen,
+      openBill: () => this.setState({ billOpen: true }),
+      closeBill: () => this.setState({ billOpen: false }),
+      bfUtilities: s.billFor === 'water / utilities', bfLate: s.billFor === 'late fee',
+      bfCleaning: s.billFor === 'cleaning', bfDamages: s.billFor === 'damages', bfOther: s.billFor === 'other',
+      pickBillFor: (e) => this.setState({ billFor: e.currentTarget.getAttribute('data-item') }),
+      sendBill: () => {
+        this.setState({ billOpen: false });
+        this._toast('bill sent to ' + sel.name + ' — ' + this.state.billFor + ' · payment link by text');
+      },
+
+      // trades
+      quoteLines: s.quoteLines.map((l, i) => ({
+        id: l.id, n: (i + 1 < 10 ? '0' : '') + (i + 1),
+        desc: l.desc,
+        meta: l.kind === 'materials' ? 'materials · at cost + margin' : l.qty + ' ' + (l.kind === 'callout' ? 'callout' : 'hrs') + ' × ' + this._money(l.rate),
+        total: this._money(l.qty * l.rate),
+      })),
+      addLine: (e) => {
+        const k = e.currentTarget.getAttribute('data-k');
+        const id = this.state.nextLine;
+        const line = k === 'labour'
+          ? { id, kind: 'labour', desc: 'labour', qty: 4, rate: 95 }
+          : k === 'materials'
+            ? { id, kind: 'materials', desc: 'materials', qty: 1, rate: 480 }
+            : { id, kind: 'callout', desc: 'callout fee', qty: 1, rate: 80 };
+        this.setState({ quoteLines: [...this.state.quoteLines, line], nextLine: id + 1 });
+      },
+      removeLine: (e) => {
+        const id = parseInt(e.currentTarget.getAttribute('data-id'), 10);
+        this.setState({ quoteLines: this.state.quoteLines.filter((l) => l.id !== id) });
+      },
+      toggleGst: () => this.setState({ gstIncl: !this.state.gstIncl }),
+      gstLabel: s.gstIncl ? 'incl gst' : '+ gst',
+      gstRowLabel: s.gstIncl ? 'gst 15% · included' : 'gst 15% · added',
+      toggleDeposit: () => this.setState({ depositOn: !this.state.depositOn }),
+      depLabel: s.depositOn ? 'deposit on accept · 20%' : 'no deposit',
+      depBg: s.depositOn ? '#040D6D' : 'rgba(4,13,109,0.08)',
+      depFg: s.depositOn ? '#58ABFF' : 'rgba(4,13,109,0.55)',
+      depRowLabel: s.depositOn ? 'deposit on accept' : 'deposit off',
+      subTotal: this._money(sub),
+      gstAmt: this._money(gst),
+      depositAmt: s.depositOn ? this._money(dep) : '—',
+      grandTotal: this._money(total),
+      sendQuote: () => this._toast('quote sent — deposit link presents the moment they accept'),
+
+      // stock
+      catAll: s.cat === 'all', catCoffee: s.cat === 'coffee', catFood: s.cat === 'food', catRetail: s.cat === 'retail',
+      catTap: (e) => this.setState({ cat: e.currentTarget.getAttribute('data-item') }),
+      stockView,
+      stockPlus: (e) => {
+        const id = parseInt(e.currentTarget.getAttribute('data-id'), 10);
+        this.setState({ stock: this.state.stock.map((x) => x.id === id ? { ...x, qty: x.qty + 1 } : x) });
+      },
+      stockMinus: (e) => {
+        const id = parseInt(e.currentTarget.getAttribute('data-id'), 10);
+        this.setState({ stock: this.state.stock.map((x) => x.id === id ? { ...x, qty: Math.max(0, x.qty - 1) } : x) });
+      },
+
+      // settings
+      setBusinessOn: s.setSel === 'business', setBoardsOn: s.setSel === 'boards',
+      setTeamOn: s.setSel === 'team', setPayoutsOn: s.setSel === 'payouts',
+      setBusiness: s.setSel === 'business', setBoards: s.setSel === 'boards',
+      setTeam: s.setSel === 'team', setPayouts: s.setSel === 'payouts',
+      setTap: (e) => this.setState({ setSel: e.currentTarget.getAttribute('data-item') }),
+      tg1: s.tg1, tg2: s.tg2, tg3: s.tg3,
+      flipToggle: (e) => {
+        const k = e.currentTarget.getAttribute('data-k');
+        if (k === 't1') this.setState({ tg1: !this.state.tg1 });
+        if (k === 't2') this.setState({ tg2: !this.state.tg2 });
+        if (k === 't3') this.setState({ tg3: !this.state.tg3 });
+      },
+
+      // toast
+      toastOn: s.toastOn, toastMsg: s.toast,
+    };
+  }
+}
+
+</script>
+</body>
+</html>
