@@ -347,8 +347,8 @@ A refusal's status (P2.2): 401 authentication missing, invalid, expired or disab
 without the role or the tenant; 404 another business's record, or a link that is no one's, answered as
 a missing one. A few routes answer by design with 200 (a provider's call is acknowledged whatever it
 names; the reset-link check says \`{ valid: false }\`), 302 (a browser's return is sent home) or 400 (the
-pages that send a one-time token in the body, an open owner question). A retired address's success is
-its notice (410), which it gives everyone.
+pages that send a one-time token in the body: kept by the owner's decision, 2026-09-29). A retired
+address's success is its notice (410), which it gives everyone.
 
 ## Routes
 

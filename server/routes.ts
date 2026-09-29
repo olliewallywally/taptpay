@@ -2318,9 +2318,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       
       // SECURITY: verify the board belongs to this merchant
       // Another business's board is answered as a missing one (R1-T3, P2.2's tenant-safe 404), as the
-      // board's stream and brand answer; it was 403.
+      // board's stream and brand answer; it was 403. So is a board the business has removed: its page no
+      // longer shows the sale left open on it (owner decision 2026-09-29).
       const stone = await storage.getTaptStone(stoneId);
-      if (!stone || stone.merchantId !== merchantId) {
+      if (!stone || !stone.isActive || stone.merchantId !== merchantId) {
         return res.status(404).json({ message: "Payment board not found" });
       }
 

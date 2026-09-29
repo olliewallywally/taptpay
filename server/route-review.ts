@@ -212,7 +212,7 @@ const STOCK_ROW = "a whole item row (name, description, cost, emoji, variations,
 
 // ── The business's sales, refunds and reports (batch 6b) ──
 const ADMIN_MONEY =
-  "The platform admin passes checkMerchantOwnership for any business, so it can create sales, record cash sales and cancel sales for any business; no admin screen does. For R1-T3's matrix: whether money routes should admit the admin at all.";
+  "The platform admin passes checkMerchantOwnership for any business, so it can create sales, record cash sales, take Tap to Pay and cancel sales for any business; no admin screen does: kept by the owner's decision (2026-09-29).";
 const REFUND_ROW = "whole refund rows (amount, reason, method, status, the provider's refund id, when made and completed)";
 
 // ── The property routes (batch 6c) ──
@@ -1621,7 +1621,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         principal: "public",
         when: "no Authorization header, with a stoneId (without one: 410 NO_BOARD_ADDRESS_RETIRED)",
         tenant: "board",
-        tenantRule: `${BOARD_PAGE_RULE}; a board that is not the business's, or does not exist, is 404, the same answer (since 2026-09-29, R1-T3; it was 403)`,
+        tenantRule: `${BOARD_PAGE_RULE}; a board that is not the business's, or does not exist, is 404, the same answer (since 2026-09-29, R1-T3; it was 403), and so is a board the business has removed (owner decision 2026-09-29: its page no longer shows the sale left open on it)`,
       },
     ],
     input: "id: strictPositiveIntegerParam; stoneId: strictPositiveIntegerQueryParam when present (400 otherwise)",
@@ -1638,7 +1638,6 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       rate: `the board's page: ${CHECK_RATE_LIMIT}, which each open board page spends every 3 seconds and sign-up and numbered pay share; the signed-in branch: none`,
     },
     findings: [
-      "A board's page still gets a removed (inactive) board's open sale, where the same board's stream and brand answer 404: for the owner (R1-T3; the 403 for another business's board or a missing one is 404 since 2026-09-29).",
       "Each poll from a board's page logs the visitor's address: every 3 seconds for every open board page (the logs and redaction phase).",
     ],
   },
@@ -2809,6 +2808,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       "A provider failure answers with the provider's own error text (`Failed to create attended session: …`, `Payment processor error: …`, from sessionResult.error and paymentResult.error), to a signed-in login of the business (R2's provider boundary).",
       "merchantId, transactionId and amount are read with parseInt and parseFloat (§8.4). It stays off (TAP_TO_PAY_DISABLED) until the iPhone hardware work (R7).",
       "No idempotency: without a transactionId, a repeat finishes whatever is pending next, or charges a new sale for the amount sent (R3's payment attempts).",
+      ADMIN_MONEY,
     ],
   },
 

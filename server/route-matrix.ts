@@ -40,6 +40,7 @@ export const MATRIX_CALLER_MEANING = {
   "key-without-permission": "the ecommerce API with a live key that lacks the route's permission",
   "unknown-link": "a link route asked with a token, state or code that is no one's",
   "unknown-board": "a board's public route asked with a board that is not the business's, or does not exist",
+  "removed-board": "a board's public route asked with a board the business has removed",
   "sale-with-its-own-link": "a numbered route asked for a sale that has its own payment link",
   "wrong-webhook-key": "the WhatsApp webhook with a key that is not the provider's",
   "unknown-reference": "a provider's call naming a session, return state or message that is no one's",
@@ -92,7 +93,8 @@ export const GATE_REFUSED: readonly MatrixCaller[] = ["signed-out", "invalid-tok
 /**
  * A link route's answer to a token, state or code that is no one's, where it is not 404: each is the
  * route's reviewed answer. The sign-in handoff and the pages that read a token from the body answer as
- * their screens expect; the checkout's browser return goes home.
+ * their screens expect (400 for those pages: kept by the owner's decision, 2026-09-29, where P2.2 would
+ * say 401); the checkout's browser return goes home.
  */
 export const UNKNOWN_LINK_ANSWER: Record<string, MatrixAnswer> = {
   "POST /api/auth/google/session": 401,
@@ -101,6 +103,16 @@ export const UNKNOWN_LINK_ANSWER: Record<string, MatrixAnswer> = {
   "POST /api/auth/confirm-email": 400,
   "POST /api/team/accept-invite": 400,
   "GET /api/checkout/callback": 302,
+};
+
+/**
+ * A board's public routes that serve only the boards a business still uses: a removed one is answered as
+ * a missing one (404). The board's QR image is drawn for any of the business's boards.
+ */
+export const IN_USE_BOARDS_ONLY: Record<string, string> = {
+  "GET /api/merchants/:id/active-transaction": "a removed board's page no longer shows the sale left open on it (owner decision 2026-09-29)",
+  "GET /api/merchants/:id/events": "a board's stream is for the business's boards in use",
+  "GET /api/merchants/:id/stone/:stoneId/brand": "a board's brand is for the business's boards in use (owner decision 2026-09-26)",
 };
 
 function gateOf(recorded: RecordedRouteFacts): MatrixGate {
@@ -150,6 +162,7 @@ export function matrixRowFor(key: string, recorded: RecordedRouteFacts = ROUTE_P
     if (principals.has("public-bearer") && tenants.has("token")) answers["unknown-link"] = UNKNOWN_LINK_ANSWER[key] ?? 404;
     // A board's page names the business and the board: another business's board is a missing one (P2.2).
     if (tenants.has("board")) answers["unknown-board"] = 404;
+    if (key in IN_USE_BOARDS_ONLY) answers["removed-board"] = 404;
     // A sale with its own link is answered like a missing one (tenant-safe, P2.2): 404, or for the
     // Windcave browser return, which sends a missing sale home, the same redirect.
     if (tenants.has("number")) answers["sale-with-its-own-link"] = key === "GET /api/windcave/callback" ? 302 : 404;

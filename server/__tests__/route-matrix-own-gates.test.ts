@@ -268,10 +268,19 @@ describe("R1-T3 — a board's public routes answer another business's board as a
   let merchantId: number;
   let theirBoard: number;
 
+  let removedBoard: number;
+
   beforeAll(async () => {
     merchantId = (await createOwnerPrincipal()).merchantId;
     const other = await createOwnerPrincipal();
     theirBoard = (await storage.createNextTaptStone(other.merchantId, "Their till")).id;
+    // A board the business has removed, with a sale left open on it.
+    removedBoard = (await storage.createNextTaptStone(merchantId, "Old till")).id;
+    await storage.createTransaction({
+      merchantId, taptStoneId: removedBoard, itemName: "Left open", price: "4.00", status: "pending",
+      paymentMethod: "qr_code", splitEnabled: false,
+    } as any);
+    await storage.deleteTaptStone(removedBoard);
   });
 
   it("has a request for every board route", () => {
@@ -287,6 +296,25 @@ describe("R1-T3 — a board's public routes answer another business's board as a
     expect(theirs.body).toEqual(missing.body);
     expect(storageSnapshot()).toBe(before);
     expect(ROUTE_MATRIX[key].answers["unknown-board"]).toBe(404);
+  });
+
+  // Owner decision 2026-09-29: a removed board's page no longer shows the sale left open on it. The board's
+  // QR image is still drawn for any of the business's boards (it only encodes the page's address).
+  const IN_USE_ONLY = ["GET /api/merchants/:id/active-transaction", "GET /api/merchants/:id/events", "GET /api/merchants/:id/stone/:stoneId/brand"];
+
+  it("has a request for every board route that serves only boards still in use", () => {
+    expect(refusalsOf("removed-board").map(([key]) => key).sort()).toEqual([...IN_USE_ONLY].sort());
+  });
+
+  it.each(IN_USE_ONLY)("%s answers a removed board 404, the same as a missing one, and changes nothing", async (key) => {
+    const ask = (stoneId: number) => BOARD_ROUTES[key].replace("{m}", String(merchantId)).replace("{s}", String(stoneId));
+    const before = storageSnapshot();
+    const removed = await request(app).get(ask(removedBoard));
+    const missing = await request(app).get(ask(999_999));
+    expect([removed.status, missing.status]).toEqual([404, 404]);
+    expect(removed.body).toEqual(missing.body);
+    expect(storageSnapshot()).toBe(before);
+    expect(ROUTE_MATRIX[key].answers["removed-board"]).toBe(404);
   });
 });
 
