@@ -13,7 +13,9 @@ import {
   createMemberPrincipal,
   createOwnerPrincipal,
   createTestApp,
+  openEventStream,
   storage,
+  type EventStream,
   type Principal,
 } from "./http-harness";
 
@@ -40,14 +42,19 @@ export interface ServedRequest {
   binary?: true;
   /** A route with its own gate: the credential its caller brings (a cookie, the scheduler's secret, a key). */
   headers?: Record<string, string>;
+  /** A live event stream (read as a browser's EventSource does): the response's body is its first event. */
+  stream?: true;
 }
+
+/** A response; for a live event stream, its first event as the body and a way to read the next. */
+export type ServedResponse = request.Response & { nextEvent?: EventStream["nextEvent"] };
 
 export interface Served {
   req: ServedRequest;
   /** The route's success status. */
   status: number;
   /** What the success did or returned. (Not `then`: that would make each recipe a promise.) */
-  check: (res: request.Response) => void | Promise<void>;
+  check: (res: ServedResponse) => void | Promise<void>;
 }
 
 export type ServedRecipe = (ctx: ServedCtx, who: Principal, caller: ServedCaller) => Promise<Served> | Served;
@@ -131,10 +138,24 @@ export async function expectServed(recipes: Record<string, ServedRecipe>, key: s
 }
 
 async function expectSuccess(ctx: ServedCtx, who: Principal | null, caller: string, served: Served) {
+  if (served.req.stream) return expectStreamServed(ctx, who, caller, served);
   const res = await sendServed(ctx, who, served.req);
   expect({ caller, status: res.status, body: res.status === served.status ? "…" : res.body })
     .toEqual({ caller, status: served.status, body: "…" });
   await served.check(res);
+}
+
+/** A live event stream is served when it opens with the route's status; the check reads its events. */
+async function expectStreamServed(ctx: ServedCtx, who: Principal | null, caller: string, served: Served) {
+  const stream = await openEventStream(ctx.app, served.req.path, { ...(who ? bearer(who) : {}), ...served.req.headers });
+  try {
+    expect({ caller, status: stream.status }).toEqual({ caller, status: served.status });
+    const first = await stream.nextEvent();
+    // Not a supertest response: only what a stream has (its status, headers, events).
+    await served.check({ status: stream.status, headers: stream.headers, body: first, nextEvent: stream.nextEvent } as unknown as ServedResponse);
+  } finally {
+    await stream.close();
+  }
 }
 
 // ── The routes with their own gates ──
