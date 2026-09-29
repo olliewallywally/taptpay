@@ -38,6 +38,11 @@ it."**
   no sale; it never shows the sale or takes them to pay it. Not changed: a removed board's QR image
   (`GET /api/merchants/:id/stone/:stoneId/qr`) is still drawn; it only encodes the board page's address.
 
-## Outcome
+## Outcome (same day, local commits)
 
-To be filled in when built.
+- 3, **`c8055341`**: the open-sale read answers a removed board 404 "Payment board not found", as a
+  missing one; the matrix records the new caller `removed-board` on the three board reads that serve only
+  boards in use (the open sale, the stream, the brand), driven by `route-matrix-own-gates.test.ts` with a
+  removed board carrying an open sale. Red first 4 of 4; mutations 4/4; `tsc` clean.
+- 1 and 2: no code change; the matrix's comment, the inventory table and the reviews' finding
+  (`ADMIN_MONEY`, now on Tap to Pay too) say "kept by the owner's decision (2026-09-29)".
