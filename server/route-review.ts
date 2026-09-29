@@ -1621,7 +1621,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         principal: "public",
         when: "no Authorization header, with a stoneId (without one: 410 NO_BOARD_ADDRESS_RETIRED)",
         tenant: "board",
-        tenantRule: `${BOARD_PAGE_RULE}; a board that is not the business's, or does not exist, is 403`,
+        tenantRule: `${BOARD_PAGE_RULE}; a board that is not the business's, or does not exist, is 404, the same answer (since 2026-09-29, R1-T3; it was 403)`,
       },
     ],
     input: "id: strictPositiveIntegerParam; stoneId: strictPositiveIntegerQueryParam when present (400 otherwise)",
@@ -1638,7 +1638,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       rate: `the board's page: ${CHECK_RATE_LIMIT}, which each open board page spends every 3 seconds and sign-up and numbered pay share; the signed-in branch: none`,
     },
     findings: [
-      "A board's page gets 403 for a board that is not the business's or does not exist, and still gets a removed (inactive) board's open sale; the same board's stream answers 404 for all three. P2.2 asks for the tenant-safe 404 (R1-T3).",
+      "A board's page still gets a removed (inactive) board's open sale, where the same board's stream and brand answer 404: for the owner (R1-T3; the 403 for another business's board or a missing one is 404 since 2026-09-29).",
       "Each poll from a board's page logs the visitor's address: every 3 seconds for every open board page (the logs and redaction phase).",
     ],
   },

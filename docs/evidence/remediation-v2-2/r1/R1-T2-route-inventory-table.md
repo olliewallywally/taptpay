@@ -1,4 +1,4 @@
-# R1-T2 route inventory — generated 2026-09-29 @ `b0500c5de0e32d8cd6f03faa20c6ec53c8eceb63`
+# R1-T2 route inventory — generated 2026-09-29 @ `d6be33691a505d6fd7a5776adb581dd6546dd783`
 
 Regenerate with `npx tsx scripts/generate-route-policy.ts`. This table is
 evidence for the SHA named above, not a timeless constant — see
@@ -56,7 +56,7 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 - **POST /api/auth/confirm-email:** The sign-up confirmation token is stored as it was sent, not hashed (reset and invite tokens keep only a SHA-256), and never expires: anyone who can read the merchants table holds every waiting application's link. Here the link alone confirms nothing (the password chosen at sign-up is asked for).
 - **POST /api/merchants/signup:** The only limit on new applications is checkRateLimit, 100 a minute per visitor address in this process only. Until TRUST_PROXY_HOPS is set, visitors may all count as the proxy's address, and the same count serves GET /api/merchants/:id/active-transaction (which each open board page asks every 3 seconds) and POST /api/transactions/:id/pay: five open board pages can use it up, refusing sign-ups and board payments, and a run of sign-ups can refuse board customers. Each new address costs a bcrypt hash, a merchant row and an email.
 - **GET /.well-known/apple-developer-merchantid-domain-association:** Were the file ever missing, sendFile's error would reach the global handler, which passes a 4xx error's own message on: a 404 naming the server's absolute path (shown with express's sendFile and the same pass-through, 2026-09-26). The file is in the repository, so only a broken deploy shows it; the pass-through itself belongs to the logs and redaction phase.
-- **GET /api/merchants/:id/active-transaction:** A board's page gets 403 for a board that is not the business's or does not exist, and still gets a removed (inactive) board's open sale; the same board's stream answers 404 for all three. P2.2 asks for the tenant-safe 404 (R1-T3).
+- **GET /api/merchants/:id/active-transaction:** A board's page still gets a removed (inactive) board's open sale, where the same board's stream and brand answer 404: for the owner (R1-T3; the 403 for another business's board or a missing one is 404 since 2026-09-29).
 - **GET /api/merchants/:id/active-transaction:** Each poll from a board's page logs the visitor's address: every 3 seconds for every open board page (the logs and redaction phase).
 - **GET /api/merchants/:id/events:** Nothing limits how many streams anyone holds open: each keeps a connection and a subscriber in this process's memory, so one script can hold thousands on any board's public stream (R1-T4 phase B's address limits, once TRUST_PROXY_HOPS is set).
 - **GET /api/nfc/capabilities:** Only pages mounted nowhere ask for it (merchant-terminal.tsx, merchant-terminal-mobile.tsx; the stale bundles under client/public/app too). Retire it with them (dead code, R8).
@@ -145,6 +145,7 @@ The callers:
 - `unknown-key`: the ecommerce API with a key nobody was issued
 - `key-without-permission`: the ecommerce API with a live key that lacks the route's permission
 - `unknown-link`: a link route asked with a token, state or code that is no one's
+- `unknown-board`: a board's public route asked with a board that is not the business's, or does not exist
 - `sale-with-its-own-link`: a numbered route asked for a sale that has its own payment link
 - `wrong-webhook-key`: the WhatsApp webhook with a key that is not the provider's
 - `link-holder`: the holder of the route's own link: its token, return state, handoff code or invite
@@ -185,8 +186,8 @@ its notice (410), which it gives everyone.
 | POST | `/api/merchants/:id/onboarding` | 1231 | merchant | authenticateToken, checkAccountOwnership | `owner`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `other-owner` |
 | GET | `/api/admin/auth/me` | 1323 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `owner`, `member` |
 | GET | `/api/merchants/:id/qr` | 1336 | public | — | `signed-out` | — |
-| GET | `/api/merchants/:id/stone/:stoneId/qr` | 1343 | public | — | `signed-out` | — |
-| GET | `/api/merchants/:id/stone/:stoneId/brand` | 1396 | public | publicBoardBrandDto( | `signed-out` | — |
+| GET | `/api/merchants/:id/stone/:stoneId/qr` | 1343 | public | — | `signed-out` | 404: `unknown-board` |
+| GET | `/api/merchants/:id/stone/:stoneId/brand` | 1396 | public | publicBoardBrandDto( | `signed-out` | 404: `unknown-board` |
 | GET | `/api/merchants/:id/profile` | 1418 | merchant | authenticateToken, checkMerchantOwnership, isAccountOwner | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
 | GET | `/api/pay/t/:token` | 1440 | public-bearer | resolvePaymentToken( | `link-holder` | 404: `unknown-link` |
 | GET | `/api/pay/t/:token/qr` | 1467 | public-bearer | resolvePaymentToken( | `link-holder` | 404: `unknown-link` |
@@ -199,7 +200,7 @@ its notice (410), which it gives everyone.
 | POST | `/api/pay/t/:token/googlepay-complete` | 2063 | public-bearer | prepareTokenCompletion(, paymentAttempts.resolveReturnState( | `link-holder` | 404: `unknown-link` |
 | GET | `/api/pay/return/:state` | 2194 | public-bearer | paymentAttempts.resolveReturnState( | `link-holder` | 404: `unknown-link` |
 | ALL | `/api/pay/notification/:state` | 2228 | provider | — | `provider` | — |
-| GET | `/api/merchants/:id/active-transaction` | 2245 | merchant / public | authenticateToken, checkMerchantOwnership, publicTransactionDto(, generatePaymentUrl( | `signed-out`, `owner`, `member`, `platform-admin` | 401: `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
+| GET | `/api/merchants/:id/active-transaction` | 2245 | merchant / public | authenticateToken, checkMerchantOwnership, publicTransactionDto(, generatePaymentUrl( | `signed-out`, `owner`, `member`, `platform-admin` | 401: `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner`; 404: `unknown-board` |
 | POST | `/api/transactions` | 2362 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
 | POST | `/api/transactions/cash-sale` | 2443 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
 | POST | `/api/transactions/tap-to-pay` | 2507 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
@@ -247,7 +248,7 @@ its notice (410), which it gives everyone.
 | POST | `/api/auth/resend-confirmation` | 4899 | public | — | `signed-out` | — |
 | POST | `/api/info-pack-leads` | 4929 | public | — | `signed-out` | — |
 | POST | `/api/merchants/signup` | 4982 | public | — | `signed-out` | — |
-| GET | `/api/merchants/:id/events` | 5093 | merchant / public | authenticateToken, checkMerchantOwnership | `signed-out`, `owner`, `member`, `platform-admin` | 401: `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
+| GET | `/api/merchants/:id/events` | 5093 | merchant / public | authenticateToken, checkMerchantOwnership | `signed-out`, `owner`, `member`, `platform-admin` | 401: `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner`; 404: `unknown-board` |
 | GET | `/api/push/capabilities` | 5169 | public | — | `signed-out` | — |
 | GET | `/api/push/vapid-key` | 5193 | public | — | `signed-out` | — |
 | POST | `/api/push/subscribe` | 5203 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
@@ -1079,7 +1080,7 @@ Reviewed policy:
 - query: `stoneId: strictPositiveIntegerQueryParam`
 - authChecks: `authenticateToken`, `checkMerchantOwnership`, `compares stone.merchantId !== merchantId`, `compares transaction.merchantId !== merchantId`
 - storageMethods: `getActiveTransactionByMerchant`, `getTaptStone`
-- statuses: `200`, `400`, `401`, `403`, `410`, `429`, `500`, `503`
+- statuses: `200`, `400`, `401`, `403`, `404`, `410`, `429`, `500`, `503`
 - dtos: `ownerTransactionDto`, `publicTransactionDto`
 - rateLimits: `checkRateLimit`
 - helpers: `checkRateLimit`
@@ -1087,7 +1088,7 @@ Reviewed policy:
 Reviewed policy:
 
 - **Who:** merchant (owner, member, platform admin) — an Authorization header is sent. **Tenant (path-merchant):** checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business; its newest open sale on any board, or on the board asked for, including a sale with its own link
-- **Who:** public — no Authorization header, with a stoneId (without one: 410 NO_BOARD_ADDRESS_RETIRED). **Tenant (board):** a board's customer page: the board (stoneId) must belong to the business in the path, and only that board's open sale is shown, never a sale with its own link; a board that is not the business's, or does not exist, is 403
+- **Who:** public — no Authorization header, with a stoneId (without one: 410 NO_BOARD_ADDRESS_RETIRED). **Tenant (board):** a board's customer page: the board (stoneId) must belong to the business in the path, and only that board's open sale is shown, never a sale with its own link; a board that is not the business's, or does not exist, is 404, the same answer (since 2026-09-29, R1-T3; it was 403)
 - **Input:** id: strictPositiveIntegerParam; stoneId: strictPositiveIntegerQueryParam when present (400 otherwise)
 - **Idempotency:** read-only
 - **Success:** the open sale or null, not cached: to the business, ownerTransactionDto; to the board's page, publicTransactionDto; each with the board's page and QR addresses for a board sale
@@ -1095,7 +1096,7 @@ Reviewed policy:
 - **Authenticity:** none: a board's page is public by design (owner 2026-09-25: with a board, its own page and stream are unchanged); the business and board numbers are both sequential, so anyone can follow any board's open sale, its item and price, by counting
 - **Replay:** read-only
 - **Rate:** the board's page: checkRateLimit (100 a minute per visitor address, counted in this server process only; until TRUST_PROXY_HOPS is set every visitor shares one address — R1-T4 phase B), which each open board page spends every 3 seconds and sign-up and numbered pay share; the signed-in branch: none
-- **Finding:** A board's page gets 403 for a board that is not the business's or does not exist, and still gets a removed (inactive) board's open sale; the same board's stream answers 404 for all three. P2.2 asks for the tenant-safe 404 (R1-T3).
+- **Finding:** A board's page still gets a removed (inactive) board's open sale, where the same board's stream and brand answer 404: for the owner (R1-T3; the 403 for another business's board or a missing one is 404 since 2026-09-29).
 - **Finding:** Each poll from a board's page logs the visitor's address: every 3 seconds for every open board page (the logs and redaction phase).
 
 ### POST `/api/transactions`

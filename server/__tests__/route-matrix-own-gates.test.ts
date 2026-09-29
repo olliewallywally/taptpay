@@ -254,6 +254,40 @@ describe("R1-T3 — the two reads a business also makes signed in check the sign
   });
 });
 
+describe("R1-T3 — a board's public routes answer another business's board as a missing one", () => {
+  // A board's page is public and names the business and the board. Another business's board and a board
+  // that does not exist are answered alike: 404, P2.2's tenant-safe answer, with nothing changed.
+  const BOARD_ROUTES: Record<string, string> = {
+    "GET /api/merchants/:id/stone/:stoneId/qr": "/api/merchants/{m}/stone/{s}/qr",
+    "GET /api/merchants/:id/stone/:stoneId/brand": "/api/merchants/{m}/stone/{s}/brand",
+    "GET /api/merchants/:id/active-transaction": "/api/merchants/{m}/active-transaction?stoneId={s}",
+    "GET /api/merchants/:id/events": "/api/merchants/{m}/events?stoneId={s}",
+  };
+  let merchantId: number;
+  let theirBoard: number;
+
+  beforeAll(async () => {
+    merchantId = (await createOwnerPrincipal()).merchantId;
+    const other = await createOwnerPrincipal();
+    theirBoard = (await storage.createNextTaptStone(other.merchantId, "Their till")).id;
+  });
+
+  it("has a request for every board route", () => {
+    expect(refusalsOf("unknown-board").map(([key]) => key).sort()).toEqual(Object.keys(BOARD_ROUTES).sort());
+  });
+
+  it.each(Object.keys(BOARD_ROUTES))("%s answers another business's board 404, the same as a missing one, and changes nothing", async (key) => {
+    const ask = (stoneId: number) => BOARD_ROUTES[key].replace("{m}", String(merchantId)).replace("{s}", String(stoneId));
+    const before = storageSnapshot();
+    const theirs = await request(app).get(ask(theirBoard));
+    const missing = await request(app).get(ask(999_999));
+    expect([theirs.status, missing.status]).toEqual([404, 404]);
+    expect(theirs.body).toEqual(missing.body);
+    expect(storageSnapshot()).toBe(before);
+    expect(ROUTE_MATRIX[key].answers["unknown-board"]).toBe(404);
+  });
+});
+
 describe("R1-T3 — the WhatsApp webhook believes only the provider's key", () => {
   it("acknowledges a call with a wrong key (200) and changes nothing", async () => {
     expect(ROUTE_MATRIX["POST /api/webhooks/whatsapp"].answers["wrong-webhook-key"]).toBe(200);

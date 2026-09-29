@@ -39,6 +39,7 @@ export const MATRIX_CALLER_MEANING = {
   "unknown-key": "the ecommerce API with a key nobody was issued",
   "key-without-permission": "the ecommerce API with a live key that lacks the route's permission",
   "unknown-link": "a link route asked with a token, state or code that is no one's",
+  "unknown-board": "a board's public route asked with a board that is not the business's, or does not exist",
   "sale-with-its-own-link": "a numbered route asked for a sale that has its own payment link",
   "wrong-webhook-key": "the WhatsApp webhook with a key that is not the provider's",
   "link-holder": "the holder of the route's own link: its token, return state, handoff code or invite",
@@ -146,6 +147,8 @@ export function matrixRowFor(key: string, recorded: RecordedRouteFacts = ROUTE_P
       answers["key-without-permission"] = 403;
     }
     if (principals.has("public-bearer") && tenants.has("token")) answers["unknown-link"] = UNKNOWN_LINK_ANSWER[key] ?? 404;
+    // A board's page names the business and the board: another business's board is a missing one (P2.2).
+    if (tenants.has("board")) answers["unknown-board"] = 404;
     // A sale with its own link is answered like a missing one (tenant-safe, P2.2): 404, or for the
     // Windcave browser return, which sends a missing sale home, the same redirect.
     if (tenants.has("number")) answers["sale-with-its-own-link"] = key === "GET /api/windcave/callback" ? 302 : 404;

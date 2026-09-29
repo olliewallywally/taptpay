@@ -2317,11 +2317,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       console.log(`Active transaction requested: merchant ${merchantId}, stone ${stoneId}, IP ${clientIp}`);
       
       // SECURITY: verify the board belongs to this merchant
+      // Another business's board is answered as a missing one (R1-T3, P2.2's tenant-safe 404), as the
+      // board's stream and brand answer; it was 403.
       const stone = await storage.getTaptStone(stoneId);
       if (!stone || stone.merchantId !== merchantId) {
-        return res.status(403).json({
-          message: "Invalid stone access - stone does not belong to this merchant"
-        });
+        return res.status(404).json({ message: "Payment board not found" });
       }
 
       const transaction = await storage.getActiveTransactionByMerchant(merchantId, { kind: "board", stoneId });
