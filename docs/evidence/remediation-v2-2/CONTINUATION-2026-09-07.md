@@ -680,7 +680,11 @@ the owner prefers. **R1-T3's three owner questions were answered the same day** 
 **R1-T4 phase E's design** was written and committed (`1d807c6a`, [design](../../PLAN-2026-09-29-r1-t4-phase-e-sessions.md));
 its three questions answered the same day ([decision](../../decisions/2026-09-29-r1-t4-phase-e-owner-answers.md)):
 a business sign-in lasts 1 day without use and 7 days at most; the admin's 30 minutes and 12 hours; the
-Keychain adapter moves to A-T4. No phase E code yet: building waits for the owner's go on the design.
+Keychain adapter moves to A-T4. **The owner's go came 2026-09-30** ([decision](../../decisions/2026-09-30-r1-t4-phase-e-go-owner-answers.md)):
+build phase E as designed, with two additions (a rotation completes on the new secret's first use; an
+explicit exception list for cross-site callbacks), and fix the admin home page's always-$0 totals. The
+session that recorded the three answers had stopped straight after its commit (`d901adcb`, 19:37 UTC), before
+its reply; the container restarted at 04:51 UTC and dev relaunched on the clean tree at 05:00.
 Found on the way, for the owner: the admin area's home page shows $0 revenue and 0 sales whatever the
 platform holds (it reads a route that does not exist; the R1-T3 notes, "Where R1-T3 stands" of 2026-09-28).
 Open for the owner: 0030 in dev (above); the card-free dev write (above). The

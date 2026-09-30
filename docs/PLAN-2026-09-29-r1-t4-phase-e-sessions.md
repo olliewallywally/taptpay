@@ -2,7 +2,9 @@
 
 Branch: `remediation/r1-continuation-20260907` (at `66b18a31`). Owner direction, 2026-09-29: "Yes, follow
 the plan (Recommended)": the design is written and shown first; no code until it is approved
-([decision](decisions/2026-09-29-finish-r1-owner-answers.md)). Source: plan R1-T4 (~line 660) and
+([decision](decisions/2026-09-29-finish-r1-owner-answers.md)). **Approved for building 2026-09-30, with two
+additions** (rotation completes on first use of the new secret, §2.1; an explicit exception list for
+cross-site callbacks, §2.3) ([decision](decisions/2026-09-30-r1-t4-phase-e-go-owner-answers.md)). Source: plan R1-T4 (~line 660) and
 v2.2 §8.6; phases A–D are built ([R1-T4 plan](PLAN-2026-09-21-r1-t4-sign-in-security.md)).
 
 ## In plain words
@@ -55,6 +57,10 @@ else on screen changes.
   day the secret is replaced by a new one in the response's cookie; the old one keeps working for 60
   seconds (requests already in flight), and **a replaced secret used after that ends the whole session**
   and is logged (`SESSION_REUSE_DETECTED`): someone else holds a copy.
+  - *Addition, 2026-09-30:* the swap completes only when the new secret is first presented. Until then the
+    old secret stays current (a response carrying the new cookie can be lost: a dropped connection must not
+    sign the device out or be logged as a theft), and a new swap may be offered after 60 seconds. The 60
+    seconds for the old secret run from the new one's first use.
 - **Ending sessions:** Log Out ends this session; "sign out everywhere", a password reset, a password
   change (other sessions), disabling or removing a teammate end the login's sessions. Each end is logged (`SESSION_REVOKED`,
   with why).
@@ -78,6 +84,13 @@ An exact list of the site's own origins per environment (production: `PUBLIC_ORI
 dev URL). A request from any other origin, `null` included, gets no CORS headers; a state-changing one is
 refused (403). Preflights and the requests that follow get the same answer. No response ever says `*` or
 repeats an origin it was sent.
+
+*Addition, 2026-09-30:* callbacks that legitimately arrive from another site are named in an explicit
+exception list, each with its route and the other site's exact origin. The list is empty today (Windcave
+returns the browser with a GET; its notifications and the other provider calls come from servers and carry
+no `Origin`); Sign in with Apple (R1-T5) adds Apple's form post. Requests with no `Origin` (servers, the
+scheduler, the ecommerce API) get no CORS headers and are otherwise treated as today; a cookie-session
+change without an `Origin` still needs the CSRF token.
 
 ### 2.4 The client
 
