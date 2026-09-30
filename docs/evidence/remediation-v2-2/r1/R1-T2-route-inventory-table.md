@@ -1,12 +1,12 @@
-# R1-T2 route inventory — generated 2026-09-29 @ `6a7db2132e35eece88ada9fbdae44dfd5bd3fcfc`
+# R1-T2 route inventory — generated 2026-09-30 @ `4a6ea4502974c8edb894451ee081e23d8e80c65e`
 
 Regenerate with `npx tsx scripts/generate-route-policy.ts`. This table is
 evidence for the SHA named above, not a timeless constant — see
 docs/evidence/remediation-v2-2/r1/ for the task record.
 
-Total registrations: **184** (77 GET, 75 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE).
+Total registrations: **187** (78 GET, 77 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE).
 
-By principal: **public**: 56, **admin**: 17, **merchant-user**: 100, **provider-webhook**: 6, **api-key**: 3, **cron**: 2.
+By principal: **public**: 57, **admin**: 18, **merchant-user**: 101, **provider-webhook**: 6, **api-key**: 3, **cron**: 2.
 
 Unclassified (no known gate marker, no known public-design marker, and no
 curated allowlist entry found near the handler — needs a human read, not
@@ -14,7 +14,7 @@ necessarily a bug): **0**.
 
 ## Review
 
-184 of 184 routes reviewed (server/route-review.ts); 0 pending.
+187 of 187 routes reviewed (server/route-review.ts); 0 pending.
 A reviewed route's principal below is the review's; a pending one's is the heuristic, marked "(heuristic)".
 
 ### Open findings
@@ -174,182 +174,185 @@ address's success is its notice (410), which it gives everyone.
 | GET | `/api/auth/google` | 600 | public | — | `signed-out` | — |
 | GET | `/api/auth/google/callback` | 621 | public | — | `signed-out` | — |
 | POST | `/api/auth/google/session` | 770 | public-bearer | — | `link-holder` | 401: `unknown-link` |
-| POST | `/api/auth/sign-out-everywhere` | 793 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
-| POST | `/api/auth/login` | 838 | public | — | `signed-out` | — |
-| POST | `/api/auth/forgot-password` | 895 | public | requestPasswordReset( | `signed-out` | — |
-| POST | `/api/auth/reset-password` | 935 | public-bearer | resetPassword( | `link-holder` | 400: `unknown-link` |
-| GET | `/api/auth/validate-reset-token/:token` | 975 | public-bearer | validateResetToken( | `link-holder` | 200: `unknown-link` |
-| GET | `/api/admin/request-origin` | 994 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `owner`, `member` |
-| POST | `/api/admin/auth/login` | 1014 | public | — | `signed-out` | — |
-| GET | `/api/auth/me` | 1102 | merchant | authenticateToken | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in` |
-| GET | `/api/tutorial/state` | 1143 | merchant | authenticateToken, req.user?.role === "admin" | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
-| PATCH | `/api/tutorial/pages/:pageKey` | 1173 | merchant | authenticateToken, req.user?.role === "admin" | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
-| POST | `/api/tutorial/restart` | 1210 | merchant | authenticateToken, req.user?.role === "admin" | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
-| POST | `/api/merchants/:id/onboarding` | 1231 | merchant | authenticateToken, checkAccountOwnership | `owner`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `other-owner` |
-| GET | `/api/admin/auth/me` | 1323 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `owner`, `member` |
-| GET | `/api/merchants/:id/qr` | 1336 | public | — | `signed-out` | — |
-| GET | `/api/merchants/:id/stone/:stoneId/qr` | 1343 | public | — | `signed-out` | 404: `unknown-board` |
-| GET | `/api/merchants/:id/stone/:stoneId/brand` | 1396 | public | publicBoardBrandDto( | `signed-out` | 404: `unknown-board`, `removed-board` |
-| GET | `/api/merchants/:id/profile` | 1418 | merchant | authenticateToken, checkMerchantOwnership, isAccountOwner | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
-| GET | `/api/pay/t/:token` | 1440 | public-bearer | resolvePaymentToken( | `link-holder` | 404: `unknown-link` |
-| GET | `/api/pay/t/:token/qr` | 1467 | public-bearer | resolvePaymentToken( | `link-holder` | 404: `unknown-link` |
-| POST | `/api/pay/t/:token/split` | 1495 | public-bearer | resolvePaymentToken(, loadTokenReceipt( | `link-holder` | 404: `unknown-link` |
-| GET | `/api/pay/t/:token/receipt` | 1592 | public-bearer | loadTokenReceipt( | `link-holder` | 404: `unknown-link` |
-| POST | `/api/pay/t/:token/receipt-pdf` | 1605 | public-bearer | loadTokenReceipt( | `link-holder` | 404: `unknown-link` |
-| GET | `/api/pay/t/:token/receipt-qr` | 1635 | public-bearer | loadTokenReceipt( | `link-holder` | 404: `unknown-link` |
-| POST | `/api/pay/t/:token/session` | 1711 | public-bearer | resolvePaymentToken(, prepareTokenCompletion( | `link-holder` | 404: `unknown-link` |
-| POST | `/api/pay/t/:token/hosted-fields-complete` | 2011 | public-bearer | prepareTokenCompletion( | `link-holder` | 404: `unknown-link` |
-| POST | `/api/pay/t/:token/googlepay-complete` | 2063 | public-bearer | prepareTokenCompletion(, paymentAttempts.resolveReturnState( | `link-holder` | 404: `unknown-link` |
-| GET | `/api/pay/return/:state` | 2194 | public-bearer | paymentAttempts.resolveReturnState( | `link-holder` | 404: `unknown-link` |
-| ALL | `/api/pay/notification/:state` | 2228 | provider | — | `provider` | 200: `unknown-reference` |
-| GET | `/api/merchants/:id/active-transaction` | 2245 | merchant / public | authenticateToken, checkMerchantOwnership, publicTransactionDto(, generatePaymentUrl( | `signed-out`, `owner`, `member`, `platform-admin` | 401: `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner`; 404: `unknown-board`, `removed-board` |
-| POST | `/api/transactions` | 2363 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
-| POST | `/api/transactions/cash-sale` | 2444 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
-| POST | `/api/transactions/tap-to-pay` | 2508 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
-| POST | `/api/transactions/:id/split` | 2650 | public | isTokenAddressedTransaction(, publicTransactionDto( | `signed-out` | 404: `sale-with-its-own-link` |
-| GET | `/api/split-payments/:id` | 2704 | public | isTokenAddressedTransaction( | `signed-out` | 404: `sale-with-its-own-link` |
-| POST | `/api/transactions/:id/cancel` | 2723 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 404: `other-owner` |
-| GET | `/api/nfc/capabilities` | 2783 | public | — | `signed-out` | — |
-| POST | `/api/transactions/:id/pay` | 2797 | public | isTokenAddressedTransaction( | `signed-out` | 404: `sale-with-its-own-link` |
-| GET | `/api/windcave/env` | 3049 | public | — | `signed-out` | — |
-| POST | `/api/transactions/:id/hosted-fields-complete` | 3063 | public | isTokenAddressedTransaction( | `signed-out` | 404: `sale-with-its-own-link` |
-| POST | `/api/transactions/:id/googlepay-complete` | 3101 | public | isTokenAddressedTransaction( | `signed-out` | 404: `sale-with-its-own-link` |
-| GET | `/api/transactions/:id` | 3174 | public | isTokenAddressedTransaction(, publicTransactionDto( | `signed-out` | 404: `sale-with-its-own-link` |
-| POST | `/api/transactions/:id/receipt-pdf` | 3197 | public | isTokenAddressedTransaction( | `signed-out` | 404: `sale-with-its-own-link` |
-| GET | `/api/transactions/:id/receipt-qr` | 3258 | public | isTokenAddressedTransaction( | `signed-out` | 404: `sale-with-its-own-link` |
-| GET | `/api/merchants/:id/export/pdf` | 3312 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
-| POST | `/api/admin/merchants/:id/verify` | 3352 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `owner`, `member` |
-| POST | `/api/admin/merchants/:id/set-active` | 3403 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `owner`, `member` |
-| GET | `/api/admin/merchants/:id/transactions` | 3426 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `owner`, `member` |
-| PATCH | `/api/admin/merchants/:id/windcave-merchant-id` | 3439 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `owner`, `member` |
-| POST | `/api/admin/merchants/:id/activate` | 3455 | platform-admin | authenticateAdmin, storage.verifyMerchant( | `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `owner`, `member` |
-| PUT | `/api/merchants/:id/details` | 3513 | merchant | authenticateToken, checkAccountOwnership | `owner`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `other-owner` |
-| PUT | `/api/merchants/:id/change-password` | 3539 | merchant | authenticateToken, checkMerchantOwnership, req.user?.role === "admin" | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner`, `platform-admin` |
-| PUT | `/api/merchants/:id/theme` | 3629 | merchant | authenticateToken, checkAccountOwnership | `owner`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `other-owner` |
-| PUT | `/api/merchants/:id/daily-goal` | 3657 | merchant | authenticateToken, checkAccountOwnership | `owner`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `other-owner` |
-| PUT | `/api/merchants/:id` | 3690 | merchant | authenticateToken, checkAccountOwnership | `owner`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `other-owner` |
-| POST | `/api/merchants/:id/logo` | 3764 | merchant | authenticateToken, checkAccountOwnership | `owner`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `other-owner` |
-| DELETE | `/api/merchants/:id/logo` | 3819 | merchant | authenticateToken, checkAccountOwnership | `owner`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `other-owner` |
-| GET | `/api/merchants/:id/transactions` | 3862 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
-| GET | `/api/merchants/:id/tapt-stones` | 3879 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
-| POST | `/api/merchants/:id/tapt-stones` | 3895 | merchant | authenticateToken, checkMerchantOwnership, generatePaymentUrl( | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
-| PUT | `/api/merchants/:merchantId/tapt-stones/:stoneId` | 3946 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
-| DELETE | `/api/merchants/:merchantId/tapt-stones/:stoneId` | 3985 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
-| ALL | `/api/windcave/notification` | 4025 | provider | — | `provider` | 200: `unknown-reference` |
-| GET | `/api/windcave/callback` | 4147 | public | isTokenAddressedTransaction( | `signed-out` | 302: `sale-with-its-own-link` |
-| GET | `/api/admin/analytics` | 4345 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `owner`, `member` |
-| GET | `/api/admin/revenue-over-time` | 4418 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `owner`, `member` |
-| GET | `/api/admin/payment-method-breakdown` | 4454 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `owner`, `member` |
-| GET | `/api/admin/ga4-detailed` | 4491 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `owner`, `member` |
-| GET | `/api/admin/ga4-metrics` | 4556 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `owner`, `member` |
-| GET | `/api/admin/merchants` | 4643 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `owner`, `member` |
-| GET | `/api/admin/merchants/:id` | 4653 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `owner`, `member` |
-| POST | `/api/admin/resend-verification` | 4676 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `owner`, `member` |
-| GET | `/api/admin/email-status` | 4736 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `owner`, `member` |
-| POST | `/api/auth/confirm-email` | 4773 | public-bearer | getMerchantByToken( | `link-holder` | 400: `unknown-link` |
-| POST | `/api/auth/resend-confirmation` | 4900 | public | — | `signed-out` | — |
-| POST | `/api/info-pack-leads` | 4930 | public | — | `signed-out` | — |
-| POST | `/api/merchants/signup` | 4983 | public | — | `signed-out` | — |
-| GET | `/api/merchants/:id/events` | 5094 | merchant / public | authenticateToken, checkMerchantOwnership | `signed-out`, `owner`, `member`, `platform-admin` | 401: `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner`; 404: `unknown-board`, `removed-board` |
-| GET | `/api/push/capabilities` | 5170 | public | — | `signed-out` | — |
-| GET | `/api/push/vapid-key` | 5194 | public | — | `signed-out` | — |
-| POST | `/api/push/subscribe` | 5204 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
-| POST | `/api/push/unsubscribe` | 5246 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
-| POST | `/api/push/native-subscribe` | 5273 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
-| POST | `/api/push/native-unsubscribe` | 5307 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
-| GET | `/api/push/status` | 5342 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
-| GET | `/api/push/preferences` | 5367 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
-| PUT | `/api/push/preferences` | 5382 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
-| POST | `/api/transactions/:transactionId/refunds` | 5414 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `platform-admin`; 404: `other-owner` |
-| GET | `/api/transactions/:transactionId/refunds` | 5554 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
-| GET | `/api/merchants/:merchantId/refunds` | 5586 | merchant | authenticateToken | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
-| GET | `/api/merchants/:merchantId/stock-items` | 5619 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
-| POST | `/api/merchants/:merchantId/stock-items` | 5638 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
-| PUT | `/api/merchants/:merchantId/stock-items/:itemId` | 5666 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
-| DELETE | `/api/merchants/:merchantId/stock-items/:itemId` | 5703 | merchant | authenticateToken, authenticateApiKey, requireEcommerceApi, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
-| POST | `/api/v1/transactions` | 5771 | api-key | authenticateApiKey, requireEcommerceApi, publicTransactionDto( | `api-key` | 401: `no-key`, `unknown-key`; 403: `key-without-permission` |
-| GET | `/api/v1/transactions/:id` | 5883 | api-key | authenticateApiKey, requireEcommerceApi | `api-key` | 401: `no-key`, `unknown-key`; 403: `key-without-permission` |
-| GET | `/api/subscription` | 5971 | merchant | authenticateToken, isAccountOwner | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
-| PUT | `/api/subscription/plan` | 5994 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `platform-admin` |
-| POST | `/api/subscription/cancel` | 6057 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `platform-admin` |
-| POST | `/api/subscription/resume` | 6100 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `platform-admin` |
-| GET | `/api/team` | 6131 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `platform-admin` |
-| POST | `/api/team/invite` | 6152 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `platform-admin` |
-| POST | `/api/team/:userId/resend` | 6213 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `platform-admin`; 404: `other-owner` |
-| DELETE | `/api/team/:userId/invite` | 6295 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `platform-admin`; 404: `other-owner` |
-| PUT | `/api/team/:userId/status` | 6315 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `platform-admin`; 404: `other-owner` |
-| DELETE | `/api/team/:userId` | 6363 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `platform-admin`; 404: `other-owner` |
-| POST | `/api/team/accept-invite` | 6401 | public-bearer | getUserByInviteToken( | `link-holder` | 400: `unknown-link` |
-| GET | `/api/subscription/billing-history` | 6437 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `platform-admin` |
-| GET | `/api/billing/card` | 6467 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `platform-admin` |
-| POST | `/api/billing/card/session` | 6496 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `platform-admin` |
-| POST | `/api/billing/card/confirm` | 6542 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `platform-admin` |
-| ALL | `/api/billing/card/notification` | 6633 | provider | billingCardCallback | `provider` | — |
-| GET | `/api/billing/card/callback` | 6643 | public | billingCardCallback | `signed-out` | — |
-| POST | `/api/billing/card/callback` | 6644 | public | billingCardCallback | `signed-out` | — |
-| DELETE | `/api/billing/card` | 6647 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `platform-admin` |
-| POST | `/api/board-builder/submit` | 6672 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
-| GET | `/uploads/:folder/:name` | 6737 | public | getCheckoutInvoiceByToken( | `signed-out` | — |
-| GET | `/api/property/tenants` | 7002 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
-| POST | `/api/property/tenants` | 7013 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
-| GET | `/api/property/tenants/:id` | 7030 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
-| PUT | `/api/property/tenants/:id` | 7042 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
-| POST | `/api/property/tenants/:id/archive` | 7059 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
-| POST | `/api/property/tenants/:id/unarchive` | 7073 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
-| GET | `/api/property/tenants/:id/events` | 7087 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
-| GET | `/api/property/schedules` | 7104 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
-| POST | `/api/property/tenants/:tenantId/schedules` | 7115 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
-| PUT | `/api/property/schedules/:id` | 7143 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
-| DELETE | `/api/property/schedules/:id` | 7171 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
-| GET | `/api/property/invoices` | 7187 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
-| POST | `/api/property/invoices/document` | 7218 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
-| GET | `/api/invoice-documents/:name` | 7264 | merchant / platform-admin | authenticateToken | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 404: `other-owner` |
-| POST | `/api/property/invoices` | 7293 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
-| POST | `/api/property/invoices/:id/resend` | 7335 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
-| POST | `/api/property/invoices/:id/void` | 7354 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
-| POST | `/api/property/invoices/:id/mark-paid-external` | 7369 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
-| GET | `/api/checkout/resolve/:token` | 7392 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 404: `unknown-link` |
-| GET | `/api/checkout/document/:token` | 7478 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 404: `unknown-link` |
-| POST | `/api/checkout/:token/split` | 7502 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 404: `unknown-link` |
-| POST | `/api/checkout/:token/session` | 7533 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 404: `unknown-link` |
-| POST | `/api/checkout/:token/hosted-fields-complete` | 7611 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 404: `unknown-link` |
-| POST | `/api/checkout/:token/googlepay-complete` | 7647 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 404: `unknown-link` |
-| GET | `/api/checkout/callback` | 7705 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 302: `unknown-link` |
-| ALL | `/api/windcave/rent-notification` | 7732 | provider | — | `provider` | 200: `unknown-reference` |
-| ALL | `/api/windcave/trades-notification` | 7754 | provider | — | `provider` | 200: `unknown-reference` |
-| POST | `/api/webhooks/whatsapp` | 7779 | provider | req.headers["apikey"] | `provider` | 200: `wrong-webhook-key`, `unknown-reference` |
-| GET | `/api/property/reminder-settings` | 7829 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
-| PUT | `/api/property/reminder-settings` | 7839 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
-| GET | `/api/trades/reminder-settings` | 7859 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
-| PUT | `/api/trades/reminder-settings` | 7869 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
-| GET | `/api/trades/gst-settings` | 7882 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
-| PUT | `/api/trades/gst-settings` | 7898 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `platform-admin` |
-| GET | `/api/trades/clients` | 7918 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
-| POST | `/api/trades/clients` | 7926 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
-| GET | `/api/trades/clients/:id` | 7938 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
-| PUT | `/api/trades/clients/:id` | 7949 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
-| POST | `/api/trades/clients/:id/archive` | 7962 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
-| POST | `/api/trades/clients/:id/unarchive` | 7981 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
-| POST | `/api/trades/clients/:id/promote` | 7994 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
-| GET | `/api/trades/clients/:id/events` | 8006 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
-| GET | `/api/trades/quotes` | 8018 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
-| POST | `/api/trades/quotes` | 8027 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
-| GET | `/api/trades/quotes/:id/pdf` | 8124 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
-| GET | `/api/trades/quotes/token/:token/pdf` | 8139 | public-bearer | getQuoteByToken( | `link-holder` | 404: `unknown-link` |
-| GET | `/api/trades/quotes/token/:token` | 8154 | public-bearer | getQuoteByToken( | `link-holder` | 404: `unknown-link` |
-| POST | `/api/trades/quotes/token/:token/respond` | 8199 | public-bearer | getQuoteByToken( | `link-holder` | 404: `unknown-link` |
-| GET | `/api/trades/invoices` | 8248 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
-| POST | `/api/trades/invoices` | 8260 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
-| POST | `/api/trades/invoices/:id/send-balance` | 8318 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
-| POST | `/api/trades/invoices/:id/mark-paid-external` | 8359 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
-| POST | `/api/trades/invoices/:id/complete` | 8382 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
-| POST | `/api/trades/invoices/:id/void` | 8401 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
-| GET | `/api/trades/schedules` | 8418 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
-| POST | `/api/trades/schedules` | 8425 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
-| PUT | `/api/trades/schedules/:id` | 8450 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
-| DELETE | `/api/trades/schedules/:id` | 8473 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
-| GET | `/api/internal/cron/status` | 8489 | cron | authorizeCronRequest | `scheduler` | 401: `no-secret`, `wrong-secret` |
-| POST | `/api/internal/cron` | 8499 | cron | authorizeCronRequest | `scheduler` | 401: `no-secret`, `wrong-secret` |
+| POST | `/api/auth/sign-out-everywhere` | 796 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
+| POST | `/api/auth/logout` | 824 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
+| POST | `/api/auth/login` | 865 | public | — | `signed-out` | — |
+| POST | `/api/auth/forgot-password` | 930 | public | requestPasswordReset( | `signed-out` | — |
+| POST | `/api/auth/reset-password` | 970 | public-bearer | resetPassword( | `link-holder` | 400: `unknown-link` |
+| GET | `/api/auth/validate-reset-token/:token` | 1012 | public-bearer | validateResetToken( | `link-holder` | 200: `unknown-link` |
+| GET | `/api/admin/request-origin` | 1031 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `owner`, `member` |
+| POST | `/api/admin/auth/login` | 1051 | public | — | `signed-out` | — |
+| GET | `/api/auth/me` | 1173 | merchant | authenticateToken | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in` |
+| GET | `/api/auth/session` | 1187 | public | — | `signed-out` | — |
+| GET | `/api/tutorial/state` | 1206 | merchant | authenticateToken, req.user?.role === "admin" | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
+| PATCH | `/api/tutorial/pages/:pageKey` | 1236 | merchant | authenticateToken, req.user?.role === "admin" | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
+| POST | `/api/tutorial/restart` | 1273 | merchant | authenticateToken, req.user?.role === "admin" | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
+| POST | `/api/merchants/:id/onboarding` | 1294 | merchant | authenticateToken, checkAccountOwnership | `owner`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `other-owner` |
+| GET | `/api/admin/auth/me` | 1386 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `owner`, `member` |
+| POST | `/api/admin/auth/logout` | 1401 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `owner`, `member` |
+| GET | `/api/merchants/:id/qr` | 1417 | public | — | `signed-out` | — |
+| GET | `/api/merchants/:id/stone/:stoneId/qr` | 1424 | public | — | `signed-out` | 404: `unknown-board` |
+| GET | `/api/merchants/:id/stone/:stoneId/brand` | 1477 | public | publicBoardBrandDto( | `signed-out` | 404: `unknown-board`, `removed-board` |
+| GET | `/api/merchants/:id/profile` | 1499 | merchant | authenticateToken, checkMerchantOwnership, isAccountOwner | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
+| GET | `/api/pay/t/:token` | 1521 | public-bearer | resolvePaymentToken( | `link-holder` | 404: `unknown-link` |
+| GET | `/api/pay/t/:token/qr` | 1548 | public-bearer | resolvePaymentToken( | `link-holder` | 404: `unknown-link` |
+| POST | `/api/pay/t/:token/split` | 1576 | public-bearer | resolvePaymentToken(, loadTokenReceipt( | `link-holder` | 404: `unknown-link` |
+| GET | `/api/pay/t/:token/receipt` | 1673 | public-bearer | loadTokenReceipt( | `link-holder` | 404: `unknown-link` |
+| POST | `/api/pay/t/:token/receipt-pdf` | 1686 | public-bearer | loadTokenReceipt( | `link-holder` | 404: `unknown-link` |
+| GET | `/api/pay/t/:token/receipt-qr` | 1716 | public-bearer | loadTokenReceipt( | `link-holder` | 404: `unknown-link` |
+| POST | `/api/pay/t/:token/session` | 1792 | public-bearer | resolvePaymentToken(, prepareTokenCompletion( | `link-holder` | 404: `unknown-link` |
+| POST | `/api/pay/t/:token/hosted-fields-complete` | 2092 | public-bearer | prepareTokenCompletion( | `link-holder` | 404: `unknown-link` |
+| POST | `/api/pay/t/:token/googlepay-complete` | 2144 | public-bearer | prepareTokenCompletion(, paymentAttempts.resolveReturnState( | `link-holder` | 404: `unknown-link` |
+| GET | `/api/pay/return/:state` | 2275 | public-bearer | paymentAttempts.resolveReturnState( | `link-holder` | 404: `unknown-link` |
+| ALL | `/api/pay/notification/:state` | 2309 | provider | — | `provider` | 200: `unknown-reference` |
+| GET | `/api/merchants/:id/active-transaction` | 2326 | merchant / public | authenticateToken, checkMerchantOwnership, publicTransactionDto(, generatePaymentUrl( | `signed-out`, `owner`, `member`, `platform-admin` | 401: `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner`; 404: `unknown-board`, `removed-board` |
+| POST | `/api/transactions` | 2444 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
+| POST | `/api/transactions/cash-sale` | 2525 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
+| POST | `/api/transactions/tap-to-pay` | 2589 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
+| POST | `/api/transactions/:id/split` | 2731 | public | isTokenAddressedTransaction(, publicTransactionDto( | `signed-out` | 404: `sale-with-its-own-link` |
+| GET | `/api/split-payments/:id` | 2785 | public | isTokenAddressedTransaction( | `signed-out` | 404: `sale-with-its-own-link` |
+| POST | `/api/transactions/:id/cancel` | 2804 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 404: `other-owner` |
+| GET | `/api/nfc/capabilities` | 2864 | public | — | `signed-out` | — |
+| POST | `/api/transactions/:id/pay` | 2878 | public | isTokenAddressedTransaction( | `signed-out` | 404: `sale-with-its-own-link` |
+| GET | `/api/windcave/env` | 3130 | public | — | `signed-out` | — |
+| POST | `/api/transactions/:id/hosted-fields-complete` | 3144 | public | isTokenAddressedTransaction( | `signed-out` | 404: `sale-with-its-own-link` |
+| POST | `/api/transactions/:id/googlepay-complete` | 3182 | public | isTokenAddressedTransaction( | `signed-out` | 404: `sale-with-its-own-link` |
+| GET | `/api/transactions/:id` | 3255 | public | isTokenAddressedTransaction(, publicTransactionDto( | `signed-out` | 404: `sale-with-its-own-link` |
+| POST | `/api/transactions/:id/receipt-pdf` | 3278 | public | isTokenAddressedTransaction( | `signed-out` | 404: `sale-with-its-own-link` |
+| GET | `/api/transactions/:id/receipt-qr` | 3339 | public | isTokenAddressedTransaction( | `signed-out` | 404: `sale-with-its-own-link` |
+| GET | `/api/merchants/:id/export/pdf` | 3393 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
+| POST | `/api/admin/merchants/:id/verify` | 3433 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `owner`, `member` |
+| POST | `/api/admin/merchants/:id/set-active` | 3484 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `owner`, `member` |
+| GET | `/api/admin/merchants/:id/transactions` | 3507 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `owner`, `member` |
+| PATCH | `/api/admin/merchants/:id/windcave-merchant-id` | 3520 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `owner`, `member` |
+| POST | `/api/admin/merchants/:id/activate` | 3536 | platform-admin | authenticateAdmin, storage.verifyMerchant( | `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `owner`, `member` |
+| PUT | `/api/merchants/:id/details` | 3594 | merchant | authenticateToken, checkAccountOwnership | `owner`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `other-owner` |
+| PUT | `/api/merchants/:id/change-password` | 3620 | merchant | authenticateToken, checkMerchantOwnership, req.user?.role === "admin" | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner`, `platform-admin` |
+| PUT | `/api/merchants/:id/theme` | 3715 | merchant | authenticateToken, checkAccountOwnership | `owner`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `other-owner` |
+| PUT | `/api/merchants/:id/daily-goal` | 3743 | merchant | authenticateToken, checkAccountOwnership | `owner`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `other-owner` |
+| PUT | `/api/merchants/:id` | 3776 | merchant | authenticateToken, checkAccountOwnership | `owner`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `other-owner` |
+| POST | `/api/merchants/:id/logo` | 3850 | merchant | authenticateToken, checkAccountOwnership | `owner`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `other-owner` |
+| DELETE | `/api/merchants/:id/logo` | 3905 | merchant | authenticateToken, checkAccountOwnership | `owner`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `other-owner` |
+| GET | `/api/merchants/:id/transactions` | 3948 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
+| GET | `/api/merchants/:id/tapt-stones` | 3965 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
+| POST | `/api/merchants/:id/tapt-stones` | 3981 | merchant | authenticateToken, checkMerchantOwnership, generatePaymentUrl( | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
+| PUT | `/api/merchants/:merchantId/tapt-stones/:stoneId` | 4032 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
+| DELETE | `/api/merchants/:merchantId/tapt-stones/:stoneId` | 4071 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
+| ALL | `/api/windcave/notification` | 4111 | provider | — | `provider` | 200: `unknown-reference` |
+| GET | `/api/windcave/callback` | 4233 | public | isTokenAddressedTransaction( | `signed-out` | 302: `sale-with-its-own-link` |
+| GET | `/api/admin/analytics` | 4431 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `owner`, `member` |
+| GET | `/api/admin/revenue-over-time` | 4504 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `owner`, `member` |
+| GET | `/api/admin/payment-method-breakdown` | 4540 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `owner`, `member` |
+| GET | `/api/admin/ga4-detailed` | 4577 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `owner`, `member` |
+| GET | `/api/admin/ga4-metrics` | 4642 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `owner`, `member` |
+| GET | `/api/admin/merchants` | 4729 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `owner`, `member` |
+| GET | `/api/admin/merchants/:id` | 4739 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `owner`, `member` |
+| POST | `/api/admin/resend-verification` | 4762 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `owner`, `member` |
+| GET | `/api/admin/email-status` | 4822 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `owner`, `member` |
+| POST | `/api/auth/confirm-email` | 4859 | public-bearer | getMerchantByToken( | `link-holder` | 400: `unknown-link` |
+| POST | `/api/auth/resend-confirmation` | 4986 | public | — | `signed-out` | — |
+| POST | `/api/info-pack-leads` | 5016 | public | — | `signed-out` | — |
+| POST | `/api/merchants/signup` | 5069 | public | — | `signed-out` | — |
+| GET | `/api/merchants/:id/events` | 5180 | merchant / public | authenticateToken, checkMerchantOwnership | `signed-out`, `owner`, `member`, `platform-admin` | 401: `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner`; 404: `unknown-board`, `removed-board` |
+| GET | `/api/push/capabilities` | 5261 | public | — | `signed-out` | — |
+| GET | `/api/push/vapid-key` | 5285 | public | — | `signed-out` | — |
+| POST | `/api/push/subscribe` | 5295 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
+| POST | `/api/push/unsubscribe` | 5337 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
+| POST | `/api/push/native-subscribe` | 5364 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
+| POST | `/api/push/native-unsubscribe` | 5398 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
+| GET | `/api/push/status` | 5433 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
+| GET | `/api/push/preferences` | 5458 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
+| PUT | `/api/push/preferences` | 5473 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
+| POST | `/api/transactions/:transactionId/refunds` | 5505 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `platform-admin`; 404: `other-owner` |
+| GET | `/api/transactions/:transactionId/refunds` | 5645 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/merchants/:merchantId/refunds` | 5677 | merchant | authenticateToken | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
+| GET | `/api/merchants/:merchantId/stock-items` | 5710 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
+| POST | `/api/merchants/:merchantId/stock-items` | 5729 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
+| PUT | `/api/merchants/:merchantId/stock-items/:itemId` | 5757 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
+| DELETE | `/api/merchants/:merchantId/stock-items/:itemId` | 5794 | merchant | authenticateToken, authenticateApiKey, requireEcommerceApi, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner` |
+| POST | `/api/v1/transactions` | 5862 | api-key | authenticateApiKey, requireEcommerceApi, publicTransactionDto( | `api-key` | 401: `no-key`, `unknown-key`; 403: `key-without-permission` |
+| GET | `/api/v1/transactions/:id` | 5974 | api-key | authenticateApiKey, requireEcommerceApi | `api-key` | 401: `no-key`, `unknown-key`; 403: `key-without-permission` |
+| GET | `/api/subscription` | 6062 | merchant | authenticateToken, isAccountOwner | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
+| PUT | `/api/subscription/plan` | 6085 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `platform-admin` |
+| POST | `/api/subscription/cancel` | 6148 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `platform-admin` |
+| POST | `/api/subscription/resume` | 6191 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `platform-admin` |
+| GET | `/api/team` | 6222 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `platform-admin` |
+| POST | `/api/team/invite` | 6243 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `platform-admin` |
+| POST | `/api/team/:userId/resend` | 6304 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `platform-admin`; 404: `other-owner` |
+| DELETE | `/api/team/:userId/invite` | 6386 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `platform-admin`; 404: `other-owner` |
+| PUT | `/api/team/:userId/status` | 6406 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `platform-admin`; 404: `other-owner` |
+| DELETE | `/api/team/:userId` | 6457 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `platform-admin`; 404: `other-owner` |
+| POST | `/api/team/accept-invite` | 6498 | public-bearer | getUserByInviteToken( | `link-holder` | 400: `unknown-link` |
+| GET | `/api/subscription/billing-history` | 6534 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `platform-admin` |
+| GET | `/api/billing/card` | 6564 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `platform-admin` |
+| POST | `/api/billing/card/session` | 6593 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `platform-admin` |
+| POST | `/api/billing/card/confirm` | 6639 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `platform-admin` |
+| ALL | `/api/billing/card/notification` | 6730 | provider | billingCardCallback | `provider` | — |
+| GET | `/api/billing/card/callback` | 6740 | public | billingCardCallback | `signed-out` | — |
+| POST | `/api/billing/card/callback` | 6741 | public | billingCardCallback | `signed-out` | — |
+| DELETE | `/api/billing/card` | 6744 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `platform-admin` |
+| POST | `/api/board-builder/submit` | 6769 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
+| GET | `/uploads/:folder/:name` | 6834 | public | getCheckoutInvoiceByToken( | `signed-out` | — |
+| GET | `/api/property/tenants` | 7099 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
+| POST | `/api/property/tenants` | 7110 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
+| GET | `/api/property/tenants/:id` | 7127 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
+| PUT | `/api/property/tenants/:id` | 7139 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/property/tenants/:id/archive` | 7156 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/property/tenants/:id/unarchive` | 7170 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/property/tenants/:id/events` | 7184 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/property/schedules` | 7201 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
+| POST | `/api/property/tenants/:tenantId/schedules` | 7212 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
+| PUT | `/api/property/schedules/:id` | 7240 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
+| DELETE | `/api/property/schedules/:id` | 7268 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/property/invoices` | 7284 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
+| POST | `/api/property/invoices/document` | 7315 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
+| GET | `/api/invoice-documents/:name` | 7361 | merchant / platform-admin | authenticateToken | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 404: `other-owner` |
+| POST | `/api/property/invoices` | 7390 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/property/invoices/:id/resend` | 7432 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/property/invoices/:id/void` | 7451 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/property/invoices/:id/mark-paid-external` | 7466 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/checkout/resolve/:token` | 7489 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 404: `unknown-link` |
+| GET | `/api/checkout/document/:token` | 7575 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 404: `unknown-link` |
+| POST | `/api/checkout/:token/split` | 7599 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 404: `unknown-link` |
+| POST | `/api/checkout/:token/session` | 7630 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 404: `unknown-link` |
+| POST | `/api/checkout/:token/hosted-fields-complete` | 7708 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 404: `unknown-link` |
+| POST | `/api/checkout/:token/googlepay-complete` | 7744 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 404: `unknown-link` |
+| GET | `/api/checkout/callback` | 7802 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 302: `unknown-link` |
+| ALL | `/api/windcave/rent-notification` | 7829 | provider | — | `provider` | 200: `unknown-reference` |
+| ALL | `/api/windcave/trades-notification` | 7851 | provider | — | `provider` | 200: `unknown-reference` |
+| POST | `/api/webhooks/whatsapp` | 7876 | provider | req.headers["apikey"] | `provider` | 200: `wrong-webhook-key`, `unknown-reference` |
+| GET | `/api/property/reminder-settings` | 7926 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
+| PUT | `/api/property/reminder-settings` | 7936 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
+| GET | `/api/trades/reminder-settings` | 7956 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
+| PUT | `/api/trades/reminder-settings` | 7966 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
+| GET | `/api/trades/gst-settings` | 7979 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
+| PUT | `/api/trades/gst-settings` | 7995 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `member`, `platform-admin` |
+| GET | `/api/trades/clients` | 8015 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
+| POST | `/api/trades/clients` | 8023 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
+| GET | `/api/trades/clients/:id` | 8035 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
+| PUT | `/api/trades/clients/:id` | 8046 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/trades/clients/:id/archive` | 8059 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/trades/clients/:id/unarchive` | 8078 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/trades/clients/:id/promote` | 8091 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/trades/clients/:id/events` | 8103 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/trades/quotes` | 8115 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
+| POST | `/api/trades/quotes` | 8124 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/trades/quotes/:id/pdf` | 8221 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/trades/quotes/token/:token/pdf` | 8236 | public-bearer | getQuoteByToken( | `link-holder` | 404: `unknown-link` |
+| GET | `/api/trades/quotes/token/:token` | 8251 | public-bearer | getQuoteByToken( | `link-holder` | 404: `unknown-link` |
+| POST | `/api/trades/quotes/token/:token/respond` | 8296 | public-bearer | getQuoteByToken( | `link-holder` | 404: `unknown-link` |
+| GET | `/api/trades/invoices` | 8345 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
+| POST | `/api/trades/invoices` | 8357 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/trades/invoices/:id/send-balance` | 8415 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/trades/invoices/:id/mark-paid-external` | 8456 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/trades/invoices/:id/complete` | 8479 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/trades/invoices/:id/void` | 8498 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/trades/schedules` | 8515 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin` |
+| POST | `/api/trades/schedules` | 8522 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
+| PUT | `/api/trades/schedules/:id` | 8547 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
+| DELETE | `/api/trades/schedules/:id` | 8570 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-token`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/internal/cron/status` | 8586 | cron | authorizeCronRequest | `scheduler` | 401: `no-secret`, `wrong-secret` |
+| POST | `/api/internal/cron` | 8596 | cron | authorizeCronRequest | `scheduler` | 401: `no-secret`, `wrong-secret` |
 
 ## Per-route facts
 
@@ -493,7 +496,7 @@ Reviewed policy:
 - **Who:** public-bearer. **Tenant (token):** the one-time handoff code in this browser's cookie selects the one login the callback signed in: only its SHA-256 is looked up, and storage.consumeAuthHandoffCode spends it in one statement (unknown, spent, or older than 60 seconds: 401 GOOGLE_SIGN_IN_EXPIRED)
 - **Input:** only the handoff cookie, refused unless it is 43 base64url characters (handoffCodeHash); the body is not read
 - **Idempotency:** one-time: the first redemption spends the code (of two at once, exactly one succeeds); the cookie is cleared on every call
-- **Success:** { token, merchantId, newUser }: the account token in the body only, Cache-Control no-store. 403 ACCOUNT_UNAVAILABLE when the login is no longer active, its merchant neither verified nor active, or a member over the seat limit (issueTokenForUserId, server/auth.ts)
+- **Success:** { token, merchantId, newUser, csrfToken }: the account token in the body only (until phase E3), Cache-Control no-store; starts a session and sets its cookie (R1-T4 phase E). 403 ACCOUNT_UNAVAILABLE when the login is no longer active, its merchant neither verified nor active, or a member over the seat limit (issueTokenForUserId, server/auth.ts)
 - **Error disclosure:** fixed
 - **Authenticity:** the one-time code the callback set in this browser's cookie. SameSite=Strict, so another site cannot make the browser redeem it
 - **Replay:** refused: the code is spent on first use
@@ -512,8 +515,24 @@ Reviewed policy:
 - **Who:** merchant (owner, member). **Tenant (session):** the session's own login: every session of it ends, this one included; the platform admin is refused (403 'Only a TaptPay login can do this.')
 - **Input:** nothing
 - **Idempotency:** advances the login's session version (advanceUserSessionVersion), spending every token issued before it, this one included: the same token again is 401 SESSION_ENDED
-- **Side effects:** ends the login's live streams (sseBroker.disconnectUser) and stops its devices' notifications and the business's unattributed ones (deactivatePushSubscriptionsForLogin; a fault there is logged, never returned, as the sessions have already ended)
-- **Success:** 204, no body, not cached
+- **Side effects:** ends the login's live streams (sseBroker.disconnectUser) and stops its devices' notifications and the business's unattributed ones (deactivatePushSubscriptionsForLogin; a fault there is logged, never returned, as the sessions have already ended); records each session as ended (sign_out_everywhere; SESSION_REVOKED in the security log)
+- **Success:** 204, no body, not cached; this device's session cookie cleared
+- **Error disclosure:** fixed
+
+### POST `/api/auth/logout`
+
+- middleware: `authenticateToken`
+- authChecks: `compares req.user?.role === 'admin'`
+- sideEffects: `live update: sseBroker.disconnectSession`
+- statuses: `204`, `401`, `403`, `500`, `503`
+
+Reviewed policy:
+
+- **Who:** merchant (owner, member). **Tenant (session):** the session that signed the request in, and no other: a session cookie's session is ended; a token sign-in (until phase E3) has no session here and nothing changes. The platform admin is refused (403 'Only a TaptPay login can do this.'): the admin area has its own Log Out
+- **Input:** nothing
+- **Idempotency:** ends this session (revokeAuthSession, recorded as logout); the same cookie again is refused 401 by the sign-in gate, so the Log Out cannot repeat
+- **Side effects:** closes this session's live streams only (sseBroker.disconnectSession); SESSION_REVOKED in the security log
+- **Success:** 204, no body, not cached; the session cookie cleared
 - **Error disclosure:** fixed
 
 ### POST `/api/auth/login`
@@ -531,9 +550,9 @@ Reviewed policy:
 
 - **Who:** public. **Tenant (credentials):** the login the email names, when its password matches (authenticateUser: the password is checked at full cost for every email, one with no login included; then the login must be active, its merchant verified or active, and a member within the seat limit). Every refusal is the same 401
 - **Input:** body: loginSchema (400 with its issues)
-- **Idempotency:** each success issues another one-hour token and records the login time; each failure counts against the email (or this device) and, once addresses are told apart, the visitor's address
+- **Idempotency:** each success starts another session (R1-T4 phase E: a row in auth_sessions keeping only its secret's digest), issues another one-hour token (until phase E3) and records the login time; each failure counts against the email (or this device) and, once addresses are told apart, the visitor's address
 - **Side effects:** security audit log entries (logSecurityEvent: LOGIN_SUCCESS, FAILED_LOGIN, LOGIN_SLOWED, LOGIN_ERROR), with the email and address
-- **Success:** { token, user: { id, email, merchantId, role } }; sets the known-device cookie
+- **Success:** { token, csrfToken, user: { id, email, merchantId, role } }, not cached; sets the session cookie (HttpOnly, Secure, SameSite=Lax, __Host-, 7 days) and the known-device cookie
 - **Error disclosure:** input-issues
 - **Authenticity:** the email and its password
 - **Replay:** a replayed success issues another token; a replayed failure counts again
@@ -576,7 +595,7 @@ Reviewed policy:
 - **Who:** public-bearer. **Tenant (token):** the reset token (32 random bytes, hex) selects the one login it was sent to: only its SHA-256 is looked up; it must be live (one hour), the login active and an owner or member (resetPassword, server/auth.ts); storage.resetUserPasswordByToken spends it in the statement that sets the password
 - **Input:** body: resetPasswordSchema: the token and a new password meeting the one password rule, with its confirmation (400 with the first issue and the issues)
 - **Idempotency:** one-time: the token is spent with the new password in one statement, and a second use is 400. A storage fault is 500 and changes nothing, so the same link can be tried again (until 2026-09-26 a fault was answered 400 'Invalid or expired reset token')
-- **Side effects:** ends every session of the login (its session version, advanced in the same statement), closes its live streams (sseBroker.disconnectUser) and stops its devices' notifications; forgives its sign-in slow-downs
+- **Side effects:** ends every session of the login (its session version, advanced in the same statement; each session also recorded as ended, password_reset, SESSION_REVOKED), closes its live streams (sseBroker.disconnectUser) and stops its devices' notifications; forgives its sign-in slow-downs
 - **Success:** { message }; marks this browser as a known device for the login
 - **Error disclosure:** input-issues
 - **Authenticity:** holding the emailed reset link: its token is the credential for that one login's reset
@@ -633,9 +652,9 @@ Reviewed policy:
 
 - **Who:** public. **Tenant (credentials):** the platform admin: the configured admin email (compared without regard to case) and ADMIN_PASSWORD_HASH; any other email is refused after the same work (checkPasswordEvenly with the admin hash's budget)
 - **Input:** body: loginSchema (400 with its issues)
-- **Idempotency:** each success issues another one-hour admin token; each failure counts against the email (or this device) and the visitor's address
+- **Idempotency:** each success starts another admin session (R1-T4 phase E) and issues another one-hour admin token (until phase E3); each failure counts against the email (or this device) and the visitor's address
 - **Side effects:** security audit log entries (logSecurityEvent: ADMIN_LOGIN_SUCCESS, ADMIN_FAILED_LOGIN, ADMIN_LOGIN_SLOWED, ADMIN_LOGIN_ERROR)
-- **Success:** { token, user: { id: 1, email, merchantId: 0, role: 'admin' } }: a one-hour token under the dedicated admin principal; sets the admin known-device cookie
+- **Success:** { token, csrfToken, user: { id: 1, email, merchantId: 0, role: 'admin' } }, not cached: a one-hour token under the dedicated admin principal; sets the admin session cookie (its own name, 12 hours) and the admin known-device cookie
 - **Error disclosure:** input-issues
 - **Authenticity:** the admin email and its password
 - **Replay:** a replayed success issues another token; a replayed failure counts again
@@ -646,8 +665,10 @@ Reviewed policy:
 
 - middleware: `authenticateToken`
 - storageMethods: `getMerchant`, `getOrCreateSubscription`
-- statuses: `200`, `401`, `500`, `503`
+- statuses: `200`, `401`, `403`, `500`, `503`
+- dtos: `signedInUserDto`
 - entitlementGates: `billingCardIsReady`
+- helpers: `signedInUserDto`
 
 Reviewed policy:
 
@@ -655,8 +676,28 @@ Reviewed policy:
 - **Input:** nothing
 - **Entitlement gate:** none enforced: whether the business has paid access (billingCardIsReady) is only reported, for the app's own gate
 - **Idempotency:** read-only, apart from getOrCreateSubscription, which makes the business's subscription row if it has none
-- **Success:** { user: { id, email, merchantId, role, onboardingCompleted, merchantStatus, gstRegistered, tradeGstMode, billingCardReady } }: every client's start-up check
+- **Success:** { user: signedInUserDto: { id, email, merchantId, role, onboardingCompleted, merchantStatus, gstRegistered, tradeGstMode, billingCardReady } }, not cached: the start-up check of a token sign-in (a session cookie's is GET /api/auth/session)
 - **Error disclosure:** fixed
+
+### GET `/api/auth/session`
+
+- storageMethods: `getMerchant`, `getOrCreateSubscription`
+- statuses: `200`, `500`
+- dtos: `signedInUserDto`
+- entitlementGates: `billingCardIsReady`
+- helpers: `signedInUserDto`
+
+Reviewed policy:
+
+- **Who:** public. **Tenant (session):** the caller's own business session cookie, and nothing else: readBusinessSession finds its session by the cookie's id, checks its secret, that it has not ended, that its login is active with the session's version and that its business is verified or active; the admin's cookie and any Authorization header are not read. Anyone without such a session gets { signedIn: false }
+- **Input:** only the session cookie, refused unless it is `<22 base64url>.<43 base64url>` (parseSessionCookie); nothing else is read
+- **Entitlement gate:** none enforced: whether the business has paid access (billingCardIsReady) is only reported, for the app's own gate
+- **Idempotency:** read-only for the signed-out; for a session, recorded as a use (at most once a minute), and the daily swap offered or taken up, as on any signed-in request; apart from getOrCreateSubscription, which makes the business's subscription row if it has none
+- **Success:** { signedIn: false }, or { signedIn: true, user: signedInUserDto, csrfToken }, never cached: the app's start-up check on a session cookie (R1-T4 phase E). A cookie that is not a live session is cleared
+- **Error disclosure:** fixed
+- **Authenticity:** none needed: it answers only about the caller's own cookie, which is HttpOnly, so no script can present another's; without a valid one it says only { signedIn: false }
+- **Replay:** harmless: the cookie's holder reads their own session again
+- **Rate:** none — it reveals nothing about anyone but the caller, and each read of a session is one indexed row
 
 ### GET `/api/tutorial/state`
 
@@ -744,7 +785,24 @@ Reviewed policy:
 - **Input:** nothing
 - **Idempotency:** read-only
 - **Side effects:** an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
-- **Success:** { user: { id, email, merchantId: 0, role: 'admin' } }: the admin app's session check
+- **Success:** { user: { id, email, merchantId: 0, role: 'admin' }, csrfToken }, not cached: the admin app's session check; with an admin session cookie, the page's CSRF token (R1-T4 phase E)
+- **Error disclosure:** fixed
+
+### POST `/api/admin/auth/logout`
+
+- middleware: `authenticateAdmin`
+- authChecks: `authenticateToken`, `compares req.user?.role !== "admin"`
+- sideEffects: `audit log: logSecurityEvent`, `live update: sseBroker.disconnectSession`
+- statuses: `204`, `401`, `403`, `500`, `503`
+- helpers: `authenticateAdmin`
+
+Reviewed policy:
+
+- **Who:** platform-admin. **Tenant (none):** the admin session that signed the request in, and no other: it is ended; a token sign-in (until phase E3) has no session here and nothing changes
+- **Input:** nothing
+- **Idempotency:** ends this admin session (revokeAuthSession, recorded as logout); the same cookie again is refused 401 by the sign-in gate
+- **Side effects:** closes this session's live streams (sseBroker.disconnectSession); SESSION_REVOKED in the security log; an audit log line when a signed-in caller other than the platform admin is refused (logSecurityEvent: ADMIN_ACCESS_DENIED, from authenticateAdmin; a missing or bad token is refused by authenticateToken, unlogged)
+- **Success:** 204, no body, not cached; the admin session cookie cleared
 - **Error disclosure:** fixed
 
 ### GET `/api/merchants/:id/qr`
@@ -1230,7 +1288,7 @@ Reviewed policy:
 - authChecks: `checkMerchantOwnership`
 - storageMethods: `getTransaction`, `updateTransactionStatus`
 - sideEffects: `live update: sseBroker.broadcast`
-- statuses: `200`, `400`, `401`, `404`, `500`, `503`
+- statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 - dtos: `ownerTransactionDto`
 - helpers: `broadcastToStone`
 
@@ -1574,9 +1632,9 @@ Reviewed policy:
 
 - **Who:** merchant (owner, member). **Tenant (path-merchant):** checkMerchantOwnership: the business in the path must be the session's, a precondition only: the caller's own login is what changes; the platform admin, which that check lets through, is then refused (403 'Only a TaptPay login can do this.', since 2026-09-27)
 - **Input:** id: strictPositiveIntegerParam; body: changePasswordSchema (the current password, and a new one held to the one password rule; 400 with the first issue and the issues)
-- **Idempotency:** checks the current password, counted per login and slowed down like sign-in (429), then sets the new one and ends every session of the login (updateUserPassword); again with the old password is 400
-- **Side effects:** ends the login's live streams (sseBroker.disconnectUser) and stops its devices' notifications and the business's unattributed ones (deactivatePushSubscriptionsForLogin; a fault is logged, never returned); logs a slowed attempt (logSecurityEvent: PASSWORD_CHANGE_SLOWED)
-- **Success:** { message, token }: a fresh token for this device, not cached
+- **Idempotency:** checks the current password, counted per login and slowed down like sign-in (429), then sets the new one and ends every session of the login (updateUserPassword; each session recorded as ended, password_change) and starts a new one for this device; again with the old password is 400
+- **Side effects:** ends the login's live streams (sseBroker.disconnectUser) and stops its devices' notifications and the business's unattributed ones (deactivatePushSubscriptionsForLogin; a fault is logged, never returned); logs a slowed attempt (logSecurityEvent: PASSWORD_CHANGE_SLOWED) and the ended sessions (SESSION_REVOKED)
+- **Success:** { message, token, csrfToken }: a fresh token (until phase E3) and a new session cookie for this device, not cached
 - **Error disclosure:** input-issues
 
 ### PUT `/api/merchants/:id/theme`
@@ -2575,7 +2633,7 @@ Reviewed policy:
 - **Who:** merchant (owner). **Tenant (resource):** setTeamMemberStatus changes the login only if it is the session's business's (404 otherwise, the same for another business's) and not the owner (403); the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** userId: strictPositiveIntegerParam; body read without a schema: status, which must be 'active' or 'disabled' (400 otherwise)
 - **Idempotency:** sets the login active or disabled; the same state again is 409; turning one back on counts the plan's seats under a lock (409 when all are in use). A disabled login's tokens are refused from its next request (authenticateToken reads the login)
-- **Side effects:** on disabling: ends the login's live streams (sseBroker.disconnectUser) and stops its devices' notifications and the business's unattributed ones (deactivatePushSubscriptionsForLogin, owner decision 2026-09-22; a fault is logged, never returned)
+- **Side effects:** on disabling: records each of the login's sessions as ended (login_disabled, SESSION_REVOKED; the status check already refuses them), ends its live streams (sseBroker.disconnectUser) and stops its devices' notifications and the business's unattributed ones (deactivatePushSubscriptionsForLogin, owner decision 2026-09-22; a fault is logged, never returned)
 - **Success:** { member: teamMemberDto }
 - **Error disclosure:** fixed
 
@@ -2593,7 +2651,7 @@ Reviewed policy:
 - **Who:** merchant (owner). **Tenant (resource):** the login read by id (getUserById) must be the session's business's and not its owner (404 otherwise, the same for another business's); a pending invite is 409 (revoke it instead); the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** userId: strictPositiveIntegerParam (400 otherwise)
 - **Idempotency:** deletes the login (removeTeamMember); again is 404
-- **Side effects:** ends the login's live streams (sseBroker.disconnectUser) and, since 2026-09-26, stops the business's unattributed device subscriptions as disabling does (deactivatePushSubscriptionsForLogin; the ones recorded against the login go with it by 0029's cascade; a fault is logged, never returned)
+- **Side effects:** records each of the login's sessions as ended (login_removed, SESSION_REVOKED) before the login goes, taking its sessions with it (0031's cascade); ends its live streams (sseBroker.disconnectUser) and, since 2026-09-26, stops the business's unattributed device subscriptions as disabling does (deactivatePushSubscriptionsForLogin; the ones recorded against the login go with it by 0029's cascade; a fault is logged, never returned)
 - **Success:** { message: 'Login removed' }
 - **Error disclosure:** fixed
 
@@ -3019,7 +3077,7 @@ Reviewed policy:
 - authChecks: `isValidatedPlatformAdmin`
 - storageMethods: `getUploadedFile`, `getUploadedFileForMerchant`, `recordInvoiceDocumentAdminRead`
 - sideEffects: `audit log: logSecurityEvent`
-- statuses: `200`, `401`, `404`, `500`, `503`
+- statuses: `200`, `401`, `403`, `404`, `500`, `503`
 - helpers: `sendPrivateDocument`
 
 Reviewed policy:

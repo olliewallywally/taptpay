@@ -147,10 +147,12 @@ const RECIPES: Record<string, ServedRecipe> = {
     },
     status: 200,
     check: async (res) => {
-      expect(res.body).toEqual({ message: "Password updated successfully", token: expect.any(String) });
-      // This login's other sessions end; this device carries on under the fresh token.
+      expect(res.body).toEqual({ message: "Password updated successfully", token: expect.any(String), csrfToken: expect.any(String) });
+      // This login's other sessions end; this device carries on under the fresh token and a new session
+      // (R1-T4 phase E).
       expect(await signedIn(ctx, who.token)).toBe(401);
       expect(await signedIn(ctx, res.body.token)).toBe(200);
+      expect(String(res.headers["set-cookie"])).toMatch(/__Host-taptpay-session=[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43};/);
     },
   }),
   // Its sales (paid access: a card on file and a paid month).

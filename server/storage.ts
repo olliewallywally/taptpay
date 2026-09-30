@@ -5,7 +5,8 @@ import { getDb, isDatabaseConnected } from "./database";
 import { config } from "./config";
 import { eq, ne, desc, asc, and, inArray, notInArray, gt, gte, lte, lt, or, ilike, like, sql, isNull, isNotNull } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
-import { authHandoffCodes, authThrottle, invoiceDocumentAccessAudit, invoiceDocumentReadLimits, invoiceSplitSessions, type InvoiceSplitSession } from "@shared/schema";
+import { authHandoffCodes, authSessions, authThrottle, invoiceDocumentAccessAudit, invoiceDocumentReadLimits, invoiceSplitSessions, type AuthSession, type InvoiceSplitSession, type NewAuthSession } from "@shared/schema";
+import { SESSION_RECLAIM_AFTER_MS } from "./auth-sessions";
 import {
   AUTH_THROTTLE_RECLAIM_AFTER_MS, planAuthThrottleTake, settleAuthThrottleRow, uniqueAuthThrottleBuckets,
   type AuthThrottleBucket, type AuthThrottleOutcome, type AuthThrottleRow, type AuthThrottleTake,
@@ -910,6 +911,36 @@ export interface IStorage extends PaymentAttemptRepository {
   settleAuthThrottle(buckets: readonly AuthThrottleBucket[], outcome: AuthThrottleOutcome, now: Date): Promise<void>;
   /** R1-T4 phase C: forget buckets outright — these keys, and every key starting with a prefix. */
   forgetAuthThrottle(keys: readonly string[], keyPrefixes: readonly string[]): Promise<void>;
+  /**
+   * R1-T4 phase E: keep a new sign-in session (secret digests only), reclaiming rows that could last
+   * have been used more than 30 days ago (SESSION_RECLAIM_AFTER_MS) on the way in.
+   */
+  createAuthSession(session: NewAuthSession, now: Date): Promise<void>;
+  /** R1-T4 phase E: one session by its id, ended or not; undefined when there is none. */
+  getAuthSession(id: string): Promise<AuthSession | undefined>;
+  /**
+   * R1-T4 phase E: the daily swap offers a new secret, only while the session has not been ended, its
+   * current secret became current at or before `rotateBefore`, and no offer is newer than
+   * `reofferBefore`. One statement: of two concurrent offers exactly one is made. False when none was.
+   */
+  offerAuthSessionSecret(
+    id: string,
+    offer: { secretHash: string; now: Date; rotateBefore: Date; reofferBefore: Date },
+  ): Promise<boolean>;
+  /**
+   * R1-T4 phase E: the offered secret was used, so it becomes current and the one it replaces is
+   * accepted until `previousValidUntil`. False when the offer is no longer this one or the session ended.
+   */
+  promoteAuthSessionSecret(
+    id: string,
+    promotion: { offeredSecretHash: string; now: Date; previousValidUntil: Date },
+  ): Promise<boolean>;
+  /** R1-T4 phase E: record a use at `now` (only ever forward) with its new idle expiry. */
+  touchAuthSession(id: string, now: Date, idleExpiresAt: Date): Promise<void>;
+  /** R1-T4 phase E: end one session, with why; false when it had already been ended. */
+  revokeAuthSession(id: string, reason: string, now: Date): Promise<boolean>;
+  /** R1-T4 phase E: end every live session of one login, except `keepId`; how many were ended. */
+  revokeAuthSessionsForLogin(userId: number, reason: string, now: Date, keepId?: string): Promise<number>;
 }
 
 // A tenant id that can match a real merchant. 0 is the platform admin's
@@ -987,6 +1018,7 @@ export class MemStorage implements IStorage {
   private authHandoffCodes = new Map<string, { userId: number; newUser: boolean; expiresAt: Date; consumedAt: Date | null }>();
   private authThrottleRows = new Map<string, AuthThrottleRow>();
   private invoiceSplitSessionRows = new Map<string, InvoiceSplitSession>();
+  private authSessionRows = new Map<string, AuthSession>();
   private documentAccessAudit: Array<{ adminUserId: number; documentName: string }> = [];
 
   constructor() {
@@ -2444,6 +2476,7 @@ export class MemStorage implements IStorage {
     this.documentReadLimits.clear();
     this.authThrottleRows.clear();
     this.invoiceSplitSessionRows.clear();
+    this.authSessionRows.clear();
     this.documentAccessAudit = [];
     console.log("All merchants and transactions cleared from memory");
   }
@@ -2530,6 +2563,96 @@ export class MemStorage implements IStorage {
     for (const key of Array.from(this.authThrottleRows.keys())) {
       if (keys.includes(key) || keyPrefixes.some((prefix) => key.startsWith(prefix))) this.authThrottleRows.delete(key);
     }
+  }
+
+  // R1-T4 phase E. No await between reading and writing a row: each call is atomic here, as the
+  // database's single conditional statements are.
+  async createAuthSession(session: NewAuthSession, now: Date): Promise<void> {
+    const cutoff = now.getTime() - SESSION_RECLAIM_AFTER_MS;
+    for (const [id, row] of this.authSessionRows) {
+      if (row.absoluteExpiresAt.getTime() < cutoff) this.authSessionRows.delete(id);
+    }
+    if (this.authSessionRows.has(session.id)) throw new Error("auth session already exists");
+    this.authSessionRows.set(session.id, {
+      id: session.id,
+      principal: session.principal,
+      userId: session.userId ?? null,
+      sessionVersion: session.sessionVersion ?? null,
+      adminTag: session.adminTag ?? null,
+      secretHash: session.secretHash,
+      offeredSecretHash: session.offeredSecretHash ?? null,
+      offeredAt: session.offeredAt ?? null,
+      previousSecretHash: session.previousSecretHash ?? null,
+      previousValidUntil: session.previousValidUntil ?? null,
+      deviceLabel: session.deviceLabel ?? null,
+      createdAt: session.createdAt ?? now,
+      lastUsedAt: session.lastUsedAt,
+      idleExpiresAt: session.idleExpiresAt,
+      absoluteExpiresAt: session.absoluteExpiresAt,
+      rotatedAt: session.rotatedAt,
+      revokedAt: session.revokedAt ?? null,
+      revokedReason: session.revokedReason ?? null,
+    });
+  }
+
+  async getAuthSession(id: string): Promise<AuthSession | undefined> {
+    const row = this.authSessionRows.get(id);
+    return row ? { ...row } : undefined;
+  }
+
+  async offerAuthSessionSecret(
+    id: string,
+    offer: { secretHash: string; now: Date; rotateBefore: Date; reofferBefore: Date },
+  ): Promise<boolean> {
+    const row = this.authSessionRows.get(id);
+    if (!row || row.revokedAt) return false;
+    if (row.rotatedAt.getTime() > offer.rotateBefore.getTime()) return false;
+    if (row.offeredAt && row.offeredAt.getTime() > offer.reofferBefore.getTime()) return false;
+    row.offeredSecretHash = offer.secretHash;
+    row.offeredAt = offer.now;
+    return true;
+  }
+
+  async promoteAuthSessionSecret(
+    id: string,
+    promotion: { offeredSecretHash: string; now: Date; previousValidUntil: Date },
+  ): Promise<boolean> {
+    const row = this.authSessionRows.get(id);
+    if (!row || row.revokedAt || row.offeredSecretHash !== promotion.offeredSecretHash) return false;
+    row.previousSecretHash = row.secretHash;
+    row.previousValidUntil = promotion.previousValidUntil;
+    row.secretHash = promotion.offeredSecretHash;
+    row.offeredSecretHash = null;
+    row.offeredAt = null;
+    row.rotatedAt = promotion.now;
+    return true;
+  }
+
+  async touchAuthSession(id: string, now: Date, idleExpiresAt: Date): Promise<void> {
+    const row = this.authSessionRows.get(id);
+    if (!row || row.revokedAt || row.lastUsedAt.getTime() >= now.getTime()) return;
+    row.lastUsedAt = now;
+    row.idleExpiresAt = idleExpiresAt;
+  }
+
+  async revokeAuthSession(id: string, reason: string, now: Date): Promise<boolean> {
+    const row = this.authSessionRows.get(id);
+    if (!row || row.revokedAt) return false;
+    row.revokedAt = now;
+    row.revokedReason = reason;
+    return true;
+  }
+
+  async revokeAuthSessionsForLogin(userId: number, reason: string, now: Date, keepId?: string): Promise<number> {
+    let ended = 0;
+    for (const row of this.authSessionRows.values()) {
+      if (row.userId !== userId || row.id === keepId || row.revokedAt) continue;
+      if (row.idleExpiresAt.getTime() <= now.getTime() || row.absoluteExpiresAt.getTime() <= now.getTime()) continue;
+      row.revokedAt = now;
+      row.revokedReason = reason;
+      ended += 1;
+    }
+    return ended;
   }
 
   async consumeInvoiceDocumentReadLimit(token: string): Promise<boolean> {
@@ -8200,6 +8323,93 @@ export class DatabaseStorage implements IStorage {
     for (const prefix of keyPrefixes) {
       await db.delete(authThrottle).where(like(authThrottle.bucketKey, `${prefix.replace(/[\\%_]/g, "\\$&")}%`));
     }
+  }
+
+  // R1-T4 phase E. Every change is one conditional statement, so concurrent requests on any
+  // instance cannot both make an offer, both promote, or revive an ended session.
+  async createAuthSession(session: NewAuthSession, now: Date): Promise<void> {
+    const db = this.db; if (!db) throw new Error("Database not connected");
+    await db.delete(authSessions)
+      .where(lt(authSessions.absoluteExpiresAt, new Date(now.getTime() - SESSION_RECLAIM_AFTER_MS)));
+    await db.insert(authSessions).values(session);
+  }
+
+  async getAuthSession(id: string): Promise<AuthSession | undefined> {
+    const db = this.db; if (!db) throw new Error("Database not connected");
+    const rows = await db.select().from(authSessions).where(eq(authSessions.id, id)).limit(1);
+    return rows[0];
+  }
+
+  async offerAuthSessionSecret(
+    id: string,
+    offer: { secretHash: string; now: Date; rotateBefore: Date; reofferBefore: Date },
+  ): Promise<boolean> {
+    const db = this.db; if (!db) throw new Error("Database not connected");
+    const rows = await db.update(authSessions)
+      .set({ offeredSecretHash: offer.secretHash, offeredAt: offer.now })
+      .where(and(
+        eq(authSessions.id, id),
+        isNull(authSessions.revokedAt),
+        lte(authSessions.rotatedAt, offer.rotateBefore),
+        or(isNull(authSessions.offeredAt), lte(authSessions.offeredAt, offer.reofferBefore)),
+      ))
+      .returning({ id: authSessions.id });
+    return rows.length === 1;
+  }
+
+  async promoteAuthSessionSecret(
+    id: string,
+    promotion: { offeredSecretHash: string; now: Date; previousValidUntil: Date },
+  ): Promise<boolean> {
+    const db = this.db; if (!db) throw new Error("Database not connected");
+    // Every right-hand side reads the row as it was, so the current secret becomes the previous one.
+    const rows = await db.update(authSessions)
+      .set({
+        previousSecretHash: sql`${authSessions.secretHash}`,
+        previousValidUntil: promotion.previousValidUntil,
+        secretHash: sql`${authSessions.offeredSecretHash}`,
+        offeredSecretHash: null,
+        offeredAt: null,
+        rotatedAt: promotion.now,
+      })
+      .where(and(
+        eq(authSessions.id, id),
+        isNull(authSessions.revokedAt),
+        eq(authSessions.offeredSecretHash, promotion.offeredSecretHash),
+      ))
+      .returning({ id: authSessions.id });
+    return rows.length === 1;
+  }
+
+  async touchAuthSession(id: string, now: Date, idleExpiresAt: Date): Promise<void> {
+    const db = this.db; if (!db) throw new Error("Database not connected");
+    await db.update(authSessions)
+      .set({ lastUsedAt: now, idleExpiresAt })
+      .where(and(eq(authSessions.id, id), isNull(authSessions.revokedAt), lt(authSessions.lastUsedAt, now)));
+  }
+
+  async revokeAuthSession(id: string, reason: string, now: Date): Promise<boolean> {
+    const db = this.db; if (!db) throw new Error("Database not connected");
+    const rows = await db.update(authSessions)
+      .set({ revokedAt: now, revokedReason: reason })
+      .where(and(eq(authSessions.id, id), isNull(authSessions.revokedAt)))
+      .returning({ id: authSessions.id });
+    return rows.length === 1;
+  }
+
+  async revokeAuthSessionsForLogin(userId: number, reason: string, now: Date, keepId?: string): Promise<number> {
+    const db = this.db; if (!db) throw new Error("Database not connected");
+    const rows = await db.update(authSessions)
+      .set({ revokedAt: now, revokedReason: reason })
+      .where(and(
+        eq(authSessions.userId, userId),
+        isNull(authSessions.revokedAt),
+        gt(authSessions.idleExpiresAt, now),
+        gt(authSessions.absoluteExpiresAt, now),
+        ...(keepId ? [ne(authSessions.id, keepId)] : []),
+      ))
+      .returning({ id: authSessions.id });
+    return rows.length;
   }
 
   async consumeInvoiceDocumentReadLimit(token: string): Promise<boolean> {

@@ -9,7 +9,8 @@ import {
 // payment board has its own private link and no public stream. The only anonymous audience
 // left is a board's, scoped to that board.
 export type SseAudience =
-  | { kind: "merchant"; userId: number; principal: "user" | "admin" }
+  // sessionId: the sign-in session the stream was opened by (R1-T4 phase E), when it was a cookie.
+  | { kind: "merchant"; userId: number; principal: "user" | "admin"; sessionId?: string }
   | { kind: "board"; stoneId: number };
 
 export interface SseWritable {
@@ -136,6 +137,28 @@ export class SseBroker {
     }
 
     if (merchantSubscribers.size === 0) this.subscribers.delete(merchantId);
+    return disconnected;
+  }
+
+  /**
+   * Drop the live streams one sign-in session opened (R1-T4 phase E: Log Out ends that session only),
+   * on every business, as an admin session's streams may be on any.
+   */
+  disconnectSession(sessionId: string) {
+    let disconnected = 0;
+    for (const [merchantId, merchantSubscribers] of Array.from(this.subscribers.entries())) {
+      for (const subscriber of Array.from(merchantSubscribers)) {
+        if (subscriber.audience.kind !== "merchant" || subscriber.audience.sessionId !== sessionId) continue;
+        merchantSubscribers.delete(subscriber);
+        disconnected++;
+        try {
+          subscriber.connection.end?.();
+        } catch {
+          // A socket that already vanished is still successfully unsubscribed.
+        }
+      }
+      if (merchantSubscribers.size === 0) this.subscribers.delete(merchantId);
+    }
     return disconnected;
   }
 

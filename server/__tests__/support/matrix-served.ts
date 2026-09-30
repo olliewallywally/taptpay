@@ -125,7 +125,7 @@ export type ServedFamily =
 export const SERVED_FAMILIES: Record<ServedFamily, { gate: MatrixGate; family: RegExp }> = {
   account: {
     gate: "session",
-    family: /^[A-Z]+ \/api\/(auth\/(me|sign-out-everywhere)$|tutorial\/|push\/|subscription|team|billing\/|board-builder\/|invoice-documents\/)/,
+    family: /^[A-Z]+ \/api\/(auth\/(me|sign-out-everywhere|logout)$|tutorial\/|push\/|subscription|team|billing\/|board-builder\/|invoice-documents\/)/,
   },
   business: { gate: "session", family: /^[A-Z]+ \/api\/(merchants|transactions)(\/|$)/ },
   property: { gate: "session", family: /^[A-Z]+ \/api\/property\// },

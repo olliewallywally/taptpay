@@ -106,6 +106,19 @@ async function resetLink(ctx: ServedCtx) {
 }
 
 const RECIPES: Record<string, OwnServedRecipe> = {
+  // R1-T4 phase E: the app's start-up check on a session cookie answers anyone, signed in or not.
+  "GET /api/auth/session": (ctx) => ({
+    req: get("/api/auth/session"), status: 200,
+    check: async (res) => {
+      expect(res.headers["cache-control"]).toMatch(/no-store/);
+      expect(res.body).toEqual({ signedIn: false });
+      // The same check with the owner's session cookie reads the owner.
+      const signIn = await request(ctx.app).post("/api/auth/login").send({ email: ctx.owner.user.email, password: VALID_PASSWORD });
+      const session = cookieValue(setCookies(signIn).get("__Host-taptpay-session"));
+      const read = await request(ctx.app).get("/api/auth/session").set("Cookie", `__Host-taptpay-session=${session}`);
+      expect(read.body).toMatchObject({ signedIn: true, user: { id: ctx.owner.user.id, merchantId: ctx.merchantId }, csrfToken: signIn.body.csrfToken });
+    },
+  }),
   // Google sign-in: the start, Google's return, and the browser redeeming its one-time code.
   "GET /api/auth/google": () => ({
     req: get("/api/auth/google"), status: 302,
@@ -149,7 +162,9 @@ const RECIPES: Record<string, OwnServedRecipe> = {
       req: post("/api/auth/google/session", {}, { Cookie: `${HANDOFF_COOKIE}=${code}` }), status: 200,
       check: async (res) => {
         expect(res.headers["cache-control"]).toMatch(/no-store/);
-        expect(res.body).toEqual({ token: expect.any(String), merchantId: ctx.merchantId, newUser: false });
+        expect(res.body).toEqual({ token: expect.any(String), merchantId: ctx.merchantId, newUser: false, csrfToken: expect.any(String) });
+        // R1-T4 phase E: the sign-in is a session cookie too.
+        expect(setCookies(res).get("__Host-taptpay-session")).toMatch(/HttpOnly/i);
         expect((await me(ctx, res.body.token)).body.user).toMatchObject({ id: ctx.owner.user.id, merchantId: ctx.merchantId });
         // The code is spent.
         expect(await storage.consumeAuthHandoffCode(sha256(code), new Date())).toBeUndefined();
@@ -164,6 +179,9 @@ const RECIPES: Record<string, OwnServedRecipe> = {
       expect((await me(ctx, res.body.token)).status).toBe(200);
       // This browser is now a known device for the login (its own sign-in slow-down).
       expect(setCookies(res).get(DEVICE_COOKIE)).toMatch(/HttpOnly/i);
+      // R1-T4 phase E: the sign-in is a session cookie, with the page's CSRF token in the body.
+      expect(setCookies(res).get("__Host-taptpay-session")).toMatch(/HttpOnly/i);
+      expect(res.body.csrfToken).toMatch(/^[A-Za-z0-9_-]{43}$/);
     },
   }),
   "POST /api/admin/auth/login": (ctx) => ({
@@ -173,6 +191,9 @@ const RECIPES: Record<string, OwnServedRecipe> = {
       const admin = await request(ctx.app).get("/api/admin/auth/me").set(bearer({ token: res.body.token }));
       expect(admin.status).toBe(200);
       expect(setCookies(res).get(ADMIN_DEVICE_COOKIE)).toMatch(/HttpOnly/i);
+      // R1-T4 phase E: the admin's own session cookie, with the page's CSRF token in the body.
+      expect(setCookies(res).get("__Host-taptpay-admin-session")).toMatch(/HttpOnly/i);
+      expect(res.body.csrfToken).toMatch(/^[A-Za-z0-9_-]{43}$/);
     },
   }),
   // A forgotten password: the link is emailed, checked, and used.
@@ -280,6 +301,7 @@ const SERVED = ownServedPairs(ROWS);
  * a review that stopped naming a caller (or started naming one) cannot quietly drop or add a case here.
  */
 const SERVED_BY: Record<string, OwnServedCaller[]> = {
+  "GET /api/auth/session": ["signed-out"],
   "GET /api/auth/google": ["signed-out"],
   "GET /api/auth/google/callback": ["signed-out"],
   "POST /api/auth/google/session": ["link-holder"],

@@ -329,6 +329,155 @@ try {
       assert.deepEqual(await throttleRow(bucket.key), { failures: 1, next_allowed_at: null });
     } finally { blocker.release(); }
   });
+  // Phase E: auth_sessions (0031) — sessions the server keeps, shared by every instance.
+  const { SESSION_RECLAIM_AFTER_MS } = await import("../server/auth-sessions");
+  const HOUR = 3_600_000;
+  const sessionId = () => randomBytes(16).toString("base64url");
+  const secretHash = () => sha(randomBytes(32).toString("base64url"));
+  const sessionRow = async (id: string) => (await pool.query(
+    `SELECT secret_hash, offered_secret_hash, offered_at, previous_secret_hash, previous_valid_until,
+       last_used_at, idle_expires_at, rotated_at, revoked_at, revoked_reason FROM auth_sessions WHERE id=$1`, [id])).rows[0];
+  const startSessionRow = async (userId: number, at: Date, overrides: Record<string, unknown> = {}, via = one) => {
+    const id = sessionId();
+    await via.createAuthSession({
+      id, principal: "business", userId, sessionVersion: 0, adminTag: null, secretHash: secretHash(),
+      deviceLabel: "Chrome on macOS", createdAt: at, lastUsedAt: at, rotatedAt: at,
+      idleExpiresAt: new Date(at.getTime() + 24 * HOUR), absoluteExpiresAt: new Date(at.getTime() + 7 * 24 * HOUR),
+      ...overrides,
+    }, at);
+    return id;
+  };
+  const sessionLogin = await addUser("sessions@r1-t4.test", "member");
+  await check("a session keeps only digests; the table refuses a row whose principal fields disagree", async () => {
+    const id = await startSessionRow(sessionLogin, new Date());
+    const row = (await pool.query("SELECT * FROM auth_sessions WHERE id=$1", [id])).rows[0];
+    assert.equal(row.principal, "business");
+    assert.match(row.secret_hash, /^[0-9a-f]{64}$/);
+    const insert = (principal: string, userId: number | null, version: number | null, tag: string | null) => pool.query(
+      `INSERT INTO auth_sessions(id, principal, user_id, session_version, admin_tag, secret_hash, last_used_at,
+         idle_expires_at, absolute_expires_at, rotated_at) VALUES ($1,$2,$3,$4,$5,'x',now(),now(),now(),now())`,
+      [sessionId(), principal, userId, version, tag]);
+    await assert.rejects(insert("business", null, 0, null), /auth_sessions_principal_chk/);
+    await assert.rejects(insert("business", sessionLogin, null, null), /auth_sessions_principal_chk/);
+    await assert.rejects(insert("admin", sessionLogin, null, "tag"), /auth_sessions_principal_chk/);
+    await assert.rejects(insert("admin", null, null, null), /auth_sessions_principal_chk/);
+    await assert.rejects(insert("someone", null, null, "tag"), /auth_sessions_principal_chk/);
+    await insert("admin", null, null, "tag");
+    await assert.rejects(pool.query("UPDATE auth_sessions SET offered_secret_hash='x' WHERE id=$1", [id]), /auth_sessions_offer_chk/);
+    await assert.rejects(pool.query("UPDATE auth_sessions SET revoked_at=now() WHERE id=$1", [id]), /auth_sessions_revoked_chk/);
+    await assert.rejects(pool.query("UPDATE auth_sessions SET previous_secret_hash='x' WHERE id=$1", [id]),
+      /auth_sessions_previous_chk/);
+  });
+  await check("20 simultaneous offers of the daily swap from two instances: exactly one is made", async () => {
+    const now = new Date();
+    const id = await startSessionRow(sessionLogin, new Date(now.getTime() - 25 * HOUR));
+    const hashes = Array.from({ length: 20 }, secretHash);
+    const results = await Promise.all(hashes.map((hash, i) => (i % 2 ? two : one).offerAuthSessionSecret(id,
+      { secretHash: hash, now, rotateBefore: new Date(now.getTime() - 24 * HOUR), reofferBefore: new Date(now.getTime() - 60_000) })));
+    assert.equal(results.filter(Boolean).length, 1);
+    assert.equal((await sessionRow(id)).offered_secret_hash, hashes[results.indexOf(true)]);
+  });
+  await check("an offer is made only when the swap is due, not repeated within a minute, and re-made after one", async () => {
+    const now = new Date();
+    const offer = (hash: string, at: Date) => one.offerAuthSessionSecret(id, { secretHash: hash, now: at,
+      rotateBefore: new Date(at.getTime() - 24 * HOUR), reofferBefore: new Date(at.getTime() - 60_000) });
+    const young = await startSessionRow(sessionLogin, new Date(now.getTime() - 23 * HOUR));
+    assert.equal(await one.offerAuthSessionSecret(young, { secretHash: secretHash(), now,
+      rotateBefore: new Date(now.getTime() - 24 * HOUR), reofferBefore: new Date(now.getTime() - 60_000) }), false,
+      "a secret younger than a day is not swapped");
+    const id = await startSessionRow(sessionLogin, new Date(now.getTime() - 25 * HOUR));
+    const [first, second, third] = [secretHash(), secretHash(), secretHash()];
+    assert.equal(await offer(first, now), true);
+    assert.equal(await offer(second, new Date(now.getTime() + 30_000)), false, "not again within a minute");
+    assert.equal((await sessionRow(id)).offered_secret_hash, first);
+    assert.equal(await offer(third, new Date(now.getTime() + 61_000)), true, "a lost offer is replaced after a minute");
+    assert.equal((await sessionRow(id)).offered_secret_hash, third);
+  });
+  await check("20 simultaneous first uses of the offered secret from two instances: exactly one promotion", async () => {
+    const now = new Date();
+    const id = await startSessionRow(sessionLogin, new Date(now.getTime() - 25 * HOUR));
+    const before = await sessionRow(id);
+    const offered = secretHash();
+    assert.ok(await one.offerAuthSessionSecret(id, { secretHash: offered, now,
+      rotateBefore: new Date(now.getTime() - 24 * HOUR), reofferBefore: new Date(now.getTime() - 60_000) }));
+    const until = new Date(now.getTime() + 60_000);
+    const results = await Promise.all(Array.from({ length: 20 }, (_, i) =>
+      (i % 2 ? two : one).promoteAuthSessionSecret(id, { offeredSecretHash: offered, now, previousValidUntil: until })));
+    assert.equal(results.filter(Boolean).length, 1);
+    const after = await sessionRow(id);
+    assert.equal(after.secret_hash, offered);
+    assert.equal(after.previous_secret_hash, before.secret_hash, "the replaced secret is kept as the previous one");
+    assert.equal(after.previous_valid_until.getTime(), until.getTime());
+    assert.equal(after.offered_secret_hash, null);
+    assert.equal(after.offered_at, null);
+    assert.equal(after.rotated_at.getTime(), now.getTime());
+    assert.equal(await two.promoteAuthSessionSecret(id, { offeredSecretHash: secretHash(), now, previousValidUntil: until }),
+      false, "an offer that is no longer this one promotes nothing");
+  });
+  await check("a use is recorded only forward in time", async () => {
+    const at = new Date(Date.now() - 10 * 60_000);
+    const id = await startSessionRow(sessionLogin, at);
+    const later = new Date(at.getTime() + 5 * 60_000);
+    await two.touchAuthSession(id, later, new Date(later.getTime() + 24 * HOUR));
+    await one.touchAuthSession(id, new Date(at.getTime() + 60_000), new Date(at.getTime() + 25 * HOUR));
+    const row = await sessionRow(id);
+    assert.equal(row.last_used_at.getTime(), later.getTime());
+    assert.equal(row.idle_expires_at.getTime(), later.getTime() + 24 * HOUR);
+  });
+  await check("a session is ended once, and an ended one is never offered, promoted or touched", async () => {
+    const now = new Date();
+    const id = await startSessionRow(sessionLogin, new Date(now.getTime() - 25 * HOUR));
+    const offered = secretHash();
+    assert.ok(await one.offerAuthSessionSecret(id, { secretHash: offered, now,
+      rotateBefore: new Date(now.getTime() - 24 * HOUR), reofferBefore: new Date(now.getTime() - 60_000) }));
+    const ends = await Promise.all(Array.from({ length: 10 }, (_, i) => (i % 2 ? two : one).revokeAuthSession(id, "logout", now)));
+    assert.equal(ends.filter(Boolean).length, 1);
+    assert.equal(await one.promoteAuthSessionSecret(id, { offeredSecretHash: offered, now, previousValidUntil: now }), false);
+    assert.equal(await one.offerAuthSessionSecret(id, { secretHash: secretHash(), now: new Date(now.getTime() + HOUR),
+      rotateBefore: new Date(now.getTime()), reofferBefore: new Date(now.getTime() + HOUR) }), false);
+    await one.touchAuthSession(id, new Date(now.getTime() + HOUR), new Date(now.getTime() + 25 * HOUR));
+    const row = await sessionRow(id);
+    assert.equal(row.revoked_reason, "logout");
+    assert.equal(row.secret_hash === offered, false);
+    assert.ok(row.last_used_at.getTime() < now.getTime(), "an ended session records no use");
+  });
+  await check("ending a login's sessions ends its live ones but the kept one, never another login's; another instance sees it at once", async () => {
+    const now = new Date();
+    const [login, other] = [await addUser("sessions-end@r1-t4.test", "member"), await addUser("sessions-other@r1-t4.test", "member")];
+    const [a, b, kept] = [await startSessionRow(login, now), await startSessionRow(login, now), await startSessionRow(login, now)];
+    const expired = await startSessionRow(login, new Date(now.getTime() - 8 * 24 * HOUR));
+    const theirs = await startSessionRow(other, now);
+    assert.equal(await one.revokeAuthSessionsForLogin(login, "sign_out_everywhere", now, kept), 2);
+    for (const id of [a, b]) assert.equal((await two.getAuthSession(id))?.revokedReason, "sign_out_everywhere");
+    for (const id of [kept, expired, theirs]) assert.equal((await two.getAuthSession(id))?.revokedAt, null);
+    assert.equal(await two.revokeAuthSessionsForLogin(login, "password_change", now), 1, "then the kept one");
+  });
+  await check("a deleted login's sessions are deleted with it", async () => {
+    const leaving = await addUser("sessions-leaving@r1-t4.test", "member");
+    const id = await startSessionRow(leaving, new Date());
+    await pool.query("DELETE FROM users WHERE id=$1", [leaving]);
+    assert.equal(await one.getAuthSession(id), undefined);
+  });
+  await check("rows 30 days past their absolute expiry are reclaimed when the next session starts; newer ones stay", async () => {
+    const now = new Date();
+    const lastUseBefore = (ms: number) => new Date(now.getTime() - ms - 7 * 24 * HOUR);
+    const stale = await startSessionRow(sessionLogin, lastUseBefore(SESSION_RECLAIM_AFTER_MS + 60_000), {}, two);
+    const recent = await startSessionRow(sessionLogin, lastUseBefore(SESSION_RECLAIM_AFTER_MS - 60 * 60_000), {}, two);
+    assert.ok(await sessionRow(stale), "the stale session was stored");
+    await startSessionRow(sessionLogin, now);
+    assert.equal(await sessionRow(stale), undefined, "reclaimed");
+    assert.ok(await sessionRow(recent), "not yet 30 days past its expiry");
+  });
+  await check("an admin session has no login and carries the admin's credential tag", async () => {
+    const now = new Date();
+    const id = sessionId();
+    await two.createAuthSession({ id, principal: "admin", userId: null, sessionVersion: null, adminTag: "a".repeat(43),
+      secretHash: secretHash(), lastUsedAt: now, rotatedAt: now, idleExpiresAt: new Date(now.getTime() + 30 * 60_000),
+      absoluteExpiresAt: new Date(now.getTime() + 12 * HOUR) }, now);
+    assert.deepEqual(await one.getAuthSession(id).then((row) => row && [row.principal, row.userId, row.adminTag]),
+      ["admin", null, "a".repeat(43)]);
+  });
+
   assert.deepEqual(failures, [], "R1-T4 sign-in PostgreSQL verification failed");
   console.log("R1-T4 sign-in PostgreSQL verification passed");
 } finally {

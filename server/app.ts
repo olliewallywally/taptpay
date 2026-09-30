@@ -4,11 +4,12 @@ import compression from "compression";
 import { config } from "./config";
 import { createRequestLogger } from "./request-log";
 import { BOARD_PRINT_PATH } from "./board-print";
+import { crossSiteGuard } from "./cross-site";
 
 /**
  * The HTTP pipeline every request passes through before the routes: security
- * headers, compression, no-store for bearer-addressed pages, body parsing and
- * the request log.
+ * headers, compression, no-store for bearer-addressed pages, body parsing, the
+ * request log and the cross-site guard.
  *
  * server/index.ts serves this app; the server test harness
  * (server/__tests__/support/http-harness.ts) builds the very same one, so tests
@@ -100,6 +101,11 @@ export function createApp(options: { writeRequestLog: (line: string) => void }):
   app.use(express.urlencoded({ extended: false }));
 
   app.use(createRequestLogger(options.writeRequestLog));
+
+  // R1-T4 phase E: a change sent from another website is refused before any route runs, and only
+  // the site's own origin gets CORS headers (server/cross-site.ts). After the request log, so a
+  // refusal is logged like any other answer.
+  app.use(crossSiteGuard());
 
   return app;
 }

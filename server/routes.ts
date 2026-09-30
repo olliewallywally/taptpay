@@ -15,7 +15,7 @@ import {
 import { TUTORIAL_PAGE_KEYS, isTutorialPageKey } from "@shared/tutorial";
 import { inviteTeamMemberSchema, acceptInviteSchema, retailTransactionCreateRequestSchema, cashSaleRequestSchema, updateMerchantDetailsSchema, updateThemeSchema, updateDailyGoalSchema, forgotPasswordSchema, resetPasswordSchema, changePasswordSchema, newPasswordSchema, createRefundSchema, insertRefundSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, merchantOnboardingSchema, pushNotificationPreferencesSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createClientProfileSchema, updateClientProfileSchema, createQuoteSchema, acceptQuoteSchema, createJobInvoiceSchema, markJobPaidExternalSchema, sendJobBalanceSchema, createJobScheduleSchema, updateJobScheduleSchema, updateTradeReminderSettingsSchema, updateTradeGstSettingsSchema } from "@shared/schema";
 import { isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, getWindcaveEnv, submitGooglePayToken, createAttendedSession, submitTapToPayToken, createCardStorageSession, queryStoredCardSession, chargeStoredCard } from "./windcave";
-import { authenticateUser, checkPasswordEvenly, passwordCheckBudget, generateToken, authenticateToken, createUser, issueTokenForUserId, tokenForUserRow, isAccountOwner, requestPasswordReset, resetPassword, validateResetToken, type AuthenticatedRequest, logSecurityEvent, syncVerifiedMerchants } from "./auth";
+import { authenticateUser, checkPasswordEvenly, passwordCheckBudget, generateToken, authenticateToken, createUser, issueTokenForUserId, tokenForUserRow, isAccountOwner, requestPasswordReset, resetPassword, validateResetToken, type AuthenticatedRequest, logSecurityEvent, syncVerifiedMerchants, startBusinessSession, startAdminSession, endAuthSession, endLoginSessions, csrfTokenForRequest, clearSessionCookie, hasSessionCookie, readBusinessSession, respondAuthBackendUnavailable } from "./auth";
 import {
   HANDOFF_CODE_TTL_MS, clearSignInCookie, googleVerifiedEmail, handoffCodeHash, newHandoffCode, readCookie,
   signInCookies, startGoogleSignIn, verifyGoogleSignInState,
@@ -781,7 +781,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!issued) {
         return res.status(403).json({ code: 'ACCOUNT_UNAVAILABLE', message: 'This account cannot sign in right now.' });
       }
-      return res.json({ token: issued.token, merchantId: issued.merchantId, newUser: redeemed.newUser });
+      // R1-T4 phase E: the sign-in is a session cookie; the token stays in the body until the app stops
+      // reading it (phase E2), then goes (E3).
+      const session = await startBusinessSession(req, res, issued);
+      return res.json({ token: issued.token, merchantId: issued.merchantId, newUser: redeemed.newUser, csrfToken: session.csrfToken });
     } catch (err) {
       console.error('[GOOGLE_SESSION]', err);
       return res.status(500).json({ message: 'Google sign in failed. Please try again.' });
@@ -803,12 +806,36 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       sseBroker.disconnectUser(req.user!.merchantId, userId);
       // Every session has ended, this caller's included, so a fault from here on
       // must not answer "try again": the spent token could never retry it.
+      // R1-T4 phase E: the version already refuses every session; this records why on each.
+      await endLoginSessions(userId, 'sign_out_everywhere')
+        .catch((error) => console.error("[SIGN_OUT_EVERYWHERE_SESSIONS]", error));
+      if (req.authSession) clearSessionCookie(res, req.authSession.realm);
       await storage.deactivatePushSubscriptionsForLogin(req.user!.merchantId, userId)
         .catch((error) => console.error("[SIGN_OUT_EVERYWHERE_PUSH_STOP]", error));
       return res.status(204).end();
     } catch (err) {
       console.error('[SIGN_OUT_EVERYWHERE]', err);
       return res.status(500).json({ message: 'Could not sign out everywhere. Please try again.' });
+    }
+  });
+
+  // R1-T4 phase E: Log Out ends this session only, clears its cookie and closes its live streams.
+  // A token sign-in (until phase E3) has no session here: the app discards its token itself.
+  app.post("/api/auth/logout", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    res.set('Cache-Control', 'no-store');
+    // The admin area has its own Log Out (POST /api/admin/auth/logout), as sign out everywhere refuses it.
+    if (req.user?.role === 'admin') {
+      return res.status(403).json({ message: 'Only a TaptPay login can do this.' });
+    }
+    try {
+      if (req.authSession) {
+        await endAuthSession(res, req.authSession, 'logout');
+        sseBroker.disconnectSession(req.authSession.id);
+      }
+      return res.status(204).end();
+    } catch (err) {
+      console.error('[LOGOUT]', err);
+      return res.status(500).json({ message: 'Could not sign out. Please try again.' });
     }
   });
 
@@ -874,10 +901,18 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       markSignInDevice(res, merchantDeviceCookie, device, email);
       logSecurityEvent('LOGIN_SUCCESS', { email, ip: clientIp, userId: user.id });
 
+      // R1-T4 phase E: the sign-in is a session cookie; the token stays in the body until the app stops
+      // reading it (phase E2), then goes (E3).
+      const session = await startBusinessSession(req, res, {
+        userId: user.userId ?? user.id,
+        sessionVersion: user.sessionVersion ?? 0,
+      });
       const token = generateToken(user);
       
+      res.set("Cache-Control", "no-store");
       res.json({
         token,
+        csrfToken: session.csrfToken,
         user: {
           id: user.id,
           email: user.email,
@@ -951,6 +986,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // The reset ended every session of this login; close its live streams and
       // stop its devices' notifications too.
       sseBroker.disconnectUser(reset.merchantId, reset.userId);
+      await endLoginSessions(reset.userId, 'password_reset')
+        .catch((error) => console.error("[RESET_SESSIONS]", error));
       await storage.deactivatePushSubscriptionsForLogin(reset.merchantId, reset.userId)
         .catch((error) => console.error("[RESET_PUSH_STOP]", error));
       // R1-T4 phase C: the link proved the email is theirs. Forgive the login's
@@ -1075,10 +1112,15 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         createdAt: new Date(),
       };
 
+      // R1-T4 phase E: the admin's sign-in is a session cookie of its own; the token stays in the body
+      // until the admin area stops reading it (phase E2), then goes (E3).
+      const session = await startAdminSession(req, res);
       const token = generateToken(adminUser);
       
+      res.set("Cache-Control", "no-store");
       return res.json({
         token,
+        csrfToken: session.csrfToken,
         user: {
           id: adminUser.id,
           email: adminUser.email,
@@ -1099,38 +1141,59 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // request open forever and the whole app — mobile and desktop — spins on the
   // loader with nothing to show. Always answer, even on failure: a 500 lets the
   // client fall back to the login screen instead of hanging.
+  // The signed-in login as every client's start-up check reads it.
+  async function signedInUserDto(user: NonNullable<AuthenticatedRequest["user"]>) {
+    const merchantId = user.merchantId;
+    let onboardingCompleted = true; // default for non-merchant users
+    let merchantStatus: string | null = null;
+    let gstRegistered = false;
+    let tradeGstMode = "inclusive";
+    let billingCardReady = false;
+    if (merchantId) {
+      const merchant = await storage.getMerchant(merchantId);
+      onboardingCompleted = merchant?.onboardingCompleted ?? false;
+      merchantStatus = merchant?.status ?? null;
+      gstRegistered = merchant?.gstRegistered ?? false;
+      tradeGstMode = merchant?.tradeGstMode === "exclusive" ? "exclusive" : "inclusive";
+      billingCardReady = billingCardIsReady(await storage.getOrCreateSubscription(merchantId));
+    }
+    return {
+      id: user.id,
+      email: user.email,
+      merchantId: user.merchantId,
+      role: user.role,
+      onboardingCompleted,
+      merchantStatus,
+      gstRegistered,
+      tradeGstMode,
+      billingCardReady,
+    };
+  }
+
   app.get("/api/auth/me", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
-      const merchantId = req.user!.merchantId;
-      let onboardingCompleted = true; // default for non-merchant users
-      let merchantStatus: string | null = null;
-      let gstRegistered = false;
-      let tradeGstMode = "inclusive";
-      let billingCardReady = false;
-      if (merchantId) {
-        const merchant = await storage.getMerchant(merchantId);
-        onboardingCompleted = merchant?.onboardingCompleted ?? false;
-        merchantStatus = merchant?.status ?? null;
-        gstRegistered = merchant?.gstRegistered ?? false;
-        tradeGstMode = merchant?.tradeGstMode === "exclusive" ? "exclusive" : "inclusive";
-        billingCardReady = billingCardIsReady(await storage.getOrCreateSubscription(merchantId));
-      }
-      res.json({
-        user: {
-          id: req.user!.id,
-          email: req.user!.email,
-          merchantId: req.user!.merchantId,
-          role: req.user!.role,
-          onboardingCompleted,
-          merchantStatus,
-          gstRegistered,
-          tradeGstMode,
-          billingCardReady,
-        },
-      });
+      res.set("Cache-Control", "no-store");
+      res.json({ user: await signedInUserDto(req.user!) });
     } catch (error) {
       console.error("Auth me error:", error);
       res.status(500).json({ message: "Failed to load the signed-in user" });
+    }
+  });
+
+  // R1-T4 phase E: the app's start-up check on a session cookie. Unlike /api/auth/me it answers a visitor
+  // who is not signed in with an ordinary 200 (no refusal, so nothing is logged as an error in the
+  // browser), and hands a signed-in page its CSRF token, which the page keeps in memory only. An invalid
+  // cookie is cleared; a database that cannot be read is 503, as for any sign-in check.
+  app.get("/api/auth/session", async (req: AuthenticatedRequest, res) => {
+    res.set("Cache-Control", "no-store");
+    try {
+      const signedIn = await readBusinessSession(req, res);
+      if (signedIn === "unavailable") return respondAuthBackendUnavailable(res);
+      if (!signedIn) return res.json({ signedIn: false });
+      return res.json({ signedIn: true, user: await signedInUserDto(signedIn.user), csrfToken: signedIn.csrfToken });
+    } catch (error) {
+      console.error("[AUTH_SESSION]", error);
+      return res.status(500).json({ message: "Failed to load the signed-in user" });
     }
   });
 
@@ -1321,6 +1384,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   });
 
   app.get("/api/admin/auth/me", authenticateAdmin, (req: AuthenticatedRequest, res) => {
+    // R1-T4 phase E: the admin session's page gets its CSRF token here, as the business's does.
+    res.set("Cache-Control", "no-store");
     res.json({
       user: {
         id: req.user!.id,
@@ -1328,7 +1393,23 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         merchantId: 0,
         role: "admin",
       },
+      csrfToken: csrfTokenForRequest(req),
     });
+  });
+
+  // R1-T4 phase E: the admin area's Log Out ends this admin session and closes its live streams.
+  app.post("/api/admin/auth/logout", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    res.set("Cache-Control", "no-store");
+    try {
+      if (req.authSession) {
+        await endAuthSession(res, req.authSession, "logout");
+        sseBroker.disconnectSession(req.authSession.id);
+      }
+      return res.status(204).end();
+    } catch (error) {
+      console.error("[ADMIN_LOGOUT]", error);
+      return res.status(500).json({ message: "Could not sign out. Please try again." });
+    }
   });
 
   // The business-wide no-board QR image, retired on 2026-09-25 (server/no-board-address.ts):
@@ -3613,9 +3694,14 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!token) {
         return res.status(500).json({ message: "Password changed. Please sign in again." });
       }
+      // R1-T4 phase E: the change advanced the version, which ends every session of this login,
+      // this one included (recorded on each); this device carries on under a new session.
+      await endLoginSessions(userId, "password_change")
+        .catch((error) => console.error("[PASSWORD_CHANGE_SESSIONS]", error));
+      const session = await startBusinessSession(req, res, { userId, sessionVersion: updated.sessionVersion ?? 0 });
 
       res.set("Cache-Control", "no-store");
-      res.json({ message: "Password updated successfully", token });
+      res.json({ message: "Password updated successfully", token, csrfToken: session.csrfToken });
 
     } catch (error) {
       console.error("Change password error:", error);
@@ -5107,7 +5193,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       let audience: SseAudience;
       const authorization = req.headers.authorization;
-      if (authorization !== undefined) {
+      // R1-T4 phase E: a browser's EventSource sends the session cookie, never a header. A board's
+      // page names its board, and keeps its board stream even in a browser signed in to the business.
+      const signedIn = authorization !== undefined ||
+        (req.query.stoneId === undefined && hasSessionCookie(req));
+      if (signedIn) {
         let authenticated = false;
         await authenticateToken(req as AuthenticatedRequest, res, () => {
           authenticated = true;
@@ -5127,6 +5217,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           kind: "merchant",
           userId,
           principal: authenticatedRequest.user?.role === "admin" ? "admin" : "user",
+          sessionId: authenticatedRequest.authSession?.id,
         };
       } else if (req.query.stoneId !== undefined) {
         const stoneId = strictPositiveIntegerQueryParam(req.query.stoneId);
@@ -6347,6 +6438,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       if (status === "disabled") {
         sseBroker.disconnectUser(merchantId, userId);
+        // R1-T4 phase E: the status check already refuses every session of this login; this records why.
+        await endLoginSessions(userId, "login_disabled")
+          .catch((error) => console.error("[TEAM_DISABLE_SESSIONS]", error));
         // Owner decision 2026-09-22: a disabled login's devices stop getting
         // notifications too. The login is already disabled, so a fault here is
         // logged, never returned.
@@ -6379,6 +6473,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(409).json({ message: "Use revoke invite for a pending invitation." });
       }
 
+      // R1-T4 phase E: record why this login's sessions end; removing the login removes them.
+      await endLoginSessions(userId, "login_removed")
+        .catch((error) => console.error("[TEAM_REMOVE_SESSIONS]", error));
       const removed = await storage.removeTeamMember(merchantId, userId);
       if (!removed) {
         return res.status(404).json({ message: "Login not found, or it is the account owner" });

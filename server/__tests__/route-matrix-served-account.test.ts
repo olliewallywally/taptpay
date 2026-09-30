@@ -91,6 +91,15 @@ const RECIPES: Record<string, Recipe> = {
       }
     },
   }),
+  // R1-T4 phase E: Log Out ends the session that signed the request in. The served callers sign in with
+  // their token (until phase E3), which has no session here: served, and nothing is ended.
+  "POST /api/auth/logout": (ctx, who) => ({
+    req: { method: "post", path: "/api/auth/logout" }, status: 204,
+    check: async (res) => {
+      expect(res.headers["cache-control"]).toBe("no-store");
+      expect(await signedIn(ctx, who)).toBe(200);
+    },
+  }),
   "POST /api/auth/sign-out-everywhere": (ctx, who) => ({
     req: { method: "post", path: "/api/auth/sign-out-everywhere" }, status: 204,
     check: async () => {
@@ -369,7 +378,7 @@ const SERVED = servedPairs(ROWS);
  * quietly drop or add a case here.
  */
 const TEAMMATE_SERVED = [
-  "GET /api/auth/me", "POST /api/auth/sign-out-everywhere",
+  "GET /api/auth/me", "POST /api/auth/logout", "POST /api/auth/sign-out-everywhere",
   "GET /api/tutorial/state", "PATCH /api/tutorial/pages/:pageKey", "POST /api/tutorial/restart",
   "POST /api/push/subscribe", "POST /api/push/unsubscribe", "POST /api/push/native-subscribe",
   "POST /api/push/native-unsubscribe", "GET /api/push/status", "GET /api/push/preferences", "PUT /api/push/preferences",

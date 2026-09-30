@@ -27,9 +27,11 @@ The other options were "Walk me through it first" and "Do upload scanning first"
    use after that ends the session (`SESSION_REUSE_DETECTED`), as designed. A copied secret used alongside
    the real one is still caught.
 2. **The cross-site refusal carries an explicit exception list** for callbacks that legitimately arrive from
-   another site. None exists today (Windcave returns the browser with a GET; its notifications and the other
-   provider calls come from servers, with no `Origin`); Sign in with Apple (R1-T5) will need one for Apple's
-   form post.
+   another site. Sign in with Apple (R1-T5) will need one for Apple's form post. *Corrected the same day,
+   on reading the routes:* one is needed already. The billing card return (`POST /api/billing/card/callback`)
+   accepts a form post, as Windcave's card capture may send the browser back that way; it changes nothing
+   (it only sends the browser to billing settings with one of four fixed words), so it is listed for any
+   origin. The provider notifications come from servers, with no `Origin`, and are unaffected.
 
 ## What this authorizes
 

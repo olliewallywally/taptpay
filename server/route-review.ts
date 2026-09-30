@@ -1206,7 +1206,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     idempotency: "one-time: the first redemption spends the code (of two at once, exactly one succeeds); the cookie is cleared on every call",
     sideEffects: null,
     successDto:
-      "{ token, merchantId, newUser }: the account token in the body only, Cache-Control no-store. 403 ACCOUNT_UNAVAILABLE when the login is no longer active, its merchant neither verified nor active, or a member over the seat limit (issueTokenForUserId, server/auth.ts)",
+      "{ token, merchantId, newUser, csrfToken }: the account token in the body only (until phase E3), Cache-Control no-store; starts a session and sets its cookie (R1-T4 phase E). 403 ACCOUNT_UNAVAILABLE when the login is no longer active, its merchant neither verified nor active, or a member over the seat limit (issueTokenForUserId, server/auth.ts)",
     errorDisclosure: ["fixed"],
     controls: {
       authenticity:
@@ -1229,9 +1229,10 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     capability: null,
     entitlement: null,
     idempotency:
-      "each success issues another one-hour token and records the login time; each failure counts against the email (or this device) and, once addresses are told apart, the visitor's address",
+      "each success starts another session (R1-T4 phase E: a row in auth_sessions keeping only its secret's digest), issues another one-hour token (until phase E3) and records the login time; each failure counts against the email (or this device) and, once addresses are told apart, the visitor's address",
     sideEffects: "security audit log entries (logSecurityEvent: LOGIN_SUCCESS, FAILED_LOGIN, LOGIN_SLOWED, LOGIN_ERROR), with the email and address",
-    successDto: "{ token, user: { id, email, merchantId, role } }; sets the known-device cookie",
+    successDto:
+      "{ token, csrfToken, user: { id, email, merchantId, role } }, not cached; sets the session cookie (HttpOnly, Secure, SameSite=Lax, __Host-, 7 days) and the known-device cookie",
     errorDisclosure: ["input-issues"],
     controls: {
       authenticity: "the email and its password",
@@ -1252,10 +1253,11 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     input: "body: loginSchema (400 with its issues)",
     capability: null,
     entitlement: null,
-    idempotency: "each success issues another one-hour admin token; each failure counts against the email (or this device) and the visitor's address",
+    idempotency:
+      "each success starts another admin session (R1-T4 phase E) and issues another one-hour admin token (until phase E3); each failure counts against the email (or this device) and the visitor's address",
     sideEffects: "security audit log entries (logSecurityEvent: ADMIN_LOGIN_SUCCESS, ADMIN_FAILED_LOGIN, ADMIN_LOGIN_SLOWED, ADMIN_LOGIN_ERROR)",
     successDto:
-      "{ token, user: { id: 1, email, merchantId: 0, role: 'admin' } }: a one-hour token under the dedicated admin principal; sets the admin known-device cookie",
+      "{ token, csrfToken, user: { id: 1, email, merchantId: 0, role: 'admin' } }, not cached: a one-hour token under the dedicated admin principal; sets the admin session cookie (its own name, 12 hours) and the admin known-device cookie",
     errorDisclosure: ["input-issues"],
     controls: {
       authenticity: "the admin email and its password",
@@ -1311,7 +1313,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     idempotency:
       "one-time: the token is spent with the new password in one statement, and a second use is 400. A storage fault is 500 and changes nothing, so the same link can be tried again (until 2026-09-26 a fault was answered 400 'Invalid or expired reset token')",
     sideEffects:
-      "ends every session of the login (its session version, advanced in the same statement), closes its live streams (sseBroker.disconnectUser) and stops its devices' notifications; forgives its sign-in slow-downs",
+      "ends every session of the login (its session version, advanced in the same statement; each session also recorded as ended, password_reset, SESSION_REVOKED), closes its live streams (sseBroker.disconnectUser) and stops its devices' notifications; forgives its sign-in slow-downs",
     successDto: "{ message }; marks this browser as a known device for the login",
     errorDisclosure: ["input-issues"],
     controls: {
@@ -1824,7 +1826,27 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     entitlement: null,
     idempotency: "read-only",
     sideEffects: ADMIN_AUDIT,
-    successDto: "{ user: { id, email, merchantId: 0, role: 'admin' } }: the admin app's session check",
+    successDto:
+      "{ user: { id, email, merchantId: 0, role: 'admin' }, csrfToken }, not cached: the admin app's session check; with an admin session cookie, the page's CSRF token (R1-T4 phase E)",
+    errorDisclosure: ["fixed"],
+  },
+
+  "POST /api/admin/auth/logout": {
+    branches: [
+      {
+        principal: "platform-admin",
+        tenant: "none",
+        tenantRule:
+          "the admin session that signed the request in, and no other: it is ended; a token sign-in (until phase E3) has no session here and nothing changes",
+      },
+    ],
+    input: "nothing",
+    capability: null,
+    entitlement: null,
+    idempotency:
+      "ends this admin session (revokeAuthSession, recorded as logout); the same cookie again is refused 401 by the sign-in gate",
+    sideEffects: `closes this session's live streams (sseBroker.disconnectSession); SESSION_REVOKED in the security log; ${ADMIN_AUDIT}`,
+    successDto: "204, no body, not cached; the admin session cookie cleared",
     errorDisclosure: ["fixed"],
   },
 
@@ -2031,8 +2053,28 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     idempotency:
       "advances the login's session version (advanceUserSessionVersion), spending every token issued before it, this one included: the same token again is 401 SESSION_ENDED",
     sideEffects:
-      "ends the login's live streams (sseBroker.disconnectUser) and stops its devices' notifications and the business's unattributed ones (deactivatePushSubscriptionsForLogin; a fault there is logged, never returned, as the sessions have already ended)",
-    successDto: "204, no body, not cached",
+      "ends the login's live streams (sseBroker.disconnectUser) and stops its devices' notifications and the business's unattributed ones (deactivatePushSubscriptionsForLogin; a fault there is logged, never returned, as the sessions have already ended); records each session as ended (sign_out_everywhere; SESSION_REVOKED in the security log)",
+    successDto: "204, no body, not cached; this device's session cookie cleared",
+    errorDisclosure: ["fixed"],
+  },
+
+  "POST /api/auth/logout": {
+    branches: [
+      {
+        principal: "merchant",
+        roles: ["owner", "member"],
+        tenant: "session",
+        tenantRule:
+          "the session that signed the request in, and no other: a session cookie's session is ended; a token sign-in (until phase E3) has no session here and nothing changes. The platform admin is refused (403 'Only a TaptPay login can do this.'): the admin area has its own Log Out",
+      },
+    ],
+    input: "nothing",
+    capability: null,
+    entitlement: null,
+    idempotency:
+      "ends this session (revokeAuthSession, recorded as logout); the same cookie again is refused 401 by the sign-in gate, so the Log Out cannot repeat",
+    sideEffects: "closes this session's live streams only (sseBroker.disconnectSession); SESSION_REVOKED in the security log",
+    successDto: "204, no body, not cached; the session cookie cleared",
     errorDisclosure: ["fixed"],
   },
 
@@ -2052,8 +2094,33 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     idempotency: `read-only, ${CREATES_SUBSCRIPTION}`,
     sideEffects: null,
     successDto:
-      "{ user: { id, email, merchantId, role, onboardingCompleted, merchantStatus, gstRegistered, tradeGstMode, billingCardReady } }: every client's start-up check",
+      "{ user: signedInUserDto: { id, email, merchantId, role, onboardingCompleted, merchantStatus, gstRegistered, tradeGstMode, billingCardReady } }, not cached: the start-up check of a token sign-in (a session cookie's is GET /api/auth/session)",
     errorDisclosure: ["fixed"],
+  },
+
+  "GET /api/auth/session": {
+    branches: [
+      {
+        principal: "public",
+        tenant: "session",
+        tenantRule:
+          "the caller's own business session cookie, and nothing else: readBusinessSession finds its session by the cookie's id, checks its secret, that it has not ended, that its login is active with the session's version and that its business is verified or active; the admin's cookie and any Authorization header are not read. Anyone without such a session gets { signedIn: false }",
+      },
+    ],
+    input: "only the session cookie, refused unless it is `<22 base64url>.<43 base64url>` (parseSessionCookie); nothing else is read",
+    capability: null,
+    entitlement: "none enforced: whether the business has paid access (billingCardIsReady) is only reported, for the app's own gate",
+    idempotency: `read-only for the signed-out; for a session, recorded as a use (at most once a minute), and the daily swap offered or taken up, as on any signed-in request; ${CREATES_SUBSCRIPTION}`,
+    sideEffects: null,
+    successDto:
+      "{ signedIn: false }, or { signedIn: true, user: signedInUserDto, csrfToken }, never cached: the app's start-up check on a session cookie (R1-T4 phase E). A cookie that is not a live session is cleared",
+    errorDisclosure: ["fixed"],
+    controls: {
+      authenticity:
+        "none needed: it answers only about the caller's own cookie, which is HttpOnly, so no script can present another's; without a valid one it says only { signedIn: false }",
+      replay: "harmless: the cookie's holder reads their own session again",
+      rate: "none — it reveals nothing about anyone but the caller, and each read of a session is one indexed row",
+    },
   },
 
   "GET /api/team": {
@@ -2136,7 +2203,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     idempotency:
       "sets the login active or disabled; the same state again is 409; turning one back on counts the plan's seats under a lock (409 when all are in use). A disabled login's tokens are refused from its next request (authenticateToken reads the login)",
     sideEffects:
-      "on disabling: ends the login's live streams (sseBroker.disconnectUser) and stops its devices' notifications and the business's unattributed ones (deactivatePushSubscriptionsForLogin, owner decision 2026-09-22; a fault is logged, never returned)",
+      "on disabling: records each of the login's sessions as ended (login_disabled, SESSION_REVOKED; the status check already refuses them), ends its live streams (sseBroker.disconnectUser) and stops its devices' notifications and the business's unattributed ones (deactivatePushSubscriptionsForLogin, owner decision 2026-09-22; a fault is logged, never returned)",
     successDto: "{ member: teamMemberDto }",
     errorDisclosure: ["fixed"],
   },
@@ -2155,7 +2222,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     entitlement: null,
     idempotency: "deletes the login (removeTeamMember); again is 404",
     sideEffects:
-      "ends the login's live streams (sseBroker.disconnectUser) and, since 2026-09-26, stops the business's unattributed device subscriptions as disabling does (deactivatePushSubscriptionsForLogin; the ones recorded against the login go with it by 0029's cascade; a fault is logged, never returned)",
+      "records each of the login's sessions as ended (login_removed, SESSION_REVOKED) before the login goes, taking its sessions with it (0031's cascade); ends its live streams (sseBroker.disconnectUser) and, since 2026-09-26, stops the business's unattributed device subscriptions as disabling does (deactivatePushSubscriptionsForLogin; the ones recorded against the login go with it by 0029's cascade; a fault is logged, never returned)",
     successDto: "{ message: 'Login removed' }",
     errorDisclosure: ["fixed"],
   },
@@ -2535,10 +2602,10 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     capability: null,
     entitlement: null,
     idempotency:
-      "checks the current password, counted per login and slowed down like sign-in (429), then sets the new one and ends every session of the login (updateUserPassword); again with the old password is 400",
+      "checks the current password, counted per login and slowed down like sign-in (429), then sets the new one and ends every session of the login (updateUserPassword; each session recorded as ended, password_change) and starts a new one for this device; again with the old password is 400",
     sideEffects:
-      "ends the login's live streams (sseBroker.disconnectUser) and stops its devices' notifications and the business's unattributed ones (deactivatePushSubscriptionsForLogin; a fault is logged, never returned); logs a slowed attempt (logSecurityEvent: PASSWORD_CHANGE_SLOWED)",
-    successDto: "{ message, token }: a fresh token for this device, not cached",
+      "ends the login's live streams (sseBroker.disconnectUser) and stops its devices' notifications and the business's unattributed ones (deactivatePushSubscriptionsForLogin; a fault is logged, never returned); logs a slowed attempt (logSecurityEvent: PASSWORD_CHANGE_SLOWED) and the ended sessions (SESSION_REVOKED)",
+    successDto: "{ message, token, csrfToken }: a fresh token (until phase E3) and a new session cookie for this device, not cached",
     errorDisclosure: ["input-issues"],
   },
 

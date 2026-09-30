@@ -94,6 +94,21 @@ export const MIDDLEWARE_POLICY: Record<RegistrationFile, readonly MiddlewarePoli
         "Logs the route template (e.g. /api/pay/t/:token), never the path's values, the query or the body; " +
         "server/request-log.ts redacts tokens, return states and session ids from any path it must print.",
     },
+    {
+      path: null,
+      mounts: "crossSiteGuard(…)",
+      when: "always",
+      runtimeName: "<anonymous>",
+      purpose:
+        "R1-T4 phase E: refuses a change sent from another website before any route runs, and answers CORS " +
+        "for the site's own origin only (server/cross-site.ts).",
+      security:
+        "A POST, PUT, PATCH or DELETE whose Origin is not the site's own (null included), or with no Origin " +
+        "whose Sec-Fetch-Site is cross-site or same-site, is 403 CROSS_SITE_REJECTED, unless it is on the " +
+        "named list of callbacks (today only the billing card return, which changes nothing). Only the exact " +
+        "site origin gets Access-Control-Allow-Origin, with credentials; other preflights are 403 with no " +
+        "CORS headers; nothing answers *. Requests with neither header (servers) pass as before.",
+    },
   ],
   "server/routes.ts": [],
   "server/index.ts": [

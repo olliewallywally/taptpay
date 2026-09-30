@@ -1584,6 +1584,38 @@ export const authThrottle = pgTable("auth_throttle", {
   updatedAtIdx: index("auth_throttle_updated_at_idx").on(t.updatedAt),
 }));
 
+// R1-T4 phase E (0031): one row per signed-in device. The browser holds `<id>.<secret>` in an
+// HttpOnly cookie; only SHA-256 digests of secrets are stored: the current one, one offered by the
+// daily swap and not yet used, and the one it replaced (for 60 seconds). A business session records
+// its login's session_version (advancing it ends the session); an admin session, which has no login
+// row, records an HMAC tag of the admin's credentials. No address is kept.
+export const authSessions = pgTable("auth_sessions", {
+  id: text("id").primaryKey(),
+  principal: text("principal").notNull(),
+  userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }),
+  sessionVersion: integer("session_version"),
+  adminTag: text("admin_tag"),
+  secretHash: text("secret_hash").notNull(),
+  offeredSecretHash: text("offered_secret_hash"),
+  offeredAt: timestamp("offered_at", { withTimezone: true }),
+  previousSecretHash: text("previous_secret_hash"),
+  previousValidUntil: timestamp("previous_valid_until", { withTimezone: true }),
+  deviceLabel: text("device_label"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }).notNull(),
+  idleExpiresAt: timestamp("idle_expires_at", { withTimezone: true }).notNull(),
+  absoluteExpiresAt: timestamp("absolute_expires_at", { withTimezone: true }).notNull(),
+  rotatedAt: timestamp("rotated_at", { withTimezone: true }).notNull(),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  revokedReason: text("revoked_reason"),
+}, (t) => ({
+  userIdIdx: index("auth_sessions_user_id_idx").on(t.userId),
+  absoluteExpiresAtIdx: index("auth_sessions_absolute_expires_at_idx").on(t.absoluteExpiresAt),
+}));
+
+export type AuthSession = typeof authSessions.$inferSelect;
+export type NewAuthSession = typeof authSessions.$inferInsert;
+
 // Each provider session opened for a split rent or trades invoice (0030; owner decision
 // 2026-09-26): the amount it was opened for and the email its payer gave. A split share is
 // paid only by a session recorded here for its invoice; paid_at marks the share it paid.

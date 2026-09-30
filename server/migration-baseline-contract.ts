@@ -186,6 +186,11 @@ export const BASELINE_EFFECT_REQUIREMENTS: readonly Requirement[] = [
   r("0030_invoice_split_sessions.sql", "constraint", "invoice_split_sessions", "invoice_split_sessions_one_invoice_chk"),
   r("0030_invoice_split_sessions.sql", "index", "invoice_split_sessions", "invoice_split_sessions_rent_invoice_idx"),
   r("0030_invoice_split_sessions.sql", "index", "invoice_split_sessions", "invoice_split_sessions_job_invoice_idx"),
+  r("0031_auth_sessions.sql", "table", "auth_sessions"),
+  r("0031_auth_sessions.sql", "constraint", "auth_sessions", "auth_sessions_principal_chk"),
+  r("0031_auth_sessions.sql", "constraint", "auth_sessions", "auth_sessions_user_id_fkey"),
+  r("0031_auth_sessions.sql", "index", "auth_sessions", "auth_sessions_user_id_idx"),
+  r("0031_auth_sessions.sql", "index", "auth_sessions", "auth_sessions_absolute_expires_at_idx"),
 ];
 
 export const FIND_MISSING_BASELINE_EFFECTS_SQL = `

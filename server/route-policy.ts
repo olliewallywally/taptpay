@@ -1,8 +1,8 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 6a7db2132e35eece88ada9fbdae44dfd5bd3fcfc on 2026-09-29.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 4a6ea4502974c8edb894451ee081e23d8e80c65e on 2026-09-30.
  *
- * 184 registrations (77 GET, 75 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
+ * 187 registrations (78 GET, 77 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
  * live count on every run rather than trusting this comment.
  *
@@ -178,6 +178,18 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       statuses: [204,401,403,404,500,503],
     },
   },
+  "POST /api/auth/logout": {
+    method: "POST",
+    path: "/api/auth/logout",
+    principal: "merchant-user",
+    markers: ["authenticateToken"],
+    facts: {
+      middleware: ["authenticateToken"],
+      authChecks: ["compares req.user?.role === 'admin'"],
+      sideEffects: ["live update: sseBroker.disconnectSession"],
+      statuses: [204,401,403,500,503],
+    },
+  },
   "POST /api/auth/login": {
     method: "POST",
     path: "/api/auth/login",
@@ -271,8 +283,23 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       middleware: ["authenticateToken"],
       storageMethods: ["getMerchant","getOrCreateSubscription"],
-      statuses: [200,401,500,503],
+      statuses: [200,401,403,500,503],
+      dtos: ["signedInUserDto"],
       entitlementGates: ["billingCardIsReady"],
+      helpers: ["signedInUserDto"],
+    },
+  },
+  "GET /api/auth/session": {
+    method: "GET",
+    path: "/api/auth/session",
+    principal: "public",
+    markers: [],
+    facts: {
+      storageMethods: ["getMerchant","getOrCreateSubscription"],
+      statuses: [200,500],
+      dtos: ["signedInUserDto"],
+      entitlementGates: ["billingCardIsReady"],
+      helpers: ["signedInUserDto"],
     },
   },
   "GET /api/tutorial/state": {
@@ -341,6 +368,19 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       authChecks: ["authenticateToken","compares req.user?.role !== \"admin\""],
       sideEffects: ["audit log: logSecurityEvent"],
       statuses: [200,401,403,503],
+      helpers: ["authenticateAdmin"],
+    },
+  },
+  "POST /api/admin/auth/logout": {
+    method: "POST",
+    path: "/api/admin/auth/logout",
+    principal: "admin",
+    markers: ["authenticateAdmin"],
+    facts: {
+      middleware: ["authenticateAdmin"],
+      authChecks: ["authenticateToken","compares req.user?.role !== \"admin\""],
+      sideEffects: ["audit log: logSecurityEvent","live update: sseBroker.disconnectSession"],
+      statuses: [204,401,403,500,503],
       helpers: ["authenticateAdmin"],
     },
   },
@@ -686,7 +726,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       authChecks: ["checkMerchantOwnership"],
       storageMethods: ["getTransaction","updateTransactionStatus"],
       sideEffects: ["live update: sseBroker.broadcast"],
-      statuses: [200,400,401,404,500,503],
+      statuses: [200,400,401,403,404,500,503],
       dtos: ["ownerTransactionDto"],
       helpers: ["broadcastToStone"],
     },
@@ -2016,7 +2056,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       authChecks: ["isValidatedPlatformAdmin"],
       storageMethods: ["getUploadedFile","getUploadedFileForMerchant","recordInvoiceDocumentAdminRead"],
       sideEffects: ["audit log: logSecurityEvent"],
-      statuses: [200,401,404,500,503],
+      statuses: [200,401,403,404,500,503],
       helpers: ["sendPrivateDocument"],
     },
   },

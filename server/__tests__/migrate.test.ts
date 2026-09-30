@@ -70,6 +70,7 @@ const REAL_MIGRATIONS = [
   "0028_auth_throttle.sql",
   "0029_push_subscriptions_user.sql",
   "0030_invoice_split_sessions.sql",
+  "0031_auth_sessions.sql",
 ];
 
 /** Migrations that own a `BEGIN;` / `COMMIT;` pair. */

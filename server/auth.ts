@@ -7,6 +7,25 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { sendPasswordResetEmail } from './email-service';
+import {
+  CSRF_HEADER,
+  adminTagMatches,
+  clearSessionCookie,
+  csrfTokenFor,
+  csrfTokenMatches,
+  parseSessionCookie,
+  presentedSecret,
+  readSessionCookie,
+  sessionEnded,
+  settleSession,
+  startSession,
+  type PresentedSecret,
+  type SessionEndReason,
+  type SessionRealm,
+  type StartedSession,
+} from './auth-sessions';
+import { getBaseUrl } from './url-utils';
+import type { AuthSession } from '@shared/schema';
 
 // Security Audit Log File
 const SECURITY_LOG_DIR = path.join(process.cwd(), 'logs');
@@ -104,6 +123,8 @@ export function logSecurityEvent(event: string, details: Record<string, any>) {
 
 export interface AuthenticatedRequest extends Request {
   user?: User;
+  /** R1-T4 phase E: the session the request was signed in by, when it was a session cookie. */
+  authSession?: { id: string; realm: SessionRealm };
 }
 
 // Retained for backwards compatibility with startup and verification call sites.
@@ -252,7 +273,9 @@ async function memberWithinSeatLimit(user: User): Promise<boolean> {
  * password login applies: the row is active, the merchant verified or active, a
  * member within the seat limit.
  */
-export async function issueTokenForUserId(userId: number): Promise<{ token: string; merchantId: number } | null> {
+export async function issueTokenForUserId(
+  userId: number,
+): Promise<{ token: string; merchantId: number; userId: number; sessionVersion: number } | null> {
   if (!isPositiveInteger(userId)) return null;
   const { storage } = await import('./storage');
   const userRow = await storage.getUserById(userId);
@@ -263,7 +286,7 @@ export async function issueTokenForUserId(userId: number): Promise<{ token: stri
   if (!merchant || (merchant.status !== 'verified' && merchant.status !== 'active')) return null;
   if (!(await memberWithinSeatLimit(user))) return null;
   await storage.recordUserLogin(userRow.id, new Date()).catch(() => {});
-  return { token: generateToken(user), merchantId: user.merchantId };
+  return { token: generateToken(user), merchantId: user.merchantId, userId: userRow.id, sessionVersion: user.sessionVersion ?? 0 };
 }
 
 /** A token for a users row just read or updated, under its current session version; null if it is not a merchant login. */
@@ -356,6 +379,17 @@ function respondAuthBackendUnavailable(res: Response) {
 }
 
 export async function authenticateToken(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  // R1-T4 phase E: a Bearer header, while it is still accepted, is the sign-in; without one, the
+  // session cookie is. The admin area reads only the admin's cookie; every other route the business's,
+  // then the admin's, so the platform admin gets the answers its token got.
+  if (req.headers['authorization'] === undefined) {
+    const realms: SessionRealm[] = req.path.startsWith('/api/admin') ? ['admin'] : ['business', 'admin'];
+    for (const realm of realms) {
+      const value = readSessionCookie(req, realm);
+      if (value !== undefined) return authenticateSession(req, res, next, realm, value);
+    }
+  }
+
   const authHeader = req.headers['authorization'];
   const match = typeof authHeader === 'string' ? authHeader.match(/^Bearer ([^\s]+)$/i) : null;
 
@@ -451,6 +485,182 @@ export async function authenticateToken(req: AuthenticatedRequest, res: Response
   req.user = user;
   return next();
 }
+
+// ============================================
+// SESSION COOKIES (R1-T4 phase E)
+// ============================================
+
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
+type SessionRefusal = { status: 401; body: Record<string, string> };
+type SessionResolution =
+  | { kind: 'ok'; user: User; session: AuthSession; presented: Exclude<PresentedSecret, 'late'> }
+  | { kind: 'refused'; refusal: SessionRefusal }
+  | { kind: 'unavailable' };
+
+const SESSION_REFUSALS = {
+  INVALID_SESSION: { status: 401, body: { code: 'INVALID_SESSION', message: 'Please sign in again.' } },
+  SESSION_ENDED: { status: 401, body: { code: 'SESSION_ENDED', message: 'You were signed out. Please sign in again.' } },
+  ACCESS_REVOKED_LOGIN: { status: 401, body: { message: 'Access revoked' } },
+  ACCESS_REVOKED: { status: 401, body: { code: 'ACCESS_REVOKED', message: 'Access revoked' } },
+} as const satisfies Record<string, SessionRefusal>;
+
+/**
+ * Resolves a session cookie's value to its signed-in principal, or why not. The row is found by the
+ * cookie's id and its secret checked in constant time; a replaced secret presented after its 60 seconds
+ * ends the whole session (someone else holds a copy). The login and business are re-read as for a
+ * token, and the login's session version must still be the session's. Writes nothing else: only a
+ * request let through settles the session (settleSession).
+ */
+async function resolveSessionCookie(realm: SessionRealm, value: string): Promise<SessionResolution> {
+  const refused = (refusal: SessionRefusal): SessionResolution => ({ kind: 'refused', refusal });
+  const parsed = parseSessionCookie(value);
+  if (!parsed) return refused(SESSION_REFUSALS.INVALID_SESSION);
+
+  const storageModule = await readForAuth('load the storage module', () => import('./storage'));
+  if (storageModule === STORAGE_UNAVAILABLE) return { kind: 'unavailable' };
+  const { storage } = storageModule;
+
+  const session = await readForAuth('read the session', () => storage.getAuthSession(parsed.id));
+  if (session === STORAGE_UNAVAILABLE) return { kind: 'unavailable' };
+  if (!session || session.principal !== realm) return refused(SESSION_REFUSALS.INVALID_SESSION);
+
+  const now = new Date();
+  const presented = presentedSecret(session, parsed.secret, now);
+  if (!presented) return refused(SESSION_REFUSALS.INVALID_SESSION);
+  if (sessionEnded(session, now)) return refused(SESSION_REFUSALS.SESSION_ENDED);
+  if (presented === 'late') {
+    // Someone else holds a copy of a replaced secret: end the session for both of them.
+    const ended = await readForAuth('end a reused session', () => storage.revokeAuthSession(session.id, 'reuse_detected', now));
+    logSecurityEvent('SESSION_REUSE_DETECTED', { sessionId: session.id, realm, userId: session.userId, ended: ended === true });
+    return refused(SESSION_REFUSALS.SESSION_ENDED);
+  }
+
+  if (realm === 'admin') {
+    const adminEmail = config.admin.email;
+    // The admin's email or password changed since this session began.
+    if (!adminEmail || !adminTagMatches(session.adminTag)) return refused(SESSION_REFUSALS.SESSION_ENDED);
+    const admin: User = { id: 1, email: adminEmail, password: '', merchantId: 0, role: 'admin', createdAt: new Date() };
+    return { kind: 'ok', user: admin, session, presented };
+  }
+
+  const userId = session.userId;
+  if (!isPositiveInteger(userId)) return refused(SESSION_REFUSALS.INVALID_SESSION);
+  const userRow = await readForAuth('read the users row', () => storage.getUserById(userId));
+  if (userRow === STORAGE_UNAVAILABLE) return { kind: 'unavailable' };
+  const user = userRow ? userRowToUser(userRow) : null;
+  if (!userRow || !user || userRow.status !== 'active') return refused(SESSION_REFUSALS.ACCESS_REVOKED_LOGIN);
+  // A password reset or change, or "sign out everywhere", advanced the version.
+  if ((userRow.sessionVersion ?? 0) !== session.sessionVersion) return refused(SESSION_REFUSALS.SESSION_ENDED);
+  const merchant = await readForAuth('read the merchant row', () => storage.getMerchant(user.merchantId));
+  if (merchant === STORAGE_UNAVAILABLE) return { kind: 'unavailable' };
+  if (!merchant || (merchant.status !== 'verified' && merchant.status !== 'active')) {
+    return refused(SESSION_REFUSALS.ACCESS_REVOKED);
+  }
+  return { kind: 'ok', user, session, presented };
+}
+
+/**
+ * Signs a request in by its session cookie: a refusal clears the cookie; a change needs the page's CSRF
+ * token; a request let through takes up an offered secret, is offered the daily swap, and is recorded
+ * as a use.
+ */
+async function authenticateSession(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+  realm: SessionRealm,
+  value: string,
+) {
+  const resolved = await resolveSessionCookie(realm, value);
+  if (resolved.kind === 'unavailable') return respondAuthBackendUnavailable(res);
+  if (resolved.kind === 'refused') {
+    clearSessionCookie(res, realm);
+    return res.status(resolved.refusal.status).json(resolved.refusal.body);
+  }
+  if (!SAFE_METHODS.has(req.method) && !csrfTokenMatches(req.headers[CSRF_HEADER], resolved.session.id, getBaseUrl(req))) {
+    return res.status(403).json({
+      code: 'CSRF_REJECTED',
+      message: 'This request could not be verified. Please reload the page and try again.',
+    });
+  }
+  await settleSession(res, realm, resolved.session, resolved.presented, new Date());
+  req.user = resolved.user;
+  req.authSession = { id: resolved.session.id, realm };
+  return next();
+}
+
+/**
+ * The start-up check's half of a business sign-in (GET /api/auth/session): the signed-in login, or
+ * null — never a refusal, so a visitor who is not signed in gets an ordinary answer. An invalid cookie
+ * is cleared; a valid session is settled like any request it signs in.
+ */
+export async function readBusinessSession(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<'unavailable' | { user: User; csrfToken: string } | null> {
+  const value = readSessionCookie(req, 'business');
+  if (value === undefined) return null;
+  const resolved = await resolveSessionCookie('business', value);
+  if (resolved.kind === 'unavailable') return 'unavailable';
+  if (resolved.kind === 'refused') {
+    clearSessionCookie(res, 'business');
+    return null;
+  }
+  await settleSession(res, 'business', resolved.session, resolved.presented, new Date());
+  req.user = resolved.user;
+  req.authSession = { id: resolved.session.id, realm: 'business' };
+  return { user: resolved.user, csrfToken: csrfTokenFor(resolved.session.id, getBaseUrl(req)) };
+}
+
+export { respondAuthBackendUnavailable };
+
+/** Whether the request carries a business or admin session cookie at all, valid or not. */
+export function hasSessionCookie(req: Request): boolean {
+  return readSessionCookie(req, 'business') !== undefined || readSessionCookie(req, 'admin') !== undefined;
+}
+
+/** The page's CSRF token for the session a request was signed in by; undefined for a token sign-in. */
+export function csrfTokenForRequest(req: AuthenticatedRequest): string | undefined {
+  return req.authSession ? csrfTokenFor(req.authSession.id, getBaseUrl(req)) : undefined;
+}
+
+/** Starts a business session for a login that has just proved itself, and sets its cookie. */
+export function startBusinessSession(
+  req: Request,
+  res: Response,
+  login: { userId: number; sessionVersion: number },
+): Promise<StartedSession> {
+  return startSession(req, res, { realm: 'business', userId: login.userId, sessionVersion: login.sessionVersion });
+}
+
+/** Starts an admin session for the admin who has just proved themselves, and sets its cookie. */
+export function startAdminSession(req: Request, res: Response): Promise<StartedSession> {
+  return startSession(req, res, { realm: 'admin' });
+}
+
+/** Ends one session (Log Out), clears its cookie and records why. False when it had already ended. */
+export async function endAuthSession(
+  res: Response,
+  session: { id: string; realm: SessionRealm },
+  reason: SessionEndReason,
+): Promise<boolean> {
+  const { storage } = await import('./storage');
+  const ended = await storage.revokeAuthSession(session.id, reason, new Date());
+  clearSessionCookie(res, session.realm);
+  logSecurityEvent('SESSION_REVOKED', { sessionId: session.id, realm: session.realm, reason });
+  return ended;
+}
+
+/** Ends every live session of a login (but `keepId`) and records why; how many ended. */
+export async function endLoginSessions(userId: number, reason: SessionEndReason, keepId?: string): Promise<number> {
+  const { storage } = await import('./storage');
+  const count = await storage.revokeAuthSessionsForLogin(userId, reason, new Date(), keepId);
+  logSecurityEvent('SESSION_REVOKED', { userId, reason, sessions: count });
+  return count;
+}
+
+export { clearSessionCookie };
 
 // Enable the owner's login and return the real users-row principal. The merchant
 // hash writer synchronises/creates that owner row; re-reading it prevents Google

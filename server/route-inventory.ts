@@ -460,8 +460,12 @@ export const PUBLIC_PATH_ALLOWLIST: Record<string, string> = {
     "OAuth callback that issues the one-time sign-in handoff code (R1-T4 phase A); necessarily pre-session",
   "POST /api/auth/google/session":
     "redeems the one-time handoff code its HttpOnly cookie carries, once, for the account token (R1-T4 phase A); the code is the credential, so necessarily pre-session",
-  "POST /api/auth/login": "credential-checked login endpoint that issues the JWT; necessarily pre-session",
-  "POST /api/admin/auth/login": "credential-checked admin login endpoint that issues the admin JWT; necessarily pre-session",
+  "POST /api/auth/login":
+    "credential-checked login endpoint that starts a session (R1-T4 phase E; the JWT too until E3); necessarily pre-session",
+  "POST /api/admin/auth/login":
+    "credential-checked admin login endpoint that starts an admin session (R1-T4 phase E; the admin JWT too until E3); necessarily pre-session",
+  "GET /api/auth/session":
+    "the app's start-up check (R1-T4 phase E): reads only the caller's own session cookie, answers { signedIn: false } to anyone without a valid one, and the signed-in login with its page's CSRF token otherwise; necessarily open to the signed-out",
   "POST /api/auth/resend-confirmation":
     "leading '// Resend confirmation email (public — for check-email screen)' comment is misattributed by sliceHandlerBodies to the preceding registration; rate-limited, resends only to the account's own on-file email",
   "POST /api/merchants/signup": "account-creation endpoint; necessarily pre-session, rate-limited",

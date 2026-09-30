@@ -86,9 +86,11 @@ refused (403). Preflights and the requests that follow get the same answer. No r
 repeats an origin it was sent.
 
 *Addition, 2026-09-30:* callbacks that legitimately arrive from another site are named in an explicit
-exception list, each with its route and the other site's exact origin. The list is empty today (Windcave
-returns the browser with a GET; its notifications and the other provider calls come from servers and carry
-no `Origin`); Sign in with Apple (R1-T5) adds Apple's form post. Requests with no `Origin` (servers, the
+exception list, each with its route and the other site's exact origin, or any origin for a route that
+changes nothing. Today it holds the billing card return (`POST /api/billing/card/callback`: Windcave's card
+capture may send the browser back with a form post, and the route only redirects to billing settings); the
+provider notifications come from servers and carry no `Origin`. Sign in with Apple (R1-T5) adds Apple's form
+post. Requests with no `Origin` (servers, the
 scheduler, the ecommerce API) get no CORS headers and are otherwise treated as today; a cookie-session
 change without an `Origin` still needs the CSRF token.
 
