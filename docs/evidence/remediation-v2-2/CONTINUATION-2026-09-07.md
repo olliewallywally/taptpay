@@ -670,6 +670,18 @@ The work itself:
     breakages that changed nothing, replaced; one test weakness, fixed). At `b191d600`: server 125/3,137,
     client 104/1,156 (no client file changed after `d6be3369`), `tsc` clean.
 
+- **R1-T4 phase E1, the server side of the session rebuild (2026-09-30): `9e993da2`, then the mutation
+  check's tests and this evidence; local, awaiting independent review**
+  ([evidence](r1/R1-T4-phase-E1-sessions-server-2026-09-30.md),
+  [working notes](r1/WORKING-2026-09-30-r1-t4-phase-e.md)). A sign-in is a session the server keeps
+  (`auth_sessions`, 0031): an HttpOnly `__Host-` cookie, 1 day unused / 7 days (the admin's 30 minutes /
+  12 hours), a daily secret swap with reuse detection, a CSRF token on every change, Log Out per session, and
+  every sign-out path recording its ends. Changes from other websites are refused before any route; CORS names
+  only the site's origin. The token keeps working beside the cookie until E3. Red first 44 of 56; mutations
+  34/34 (three first misses closed with tests); server 127/3,216; PostgreSQL verifier 34/34; CI's
+  empty-database rehearsal 33/0/0/0 and the fingerprint re-recorded (0031 only). **Owner action: apply 0031
+  (and 0030) to dev**; until then dev sign-in fails once the dev server runs this code.
+
 **Next:** R1-T3's independent review (with the rest owed, below), then the next R1 task: R1-T7's remainder
 (tenant-scoped storage across every domain; gap 11's replay, C2–C5, needs an R3 schema decision) or
 R1-T4 phase E (the full session rebuild: HttpOnly cookies and CSRF, native refresh credentials), whichever

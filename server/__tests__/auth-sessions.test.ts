@@ -254,7 +254,7 @@ describe("the cookie is the sign-in", () => {
     // The admin's cookie is not a business sign-in here.
     const adminOnly = await request(app).get("/api/auth/session").set("Cookie", `${ADMIN}=${admin.cookie}`);
     expect(adminOnly.body).toEqual({ signedIn: false });
-    expect(setCookies(adminOnly).get(ADMIN)).toBeUndefined();
+    expect(adminOnly.headers["set-cookie"]).toBeUndefined();
   });
 
   it("business routes answer the cookie", async () => {
@@ -393,6 +393,51 @@ describe("how long a sign-in lasts", () => {
       const ended = await me(app, browser);
       expect(ended.status).toBe(401);
       expect(ended.body.code).toBe("SESSION_ENDED");
+    } finally {
+      clock.restore();
+    }
+  });
+
+  it("the 7-day limit holds on its own, even where the unused limit would allow more", async () => {
+    const clock = useFakeClock(T0);
+    try {
+      const { app } = await createTestApp();
+      const owner = await createOwnerPrincipal();
+      const browser = await signIn(app, owner.user.email);
+      const row = (await storage.getAuthSession(idOf(browser.cookie)))!;
+      const secret = crypto.randomBytes(32).toString("base64url");
+      const id = crypto.randomBytes(16).toString("base64url");
+      await storage.createAuthSession({
+        ...row, id, secretHash: sha256(secret),
+        absoluteExpiresAt: new Date(T0.getTime() + HOUR), idleExpiresAt: new Date(T0.getTime() + 20 * HOUR),
+      }, new Date());
+
+      clock.advance(HOUR + 1_000);
+      const ended = await request(app).get("/api/auth/me").set("Cookie", `${BUSINESS}=${id}.${secret}`);
+      expect(ended.status).toBe(401);
+      expect(ended.body.code).toBe("SESSION_ENDED");
+    } finally {
+      clock.restore();
+    }
+  });
+
+  it("a use never moves the unused limit past the 7-day one", async () => {
+    const clock = useFakeClock(T0);
+    try {
+      const { app } = await createTestApp();
+      const owner = await createOwnerPrincipal();
+      const browser = await signIn(app, owner.user.email);
+      let elapsed = 0;
+      while (elapsed + 20 * HOUR < BUSINESS_SESSION_MAX_MS - 2 * HOUR) {
+        clock.advance(20 * HOUR);
+        elapsed += 20 * HOUR;
+        await me(app, browser);
+      }
+      clock.advance(BUSINESS_SESSION_MAX_MS - 2 * HOUR - elapsed);
+      expect((await me(app, browser)).status).toBe(200);
+      const row = (await storage.getAuthSession(idOf(browser.cookie)))!;
+      expect(row.lastUsedAt.getTime()).toBe(T0.getTime() + BUSINESS_SESSION_MAX_MS - 2 * HOUR);
+      expect(row.idleExpiresAt.getTime()).toBe(row.absoluteExpiresAt.getTime());
     } finally {
       clock.restore();
     }
@@ -566,6 +611,19 @@ describe("every way a session ends", () => {
     expect((await me(app, laptop)).status).toBe(401);
     expect((await me(app, teammate)).status).toBe(200);
     expect(await storage.getAuthSession(idOf(laptop.cookie))).toMatchObject({ revokedReason: "sign_out_everywhere" });
+  });
+
+  it("advancing the login's session version alone ends its sessions (should recording the ends fail)", async () => {
+    const { app } = await createTestApp();
+    const owner = await createOwnerPrincipal();
+    const phone = await signIn(app, owner.user.email);
+
+    expect(await storage.advanceUserSessionVersion(owner.user.id)).toBe(true);
+
+    const res = await me(app, phone);
+    expect(res.status).toBe(401);
+    expect(res.body.code).toBe("SESSION_ENDED");
+    expect((await storage.getAuthSession(idOf(phone.cookie)))!.revokedAt).toBeNull();
   });
 
   it("a password reset ends every session of the login", async () => {

@@ -74,3 +74,23 @@ each finished step, evidence right after.
 - Found while writing them: `POST /api/billing/card/callback` accepts a form post (Windcave's card capture may
   return the browser that way), so the cross-site exception list is not empty today (decision and design
   corrected the same day).
+
+## E1 — built (2026-09-30)
+
+- Code `9e993da2`. Server 127/3,216, `tsc` clean. Route inventory 187 routes, 0 unclassified.
+- Found while building: a 401 from the start-up check would be logged as an error in every signed-out
+  visitor's browser (the device checks require none), so the design's `GET /api/auth/session` (200 for
+  anyone) was built after all; `GET /api/auth/me` stays the token's check until E3.
+- Mutations 30/33 on the first run; the three misses (the 7-day limit, the session-version check, the
+  start-up check's admin cookie) each masked by another guard; each now has its own test; 34/34 with the cap.
+- PostgreSQL: CI rehearsal 33/0/0/0; fingerprint re-recorded (0031 only); verifier 34/34 (10 new).
+- Dev: `npm run dev` is `tsx server/index.ts` with no watcher, so the running server keeps the code it
+  started with until restarted; the client is served from disk by Vite, so it changes as it is edited.
+
+## E2 — the client (from 2026-09-30)
+
+- `client/src/lib/session.ts`: the page holds who is signed in and the session's CSRF token in memory only;
+  `sessionFetch` sends the cookie (same origin) and the token on changes (never to another origin), and
+  retries once after a refreshed token; the first load removes the old stored keys.
+- The ~130 token uses in ~45 files: a scripted rewrite (`.local/claude-scratch/session-2026-09-30/e2-rewrite2.py`)
+  for the common shapes, then by hand. The property and trades header helpers now give the CSRF token.
