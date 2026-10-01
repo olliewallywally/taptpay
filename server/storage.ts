@@ -5736,27 +5736,34 @@ export class DatabaseStorage implements IStorage {
       .where(eq(pushSubscriptions.endpoint, endpoint));
   }
 
+  // The devices are locked in id order, then stopped. Each login's ending also stops the business's
+  // unattributed devices, so endings that happen together share rows; taken in whatever order each
+  // statement met them, they could deadlock, and the statement rolled back left its login's devices on
+  // (found on real PostgreSQL, 2026-10-01). Devices already stopped are not rewritten.
   async deactivatePushSubscriptionsForLogin(merchantId: number, userId: number): Promise<void> {
     if (!this.db) throw new Error("Database not connected");
-    await this.db
-      .update(pushSubscriptions)
-      .set({ isActive: false })
-      .where(or(
-        eq(pushSubscriptions.userId, userId),
-        and(eq(pushSubscriptions.merchantId, merchantId), isNull(pushSubscriptions.userId)),
-      ));
+    await this.db.execute(sql`
+      WITH held AS MATERIALIZED (
+        SELECT id FROM push_subscriptions
+        WHERE is_active AND (user_id = ${userId} OR (merchant_id = ${merchantId} AND user_id IS NULL))
+        ORDER BY id
+        FOR UPDATE
+      )
+      UPDATE push_subscriptions SET is_active = false FROM held WHERE push_subscriptions.id = held.id`);
   }
 
+  // Locked in id order, as above: the business's unattributed iPhones are shared between its logins.
   async deactivateNativePushSubscriptionsForLogin(merchantId: number, userId: number): Promise<void> {
     if (!this.db) throw new Error("Database not connected");
-    await this.db
-      .update(pushSubscriptions)
-      .set({ isActive: false })
-      .where(and(
-        eq(pushSubscriptions.merchantId, merchantId),
-        sql`${pushSubscriptions.endpoint} LIKE 'apns://%'`,
-        or(eq(pushSubscriptions.userId, userId), isNull(pushSubscriptions.userId)),
-      ));
+    await this.db.execute(sql`
+      WITH held AS MATERIALIZED (
+        SELECT id FROM push_subscriptions
+        WHERE is_active AND merchant_id = ${merchantId} AND endpoint LIKE 'apns://%'
+          AND (user_id = ${userId} OR user_id IS NULL)
+        ORDER BY id
+        FOR UPDATE
+      )
+      UPDATE push_subscriptions SET is_active = false FROM held WHERE push_subscriptions.id = held.id`);
   }
 
   async getDailyPushPaymentSummaries(start: Date, end: Date): Promise<DailyPushPaymentSummary[]> {

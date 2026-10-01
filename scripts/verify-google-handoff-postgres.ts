@@ -525,6 +525,92 @@ try {
       assert.deepEqual(await pushRows([push("queued")]), {});
     } finally { blocker.release(); }
   });
+  await check("30 logins of one business ending their sessions at once: every device is stopped and no statement is lost to a deadlock", async () => {
+    // Each ending also stops the business's unattributed devices, so the statements share rows.
+    const racePool = new pg.Pool({ connectionString: testDatabaseUrl, max: 30 });
+    const ending = new DatabaseStorage(drizzle(racePool, { schema }) as any);
+    try {
+      const business = (await pool.query(`INSERT INTO merchants(name,business_name,email,status)
+        VALUES ('Busy','Busy','busy@r1-t4.test','active') RETURNING id`)).rows[0].id as number;
+      const logins: number[] = [];
+      for (let i = 0; i < 30; i += 1) {
+        logins.push((await pool.query(`INSERT INTO users(email,password,merchant_id,role)
+          VALUES ($1,'synthetic-not-a-hash',$2,'member') RETURNING id`, [`busy-${i}@r1-t4.test`, business])).rows[0].id as number);
+      }
+      const web = (name: string) => push(`busy-${name}`);
+      const phone = (name: string) => `apns://busy-${name}`;
+      const unattributed = Array.from({ length: 6 }, (_, i) => [web(`unattributed-${i}`), phone(`unattributed-${i}`)]).flat();
+      const owned = logins.flatMap((_, i) => [web(`login-${i}`), phone(`login-${i}`)]);
+      const switchAllOn = async () => {
+        for (const endpoint of unattributed) await subscribe(business, null, endpoint);
+        for (const [i, login] of logins.entries()) {
+          await subscribe(business, login, web(`login-${i}`));
+          await subscribe(business, login, phone(`login-${i}`));
+        }
+      };
+      const lost = (results: PromiseSettledResult<void>[]) =>
+        results.flatMap((result) => (result.status === "rejected" ? [String(result.reason)] : []));
+      const stillOn = async (endpoints: string[]) =>
+        Object.entries(await activeOf(endpoints)).filter(([, active]) => active).map(([endpoint]) => endpoint);
+      await Promise.all(Array.from({ length: 30 }, () => racePool.query("SELECT 1"))); // connections open
+      for (let round = 1; round <= 3; round += 1) {
+        await switchAllOn();
+        const results = await Promise.allSettled(logins.map((login) => ending.deactivatePushSubscriptionsForLogin(business, login)));
+        assert.deepEqual(lost(results), [], `round ${round}: a statement was rolled back, so its login's devices stayed on`);
+        assert.deepEqual(await stillOn([...unattributed, ...owned]), [], `round ${round}`);
+      }
+      // "Turn notifications off" with no device token: this login's iPhones and the unattributed ones only.
+      for (let round = 1; round <= 3; round += 1) {
+        await switchAllOn();
+        const results = await Promise.allSettled(logins.map((login) => ending.deactivateNativePushSubscriptionsForLogin(business, login)));
+        assert.deepEqual(lost(results), [], `iPhone round ${round}: a statement was rolled back`);
+        assert.deepEqual((await stillOn([...unattributed, ...owned])).sort(),
+          [...unattributed, ...owned].filter((endpoint) => !endpoint.startsWith("apns://")).sort(), `iPhone round ${round}`);
+      }
+    } finally {
+      await racePool.end();
+    }
+  });
+  await check("45 registrations racing 'sign out everywhere' across instances: no device of an ended login is left on, whichever held the login's row first", async () => {
+    // Their own pools, so neither side queues behind the other for a connection: the database decides the order.
+    const racePools = [new pg.Pool({ connectionString: testDatabaseUrl, max: 30 }), new pg.Pool({ connectionString: testDatabaseUrl, max: 30 })];
+    const [registering, signingOut] = racePools.map((p) => new DatabaseStorage(drizzle(p, { schema }) as any));
+    try {
+      const logins = await Promise.all(Array.from({ length: 45 }, (_, i) => addUser(`push-race-${i}@r1-t4.test`, "member")));
+      const endpointOf = (i: number) => push(`race-${i}`);
+      // A third already have the device on file, stopped: a late registration would switch it back on.
+      for (const [i, login] of logins.entries()) {
+        if (i % 3 !== 0) continue;
+        assert.equal(await outcomeOf(register(login, endpointOf(i))), "stored");
+        await one.deactivatePushSubscriptionByEndpoint(endpointOf(i));
+      }
+      await Promise.all(racePools.flatMap((p) => Array.from({ length: 15 }, () => p.query("SELECT 1")))); // connections open
+      const later = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+      const signOutEverywhere = async (login: number) => {
+        assert.ok(await signingOut.advanceUserSessionVersion(login));
+        await signingOut.deactivatePushSubscriptionsForLogin(merchant, login);
+      };
+      // In fifteens: the registration well ahead, the sign-out well ahead, and both at once.
+      const registrations = await Promise.all(logins.map(async (login, i) => {
+        const order = Math.floor(i / 15);
+        const registered = later(order === 1 ? 25 : 0).then(() => outcomeOf(register(login, endpointOf(i), registering)));
+        const ended = later(order === 0 ? 25 : 0).then(() => signOutEverywhere(login));
+        await ended;
+        return registered;
+      }));
+      const count = (wanted: string, from = 0, to = 45) => registrations.slice(from, to).filter((o) => o === wanted).length;
+      assert.equal(count("stored") + count("ended"), 45,
+        `every registration was stored or refused as ended: ${JSON.stringify(registrations.filter((o) => o !== "stored" && o !== "ended").map(String))}`);
+      const left = Object.entries(await activeOf(logins.map((_, i) => endpointOf(i)))).filter(([, active]) => active).map(([endpoint]) => endpoint);
+      assert.deepEqual(left, [], "a device was left on for a login whose sessions had ended");
+      assert.ok(count("stored") > 0 && count("ended") > 0, "both orders were exercised");
+      console.log(`     (registered first, then stopped: ${count("stored")}; refused: ${count("ended")}. ` +
+        `Registration ahead ${count("stored", 0, 15)}/${count("ended", 0, 15)}, sign-out ahead ${count("stored", 15, 30)}/${count("ended", 15, 30)}, ` +
+        `at once ${count("stored", 30, 45)}/${count("ended", 30, 45)})`);
+    } finally {
+      await Promise.all(racePools.map((p) => p.end()));
+    }
+  });
   await check("one Google sign-in start is taken up exactly once by 24 simultaneous callbacks from two instances; its key holds no state", async () => {
     const state = randomBytes(32).toString("base64url");
     const bucket = throttle.googleStateBucket(state);
