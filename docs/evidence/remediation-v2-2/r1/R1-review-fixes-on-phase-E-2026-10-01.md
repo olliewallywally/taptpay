@@ -1,7 +1,7 @@
-# The external review's R1 fixes on this branch — the server side (2026-10-01)
+# The external review's R1 fixes on this branch (2026-10-01)
 
-Branch `remediation/r1-continuation-20260907`. Code `d9382672` (the fixes, ported) and `bc9f37ff` (a
-deadlock the port's own checks found). Owner direction:
+Branch `remediation/r1-continuation-20260907`. Code `d9382672` (the server fixes, ported), `bc9f37ff` (a
+deadlock the port's own checks found) and `9fede25d` (the client fixes, on phase E2's client). Owner direction:
 [2026-10-01](../../../decisions/2026-10-01-r1-review-patch-on-this-branch-owner-direction.md), and the
 [2026-09-29 decision](../../../decisions/2026-09-29-apply-r1-review-fixes-patch.md) that came with the
 patch. The patch's own handoff, verbatim:
@@ -89,8 +89,8 @@ Ported:
   effects too.
 - The route reviews of the four changed routes; the inventory regenerated (187 routes, 0 unclassified).
 
-Not in these commits: the patch's desktop pages (R1-T9, `response-data.ts`). They touch three files of
-phase E2's client and go in with it.
+The patch's desktop pages (R1-T9) touch three files of phase E2's client, so they went in after it: see
+"The client half" below.
 
 ## Tests first
 
@@ -164,6 +164,30 @@ Fixed in `DatabaseStorage`: that statement and the iPhone-only one
 already stopped alone. **After: 7 runs of 7 pass, 40 checks each, no new deadlock line in the server's
 log.** Red first is the three failed runs; the in-memory storage has no locks to test this with.
 
+## The client half (`9fede25d`): R1-T9, a reply that says OK and is not the data
+
+On the client as phase E2 left it (`2611e80e`). As the patch has them: `lib/response-data.ts` (a list is an
+array of records that each carry an id; a settings object is a record; a retail sale also needs a status,
+a date that parses and a price that is a number), the property lists, the trades lists, schedules and
+reminder settings, the property reminder settings, and the client tests' timezone pinned to
+Pacific/Auckland. Ported onto `sessionFetch`: desktop settings (business details, plan, access, saved
+card) and the retail analytics and terminal reads.
+
+- The patch tested the retail pages and one settings case. Added: unit tests for every rule
+  (`response-data.test.ts`, 40), and the same malformed replies for access, the plan and the saved card on
+  desktop settings and for the property and trades terminals' lists and settings. Each reads as that
+  source's failed load: no $0, no "nothing here", no live money button.
+- **Client 111 files / 1,291 tests**; `tsc` clean.
+- **Mutations: 27 of 28** (`mutate-t9.py`). The handoff's seventh, the sales check dropped, fails 11 tests
+  (6 at its base). The miss changes nothing: the access reply is checked twice, and the second check alone
+  refuses what the first does.
+- The timezone pin sits in `jest.client.config.cjs`, which the root config loads, so the server tests run
+  in that timezone too: 130 / 3,278, green.
+- **For the release:** a sale with no date refuses the whole sales list, and with it the desktop terminal's
+  "send payment" for that business. `transactions.created_at` allows NULL. The development database has
+  none (0 of 8, read-only count, 2026-10-01); production could not be read. One count-only check there
+  before release.
+
 ## Still open
 
 From the patch's handoff, as they stand on this branch:
@@ -173,11 +197,12 @@ From the patch's handoff, as they stand on this branch:
    idle stream of an ended session closes within five seconds, not at once.
 3. The no-network guard is an application-level guard: child processes and native extensions are outside it.
 4. A Google sign-in in progress when this deploys must be started again (the cookie's shape changed).
-5. The response checks (R1-T9) are with phase E2.
+5. The response checks (R1-T9) are in (`9fede25d`): they cover the reproduced class, not a schema for
+   every endpoint, as the handoff says.
 6. Owner questions. **Answered 2026-09-29**
    ([decision](../../../decisions/2026-09-29-r1-t3-owner-answers.md)): the body-token pages keep 400; the
    platform admin keeps the money routes. **Open:** whether a terminal may send a payment while its sales
-   are still loading (put to the owner with phase E2's client).
+   are still loading. Today it may (the button is off only once the load has failed); put to the owner.
 7. **Open:** the plan's Google nonce, issuer and audience checks. The server asks Google directly who
    signed in (the code, with PKCE, at Google's token address, then the profile); it never trusts an ID
    token passed through the browser, so there is no token to check a nonce on. Put to the owner as a
@@ -194,15 +219,15 @@ New, from this work:
   browser retires its endpoint at the push service itself, so this is the iPhone app's gap. Closing it
   needs the subscription to remember the session that registered it (a migration).
 - A registration whose preferences read fails now fails (500) instead of registering with default switches.
-- The patch's branch on GitHub (`claude/trusting-cannon-l7wb6n`) is now superseded by this branch for
-  everything but its three client files' worth of R1-T9.
+- The patch's branch on GitHub (`claude/trusting-cannon-l7wb6n`) is now superseded by this branch.
 
 ## Brief for the independent review
 
 > You are the independent security reviewer for TaptPay, a payment-terminal SaaS. Review commits
-> `d9382672` and `bc9f37ff` on branch `remediation/r1-continuation-20260907` (range `cee3cf05..bc9f37ff`):
-> an external review's patch for R1-T1/T2/T3/T4/T8, written against a token sign-in, carried onto a branch
-> whose sign-in is now a session cookie; and a deadlock fix. Start from
+> `d9382672`, `bc9f37ff` and `9fede25d` on branch `remediation/r1-continuation-20260907` (ranges
+> `cee3cf05..bc9f37ff` and `2611e80e..9fede25d`): an external review's patch for R1-T1/T2/T3/T4/T8/T9,
+> written against a token sign-in, carried onto a branch whose sign-in is now a session cookie; and a
+> deadlock fix. Start from
 > `docs/evidence/remediation-v2-2/r1/R1-review-fixes-on-phase-E-2026-10-01.md`; treat it as claims and
 > re-derive everything from the code. Compare with the patch itself (`git show ce4473df`). Attack especially:
 > - Can a signed-in stream outlive its sign-in: a cookie session ended, run out or revoked on another
@@ -215,7 +240,9 @@ New, from this work:
 > - Can a Google start cookie be forged, extended, replayed or shared between starts?
 > - Does the refusal-effects observer miss an effect a refusal could have? Do the edits to older tests
 >   keep what they checked?
-> - Is anything in the patch (`ce4473df`) missing from the port, besides its client files?
+> - Is anything in the patch (`ce4473df`) missing from the port?
+> - The response checks: can a malformed reply still be shown as data, or a well-formed one be refused
+>   (a legacy row, an id type, an optional field)?
 >
 > Label anything you cannot verify UNVERIFIED; cite `file:line`; give a failing test for every Blocking
 > issue. Return exactly the ten headings of plan §21.1
