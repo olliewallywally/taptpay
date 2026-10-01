@@ -12,9 +12,10 @@ import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { adminCsrfHeader } from "@/lib/session";
 
-const ADMIN_TOKEN = () => localStorage.getItem('adminAuthToken') || '';
-const ADMIN_HEADERS = () => ({ Authorization: `Bearer ${ADMIN_TOKEN()}` });
+// R1-T4 phase E: the sign-in is the admin's session cookie; this is the page's CSRF token.
+const ADMIN_HEADERS = () => adminCsrfHeader();
 
 interface MerchantDetailProps { merchantId: string; }
 

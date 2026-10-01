@@ -34,6 +34,8 @@ import {
   Trash2
 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { sessionFetch } from "@/lib/session";
+import { logOutAdmin } from "@/lib/session";
 
 interface MerchantDetails {
   id: number;
@@ -90,12 +92,11 @@ export default function AdminMerchantDetail() {
   // Update merchant details mutation
   const updateDetailsMutation = useMutation({
     mutationFn: async (data: any) => {
-      const response = await fetch(`/api/merchants/${merchantId}/details`, {
+      const response = await sessionFetch(`/api/merchants/${merchantId}/details`, {
         method: 'PUT',
         body: JSON.stringify(data),
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('adminAuthToken')}`
         },
       });
       if (!response.ok) throw new Error('Failed to update merchant details');
@@ -121,10 +122,9 @@ export default function AdminMerchantDetail() {
   // Delete merchant mutation
   const deleteMerchantMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch(`/api/admin/merchants/${merchantId}`, {
+      const response = await sessionFetch(`/api/admin/merchants/${merchantId}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('adminAuthToken')}`
         },
       });
       if (!response.ok) throw new Error('Failed to delete merchant');
@@ -150,11 +150,7 @@ export default function AdminMerchantDetail() {
   const { data: merchant, isLoading: merchantLoading } = useQuery<MerchantDetails>({
     queryKey: ['/api/admin/merchants', merchantId],
     queryFn: async () => {
-      const response = await fetch(`/api/admin/merchants/${merchantId}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('adminAuthToken')}`
-        }
-      });
+      const response = await sessionFetch(`/api/admin/merchants/${merchantId}`);
       if (!response.ok) throw new Error('Failed to fetch merchant details');
       return response.json();
     },
@@ -164,11 +160,7 @@ export default function AdminMerchantDetail() {
   const { data: analytics, isLoading: analyticsLoading } = useQuery<MerchantAnalytics>({
     queryKey: ['/api/merchants', merchantId, 'analytics'],
     queryFn: async () => {
-      const response = await fetch(`/api/merchants/${merchantId}/analytics`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('adminAuthToken')}`
-        }
-      });
+      const response = await sessionFetch(`/api/merchants/${merchantId}/analytics`);
       if (!response.ok) throw new Error('Failed to fetch merchant analytics');
       return response.json();
     },
@@ -178,19 +170,14 @@ export default function AdminMerchantDetail() {
   const { data: transactions, isLoading: transactionsLoading } = useQuery<Transaction[]>({
     queryKey: ['/api/merchants', merchantId, 'transactions'],
     queryFn: async () => {
-      const response = await fetch(`/api/merchants/${merchantId}/transactions`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('adminAuthToken')}`
-        }
-      });
+      const response = await sessionFetch(`/api/merchants/${merchantId}/transactions`);
       if (!response.ok) throw new Error('Failed to fetch merchant transactions');
       return response.json();
     },
   });
 
   const handleLogout = () => {
-    localStorage.removeItem("adminAuthToken");
-    localStorage.removeItem("adminUser");
+    void logOutAdmin();
     toast({
       title: "Logged Out",
       description: "You have been successfully logged out.",

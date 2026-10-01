@@ -25,6 +25,7 @@ import RetailTerminalView, {
   type RetailShareSale,
   type RetailTerminalState,
 } from "@/features/terminal/retail/RetailTerminalView";
+import { sessionFetch } from "@/lib/session";
 
 const BRAND = "#00DFC8";
 
@@ -175,9 +176,7 @@ export default function MerchantTerminalMobile() {
   const { data: merchant } = useQuery({
     queryKey: ["/api/merchants", merchantId, "profile"],
     queryFn: async () => {
-      const r = await fetch(`/api/merchants/${merchantId}/profile`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
-      });
+      const r = await sessionFetch(`/api/merchants/${merchantId}/profile`);
       if (!r.ok) throw new Error("Failed to fetch merchant");
       return r.json();
     },
@@ -189,10 +188,7 @@ export default function MerchantTerminalMobile() {
     queryFn: async () => {
       // Signed in: this business's newest open sale, a board-less sale with its own link
       // included. The anonymous read of this address was retired on 2026-09-25.
-      const authToken = localStorage.getItem("authToken");
-      const r = await fetch(`/api/merchants/${merchantId}/active-transaction`, {
-        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
-      });
+      const r = await sessionFetch(`/api/merchants/${merchantId}/active-transaction`);
       if (!r.ok) throw new Error("Failed to fetch active transaction");
       return r.json();
     },
@@ -205,10 +201,7 @@ export default function MerchantTerminalMobile() {
   const { data: taptStones = [] } = useQuery({
     queryKey: ["/api/merchants", merchantId, "tapt-stones"],
     queryFn: async () => {
-      const authToken = localStorage.getItem("authToken");
-      const r = await fetch(`/api/merchants/${merchantId}/tapt-stones`, {
-        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
-      });
+      const r = await sessionFetch(`/api/merchants/${merchantId}/tapt-stones`);
       if (!r.ok) throw new Error("Failed to fetch tapt stones");
       return r.json();
     },
@@ -218,10 +211,7 @@ export default function MerchantTerminalMobile() {
   const { data: allTransactions = [], isSuccess: transactionsLoaded } = useQuery({
     queryKey: ["/api/merchants", merchantId, "transactions"],
     queryFn: async () => {
-      const authToken = localStorage.getItem("authToken");
-      const r = await fetch(`/api/merchants/${merchantId}/transactions`, {
-        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
-      });
+      const r = await sessionFetch(`/api/merchants/${merchantId}/transactions`);
       if (!r.ok) throw new Error("Failed to fetch transactions");
       return r.json();
     },
@@ -253,9 +243,7 @@ export default function MerchantTerminalMobile() {
 
   useEffect(() => {
     if (!merchantId) return;
-    const token = localStorage.getItem("authToken");
-    if (!token) return;
-    sseClient.connectMerchant(merchantId, token);
+    sseClient.connectMerchant(merchantId);
     sseClient.subscribe("transaction_updated", (message) => {
       const tx = message.transaction ?? null;
       queryClient.setQueryData(["/api/merchants", merchantId, "active-transaction"], tx);
@@ -404,10 +392,9 @@ export default function MerchantTerminalMobile() {
         return;
       }
       setTapToPayStatus("processing");
-      const authToken = localStorage.getItem("authToken");
-      const r = await fetch("/api/transactions/tap-to-pay", {
+      const r = await sessionFetch("/api/transactions/tap-to-pay", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           merchantId,
           transactionId: tx.id,
@@ -592,12 +579,10 @@ export default function MerchantTerminalMobile() {
     refundReason,
     refundMethod,
   }: RetailRefundIntent) => {
-    const token = localStorage.getItem("authToken");
-    const response = await fetch(`/api/transactions/${transactionId}/refunds`, {
+    const response = await sessionFetch(`/api/transactions/${transactionId}/refunds`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({ refundAmount, refundReason, refundMethod }),
     });

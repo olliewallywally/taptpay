@@ -5,6 +5,7 @@ import { startPropertyNavigation, startPropertyBack, signalPropertyReady } from 
 import { propFetch } from "@/lib/property-api";
 import { usePropertyTenants, usePropertyInvoices } from "@/lib/property-data";
 import { AnimatedListRow } from "@/components/AnimatedScrollList";
+import { businessCsrfHeader } from "@/lib/session";
 
 /* ── Design tokens ── */
 const C = {
@@ -19,9 +20,9 @@ const C = {
 };
 
 function fmtCents(c: number) { return '$' + (c / 100).toLocaleString('en-NZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+// R1-T4 phase E: the page's CSRF token; the sign-in is the session cookie.
 function propHeaders(): HeadersInit {
-  const token = localStorage.getItem('authToken');
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return businessCsrfHeader();
 }
 
 function pulse(e: any) {

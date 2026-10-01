@@ -16,6 +16,7 @@ import {
   type DesktopKeypadKey,
 } from "../desktop-keypad";
 import { DesktopLoadFailure } from "../DesktopLoadFailure";
+import { sessionFetch } from "@/lib/session";
 
 /* ── palette ── */
 const ACCENT = "#5E9EFF";
@@ -190,8 +191,7 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
   const [draftName, setDraftName] = useState("");
 
   const authFetch = async (path: string) => {
-    const token = localStorage.getItem("authToken");
-    const res = await fetch(path, { headers: { Authorization: `Bearer ${token}` } });
+    const res = await sessionFetch(path);
     if (!res.ok) throw new Error(path);
     return res.json();
   };

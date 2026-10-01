@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import { consumeSnap, startPropertyBack, signalPropertyReady } from "@/lib/property-transition";
 import { propFetch } from "@/lib/property-api";
+import { businessCsrfHeader } from "@/lib/session";
 
 /* ── Design tokens ── */
 const C = {
@@ -20,9 +21,9 @@ const STATUS_MAP: Record<string, { dot: string; bg: string; fg: string; label: s
   upcoming: { dot: C.btn,    bg: 'rgba(63,155,255,0.22)', fg: C.sky,    label: 'upcoming' },
 };
 
+// R1-T4 phase E: the page's CSRF token; the sign-in is the session cookie.
 function propHeaders(): HeadersInit {
-  const token = localStorage.getItem('authToken');
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return businessCsrfHeader();
 }
 
 const EVENT_KINDS: Record<string, { color: string; icon: string; fg: string }> = {

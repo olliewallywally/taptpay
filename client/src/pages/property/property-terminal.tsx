@@ -11,6 +11,7 @@ import {
   PropertyTerminalView,
   type PropertyTerminalScreen,
 } from "@/features/terminal/property/PropertyTerminalView";
+import { businessCsrfHeader } from "@/lib/session";
 
 const PROPERTY_TERMINAL_FONT_CSS =
   "@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap');";
@@ -35,9 +36,9 @@ function addInterval(from: Date, frequency: string): Date {
   return date;
 }
 
+// R1-T4 phase E: the page's CSRF token; the sign-in is the session cookie.
 function propHeaders(): HeadersInit {
-  const token = localStorage.getItem('authToken');
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return businessCsrfHeader();
 }
 
 export default function PropertyTerminal() {

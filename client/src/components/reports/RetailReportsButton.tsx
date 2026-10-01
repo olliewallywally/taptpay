@@ -10,6 +10,7 @@ import { getCurrentMerchantId } from "@/lib/auth";
 import { dollarsToCents } from "@/lib/report-utils";
 import { RETAIL_REPORT_OPTIONS } from "@/lib/report-pdf/reports/retail-options";
 import type { RetailReportData } from "@/lib/report-pdf/reports/retail";
+import { sessionFetch } from "@/lib/session";
 
 export function RetailReportsButton({ tone = "onDark", color = "#00E5CC", style }: { tone?: "onLight" | "onDark"; color?: string; style?: React.CSSProperties }) {
   const [open, setOpen] = useState(false);
@@ -20,10 +21,7 @@ export function RetailReportsButton({ tone = "onDark", color = "#00E5CC", style 
     enabled: !!merchantId,
     staleTime: 30000,
     queryFn: async () => {
-      const token = localStorage.getItem("authToken");
-      const r = await fetch(`/api/merchants/${merchantId}/transactions`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-      });
+      const r = await sessionFetch(`/api/merchants/${merchantId}/transactions`);
       if (!r.ok) throw new Error("Failed to load transactions");
       return r.json();
     },

@@ -716,6 +716,69 @@ describe("every way a session ends", () => {
   });
 });
 
+describe("the terminal's own read of its current sale follows the session", () => {
+  // The business's terminal asks for its newest open sale without naming a board. Signed in, it gets it,
+  // a sale with its own link included, which no public read can see. The app sends no token any more
+  // (phase E2), so the route must tell the terminal by its session cookie, as the event stream does.
+  async function businessWithAnOpenSale() {
+    const { app } = await createTestApp();
+    const owner = await createOwnerPrincipal();
+    const sale = await storage.createTransaction({
+      merchantId: owner.merchantId, itemName: "Counter coffee", price: "4.50", status: "pending",
+      paymentMethod: "qr_code", splitEnabled: false,
+    } as any);
+    return { app, owner, sale, read: `/api/merchants/${owner.merchantId}/active-transaction` };
+  }
+
+  it("is answered on the cookie alone, with the business's own view of the sale", async () => {
+    const { app, owner, sale, read } = await businessWithAnOpenSale();
+    const browser = await signIn(app, owner.user.email);
+
+    const res = await send(app, browser, "get", read);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ id: sale.id, itemName: "Counter coffee", merchantId: owner.merchantId });
+    expect(res.headers["cache-control"]).toMatch(/no-store/);
+  });
+
+  it("is refused to another business's session (403) and to a session that has ended (401), not answered as the retired address", async () => {
+    const { app, owner, read } = await businessWithAnOpenSale();
+    const other = await createOwnerPrincipal();
+    const theirs = await signIn(app, other.user.email);
+    const ended = await signIn(app, owner.user.email);
+    expect((await send(app, ended, "post", "/api/auth/logout")).status).toBe(204);
+
+    expect((await send(app, theirs, "get", read)).status).toBe(403);
+    const afterLogOut = await request(app).get(read).set("Cookie", `${BUSINESS}=${ended.cookie}`);
+    expect(afterLogOut.status).toBe(401);
+    expect(afterLogOut.body.code).toBe("SESSION_ENDED");
+  });
+
+  it("with no cookie and no board it is still the retired address (410)", async () => {
+    const { app, read } = await businessWithAnOpenSale();
+    expect((await request(app).get(read)).status).toBe(410);
+  });
+
+  it("a board's page reads its board's sale as any customer does, even in a browser signed in to the business", async () => {
+    const { app } = await createTestApp();
+    const owner = await createOwnerPrincipal();
+    const board = await storage.createNextTaptStone(owner.merchantId, "Front till");
+    const sale = await storage.createTransaction({
+      merchantId: owner.merchantId, taptStoneId: board.id, itemName: "Window sale", price: "7.00", status: "pending",
+      paymentMethod: "qr_code", splitEnabled: false,
+    } as any);
+    const browser = await signIn(app, owner.user.email);
+    const read = `/api/merchants/${owner.merchantId}/active-transaction?stoneId=${board.id}`;
+
+    const signedIn = await send(app, browser, "get", read);
+    const anyone = await request(app).get(read);
+
+    expect([signedIn.status, anyone.status]).toEqual([200, 200]);
+    expect(signedIn.body).toEqual(anyone.body);
+    expect(signedIn.body.id).toBe(sale.id);
+  });
+});
+
 describe("live updates follow the session", () => {
   it("the business's event stream opens on the cookie alone", async () => {
     const { app } = await createTestApp();

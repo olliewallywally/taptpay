@@ -11,7 +11,8 @@ import { apiRequest } from "@/lib/queryClient";
 import { useTutorial } from "@/features/tutorial/tutorial";
 import { useToast } from "@/hooks/use-toast";
 import { SIGN_OUT_EVERYWHERE_CONFIRMATION, signOutEverywhere } from "@/lib/sign-out-everywhere";
-import { resyncThisDevicePush, stopThisDevicePush } from "@/lib/push-device";
+import { resyncThisDevicePush } from "@/lib/push-device";
+import { forgetThisDeviceSignIn, logOut } from "@/lib/log-out";
 import {
   BILLING_CARD_SESSION_KEY,
   useBillingCardReturn,
@@ -34,6 +35,7 @@ import {
   type DesktopRoutePageProps,
 } from "./DesktopPageScaffold";
 import { DesktopLoadFailure } from "./DesktopLoadFailure";
+import { replaceCsrfToken, sessionFetch } from "@/lib/session";
 
 /* ── palette ── */
 const ACCENT = "#5E9EFF";
@@ -184,8 +186,7 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
   const [pw, setPw] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
 
   const authFetch = async (path: string) => {
-    const token = localStorage.getItem("authToken");
-    const res = await fetch(path, { headers: { Authorization: `Bearer ${token}` } });
+    const res = await sessionFetch(path);
     if (!res.ok) throw new Error(path);
     return res.json();
   };
@@ -264,10 +265,9 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
   /* ── mutations ── */
   const saveDetails = useMutation({
     mutationFn: async () => {
-      const token = localStorage.getItem("authToken");
-      const res = await fetch(`/api/merchants/${merchantId}`, {
+      const res = await sessionFetch(`/api/merchants/${merchantId}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           businessName: details.businessName,
           gstNumber: details.gstNumber,
@@ -287,10 +287,9 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
 
   const saveGoal = useMutation({
     mutationFn: async (goal: string) => {
-      const token = localStorage.getItem("authToken");
-      const res = await fetch(`/api/merchants/${merchantId}/daily-goal`, {
+      const res = await sessionFetch(`/api/merchants/${merchantId}/daily-goal`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ dailyGoal: goal }),
       });
       if (!res.ok) throw new Error("Failed to update daily goal");
@@ -457,13 +456,13 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
       return res.json();
     },
     onSuccess: (data: unknown) => {
-      // The change ended every session of this login (R1-T4 phase D); this device
-      // carries on under the fresh token the server returned.
-      const token = (data as { token?: unknown } | null)?.token;
-      if (typeof token === "string" && token) {
-        localStorage.setItem("authToken", token);
+      // The change ended every session of this login (R1-T4 phase D); this device carries on under
+      // the new session the server started, whose cookie it now holds, with its CSRF token (phase E).
+      const csrfToken = (data as { csrfToken?: unknown } | null)?.csrfToken;
+      if (typeof csrfToken === "string" && csrfToken) {
+        replaceCsrfToken("business", csrfToken);
         // The change also stopped every device's notifications; this one resumes.
-        void resyncThisDevicePush(token);
+        void resyncThisDevicePush();
       }
       setPw({ currentPassword: "", newPassword: "", confirmPassword: "" });
       toast({ title: "Password changed", description: "Your other devices have been signed out." });
@@ -492,10 +491,8 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
   const removeCard = async () => {
     setCardBusy("remove");
     try {
-      const token = localStorage.getItem("authToken");
-      const res = await fetch("/api/billing/card", {
+      const res = await sessionFetch("/api/billing/card", {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.message || "Failed to remove card");
@@ -544,16 +541,17 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
     setLocation(path);
   };
 
+  // After "Sign out of all devices" the server has already ended this session too.
   const signOutThisDevice = () => {
-    localStorage.removeItem("authToken");
+    forgetThisDeviceSignIn();
     setLocation("/login");
   };
 
-  // R1-T4 (owner decision 2026-09-22): Log Out also stops this device's
-  // notifications, with the token it is discarding.
-  const logout = () => {
-    void stopThisDevicePush(localStorage.getItem("authToken"));
-    signOutThisDevice();
+  // R1-T4: Log Out stops this device's notifications (owner decision 2026-09-22), then ends this
+  // session on the server (phase E).
+  const logout = async () => {
+    await logOut();
+    setLocation("/login");
   };
 
   const signOutAllDevices = async () => {

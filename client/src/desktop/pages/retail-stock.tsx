@@ -9,6 +9,7 @@ import {
 } from "../DesktopPageScaffold";
 import { entranceProps, useListEntrance } from "../list-entrance";
 import { DesktopLoadFailure } from "../DesktopLoadFailure";
+import { sessionFetch } from "@/lib/session";
 
 /* ── palette ── */
 const ACCENT = "#5E9EFF";
@@ -80,10 +81,7 @@ export default function DesktopRetailStock(props: DesktopRoutePageProps) {
   const stockQuery = useQuery<StockItem[]>({
     queryKey: ["/api/merchants", merchantId, "stock-items"],
     queryFn: async () => {
-      const token = localStorage.getItem("authToken");
-      const res = await fetch(`/api/merchants/${merchantId}/stock-items`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await sessionFetch(`/api/merchants/${merchantId}/stock-items`);
       if (!res.ok) throw new Error("Failed to fetch stock items");
       return res.json();
     },
@@ -93,10 +91,7 @@ export default function DesktopRetailStock(props: DesktopRoutePageProps) {
   const txQuery = useQuery<Tx[]>({
     queryKey: ["/api/merchants", merchantId, "transactions"],
     queryFn: async () => {
-      const token = localStorage.getItem("authToken");
-      const res = await fetch(`/api/merchants/${merchantId}/transactions`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await sessionFetch(`/api/merchants/${merchantId}/transactions`);
       if (!res.ok) throw new Error("Failed to fetch transactions");
       return res.json();
     },
@@ -121,10 +116,9 @@ export default function DesktopRetailStock(props: DesktopRoutePageProps) {
 
   const addMutation = useMutation({
     mutationFn: async (item: Draft) => {
-      const token = localStorage.getItem("authToken");
-      const res = await fetch(`/api/merchants/${merchantId}/stock-items`, {
+      const res = await sessionFetch(`/api/merchants/${merchantId}/stock-items`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(item),
       });
       if (!res.ok) throw new Error("Failed to add");
@@ -140,12 +134,11 @@ export default function DesktopRetailStock(props: DesktopRoutePageProps) {
 
   const updateMutation = useMutation({
     mutationFn: async (item: Draft) => {
-      const token = localStorage.getItem("authToken");
-      const res = await fetch(
+      const res = await sessionFetch(
         `/api/merchants/${merchantId}/stock-items/${item.id}`,
         {
           method: "PUT",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             name: item.name,
             cost: item.cost,
@@ -168,11 +161,7 @@ export default function DesktopRetailStock(props: DesktopRoutePageProps) {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      const token = localStorage.getItem("authToken");
-      const res = await fetch(
-        `/api/merchants/${merchantId}/stock-items/${id}`,
-        { method: "DELETE", headers: { Authorization: `Bearer ${token}` } },
-      );
+      const res = await sessionFetch(`/api/merchants/${merchantId}/stock-items/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Failed to delete");
       return res.json();
     },

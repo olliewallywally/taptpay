@@ -94,3 +94,45 @@ each finished step, evidence right after.
   retries once after a refreshed token; the first load removes the old stored keys.
 - The ~130 token uses in ~45 files: a scripted rewrite (`.local/claude-scratch/session-2026-09-30/e2-rewrite2.py`)
   for the common shapes, then by hand. The property and trades header helpers now give the CSRF token.
+
+### E2 resumed (2026-10-01)
+
+The 2026-09-30 session stopped mid-step (09:57:33 UTC, no summary) with E2 an uncommitted draft: the client
+rewritten to the session, 13 of 105 test files failing against it, its last edit (`session.ts`) referring to
+a start-up step in `App.tsx` that was not yet written, and one test rewrite that had failed without saving.
+The draft was copied to scratch before anything else, then re-read hunk by hunk.
+
+Found on re-reading, and fixed (each with a test):
+
+- **The server still told a signed-in terminal by its token only.** E1 taught the event stream the cookie,
+  not `GET /api/merchants/:id/active-transaction`: with the app sending no token, the phone terminal's
+  read of its current sale would have been answered 410 (the retired address). Now the cookie signs it in
+  when no board is named, as for the stream; a board's page still reads as any customer does. Red first,
+  2 of 4 (410 where 200 and 403 were expected).
+- **A sign-out the server cannot be reached for.** The page cannot delete an HttpOnly cookie, so a Log Out
+  made while the server is unreachable would have been undone by the next load, which finds the session
+  still standing. Log Out now marks the sign-out as begun (`taptpay:sign-out-pending`, the value `1`: no
+  credential) before it awaits anything; a load that finds the mark signs no one in and has the server end
+  the cookie's session (`finishPendingSignOut`, which holds nothing in memory and does not retry a refused
+  token, so it cannot end a sign-in made since); a new sign-in clears it.
+- **An answer that arrives after the check was cancelled was still held.** The start-up check's reader
+  held the session as a side effect, so a retry that answered after a deliberate sign-out left the page
+  holding a sign-in it was not showing. The reader now only reads; the session is held when the check's
+  answer is taken.
+- **With only the admin signed in, a change on a business route carried no CSRF token** (the server reads
+  the admin's cookie there, and wants the admin session's token). The token now follows the cookie the
+  server reads.
+- **Three Logout buttons cleared a storage key no sign-in was ever kept under** (`auth-token`,
+  `admin-token`), and so signed no one out: `mobile-header.tsx`, `merchant-terminal-mobile.tsx`,
+  `admin-api.tsx`. None is routed. They now end the session as every other Log Out does.
+
+Decided while finishing it (engineering, within the approved design):
+
+- The merchant stream is still read with `fetch` (the design said `EventSource`): `fetch` sees a 401 or 403
+  and stops, where `EventSource` cannot tell a refusal from a dropped connection and would reconnect for
+  ever. The cookie goes with it either way; no token is read or sent.
+- The pending mark is the one thing the page writes to `localStorage` about its sign-in. It holds no
+  credential. E3's source guard names it.
+
+Tests: the twelve files that failed against the draft now pass on the session model (who is signed in is
+what the page holds from the start-up check; a change carries the CSRF token; no `Authorization` header).

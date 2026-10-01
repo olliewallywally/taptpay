@@ -6,6 +6,7 @@ import { z } from "zod";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { clearSignOutPending } from "@/lib/session";
 import { apiErrorMessage } from "@/lib/api-error";
 import { trackEvent } from "@/lib/analytics";
 import { SEOHead } from "@/components/SEOHead";
@@ -51,7 +52,7 @@ export default function Login() {
 
     if (googleComplete) {
       void (async () => {
-        let result: { token?: unknown; merchantId?: unknown; newUser?: unknown; message?: unknown } = {};
+        let result: { csrfToken?: unknown; merchantId?: unknown; newUser?: unknown; message?: unknown } = {};
         let ok = false;
         try {
           const response = await fetch('/api/auth/google/session', { method: 'POST', credentials: 'same-origin' });
@@ -60,14 +61,15 @@ export default function Login() {
         } catch {
           // Network failure: fall through to the generic message.
         }
-        if (!ok || typeof result.token !== 'string') {
+        if (!ok || typeof result.csrfToken !== 'string') {
           signInFailed(typeof result.message === 'string' ? result.message : 'Google sign in failed. Please try again.');
           return;
         }
         const newUser = result.newUser === true;
         trackEvent("login_succeeded", { auth_method: "google", login_type: "merchant", new_user: newUser });
-        localStorage.setItem('authToken', result.token);
-        if (typeof result.merchantId === 'number') localStorage.setItem('merchantId', String(result.merchantId));
+        // R1-T4 phase E: the sign-in is the session cookie the server just set, which no script can
+        // read; nothing is stored here. The next page load's start-up check reads the session.
+        clearSignOutPending();
         if (newUser) {
           toast({
             title: 'Welcome to TaptPay!',
@@ -77,7 +79,7 @@ export default function Login() {
           toast({ title: 'Welcome back!', description: 'Signed in with Google.' });
         }
         // Match password login: force the app-wide AuthProvider to re-mount and
-        // fetch /api/auth/me with the fresh token instead of keeping stale state.
+        // read the new session instead of keeping stale state.
         window.location.href = '/dashboard';
       })();
     } else if (error) {
@@ -103,12 +105,12 @@ export default function Login() {
       const response = await apiRequest("POST", endpoint, data);
       return response.json();
     },
-    onSuccess: (result) => {
+    onSuccess: () => {
       trackEvent("login_succeeded", { auth_method: "password", login_type: loginType });
+      // R1-T4 phase E: the sign-in is the session cookie the server just set, which no script can read;
+      // nothing is stored here. The next page load's start-up check reads the session.
       if (loginType === 'merchant') {
-        localStorage.setItem("authToken", result.token);
-        localStorage.setItem("user", JSON.stringify(result.user));
-        
+        clearSignOutPending();
         toast({
           title: "Welcome back!",
           description: "You have been successfully logged in.",
@@ -123,12 +125,9 @@ export default function Login() {
         // Full-page navigation (not SPA setLocation): AuthProvider only checks
         // auth once on mount, so a client-side route change would leave its
         // cached state stale and ProtectedRoute would bounce back to /login.
-        // A hard navigation re-initialises auth with the just-stored token.
+        // A hard navigation re-initialises auth with the new session.
         window.location.href = dest;
       } else {
-        localStorage.setItem("adminAuthToken", result.token);
-        localStorage.setItem("adminUser", JSON.stringify(result.user));
-        
         toast({
           title: "Admin Access Granted",
           description: "Welcome to the Tapt Admin Dashboard",

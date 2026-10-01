@@ -1,11 +1,13 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import PaymentStack from "@/pages/payment-stack";
+import { holdSession, releaseSession } from "@/lib/session";
 
 /**
  * The phone Payment Stack lists this business's open sales.
- * - It reads them signed in: both reads are behind authenticateToken, which reads only the
- *   Authorization header, and the page sent none (since c7220cea, 2026-05-12).
+ * - It reads them signed in: both reads are behind authenticateToken. The sign-in is the session
+ *   cookie, which the browser sends with a same-origin request by itself (R1-T4 phase E); the page
+ *   sends no token. (From c7220cea, 2026-05-12, until 2026-09-25 it sent nothing and read nothing.)
  * - Owner decision 2026-09-25 (server/no-board-address.ts): "Copy Link" gives a board sale its
  *   board's address. A sale without a board has its own link, shown when it was made and not
  *   kept (only its hash is), so there is no link to copy — never the retired /pay/<merchant>.
@@ -43,9 +45,11 @@ function renderStack() {
 beforeEach(() => {
   jest.clearAllMocks();
   fetchMock.mockReset();
-  localStorage.setItem("authToken", "tok-1");
+  releaseSession("business");
+  holdSession("business", { id: 7, email: "owner@example.test", merchantId: 1, role: "owner" }, "page-csrf-token");
   fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
-    const signedIn = new Headers(init?.headers).get("Authorization") === "Bearer tok-1";
+    // The browser sends the session cookie with a same-origin request unless told to leave it off.
+    const signedIn = init?.credentials !== "omit";
     if (!signedIn) return jsonResponse({ message: "Access token required" }, 401);
     if (url === "/api/merchants/1/transactions") return jsonResponse([boardSale, noBoardSale]);
     if (url === "/api/merchants/1/tapt-stones") return jsonResponse(boards);
@@ -54,14 +58,20 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  localStorage.removeItem("authToken");
+  releaseSession("business");
 });
 
-it("loads the business's open sales signed in", async () => {
+it("loads the business's open sales signed in, by the session cookie: no token is sent", async () => {
   renderStack();
 
   expect(await screen.findByText("Counter coffee")).toBeInTheDocument();
   expect(screen.getByText("Takeaway lunch")).toBeInTheDocument();
+  const reads = fetchMock.mock.calls as Array<[string, RequestInit | undefined]>;
+  expect(reads.map(([url]) => url).sort()).toEqual(["/api/merchants/1/tapt-stones", "/api/merchants/1/transactions"]);
+  for (const [, init] of reads) {
+    expect(new Headers(init?.headers).get("Authorization")).toBeNull();
+    expect(init?.credentials ?? "same-origin").toBe("same-origin");
+  }
 });
 
 it("copies a board sale's board address", async () => {

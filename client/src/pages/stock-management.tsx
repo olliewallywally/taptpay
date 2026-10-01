@@ -11,6 +11,7 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { sessionFetch } from "@/lib/session";
 
 interface VariationOption {
   label: string;
@@ -364,10 +365,7 @@ function StockManagementPage({ merchantId }: { merchantId: number }) {
   const { data: merchant } = useQuery({
     queryKey: ["/api/merchants", merchantId, "profile"],
     queryFn: async () => {
-      const token = localStorage.getItem("authToken");
-      const response = await fetch(`/api/merchants/${merchantId}/profile`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await sessionFetch(`/api/merchants/${merchantId}/profile`);
       if (!response.ok) throw new Error("Failed to fetch merchant");
       return response.json();
     },
@@ -376,10 +374,7 @@ function StockManagementPage({ merchantId }: { merchantId: number }) {
   const { data: stockItems = [], isLoading } = useQuery({
     queryKey: ["/api/merchants", merchantId, "stock-items"],
     queryFn: async () => {
-      const token = localStorage.getItem("authToken");
-      const response = await fetch(`/api/merchants/${merchantId}/stock-items`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await sessionFetch(`/api/merchants/${merchantId}/stock-items`);
       if (!response.ok) throw new Error("Failed to fetch stock items");
       return response.json();
     },
@@ -387,10 +382,9 @@ function StockManagementPage({ merchantId }: { merchantId: number }) {
 
   const addItemMutation = useMutation({
     mutationFn: async (item: typeof sheetItem) => {
-      const token = localStorage.getItem("authToken");
-      const response = await fetch(`/api/merchants/${merchantId}/stock-items`, {
+      const response = await sessionFetch(`/api/merchants/${merchantId}/stock-items`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(item),
       });
       if (!response.ok) throw new Error("Failed to add stock item");
@@ -406,10 +400,9 @@ function StockManagementPage({ merchantId }: { merchantId: number }) {
 
   const updateItemMutation = useMutation({
     mutationFn: async (item: StockItem & { variations: VariationGroup[] }) => {
-      const token = localStorage.getItem("authToken");
-      const response = await fetch(`/api/merchants/${merchantId}/stock-items/${item.id}`, {
+      const response = await sessionFetch(`/api/merchants/${merchantId}/stock-items/${item.id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: item.name,
           cost: item.cost,
@@ -431,10 +424,8 @@ function StockManagementPage({ merchantId }: { merchantId: number }) {
 
   const deleteItemMutation = useMutation({
     mutationFn: async (itemId: number) => {
-      const token = localStorage.getItem("authToken");
-      const response = await fetch(`/api/merchants/${merchantId}/stock-items/${itemId}`, {
+      const response = await sessionFetch(`/api/merchants/${merchantId}/stock-items/${itemId}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok) throw new Error("Failed to delete stock item");
       return response.json();

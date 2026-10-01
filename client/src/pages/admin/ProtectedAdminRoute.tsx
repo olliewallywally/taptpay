@@ -1,48 +1,21 @@
 import { useEffect } from 'react';
 import { useLocation } from 'wouter';
+import { heldSession } from '@/lib/session';
 
 interface ProtectedAdminRouteProps {
   children: React.ReactNode;
 }
 
+// R1-T4 phase E: the admin's sign-in is a session cookie the page cannot read; the page knows it only
+// from the admin area's start-up check (lib/session.ts readAdminSession).
 export function ProtectedAdminRoute({ children }: ProtectedAdminRouteProps) {
   const [, setLocation] = useLocation();
+  const session = heldSession('admin');
+  const isAdmin = session?.user.role === 'admin';
 
   useEffect(() => {
-    const adminToken = localStorage.getItem('adminAuthToken');
-    const adminUser = localStorage.getItem('adminUser');
+    if (!isAdmin) setLocation('/login');
+  }, [isAdmin, setLocation]);
 
-    if (!adminToken || !adminUser) {
-      setLocation('/login');
-      return;
-    }
-
-    try {
-      const user = JSON.parse(adminUser);
-      if (user.role !== 'admin') {
-        setLocation('/login');
-      }
-    } catch (error) {
-      console.error('Invalid admin user data:', error);
-      setLocation('/login');
-    }
-  }, [setLocation]);
-
-  const adminToken = localStorage.getItem('adminAuthToken');
-  const adminUser = localStorage.getItem('adminUser');
-
-  if (!adminToken || !adminUser) {
-    return null;
-  }
-
-  try {
-    const user = JSON.parse(adminUser);
-    if (user.role !== 'admin') {
-      return null;
-    }
-  } catch (error) {
-    return null;
-  }
-
-  return <>{children}</>;
+  return isAdmin ? <>{children}</> : null;
 }

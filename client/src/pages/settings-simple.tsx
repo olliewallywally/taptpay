@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { sessionFetch } from "@/lib/session";
 
 export default function SettingsSimple() {
   // Get current user
@@ -14,9 +15,7 @@ export default function SettingsSimple() {
     queryKey: ["/api/merchants", merchantId, "profile"],
     queryFn: async () => {
       if (!merchantId) throw new Error("No merchant ID available");
-      const response = await fetch(`/api/merchants/${merchantId}/profile`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
-      });
+      const response = await sessionFetch(`/api/merchants/${merchantId}/profile`);
       if (!response.ok) throw new Error("Failed to fetch merchant");
       return response.json();
     },

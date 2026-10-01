@@ -46,6 +46,7 @@ import {
 } from "../DesktopPageScaffold";
 import { entranceProps, useListEntrance } from "../list-entrance";
 import { DesktopLoadFailure } from "../DesktopLoadFailure";
+import { sessionFetch } from "@/lib/session";
 
 /* ── palette ── */
 const ACCENT = "#5E9EFF";
@@ -148,8 +149,7 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
   const chipRef = useRef<HTMLDivElement>(null);
 
   const authFetch = async (path: string) => {
-    const token = localStorage.getItem("authToken");
-    const res = await fetch(path, { headers: { Authorization: `Bearer ${token}` } });
+    const res = await sessionFetch(path);
     if (!res.ok) throw new Error(path);
     return res.json();
   };
@@ -381,10 +381,8 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
   const downloadReceipt = async (tx: Tx) => {
     setBusyTx(tx.id);
     try {
-      const token = localStorage.getItem("authToken");
-      const res = await fetch(`/api/transactions/${tx.id}/receipt-pdf`, {
+      const res = await sessionFetch(`/api/transactions/${tx.id}/receipt-pdf`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error("receipt");
       const blob = await res.blob();

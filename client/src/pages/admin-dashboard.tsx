@@ -44,6 +44,8 @@ import {
   Tooltip,
   Legend
 } from "recharts";
+import { sessionFetch } from "@/lib/session";
+import { logOutAdmin } from "@/lib/session";
 
 interface AdminAnalytics {
   totalMerchants: number;
@@ -181,9 +183,7 @@ export default function AdminDashboard() {
   const { data: analytics, isLoading } = useQuery<AdminAnalytics>({
     queryKey: ['/api/admin/analytics'],
     queryFn: async () => {
-      const response = await fetch('/api/admin/analytics', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('adminAuthToken')}` }
-      });
+      const response = await sessionFetch('/api/admin/analytics');
       if (!response.ok) throw new Error('Failed to fetch admin analytics');
       return response.json();
     },
@@ -194,9 +194,7 @@ export default function AdminDashboard() {
   const { data: revenueOverTime = [] } = useQuery<{ day: string; revenue: number; transactions: number }[]>({
     queryKey: ['/api/admin/revenue-over-time'],
     queryFn: async () => {
-      const res = await fetch('/api/admin/revenue-over-time', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('adminAuthToken')}` }
-      });
+      const res = await sessionFetch('/api/admin/revenue-over-time');
       if (!res.ok) return [];
       return res.json();
     },
@@ -207,9 +205,7 @@ export default function AdminDashboard() {
   const { data: paymentMethodData = [] } = useQuery<{ name: string; value: number; color: string }[]>({
     queryKey: ['/api/admin/payment-method-breakdown'],
     queryFn: async () => {
-      const res = await fetch('/api/admin/payment-method-breakdown', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('adminAuthToken')}` }
-      });
+      const res = await sessionFetch('/api/admin/payment-method-breakdown');
       if (!res.ok) return [];
       return res.json();
     },
@@ -217,8 +213,7 @@ export default function AdminDashboard() {
   });
 
   const handleLogout = () => {
-    localStorage.removeItem("adminAuthToken");
-    localStorage.removeItem("adminUser");
+    void logOutAdmin();
     toast({
       title: "Logged Out",
       description: "You have been successfully logged out.",

@@ -1614,15 +1614,15 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     branches: [
       {
         principal: "merchant",
-        when: "an Authorization header is sent",
+        when: "a session cookie with no stoneId (R1-T4 phase E), or an Authorization header (until phase E3)",
         roles: ["owner", "member"],
         platformAdmin: true,
         tenant: "path-merchant",
-        tenantRule: `${SIGNED_IN_BUSINESS_RULE}; its newest open sale on any board, or on the board asked for, including a sale with its own link`,
+        tenantRule: `${SIGNED_IN_BUSINESS_RULE}; its newest open sale on any board, or (with a token) on the board asked for, including a sale with its own link`,
       },
       {
         principal: "public",
-        when: "no Authorization header, with a stoneId (without one: 410 NO_BOARD_ADDRESS_RETIRED)",
+        when: "a stoneId and no Authorization header, signed in or not: a board's page reads its board as any customer does (with neither a sign-in nor a stoneId: 410 NO_BOARD_ADDRESS_RETIRED)",
         tenant: "board",
         tenantRule: `${BOARD_PAGE_RULE}; a board that is not the business's, or does not exist, is 404, the same answer (since 2026-09-29, R1-T3; it was 403), and so is a board the business has removed (owner decision 2026-09-29: its page no longer shows the sale left open on it)`,
       },

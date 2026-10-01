@@ -5,7 +5,8 @@
  * mounted); plan R1-T8 converts it to assert the opposite, across the
  * transitions the plan names: loading → authenticated, loading →
  * unauthenticated, error → retry, a change of merchant, and unmount. The real
- * auth module is used — the token is read from localStorage, as in the app.
+ * auth module is used: who is signed in is what the page holds from the start-up
+ * check, as in the app (R1-T4 phase E; it was a token read from localStorage).
  */
 import { act, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -33,10 +34,13 @@ jest.mock("@/lib/queryClient", () => ({
 }));
 
 import Settings from "@/pages/settings";
+import { holdSession, releaseSession } from "@/lib/session";
 
-/** A bearer-shaped token whose payload decodes to that merchant, as the app stores it. */
-const tokenFor = (merchantId: number) =>
-  `h.${Buffer.from(JSON.stringify({ merchantId, role: "owner" })).toString("base64")}.s`;
+/** The page's sign-in, as the start-up check hands it over: this merchant's owner. */
+const signInAs = (merchantId: number) =>
+  holdSession("business", { id: 7, email: "owner@example.test", merchantId, role: "owner" }, "c".repeat(43));
+/** What Log Out does to the page, and what a refused session does: the sign-in is no longer held. */
+const signOut = () => releaseSession("business");
 
 type Reply = { ok: boolean; status: number; json: () => Promise<unknown> };
 const reply = (body: unknown, status = 200): Reply => ({ ok: status < 400, status, json: async () => body });
@@ -47,6 +51,7 @@ let consoleErrors: unknown[][];
 let client: QueryClient;
 beforeEach(() => {
   localStorage.clear();
+  signOut();
   mockNavigate.mockClear();
   consoleErrors = [];
   jest.spyOn(console, "error").mockImplementation((...args) => { consoleErrors.push(args); });
@@ -83,14 +88,14 @@ function holdProfile() {
 }
 
 describe("Settings keeps its hooks in order (R1-T8)", () => {
-  it("does not crash on re-render once the auth token is gone, and leaves for /login", async () => {
-    localStorage.setItem("authToken", tokenFor(22));
+  it("does not crash on re-render once the sign-in is gone, and leaves for /login", async () => {
+    signInAs(22);
     const view = mount();
     await settle();
 
-    // Exactly what handleLogout() does, and what a 401 credential clear does:
-    // the token disappears while the page is mounted.
-    localStorage.removeItem("authToken");
+    // Exactly what Log Out does, and what a refused session does: the sign-in
+    // disappears while the page is mounted.
+    signOut();
 
     expect(() => view.rerender()).not.toThrow();
     await settle();
@@ -100,7 +105,7 @@ describe("Settings keeps its hooks in order (R1-T8)", () => {
   });
 
   it("loading → authenticated: renders the merchant once the profile arrives", async () => {
-    localStorage.setItem("authToken", tokenFor(22));
+    signInAs(22);
     const profile = holdProfile();
     mount();
     await settle();
@@ -114,12 +119,12 @@ describe("Settings keeps its hooks in order (R1-T8)", () => {
   });
 
   it("loading → unauthenticated: the session ending mid-load neither crashes nor renders the page", async () => {
-    localStorage.setItem("authToken", tokenFor(22));
+    signInAs(22);
     const profile = holdProfile();
     const view = mount();
     await settle();
 
-    localStorage.removeItem("authToken");
+    signOut();
     expect(() => view.rerender()).not.toThrow();
     profile.release();
     await settle();
@@ -129,7 +134,7 @@ describe("Settings keeps its hooks in order (R1-T8)", () => {
   });
 
   it("error → retry: a failed profile load, then a successful retry", async () => {
-    localStorage.setItem("authToken", tokenFor(22));
+    signInAs(22);
     fetchMock.mockImplementationOnce(async () => reply({ message: "unavailable" }, 503));
     mount();
     await settle();
@@ -142,12 +147,12 @@ describe("Settings keeps its hooks in order (R1-T8)", () => {
   });
 
   it("a change of merchant loads the new merchant, with no crash and no state carried over", async () => {
-    localStorage.setItem("authToken", tokenFor(22));
+    signInAs(22);
     const view = mount();
     await settle();
     expect(screen.getByText("Synthetic Merchant 22")).toBeInTheDocument();
 
-    localStorage.setItem("authToken", tokenFor(23));
+    signInAs(23);
     expect(() => view.rerender()).not.toThrow();
     await settle();
     expect(screen.getByText("Synthetic Merchant 23")).toBeInTheDocument();
@@ -157,7 +162,7 @@ describe("Settings keeps its hooks in order (R1-T8)", () => {
   });
 
   it("unmounts cleanly", async () => {
-    localStorage.setItem("authToken", tokenFor(22));
+    signInAs(22);
     const view = mount();
     await settle();
     view.unmount();

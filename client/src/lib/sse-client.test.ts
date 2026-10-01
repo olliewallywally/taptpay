@@ -23,7 +23,7 @@ describe("SSEClient merchant authentication failures", () => {
     } as Response);
 
     const client = new SSEClient();
-    client.connectMerchant(42, "revoked-token");
+    client.connectMerchant(42);
     await Promise.resolve();
 
     expect(fetchMock).toHaveBeenCalledTimes(1);

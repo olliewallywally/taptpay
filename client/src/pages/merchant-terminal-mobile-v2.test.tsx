@@ -396,8 +396,9 @@ describe("sales from the phone terminal, and what its share page offers (gap 12;
     ]));
   });
 
-  it("reads its current sale signed in", async () => {
-    localStorage.setItem("authToken", "tok-1");
+  it("reads its current sale signed in: by the session cookie, with no token and no board in the address", async () => {
+    // R1-T4 phase E: the server tells a signed-in terminal from a board's page by the session cookie
+    // the browser sends with a same-origin request; the address names no board.
     renderTerminal();
     await screen.findByTestId("retail-terminal-view-stub");
 
@@ -405,7 +406,8 @@ describe("sales from the phone terminal, and what its share page offers (gap 12;
       expect(fetchMock.mock.calls.some(([url]) => String(url) === "/api/merchants/1/active-transaction")).toBe(true),
     );
     const [, init] = fetchMock.mock.calls.find(([url]) => String(url) === "/api/merchants/1/active-transaction")!;
-    expect(new Headers((init as RequestInit | undefined)?.headers).get("Authorization")).toBe("Bearer tok-1");
+    expect((init as RequestInit | undefined)?.credentials).toBe("same-origin");
+    expect(new Headers((init as RequestInit | undefined)?.headers).get("Authorization")).toBeNull();
   });
 });
 

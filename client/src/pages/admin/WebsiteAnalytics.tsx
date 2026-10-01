@@ -2,6 +2,7 @@ import { useLocation } from 'wouter';
 import { ArrowLeft, Users, Eye, Clock, Smartphone, Monitor, Tablet, AlertCircle, TrendingUp, Activity } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { sessionFetch } from "@/lib/session";
 
 interface GA4Metrics {
   configured: boolean;
@@ -39,14 +40,11 @@ const DEVICE_COLORS = ['#0055FF', '#00E5CC', '#10B981'];
 
 export function WebsiteAnalytics() {
   const [, setLocation] = useLocation();
-  const adminToken = localStorage.getItem('adminAuthToken');
 
   const { data, isLoading } = useQuery<GA4Metrics>({
     queryKey: ['/api/admin/ga4-metrics'],
     queryFn: async () => {
-      const res = await fetch('/api/admin/ga4-metrics', {
-        headers: { Authorization: `Bearer ${adminToken}` },
-      });
+      const res = await sessionFetch('/api/admin/ga4-metrics');
       if (!res.ok) throw new Error('Failed to fetch GA4 metrics');
       return res.json();
     },

@@ -28,7 +28,17 @@ import { useKeyboardInset } from "@/hooks/use-keyboard-inset";
 import { desktopChromeForLocation } from "@/lib/desktop-chrome-route";
 import type { TutorialPageKey } from "@shared/tutorial";
 import { sendAnalyticsPageView } from "@/lib/analytics-page";
-import { resyncThisDevicePush, stopThisDevicePush } from "@/lib/push-device";
+import { resyncThisDevicePush } from "@/lib/push-device";
+import { logOut } from "@/lib/log-out";
+import {
+  finishPendingSignOut,
+  forgetLegacyStoredSession,
+  holdSession,
+  logOutAdmin,
+  releaseSession,
+  signOutPending,
+  type SessionUser,
+} from "@/lib/session";
 
 import { LandingPage } from "@/pages/landing-page";
 import Login from "@/pages/login";
@@ -458,17 +468,20 @@ function startBoundedSessionCheck<T>(
 
 /**
  * One session probe. The classification here is the client half of the fix:
- * only 401/403 — the server having looked at the credentials and refused them —
- * counts as a rejection. Everything else is an outage of some kind, and an
- * outage must never cost the user their session.
+ * only the server having looked at the session and refused it — 401/403, or the
+ * start-up check's ordinary "not signed in" — counts as a rejection. Everything
+ * else is an outage of some kind, and an outage must never cost the user their
+ * session.
+ *
+ * R1-T4 phase E: the session is an HttpOnly cookie the browser sends by itself;
+ * no token is read or sent here. `read` returns null for "not signed in".
  */
 async function probeSession<T>(
   url: string,
-  token: string,
   signal: AbortSignal,
-  read: (payload: any) => T,
+  read: (payload: any) => T | null,
 ): Promise<ProbeOutcome<T>> {
-  const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` }, signal });
+  const response = await fetch(url, { credentials: "same-origin", cache: "no-store", signal });
 
   if (response.status === 401 || response.status === 403 || response.status === 404) {
     return { kind: "rejected" };
@@ -484,7 +497,8 @@ async function probeSession<T>(
       return { kind: "unavailable", detail: "The server sent a reply we couldn't read.", retryable: true };
     }
     try {
-      return { kind: "ok", value: read(payload) };
+      const value = read(payload);
+      return value === null ? { kind: "rejected" } : { kind: "ok", value };
     } catch {
       // A successful status with an incomplete body is a broken deploy, not a
       // valid identity. Keep the token and retry within the same hard bounds.
@@ -513,25 +527,46 @@ async function probeSession<T>(
   };
 }
 
-function readStoredToken(key: string): string | null {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    // Storage can be unavailable in privacy-restricted browser contexts.
-    return null;
-  }
+/** A start-up check's answer: who the session cookie signs in, and the page's CSRF token. */
+interface SessionReply {
+  user: SessionUser;
+  csrfToken: string;
 }
 
-function clearStoredSession(keys: string[]) {
-  try {
-    keys.forEach((key) => localStorage.removeItem(key));
-  } catch {
-    // Nothing to clear if storage is unreachable.
+/**
+ * The business start-up check's answer (GET /api/auth/session): the signed-in login and its CSRF token,
+ * or null when no one is signed in here. Nothing is held yet: the page holds a session only when its
+ * check's answer is taken (an answer that arrives after a sign-out, or after the check gave up, is not).
+ */
+function readBusinessSessionReply(payload: unknown): (SessionReply & { auth: AuthData }) | null {
+  if (isRecord(payload) && payload.signedIn === false) return null;
+  if (!isRecord(payload) || payload.signedIn !== true || typeof payload.csrfToken !== "string") {
+    throw new Error("Incomplete session reply");
   }
+  const auth = readMerchantAuthData(payload);
+  const user = payload.user as Record<string, unknown>;
+  return {
+    auth,
+    user: {
+      ...(user as unknown as SessionUser),
+      id: Number(user.id),
+      merchantId: user.merchantId === null ? null : Number(user.merchantId),
+    },
+    csrfToken: payload.csrfToken,
+  };
 }
 
-const MERCHANT_SESSION_KEYS = ["authToken", "user", "merchantId"];
-const ADMIN_SESSION_KEYS = ["adminAuthToken", "adminUser"];
+/** The admin area's start-up check (GET /api/admin/auth/me), read as the business's is. */
+function readAdminSessionReply(payload: unknown): SessionReply {
+  if (!isRecord(payload) || !isRecord(payload.user) || typeof payload.csrfToken !== "string") {
+    throw new Error("Incomplete admin session reply");
+  }
+  const user = payload.user;
+  return {
+    user: { id: Number(user.id), email: String(user.email), merchantId: 0, role: String(user.role) },
+    csrfToken: payload.csrfToken,
+  };
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<{ phase: AuthPhase; auth: AuthData | null; detail: string | null }>({
@@ -543,33 +578,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [runId, setRunId] = useState(0);
 
   useEffect(() => {
-    const token = readStoredToken("authToken");
-    if (!token) {
-      setState({ phase: "resolved", auth: { isAuthenticated: false }, detail: null });
+    // R1-T4 phase E: the sign-in is an HttpOnly session cookie, so the page cannot tell on its own
+    // whether one exists: it always asks. The first load after the switch also removes the sign-in
+    // the page used to keep in storage.
+    forgetLegacyStoredSession();
+
+    // A sign-out begun here and not yet finished (the server could not be reached, or it is still on
+    // its way): no one is signed in until it is. The page cannot delete an HttpOnly cookie, so it has
+    // the server end the session now, and asks nothing that would sign the browser back in.
+    if (signOutPending()) {
+      releaseSession("business");
       setIsRetrying(false);
+      setState({ phase: "resolved", auth: { isAuthenticated: false }, detail: null });
+      void finishPendingSignOut();
       return;
     }
 
     return startBoundedSessionCheck(
-      (signal) =>
-        probeSession(
-          "/api/auth/me",
-          token,
-          signal,
-          readMerchantAuthData,
-        ),
+      (signal) => probeSession("/api/auth/session", signal, readBusinessSessionReply),
       (result) => {
         setIsRetrying(false);
         if (result.kind === "ok") {
-          setState({ phase: "resolved", auth: result.value, detail: null });
+          // Held in memory only (lib/session.ts): who is signed in, and the page's CSRF token.
+          holdSession("business", result.value.user, result.value.csrfToken);
+          setState({ phase: "resolved", auth: result.value.auth, detail: null });
           // R1-T4: this device's existing notification subscription follows the
           // signed-in login. Never turns notifications on; never throws.
-          void resyncThisDevicePush(token);
+          void resyncThisDevicePush();
           return;
         }
         if (result.kind === "rejected") {
-          // The one and only place a failed check discards credentials.
-          clearStoredSession(MERCHANT_SESSION_KEYS);
+          // The one and only place a failed check lets the page's sign-in go.
+          releaseSession("business");
           setState({ phase: "resolved", auth: { isAuthenticated: false }, detail: null });
           return;
         }
@@ -587,13 +627,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Bumping runId as well as setting the state cancels any check still in
   // flight (the effect's cleanup), so a retry that lands after the user has
-  // chosen to sign out cannot quietly sign them back in.
+  // chosen to sign out cannot quietly sign them back in. The effect then runs
+  // again and finds the sign-out begun (logOut marks it before it awaits
+  // anything), so it starts no new check either.
   const signOut = useCallback(() => {
-    // R1-T4: as Log Out does, stop this device's notifications with the token
-    // being discarded. With the server unreachable, a browser still retires its
-    // subscription locally.
-    void stopThisDevicePush(readStoredToken("authToken"));
-    clearStoredSession(MERCHANT_SESSION_KEYS);
+    // R1-T4: as Log Out does, stop this device's notifications and end this
+    // session (phase E). With the server unreachable, a browser still retires
+    // its subscription locally, the page forgets its sign-in, and the next load
+    // that reaches the server ends the session.
+    void logOut();
     setIsRetrying(false);
     setState({ phase: "resolved", auth: { isAuthenticated: false }, detail: null });
     setRunId((n) => n + 1);
@@ -661,22 +703,18 @@ export function AdminProtectedRoute({ children }: { children: React.ReactNode })
   const [runId, setRunId] = useState(0);
 
   useEffect(() => {
-    const token = readStoredToken("adminAuthToken");
-    if (!token) {
-      setState({ phase: "signedOut", detail: null });
-      return;
-    }
-
+    // R1-T4 phase E: the admin's sign-in is a session cookie of its own; the page always asks.
     return startBoundedSessionCheck(
-      (signal) => probeSession("/api/admin/auth/me", token, signal, () => true),
+      (signal) => probeSession("/api/admin/auth/me", signal, readAdminSessionReply),
       (result) => {
         setIsRetrying(false);
         if (result.kind === "ok") {
+          holdSession("admin", result.value.user, result.value.csrfToken);
           setState({ phase: "resolved", detail: null });
           return;
         }
         if (result.kind === "rejected") {
-          clearStoredSession(ADMIN_SESSION_KEYS);
+          releaseSession("admin");
           setState({ phase: "signedOut", detail: null });
           return;
         }
@@ -695,7 +733,7 @@ export function AdminProtectedRoute({ children }: { children: React.ReactNode })
   }, []);
 
   const signOut = useCallback(() => {
-    clearStoredSession(ADMIN_SESSION_KEYS);
+    void logOutAdmin();
     setIsRetrying(false);
     setState({ phase: "signedOut", detail: null });
     setRunId((n) => n + 1);

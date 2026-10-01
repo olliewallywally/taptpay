@@ -13,6 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { sessionFetch } from "@/lib/session";
+import { logOut } from "@/lib/log-out";
 
 interface Merchant {
   id: number;
@@ -248,9 +250,6 @@ export default function DemoTerminal() {
   useEffect(() => {
     if (!merchantId) return;
 
-    const token = localStorage.getItem('authToken');
-    if (!token) return;
-
     const handleTransaction = (data: any) => {
       if (!data.transaction) return;
       // The authenticated merchant stream includes every board; retain the demo's
@@ -264,7 +263,7 @@ export default function DemoTerminal() {
         }
       }
     };
-    sseClient.connectMerchant(merchantId, token);
+    sseClient.connectMerchant(merchantId);
     sseClient.subscribe("transaction_update", handleTransaction);
     sseClient.subscribe("transaction_updated", handleTransaction);
 
@@ -434,9 +433,9 @@ export default function DemoTerminal() {
     },
   });
 
-  const handleLogout = () => {
-    localStorage.removeItem("authToken");
-    localStorage.removeItem("user");
+  const handleLogout = async () => {
+    // R1-T4 phase E: the server ends this session; the page forgets it.
+    await logOut();
     setLocation("/login");
   };
 
@@ -1064,10 +1063,9 @@ export default function DemoTerminal() {
                       }
                       setCashSaleLoading(true);
                       try {
-                        const token = localStorage.getItem("authToken");
-                        const res = await fetch("/api/transactions/cash-sale", {
+                        const res = await sessionFetch("/api/transactions/cash-sale", {
                           method: "POST",
-                          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                          headers: { "Content-Type": "application/json" },
                           body: JSON.stringify({ merchantId, itemName: cashItemName.trim(), price: parseFloat(cashAmount).toFixed(2), stoneId: selectedStoneId }),
                         });
                         if (!res.ok) throw new Error("Failed to record cash sale");
@@ -1380,10 +1378,8 @@ export default function DemoTerminal() {
             <button
               onClick={async () => {
                 try {
-                  const token = localStorage.getItem("authToken");
-                  const res = await fetch(`/api/transactions/${cashSaleTransaction.id}/receipt-pdf`, {
+                  const res = await sessionFetch(`/api/transactions/${cashSaleTransaction.id}/receipt-pdf`, {
                     method: "POST",
-                    headers: { "Authorization": `Bearer ${token}` },
                   });
                   if (!res.ok) throw new Error("Failed");
                   const blob = await res.blob();
@@ -1408,10 +1404,8 @@ export default function DemoTerminal() {
             <button
               onClick={async () => {
                 try {
-                  const token = localStorage.getItem("authToken");
-                  const res = await fetch(`/api/transactions/${cashSaleTransaction.id}/receipt-pdf`, {
+                  const res = await sessionFetch(`/api/transactions/${cashSaleTransaction.id}/receipt-pdf`, {
                     method: "POST",
-                    headers: { "Authorization": `Bearer ${token}` },
                   });
                   if (!res.ok) throw new Error("Failed");
                   const blob = await res.blob();

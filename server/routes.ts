@@ -2353,7 +2353,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     // The business's own terminal, signed in: its newest open sale on any board or
     // none, including a sale with its own link, which no public read can see. The
     // same shape its own event stream sends.
-    if (req.headers.authorization !== undefined) {
+    // R1-T4 phase E: the terminal is told by its session cookie, as its event stream is (the app sends
+    // no token). A board's page names its board, and reads it as any customer does even in a browser
+    // signed in to the business.
+    const signedIn = req.headers.authorization !== undefined ||
+      (stoneId === undefined && hasSessionCookie(req));
+    if (signedIn) {
       let authenticated = false;
       await authenticateToken(req as AuthenticatedRequest, res, () => {
         authenticated = true;

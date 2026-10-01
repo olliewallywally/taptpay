@@ -5,28 +5,33 @@
  * that signed in since, so it is reported separately rather than as success.
  */
 import { signOutEverywhere } from "../sign-out-everywhere";
+import { CSRF_HEADER, holdSession, releaseSession } from "../session";
 
 const fetchMock = global.fetch as jest.Mock;
 const reply = (status: number, body?: unknown) => ({
   ok: status >= 200 && status < 300,
   status,
   json: body === undefined ? async () => { throw new SyntaxError("no body"); } : async () => body,
+  clone() { return this; },
 });
 
+// R1-T4 phase E: this device's sign-in is its session cookie, which the browser sends itself; the page
+// holds who is signed in and the session's CSRF token.
 beforeEach(() => {
   fetchMock.mockReset();
   localStorage.clear();
-  localStorage.setItem("authToken", "this.device.token");
+  holdSession("business", { id: 5, email: "owner@example.test", merchantId: 77, role: "owner" }, "this-page-csrf-token");
 });
 
 describe("signOutEverywhere", () => {
-  it("asks the server to end every session, with this device's token", async () => {
+  it("asks the server to end every session, with this device's session cookie and the page's CSRF token", async () => {
     fetchMock.mockResolvedValue(reply(204));
     await expect(signOutEverywhere()).resolves.toBe("ended");
-    expect(fetchMock).toHaveBeenCalledWith("/api/auth/sign-out-everywhere", {
-      method: "POST",
-      headers: { Authorization: "Bearer this.device.token" },
-    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const headers = new Headers(init.headers);
+    expect({ url, method: init.method, credentials: init.credentials, csrf: headers.get(CSRF_HEADER), authorization: headers.get("Authorization") })
+      .toEqual({ url: "/api/auth/sign-out-everywhere", method: "POST", credentials: "same-origin", csrf: "this-page-csrf-token", authorization: null });
   });
 
   it("reports a session that had already ended, not success", async () => {
@@ -34,8 +39,8 @@ describe("signOutEverywhere", () => {
     await expect(signOutEverywhere()).resolves.toBe("already-signed-out");
   });
 
-  it("does not call the server without a token", async () => {
-    localStorage.removeItem("authToken");
+  it("does not call the server when no one is signed in on this page", async () => {
+    releaseSession("business");
     await expect(signOutEverywhere()).resolves.toBe("already-signed-out");
     expect(fetchMock).not.toHaveBeenCalled();
   });

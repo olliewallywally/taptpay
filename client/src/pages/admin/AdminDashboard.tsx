@@ -8,13 +8,14 @@ import { MerchantsPage } from './MerchantsPage';
 import { MerchantDetail } from './MerchantDetail';
 import { APIManagement } from './APIManagement';
 import { Analytics } from './Analytics';
+import { logOutAdmin } from "@/lib/session";
 
 export default function AdminDashboard() {
   const [location, setLocation] = useLocation();
 
-  const handleLogout = () => {
-    localStorage.removeItem('adminAuthToken');
-    localStorage.removeItem('adminUser');
+  // R1-T4 phase E: the server ends this admin session; the page forgets it.
+  const handleLogout = async () => {
+    await logOutAdmin();
     window.location.href = '/login';
   };
 

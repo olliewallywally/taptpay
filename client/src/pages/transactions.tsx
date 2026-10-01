@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { csvCell } from "@/lib/report-utils";
 import QRCode from "qrcode";
+import { sessionFetch } from "@/lib/session";
 
 interface Transaction {
   id: number;
@@ -116,10 +117,7 @@ function TransactionsPage({ merchantId }: { merchantId: number }) {
   const { data: transactions = [], isLoading } = useQuery({
     queryKey: ["/api/merchants", merchantId, "transactions"],
     queryFn: async () => {
-      const token = localStorage.getItem("authToken");
-      const response = await fetch(`/api/merchants/${merchantId}/transactions`, {
-        headers: { "Authorization": `Bearer ${token}` },
-      });
+      const response = await sessionFetch(`/api/merchants/${merchantId}/transactions`);
       if (!response.ok) throw new Error("Failed to fetch transactions");
       return response.json();
     },
@@ -128,10 +126,7 @@ function TransactionsPage({ merchantId }: { merchantId: number }) {
   const { data: merchant } = useQuery({
     queryKey: ["/api/merchants", merchantId, "profile"],
     queryFn: async () => {
-      const token = localStorage.getItem("authToken");
-      const response = await fetch(`/api/merchants/${merchantId}/profile`, {
-        headers: { "Authorization": `Bearer ${token}` },
-      });
+      const response = await sessionFetch(`/api/merchants/${merchantId}/profile`);
       if (!response.ok) throw new Error("Failed to fetch merchant");
       return response.json();
     },
@@ -182,10 +177,8 @@ function TransactionsPage({ merchantId }: { merchantId: number }) {
   };
 
   const fetchPdfBlob = async (txId: number): Promise<Blob> => {
-    const token = localStorage.getItem("authToken");
-    const response = await fetch(`/api/transactions/${txId}/receipt-pdf`, {
+    const response = await sessionFetch(`/api/transactions/${txId}/receipt-pdf`, {
       method: "POST",
-      headers: { "Authorization": `Bearer ${token}` },
     });
     if (!response.ok) throw new Error("Failed to generate PDF");
     return response.blob();
@@ -378,10 +371,7 @@ function TransactionsPage({ merchantId }: { merchantId: number }) {
 
   const handleDownloadPDF = async () => {
     try {
-      const token = localStorage.getItem("authToken");
-      const response = await fetch(`/api/merchants/${merchantId}/export/pdf`, {
-        headers: { "Authorization": `Bearer ${token}` },
-      });
+      const response = await sessionFetch(`/api/merchants/${merchantId}/export/pdf`);
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);

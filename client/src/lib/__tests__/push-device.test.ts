@@ -4,6 +4,9 @@
  * confirmed session re-registers this device's existing subscription under the
  * signed-in login, and never turns notifications on for a device that has none.
  * Neither may throw or hold up signing out or opening the app.
+ *
+ * R1-T4 phase E: the session cookie signs these requests in (the browser sends it itself); each carries
+ * the page's CSRF token, and none is sent unless the page holds a sign-in.
  */
 import {
   forgetNativeDeviceToken,
@@ -14,6 +17,7 @@ import {
   resyncThisDevicePush,
   stopThisDevicePush,
 } from "../push-device";
+import { holdSession, releaseSession } from "../session";
 
 let mockNativeIOS = false;
 jest.mock("@/lib/native", () => ({ isNativeIOS: () => mockNativeIOS }));
@@ -50,9 +54,11 @@ beforeEach(() => {
   localStorage.clear();
   subscription = browserSubscription();
   installBrowserPush();
+  holdSession("business", { id: 7, email: "owner@example.test", merchantId: 22, role: "owner" }, "this.device.csrf");
 });
 
 afterEach(() => {
+  releaseSession("business");
   jest.useRealTimers();
   jest.restoreAllMocks();
   delete (navigator as { serviceWorker?: unknown }).serviceWorker;
@@ -62,16 +68,19 @@ afterEach(() => {
 
 const callsTo = (path: string) => fetchMock.mock.calls.filter(([url]) => url === path);
 const bodyOf = (call: unknown[]) => JSON.parse((call[1] as RequestInit).body as string);
-const authOf = (call: unknown[]) => ((call[1] as RequestInit).headers as Record<string, string>).Authorization;
+const headersOf = (call: unknown[]) => (call[1] as RequestInit).headers as Record<string, string>;
+const csrfOf = (call: unknown[]) => headersOf(call)["X-CSRF-Token"];
 
 describe("Log Out on a browser", () => {
-  it("retires this browser's subscription, then tells the server with the token it had", async () => {
-    await stopThisDevicePush("this.device.token");
+  it("retires this browser's subscription, then tells the server, signed in by the session it had", async () => {
+    await stopThisDevicePush();
 
     expect(subscription!.unsubscribe).toHaveBeenCalledTimes(1);
     const [call] = callsTo("/api/push/unsubscribe");
     expect(call[1]).toEqual(expect.objectContaining({ method: "POST", keepalive: true }));
-    expect(authOf(call)).toBe("Bearer this.device.token");
+    expect(call[1]).toEqual(expect.objectContaining({ credentials: "same-origin" }));
+    expect(csrfOf(call)).toBe("this.device.csrf");
+    expect(headersOf(call).Authorization).toBeUndefined();
     expect(bodyOf(call)).toEqual({ endpoint: "https://push.example.test/this-browser" });
     // Local first: it retires the endpoint at the push service even if the request never lands.
     expect(subscription!.unsubscribe.mock.invocationCallOrder[0])
@@ -80,33 +89,34 @@ describe("Log Out on a browser", () => {
 
   it("asks nothing of the server when this browser has no subscription", async () => {
     subscription = null;
-    await stopThisDevicePush("this.device.token");
+    await stopThisDevicePush();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("retires the subscription even with no token to tell the server", async () => {
-    await stopThisDevicePush(null);
+  it("retires the subscription even with no sign-in to tell the server", async () => {
+    releaseSession("business");
+    await stopThisDevicePush();
     expect(subscription!.unsubscribe).toHaveBeenCalledTimes(1);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("is not held up by a page without a service worker", async () => {
     getRegistration.mockResolvedValue(undefined);
-    await expect(stopThisDevicePush("this.device.token")).resolves.toBeUndefined();
+    await expect(stopThisDevicePush()).resolves.toBeUndefined();
     delete (navigator as { serviceWorker?: unknown }).serviceWorker;
-    await expect(stopThisDevicePush("this.device.token")).resolves.toBeUndefined();
+    await expect(stopThisDevicePush()).resolves.toBeUndefined();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("never throws, and still tells the server when the browser refuses to unsubscribe", async () => {
     subscription!.unsubscribe.mockRejectedValue(new Error("synthetic browser fault"));
-    await expect(stopThisDevicePush("this.device.token")).resolves.toBeUndefined();
+    await expect(stopThisDevicePush()).resolves.toBeUndefined();
     expect(callsTo("/api/push/unsubscribe")).toHaveLength(1);
 
     fetchMock.mockRejectedValue(new TypeError("Failed to fetch"));
-    await expect(stopThisDevicePush("this.device.token")).resolves.toBeUndefined();
+    await expect(stopThisDevicePush()).resolves.toBeUndefined();
     getRegistration.mockRejectedValue(new Error("synthetic worker fault"));
-    await expect(stopThisDevicePush("this.device.token")).resolves.toBeUndefined();
+    await expect(stopThisDevicePush()).resolves.toBeUndefined();
   });
 
   it("abandons a request that never answers", async () => {
@@ -115,7 +125,7 @@ describe("Log Out on a browser", () => {
       init.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
     }));
     let settled = false;
-    const stopping = stopThisDevicePush("this.device.token").then(() => { settled = true; });
+    const stopping = stopThisDevicePush().then(() => { settled = true; });
     for (let i = 0; i < 5; i += 1) await Promise.resolve();
     expect(callsTo("/api/push/unsubscribe")).toHaveLength(1);
 
@@ -139,10 +149,10 @@ describe("Log Out on an iPhone", () => {
       return ok;
     });
 
-    await stopThisDevicePush("this.device.token");
+    await stopThisDevicePush();
 
     const [call] = callsTo("/api/push/native-unsubscribe");
-    expect(authOf(call)).toBe("Bearer this.device.token");
+    expect(csrfOf(call)).toBe("this.device.csrf");
     expect(bodyOf(call)).toEqual({ deviceToken: "device-token-1" });
     expect(rememberedDuringRequest).toBeNull();
     expect(readNativeDeviceToken()).toBeNull();
@@ -151,28 +161,29 @@ describe("Log Out on an iPhone", () => {
   });
 
   it("asks for this login's iPhones when it registered before tokens were remembered", async () => {
-    await stopThisDevicePush("this.device.token");
+    await stopThisDevicePush();
     expect(bodyOf(callsTo("/api/push/native-unsubscribe")[0])).toEqual({});
   });
 });
 
 describe("a confirmed session re-registers this device", () => {
   it("re-registers this browser's existing subscription under the signed-in login", async () => {
-    await resyncThisDevicePush("fresh.token");
+    await resyncThisDevicePush();
 
     const [call] = callsTo("/api/push/subscribe");
     expect(call[1]).toEqual(expect.objectContaining({ method: "POST" }));
-    expect(authOf(call)).toBe("Bearer fresh.token");
+    expect(csrfOf(call)).toBe("this.device.csrf");
+    expect(headersOf(call).Authorization).toBeUndefined();
     expect(bodyOf(call)).toEqual({ subscription: subscription!.toJSON() });
     expect(pushManagerSubscribe).not.toHaveBeenCalled();
   });
 
   it("never turns notifications on: not without permission, not without a subscription", async () => {
     installBrowserPush("default");
-    await resyncThisDevicePush("fresh.token");
+    await resyncThisDevicePush();
     installBrowserPush("granted");
     subscription = null;
-    await resyncThisDevicePush("fresh.token");
+    await resyncThisDevicePush();
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(pushManagerSubscribe).not.toHaveBeenCalled();
@@ -181,22 +192,28 @@ describe("a confirmed session re-registers this device", () => {
   it("re-registers an iPhone's remembered token, and leaves one with none alone", async () => {
     mockNativeIOS = true;
     rememberNativeDeviceToken("device-token-2");
-    await resyncThisDevicePush("fresh.token");
+    await resyncThisDevicePush();
     const [call] = callsTo("/api/push/native-subscribe");
-    expect(authOf(call)).toBe("Bearer fresh.token");
+    expect(csrfOf(call)).toBe("this.device.csrf");
     expect(bodyOf(call)).toEqual({ deviceToken: "device-token-2" });
 
     fetchMock.mockClear();
     forgetNativeDeviceToken();
-    await resyncThisDevicePush("fresh.token");
+    await resyncThisDevicePush();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("asks nothing of the server when the page holds no sign-in", async () => {
+    releaseSession("business");
+    await resyncThisDevicePush();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("never throws", async () => {
     fetchMock.mockRejectedValue(new TypeError("Failed to fetch"));
-    await expect(resyncThisDevicePush("fresh.token")).resolves.toBeUndefined();
+    await expect(resyncThisDevicePush()).resolves.toBeUndefined();
     getRegistration.mockRejectedValue(new Error("synthetic worker fault"));
-    await expect(resyncThisDevicePush("fresh.token")).resolves.toBeUndefined();
+    await expect(resyncThisDevicePush()).resolves.toBeUndefined();
   });
 });
 

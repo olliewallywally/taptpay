@@ -15,6 +15,7 @@ import {
   Layout, CheckCircle, Loader2, ChevronDown
 } from "lucide-react";
 import jsPDF from "jspdf";
+import { sessionFetch } from "@/lib/session";
 
 type LayoutKey = "taptpay-a5-portrait" | "taptpay-a5-landscape";
 
@@ -58,9 +59,9 @@ interface TaptStoneData {
   isActive: boolean | null;
 }
 
-async function fetchAsDataUrl(url: string, authToken?: string): Promise<string> {
-  const headers: HeadersInit = authToken ? { Authorization: `Bearer ${authToken}` } : {};
-  const res = await fetch(url, { headers });
+// R1-T4 phase E: the business's own image, read with its session cookie (sent by the browser itself).
+async function fetchAsDataUrl(url: string): Promise<string> {
+  const res = await sessionFetch(url);
   if (!res.ok) throw new Error(`Failed to fetch ${url}: ${res.status}`);
   const blob = await res.blob();
   return new Promise((resolve, reject) => {
@@ -308,7 +309,6 @@ export default function BoardBuilder() {
   const captureRef = useRef<HTMLDivElement>(null);
 
   const merchantId = getCurrentMerchantId();
-  const token = localStorage.getItem("authToken") ?? "";
 
   useEffect(() => {
     if (!merchantId) setLocation("/login?returnTo=/board-builder");
@@ -317,9 +317,7 @@ export default function BoardBuilder() {
   const merchantQuery = useQuery<MerchantData>({
     queryKey: ["/api/merchants", merchantId, "profile"],
     queryFn: async () => {
-      const res = await fetch(`/api/merchants/${merchantId}/profile`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await sessionFetch(`/api/merchants/${merchantId}/profile`);
       if (!res.ok) throw new Error("Failed to fetch merchant");
       return res.json() as Promise<MerchantData>;
     },
@@ -329,9 +327,7 @@ export default function BoardBuilder() {
   const stonesQuery = useQuery<TaptStoneData[]>({
     queryKey: ["/api/merchants", merchantId, "tapt-stones"],
     queryFn: async () => {
-      const res = await fetch(`/api/merchants/${merchantId}/tapt-stones`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await sessionFetch(`/api/merchants/${merchantId}/tapt-stones`);
       if (!res.ok) throw new Error("Failed to fetch stones");
       return res.json() as Promise<TaptStoneData[]>;
     },
@@ -419,11 +415,11 @@ export default function BoardBuilder() {
     }
     setFetchingQr(true);
     const url = `/api/merchants/${merchantId}/stone/${selectedStoneId}/qr?size=600`;
-    fetchAsDataUrl(url, token)
+    fetchAsDataUrl(url)
       .then(setQrDataUrl)
       .catch(() => setQrDataUrl(""))
       .finally(() => setFetchingQr(false));
-  }, [merchantId, selectedStoneId, token]);
+  }, [merchantId, selectedStoneId]);
 
   const svgOpts: BuildSvgOpts = {
     svgTemplate,

@@ -32,13 +32,15 @@ jest.mock("@/lib/queryClient", () => ({
 }));
 
 import Settings from "@/pages/settings";
+import { holdSession, releaseSession } from "@/lib/session";
 
-const TOKEN = `h.${Buffer.from(JSON.stringify({ merchantId: 22, role: "owner" })).toString("base64")}.s`;
 const reply = (body: unknown, status = 200) => ({ ok: status < 400, status, json: async () => body });
 
 beforeEach(() => {
   localStorage.clear();
-  localStorage.setItem("authToken", TOKEN);
+  // R1-T4 phase E: who is signed in is what the start-up check read, held in memory.
+  releaseSession("business");
+  holdSession("business", { id: 7, email: "owner@example.test", merchantId: 22, role: "owner" }, "c".repeat(43));
   mockNavigate.mockClear();
   global.fetch = jest.fn(async (url: unknown) => {
     if (url === "/api/merchants/22/profile") return reply({ id: 22, businessName: "Synthetic Merchant 22", status: "active" });

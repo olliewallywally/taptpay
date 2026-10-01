@@ -8,14 +8,6 @@ export interface SSEMessage {
 
 type Listener = (data: SSEMessage) => void;
 
-function readStoredToken(): string | null {
-  try {
-    return localStorage.getItem("authToken");
-  } catch {
-    return null;
-  }
-}
-
 export class SSEClient {
   private eventSource: EventSource | null = null;
   private abortController: AbortController | null = null;
@@ -52,11 +44,16 @@ export class SSEClient {
     };
   }
 
-  connectMerchant(merchantId: number, token: string) {
+  /**
+   * The business's own stream. R1-T4 phase E: the session cookie signs it in, sent by the browser itself;
+   * no token is read or sent. A password change replaces this device's session, and the server ends the
+   * login's streams: the next attempt goes with the new cookie.
+   */
+  connectMerchant(merchantId: number) {
     this.closeTransport();
     const controller = new AbortController();
     this.abortController = controller;
-    void this.consumeMerchantStream(merchantId, token, controller.signal);
+    void this.consumeMerchantStream(merchantId, controller.signal);
   }
 
   // Compatibility for anonymous customer callers while call sites migrate to
@@ -65,26 +62,17 @@ export class SSEClient {
     this.connectCustomer(merchantId, stoneId);
   }
 
-  private async consumeMerchantStream(merchantId: number, token: string, signal: AbortSignal) {
+  private async consumeMerchantStream(merchantId: number, signal: AbortSignal) {
     const decoder = new TextDecoder();
-    let current = token;
     while (!signal.aborted) {
-      // R1-T4 phase D: a password change ends this login's streams and hands this
-      // device a fresh token, so reconnect with the token the device now holds.
-      current = readStoredToken() ?? current;
       try {
         const response = await fetch(`/api/merchants/${merchantId}/events`, {
-          headers: {
-            Accept: "text/event-stream",
-            Authorization: `Bearer ${current}`,
-          },
-          credentials: "include",
+          headers: { Accept: "text/event-stream" },
+          credentials: "same-origin",
           cache: "no-store",
           signal,
         });
         if (response.status === 401 || response.status === 403) {
-          const latest = readStoredToken();
-          if (latest && latest !== current) continue; // a fresh token arrived meanwhile
           console.error("Merchant SSE authentication expired or was revoked");
           return;
         }

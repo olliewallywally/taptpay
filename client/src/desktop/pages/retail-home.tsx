@@ -16,6 +16,7 @@ import {
 } from "../DesktopPageScaffold";
 import { useBucketMorph } from "../bucket-morph";
 import { SlidingIndicator, useSlidingIndicator } from "../sliding-indicator";
+import { sessionFetch } from "@/lib/session";
 
 /* ── Retail palette (from the desktop design tokens) ── */
 const ACCENT = "#5E9EFF";
@@ -112,10 +113,7 @@ function useRetailHomeModel(tf: Timeframe, selBar: number) {
   const merchantQuery = useQuery<any>({
     queryKey: ["/api/merchants", merchantId, "profile"],
     queryFn: async () => {
-      const token = localStorage.getItem("authToken");
-      const res = await fetch(`/api/merchants/${merchantId}/profile`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await sessionFetch(`/api/merchants/${merchantId}/profile`);
       if (!res.ok) throw new Error("Failed to fetch merchant");
       return res.json();
     },
@@ -125,10 +123,7 @@ function useRetailHomeModel(tf: Timeframe, selBar: number) {
   const txQuery = useQuery<Tx[]>({
     queryKey: ["/api/merchants", merchantId, "transactions"],
     queryFn: async () => {
-      const token = localStorage.getItem("authToken");
-      const res = await fetch(`/api/merchants/${merchantId}/transactions`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await sessionFetch(`/api/merchants/${merchantId}/transactions`);
       if (!res.ok) throw new Error("Failed to fetch transactions");
       return res.json();
     },

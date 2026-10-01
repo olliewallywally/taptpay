@@ -1,6 +1,8 @@
+import { heldSession, sessionFetch } from "./session";
+
 /**
  * R1-T4 phase D — "Sign out of all devices". The server ends every session of
- * this login by advancing its session version; this device's token is spent
+ * this login by advancing its session version; this device's session ends
  * with the rest, so the caller then signs this device out as it always does.
  *
  * Only the server's 204 means every session ended. A 401 means this device's
@@ -15,20 +17,12 @@ export const SIGN_OUT_EVERYWHERE_CONFIRMATION =
   "Sign out of all devices? Every device signed in to this login, this one included, will need to sign in again.";
 
 export async function signOutEverywhere(): Promise<SignOutEverywhereOutcome> {
-  let token: string | null = null;
-  try {
-    token = localStorage.getItem("authToken");
-  } catch {
-    // Storage unavailable: nothing here is signed in.
-  }
-  if (!token) return "already-signed-out";
+  // R1-T4 phase E: the sign-in is the session cookie; the page holds only its CSRF token.
+  if (!heldSession("business")) return "already-signed-out";
 
   let response: Response;
   try {
-    response = await fetch("/api/auth/sign-out-everywhere", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    response = await sessionFetch("/api/auth/sign-out-everywhere", { method: "POST" });
   } catch {
     throw new Error(FAILED);
   }

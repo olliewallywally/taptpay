@@ -10,6 +10,7 @@ import {
 } from 'recharts';
 // @ts-ignore - react-simple-maps ships no type declarations and has no @types package
 import { ComposableMap, Geographies, Geography, ZoomableGroup } from 'react-simple-maps';
+import { adminCsrfHeader } from "@/lib/session";
 
 const GEO_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
 
@@ -160,12 +161,12 @@ function WorldMap({ countries }: { countries: { code: string; users: number }[] 
 }
 
 export function Analytics() {
-  const adminToken = localStorage.getItem('adminAuthToken');
   const [range, setRange] = useState('7d');
   const [trafficView, setTrafficView] = useState<'chart' | 'map'>('chart');
   const [chartMetric, setChartMetric] = useState<'users' | 'sessions' | 'pageViews'>('users');
 
-  const headers = { Authorization: `Bearer ${adminToken}` };
+  // R1-T4 phase E: the sign-in is the admin's session cookie; this is the page's CSRF token.
+  const headers = adminCsrfHeader();
 
   const { data: summary, isLoading: summaryLoading } = useQuery<GA4Summary>({
     queryKey: ['/api/admin/ga4-metrics'],

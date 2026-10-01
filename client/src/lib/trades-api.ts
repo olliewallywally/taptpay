@@ -1,17 +1,18 @@
 // Shared fetch helpers for the trades pages — mirrors property-api.ts.
-// tradesHeaders() attaches the bearer token. tradesFetch() additionally catches
+// tradesHeaders() attaches the page's CSRF token (R1-T4 phase E: the sign-in is the session cookie,
+// which the browser sends itself). tradesFetch() additionally catches
 // a 401 (session expired mid-use) and bounces to /login with a returnTo, and
 // turns a billing 402 into BillingCardRequiredError once the banner is raised.
 import { BillingCardRequiredError, notifyIfBillingCardRequired } from "./queryClient";
+import { businessCsrfHeader, sessionFetch } from "./session";
 export function tradesHeaders(): HeadersInit {
-  const token = localStorage.getItem('authToken');
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return businessCsrfHeader();
 }
 
 let redirecting = false;
 
 export async function tradesFetch(url: string, init: RequestInit = {}): Promise<Response> {
-  const res = await fetch(url, { ...init, headers: { ...(init.headers || {}), ...tradesHeaders() } });
+  const res = await sessionFetch(url, init);
   if (notifyIfBillingCardRequired(res)) throw new BillingCardRequiredError();
   if (res.status === 401) {
     if (!redirecting) {

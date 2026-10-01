@@ -24,6 +24,7 @@ const forbiddenViewPatterns = [
   /@tanstack\/react-query/,
   /@\/components\/reports/,
   /@\/lib\/auth/,
+  /@\/lib\/session/,
   /wouter/,
   /useLocation/,
   /\bfetch\s*\(/,
@@ -88,7 +89,9 @@ describe("RetailDashboardView boundary", () => {
     expect(adapterSource).toContain("<RetailDashboardView");
     expect(adapterSource).toContain("getCurrentMerchantId");
     expect(adapterSource).toContain("useQuery");
-    expect(adapterSource).toContain('localStorage.getItem("authToken")');
+    // R1-T4 phase E: the adapter's reads go with the session cookie; nothing is read from storage.
+    expect(adapterSource).toContain("sessionFetch");
+    expect(adapterSource).not.toMatch(/localStorage|Authorization/);
     expect(adapterSource).toContain("RetailReportsButton");
     expect(adapterSource).toContain("/api/merchants/");
     expect(adapterSource).toContain("/profile");

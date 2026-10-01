@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { SIGN_OUT_EVERYWHERE_CONFIRMATION, signOutEverywhere } from "@/lib/sign-out-everywhere";
-import { stopThisDevicePush } from "@/lib/push-device";
+import { forgetThisDeviceSignIn, logOut } from "@/lib/log-out";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -79,6 +79,7 @@ const billingTypeLabel = (value: string) =>
 import {
   Upload, CheckCircle, XCircle, LogOut, AlertCircle, Bell, BellOff, Printer, ArrowRight, ArrowLeft, CreditCard, Building2, Wrench, BookOpen, RotateCcw, SlidersHorizontal, UserCircle
 } from "lucide-react";
+import { sessionFetch } from "@/lib/session";
 
 type SectionKey = "business" | "prefs" | "billing" | "account" | "notifs" | "tutorial";
 
@@ -279,10 +280,7 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
   const { data: merchant, isLoading } = useQuery({
     queryKey: ["/api/merchants", merchantId, "profile"],
     queryFn: async () => {
-      const token = localStorage.getItem("authToken");
-      const response = await fetch(`/api/merchants/${merchantId}/profile`, {
-        headers: { "Authorization": `Bearer ${token}` },
-      });
+      const response = await sessionFetch(`/api/merchants/${merchantId}/profile`);
       if (!response.ok) throw new Error("Failed to fetch merchant");
       const data = await response.json();
       setBusinessDetails({
@@ -322,12 +320,10 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
 
   const updateMerchantMutation = useMutation({
     mutationFn: async (details: MerchantDetails) => {
-      const token = localStorage.getItem("authToken");
-      const response = await fetch(`/api/merchants/${merchantId}`, {
+      const response = await sessionFetch(`/api/merchants/${merchantId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
         },
         body: JSON.stringify(details),
       });
@@ -345,12 +341,10 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
 
   const updateDailyGoalMutation = useMutation({
     mutationFn: async (goalAmount: string) => {
-      const token = localStorage.getItem("authToken");
-      const response = await fetch(`/api/merchants/${merchantId}/daily-goal`, {
+      const response = await sessionFetch(`/api/merchants/${merchantId}/daily-goal`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
         },
         body: JSON.stringify({ dailyGoal: goalAmount }),
       });
@@ -368,14 +362,12 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
 
   const uploadLogoMutation = useMutation({
     mutationFn: async (file: File) => {
-      const token = localStorage.getItem("authToken");
       const formData = new FormData();
       formData.append('logo', file);
       
-      const response = await fetch(`/api/merchants/${merchantId}/logo`, {
+      const response = await sessionFetch(`/api/merchants/${merchantId}/logo`, {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${token}`,
         },
         body: formData,
       });
@@ -395,11 +387,9 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
 
   const deleteLogoMutation = useMutation({
     mutationFn: async () => {
-      const token = localStorage.getItem("authToken");
-      const response = await fetch(`/api/merchants/${merchantId}/logo`, {
+      const response = await sessionFetch(`/api/merchants/${merchantId}/logo`, {
         method: "DELETE",
         headers: {
-          "Authorization": `Bearer ${token}`,
         },
       });
       if (!response.ok) throw new Error("Failed to delete logo");
@@ -627,16 +617,17 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
     deleteLogoMutation.mutate();
   };
 
+  // After "Sign out of all devices" the server has already ended this session too.
   const signOutThisDevice = () => {
-    localStorage.removeItem("authToken");
+    forgetThisDeviceSignIn();
     setLocation('/login');
   };
 
-  // R1-T4 (owner decision 2026-09-22): Log Out also stops this device's
-  // notifications, with the token it is discarding.
-  const handleLogout = () => {
-    void stopThisDevicePush(localStorage.getItem("authToken"));
-    signOutThisDevice();
+  // R1-T4: Log Out stops this device's notifications (owner decision 2026-09-22), then ends this
+  // session on the server (phase E).
+  const handleLogout = async () => {
+    await logOut();
+    setLocation('/login');
   };
 
   const handleSignOutAllDevices = async () => {
@@ -711,10 +702,8 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
   const handleRemoveCard = async () => {
     setCardRemoving(true);
     try {
-      const authToken = localStorage.getItem("authToken");
-      const resp = await fetch('/api/billing/card', {
+      const resp = await sessionFetch('/api/billing/card', {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${authToken}` },
       });
       const body = await resp.json().catch(() => ({}));
       if (!resp.ok) throw new Error(body?.message || 'Failed to remove card');

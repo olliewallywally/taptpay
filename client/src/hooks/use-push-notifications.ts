@@ -11,6 +11,7 @@ import {
   readNativeDeviceToken,
   rememberNativeDeviceToken,
 } from "@/lib/push-device";
+import { businessCsrfHeader } from "@/lib/session";
 
 export type PushNotificationPreferences = {
   paymentReceived: boolean;
@@ -60,13 +61,11 @@ function applicationServerKeysMatch(
   return actual.every((value, index) => value === expected[index]);
 }
 
-const authHeaders = (json = false) => {
-  const token = localStorage.getItem("authToken");
-  return {
-    ...(json ? { "Content-Type": "application/json" } : {}),
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-};
+// R1-T4 phase E: the page's CSRF token; the sign-in is the session cookie, which the browser sends itself.
+const authHeaders = (json = false) => ({
+  ...(json ? { "Content-Type": "application/json" } : {}),
+  ...businessCsrfHeader(),
+});
 
 /**
  * Keep an already-opted-in browser subscribed after a VAPID key rotation.

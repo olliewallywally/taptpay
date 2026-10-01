@@ -7,6 +7,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { Clock, Loader2, Plus, Copy, X, ChevronRight, Layers, ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
 import type { Transaction } from "@shared/schema";
+import { businessCsrfHeader } from "@/lib/session";
 
 const BRAND = "#00DFC8";
 const SURFACE = "rgba(26, 86, 255, 0.08)";
@@ -27,9 +28,9 @@ function timeAgo(dateStr: string | Date): string {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
+// R1-T4 phase E: the page's CSRF token; the sign-in is the session cookie, which the browser sends itself.
 function authHeaders(): Record<string, string> {
-  const authToken = localStorage.getItem("authToken");
-  return authToken ? { Authorization: `Bearer ${authToken}` } : {};
+  return businessCsrfHeader();
 }
 
 export default function PaymentStack() {

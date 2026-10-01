@@ -5,6 +5,16 @@ import userEvent from "@testing-library/user-event";
 import { apiRequest } from "@/lib/queryClient";
 import { BILLING_CARD_SESSION_KEY } from "@/hooks/use-billing-card-return";
 import { DesktopSettingsPage } from "./DesktopSettingsPage";
+import { CSRF_HEADER, heldSession, holdSession, releaseSession } from "@/lib/session";
+
+// R1-T4 phase E: the sign-in is the session cookie, which the browser sends itself; the page holds who
+// is signed in and the session's CSRF token, in memory.
+const signInThisPage = () =>
+  holdSession("business", { id: 7, email: "owner@example.test", merchantId: 42, role: "owner" }, "page-csrf-token");
+const sentWith = (init: RequestInit | undefined) => {
+  const headers = new Headers(init?.headers);
+  return { credentials: init?.credentials, csrf: headers.get(CSRF_HEADER), authorization: headers.get("Authorization") };
+};
 
 const mockSetPreference = jest.fn();
 const mockRestartTutorials = jest.fn();
@@ -96,7 +106,8 @@ describe("desktop settings business-details save contract", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     localStorage.clear();
-    localStorage.setItem("authToken", "merchant.jwt.token");
+    releaseSession("business");
+    signInThisPage();
     sessionStorage.clear();
     window.history.replaceState({}, "", "/settings");
     authRole = "owner";
@@ -193,7 +204,7 @@ describe("desktop settings business-details save contract", () => {
       gstNumber: "GST-42",
       email: "receipts@example.test",
     });
-    expect(request.headers.Authorization).toBe("Bearer merchant.jwt.token");
+    expect(sentWith(request)).toEqual({ credentials: "same-origin", csrf: "page-csrf-token", authorization: null });
   });
 
   it("opens the boards from the Customer Payment Page button, never the retired business-wide page", async () => {
@@ -566,7 +577,8 @@ describe("desktop settings: sign out of all devices", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     localStorage.clear();
-    localStorage.setItem("authToken", "merchant.jwt.token");
+    releaseSession("business");
+    signInThisPage();
     signOutReply = { ok: true, status: 204, json: async () => ({}) };
     apiRequestMock.mockImplementation(async (method: string, path: string) => {
       if (method === "GET" && path === "/api/auth/me") {
@@ -579,13 +591,14 @@ describe("desktop settings: sign out of all devices", () => {
         return jsonResponse({ history: [] });
       }
       if (method === "PUT" && path === "/api/merchants/42/change-password") {
-        return jsonResponse({ message: "Password updated successfully", token: "fresh.jwt.token" });
+        return jsonResponse({ message: "Password updated successfully", token: "fresh.jwt.token", csrfToken: "fresh-csrf-token" });
       }
       throw new Error(`Unexpected apiRequest: ${method} ${path}`);
     });
     fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
       if (url === "/api/merchants/42/profile" && !init?.method) return jsonResponse(safeOwnerProfile);
       if (url === "/api/auth/sign-out-everywhere" && init?.method === "POST") return signOutReply;
+      if (url === "/api/auth/logout" && init?.method === "POST") return { ok: true, status: 204, json: async () => ({}) };
       throw new Error(`Unexpected fetch: ${init?.method ?? "GET"} ${url}`);
     });
   });
@@ -601,8 +614,9 @@ describe("desktop settings: sign out of all devices", () => {
     await waitFor(() => expect(mockSetLocation).toHaveBeenCalledWith("/login"));
     expect(confirm).toHaveBeenCalledTimes(1);
     expect(signOutCalls()).toHaveLength(1);
-    expect(signOutCalls()[0][1]).toEqual({ method: "POST", headers: { Authorization: "Bearer merchant.jwt.token" } });
-    expect(localStorage.getItem("authToken")).toBeNull();
+    expect(signOutCalls()[0][1].method).toBe("POST");
+    expect(sentWith(signOutCalls()[0][1])).toEqual({ credentials: "same-origin", csrf: "page-csrf-token", authorization: null });
+    expect(heldSession("business")).toBeNull();
     expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ title: "Signed out of all devices" }));
   });
 
@@ -612,7 +626,7 @@ describe("desktop settings: sign out of all devices", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Sign out of all devices" }));
 
     expect(signOutCalls()).toHaveLength(0);
-    expect(localStorage.getItem("authToken")).toBe("merchant.jwt.token");
+    expect(heldSession("business")?.csrfToken).toBe("page-csrf-token");
     expect(mockSetLocation).not.toHaveBeenCalled();
   });
 
@@ -627,11 +641,11 @@ describe("desktop settings: sign out of all devices", () => {
       description: "Could not sign out everywhere. Please try again.",
       variant: "destructive",
     })));
-    expect(localStorage.getItem("authToken")).toBe("merchant.jwt.token");
+    expect(heldSession("business")?.csrfToken).toBe("page-csrf-token");
     expect(mockSetLocation).not.toHaveBeenCalled();
   });
 
-  it("keeps this device signed in under the fresh token after a password change", async () => {
+  it("keeps this device signed in, under the new session's CSRF token, after a password change", async () => {
     renderPage();
     await userEvent.click(await screen.findByRole("button", { name: "Account" }));
     await userEvent.type(screen.getByLabelText("current password"), "old-password");
@@ -639,7 +653,8 @@ describe("desktop settings: sign out of all devices", () => {
     await userEvent.type(screen.getByLabelText("confirm password"), "new-password");
     await userEvent.click(screen.getByRole("button", { name: "Change password" }));
 
-    await waitFor(() => expect(localStorage.getItem("authToken")).toBe("fresh.jwt.token"));
+    await waitFor(() => expect(heldSession("business")?.csrfToken).toBe("fresh-csrf-token"));
+    expect(Object.keys(localStorage)).toEqual([]);
     expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
       title: "Password changed",
       description: "Your other devices have been signed out.",
@@ -648,16 +663,21 @@ describe("desktop settings: sign out of all devices", () => {
   });
 
   // R1-T4 phase D follow-up (owner decision 2026-09-22): notifications belong to the login.
-  it("Log Out stops this device's notifications with the token it had", async () => {
+  it("Log Out stops this device's notifications while its session still stands, then has the server end the session", async () => {
+    let signedInWhenStopped = false;
+    mockStopThisDevicePush.mockImplementation(async () => { signedInWhenStopped = heldSession("business") !== null; });
     renderPage();
     await userEvent.click(await screen.findByTestId("button-logout"));
 
-    expect(mockStopThisDevicePush).toHaveBeenCalledWith("merchant.jwt.token");
-    expect(localStorage.getItem("authToken")).toBeNull();
-    expect(mockSetLocation).toHaveBeenCalledWith("/login");
+    await waitFor(() => expect(mockSetLocation).toHaveBeenCalledWith("/login"));
+    expect(mockStopThisDevicePush).toHaveBeenCalledTimes(1);
+    expect(signedInWhenStopped).toBe(true);
+    const logout = fetchMock.mock.calls.find(([url]) => url === "/api/auth/logout")!;
+    expect(sentWith(logout[1])).toEqual({ credentials: "same-origin", csrf: "page-csrf-token", authorization: null });
+    expect(heldSession("business")).toBeNull();
   });
 
-  it("re-registers this device's notifications under the fresh token after a password change", async () => {
+  it("re-registers this device's notifications under the new session after a password change", async () => {
     renderPage();
     await userEvent.click(await screen.findByRole("button", { name: "Account" }));
     await userEvent.type(screen.getByLabelText("current password"), "old-password");
@@ -665,7 +685,8 @@ describe("desktop settings: sign out of all devices", () => {
     await userEvent.type(screen.getByLabelText("confirm password"), "new-password");
     await userEvent.click(screen.getByRole("button", { name: "Change password" }));
 
-    await waitFor(() => expect(mockResyncThisDevicePush).toHaveBeenCalledWith("fresh.jwt.token"));
+    await waitFor(() => expect(mockResyncThisDevicePush).toHaveBeenCalledTimes(1));
+    expect(heldSession("business")?.csrfToken).toBe("fresh-csrf-token");
     expect(mockStopThisDevicePush).not.toHaveBeenCalled();
   });
 

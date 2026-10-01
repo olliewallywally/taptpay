@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { MerchantGate } from "@/components/merchant-gate";
 import { Download, FileText, FileSpreadsheet, Calendar, TrendingUp } from "lucide-react";
 import { format } from "date-fns";
+import { sessionFetch } from "@/lib/session";
 
 type DateRange = "7days" | "30days" | "90days" | "1year" | "lifetime" | "custom";
 
@@ -72,10 +73,7 @@ function ExportsPage({ merchantId }: { merchantId: number }) {
       if (startDate) params.append('startDate', startDate.toISOString());
       if (endDate) params.append('endDate', endDate.toISOString());
       
-      const token = localStorage.getItem("authToken");
-      const response = await fetch(`/api/merchants/${merchantId}/analytics/export?${params}`, {
-        headers: { "Authorization": `Bearer ${token}` },
-      });
+      const response = await sessionFetch(`/api/merchants/${merchantId}/analytics/export?${params}`);
       if (!response.ok) throw new Error('Failed to fetch analytics');
       return response.json();
     },
@@ -89,10 +87,7 @@ function ExportsPage({ merchantId }: { merchantId: number }) {
       if (startDate) params.append('startDate', startDate.toISOString());
       if (endDate) params.append('endDate', endDate.toISOString());
       
-      const token = localStorage.getItem("authToken");
-      const response = await fetch(`/api/merchants/${merchantId}/export/csv?${params}`, {
-        headers: { "Authorization": `Bearer ${token}` },
-      });
+      const response = await sessionFetch(`/api/merchants/${merchantId}/export/csv?${params}`);
       if (!response.ok) throw new Error('Failed to export CSV');
       
       // Download the file
@@ -129,10 +124,7 @@ function ExportsPage({ merchantId }: { merchantId: number }) {
       if (startDate) params.append('startDate', startDate.toISOString());
       if (endDate) params.append('endDate', endDate.toISOString());
       
-      const token = localStorage.getItem("authToken");
-      const response = await fetch(`/api/merchants/${merchantId}/export/pdf?${params}`, {
-        headers: { "Authorization": `Bearer ${token}` },
-      });
+      const response = await sessionFetch(`/api/merchants/${merchantId}/export/pdf?${params}`);
       if (!response.ok) throw new Error('Failed to export PDF');
       
       // Download the file

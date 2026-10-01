@@ -1,4 +1,5 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { sessionFetch } from "./session";
 
 export const BILLING_CARD_REQUIRED_EVENT = "taptpay:billing-card-required";
 
@@ -42,6 +43,10 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+/**
+ * R1-T4 phase E: the sign-in is the session cookie, sent by the browser itself; a change carries the
+ * page's CSRF token (lib/session.ts). No token is read from storage or sent in a header.
+ */
 export async function apiRequest(
   method: string,
   url: string,
@@ -52,21 +57,11 @@ export async function apiRequest(
   if (data) {
     headers["Content-Type"] = "application/json";
   }
-  
-  const isAdminRoute = url.startsWith("/api/admin");
-  const token = isAdminRoute 
-    ? localStorage.getItem("adminAuthToken")
-    : localStorage.getItem("authToken");
-    
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
 
-  const res = await fetch(url, {
+  const res = await sessionFetch(url, {
     method,
     headers,
     body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
   });
 
   await throwIfResNotOk(res);
@@ -79,22 +74,7 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const headers: Record<string, string> = {};
-    
-    const url = queryKey[0] as string;
-    const isAdminRoute = url.startsWith("/api/admin");
-    const token = isAdminRoute 
-      ? localStorage.getItem("adminAuthToken")
-      : localStorage.getItem("authToken");
-      
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
-    
-    const res = await fetch(queryKey[0] as string, {
-      headers,
-      credentials: "include",
-    });
+    const res = await sessionFetch(queryKey[0] as string);
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
       return null;

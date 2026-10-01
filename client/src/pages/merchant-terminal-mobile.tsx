@@ -18,6 +18,8 @@ import { MerchantGate } from "@/components/merchant-gate";
 import { Send, Loader2, CheckCircle, Clock, XCircle, QrCode, Smartphone, Edit, Split, MoreHorizontal, Menu, X, Waves, ChevronDown, Copy, Check, CreditCard } from "lucide-react";
 import { Link } from "wouter";
 import { isNativeIOS, canTapToPay } from "@/lib/native";
+import { sessionFetch } from "@/lib/session";
+import { logOut } from "@/lib/log-out";
 
 const transactionFormSchema = z.object({
   itemName: z.string().min(1, "Item name is required"),
@@ -140,7 +142,7 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
     if (activeTab === "NFC" && !nfcCapabilities) {
       const checkNfcCapabilities = async () => {
         try {
-          const response = await fetch('/api/nfc/capabilities');
+          const response = await sessionFetch('/api/nfc/capabilities');
           const capabilities = await response.json();
           setNfcCapabilities(capabilities);
           
@@ -173,9 +175,7 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
   const { data: merchant } = useQuery({
     queryKey: ["/api/merchants", merchantId, "profile"],
     queryFn: async () => {
-      const response = await fetch(`/api/merchants/${merchantId}/profile`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
-      });
+      const response = await sessionFetch(`/api/merchants/${merchantId}/profile`);
       if (!response.ok) throw new Error("Failed to fetch merchant");
       return response.json();
     },
@@ -185,7 +185,7 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
   const { data: activeTransaction } = useQuery({
     queryKey: ["/api/merchants", merchantId, "active-transaction"],
     queryFn: async () => {
-      const response = await fetch(`/api/merchants/${merchantId}/active-transaction`);
+      const response = await sessionFetch(`/api/merchants/${merchantId}/active-transaction`);
       if (!response.ok) throw new Error("Failed to fetch active transaction");
       return response.json();
     },
@@ -196,7 +196,7 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
   const { data: taptStones = [], isLoading: taptStonesLoading } = useQuery({
     queryKey: ["/api/merchants", merchantId, "tapt-stones"],
     queryFn: async () => {
-      const response = await fetch(`/api/merchants/${merchantId}/tapt-stones`);
+      const response = await sessionFetch(`/api/merchants/${merchantId}/tapt-stones`);
       if (!response.ok) throw new Error("Failed to fetch tapt stones");
       return response.json();
     },
@@ -295,9 +295,7 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
 
   // Set up SSE connection
   useEffect(() => {
-    const token = localStorage.getItem("authToken");
-    if (!token) return;
-    sseClient.connectMerchant(merchantId, token);
+    sseClient.connectMerchant(merchantId);
 
     sseClient.subscribe("transaction_updated", (message) => {
       // Route through the query cache only — the [activeTransaction] effect
@@ -405,7 +403,7 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
       // Simulate processing delay
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      const response = await fetch(`/api/nfc-sessions/${nfcSession.sessionId}/complete`, {
+      const response = await sessionFetch(`/api/nfc-sessions/${nfcSession.sessionId}/complete`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -499,10 +497,9 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
       }
 
       setTapToPayStatus("processing");
-      const authToken = localStorage.getItem("authToken");
-      const response = await fetch("/api/transactions/tap-to-pay", {
+      const response = await sessionFetch("/api/transactions/tap-to-pay", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           merchantId,
           transactionId: transaction.id,
@@ -736,8 +733,9 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
               <div className="pt-4 mt-4 border-t border-gray-600">
                 <button 
                   onClick={() => {
-                    localStorage.removeItem('auth-token');
-                    window.location.href = '/login';
+                    // R1-T4 phase E: the server ends this session. (This cleared a storage key no
+                    // sign-in was ever kept under, and so signed no one out.)
+                    void logOut().then(() => { window.location.href = '/login'; });
                   }}
                   className="block w-full text-left py-3 px-4 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl transition-colors"
                 >
