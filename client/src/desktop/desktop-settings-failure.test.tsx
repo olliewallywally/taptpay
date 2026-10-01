@@ -281,3 +281,52 @@ describe("desktop settings with everything loaded (R1-T9 guard)", () => {
     expect(screen.getByRole("button", { name: "Cancel at period end" })).toBeEnabled();
   });
 });
+
+describe("desktop settings when a reply says OK and is not the data (external review 2026-09-29)", () => {
+  it.each([
+    ["null", null],
+    ["a list", []],
+    ["a login that is null", { user: null }],
+  ])("access answered %s: 'Your access didn't load', and nothing is editable", async (_name, body) => {
+    renderPage(serve({ access: () => ok(body) }));
+    await settle();
+
+    expect(screen.queryByText("Business details are managed by the account owner.")).toBeNull();
+    expect(alertSaying("Your access didn't load")).toBeDefined();
+    expect(screen.getByRole("textbox", { name: "trading name" })).toBeDisabled();
+  });
+
+  it.each([
+    ["null", null],
+    ["a list", []],
+  ])("the plan answered %s: 'Your plan didn't load', no default plan and no plan action", async (_name, body) => {
+    renderPage(serve({ subscription: () => ok(body) }));
+    await settle();
+    await openSection("Subscription & Billing");
+
+    expect(alertSaying("Your plan didn't load")).toBeDefined();
+    expect(screen.queryByText(/\/mo/)).toBeNull();
+    expect(screen.getByRole("button", { name: "solo · $7.99" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /Cancel/ })).toBeNull();
+  });
+
+  it.each([
+    ["null", null],
+    ["a card with no word on whether it is ready", { card: null }],
+    ["a ready that is not yes or no", { ready: "yes", card: null }],
+  ])("the payment method answered %s: 'Payment method didn't load', not 'Add payment method'", async (_name, body) => {
+    renderPage(serve({ card: () => body }));
+    await settle();
+    await openSection("Subscription & Billing");
+
+    expect(screen.queryByRole("button", { name: "Add payment method" })).toBeNull();
+    expect(alertSaying("Payment method didn't load")).toBeDefined();
+  });
+});
+
+test('a malformed successful business response does not expose an empty editable form', async () => {
+  renderPage(serve({ profile: () => ok(null) }));
+  await settle();
+  expect(alertSaying("Business details didn't load")).toBeDefined();
+  expect(screen.queryByRole('button', {name: 'Save changes'})).toBeNull();
+});

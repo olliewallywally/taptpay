@@ -1,3 +1,4 @@
+import { responseRows, requireResponseRecord } from "@/lib/response-data";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -170,7 +171,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
     queryFn: async () => {
       const response = await tradesFetch("/api/trades/schedules");
       if (!response.ok) throw new Error("Could not load recurring invoices");
-      return response.json();
+      return responseRows(await response.json()) as TradesSchedule[];
     },
   });
   const reminderSettingsQuery = useQuery<{ tradeRemindersEnabled: boolean }>({
@@ -178,7 +179,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
     queryFn: async () => {
       const response = await tradesFetch("/api/trades/reminder-settings");
       if (!response.ok) throw new Error("Could not load reminder settings");
-      const body = await response.json();
+      const body = requireResponseRecord(await response.json());
       return { tradeRemindersEnabled: body?.tradeRemindersEnabled !== false };
     },
   });

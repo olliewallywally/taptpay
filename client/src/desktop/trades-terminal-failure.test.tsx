@@ -409,3 +409,43 @@ describe("trades terminal on a billing 402 (R1-T9)", () => {
     expect(screen.getByRole("textbox", { name: "recurring amount" })).toHaveValue("200");
   });
 });
+
+describe("trades terminal when a reply says OK and is not the data (external review 2026-09-29)", () => {
+  it.each([
+    ["an object", {}],
+    ["a row that is null", [null]],
+    ["a row with no id", [{ clientName: "Aroha Ngata", totalCents: 180_000 }]],
+  ])("invoices answered %s: 'Invoices didn't load', no $0 figures, send invoice off", async (_name, body) => {
+    serve({ invoices: () => reply(body) });
+    renderPage();
+    await settle();
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Invoices didn't load");
+    expect(document.querySelector(".tt-hero")).toBeNull();
+    expect(sendButton()).toBeDisabled();
+  });
+
+  it.each([
+    ["an object", {}],
+    ["a row that is null", [null]],
+  ])("recurring invoices answered %s: 'recurring invoices didn't load', not 'no recurring invoices'", async (_name, body) => {
+    serve({ schedules: () => reply(body) });
+    renderPage("/trades/recurring");
+    await settle();
+
+    expect(screen.queryByText("no recurring invoices")).toBeNull();
+    expect(screen.getByText("recurring invoices didn't load")).toBeInTheDocument();
+  });
+
+  it.each([
+    ["null", null],
+    ["a list", []],
+  ])("reminder settings answered %s: 'settings didn't load', and no switch to set from a made-up state", async (_name, body) => {
+    serve({ reminders: () => reply(body) });
+    renderPage("/trades/recurring");
+    await settle();
+
+    expect(screen.queryByRole("switch", { name: "toggle trades reminders" })).toBeNull();
+    expect(screen.getByText("settings didn't load")).toBeInTheDocument();
+  });
+});

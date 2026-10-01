@@ -1,3 +1,4 @@
+import { responseRows } from "./response-data";
 /* Single source of truth for the property vertical's shared data.
 
    Every page that shows tenants or invoices (dashboard, terminal, analytics,
@@ -17,7 +18,7 @@ export const PROPERTY_KEYS = {
 };
 
 const fetchList = (path: string) => () =>
-  propFetch(path).then(r => { if (!r.ok) throw new Error('load failed'); return r.json(); });
+  propFetch(path).then(r => { if (!r.ok) throw new Error('load failed'); return r.json().then(responseRows); });
 
 /* Fresh enough to feel live, shared by every consumer. refetchOnWindowFocus
    overrides the app-wide `false` so returning to the tab re-syncs the charts

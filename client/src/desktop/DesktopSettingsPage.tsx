@@ -36,6 +36,7 @@ import {
 } from "./DesktopPageScaffold";
 import { DesktopLoadFailure } from "./DesktopLoadFailure";
 import { replaceCsrfToken, sessionFetch } from "@/lib/session";
+import { requireResponseRecord } from "@/lib/response-data";
 
 /* ── palette ── */
 const ACCENT = "#5E9EFF";
@@ -188,7 +189,7 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
   const authFetch = async (path: string) => {
     const res = await sessionFetch(path);
     if (!res.ok) throw new Error(path);
-    return res.json();
+    return res.json().then(requireResponseRecord);
   };
 
   const merchantQuery = useQuery<any>({
@@ -202,7 +203,7 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/subscription");
       if (!res.ok) throw new Error("subscription");
-      return res.json();
+      return res.json().then(requireResponseRecord);
     },
     enabled: !!merchantId,
   });
@@ -212,7 +213,9 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/auth/me");
       if (!res.ok) throw new Error("Failed to load account access");
-      return res.json();
+      const body = requireResponseRecord(await res.json());
+      requireResponseRecord(body.user);
+      return body as { user: { id: number; email: string; role: string } };
     },
     enabled: !!merchantId,
   });
@@ -220,6 +223,7 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
 
   const cardQuery = useQuery<{ ready: boolean; card: { last4: string; brand: string | null; expiry: string | null } | null }>({
     queryKey: ["/api/billing/card"],
+    select: (body) => { requireResponseRecord(body); if (typeof body.ready !== "boolean") throw new Error("Invalid card response"); return body; },
     enabled: !!merchantId && isOwner,
   });
 

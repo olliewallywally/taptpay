@@ -47,6 +47,7 @@ import {
 import { entranceProps, useListEntrance } from "../list-entrance";
 import { DesktopLoadFailure } from "../DesktopLoadFailure";
 import { sessionFetch } from "@/lib/session";
+import { retailResponse } from "@/lib/response-data";
 
 /* ── palette ── */
 const ACCENT = "#5E9EFF";
@@ -151,7 +152,7 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
   const authFetch = async (path: string) => {
     const res = await sessionFetch(path);
     if (!res.ok) throw new Error(path);
-    return res.json();
+    return retailResponse(path, await res.json());
   };
 
   const merchantQuery = useQuery<any>({

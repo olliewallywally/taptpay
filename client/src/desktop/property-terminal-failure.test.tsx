@@ -226,3 +226,48 @@ describe("property terminal when reminder settings or schedules fail to load (R1
     expect(screen.getAllByText("Mia Chen").length).toBeGreaterThan(0);
   });
 });
+
+describe("property terminal when a reply says OK and is not the data (external review 2026-09-29)", () => {
+  it.each([
+    ["null", null],
+    ["an object", {}],
+    ["a row that is null", [null]],
+    ["a row with no id", [{ tenantName: "Mia Chen", amountCents: 80_000 }]],
+  ])("requests answered %s: 'Requests didn't load', no $0 owing, sending off", async (_name, body) => {
+    serve({ invoices: () => reply(body) });
+    renderPage();
+    await settle();
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Requests didn't load");
+    expect(heroes()).toHaveLength(0);
+    expect(screen.queryByText("no requests here")).toBeNull();
+    expect(sendRequest()).toBeDisabled();
+  });
+
+  it.each([
+    ["null", null],
+    ["a list", []],
+  ])("reminder settings answered %s: 'reminders unavailable', not the defaults", async (_name, body) => {
+    serve({ reminders: () => reply(body) });
+    renderPage();
+    await settle();
+
+    const toggle = screen.getByRole("button", { name: "automation" });
+    expect(toggle).toHaveTextContent("reminders unavailable");
+    await userEvent.click(toggle);
+    await settle();
+    expect(screen.queryByRole("switch", { name: "overdue reminders" })).toBeNull();
+    expect(screen.getByText("settings didn't load")).toBeInTheDocument();
+  });
+
+  it("recurring rent answered with a row that is null: 'recurring rent didn't load', not 'no schedules yet'", async () => {
+    serve({ schedules: () => reply([null]) });
+    renderPage();
+    await settle();
+
+    await userEvent.click(screen.getByRole("button", { name: "automation" }));
+    await settle();
+    expect(screen.queryByText(/no schedules yet/)).toBeNull();
+    expect(screen.getByText("recurring rent didn't load")).toBeInTheDocument();
+  });
+});
