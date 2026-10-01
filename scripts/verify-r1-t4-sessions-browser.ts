@@ -375,9 +375,15 @@ try {
     JSON.stringify(Object.keys(stored.local)));
   const businessAsAdmin = await page.evaluate(async () => (await fetch("/api/auth/session", { credentials: "same-origin" })).json());
   check("the admin's cookie signs no business in", businessAsAdmin.signedIn === false);
-  const adminHome = await shownText(page, "Probe Cafe Ltd");
+  const adminHome = (await shownText(page, "Probe Cafe Ltd")).replace(/\s+/g, " ");
   check("the admin area shows the platform's businesses", adminHome.includes("Probe Cafe Ltd"),
-    JSON.stringify(adminHome.replace(/\s+/g, " ").slice(0, 200)));
+    JSON.stringify(adminHome.slice(0, 200)));
+  // Owner decision 2026-09-30: the home page's totals are the platform's real figures (one sale, still
+  // waiting; one active business), not the $0 and 0 it showed whatever the platform held.
+  check("the admin home page shows the real totals: one sale, still waiting, and the business as verified",
+    /Total Revenue \$0\.00 All time Total Transactions 1 All time Active Merchants 1 Verified accounts Pending Transactions 1 Awaiting completion/.test(adminHome) &&
+      adminHome.includes("Probe Cafe Ltd owner@probe.test ✓ Verified"),
+    JSON.stringify(adminHome.slice(adminHome.indexOf("Total Revenue"), adminHome.indexOf("Total Revenue") + 170)));
   if (out) await page.screenshot({ path: `${out}/admin-area.png` });
   const adminOut = responseTo(page, "POST", "/api/admin/auth/logout");
   await page.getByTestId("button-admin-logout").click({ timeout: 120_000 });

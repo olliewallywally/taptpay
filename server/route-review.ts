@@ -1948,11 +1948,11 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     idempotency: "read-only",
     sideEffects: ADMIN_AUDIT,
     successDto:
-      "platform totals (businesses, active ones, sales, revenue, monthly recurring revenue, paying subscriptions) and, per business, its id, name, business name, sales count and revenue, status and last sale",
+      "platform totals (businesses, active ones, sales, completed and still-waiting sales, revenue, how many businesses' figures could not be read, monthly recurring revenue, paying subscriptions) and, per business, its id, name, business name, sales count and revenue, status and last sale",
     errorDisclosure: ["fixed"],
     findings: [
       ADMIN_EACH_BUSINESS_FINDING,
-      "A business whose figures fail to load is listed with zero sales and zero revenue, as if it had none (R1-T9's rule, for the admin's screens too).",
+      "A business whose figures fail to load is listed with zero sales and zero revenue, as if it had none (R1-T9's rule, for the admin's screens too). Since 2026-10-01 the totals say how many were left out (businessesNotLoaded), and the home page shows it; the per-business rows of the merchants list still show zeros.",
     ],
   },
 

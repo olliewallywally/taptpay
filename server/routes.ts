@@ -4447,6 +4447,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       let totalRevenue = 0;
       let totalTransactions = 0;
       let totalCompletedTransactions = 0;
+      // What the admin home page shows (owner decision 2026-09-30): sales still waiting, and how many
+      // businesses' figures could not be read, so the totals never pass off a missing business as nothing.
+      let pendingTransactions = 0;
+      let businessesNotLoaded = 0;
       const recentMerchants = [];
 
       for (const merchant of merchants) {
@@ -4457,6 +4461,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           totalRevenue += analytics.totalRevenue || 0;
           totalTransactions += analytics.totalTransactions || 0;
           totalCompletedTransactions += analytics.completedTransactions || 0;
+          pendingTransactions += transactions.filter(t => t.status === 'pending').length;
 
           // Get last transaction date
           const completedTransactionsList = transactions.filter(t => t.status === 'completed' && t.createdAt);
@@ -4478,7 +4483,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
             lastTransactionDate: lastTransaction?.createdAt || null,
           });
         } catch (error) {
-          // If merchant doesn't exist, add with zero values
+          // Its figures could not be read: left out of the totals, and counted as left out.
+          businessesNotLoaded += 1;
           recentMerchants.push({
             id: merchant.id,
             name: merchant.name,
@@ -4501,6 +4507,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         totalRevenue,
         totalTransactions,
         completedTransactions: totalCompletedTransactions,
+        pendingTransactions,
+        businessesNotLoaded,
         monthlyRecurringRevenue: subscriptionRevenue.monthlyRecurringRevenue,
         payingSubscriptions: subscriptionRevenue.payingSubscriptions,
         recentMerchants: recentMerchants.sort((a, b) => b.totalRevenue - a.totalRevenue),
