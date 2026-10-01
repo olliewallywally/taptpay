@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { config } from "./config";
 import type { CookieOptions, Response } from "express";
 
 /**
@@ -8,7 +9,10 @@ import type { CookieOptions, Response } from "express";
  * - Starting sign-in sets one HttpOnly cookie holding a one-time `state` and the
  *   PKCE verifier. Google echoes the state back; the callback accepts only a state
  *   equal to this browser's cookie (no login CSRF) and proves the code with the
- *   verifier (an intercepted code is useless).
+ *   verifier (an intercepted code is useless). The cookie also carries its start
+ *   time under the server's signature, and the callback takes each start up once
+ *   (server/auth-throttle.ts, googleStateBucket): a kept copy of the cookie cannot
+ *   be used after ten minutes, or twice.
  * - The callback never hands the browser an account token. It stores the SHA-256
  *   of a random one-time code and sets the code in a second HttpOnly cookie; the
  *   login page redeems it once, by POST, and receives the token in the response
@@ -60,22 +64,40 @@ export function readCookie(header: string | undefined, name: string): string | u
   return undefined;
 }
 
-/** A fresh state and PKCE pair, and the cookie value binding them to this browser. */
+/** A fresh state and PKCE pair, and the signed cookie value binding them to this browser and this moment. */
 export function startGoogleSignIn(): { state: string; codeChallenge: string; cookieValue: string } {
   const state = randomToken();
   const verifier = randomToken();
   const codeChallenge = crypto.createHash("sha256").update(verifier, "ascii").digest("base64url");
-  return { state, codeChallenge, cookieValue: `${state}.${verifier}` };
+  const payload = `${state}.${verifier}.${Date.now()}`;
+  return { state, codeChallenge, cookieValue: `${payload}.${stateSignature(payload)}` };
+}
+
+let stateKey: Buffer | undefined;
+/**
+ * The starting cookie's signature over its state, verifier and start time (external review 2026-09-29):
+ * the server, not the browser, decides when a start has expired. Keyed for this purpose alone, as the
+ * session's keys are.
+ */
+function stateSignature(payload: string): string {
+  stateKey ??= Buffer.from(crypto.hkdfSync("sha256", config.jwtSecret, Buffer.alloc(0), "taptpay google-state v1", 32));
+  return crypto.createHmac("sha256", stateKey).update(payload, "utf8").digest("base64url");
 }
 
 /**
  * The PKCE verifier when the returned `state` is this browser's own, else null.
+ * The cookie is believed only under this server's signature and within ten minutes of its start
+ * (external review 2026-09-29): the cookie's Max-Age is the browser's promise, not the server's.
  * Compared in constant time; a malformed cookie or state is simply refused.
  */
 export function verifyGoogleSignInState(cookieValue: string | undefined, returnedState: unknown): string | null {
   if (typeof cookieValue !== "string" || typeof returnedState !== "string") return null;
-  const [state, verifier, extra] = cookieValue.split(".");
-  if (extra !== undefined || !RANDOM_TOKEN.test(state ?? "") || !RANDOM_TOKEN.test(verifier ?? "")) return null;
+  const [state, verifier, issued, signature, extra] = cookieValue.split(".");
+  if (extra !== undefined || !RANDOM_TOKEN.test(state ?? "") || !RANDOM_TOKEN.test(verifier ?? "") || !RANDOM_TOKEN.test(signature ?? "")) return null;
+  if (!/^\d{13}$/.test(issued ?? "")) return null;
+  if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(stateSignature(`${state}.${verifier}.${issued}`)))) return null;
+  const age = Date.now() - Number(issued);
+  if (age < 0 || age >= OAUTH_STATE_TTL_MS) return null;
   if (!RANDOM_TOKEN.test(returnedState)) return null;
   const same = crypto.timingSafeEqual(Buffer.from(state), Buffer.from(returnedState));
   return same ? verifier : null;

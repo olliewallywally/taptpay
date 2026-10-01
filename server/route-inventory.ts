@@ -18,8 +18,9 @@
 import * as ts from "typescript";
 import fs from "fs";
 import path from "path";
+import { METHODS } from "node:http";
 
-export type HttpRegistrationMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "ALL";
+export type HttpRegistrationMethod = Uppercase<string>;
 
 export interface RouteRegistration {
   method: HttpRegistrationMethod;
@@ -48,14 +49,9 @@ export interface SourceInventory {
   uses: MiddlewareUse[];
 }
 
-const ROUTE_METHODS: Record<string, HttpRegistrationMethod> = {
-  get: "GET",
-  post: "POST",
-  put: "PUT",
-  patch: "PATCH",
-  delete: "DELETE",
-  all: "ALL",
-};
+const ROUTE_METHODS = Object.fromEntries(
+  [...METHODS, "ALL"].map(method => [method.toLowerCase(), method as HttpRegistrationMethod]).concat([["del", "DELETE"]]),
+) as Record<string, HttpRegistrationMethod>;
 
 /**
  * Type names that make a parameter an Express app or router
@@ -150,17 +146,21 @@ export function extractSourceInventory(
   function visit(node: ts.Node) {
     if (
       ts.isCallExpression(node) &&
-      ts.isPropertyAccessExpression(node.expression) &&
+      (ts.isPropertyAccessExpression(node.expression) || ts.isElementAccessExpression(node.expression)) &&
       ts.isIdentifier(node.expression.expression) &&
       bindings.has(node.expression.expression.text)
     ) {
-      const prop = node.expression.name.text;
+      const prop = ts.isPropertyAccessExpression(node.expression) ? node.expression.name.text
+        : ts.isStringLiteralLike(node.expression.argumentExpression) ? node.expression.argumentExpression.text : null;
+      if (prop === null || prop === "route") throw new Error(`Unsupported dynamic/chained Express registration at ${fileName}:${lineOf(node)}`);
       const firstArg = node.arguments[0];
 
       if (prop in ROUTE_METHODS) {
         // `app.get("env")` (one argument) reads a setting; a route has a handler.
         if (firstArg && ts.isStringLiteralLike(firstArg) && node.arguments.length >= 2) {
           registrations.push({ method: ROUTE_METHODS[prop], path: firstArg.text, line: lineOf(node) });
+        } else if (node.arguments.length >= 2) {
+          throw new Error(`Non-literal Express route path at ${fileName}:${lineOf(node)}`);
         }
       } else if (prop === "use") {
         const pathArg = firstArg && ts.isStringLiteralLike(firstArg) ? firstArg : null;

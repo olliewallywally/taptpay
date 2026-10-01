@@ -5,7 +5,7 @@ import { strictBoundedIntegerQueryParam, strictPositiveIntegerParam, strictPosit
 import { createServer, type Server } from "http";
 import { installAsyncRouteGuard } from "./async-route-guard";
 import {
-  storage,
+  storage, PushSessionEndedError,
   BillSplitConflictError,
   SubscriptionBillingBusyError,
   TaptStoneCapacityError,
@@ -15,12 +15,12 @@ import {
 import { TUTORIAL_PAGE_KEYS, isTutorialPageKey } from "@shared/tutorial";
 import { inviteTeamMemberSchema, acceptInviteSchema, retailTransactionCreateRequestSchema, cashSaleRequestSchema, updateMerchantDetailsSchema, updateThemeSchema, updateDailyGoalSchema, forgotPasswordSchema, resetPasswordSchema, changePasswordSchema, newPasswordSchema, createRefundSchema, insertRefundSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, merchantOnboardingSchema, pushNotificationPreferencesSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createClientProfileSchema, updateClientProfileSchema, createQuoteSchema, acceptQuoteSchema, createJobInvoiceSchema, markJobPaidExternalSchema, sendJobBalanceSchema, createJobScheduleSchema, updateJobScheduleSchema, updateTradeReminderSettingsSchema, updateTradeGstSettingsSchema } from "@shared/schema";
 import { isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, getWindcaveEnv, submitGooglePayToken, createAttendedSession, submitTapToPayToken, createCardStorageSession, queryStoredCardSession, chargeStoredCard } from "./windcave";
-import { authenticateUser, checkPasswordEvenly, passwordCheckBudget, generateToken, authenticateToken, createUser, issueTokenForUserId, tokenForUserRow, isAccountOwner, requestPasswordReset, resetPassword, validateResetToken, type AuthenticatedRequest, logSecurityEvent, syncVerifiedMerchants, startBusinessSession, startAdminSession, endAuthSession, endLoginSessions, csrfTokenForRequest, clearSessionCookie, hasSessionCookie, readBusinessSession, respondAuthBackendUnavailable } from "./auth";
+import { authenticateUser, checkPasswordEvenly, passwordCheckBudget, generateToken, authenticateToken, createUser, issueTokenForUserId, tokenForUserRow, isAccountOwner, requestPasswordReset, resetPassword, validateResetToken, type AuthenticatedRequest, logSecurityEvent, syncVerifiedMerchants, startBusinessSession, startAdminSession, endAuthSession, endLoginSessions, csrfTokenForRequest, clearSessionCookie, hasSessionCookie, readBusinessSession, respondAuthBackendUnavailable, isStreamSessionActive } from "./auth";
 import {
   HANDOFF_CODE_TTL_MS, clearSignInCookie, googleVerifiedEmail, handoffCodeHash, newHandoffCode, readCookie,
   signInCookies, startGoogleSignIn, verifyGoogleSignInState,
 } from "./google-sign-in";
-import { type SignInRealm, type TooManyWhat, boardPrintBucket, confirmEmailBucket, confirmationResendBucket, googleCallbackAddressBucket, normalizeThrottleEmail, passwordChangeBucket, passwordResetAddressBucket, passwordResetBucket, signInAccountBucket, signInAddressBucket, signInDeviceKeyPrefix, signupNoticeBucket, tooManyAttempts } from "./auth-throttle";
+import { type SignInRealm, type TooManyWhat, boardPrintBucket, confirmEmailBucket, confirmationResendBucket, googleCallbackAddressBucket, googleStateBucket, normalizeThrottleEmail, passwordChangeBucket, passwordResetAddressBucket, passwordResetBucket, signInAccountBucket, signInAddressBucket, signInDeviceKeyPrefix, signupNoticeBucket, tooManyAttempts } from "./auth-throttle";
 import { BOARD_PRINT_JSON_LIMIT, boardPrintRequestSchema, decodeBoardPrintPdf } from "./board-print";
 import { clientAddressForLimits } from "./client-address";
 import { ACCOUNT_EMAIL_REPLY_FLOOR_MS, SIGN_UP_REPLY_FLOOR_MS, replyNoSoonerThan, replyStart } from "./even-reply";
@@ -634,6 +634,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
 
     try {
+      // External review 2026-09-29: each start is taken up once, before Google is asked anything, so a
+      // kept copy of the starting cookie cannot replay the callback. The slot is never given back.
+      const firstUse = await storage.takeAuthThrottleSlot([googleStateBucket(state as string)], new Date());
+      if (!firstUse.allowed) {
+        return res.redirect(googleSignInError('Google sign in expired. Please try again.'));
+      }
       const clientId = config.oauth.googleClientId;
       const clientSecret = config.oauth.googleClientSecret;
       if (!clientId || !clientSecret) {
@@ -5192,6 +5198,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     // still being made — the client would sit there rather than retrying.
     try {
       let audience: SseAudience;
+      // Whether the stream's sign-in still stands; a board's stream has none to check.
+      let stillSignedIn: (() => Promise<boolean>) | undefined;
       const authorization = req.headers.authorization;
       // R1-T4 phase E: a browser's EventSource sends the session cookie, never a header. A board's
       // page names its board, and keeps its board stream even in a browser signed in to the business.
@@ -5219,6 +5227,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           principal: authenticatedRequest.user?.role === "admin" ? "admin" : "user",
           sessionId: authenticatedRequest.authSession?.id,
         };
+        // External review 2026-09-29: the sign-in is read again before each event and every few
+        // seconds while the stream is idle, so an ending made on another instance closes it here.
+        // A session cookie's stream is checked by its session; a token's (until phase E3) by its token.
+        const signIn = authenticatedRequest.authSession ?? authorization ?? "";
+        stillSignedIn = () => isStreamSessionActive(signIn, merchantId);
       } else if (req.query.stoneId !== undefined) {
         const stoneId = strictPositiveIntegerQueryParam(req.query.stoneId);
         if (stoneId === null) {
@@ -5243,7 +5256,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       });
       res.flushHeaders?.();
 
-      const unsubscribe = sseBroker.subscribe(merchantId, audience, res);
+      const unsubscribe = sseBroker.subscribe(merchantId, audience, res, stillSignedIn);
 
       req.on('close', () => {
         unsubscribe();
@@ -5316,6 +5329,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const pushSub = await storage.createPushSubscription({
         merchantId,
         userId: req.user?.userId ?? null,
+        sessionVersion: req.user?.sessionVersion ?? 0,
         endpoint: subscription.endpoint,
         p256dh: subscription.keys.p256dh,
         auth: subscription.keys.auth,
@@ -5328,6 +5342,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         preferences: pushNotificationPreferencesDto(pushSub.preferences),
       });
     } catch (error) {
+      if (error instanceof PushSessionEndedError) {
+        return res.status(401).json({ code: "SESSION_ENDED", message: "You were signed out. Please sign in again." });
+      }
       console.error("Push subscribe error:", error);
       res.status(500).json({ message: "Failed to save push subscription" });
     }
@@ -5377,6 +5394,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const sub = await storage.createPushSubscription({
         merchantId,
         userId: req.user?.userId ?? null,
+        sessionVersion: req.user?.sessionVersion ?? 0,
         endpoint,
         p256dh: "",
         auth: "",
@@ -5389,6 +5407,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         preferences: pushNotificationPreferencesDto(sub.preferences),
       });
     } catch (error) {
+      if (error instanceof PushSessionEndedError) {
+        return res.status(401).json({ code: "SESSION_ENDED", message: "You were signed out. Please sign in again." });
+      }
       console.error("Native push subscribe error:", error);
       res.status(500).json({ message: "Failed to save device token" });
     }

@@ -26,6 +26,7 @@ import {
 } from './auth-sessions';
 import { getBaseUrl } from './url-utils';
 import type { AuthSession } from '@shared/schema';
+import type { IStorage } from './storage';
 
 // Security Audit Log File
 const SECURITY_LOG_DIR = path.join(process.cwd(), 'logs');
@@ -497,6 +498,10 @@ type SessionResolution =
   | { kind: 'ok'; user: User; session: AuthSession; presented: Exclude<PresentedSecret, 'late'> }
   | { kind: 'refused'; refusal: SessionRefusal }
   | { kind: 'unavailable' };
+type SessionLoginResolution =
+  | { kind: 'ok'; user: User }
+  | { kind: 'refused'; refusal: SessionRefusal }
+  | { kind: 'unavailable' };
 
 const SESSION_REFUSALS = {
   INVALID_SESSION: { status: 401, body: { code: 'INVALID_SESSION', message: 'Please sign in again.' } },
@@ -536,12 +541,27 @@ async function resolveSessionCookie(realm: SessionRealm, value: string): Promise
     return refused(SESSION_REFUSALS.SESSION_ENDED);
   }
 
+  const login = await resolveSessionLogin(storage, realm, session);
+  return login.kind === 'ok' ? { kind: 'ok', user: login.user, session, presented } : login;
+}
+
+/**
+ * The login a session stands for, re-read as for a token: the admin's credentials must still be the
+ * session's; a business login must be active, its session version still the session's, and its business
+ * verified or active. Reads only.
+ */
+async function resolveSessionLogin(
+  storage: Pick<IStorage, 'getUserById' | 'getMerchant'>,
+  realm: SessionRealm,
+  session: AuthSession,
+): Promise<SessionLoginResolution> {
+  const refused = (refusal: SessionRefusal): SessionLoginResolution => ({ kind: 'refused', refusal });
   if (realm === 'admin') {
     const adminEmail = config.admin.email;
     // The admin's email or password changed since this session began.
     if (!adminEmail || !adminTagMatches(session.adminTag)) return refused(SESSION_REFUSALS.SESSION_ENDED);
     const admin: User = { id: 1, email: adminEmail, password: '', merchantId: 0, role: 'admin', createdAt: new Date() };
-    return { kind: 'ok', user: admin, session, presented };
+    return { kind: 'ok', user: admin };
   }
 
   const userId = session.userId;
@@ -557,7 +577,53 @@ async function resolveSessionCookie(realm: SessionRealm, value: string): Promise
   if (!merchant || (merchant.status !== 'verified' && merchant.status !== 'active')) {
     return refused(SESSION_REFUSALS.ACCESS_REVOKED);
   }
-  return { kind: 'ok', user, session, presented };
+  return { kind: 'ok', user };
+}
+
+/**
+ * Whether the sign-in a live stream was opened by still stands, read again from shared storage, so an
+ * ending made on another instance closes the stream here (external review 2026-09-29, R1-T4). True only
+ * for a sign-in a request would still be let through on, and for `merchantId`'s own login or the
+ * platform admin. A refusal and a storage fault alike answer false: the stream is closed and the page
+ * asks again.
+ *
+ * A session cookie's stream is checked by its session id: the session must not have been ended or run
+ * out, and its login is re-read. The cookie's secret is not presented again (the daily swap replaces it
+ * while a stream stays open, and a replaced secret presented late would end the session as a stolen
+ * copy), nothing is written, and the check is not a use: an open stream does not keep a session alive.
+ * A token's stream (until phase E3) re-runs the request's whole authentication.
+ */
+export async function isStreamSessionActive(
+  signIn: string | { id: string; realm: SessionRealm },
+  merchantId?: number,
+): Promise<boolean> {
+  const user = typeof signIn === 'string' ? await userOfAuthorization(signIn) : await userOfLiveSession(signIn);
+  if (!user) return false;
+  return merchantId === undefined || user.role === 'admin' || user.merchantId === merchantId;
+}
+
+/** The principal an Authorization header signs in now, by the request's own authentication; else null. */
+async function userOfAuthorization(authorization: string): Promise<User | null> {
+  let accepted = false;
+  const request = { headers: { authorization } } as AuthenticatedRequest;
+  // No response is sent: whatever the refusal would have said, the stream is simply closed.
+  const response = {
+    status() { return this; }, json() { return this; }, setHeader() { return this; },
+  } as unknown as Response;
+  await authenticateToken(request, response, () => { accepted = true; });
+  return accepted ? request.user ?? null : null;
+}
+
+/** The principal a session stands for now, when it has not been ended or run out; else null. */
+async function userOfLiveSession(signIn: { id: string; realm: SessionRealm }): Promise<User | null> {
+  const storageModule = await readForAuth('load the storage module', () => import('./storage'));
+  if (storageModule === STORAGE_UNAVAILABLE) return null;
+  const { storage } = storageModule;
+  const session = await readForAuth('read the session', () => storage.getAuthSession(signIn.id));
+  if (session === STORAGE_UNAVAILABLE || !session || session.principal !== signIn.realm) return null;
+  if (sessionEnded(session, new Date())) return null;
+  const login = await resolveSessionLogin(storage, signIn.realm, session);
+  return login.kind === 'ok' ? login.user : null;
 }
 
 /**

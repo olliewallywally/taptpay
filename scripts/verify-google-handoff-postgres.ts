@@ -478,6 +478,69 @@ try {
       ["admin", null, "a".repeat(43)]);
   });
 
+  // The external review's fixes (2026-09-29), against real PostgreSQL. A device is registered only while
+  // the login's sessions stand, decided under the login's row lock in the transaction that writes; one
+  // Google sign-in start is taken up once.
+  const { PushSessionEndedError } = await import("../server/storage");
+  const register = (login: number | null, endpoint: string, via = one, sessionVersion = 0, merchantId = merchant) =>
+    via.createPushSubscription({ merchantId, userId: login, sessionVersion, endpoint, p256dh: "synthetic", auth: "synthetic" });
+  const outcomeOf = (pending: Promise<unknown>) =>
+    pending.then((row) => (row ? "stored" : "not stored"), (error) => (error instanceof PushSessionEndedError ? "ended" : error));
+  await check("a device registers under the login's current session version; under a spent one it is refused and nothing is written or switched back on", async () => {
+    const login = await addUser("push-spent@r1-t4.test", "member");
+    assert.equal(await outcomeOf(register(login, push("spent-on-file"))), "stored");
+    assert.ok(await two.advanceUserSessionVersion(login));
+    await two.deactivatePushSubscriptionsForLogin(merchant, login);
+    assert.equal(await outcomeOf(register(login, push("spent-new"))), "ended");
+    assert.equal(await outcomeOf(register(login, push("spent-on-file"))), "ended");
+    assert.deepEqual(await pushRows([push("spent-on-file"), push("spent-new")]),
+      { [push("spent-on-file")]: { active: false, userId: login } });
+    assert.equal(await outcomeOf(register(login, push("spent-new"), two, 1)), "stored", "the login's next sign-in registers it");
+  });
+  await check("a registration naming a disabled login, another business's login or no login is refused", async () => {
+    const disabled = await addUser("push-disabled@r1-t4.test", "member");
+    await pool.query("UPDATE users SET status='disabled' WHERE id=$1", [disabled]);
+    assert.equal(await outcomeOf(register(disabled, push("refused-disabled"))), "ended");
+    assert.equal(await outcomeOf(register(otherLogin, push("refused-other-business"))), "ended");
+    assert.equal(await outcomeOf(register(null, push("refused-no-login"))), "ended");
+    assert.deepEqual(await pushRows([push("refused-disabled"), push("refused-other-business"), push("refused-no-login")]), {});
+  });
+  await check("a registration queued behind 'sign out everywhere' is refused once it holds the login's row", async () => {
+    const login = await addUser("push-queued@r1-t4.test", "member");
+    const blocker = await pool.connect();
+    try {
+      // The sign-out's own statement, not yet committed: it holds the login's row.
+      await blocker.query("BEGIN");
+      await blocker.query("UPDATE users SET session_version = session_version + 1 WHERE id=$1", [login]);
+      const pending = outcomeOf(register(login, push("queued"), two));
+      for (let i = 0; ; i += 1) {
+        const waiting = await pool.query(`SELECT count(*)::int AS n FROM pg_locks WHERE NOT granted`);
+        if (waiting.rows[0].n > 0) break;
+        assert.ok(i < 100, "the registration never queued behind the login's row");
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      assert.deepEqual(await pushRows([push("queued")]), {}, "nothing is written while it waits");
+      await blocker.query("COMMIT");
+      assert.equal(await pending, "ended");
+      assert.deepEqual(await pushRows([push("queued")]), {});
+    } finally { blocker.release(); }
+  });
+  await check("one Google sign-in start is taken up exactly once by 24 simultaneous callbacks from two instances; its key holds no state", async () => {
+    const state = randomBytes(32).toString("base64url");
+    const bucket = throttle.googleStateBucket(state);
+    const started = Date.now();
+    const results = await Promise.all(Array.from({ length: 24 }, (_, i) =>
+      (i % 2 ? two : one).takeAuthThrottleSlot([bucket], new Date())));
+    assert.equal(results.filter((r) => r.allowed).length, 1);
+    const stored = await throttleRow(bucket.key);
+    assert.equal(stored?.failures, 1);
+    const wait = stored!.next_allowed_at!.getTime() - started;
+    assert.ok(wait >= 10 * 60_000 && wait < 10 * 60_000 + 5_000, `refused for as long as a start lasts (${wait} ms)`);
+    assert.ok(!bucket.key.includes(state), "the key holds no state");
+    assert.equal((await one.takeAuthThrottleSlot([throttle.googleStateBucket(randomBytes(32).toString("base64url"))], new Date())).allowed,
+      true, "another start is its own");
+  });
+
   assert.deepEqual(failures, [], "R1-T4 sign-in PostgreSQL verification failed");
   console.log("R1-T4 sign-in PostgreSQL verification passed");
 } finally {

@@ -18,9 +18,20 @@ export interface SseWritable {
   end?(): unknown;
 }
 
+/**
+ * How often an idle signed-in stream's sign-in is read again from shared storage (external review
+ * 2026-09-29, R1-T4): an ending made on another instance closes the stream here within this long.
+ */
+export const SSE_REVALIDATE_EVERY_MS = 5_000;
+
 type Subscriber = {
   audience: SseAudience;
   connection: SseWritable;
+  /** Whether the sign-in that opened the stream still stands; a board's stream has none. */
+  authorize?: () => Promise<boolean>;
+  /** This subscriber's checks and writes, one after another, so its events keep their order. */
+  pending: Promise<void>;
+  unsubscribe: () => void;
 };
 
 function ownerRefundDto(refund: Record<string, any>) {
@@ -78,9 +89,23 @@ function isTarget(
 export class SseBroker {
   private subscribers = new Map<number, Set<Subscriber>>();
 
-  subscribe(merchantId: number, audience: SseAudience, connection: SseWritable) {
+  subscribe(merchantId: number, audience: SseAudience, connection: SseWritable, authorize?: () => Promise<boolean>) {
     const merchantSubscribers = this.subscribers.get(merchantId) ?? new Set<Subscriber>();
-    const subscriber = { audience, connection };
+    let timer: ReturnType<typeof setInterval> | undefined;
+    const subscriber: Subscriber = { audience, connection, authorize, pending: Promise.resolve(), unsubscribe: () => {
+      if (timer) clearInterval(timer);
+      timer = undefined;
+      merchantSubscribers.delete(subscriber);
+      // Only its own set: a stream that closes late must not drop a newer set of the same business.
+      if (merchantSubscribers.size === 0 && this.subscribers.get(merchantId) === merchantSubscribers) {
+        this.subscribers.delete(merchantId);
+      }
+    } };
+    // Shared-storage revalidation closes idle streams on other instances too.
+    if (authorize) {
+      timer = setInterval(() => { void this.deliver(subscriber, merchantSubscribers); }, SSE_REVALIDATE_EVERY_MS);
+      timer.unref?.();
+    }
     merchantSubscribers.add(subscriber);
     this.subscribers.set(merchantId, merchantSubscribers);
 
@@ -90,23 +115,44 @@ export class SseBroker {
       ...(audience.kind === "board" ? { stoneId: audience.stoneId } : {}),
     })}\n\n`);
 
-    return () => {
-      merchantSubscribers.delete(subscriber);
-      if (merchantSubscribers.size === 0) this.subscribers.delete(merchantId);
-    };
+    return subscriber.unsubscribe;
   }
 
-  broadcast(merchantId: number, stoneId: number | null | undefined, data: Record<string, any>) {
+  /**
+   * A signed-in stream's next step: its sign-in is read again, and only then is the event written. A
+   * sign-in that no longer stands, or a check that fails, closes the stream with nothing written.
+   */
+  private deliver(subscriber: Subscriber, members: Set<Subscriber>, message?: string): Promise<void> {
+    subscriber.pending = subscriber.pending.then(async () => {
+      if (!members.has(subscriber)) return;
+      try {
+        if (subscriber.authorize && !await subscriber.authorize()) {
+          subscriber.unsubscribe();
+          subscriber.connection.end?.();
+          return;
+        }
+        if (message && members.has(subscriber)) subscriber.connection.write(message);
+      } catch {
+        subscriber.unsubscribe();
+        try { subscriber.connection.end?.(); } catch { /* already closed */ }
+      }
+    });
+    return subscriber.pending;
+  }
+
+  broadcast(merchantId: number, stoneId: number | null | undefined, data: Record<string, any>): void | Promise<void[]> {
     const merchantSubscribers = this.subscribers.get(merchantId);
     if (!merchantSubscribers) return;
     const canonicalStoneId = stoneId ?? null;
 
+    const pending: Promise<void>[] = [];
     for (const subscriber of merchantSubscribers) {
       if (!isTarget(subscriber.audience, canonicalStoneId, data)) continue;
-      subscriber.connection.write(
-        `data: ${JSON.stringify(projectEvent(data, subscriber.audience))}\n\n`,
-      );
+      const message = `data: ${JSON.stringify(projectEvent(data, subscriber.audience))}\n\n`;
+      if (subscriber.authorize) pending.push(this.deliver(subscriber, merchantSubscribers, message));
+      else subscriber.connection.write(message);
     }
+    return Promise.all(pending);
   }
 
   /**
@@ -127,7 +173,7 @@ export class SseBroker {
       ) {
         continue;
       }
-      merchantSubscribers.delete(subscriber);
+      subscriber.unsubscribe();
       disconnected++;
       try {
         subscriber.connection.end?.();
@@ -149,7 +195,7 @@ export class SseBroker {
     for (const [merchantId, merchantSubscribers] of Array.from(this.subscribers.entries())) {
       for (const subscriber of Array.from(merchantSubscribers)) {
         if (subscriber.audience.kind !== "merchant" || subscriber.audience.sessionId !== sessionId) continue;
-        merchantSubscribers.delete(subscriber);
+        subscriber.unsubscribe();
         disconnected++;
         try {
           subscriber.connection.end?.();
@@ -170,6 +216,7 @@ export class SseBroker {
   }
 
   clear() {
+    for (const members of this.subscribers.values()) for (const subscriber of members) subscriber.unsubscribe();
     this.subscribers.clear();
   }
 }

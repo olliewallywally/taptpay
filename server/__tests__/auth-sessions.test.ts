@@ -27,6 +27,7 @@ import {
   storageSnapshot,
   useFakeClock,
 } from "./support/http-harness";
+import { observeRefusalEffects } from "./support/refusal-effects";
 
 /**
  * R1-T4 phase E (owner decisions 2026-09-29 and 2026-09-30,
@@ -326,9 +327,13 @@ describe("a change needs the page's CSRF token", () => {
 
     for (const csrf of [null, "", "x".repeat(43), other.csrf]) {
       const before = storageSnapshot();
+      const effects = observeRefusalEffects();
       const res = await change(app, browser, csrf);
       expect({ csrf, status: res.status, code: res.body.code }).toEqual({ csrf, status: 403, code: "CSRF_REJECTED" });
       expect(storageSnapshot()).toBe(before);
+      // Nothing sent, pushed, asked of a provider or written either (external review 2026-09-29, R1-T3).
+      effects.assertNone();
+      effects.restore();
     }
   });
 

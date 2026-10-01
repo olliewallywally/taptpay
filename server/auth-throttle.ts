@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { config } from "./config";
+import { OAUTH_STATE_TTL_MS } from "./google-sign-in";
 
 /**
  * R1-T4 phase C — sign-in and account-recovery throttles shared by every app
@@ -65,6 +66,16 @@ export const ADDRESS_RESET_POLICY: AuthThrottlePolicy = Object.freeze({
 /** Google callbacks from one address that get as far as asking Google (phase B). */
 export const ADDRESS_GOOGLE_POLICY: AuthThrottlePolicy = Object.freeze({
   free: 20, firstWaitMs: 30_000, maxWaitMs: 15 * MINUTE, forgetAfterMs: 60 * MINUTE,
+});
+
+/**
+ * One Google sign-in start, taken up once (external review 2026-09-29): the callback takes the
+ * bucket's only slot before it asks Google anything, so a second callback with the same starting
+ * cookie, a simultaneous one included, is refused. The wait lasts as long as a start does, and the
+ * slot is never given back.
+ */
+export const GOOGLE_STATE_ONCE_POLICY: AuthThrottlePolicy = Object.freeze({
+  free: 1, firstWaitMs: OAUTH_STATE_TTL_MS, maxWaitMs: OAUTH_STATE_TTL_MS, forgetAfterMs: 2 * OAUTH_STATE_TTL_MS,
 });
 
 /**
@@ -227,6 +238,11 @@ export function passwordResetAddressBucket(address: string): AuthThrottleBucket 
 /** Google callbacks from one visitor address. */
 export function googleCallbackAddressBucket(address: string): AuthThrottleBucket {
   return { key: `google-address:${bucketKeyHmac("google-address", address)}`, policy: ADDRESS_GOOGLE_POLICY };
+}
+
+/** One Google sign-in start, by its state: the callback takes it up once. */
+export function googleStateBucket(state: string): AuthThrottleBucket {
+  return { key: `google-state:${bucketKeyHmac("google-state", state)}`, policy: GOOGLE_STATE_ONCE_POLICY };
 }
 
 /** Password tries on one email-confirmation link (owner decision 2026-09-23). */

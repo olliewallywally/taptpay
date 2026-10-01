@@ -2,6 +2,7 @@ import "./support/test-env";
 
 import request from "supertest";
 import { createOwnerPrincipal, createTestApp, resetTestStorage, storageSnapshot, VALID_PASSWORD } from "./support/http-harness";
+import { observeRefusalEffects } from "./support/refusal-effects";
 
 /**
  * R1-T4 phase E (owner decisions 2026-09-29 and 2026-09-30,
@@ -40,6 +41,7 @@ describe("a change sent from another website is refused before anything else", (
   ])("%s: 403 CROSS_SITE_REJECTED, nothing counted or changed", async (_label, headers) => {
     const { app } = await createTestApp();
     const before = storageSnapshot();
+    const effects = observeRefusalEffects();
 
     const res = await loginFrom(app, headers);
 
@@ -47,6 +49,9 @@ describe("a change sent from another website is refused before anything else", (
     expect(res.body.code).toBe("CROSS_SITE_REJECTED");
     expect(res.headers["access-control-allow-origin"]).toBeUndefined();
     expect(storageSnapshot()).toBe(before);
+    // Nothing sent, pushed, asked of a provider or written either (external review 2026-09-29, R1-T3).
+    effects.assertNone();
+    effects.restore();
   });
 
   it.each([

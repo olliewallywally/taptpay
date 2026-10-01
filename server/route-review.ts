@@ -1168,12 +1168,12 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       },
     ],
     input:
-      "query read raw: code (sent to Google with this browser's PKCE verifier), state (must equal the state cookie's, compared in constant time by verifyGoogleSignInState; both halves must be 43 base64url characters) and error (only its presence is used)",
+      "query read raw: code (sent to Google with this browser's PKCE verifier), state (must equal the state cookie's, compared in constant time by verifyGoogleSignInState; the cookie's state and verifier must each be 43 base64url characters, under this server's signature with a start time no more than ten minutes old) and error (only its presence is used)",
     capability:
       "Google sign-in configured (config.oauth.googleClientId and googleClientSecret, server/config.ts): without them the browser goes back to /login with an error",
     entitlement: null,
     idempotency:
-      "the state cookie is cleared on every call; a new Google user gets one merchant (two first sign-ins at once: the second fails on the unique email and is asked to try again); an existing merchant is linked to the Google id once; each success stores a new one-time handoff code",
+      "the state cookie is cleared on every call, and each start is taken up once (googleStateBucket, a row of auth_throttle taken before Google is asked and never given back: a second callback with the same cookie and state, a simultaneous one included, goes back to /login with the expired message); a new Google user gets one merchant (two first sign-ins at once: the second fails on the unique email and is asked to try again); an existing merchant is linked to the Google id once; each success stores a new one-time handoff code",
     sideEffects:
       "asks Google to exchange the code (oauth2.googleapis.com/token, with the client secret and the PKCE verifier) and for the profile (googleapis.com/oauth2/v2/userinfo); for a new Google user, creates a verified merchant (createMerchantWithPassword) and its owner login (createUser, server/auth.ts, which keeps an existing password)",
     successDto:
@@ -1181,13 +1181,14 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     errorDisclosure: ["fixed"],
     controls: {
       authenticity:
-        "Google's authorization code, exchanged with the PKCE verifier from this browser's state cookie, and Google's word that the email is verified. The returned state must equal the cookie's, which stops login CSRF and makes a stolen code useless. The server keeps no record of the pair, so a script can present one of its own making; that gets it only Google's refusal of a made-up code",
-      replay: "Google accepts a code once; a replayed cookie and state make the server ask Google again, which refuses the spent code",
+        "Google's authorization code, exchanged with the PKCE verifier from this browser's state cookie, and Google's word that the email is verified. The returned state must equal the cookie's, which stops login CSRF and makes a stolen code useless. The cookie carries its start time under the server's signature (a key of its own, derived from JWT_SECRET), so a script cannot present a pair of its own making, and a kept cookie is refused after ten minutes whatever the browser does with it (external review 2026-09-29)",
+      replay:
+        "each start is taken up once, before Google is asked (googleStateBucket): a replayed cookie and state are refused without asking Google again; Google also accepts a code once",
       rate:
         "tooManyAttempts after takeAuthThrottleSlot per visitor address (20 free, then waits from 30 s), counted before Google is asked, only once TRUST_PROXY_HOPS is set (R1-T4 phase B, off by default): until then no limit. A success gives its count back",
     },
     findings: [
-      "Until TRUST_PROXY_HOPS is set there is no limit: every request carrying a self-made cookie and state makes the server call Google's token endpoint, which refuses the made-up code. Phase B's live check switches the limit on.",
+      "Until TRUST_PROXY_HOPS is set there is no limit: each sign-in started (GET /api/auth/google, itself unlimited) can make the server call Google's token endpoint once with a made-up code, which Google refuses. Phase B's live check switches the limit on.",
     ],
   },
 
@@ -1648,26 +1649,26 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     branches: [
       {
         principal: "merchant",
-        when: "an Authorization header is sent",
+        when: "a session cookie with no stoneId (R1-T4 phase E), or an Authorization header (until phase E3)",
         roles: ["owner", "member"],
         platformAdmin: true,
         tenant: "path-merchant",
-        tenantRule: `${SIGNED_IN_BUSINESS_RULE}, labelled admin on its stream; every live event of the business`,
+        tenantRule: `${SIGNED_IN_BUSINESS_RULE}, labelled admin on its stream; every live event of the business, for as long as the sign-in stands (it is read again before each event and every five seconds: isStreamSessionActive, server/auth.ts)`,
       },
       {
         principal: "public",
-        when: "no Authorization header, with a stoneId (without one: 410 NO_BOARD_ADDRESS_RETIRED)",
+        when: "a stoneId and no Authorization header, signed in or not: a board's page keeps its board stream (with neither a sign-in nor a stoneId: 410 NO_BOARD_ADDRESS_RETIRED)",
         tenant: "board",
         tenantRule: `${BOARD_PAGE_RULE}; the board must also be active, and anything else is 404 (sse-broker.ts sends a board's stream only its own board's events)`,
       },
     ],
     input:
-      "id: strictPositiveIntegerParam; stoneId: strictPositiveIntegerQueryParam (400 otherwise); a token in the query is refused (400: credentials go in the Authorization header)",
+      "id: strictPositiveIntegerParam; stoneId: strictPositiveIntegerQueryParam (400 otherwise); a token in the query is refused (400: no credential travels in an address)",
     capability: null,
     entitlement: null,
     idempotency: "each request opens another stream; closing it unsubscribes",
     sideEffects:
-      "subscribes the connection to the business's live updates (sseBroker.subscribe): the business's own view (its sales and refunds) or the board's (publicTransactionDto of that board's sales)",
+      "subscribes the connection to the business's live updates (sseBroker.subscribe): the business's own view (its sales and refunds) or the board's (publicTransactionDto of that board's sales). A signed-in stream's sign-in is read again from shared storage before each event and every five seconds while idle (external review 2026-09-29): a session ended or run out, a login no longer let through, on this instance or another, or a check that fails, closes the stream with nothing written. A session cookie's stream is checked by its session id (no secret is presented again, nothing is written, and the check is not a use of the session); a token's by its token",
     successDto: "text/event-stream, not cached: a 'connected' event, then the audience's events",
     errorDisclosure: ["fixed"],
     controls: {
@@ -2420,7 +2421,8 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       "body read without a schema: subscription, whose endpoint, keys.p256dh and keys.auth must be present (400 otherwise); the endpoint must be a browser push service's (isPushServiceEndpoint, server/push-endpoint.ts: https on port 443, no user or password, a host of Google's, Mozilla's, Apple's or Microsoft's push service; 400 otherwise, owner decision 2026-09-26); the keys are not checked for form",
     capability: "the server's push keys must be set (config.push in server/config.ts: 503 otherwise)",
     entitlement: null,
-    idempotency: "registers the device, or re-registers it by its endpoint (active again, this login's); the same body again changes nothing",
+    idempotency:
+      "registers the device, or re-registers it by its endpoint (active again, this login's); the same body again changes nothing. The login's sessions must not have been ended while the request was on its way: its session version is checked again under the login's row lock, in the transaction that writes (external review 2026-09-29: 401 SESSION_ENDED, nothing registered)",
     sideEffects: null,
     successDto: "{ success: true, preferences: pushNotificationPreferencesDto }",
     errorDisclosure: ["fixed"],
@@ -2460,7 +2462,8 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     input: "body read without a schema: deviceToken, a string of at least 8 characters once trimmed (400 otherwise), stored as the endpoint apns://<token>",
     capability: null,
     entitlement: null,
-    idempotency: "registers the iPhone, or re-registers it by its endpoint; the same body again changes nothing",
+    idempotency:
+      "registers the iPhone, or re-registers it by its endpoint; the same body again changes nothing. The login's sessions must not have been ended while the request was on its way: its session version is checked again under the login's row lock, in the transaction that writes (external review 2026-09-29: 401 SESSION_ENDED, nothing registered)",
     sideEffects: null,
     successDto: "{ success: true, preferences: pushNotificationPreferencesDto }",
     errorDisclosure: ["fixed"],
