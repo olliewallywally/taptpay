@@ -325,7 +325,7 @@ describe("MemStorage board allocation", () => {
       stoneNumber: 1,
     });
     await storage.createTaptStone({ merchantId: 1, name: "Three", stoneNumber: 3 });
-    await storage.deleteTaptStone(first.id);
+    await storage.deleteTaptStoneForMerchant(first.id, 1);
 
     await expect(storage.createNextTaptStone(1)).resolves.toMatchObject({
       merchantId: 1,

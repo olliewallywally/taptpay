@@ -110,7 +110,7 @@ describe("a cash sale is held to the rules creating a sale uses", () => {
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
     const board = await storage.createNextTaptStone(owner.merchantId);
-    await storage.deleteTaptStone(board.id);
+    await storage.deleteTaptStoneForMerchant(board.id, owner.merchantId);
     billingInOrder();
     const before = storageSnapshot();
 

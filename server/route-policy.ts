@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ f1ca29a8c38a13d793e7ee3a08db5cdc2120befa on 2026-10-02.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ bc5eba3c55ed95c360b08b6545dc748f0911aab0 on 2026-10-02.
  *
  * 187 registrations (78 GET, 77 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -1079,7 +1079,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       middleware: ["authenticateToken"],
       params: ["id: strictPositiveIntegerParam"],
       authChecks: ["checkMerchantOwnership"],
-      storageMethods: ["createNextTaptStone","getMerchant","updateTaptStoneUrls"],
+      storageMethods: ["createNextTaptStone","getMerchant","updateTaptStoneUrlsForMerchant"],
       statuses: [200,400,401,403,404,409,500,503],
       errorTextInResponse: ["error.message"],
     },
@@ -1093,8 +1093,8 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       middleware: ["authenticateToken"],
       params: ["merchantId: strictPositiveIntegerParam","stoneId: strictPositiveIntegerParam"],
       body: ["fields: name"],
-      authChecks: ["checkMerchantOwnership","compares existingStone.merchantId !== merchantId"],
-      storageMethods: ["getTaptStone","updateTaptStone"],
+      authChecks: ["checkMerchantOwnership"],
+      storageMethods: ["getTaptStoneForMerchant","updateTaptStoneForMerchant"],
       statuses: [200,400,401,403,404,500,503],
     },
   },
@@ -1106,8 +1106,8 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       middleware: ["authenticateToken"],
       params: ["merchantId: strictPositiveIntegerParam","stoneId: strictPositiveIntegerParam"],
-      authChecks: ["checkMerchantOwnership","compares existingStone.merchantId !== merchantId"],
-      storageMethods: ["deleteTaptStone","getTaptStone"],
+      authChecks: ["checkMerchantOwnership"],
+      storageMethods: ["deleteTaptStoneForMerchant","getTaptStoneForMerchant"],
       statuses: [200,400,401,403,404,500,503],
     },
   },
@@ -1531,8 +1531,8 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       middleware: ["authenticateToken"],
       params: ["itemId: strictPositiveIntegerParam","merchantId: strictPositiveIntegerParam"],
       body: ["schema: updateStockItemSchema"],
-      authChecks: ["checkMerchantOwnership","compares existingItem.merchantId !== merchantId"],
-      storageMethods: ["getStockItem","updateStockItem"],
+      authChecks: ["checkMerchantOwnership"],
+      storageMethods: ["getStockItemForMerchant","updateStockItemForMerchant"],
       statuses: [200,400,401,403,404,500,503],
       errorTextInResponse: ["error.errors"],
     },
@@ -1545,8 +1545,8 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       middleware: ["authenticateToken"],
       params: ["itemId: strictPositiveIntegerParam","merchantId: strictPositiveIntegerParam"],
-      authChecks: ["checkMerchantOwnership","compares existingItem.merchantId !== merchantId"],
-      storageMethods: ["deleteStockItem","getStockItem"],
+      authChecks: ["checkMerchantOwnership"],
+      storageMethods: ["deleteStockItemForMerchant","getStockItemForMerchant"],
       statuses: [200,400,401,403,404,500,503],
     },
   },

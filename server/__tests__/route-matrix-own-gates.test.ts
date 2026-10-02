@@ -346,7 +346,7 @@ describe("R1-T3 — a board's public routes answer another business's board as a
       merchantId, taptStoneId: removedBoard, itemName: "Left open", price: "4.00", status: "pending",
       paymentMethod: "qr_code", splitEnabled: false,
     } as any);
-    await storage.deleteTaptStone(removedBoard);
+    await storage.deleteTaptStoneForMerchant(removedBoard, merchantId);
   });
 
   it("has a request for every board route", () => {

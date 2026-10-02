@@ -4015,7 +4015,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const paymentUrl = generatePaymentUrl(merchantId, stoneId);
       
       // Update the stone with the URLs
-      const updatedStone = await storage.updateTaptStoneUrls(newStone.id, qrCodeUrl, paymentUrl);
+      const updatedStone = await storage.updateTaptStoneUrlsForMerchant(newStone.id, merchantId, qrCodeUrl, paymentUrl);
       
       res.json(updatedStone ?? newStone);
     } catch (error) {
@@ -4050,13 +4050,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(400).json({ message: "Board name must be 60 characters or fewer" });
       }
 
-      // Verify the stone belongs to this merchant (cross-tenant guard)
-      const existingStone = await storage.getTaptStone(stoneId);
-      if (!existingStone || existingStone.merchantId !== merchantId) {
+      // Scope both the read and the later write to the authorized business.
+      const existingStone = await storage.getTaptStoneForMerchant(stoneId, merchantId);
+      if (!existingStone) {
         return res.status(404).json({ message: "Tapt stone not found" });
       }
 
-      const updatedStone = await storage.updateTaptStone(stoneId, { name: name.trim() });
+      const updatedStone = await storage.updateTaptStoneForMerchant(stoneId, merchantId, { name: name.trim() });
       
       if (!updatedStone) {
         return res.status(404).json({ message: "Tapt stone not found" });
@@ -4080,13 +4080,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const stoneId = strictPositiveIntegerParam(req.params.stoneId);
       if (stoneId === null) return res.status(400).json({ message: "Invalid id" });
 
-      // Verify the stone belongs to this merchant (cross-tenant guard)
-      const existingStone = await storage.getTaptStone(stoneId);
-      if (!existingStone || existingStone.merchantId !== merchantId) {
+      // Scope both the read and the later write to the authorized business.
+      const existingStone = await storage.getTaptStoneForMerchant(stoneId, merchantId);
+      if (!existingStone) {
         return res.status(404).json({ message: "Tapt stone not found" });
       }
 
-      const success = await storage.deleteTaptStone(stoneId);
+      const success = await storage.deleteTaptStoneForMerchant(stoneId, merchantId);
 
       if (!success) {
         return res.status(404).json({ message: "Tapt stone not found" });
@@ -5789,15 +5789,15 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(403).json({ message: "Access denied" });
       }
 
-      // Verify the item actually belongs to this merchant (prevents cross-tenant edits by item id)
-      const existingItem = await storage.getStockItem(itemId);
-      if (!existingItem || existingItem.merchantId !== merchantId) {
+      // Scope both the read and the later write to the authorized business.
+      const existingItem = await storage.getStockItemForMerchant(itemId, merchantId);
+      if (!existingItem) {
         return res.status(404).json({ message: "Stock item not found" });
       }
 
       const validatedData = updateStockItemSchema.parse(req.body);
 
-      const stockItem = await storage.updateStockItem(itemId, validatedData);
+      const stockItem = await storage.updateStockItemForMerchant(itemId, merchantId, validatedData);
       
       if (!stockItem) {
         return res.status(404).json({ message: "Stock item not found" });
@@ -5826,13 +5826,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(403).json({ message: "Access denied" });
       }
 
-      // Verify the item belongs to this merchant before deleting (cross-tenant guard)
-      const existingItem = await storage.getStockItem(itemId);
-      if (!existingItem || existingItem.merchantId !== merchantId) {
+      // Scope both the read and the later write to the authorized business.
+      const existingItem = await storage.getStockItemForMerchant(itemId, merchantId);
+      if (!existingItem) {
         return res.status(404).json({ message: "Stock item not found" });
       }
 
-      const success = await storage.deleteStockItem(itemId);
+      const success = await storage.deleteStockItemForMerchant(itemId, merchantId);
       
       if (!success) {
         return res.status(404).json({ message: "Stock item not found" });

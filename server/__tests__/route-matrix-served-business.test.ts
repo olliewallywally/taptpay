@@ -312,7 +312,7 @@ const RECIPES: Record<string, ServedRecipe> = {
       req: { method: "put", path: url(ctx, `/stock-items/${made}`), body: { name: "Renamed", cost: "3.00" } }, status: 200,
       check: async (res) => {
         expect(res.body).toMatchObject({ id: made, name: "Renamed", cost: "3.00" });
-        expect(await storage.getStockItem(made)).toMatchObject({ name: "Renamed", cost: "3.00" });
+        expect(await storage.getStockItemForMerchant(made, ctx.merchantId)).toMatchObject({ name: "Renamed", cost: "3.00" });
       },
     };
   },
@@ -323,7 +323,7 @@ const RECIPES: Record<string, ServedRecipe> = {
       check: async (res) => {
         expect(res.body).toEqual({ message: expect.any(String) });
         // Kept, inactive (a sale may name it), and gone from the list the screen reads.
-        expect((await storage.getStockItem(made))?.isActive).toBe(false);
+        expect((await storage.getStockItemForMerchant(made, ctx.merchantId))?.isActive).toBe(false);
         expect(ids((await as(ctx, ctx.owner).get(url(ctx, "/stock-items"))).body)).toEqual([]);
       },
     };

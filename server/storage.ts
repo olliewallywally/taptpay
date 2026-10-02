@@ -88,6 +88,25 @@ export type TransactionServerOwnedFields = Readonly<{
   paymentTokenHash?: Transaction["paymentTokenHash"];
 }>;
 
+/** Management may change these fields, never the stock item's identity or business. */
+export type StockItemChanges = Partial<Pick<InsertStockItem, "name" | "description" | "cost" | "emoji" | "variations">>;
+
+function isManagementTenantId(merchantId: number): boolean {
+  // merchants.id and these foreign keys are PostgreSQL serial/integer, not bigint.
+  return isTenantId(merchantId) && merchantId <= 2_147_483_647;
+}
+
+function stockItemChanges(data: StockItemChanges): StockItemChanges {
+  // Runtime projection as well as a narrow type: preserve omitted fields and explicit nulls.
+  return {
+    ...(data.name !== undefined ? { name: data.name } : {}),
+    ...(data.description !== undefined ? { description: data.description } : {}),
+    ...(data.cost !== undefined ? { cost: data.cost } : {}),
+    ...(data.emoji !== undefined ? { emoji: data.emoji } : {}),
+    ...(data.variations !== undefined ? { variations: data.variations } : {}),
+  };
+}
+
 type RuntimeTransactionFields = InsertTransaction & {
   completedAt?: unknown;
   paymentTokenHash?: unknown;
@@ -615,19 +634,21 @@ export interface IStorage extends PaymentAttemptRepository {
   // Tapt Stone operations
   createTaptStone(data: InsertTaptStone): Promise<TaptStone>;
   createNextTaptStone(merchantId: number, name?: string): Promise<TaptStone>;
+  /** Public board/payment resolution; management uses the tenant-required read below. */
   getTaptStone(id: number): Promise<TaptStone | undefined>;
+  getTaptStoneForMerchant(id: number, merchantId: number): Promise<TaptStone | undefined>;
   getTaptStonesByMerchant(merchantId: number): Promise<TaptStone[]>;
-  updateTaptStone(id: number, data: Partial<{ name: string }>): Promise<TaptStone | undefined>;
-  updateTaptStoneUrls(id: number, qrCodeUrl: string, paymentUrl: string): Promise<TaptStone | undefined>;
-  deleteTaptStone(id: number): Promise<boolean>;
+  updateTaptStoneForMerchant(id: number, merchantId: number, data: Partial<{ name: string }>): Promise<TaptStone | undefined>;
+  updateTaptStoneUrlsForMerchant(id: number, merchantId: number, qrCodeUrl: string, paymentUrl: string): Promise<TaptStone | undefined>;
+  deleteTaptStoneForMerchant(id: number, merchantId: number): Promise<boolean>;
   associateTransactionWithStone(transactionId: number, stoneId: number): Promise<void>;
   
   // Stock Item operations
   createStockItem(data: InsertStockItem): Promise<StockItem>;
-  getStockItem(id: number): Promise<StockItem | undefined>;
+  getStockItemForMerchant(id: number, merchantId: number): Promise<StockItem | undefined>;
   getStockItemsByMerchant(merchantId: number): Promise<StockItem[]>;
-  updateStockItem(id: number, data: Partial<InsertStockItem>): Promise<StockItem | undefined>;
-  deleteStockItem(id: number): Promise<boolean>;
+  updateStockItemForMerchant(id: number, merchantId: number, data: StockItemChanges): Promise<StockItem | undefined>;
+  deleteStockItemForMerchant(id: number, merchantId: number): Promise<boolean>;
   
   // Analytics operations
   getMerchantAnalytics(merchantId: number): Promise<{
@@ -3041,15 +3062,22 @@ export class MemStorage implements IStorage {
     return this.taptStones.get(id);
   }
 
+  async getTaptStoneForMerchant(id: number, merchantId: number): Promise<TaptStone | undefined> {
+    if (!isManagementTenantId(merchantId)) return undefined;
+    const stone = this.taptStones.get(id);
+    return stone?.merchantId === merchantId ? stone : undefined;
+  }
+
   async getTaptStonesByMerchant(merchantId: number): Promise<TaptStone[]> {
     return Array.from(this.taptStones.values()).filter(
       (stone) => stone.merchantId === merchantId && stone.isActive
     );
   }
 
-  async updateTaptStone(id: number, data: Partial<{ name: string }>): Promise<TaptStone | undefined> {
+  async updateTaptStoneForMerchant(id: number, merchantId: number, data: Partial<{ name: string }>): Promise<TaptStone | undefined> {
+    if (!isManagementTenantId(merchantId)) return undefined;
     const stone = this.taptStones.get(id);
-    if (stone) {
+    if (stone?.merchantId === merchantId) {
       if (data.name !== undefined) {
         stone.name = data.name;
       }
@@ -3060,9 +3088,10 @@ export class MemStorage implements IStorage {
     return undefined;
   }
 
-  async updateTaptStoneUrls(id: number, qrCodeUrl: string, paymentUrl: string): Promise<TaptStone | undefined> {
+  async updateTaptStoneUrlsForMerchant(id: number, merchantId: number, qrCodeUrl: string, paymentUrl: string): Promise<TaptStone | undefined> {
+    if (!isManagementTenantId(merchantId)) return undefined;
     const stone = this.taptStones.get(id);
-    if (stone) {
+    if (stone?.merchantId === merchantId) {
       stone.qrCodeUrl = qrCodeUrl;
       stone.paymentUrl = paymentUrl;
       stone.updatedAt = new Date();
@@ -3072,9 +3101,10 @@ export class MemStorage implements IStorage {
     return undefined;
   }
 
-  async deleteTaptStone(id: number): Promise<boolean> {
+  async deleteTaptStoneForMerchant(id: number, merchantId: number): Promise<boolean> {
+    if (!isManagementTenantId(merchantId)) return false;
     const stone = this.taptStones.get(id);
-    if (stone) {
+    if (stone?.merchantId === merchantId) {
       stone.isActive = false;
       stone.updatedAt = new Date();
       this.taptStones.set(id, stone);
@@ -3107,8 +3137,10 @@ export class MemStorage implements IStorage {
     return stockItem;
   }
 
-  async getStockItem(id: number): Promise<StockItem | undefined> {
-    return this.stockItems.get(id);
+  async getStockItemForMerchant(id: number, merchantId: number): Promise<StockItem | undefined> {
+    if (!isManagementTenantId(merchantId)) return undefined;
+    const item = this.stockItems.get(id);
+    return item?.merchantId === merchantId ? item : undefined;
   }
 
   async getStockItemsByMerchant(merchantId: number): Promise<StockItem[]> {
@@ -3117,12 +3149,13 @@ export class MemStorage implements IStorage {
     );
   }
 
-  async updateStockItem(id: number, data: Partial<InsertStockItem>): Promise<StockItem | undefined> {
+  async updateStockItemForMerchant(id: number, merchantId: number, data: StockItemChanges): Promise<StockItem | undefined> {
+    if (!isManagementTenantId(merchantId)) return undefined;
     const item = this.stockItems.get(id);
-    if (item) {
+    if (item?.merchantId === merchantId) {
       const updatedItem = {
         ...item,
-        ...data,
+        ...stockItemChanges(data),
         updatedAt: new Date(),
       };
       this.stockItems.set(id, updatedItem);
@@ -3131,9 +3164,10 @@ export class MemStorage implements IStorage {
     return undefined;
   }
 
-  async deleteStockItem(id: number): Promise<boolean> {
+  async deleteStockItemForMerchant(id: number, merchantId: number): Promise<boolean> {
+    if (!isManagementTenantId(merchantId)) return false;
     const item = this.stockItems.get(id);
-    if (item) {
+    if (item?.merchantId === merchantId) {
       item.isActive = false;
       item.updatedAt = new Date();
       this.stockItems.set(id, item);
@@ -6167,6 +6201,14 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
+  async getTaptStoneForMerchant(id: number, merchantId: number): Promise<TaptStone | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    if (!isManagementTenantId(merchantId)) return undefined;
+    const result = await this.db.select().from(taptStones)
+      .where(and(eq(taptStones.id, id), eq(taptStones.merchantId, merchantId))).limit(1);
+    return result[0];
+  }
+
   async getTaptStonesByMerchant(merchantId: number): Promise<TaptStone[]> {
     if (!this.db) throw new Error('Database not available');
     return await this.db
@@ -6176,21 +6218,23 @@ export class DatabaseStorage implements IStorage {
       .orderBy(taptStones.stoneNumber);
   }
 
-  async updateTaptStone(id: number, data: Partial<{ name: string }>): Promise<TaptStone | undefined> {
+  async updateTaptStoneForMerchant(id: number, merchantId: number, data: Partial<{ name: string }>): Promise<TaptStone | undefined> {
     if (!this.db) throw new Error('Database not available');
+    if (!isManagementTenantId(merchantId)) return undefined;
     const result = await this.db
       .update(taptStones)
       .set({ 
-        ...data,
+        name: data.name,
         updatedAt: new Date() 
       })
-      .where(eq(taptStones.id, id))
+      .where(and(eq(taptStones.id, id), eq(taptStones.merchantId, merchantId)))
       .returning();
     return result[0];
   }
 
-  async updateTaptStoneUrls(id: number, qrCodeUrl: string, paymentUrl: string): Promise<TaptStone | undefined> {
+  async updateTaptStoneUrlsForMerchant(id: number, merchantId: number, qrCodeUrl: string, paymentUrl: string): Promise<TaptStone | undefined> {
     if (!this.db) throw new Error('Database not available');
+    if (!isManagementTenantId(merchantId)) return undefined;
     const result = await this.db
       .update(taptStones)
       .set({ 
@@ -6198,20 +6242,21 @@ export class DatabaseStorage implements IStorage {
         paymentUrl, 
         updatedAt: new Date() 
       })
-      .where(eq(taptStones.id, id))
+      .where(and(eq(taptStones.id, id), eq(taptStones.merchantId, merchantId)))
       .returning();
     return result[0];
   }
 
-  async deleteTaptStone(id: number): Promise<boolean> {
+  async deleteTaptStoneForMerchant(id: number, merchantId: number): Promise<boolean> {
     if (!this.db) throw new Error('Database not available');
+    if (!isManagementTenantId(merchantId)) return false;
     const result = await this.db
       .update(taptStones)
       .set({ 
         isActive: false, 
         updatedAt: new Date() 
       })
-      .where(eq(taptStones.id, id))
+      .where(and(eq(taptStones.id, id), eq(taptStones.merchantId, merchantId)))
       .returning();
     return result.length > 0;
   }
@@ -6229,9 +6274,11 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async getStockItem(id: number): Promise<StockItem | undefined> {
+  async getStockItemForMerchant(id: number, merchantId: number): Promise<StockItem | undefined> {
     if (!this.db) throw new Error('Database not available');
-    const result = await this.db.select().from(stockItems).where(eq(stockItems.id, id)).limit(1);
+    if (!isManagementTenantId(merchantId)) return undefined;
+    const result = await this.db.select().from(stockItems)
+      .where(and(eq(stockItems.id, id), eq(stockItems.merchantId, merchantId))).limit(1);
     return result[0];
   }
 
@@ -6244,28 +6291,30 @@ export class DatabaseStorage implements IStorage {
       .orderBy(stockItems.name);
   }
 
-  async updateStockItem(id: number, data: Partial<InsertStockItem>): Promise<StockItem | undefined> {
+  async updateStockItemForMerchant(id: number, merchantId: number, data: StockItemChanges): Promise<StockItem | undefined> {
     if (!this.db) throw new Error('Database not available');
+    if (!isManagementTenantId(merchantId)) return undefined;
     const result = await this.db
       .update(stockItems)
       .set({ 
-        ...data,
+        ...stockItemChanges(data),
         updatedAt: new Date() 
       })
-      .where(eq(stockItems.id, id))
+      .where(and(eq(stockItems.id, id), eq(stockItems.merchantId, merchantId)))
       .returning();
     return result[0];
   }
 
-  async deleteStockItem(id: number): Promise<boolean> {
+  async deleteStockItemForMerchant(id: number, merchantId: number): Promise<boolean> {
     if (!this.db) throw new Error('Database not available');
+    if (!isManagementTenantId(merchantId)) return false;
     const result = await this.db
       .update(stockItems)
       .set({ 
         isActive: false, 
         updatedAt: new Date() 
       })
-      .where(eq(stockItems.id, id))
+      .where(and(eq(stockItems.id, id), eq(stockItems.merchantId, merchantId)))
       .returning();
     return result.length > 0;
   }

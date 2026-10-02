@@ -1,4 +1,4 @@
-# R1-T2 route inventory — generated 2026-10-02 @ `f1ca29a8c38a13d793e7ee3a08db5cdc2120befa`
+# R1-T2 route inventory — generated 2026-10-02 @ `bc5eba3c55ed95c360b08b6545dc748f0911aab0`
 
 Regenerate with `npx tsx scripts/generate-route-policy.ts`. This table is
 evidence for the SHA named above, not a timeless constant — see
@@ -1773,7 +1773,7 @@ Reviewed policy:
 - middleware: `authenticateToken`
 - params: `id: strictPositiveIntegerParam`
 - authChecks: `checkMerchantOwnership`
-- storageMethods: `createNextTaptStone`, `getMerchant`, `updateTaptStoneUrls`
+- storageMethods: `createNextTaptStone`, `getMerchant`, `updateTaptStoneUrlsForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
 - errorTextInResponse: `error.message`
 
@@ -1791,15 +1791,15 @@ Reviewed policy:
 - middleware: `authenticateToken`
 - params: `merchantId: strictPositiveIntegerParam`, `stoneId: strictPositiveIntegerParam`
 - body: `fields: name`
-- authChecks: `checkMerchantOwnership`, `compares existingStone.merchantId !== merchantId`
-- storageMethods: `getTaptStone`, `updateTaptStone`
+- authChecks: `checkMerchantOwnership`
+- storageMethods: `getTaptStoneForMerchant`, `updateTaptStoneForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member, platform admin). **Tenant (path-merchant):** checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business; the board read by id (getTaptStone) must be the business's (404 otherwise, the same for another business's)
+- **Who:** merchant (owner, member, platform admin). **Tenant (path-merchant):** checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business; getTaptStoneForMerchant and updateTaptStoneForMerchant constrain the read and write by board id and authorized merchantId (404 for a missing or foreign board)
 - **Input:** merchantId and stoneId: strictPositiveIntegerParam; body read without a schema: name, a non-blank string of at most 60 characters once trimmed (400 otherwise; the cap since 2026-09-27)
-- **Idempotency:** renames the board; the same name again changes nothing. A deleted (inactive) board is still found and renamed
+- **Idempotency:** renames the board; the same name again refreshes updatedAt. A deleted (inactive) board is still found and renamed
 - **Success:** the board, a whole board row (number, name, page and QR addresses, whether active, when made and changed)
 - **Error disclosure:** fixed
 - **Finding:** Any login of the business, a teammate included, creates, renames and deletes boards, and the phone terminal offers all three to every login: kept by the owner's decision (2026-09-27).
@@ -1808,15 +1808,15 @@ Reviewed policy:
 
 - middleware: `authenticateToken`
 - params: `merchantId: strictPositiveIntegerParam`, `stoneId: strictPositiveIntegerParam`
-- authChecks: `checkMerchantOwnership`, `compares existingStone.merchantId !== merchantId`
-- storageMethods: `deleteTaptStone`, `getTaptStone`
+- authChecks: `checkMerchantOwnership`
+- storageMethods: `deleteTaptStoneForMerchant`, `getTaptStoneForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member, platform admin). **Tenant (path-merchant):** checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business; the board read by id (getTaptStone) must be the business's (404 otherwise, the same for another business's)
+- **Who:** merchant (owner, member, platform admin). **Tenant (path-merchant):** checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business; getTaptStoneForMerchant and deleteTaptStoneForMerchant constrain the read and write by board id and authorized merchantId (404 for a missing or foreign board)
 - **Input:** merchantId and stoneId: strictPositiveIntegerParam (400 otherwise)
-- **Idempotency:** marks the board inactive (deleteTaptStone), so its page and printed QR stop working; again answers 200 and changes nothing
+- **Idempotency:** marks the board inactive (deleteTaptStoneForMerchant), so its page and printed QR stop working; again answers 200 and refreshes updatedAt
 - **Success:** { message }
 - **Error disclosure:** fixed
 - **Finding:** Any login of the business, a teammate included, creates, renames and deletes boards, and the phone terminal offers all three to every login: kept by the owner's decision (2026-09-27).
@@ -2396,16 +2396,16 @@ Reviewed policy:
 - middleware: `authenticateToken`
 - params: `itemId: strictPositiveIntegerParam`, `merchantId: strictPositiveIntegerParam`
 - body: `schema: updateStockItemSchema`
-- authChecks: `checkMerchantOwnership`, `compares existingItem.merchantId !== merchantId`
-- storageMethods: `getStockItem`, `updateStockItem`
+- authChecks: `checkMerchantOwnership`
+- storageMethods: `getStockItemForMerchant`, `updateStockItemForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 - errorTextInResponse: `error.errors`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member, platform admin). **Tenant (path-merchant):** checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business; the item read by id (getStockItem) must be the business's (404 otherwise, the same for another business's)
+- **Who:** merchant (owner, member, platform admin). **Tenant (path-merchant):** checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business; getStockItemForMerchant and updateStockItemForMerchant constrain the read and write by item id and authorized merchantId (404 for a missing or foreign item); only editable stock fields are persisted
 - **Input:** merchantId and itemId: strictPositiveIntegerParam; body: updateStockItemSchema (as for a new item; 400 with the issues)
-- **Idempotency:** sets the item's fields (updateStockItem); the same again changes nothing
+- **Idempotency:** sets the item's editable fields (updateStockItemForMerchant); the same again refreshes updatedAt
 - **Success:** the item, a whole item row (name, description, cost, emoji, variations, whether active, when made and changed)
 - **Error disclosure:** input-issues
 
@@ -2413,15 +2413,15 @@ Reviewed policy:
 
 - middleware: `authenticateToken`
 - params: `itemId: strictPositiveIntegerParam`, `merchantId: strictPositiveIntegerParam`
-- authChecks: `checkMerchantOwnership`, `compares existingItem.merchantId !== merchantId`
-- storageMethods: `deleteStockItem`, `getStockItem`
+- authChecks: `checkMerchantOwnership`
+- storageMethods: `deleteStockItemForMerchant`, `getStockItemForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member, platform admin). **Tenant (path-merchant):** checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business; the item read by id (getStockItem) must be the business's (404 otherwise, the same for another business's)
+- **Who:** merchant (owner, member, platform admin). **Tenant (path-merchant):** checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business; getStockItemForMerchant and deleteStockItemForMerchant constrain the read and write by item id and authorized merchantId (404 for a missing or foreign item)
 - **Input:** merchantId and itemId: strictPositiveIntegerParam (400 otherwise)
-- **Idempotency:** deletes the item (deleteStockItem); again is 404
+- **Idempotency:** marks the item inactive (deleteStockItemForMerchant); again answers 200 and refreshes updatedAt; a missing or foreign item is 404
 - **Success:** { message }
 - **Error disclosure:** fixed
 
