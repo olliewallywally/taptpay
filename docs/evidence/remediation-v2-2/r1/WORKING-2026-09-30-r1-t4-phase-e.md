@@ -136,3 +136,27 @@ Decided while finishing it (engineering, within the approved design):
 
 Tests: the twelve files that failed against the draft now pass on the session model (who is signed in is
 what the page holds from the start-up check; a change carries the CSRF token; no `Authorization` header).
+
+## E3 resumed and completed (2026-10-02)
+
+Recovered the interrupted cookie-test draft at `f1ca29a8` (56 tracked files plus two helpers), saved it,
+re-read the actual server and re-ran the baselines. Server red: 17 suites / 278 tests failed; six new
+focused regressions all failed before production edits. E1/E2 were committed; bearer retirement was not.
+
+Code **`8d5bad38`**, local, awaiting independent review. Account JWT issuance/verification is removed;
+the session cookie signs every account request in regardless of an Authorization header. Password,
+admin, Google and password-change responses carry no account token. Named-board reads remain public;
+signed-in live streams are checked by session id. Cookie/header precedence now supersedes the interim
+bearer-wins decision in item 4 above. Completed the harness/matrix conversion, retained zero-effect
+assertions, corrected logout expectations and snapshot setup, added the source guard and tightened the
+browser probe. Production client UI unchanged; only stale client test fixtures were cleaned up.
+
+Client 112/1,303 pass; server full run 132 suites pass / 1 fails (3,549/3,550 tests), then the corrected
+snapshot-fixture suite 44/44 pass. Focused regressions/source guard 18/18; typecheck/build pass;
+inventory 187/0/0; real-browser production-build probe 50 checks pass, phone/tablet/desktop, zero
+unexplained missing-CSRF app requests. No second full server pass or new PostgreSQL pass claimed.
+
+[Evidence and review brief](R1-T4-phase-E3-bearer-retired-2026-10-02.md),
+[handoff](../../../HANDOFF-2026-10-02-full-integration-continuation.md). E1/E2/E3 independent review
+and wider R1 remain open. `0031` in dev is the owner's action, as already recorded; no migration,
+deployment, production/dev write or push performed here.
