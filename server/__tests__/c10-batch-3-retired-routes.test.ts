@@ -3,7 +3,7 @@ import "./support/test-env";
 import request from "supertest";
 import { ROUTE_POLICY } from "../route-policy";
 import crypto from "crypto";
-import { bearer, createOwnerPrincipal, createTestApp, resetTestStorage, storage, storageSnapshot } from "./support/http-harness";
+import { signedIn, createOwnerPrincipal, createTestApp, resetTestStorage, storage, storageSnapshot } from "./support/http-harness";
 
 /**
  * Owner decision 2026-09-26 (docs/decisions/2026-09-26-c10-batch-3-owner-answers.md, answer 4):
@@ -32,7 +32,7 @@ describe("the three unused public look-ups are removed (batch 3c)", () => {
   it.each(UNUSED_PUBLIC_LOOKUPS)("%s answers as an unknown address and reads nothing", async (_key, address) => {
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
-    const board = await request(app).post(`/api/merchants/${owner.merchantId}/tapt-stones`).set(bearer(owner)).send({});
+    const board = await request(app).post(`/api/merchants/${owner.merchantId}/tapt-stones`).set(signedIn(owner)).send({});
     expect(board.status).toBe(200);
     const before = storageSnapshot();
 
@@ -74,7 +74,7 @@ describe("the unused sign-up and invoice routes, and the old business-details pa
     const fill = (text: string) => text.replace("{business}", String(waiting.id)).replace("{token}", token);
     const before = storageSnapshot();
 
-    let pending = request(app)[method](fill(address)).set(bearer(owner));
+    let pending = request(app)[method](fill(address)).set(signedIn(owner));
     if (body) pending = pending.send(JSON.parse(fill(JSON.stringify(body))));
     const res = await pending;
 

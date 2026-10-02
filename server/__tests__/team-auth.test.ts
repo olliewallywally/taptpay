@@ -1,9 +1,10 @@
-import jwt from "jsonwebtoken";
-
 const JWT_SECRET = "test-secret-for-team-auth";
 process.env.JWT_SECRET = JWT_SECRET;
 
 const storageMock = {
+  getAuthSession: jest.fn(),
+  revokeAuthSession: jest.fn().mockResolvedValue(true),
+  touchAuthSession: jest.fn().mockResolvedValue(undefined),
   getUserById: jest.fn(),
   getUserByEmail: jest.fn(),
   getMerchant: jest.fn(),
@@ -12,12 +13,16 @@ const storageMock = {
 
 jest.mock("../storage", () => ({ storage: storageMock }));
 
-import { authenticateToken, generateToken, isAccountOwner, TOKEN_PRINCIPAL } from "../auth";
+import { authenticateToken, isAccountOwner } from "../auth";
+import { liveSession, requestWith } from "./support/session-row";
 
 function res() {
   const r: any = {};
   r.status = jest.fn(() => r);
   r.json = jest.fn(() => r);
+  r.setHeader = jest.fn(() => r);
+  r.cookie = jest.fn(() => r);
+  r.clearCookie = jest.fn(() => r);
   return r;
 }
 
@@ -27,95 +32,87 @@ const OWNER_ROW = {
   merchantId: 22, role: "owner", status: "active",
 };
 
+/** A request on a live session of the login with this users-row id, which the mocked storage holds. */
+function signedInAs(userId: number) {
+  const session = liveSession({ realm: "business", userId });
+  storageMock.getAuthSession.mockImplementation(async (id: string) => (id === session.row.id ? session.row : undefined));
+  return requestWith(session.cookie);
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
+  storageMock.getAuthSession.mockResolvedValue(undefined);
   storageMock.getMerchant.mockResolvedValue(ACTIVE_MERCHANT);
   storageMock.getUserById.mockResolvedValue(OWNER_ROW);
 });
 
-describe("token principal", () => {
-  it("issues tokens carrying the users-row id, not the merchant id", () => {
-    const token = generateToken({
-      id: 5, userId: 5, email: "owner@example.test", password: "",
-      merchantId: 22, role: "owner", createdAt: new Date(),
-    });
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
-    expect(decoded.principal).toBe(TOKEN_PRINCIPAL);
-    expect(decoded.userId).toBe(5);
-    expect(decoded.merchantId).toBe(22);
-  });
-
-  it("rejects a pre-team-logins token whose userId is really a merchant id", async () => {
-    // These tokens are indistinguishable from valid ones except for the missing
-    // principal claim; honouring one would resolve the wrong users row.
-    const legacy = jwt.sign(
-      { userId: 22, email: "owner@example.test", merchantId: 22, role: "merchant" },
-      JWT_SECRET,
-      { expiresIn: "1h" },
-    );
-    const response = res();
-    const next = jest.fn();
-    await authenticateToken(
-      { headers: { authorization: `Bearer ${legacy}` } } as any,
-      response,
-      next,
-    );
-
-    expect(next).not.toHaveBeenCalled();
-    expect(response.status).toHaveBeenCalledWith(401);
-    expect(storageMock.getUserById).not.toHaveBeenCalled();
-  });
-
-  it("accepts a current token and resolves the user row", async () => {
-    const token = generateToken({
-      id: 5, userId: 5, email: "owner@example.test", password: "",
-      merchantId: 22, role: "owner", createdAt: new Date(),
-    });
-    const request: any = { headers: { authorization: `Bearer ${token}` } };
+describe("session principal", () => {
+  it("resolves a session's login by its users-row id, not the business's id", async () => {
+    const request = signedInAs(5);
     const next = jest.fn();
     await authenticateToken(request, res(), next);
 
     expect(next).toHaveBeenCalled();
-    expect(request.user).toMatchObject({ id: 5, merchantId: 22, role: "owner" });
+    expect(storageMock.getUserById).toHaveBeenCalledWith(5);
+    expect(storageMock.getUserById).not.toHaveBeenCalledWith(22);
+    expect(request.user).toMatchObject({ id: 5, userId: 5, merchantId: 22, role: "owner" });
+  });
+
+  it("signs no one in by an Authorization header, and reads no row for it", async () => {
+    // The account token the app held before sessions (R1-T4 phase E3 retired it) named a users row in
+    // its claims; nothing a header says is looked up any more.
+    const request = requestWith(undefined);
+    request.headers.authorization = "Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjV9.signature";
+    const response = res();
+    const next = jest.fn();
+    await authenticateToken(request, response, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(response.status).toHaveBeenCalledWith(401);
+    expect(storageMock.getAuthSession).not.toHaveBeenCalled();
+    expect(storageMock.getUserById).not.toHaveBeenCalled();
+  });
+
+  it("refuses a session whose login row is not a business login", async () => {
+    // Admins are environment-backed; an unknown role fails closed rather than inheriting member access.
+    for (const row of [{ ...OWNER_ROW, role: "admin" }, { ...OWNER_ROW, role: "unexpected" }, { ...OWNER_ROW, merchantId: null }]) {
+      storageMock.getUserById.mockResolvedValue(row);
+      const response = res();
+      const next = jest.fn();
+      await authenticateToken(signedInAs(5), response, next);
+
+      expect(next).not.toHaveBeenCalled();
+      expect(response.status).toHaveBeenCalledWith(401);
+    }
   });
 });
 
 describe("seat revocation", () => {
-  it("refuses a disabled teammate even though their token is still valid", async () => {
+  it("refuses a disabled teammate even though their session is still live", async () => {
     storageMock.getUserById.mockResolvedValue({ ...OWNER_ROW, id: 9, role: "member", status: "disabled" });
-    const token = generateToken({
-      id: 9, userId: 9, email: "member@example.test", password: "",
-      merchantId: 22, role: "member", createdAt: new Date(),
-    });
     const response = res();
     const next = jest.fn();
-    await authenticateToken(
-      { headers: { authorization: `Bearer ${token}` } } as any,
-      response,
-      next,
-    );
+    await authenticateToken(signedInAs(9), response, next);
 
     expect(next).not.toHaveBeenCalled();
     expect(response.status).toHaveBeenCalledWith(401); // 401 since 2026-09-27 (R1-T3, P2.2, owner decision): a sign-in that is invalid, expired or disabled was 403.
+    // The session's row is left as it is: the refusal is the login's, read afresh on every request.
+    expect(storageMock.revokeAuthSession).not.toHaveBeenCalled();
   });
 
-  it("refuses a token whose merchant no longer matches the user row", async () => {
-    // Guards against a token minted for one account being replayed against another.
+  it("acts for the business the users row names now, never one remembered from sign-in", async () => {
+    // A session names a login and nothing else: there is no business in the cookie to replay against
+    // another account. The business is read from the login's row on every request.
     storageMock.getUserById.mockResolvedValue({ ...OWNER_ROW, merchantId: 99 });
-    const token = generateToken({
-      id: 5, userId: 5, email: "owner@example.test", password: "",
-      merchantId: 22, role: "owner", createdAt: new Date(),
-    });
-    const response = res();
+    storageMock.getMerchant.mockImplementation(async (id: number) => (id === 99 ? { id: 99, status: "active" } : undefined));
+    const request = signedInAs(5);
     const next = jest.fn();
-    await authenticateToken(
-      { headers: { authorization: `Bearer ${token}` } } as any,
-      response,
-      next,
-    );
+    await authenticateToken(request, res(), next);
 
-    expect(next).not.toHaveBeenCalled();
-    expect(response.status).toHaveBeenCalledWith(401);
+    expect(next).toHaveBeenCalled();
+    expect(storageMock.getMerchant).toHaveBeenCalledWith(99);
+    expect(storageMock.getMerchant).not.toHaveBeenCalledWith(22);
+    expect(request.user).toMatchObject({ id: 5, merchantId: 99 });
   });
 });
 

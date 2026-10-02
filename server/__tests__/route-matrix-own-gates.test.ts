@@ -11,14 +11,18 @@ import request from "supertest";
 import { ROUTE_MATRIX, type MatrixCaller } from "../route-matrix";
 import {
   VALID_PASSWORD,
+  createAdminPrincipal,
   createDisabledMemberPrincipal,
   createOwnerPrincipal,
   createTestApp,
   mintPaymentCredential,
   resetTestStorage,
+  signedIn,
   storage,
   storageSnapshot,
 } from "./support/http-harness";
+import { oldAccountToken, oldAdminToken, oldBearer } from "./support/old-account-token";
+import { BUSINESS_COOKIE } from "./support/session-browser";
 
 /**
  * R1-T3 (plan C10): the refusals of the routes with their own gates — the scheduler, the ecommerce
@@ -225,32 +229,44 @@ describe("R1-T3 — a sale with its own link is answered by number like a missin
 
 describe("R1-T3 — the two reads a business also makes signed in check the sign-in and the business themselves", () => {
   // A board's page reads its open sale and its live updates with no sign-in. The business's own screens
-  // read the same two routes signed in: with an Authorization header the handler runs the sign-in gate
-  // (authenticateToken) and the business check (checkMerchantOwnership) itself.
+  // read the same two routes signed in: with a session cookie and no board named, the handler runs the
+  // sign-in gate (authenticateToken) and the business check (checkMerchantOwnership) itself.
   const READS: Record<string, string> = {
     "GET /api/merchants/:id/active-transaction": "/api/merchants/{id}/active-transaction",
     "GET /api/merchants/:id/events": "/api/merchants/{id}/events",
   };
-  const REFUSED: MatrixCaller[] = ["invalid-token", "disabled-login", "suspended-business", "link-as-sign-in", "other-owner"];
+  const REFUSED: MatrixCaller[] = ["invalid-session", "disabled-login", "suspended-business", "link-as-sign-in", "other-owner"];
   const CASES = Object.keys(READS).flatMap((key) => REFUSED.map((caller): [string, MatrixCaller] => [key, caller]));
-  const tokens = {} as Record<MatrixCaller, string>;
+  const callers = {} as Record<MatrixCaller, Record<string, string>>;
   let merchantId: number;
+  let boardId: number;
 
   beforeAll(async () => {
     const owner = await createOwnerPrincipal();
     merchantId = owner.merchantId;
-    tokens["invalid-token"] = "not-a-real-token";
-    tokens["disabled-login"] = (await createDisabledMemberPrincipal(owner.merchantId)).token;
+    callers.owner = signedIn(owner);
+    callers["invalid-session"] = signedIn({ cookie: `${BUSINESS_COOKIE}=${owner.sessionId}.${"A".repeat(43)}`, csrf: owner.csrf });
+    callers["disabled-login"] = signedIn(await createDisabledMemberPrincipal(owner.merchantId));
     const suspended = await createOwnerPrincipal();
     await storage.updateMerchant(suspended.merchantId, { status: "suspended" } as any);
-    tokens["suspended-business"] = suspended.token;
+    callers["suspended-business"] = signedIn(suspended);
     const link = mintPaymentCredential();
     await storage.createTransaction({
       merchantId: owner.merchantId, itemName: "Linked sale", price: "5.50", status: "pending",
       paymentMethod: "qr_code", splitEnabled: false, paymentTokenHash: link.tokenHash,
     } as any);
-    tokens["link-as-sign-in"] = link.rawToken;
-    tokens["other-owner"] = (await createOwnerPrincipal()).token;
+    callers["link-as-sign-in"] = { Cookie: `${BUSINESS_COOKIE}=${link.rawToken}`, ...oldBearer(link.rawToken) };
+    callers["other-owner"] = signedIn(await createOwnerPrincipal());
+    // The tokens the owner and the platform admin held before sessions (R1-T4 phase E3 retired them).
+    callers["old-token"] = oldBearer(oldAccountToken(owner));
+    callers["old-admin-token"] = oldBearer(oldAdminToken());
+    callers["platform-admin"] = signedIn(await createAdminPrincipal());
+    // A board of the business with a sale open on it: what a board's page, and anyone, may read.
+    boardId = (await storage.createNextTaptStone(owner.merchantId, "Front till")).id;
+    await storage.createTransaction({
+      merchantId: owner.merchantId, taptStoneId: boardId, itemName: "Board sale", price: "7.00", status: "pending",
+      paymentMethod: "qr_code", splitEnabled: false,
+    } as any);
   });
 
   it("refuses a sign-in the server refuses (401) and another business's owner (403)", () => {
@@ -261,11 +277,48 @@ describe("R1-T3 — the two reads a business also makes signed in check the sign
   it.each(CASES)("%s refuses %s, and changes nothing", async (key, caller) => {
     const before = storageSnapshot();
     const effects = observeRefusalEffects();
-    const res = await request(app).get(READS[key].replace("{id}", String(merchantId))).set("Authorization", `Bearer ${tokens[caller]}`);
+    const res = await request(app).get(READS[key].replace("{id}", String(merchantId))).set(callers[caller]);
     expect(res.status).toBe(ROUTE_MATRIX[key].answers[caller]);
     expect(storageSnapshot()).toBe(before);
     effects.assertNone();
     effects.restore();
+  });
+
+  // R1-T4 phase E3: an Authorization header is not looked at. The account token the app once held,
+  // correctly signed and unexpired, is no sign-in here either: its request is answered as anyone's is.
+  const OLD_TOKENS: MatrixCaller[] = ["old-token", "old-admin-token"];
+  const OLD_CASES = Object.keys(READS).flatMap((key) => OLD_TOKENS.map((caller): [string, MatrixCaller] => [key, caller]));
+
+  it("records no answer of its own for an old token on these reads: it is anyone", () => {
+    for (const [key, caller] of OLD_CASES) expect(ROUTE_MATRIX[key].answers[caller]).toBeUndefined();
+  });
+
+  it.each(OLD_CASES)("%s answers %s with no board as the retired no-board address (410), as for anyone, and changes nothing", async (key, caller) => {
+    const address = READS[key].replace("{id}", String(merchantId));
+    const before = storageSnapshot();
+    const effects = observeRefusalEffects();
+    const res = await request(app).get(address).set(callers[caller]);
+    const anyone = await request(app).get(address);
+    expect(res.status).toBe(410);
+    expect(res.body).toEqual(anyone.body);
+    expect(res.body.code).toBe("NO_BOARD_ADDRESS_RETIRED");
+    expect(storageSnapshot()).toBe(before);
+    effects.assertNone();
+    effects.restore();
+  });
+
+  it.each(OLD_TOKENS)("the open sale of a board is read with %s as any customer reads it, not as the business does", async (caller) => {
+    const address = `/api/merchants/${merchantId}/active-transaction?stoneId=${boardId}`;
+    const customers = await request(app).get(address);
+    const withOldToken = await request(app).get(address).set(callers[caller]);
+    expect(customers.status).toBe(200);
+    expect(withOldToken.status).toBe(200);
+    expect(withOldToken.body).toEqual(customers.body);
+    // The business's own view of the same sale (its terminal names no board) holds more than a customer's.
+    const business = await request(app).get(`/api/merchants/${merchantId}/active-transaction`).set(callers.owner);
+    expect(business.status).toBe(200);
+    expect(Object.keys(business.body).length).toBeGreaterThan(Object.keys(customers.body).length);
+    expect(Object.keys(withOldToken.body).sort()).not.toEqual(Object.keys(business.body).sort());
   });
 });
 

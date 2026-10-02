@@ -1,12 +1,16 @@
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
-import jwt from 'jsonwebtoken';
 
 const TEST_JWT_SECRET = 'test-secret-for-auth-core';
 process.env.JWT_SECRET = TEST_JWT_SECRET;
 process.env.ADMIN_EMAIL = 'admin@example.test';
+// No password matches it: only its presence and its value matter here (the admin session's tag).
+process.env.ADMIN_PASSWORD_HASH = '$2b$12$authCorePlaceholderAdminPasswordHash0000000000000';
 
 const storageMock = {
+  getAuthSession: jest.fn(),
+  revokeAuthSession: jest.fn(),
+  touchAuthSession: jest.fn(),
   getUserById: jest.fn(),
   getUserByEmail: jest.fn(),
   getUserByResetToken: jest.fn(),
@@ -29,18 +33,26 @@ import {
   authenticateToken,
   authenticateUser,
   createUser,
-  generateToken,
   requestPasswordReset,
   resetPassword,
   validateResetToken,
 } from '../auth';
+import { liveSession, requestWith, type LiveSession } from './support/session-row';
 
 function response() {
   const value: any = {};
   value.status = jest.fn(() => value);
   value.json = jest.fn(() => value);
   value.setHeader = jest.fn(() => value);
+  value.cookie = jest.fn(() => value);
+  value.clearCookie = jest.fn(() => value);
   return value;
+}
+
+/** A session the mocked storage holds, for the request that presents its cookie. */
+function held(session: LiveSession): LiveSession {
+  storageMock.getAuthSession.mockImplementation(async (id: string) => (id === session.row.id ? session.row : undefined));
+  return session;
 }
 
 const MERCHANT = {
@@ -70,6 +82,9 @@ beforeEach(() => {
     resetTokenExpiry: null,
   };
 
+  storageMock.getAuthSession.mockReset().mockResolvedValue(undefined);
+  storageMock.revokeAuthSession.mockReset().mockResolvedValue(true);
+  storageMock.touchAuthSession.mockReset().mockResolvedValue(undefined);
   storageMock.getUserById.mockResolvedValue(ownerRow);
   storageMock.getUserByEmail.mockResolvedValue(ownerRow);
   storageMock.getUserByResetToken.mockResolvedValue(undefined);
@@ -84,17 +99,14 @@ beforeEach(() => {
 });
 
 describe('real users-row principals', () => {
-  it('returns the owner users row from createUser and mints its uid', async () => {
+  it('returns the owner users row from createUser: its own id, never the business id', async () => {
     storageMock.getMerchant.mockResolvedValue({ ...MERCHANT, passwordHash: null });
 
     const user = await createUser('OWNER@example.test', 'random-google-secret', 22);
-    const token = generateToken(user);
-    const decoded = jwt.verify(token, TEST_JWT_SECRET) as any;
 
     expect(storageMock.updateMerchantPasswordHash).toHaveBeenCalledWith(22, expect.any(String));
     expect(storageMock.getUserByEmail).toHaveBeenCalledWith('owner@example.test');
     expect(user).toMatchObject({ id: 5, userId: 5, merchantId: 22, role: 'owner' });
-    expect(decoded).toMatchObject({ userId: 5, merchantId: 22, role: 'owner', principal: 'user' });
   });
 
   it('runs the owner-row sync even when a merchant already has a password hash', async () => {
@@ -159,40 +171,86 @@ describe('login-time seat enforcement', () => {
   });
 });
 
-describe('admin token provenance', () => {
-  it('accepts only a dedicated environment-backed admin principal', async () => {
-    const token = generateToken({
-      id: 1,
-      email: 'admin@example.test',
-      password: '',
-      merchantId: 0,
-      role: 'admin',
-      createdAt: new Date(),
-    });
-    const decoded = jwt.verify(token, TEST_JWT_SECRET) as any;
-    const request: any = { headers: { authorization: `Bearer ${token}` } };
+describe('admin session provenance', () => {
+  it("accepts only the admin area's own kind of session, begun under the admin's current credentials", async () => {
+    const session = held(liveSession({ realm: 'admin' }));
+    const request = requestWith(session.cookie, '/api/admin/auth/me');
     const next = jest.fn();
 
     await authenticateToken(request, response(), next);
 
-    expect(decoded.principal).toBe('admin');
+    expect(session.row.adminTag).toEqual(expect.any(String));
     expect(next).toHaveBeenCalled();
     expect(request.user).toMatchObject({ role: 'admin', merchantId: 0, email: 'admin@example.test' });
     expect(storageMock.getUserById).not.toHaveBeenCalled();
   });
 
-  it('rejects a role-only admin token carrying the normal user principal', async () => {
-    const token = jwt.sign(
-      { principal: 'user', userId: 1, email: 'admin@example.test', merchantId: 0, role: 'admin' },
-      TEST_JWT_SECRET,
-    );
+  it("rejects a business login's session presented under the admin's cookie", async () => {
+    const session = held(liveSession({ realm: 'business', userId: 5 }, { as: 'admin' }));
     const result = response();
     const next = jest.fn();
 
-    await authenticateToken({ headers: { authorization: `Bearer ${token}` } } as any, result, next);
+    await authenticateToken(requestWith(session.cookie, '/api/admin/auth/me'), result, next);
 
     expect(next).not.toHaveBeenCalled();
     expect(result.status).toHaveBeenCalledWith(401); // 401 since 2026-09-27 (R1-T3, P2.2, owner decision): a sign-in that is invalid, expired or disabled was 403.
+    expect(storageMock.getUserById).not.toHaveBeenCalled();
+  });
+
+  it("rejects an admin session begun under credentials that are no longer the admin's", async () => {
+    const session = liveSession({ realm: 'admin' });
+    session.row.adminTag = 'the-tag-of-a-password-since-changed';
+    held(session);
+    const result = response();
+    const next = jest.fn();
+
+    await authenticateToken(requestWith(session.cookie, '/api/admin/auth/me'), result, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(result.status).toHaveBeenCalledWith(401);
+    expect(result.json.mock.calls[0][0].code).toBe('SESSION_ENDED');
+  });
+
+  it("never reads the admin's cookie as a business login, whatever role its row might claim", async () => {
+    // An admin session carries no login: on a business route it is the platform admin and nothing else.
+    const session = held(liveSession({ realm: 'admin' }));
+    const request = requestWith(session.cookie, '/api/auth/me');
+    const next = jest.fn();
+
+    await authenticateToken(request, response(), next);
+
+    expect(next).toHaveBeenCalled();
+    expect(request.user).toMatchObject({ role: 'admin', merchantId: 0 });
+    expect(storageMock.getUserById).not.toHaveBeenCalled();
+    expect(storageMock.getMerchant).not.toHaveBeenCalled();
+  });
+});
+
+describe('an Authorization header is not a sign-in (R1-T4 phase E3)', () => {
+  it('refuses a request that carries only a header, without consulting the database', async () => {
+    const result = response();
+    const next = jest.fn();
+    const request = requestWith(undefined);
+    request.headers.authorization = 'Bearer anything.at.all';
+
+    await authenticateToken(request, result, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(result.status).toHaveBeenCalledWith(401);
+    expect(storageMock.getAuthSession).not.toHaveBeenCalled();
+    expect(storageMock.getUserById).not.toHaveBeenCalled();
+  });
+
+  it('signs a request in by its cookie whatever header comes with it', async () => {
+    const session = held(liveSession({ realm: 'business', userId: 5 }));
+    const request = requestWith(session.cookie);
+    request.headers.authorization = 'Bearer anything.at.all';
+    const next = jest.fn();
+
+    await authenticateToken(request, response(), next);
+
+    expect(next).toHaveBeenCalled();
+    expect(request.user).toMatchObject({ id: 5, merchantId: 22, role: 'owner' });
   });
 });
 
@@ -204,26 +262,11 @@ describe('admin token provenance', () => {
  * between "the database answered no" and "the database did not answer".
  */
 describe('database outage versus a real rejection', () => {
-  function merchantToken() {
-    return generateToken({
-      id: 5,
-      userId: 5,
-      email: 'owner@example.test',
-      password: '',
-      merchantId: 22,
-      role: 'owner',
-      createdAt: new Date(),
-    });
-  }
-
-  async function callWithToken() {
+  async function callWithSession() {
+    const session = held(liveSession({ realm: 'business', userId: 5 }));
     const result = response();
     const next = jest.fn();
-    await authenticateToken(
-      { headers: { authorization: `Bearer ${merchantToken()}` } } as any,
-      result,
-      next,
-    );
+    await authenticateToken(requestWith(session.cookie), result, next);
     return { result, next };
   }
 
@@ -238,7 +281,7 @@ describe('database outage versus a real rejection', () => {
   it('answers 503, not 404, when the users lookup cannot reach the database', async () => {
     storageMock.getUserById.mockRejectedValue(new Error('ECONNREFUSED 10.0.0.5:5432'));
 
-    const { result, next } = await callWithToken();
+    const { result, next } = await callWithSession();
 
     expect(next).not.toHaveBeenCalled();
     expect(result.status).toHaveBeenCalledWith(503);
@@ -248,7 +291,7 @@ describe('database outage versus a real rejection', () => {
   it('never tells a merchant their account is missing because of an outage', async () => {
     storageMock.getUserById.mockRejectedValue(new Error('terminating connection due to administrator command'));
 
-    const { result } = await callWithToken();
+    const { result } = await callWithSession();
     const body = bodyOf(result);
 
     expect(body.code).toBe('AUTH_BACKEND_UNAVAILABLE');
@@ -257,16 +300,33 @@ describe('database outage versus a real rejection', () => {
     expect(result.setHeader).toHaveBeenCalledWith('Retry-After', '5');
   });
 
-  it('answers 503 when the merchant lookup is the read that fails', async () => {
-    // The second read is reached only after the users row has already validated,
-    // so this covers the half of the outage window the first test cannot.
-    storageMock.getMerchant.mockRejectedValue(new Error('connection terminated unexpectedly'));
+  it('answers 503 when the session lookup is the read that fails, and keeps the cookie', async () => {
+    // The first read of all: a session that could not be looked up has not been disproved.
+    const session = liveSession({ realm: 'business', userId: 5 });
+    storageMock.getAuthSession.mockRejectedValue(new Error('connection terminated unexpectedly'));
+    const result = response();
+    const next = jest.fn();
 
-    const { result, next } = await callWithToken();
+    await authenticateToken(requestWith(session.cookie), result, next);
 
     expect(next).not.toHaveBeenCalled();
     expect(result.status).toHaveBeenCalledWith(503);
     expect(bodyOf(result).code).toBe('AUTH_BACKEND_UNAVAILABLE');
+    expect(result.clearCookie).not.toHaveBeenCalled();
+    expect(storageMock.getUserById).not.toHaveBeenCalled();
+  });
+
+  it('answers 503 when the merchant lookup is the read that fails', async () => {
+    // The last read is reached only after the session and the users row have validated,
+    // so this covers the half of the outage window the first test cannot.
+    storageMock.getMerchant.mockRejectedValue(new Error('connection terminated unexpectedly'));
+
+    const { result, next } = await callWithSession();
+
+    expect(next).not.toHaveBeenCalled();
+    expect(result.status).toHaveBeenCalledWith(503);
+    expect(bodyOf(result).code).toBe('AUTH_BACKEND_UNAVAILABLE');
+    expect(result.clearCookie).not.toHaveBeenCalled();
   });
 
   it('treats a synchronous driver throw as an outage too', async () => {
@@ -274,7 +334,7 @@ describe('database outage versus a real rejection', () => {
       throw new Error('pool destroyed');
     });
 
-    const { result, next } = await callWithToken();
+    const { result, next } = await callWithSession();
 
     expect(next).not.toHaveBeenCalled();
     expect(result.status).toHaveBeenCalledWith(503);
@@ -283,7 +343,7 @@ describe('database outage versus a real rejection', () => {
   it('answers 401 when the database says the merchant principal is gone', async () => {
     storageMock.getMerchant.mockResolvedValue(undefined);
 
-    const { result, next } = await callWithToken();
+    const { result, next } = await callWithSession();
 
     expect(next).not.toHaveBeenCalled();
     expect(result.status).toHaveBeenCalledWith(401);
@@ -295,7 +355,7 @@ describe('database outage versus a real rejection', () => {
     async (status) => {
       storageMock.getMerchant.mockResolvedValue({ ...MERCHANT, status });
 
-      const { result, next } = await callWithToken();
+      const { result, next } = await callWithSession();
 
       expect(next).not.toHaveBeenCalled();
       expect(result.status).toHaveBeenCalledWith(401);
@@ -305,32 +365,38 @@ describe('database outage versus a real rejection', () => {
   it('still answers 401 for a revoked seat rather than hiding it behind 503', async () => {
     storageMock.getUserById.mockResolvedValue({ ...ownerRow, status: 'disabled' });
 
-    const { result, next } = await callWithToken();
+    const { result, next } = await callWithSession();
 
     expect(next).not.toHaveBeenCalled();
     expect(result.status).toHaveBeenCalledWith(401);
     expect(result.status).not.toHaveBeenCalledWith(503);
   });
 
-  it('does not consult the database at all for an unreadable token', async () => {
-    // Whether the database is up is irrelevant when the token itself is bad —
+  it('does not consult the database at all for an unreadable cookie', async () => {
+    // Whether the database is up is irrelevant when the cookie itself is not one this server wrote —
     // that verdict must stay a 401 and must not become an outage report.
+    storageMock.getAuthSession.mockRejectedValue(new Error('db is down'));
     storageMock.getUserById.mockRejectedValue(new Error('db is down'));
+    const session = liveSession({ realm: 'business', userId: 5 });
     const result = response();
     const next = jest.fn();
 
-    await authenticateToken({ headers: { authorization: 'Bearer not-a-jwt' } } as any, result, next);
+    await authenticateToken(requestWith(`${session.cookie.split('=')[0]}=not-a-session`), result, next);
 
     expect(next).not.toHaveBeenCalled();
     expect(result.status).toHaveBeenCalledWith(401);
+    expect(storageMock.getAuthSession).not.toHaveBeenCalled();
     expect(storageMock.getUserById).not.toHaveBeenCalled();
   });
 
   it('lets a healthy request through unchanged', async () => {
-    const { result, next } = await callWithToken();
+    const { result, next } = await callWithSession();
 
     expect(next).toHaveBeenCalled();
     expect(result.status).not.toHaveBeenCalled();
+    // Nothing is written for a session used within the minute and not yet due its daily swap.
+    expect(storageMock.touchAuthSession).not.toHaveBeenCalled();
+    expect(result.cookie).not.toHaveBeenCalled();
   });
 });
 

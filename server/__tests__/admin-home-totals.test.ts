@@ -2,7 +2,7 @@ import "./support/test-env";
 
 import request from "supertest";
 import {
-  bearer,
+  signedIn,
   createAdminPrincipal,
   createOwnerPrincipal,
   createTestApp,
@@ -35,7 +35,7 @@ describe("the platform's totals for the admin home page", () => {
     await sale(second.merchantId, "3.00", "failed");
     await sale(second.merchantId, "9.00", "pending");
 
-    const res = await request(app).get("/api/admin/analytics").set(bearer(createAdminPrincipal()));
+    const res = await request(app).get("/api/admin/analytics").set(signedIn(await createAdminPrincipal()));
 
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({
@@ -61,7 +61,7 @@ describe("the platform's totals for the admin home page", () => {
       return read(merchantId);
     });
     try {
-      const res = await request(app).get("/api/admin/analytics").set(bearer(createAdminPrincipal()));
+      const res = await request(app).get("/api/admin/analytics").set(signedIn(await createAdminPrincipal()));
 
       expect(res.status).toBe(200);
       expect(res.body).toMatchObject({
@@ -74,7 +74,7 @@ describe("the platform's totals for the admin home page", () => {
 
   it("with no business at all, every total is a true zero", async () => {
     const { app } = await createTestApp();
-    const res = await request(app).get("/api/admin/analytics").set(bearer(createAdminPrincipal()));
+    const res = await request(app).get("/api/admin/analytics").set(signedIn(await createAdminPrincipal()));
     expect(res.body).toMatchObject({
       totalMerchants: 0, totalRevenue: 0, totalTransactions: 0, pendingTransactions: 0, businessesNotLoaded: 0,
     });
@@ -82,7 +82,7 @@ describe("the platform's totals for the admin home page", () => {
 
   it("the list the page used to ask for is still not served to a reader", async () => {
     const { app } = await createTestApp();
-    const res = await request(app).get("/api/transactions").set(bearer(createAdminPrincipal()));
+    const res = await request(app).get("/api/transactions").set(signedIn(await createAdminPrincipal()));
     // No such read: the app's own page (or nothing) answers, never a list of sales.
     expect(Array.isArray(res.body)).toBe(false);
   });

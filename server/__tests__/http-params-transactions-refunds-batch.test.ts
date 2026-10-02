@@ -13,7 +13,7 @@ process.env.ENV_VALIDATION_MODE = "enforce";
 
 import request from "supertest";
 import {
-  bearer,
+  signedIn,
   createOwnerPrincipal,
   createTestApp,
   resetTestStorage,
@@ -131,7 +131,7 @@ describe("R1-T6 — transactions/refunds identifier batch", () => {
       const owner = await createOwnerPrincipal();
       const response = await request(app)
         .post(`/api/transactions/${encodeURIComponent(garbage)}/cancel`)
-        .set(bearer(owner));
+        .set(signedIn(owner));
       expect(response.status).toBe(400);
       expect(response.body.message).toBe("Invalid id");
     });
@@ -143,7 +143,7 @@ describe("R1-T6 — transactions/refunds identifier batch", () => {
 
       const response = await request(app)
         .post(`/api/transactions/${txn.id}/cancel`)
-        .set(bearer(owner));
+        .set(signedIn(owner));
       expect(response.status).toBe(200);
       expect(response.body.status).toBe("cancelled");
     });
@@ -326,7 +326,7 @@ describe("R1-T6 — transactions/refunds identifier batch", () => {
       const owner = await createOwnerPrincipal();
       const response = await request(app)
         .post(`/api/transactions/${encodeURIComponent(garbage)}/refunds`)
-        .set(bearer(owner))
+        .set(signedIn(owner))
         .send({ refundAmount: "1.00", refundReason: "test", refundMethod: "original_payment_method" });
       expect(response.status).toBe(400);
       expect(response.body.message).toBe("Invalid transactionId");
@@ -343,7 +343,7 @@ describe("R1-T6 — transactions/refunds identifier batch", () => {
 
       const response = await request(app)
         .post("/api/transactions/abc/refunds")
-        .set(bearer(owner))
+        .set(signedIn(owner))
         .send({ refundAmount: "1.00", refundReason: "test", refundMethod: "original_payment_method" });
       expect(response.status).toBe(400);
     });
@@ -354,7 +354,7 @@ describe("R1-T6 — transactions/refunds identifier batch", () => {
 
       const response = await request(app)
         .post("/api/transactions/999999/refunds")
-        .set(bearer(owner))
+        .set(signedIn(owner))
         .send({ refundAmount: "1.00", refundReason: "test", refundMethod: "original_payment_method" });
       expect(response.status).toBe(503);
       expect(response.body.code).toBe("REFUND_INITIATION_DISABLED");
@@ -367,7 +367,7 @@ describe("R1-T6 — transactions/refunds identifier batch", () => {
       const owner = await createOwnerPrincipal();
       const response = await request(app)
         .get(`/api/transactions/${encodeURIComponent(garbage)}/refunds`)
-        .set(bearer(owner));
+        .set(signedIn(owner));
       expect(response.status).toBe(400);
       expect(response.body.message).toBe("Invalid transactionId");
     });
@@ -379,7 +379,7 @@ describe("R1-T6 — transactions/refunds identifier batch", () => {
 
       const response = await request(app)
         .get(`/api/transactions/${txn.id}/refunds`)
-        .set(bearer(owner));
+        .set(signedIn(owner));
       expect(response.status).toBe(200);
       expect(response.body).toEqual([]);
     });

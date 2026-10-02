@@ -121,7 +121,6 @@ const alertSaying = (text: string) =>
 beforeEach(() => {
   jest.clearAllMocks();
   localStorage.clear();
-  localStorage.setItem("authToken", "merchant.jwt.token");
   sessionStorage.clear();
   window.history.replaceState({}, "", "/settings");
 });

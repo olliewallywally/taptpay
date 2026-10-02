@@ -8,7 +8,7 @@ import {
 } from "@shared/schema";
 import { createUser } from "../auth";
 import {
-  VALID_PASSWORD, bearer, createAdminPrincipal, createOwnerPrincipal, createTestApp, resetTestStorage, storage,
+  VALID_PASSWORD, signedIn, createAdminPrincipal, createOwnerPrincipal, createTestApp, resetTestStorage, storage,
 } from "./support/http-harness";
 
 /**
@@ -148,7 +148,7 @@ describe("every route that sets a password applies the rule and says it", () => 
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
     const change = (newPassword: string) =>
-      request(app).put(`/api/merchants/${owner.merchantId}/change-password`).set(bearer(owner))
+      request(app).put(`/api/merchants/${owner.merchantId}/change-password`).set(signedIn(owner))
         .send({ currentPassword: VALID_PASSWORD, newPassword, confirmPassword: newPassword });
 
     // Six refusals in a row: more than the five free attempts, so none was counted.
@@ -196,10 +196,10 @@ describe("every route that sets a password applies the rule and says it", () => 
 
   it("admin activation, which used to take any password at all", async () => {
     const { app } = await createTestApp();
-    const admin = createAdminPrincipal();
+    const admin = await createAdminPrincipal();
     const { id } = await pendingSignup();
     const activate = (password: unknown) =>
-      request(app).post(`/api/admin/merchants/${id}/activate`).set(bearer(admin)).send({ password });
+      request(app).post(`/api/admin/merchants/${id}/activate`).set(signedIn(admin)).send({ password });
 
     const refused = await activate("password");
     expect(refused.status).toBe(400);

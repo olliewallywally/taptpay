@@ -21,7 +21,8 @@ jest.mock("resend", () => ({
   })),
 }));
 
-import { VALID_PASSWORD, bearer, resetTestStorage, storage } from "./support/http-harness";
+import { VALID_PASSWORD, signedIn, type SignedIn, resetTestStorage, storage } from "./support/http-harness";
+import { adminSessionBegunBy, businessSessionBegunBy } from "./support/session-browser";
 import {
   expectOwnServed,
   familyRows,
@@ -71,7 +72,7 @@ const cookieValue = (line: string | undefined) => line?.split(";")[0].split("=")
 
 const signIn = (ctx: ServedCtx, address: string, password: string) =>
   request(ctx.app).post("/api/auth/login").send({ email: address, password });
-const me = (ctx: ServedCtx, token: string) => request(ctx.app).get("/api/auth/me").set(bearer({ token }));
+const me = (ctx: ServedCtx, who: SignedIn) => request(ctx.app).get("/api/auth/me").set(signedIn(who));
 
 /** Google's answers: its token exchange and the profile of the account that signed in. */
 let google: { id: string; email: string; name: string; verified_email: boolean };
@@ -162,10 +163,10 @@ const RECIPES: Record<string, OwnServedRecipe> = {
       req: post("/api/auth/google/session", {}, { Cookie: `${HANDOFF_COOKIE}=${code}` }), status: 200,
       check: async (res) => {
         expect(res.headers["cache-control"]).toMatch(/no-store/);
-        expect(res.body).toEqual({ token: expect.any(String), merchantId: ctx.merchantId, newUser: false, csrfToken: expect.any(String) });
-        // R1-T4 phase E: the sign-in is a session cookie too.
+        // R1-T4 phase E: the sign-in is a session cookie and the page's CSRF token; no token is handed out (E3).
+        expect(res.body).toEqual({ merchantId: ctx.merchantId, newUser: false, csrfToken: expect.any(String) });
         expect(setCookies(res).get("__Host-taptpay-session")).toMatch(/HttpOnly/i);
-        expect((await me(ctx, res.body.token)).body.user).toMatchObject({ id: ctx.owner.user.id, merchantId: ctx.merchantId });
+        expect((await me(ctx, businessSessionBegunBy(res))).body.user).toMatchObject({ id: ctx.owner.user.id, merchantId: ctx.merchantId });
         // The code is spent.
         expect(await storage.consumeAuthHandoffCode(sha256(code), new Date())).toBeUndefined();
       },
@@ -176,7 +177,8 @@ const RECIPES: Record<string, OwnServedRecipe> = {
     req: post("/api/auth/login", { email: ctx.owner.user.email, password: VALID_PASSWORD }), status: 200,
     check: async (res) => {
       expect(res.body.user).toEqual({ id: ctx.owner.user.id, email: ctx.owner.user.email, merchantId: ctx.merchantId, role: "owner" });
-      expect((await me(ctx, res.body.token)).status).toBe(200);
+      expect(Object.keys(res.body).sort()).toEqual(["csrfToken", "user"]); // no token is handed out (E3)
+      expect((await me(ctx, businessSessionBegunBy(res))).status).toBe(200);
       // This browser is now a known device for the login (its own sign-in slow-down).
       expect(setCookies(res).get(DEVICE_COOKIE)).toMatch(/HttpOnly/i);
       // R1-T4 phase E: the sign-in is a session cookie, with the page's CSRF token in the body.
@@ -188,7 +190,8 @@ const RECIPES: Record<string, OwnServedRecipe> = {
     req: post("/api/admin/auth/login", { email: "admin@harness.test", password: ADMIN_TEST_PASSWORD }), status: 200,
     check: async (res) => {
       expect(res.body.user).toEqual({ id: 1, email: "admin@harness.test", merchantId: 0, role: "admin" });
-      const admin = await request(ctx.app).get("/api/admin/auth/me").set(bearer({ token: res.body.token }));
+      expect(Object.keys(res.body).sort()).toEqual(["csrfToken", "user"]); // no token is handed out (E3)
+      const admin = await request(ctx.app).get("/api/admin/auth/me").set(signedIn(adminSessionBegunBy(res)));
       expect(admin.status).toBe(200);
       expect(setCookies(res).get(ADMIN_DEVICE_COOKIE)).toMatch(/HttpOnly/i);
       // R1-T4 phase E: the admin's own session cookie, with the page's CSRF token in the body.
@@ -221,7 +224,7 @@ const RECIPES: Record<string, OwnServedRecipe> = {
         expect(res.body).toEqual({ message: expect.any(String) });
         // The new password signs in; every session from before is ended; the link is spent.
         expect((await signIn(ctx, ctx.owner.user.email, NEW_PASSWORD)).status).toBe(200);
-        expect((await me(ctx, ctx.owner.token)).body.code).toBe("SESSION_ENDED");
+        expect((await me(ctx, ctx.owner)).body.code).toBe("SESSION_ENDED");
         expect((await request(ctx.app).get(`/api/auth/validate-reset-token/${token}`)).body).toEqual({ valid: false });
       },
     };

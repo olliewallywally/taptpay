@@ -14,7 +14,7 @@
  * of the deterministic test environment before config.ts/storage.ts load.
  */
 import crypto from "crypto";
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import http, { type IncomingHttpHeaders, type Server as HttpServer } from "http";
 import type { AddressInfo } from "net";
 import { createApp } from "../../app";
@@ -22,7 +22,8 @@ import { registerRoutes } from "../../routes";
 import { createGlobalErrorHandler } from "../../http-error-handler";
 import { storage as liveStorage } from "../../storage";
 import { config } from "../../config";
-import { generateToken, type User } from "../../auth";
+import type { User } from "../../auth";
+import { CSRF_HEADER, startSession } from "../../auth-sessions";
 import { createPaymentCredential, hashPaymentToken } from "../../payment-credential";
 import type { Merchant } from "@shared/schema";
 
@@ -110,9 +111,38 @@ async function createActiveMerchant(overrides: Partial<Merchant> & { email?: str
 }
 
 export interface Principal {
-  token: string;
+  /** The session cookie as a browser sends it: `<name>=<id>.<secret>`. */
+  cookie: string;
+  /** The page's CSRF token for that session, sent with every change. */
+  csrf: string;
+  sessionId: string;
   user: User;
   merchantId: number;
+}
+
+/**
+ * A session begun by the server's own startSession, as a sign-in begins one: the row it writes and the
+ * cookie it sets, taken from a stand-in response. No sign-in route is called, so no password is checked
+ * and no attempt is counted.
+ */
+async function beginSession(
+  start: { realm: "business"; userId: number; sessionVersion: number } | { realm: "admin" },
+): Promise<Pick<Principal, "cookie" | "csrf" | "sessionId">> {
+  let cookie = "";
+  const res = {
+    cookie(name: string, value: string) {
+      cookie = `${name}=${value}`;
+      return res;
+    },
+  } as unknown as Response;
+  const started = await startSession({ headers: {} } as Request, res, start);
+  if (!cookie) throw new Error("fixture: the session's cookie was not set");
+  return { cookie, csrf: started.csrfToken, sessionId: started.id };
+}
+
+/** A session for a login that has just been made or read. */
+function beginLoginSession(user: User) {
+  return beginSession({ realm: "business", userId: user.userId ?? user.id, sessionVersion: user.sessionVersion ?? 0 });
 }
 
 /** A merchant account owner with an active login. */
@@ -120,7 +150,7 @@ export async function createOwnerPrincipal(overrides: Partial<Merchant> & { emai
   const merchant = await createActiveMerchant(overrides);
   const { createUser } = await import("../../auth");
   const user = await createUser(merchant.email, VALID_PASSWORD, merchant.id, "merchant");
-  return { token: generateToken(user), user, merchantId: merchant.id };
+  return { ...(await beginLoginSession(user)), user, merchantId: merchant.id };
 }
 
 /** An active teammate (role "member") on the given owner's merchant, via the real invite→accept path. */
@@ -146,28 +176,32 @@ export async function createMemberPrincipal(merchantId: number): Promise<Princip
   if (!activated) throw new Error("fixture: member invite did not activate");
 
   // activateInvitedUser returns the raw storage row (nullable merchantId,
-  // per shared/schema.ts); generateToken wants auth.ts's stricter principal
-  // shape, so re-read it the same way authenticateUser does.
+  // per shared/schema.ts); a principal has auth.ts's stricter shape, so
+  // re-read it the same way authenticateUser does.
   const { getUserByEmail } = await import("../../auth");
   const user = await getUserByEmail(activated.email);
   if (!user) throw new Error("fixture: activated member row failed auth conversion");
 
-  return { token: generateToken(user), user, merchantId };
+  return { ...(await beginLoginSession(user)), user, merchantId };
 }
 
 /**
- * A teammate whose seat has been revoked *after* their token was issued —
- * proves authenticateToken re-checks status live rather than trusting the JWT.
+ * A teammate whose seat has been revoked *after* their session began, with the
+ * session's row left as it was — proves the sign-in gate re-reads the login on
+ * every request rather than trusting the session.
  */
 export async function createDisabledMemberPrincipal(merchantId: number): Promise<Principal> {
   const member = await createMemberPrincipal(merchantId);
   const result = await liveStorage.setTeamMemberStatus(merchantId, member.user.id, "disabled");
   if (!result.ok) throw new Error(`fixture: could not disable member — ${result.reason}`);
-  return member; // token was minted while active; the server must reject it now
+  return member; // the session began while active; the server must refuse it now
 }
 
-/** The platform admin principal — merchantId 0, email must equal config.admin.email exactly. */
-export function createAdminPrincipal(): Principal {
+/**
+ * The platform admin, signed in to the admin area: its own session and cookie. The admin lives in the
+ * environment, not in storage, but its session is a storage row: begin it after resetTestStorage().
+ */
+export async function createAdminPrincipal(): Promise<Principal> {
   const adminEmail = config.admin.email;
   if (!adminEmail) {
     throw new Error("fixture: ADMIN_EMAIL is not set — check server/__tests__/support/test-env.ts");
@@ -181,12 +215,18 @@ export function createAdminPrincipal(): Principal {
     role: "admin",
     createdAt: new Date(),
   };
-  return { token: generateToken(user), user, merchantId: 0 };
+  return { ...(await beginSession({ realm: "admin" })), user, merchantId: 0 };
 }
 
-/** Authorization header for the named principal. */
-export function bearer(principal: Pick<Principal, "token">): Record<string, string> {
-  return { Authorization: `Bearer ${principal.token}` };
+/** What a request needs of a principal to be sent signed in as it. */
+export type SignedIn = Pick<Principal, "cookie" | "csrf">;
+
+/**
+ * The headers a signed-in page sends: its session cookie, and the page's CSRF token. A page sends the
+ * token only with a change; sent with a read it is not looked at.
+ */
+export function signedIn(principal: SignedIn): Record<string, string> {
+  return { Cookie: principal.cookie, [CSRF_HEADER]: principal.csrf };
 }
 
 /** Header for the cron-only endpoints (authorizeCronRequest in routes.ts). */

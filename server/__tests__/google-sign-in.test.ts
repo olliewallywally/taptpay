@@ -2,9 +2,9 @@ import "./support/test-env";
 import "./support/google-oauth-test-env";
 
 import crypto from "crypto";
-import jwt from "jsonwebtoken";
 import request from "supertest";
-import { createOwnerPrincipal, createTestApp, resetTestStorage, storage } from "./support/http-harness";
+import { createOwnerPrincipal, createTestApp, resetTestStorage, signedIn, storage } from "./support/http-harness";
+import { BUSINESS_COOKIE, businessSessionBegunBy } from "./support/session-browser";
 
 /**
  * R1-T4 phase A (owner decision 2026-09-21). Google sign-in used to redirect to
@@ -169,24 +169,27 @@ describe("redeeming the one-time code", () => {
     return { app, code: cookieValue(setCookies(res).get(HANDOFF_COOKIE)) };
   }
 
-  it("returns the account token once, in the response body, never cached", async () => {
+  it("begins the session once: its cookie and the page's CSRF token, never cached, and no token in the body", async () => {
     const { app, code } = await signedInCode();
     const res = await request(app).post("/api/auth/google/session").set("Cookie", `${HANDOFF_COOKIE}=${code}`);
     expect(res.status).toBe(200);
     expect(res.headers["cache-control"]).toMatch(/no-store/);
     const merchant = await storage.getMerchantByEmail(profile.email);
-    expect(res.body).toMatchObject({ merchantId: merchant!.id, newUser: true });
-    const claims = jwt.verify(res.body.token, process.env.JWT_SECRET!) as any;
-    expect(claims.merchantId).toBe(merchant!.id);
+    // R1-T4 phase E3: nothing the page could keep or send as a sign-in is handed to it.
+    expect(res.body).toEqual({ merchantId: merchant!.id, newUser: true, csrfToken: expect.any(String) });
+    const me = await request(app).get("/api/auth/me").set(signedIn(businessSessionBegunBy(res)));
+    expect(me.status).toBe(200);
+    expect(me.body.user.merchantId).toBe(merchant!.id);
     expect(setCookies(res).get(HANDOFF_COOKIE)).toMatch(/Expires=Thu, 01 Jan 1970|Max-Age=0/i);
   });
 
-  it("refuses the same code a second time", async () => {
+  it("refuses the same code a second time, and begins no session", async () => {
     const { app, code } = await signedInCode();
     await request(app).post("/api/auth/google/session").set("Cookie", `${HANDOFF_COOKIE}=${code}`);
     const again = await request(app).post("/api/auth/google/session").set("Cookie", `${HANDOFF_COOKIE}=${code}`);
     expect(again.status).toBe(401);
-    expect(again.body.token).toBeUndefined();
+    expect(again.body).toEqual({ code: "GOOGLE_SIGN_IN_EXPIRED", message: expect.any(String) });
+    expect(setCookies(again).has(BUSINESS_COOKIE)).toBe(false);
   });
 
   it("refuses an expired code, a made-up code and no code", async () => {
@@ -203,7 +206,8 @@ describe("redeeming the one-time code", () => {
       const call = request(app).post("/api/auth/google/session");
       const res = cookie ? await call.set("Cookie", cookie) : await call;
       expect(res.status).toBe(401);
-      expect(res.body.token).toBeUndefined();
+      expect(res.body).toEqual({ code: "GOOGLE_SIGN_IN_EXPIRED", message: expect.any(String) });
+      expect(setCookies(res).has(BUSINESS_COOKIE)).toBe(false);
     }
   });
 });

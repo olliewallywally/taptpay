@@ -3,7 +3,7 @@ import "./support/test-env";
 import request from "supertest";
 import {
   apiKeyHeader,
-  bearer,
+  signedIn,
   createAdminPrincipal,
   createDisabledMemberPrincipal,
   createMemberPrincipal,
@@ -24,7 +24,7 @@ describe("R1-T1 no-live-system HTTP harness", () => {
       const { app } = await createTestApp();
       const owner = await createOwnerPrincipal();
 
-      const response = await request(app).get("/api/auth/me").set(bearer(owner));
+      const response = await request(app).get("/api/auth/me").set(signedIn(owner));
 
       expect(response.status).toBe(200);
       expect(response.body.user.merchantId).toBe(owner.merchantId);
@@ -33,7 +33,7 @@ describe("R1-T1 no-live-system HTTP harness", () => {
     5_000,
   );
 
-  it("rejects a request with no Authorization header", async () => {
+  it("rejects a request with no session cookie", async () => {
     const { app } = await createTestApp();
 
     const response = await request(app).get("/api/auth/me");
@@ -46,7 +46,7 @@ describe("R1-T1 no-live-system HTTP harness", () => {
     const owner = await createOwnerPrincipal();
     const member = await createMemberPrincipal(owner.merchantId);
 
-    const response = await request(app).get("/api/auth/me").set(bearer(member));
+    const response = await request(app).get("/api/auth/me").set(signedIn(member));
 
     expect(response.status).toBe(200);
     expect(response.body.user.merchantId).toBe(owner.merchantId);
@@ -54,12 +54,12 @@ describe("R1-T1 no-live-system HTTP harness", () => {
     expect(response.body.user.id).not.toBe(owner.user.id);
   });
 
-  it("rejects a teammate whose seat was revoked after their token was issued", async () => {
+  it("rejects a teammate whose seat was revoked after their session began", async () => {
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
     const disabled = await createDisabledMemberPrincipal(owner.merchantId);
 
-    const response = await request(app).get("/api/auth/me").set(bearer(disabled));
+    const response = await request(app).get("/api/auth/me").set(signedIn(disabled));
 
     expect(response.status).toBe(401); // 401 since 2026-09-27 (R1-T3, P2.2, owner decision): a sign-in that is invalid, expired or disabled was 403.
   });
@@ -70,8 +70,8 @@ describe("R1-T1 no-live-system HTTP harness", () => {
     const ownerB = await createOwnerPrincipal();
 
     const [resA, resB] = await Promise.all([
-      request(app).get("/api/auth/me").set(bearer(ownerA)),
-      request(app).get("/api/auth/me").set(bearer(ownerB)),
+      request(app).get("/api/auth/me").set(signedIn(ownerA)),
+      request(app).get("/api/auth/me").set(signedIn(ownerB)),
     ]);
 
     expect(resA.body.user.merchantId).toBe(ownerA.merchantId);
@@ -81,9 +81,9 @@ describe("R1-T1 no-live-system HTTP harness", () => {
 
   it("accepts the platform admin principal", async () => {
     const { app } = await createTestApp();
-    const admin = createAdminPrincipal();
+    const admin = await createAdminPrincipal();
 
-    const response = await request(app).get("/api/auth/me").set(bearer(admin));
+    const response = await request(app).get("/api/auth/me").set(signedIn(admin));
 
     expect(response.status).toBe(200);
     expect(response.body.user.role).toBe("admin");

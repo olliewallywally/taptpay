@@ -1,7 +1,7 @@
 import "./support/test-env";
 
 import request from "supertest";
-import { bearer, createOwnerPrincipal, createTestApp, resetTestStorage, storage } from "./support/http-harness";
+import { signedIn, type SignedIn, createOwnerPrincipal, createTestApp, resetTestStorage, storage } from "./support/http-harness";
 import * as billing from "../billing-card";
 import * as delivery from "../trades-delivery";
 import * as propertyCron from "../property-cron";
@@ -25,10 +25,10 @@ const TENANT_ID = "22222222-2222-4222-8222-222222222222";
 const PDF_BYTES = Buffer.concat([Buffer.from("%PDF-1.4\n"), Buffer.from("synthetic-fixture-attach")]);
 const dueAt = () => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-async function uploadDocument(app: any, principal: { token: string }) {
+async function uploadDocument(app: any, principal: SignedIn) {
   const res = await request(app)
     .post("/api/property/invoices/document")
-    .set(bearer(principal))
+    .set(signedIn(principal))
     .attach("document", PDF_BYTES, { filename: "bill.pdf", contentType: "application/pdf" });
   expect(res.status).toBe(200);
   return res.body as { documentUrl: string; documentName: string };
@@ -127,7 +127,7 @@ describe.each(ROUTES)("gap 13 — $label create validates an attached document",
     const owner = await callerWithTenant();
     const doc = await uploadDocument(app, owner);
 
-    const res = await request(app).post(route.path).set(bearer(owner)).send(route.body(doc));
+    const res = await request(app).post(route.path).set(signedIn(owner)).send(route.body(doc));
 
     expect(res.status).toBe(201);
     expect(route.created()).toHaveBeenCalledWith(
@@ -139,7 +139,7 @@ describe.each(ROUTES)("gap 13 — $label create validates an attached document",
     const { app } = await createTestApp();
     const owner = await callerWithTenant();
 
-    const res = await request(app).post(route.path).set(bearer(owner)).send(route.body({}));
+    const res = await request(app).post(route.path).set(signedIn(owner)).send(route.body({}));
 
     expect(res.status).toBe(201);
     expect(route.created()).toHaveBeenCalledTimes(1);
@@ -151,7 +151,7 @@ describe.each(ROUTES)("gap 13 — $label create validates an attached document",
 
     const res = await request(app)
       .post(route.path)
-      .set(bearer(owner))
+      .set(signedIn(owner))
       .send(route.body({ documentUrl: "", documentName: "" }));
 
     expect(res.status).toBe(201);
@@ -163,7 +163,7 @@ describe.each(ROUTES)("gap 13 — $label create validates an attached document",
     const other = await createOwnerPrincipal();
     const foreign = await uploadDocument(app, other);
 
-    const res = await request(app).post(route.path).set(bearer(owner)).send(route.body(foreign));
+    const res = await request(app).post(route.path).set(signedIn(owner)).send(route.body(foreign));
 
     expect(res.status).toBe(400);
     expect(res.body.message).toBe("Invalid document attachment");
@@ -183,7 +183,7 @@ describe.each(ROUTES)("gap 13 — $label create validates an attached document",
 
     const res = await request(app)
       .post(route.path)
-      .set(bearer(owner))
+      .set(signedIn(owner))
       .send(route.body({ documentUrl, documentName: "bill.pdf" }));
 
     expect(res.status).toBe(400);

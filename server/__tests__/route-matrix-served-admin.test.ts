@@ -49,15 +49,17 @@ const merchant = async (id: number) => (await storage.getMerchant(id))!;
 const RECIPES: Record<string, ServedRecipe> = {
   "GET /api/admin/auth/me": (_ctx, who) => ({
     req: { method: "get", path: "/api/admin/auth/me" }, status: 200,
-    check: (res) => expect(res.body).toEqual({ user: { id: who.user.id, email: who.user.email, merchantId: 0, role: "admin" } }),
+    check: (res) => expect(res.body).toEqual({
+      csrfToken: who.csrf, user: { id: who.user.id, email: who.user.email, merchantId: 0, role: "admin" },
+    }),
   }),
-  // R1-T4 phase E: the admin area's Log Out ends the admin session that signed the request in. The served
-  // admin signs in with its token (until phase E3), which has no session here: served, and nothing ended.
+  // The admin area's Log Out ends its own cookie session.
   "POST /api/admin/auth/logout": (ctx, who) => ({
     req: { method: "post", path: "/api/admin/auth/logout" }, status: 204,
     check: async (res) => {
       expect(res.headers["cache-control"]).toBe("no-store");
-      expect((await as(ctx, who).get("/api/admin/auth/me")).status).toBe(200);
+      expect((await as(ctx, who).get("/api/admin/auth/me")).status).toBe(401);
+      expect((await as(ctx, ctx.owner).get("/api/auth/me")).status).toBe(200);
     },
   }),
   "GET /api/admin/request-origin": () => ({

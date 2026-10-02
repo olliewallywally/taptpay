@@ -7,7 +7,7 @@ import { extractSourceInventory } from '../route-inventory';
 import { SseBroker } from '../sse-broker';
 import { startGoogleSignIn, verifyGoogleSignInState, OAUTH_STATE_TTL_MS } from '../google-sign-in';
 import { takeNetworkViolations } from './support/no-network';
-import { bearer, createOwnerPrincipal, createTestApp, resetTestStorage, storage } from './support/http-harness';
+import { signedIn, createOwnerPrincipal, createTestApp, resetTestStorage, storage } from './support/http-harness';
 
 beforeEach(() => resetTestStorage());
 
@@ -38,13 +38,13 @@ test.each([['/api/push/native-subscribe', {deviceToken: 'review-lost-device'}], 
   const spy = jest.spyOn(storage, 'createPushSubscription').mockImplementation(async data => {
     entered(); await mayWrite; return original(data);
   });
-  const pending = request(app).post(path as string).set(bearer(owner))
+  const pending = request(app).post(path as string).set(signedIn(owner))
     .send(body).then(response => response);
   try {
     await atWrite;
-    const ended = await request(app).post('/api/auth/sign-out-everywhere').set(bearer(owner));
+    const ended = await request(app).post('/api/auth/sign-out-everywhere').set(signedIn(owner));
     expect(ended.status).toBe(204);
-    expect((await request(app).get('/api/auth/me').set(bearer(owner))).status).toBe(401);
+    expect((await request(app).get('/api/auth/me').set(signedIn(owner))).status).toBe(401);
     release();
     const registered = await pending;
     const active = await storage.getPushSubscriptionsByMerchant(owner.merchantId);
@@ -66,13 +66,13 @@ test('a revoked login cannot receive a private event from another instance', asy
   const otherInstance = new SseBroker();
   const connection = {write: jest.fn(), end: jest.fn()};
   otherInstance.subscribe(owner.merchantId, {kind: 'merchant', userId: owner.user.id, principal: 'user'}, connection,
-    () => isStreamSessionActive(`Bearer ${owner.token}`));
+    () => isStreamSessionActive({ id: owner.sessionId, realm: 'business' }));
   try {
     connection.write.mockClear();
     await otherInstance.broadcast(owner.merchantId, null, {type: 'transaction_updated', transactionId: 1});
     expect(connection.write).toHaveBeenCalledTimes(1);
     connection.write.mockClear();
-    expect((await request(app).post('/api/auth/sign-out-everywhere').set(bearer(owner))).status).toBe(204);
+    expect((await request(app).post('/api/auth/sign-out-everywhere').set(signedIn(owner))).status).toBe(204);
     await otherInstance.broadcast(owner.merchantId, null, {type: 'transaction_updated', transactionId: 2});
     expect(connection.write).not.toHaveBeenCalled();
     expect(connection.end).toHaveBeenCalledTimes(1);
@@ -90,7 +90,7 @@ test('the production events route installs a shared-session validator', async ()
     return () => undefined;
   });
   try {
-    expect((await request(app).get(`/api/merchants/${owner.merchantId}/events`).set(bearer(owner))).status).toBe(200);
+    expect((await request(app).get(`/api/merchants/${owner.merchantId}/events`).set(signedIn(owner))).status).toBe(200);
     expect(authorize).toEqual(expect.any(Function));
     expect(await authorize!()).toBe(true);
     // A different instance advances shared storage without notifying this broker.
@@ -106,7 +106,7 @@ test('a remote revocation closes even an idle authenticated stream on its next c
   jest.useFakeTimers();
   try {
     broker.subscribe(owner.merchantId, {kind: 'merchant', userId: owner.user.id, principal: 'user'}, connection,
-      () => isStreamSessionActive(`Bearer ${owner.token}`));
+      () => isStreamSessionActive({ id: owner.sessionId, realm: 'business' }));
     await storage.advanceUserSessionVersion(owner.user.id);
     await jest.advanceTimersByTimeAsync(5000);
     expect(connection.end).toHaveBeenCalledTimes(1);

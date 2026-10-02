@@ -66,7 +66,6 @@ const generateButton = () => screen.getByRole("button", { name: "Generate Report
 
 beforeEach(() => {
   fetchMock.mockReset();
-  localStorage.setItem("authToken", "h.e30.s");
 });
 
 describe("retail analytics when sales fail to load (R1-T9)", () => {

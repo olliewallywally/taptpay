@@ -49,7 +49,7 @@ afterEach(() => jest.restoreAllMocks());
 describe("a password sign-in on the login page", () => {
   it("stores nothing: the sign-in is the cookie the server sets", async () => {
     fetchMock.mockResolvedValue(reply(200, {
-      token: "issued.jwt.token", csrfToken: "c".repeat(43),
+      csrfToken: "c".repeat(43),
       user: { id: 7, email: "owner@example.test", merchantId: 22, role: "owner" },
     }));
     await signIn();

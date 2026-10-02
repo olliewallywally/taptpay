@@ -1,7 +1,6 @@
 import bcrypt from 'bcrypt';
 import { config } from './config';
 import { isDemoAccountLoginBlocked } from './demo-safety';
-import jwt from 'jsonwebtoken';
 import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import fs from 'fs';
@@ -51,8 +50,8 @@ export interface User {
   /** Identity of the users row this principal came from, when there is one. */
   userId?: number;
   /**
-   * R1-T4 phase D: the users row's session version. Tokens carry the version they
-   * were issued under; a password reset or "sign out everywhere" advances it.
+   * R1-T4: the users row's session version. Sessions record the version they
+   * began under; a password reset or "sign out everywhere" advances it.
    */
   sessionVersion?: number;
   resetToken?: string;
@@ -64,17 +63,6 @@ export interface User {
 export function isAccountOwner(user: Pick<User, 'role'> | undefined | null): boolean {
   return user?.role === 'owner' || user?.role === 'merchant' || user?.role === 'admin';
 }
-
-/**
- * Claim marking a token as issued by the team-logins scheme.
- *
- * Before team logins, `userId` in a JWT was the *merchant* id and
- * authenticateToken ignored it entirely. Now that real `users.id` values exist,
- * an old token's `userId` would address a different row, so tokens without this
- * claim are rejected outright. The 1h TTL caps the disruption at one re-login.
- */
-export const TOKEN_PRINCIPAL = 'user' as const;
-const ADMIN_TOKEN_PRINCIPAL = 'admin' as const;
 
 function isMerchantUserRole(role: unknown): role is 'owner' | 'member' {
   return role === 'owner' || role === 'member';
@@ -133,8 +121,6 @@ export interface AuthenticatedRequest extends Request {
 export async function syncVerifiedMerchants(): Promise<void> {
   // no-op — authentication reads live from the users table
 }
-
-export const JWT_SECRET = config.jwtSecret;
 
 function userRowToUser(row: {
   id: number;
@@ -269,14 +255,14 @@ async function memberWithinSeatLimit(user: User): Promise<boolean> {
 }
 
 /**
- * R1-T4 phase A: an account token for a users row that has just proved itself
+ * R1-T4: the login for a users row that has just proved itself
  * without a password — Google sign-in's one-time code. Every other gate of a
  * password login applies: the row is active, the merchant verified or active, a
  * member within the seat limit.
  */
-export async function issueTokenForUserId(
+export async function loginForUserId(
   userId: number,
-): Promise<{ token: string; merchantId: number; userId: number; sessionVersion: number } | null> {
+): Promise<{ merchantId: number; userId: number; sessionVersion: number } | null> {
   if (!isPositiveInteger(userId)) return null;
   const { storage } = await import('./storage');
   const userRow = await storage.getUserById(userId);
@@ -287,57 +273,13 @@ export async function issueTokenForUserId(
   if (!merchant || (merchant.status !== 'verified' && merchant.status !== 'active')) return null;
   if (!(await memberWithinSeatLimit(user))) return null;
   await storage.recordUserLogin(userRow.id, new Date()).catch(() => {});
-  return { token: generateToken(user), merchantId: user.merchantId, userId: userRow.id, sessionVersion: user.sessionVersion ?? 0 };
+  return { merchantId: user.merchantId, userId: userRow.id, sessionVersion: user.sessionVersion ?? 0 };
 }
 
-/** A token for a users row just read or updated, under its current session version; null if it is not a merchant login. */
-export function tokenForUserRow(row: Parameters<typeof userRowToUser>[0]): string | null {
+/** The login for a users row just read or updated; null if it is not a business login. */
+export function sessionLoginForUserRow(row: Parameters<typeof userRowToUser>[0]): { userId: number; sessionVersion: number } | null {
   const user = userRowToUser(row);
-  return user ? generateToken(user) : null;
-}
-
-export function generateToken(user: User): string {
-  const userId = user.userId ?? user.id;
-  if (!isPositiveInteger(userId) || typeof user.email !== 'string' || !user.email) {
-    throw new Error('Cannot issue a token for an invalid principal');
-  }
-
-  if (user.role === 'admin') {
-    const adminEmail = config.admin.email;
-    if (!adminEmail || user.email.toLowerCase() !== adminEmail.toLowerCase() || user.merchantId !== 0) {
-      throw new Error('Cannot issue an admin token for an unconfigured principal');
-    }
-    return jwt.sign(
-      { principal: ADMIN_TOKEN_PRINCIPAL, userId, email: adminEmail, merchantId: 0, role: 'admin' },
-      JWT_SECRET,
-      { expiresIn: '1h' },
-    );
-  }
-
-  if (!isMerchantUserRole(user.role) || !isPositiveInteger(user.merchantId)) {
-    throw new Error('Cannot issue a token without a users-row principal');
-  }
-
-  return jwt.sign(
-    {
-      principal: TOKEN_PRINCIPAL,
-      userId,
-      email: user.email,
-      merchantId: user.merchantId,
-      role: user.role,
-      sv: user.sessionVersion ?? 0,
-    },
-    JWT_SECRET,
-    { expiresIn: '1h' } // 1 hour as requested
-  );
-}
-
-export function verifyToken(token: string): any {
-  try {
-    return jwt.verify(token, JWT_SECRET);
-  } catch (error) {
-    return null;
-  }
+  return user ? { userId: user.userId ?? user.id, sessionVersion: user.sessionVersion ?? 0 } : null;
 }
 
 /**
@@ -379,112 +321,18 @@ function respondAuthBackendUnavailable(res: Response) {
   });
 }
 
+/**
+ * R1-T4 phase E3: a request signs in by its session cookie only, whatever Authorization header comes
+ * with it. Keep the middleware's established name for the route inventory. The admin area reads only
+ * its own cookie; other routes read the business cookie, then the admin cookie.
+ */
 export async function authenticateToken(req: AuthenticatedRequest, res: Response, next: NextFunction) {
-  // R1-T4 phase E: a Bearer header, while it is still accepted, is the sign-in; without one, the
-  // session cookie is. The admin area reads only the admin's cookie; every other route the business's,
-  // then the admin's, so the platform admin gets the answers its token got.
-  if (req.headers['authorization'] === undefined) {
-    const realms: SessionRealm[] = req.path.startsWith('/api/admin') ? ['admin'] : ['business', 'admin'];
-    for (const realm of realms) {
-      const value = readSessionCookie(req, realm);
-      if (value !== undefined) return authenticateSession(req, res, next, realm, value);
-    }
+  const realms: SessionRealm[] = req.path.startsWith('/api/admin') ? ['admin'] : ['business', 'admin'];
+  for (const realm of realms) {
+    const value = readSessionCookie(req, realm);
+    if (value !== undefined) return authenticateSession(req, res, next, realm, value);
   }
-
-  const authHeader = req.headers['authorization'];
-  const match = typeof authHeader === 'string' ? authHeader.match(/^Bearer ([^\s]+)$/i) : null;
-
-  if (!match) {
-    return res.status(401).json({ message: 'Access token required' });
-  }
-  const token = match[1];
-  const decoded = verifyToken(token);
-  // P2.2 (R1-T3, owner decision 2026-09-27): a credential that is missing, invalid, expired or disabled
-  // is 401, so every page sends the person to sign in again (it was 403 here and below).
-  if (!decoded) {
-    return res.status(401).json({ message: 'Invalid or expired token' });
-  }
-
-  // A role string alone is not admin authority. Require the dedicated principal,
-  // the configured email, and a zero merchant scope.
-  if (decoded.role === 'admin') {
-    const adminEmail = config.admin.email;
-    if (
-      decoded.principal !== ADMIN_TOKEN_PRINCIPAL ||
-      !adminEmail ||
-      typeof decoded.email !== 'string' ||
-      decoded.email.toLowerCase() !== adminEmail.toLowerCase() ||
-      decoded.merchantId !== 0 ||
-      !isPositiveInteger(decoded.userId)
-    ) {
-      return res.status(401).json({ message: 'Invalid admin session' });
-    }
-    req.user = {
-      id: decoded.userId,
-      email: adminEmail,
-      password: '',
-      merchantId: 0,
-      role: 'admin',
-      createdAt: new Date(),
-    };
-    return next();
-  }
-
-  // Reject pre-team-logins tokens: their `userId` is a merchant id, so honouring
-  // one would resolve the wrong users row. See TOKEN_PRINCIPAL.
-  if (decoded.principal !== TOKEN_PRINCIPAL) {
-    return res.status(401).json({ message: 'Session expired. Please sign in again.' });
-  }
-
-  // R1-T4 phase D: tokens issued before session versions carry none and count as
-  // version 0, so they last only until the login's sessions are first ended.
-  const tokenSessionVersion = decoded.sv === undefined ? 0 : decoded.sv;
-  if (
-    !isPositiveInteger(decoded.merchantId) ||
-    !isPositiveInteger(decoded.userId) ||
-    !isMerchantUserRole(decoded.role) ||
-    !Number.isInteger(tokenSessionVersion) ||
-    tokenSessionVersion < 0
-  ) {
-    return res.status(401).json({ code: 'INVALID_SESSION', message: 'Invalid session' });
-  }
-
-  // Each read is guarded on its own, and the decisions sit outside the guard, so
-  // that only a genuine answer from the database can produce a 401 — a rejection
-  // here is a statement about this principal, never about our uptime.
-  const storageModule = await readForAuth('load the storage module', () => import('./storage'));
-  if (storageModule === STORAGE_UNAVAILABLE) return respondAuthBackendUnavailable(res);
-  const { storage } = storageModule;
-
-  const userRow = await readForAuth('read the users row', () => storage.getUserById(decoded.userId));
-  if (userRow === STORAGE_UNAVAILABLE) return respondAuthBackendUnavailable(res);
-
-  const user = userRow ? userRowToUser(userRow) : null;
-
-  // Re-check the identity on every request so disabling a teammate takes effect
-  // within the token's remaining lifetime rather than at its natural expiry.
-  if (!userRow || !user || userRow.status !== 'active' || user.merchantId !== decoded.merchantId) {
-    return res.status(401).json({ message: 'Access revoked' });
-  }
-
-  // A password reset or "sign out everywhere" advanced the version: every token
-  // issued before it is spent. 401, so the client drops it and signs in again.
-  if (tokenSessionVersion !== (userRow.sessionVersion ?? 0)) {
-    return res.status(401).json({ code: 'SESSION_ENDED', message: 'You were signed out. Please sign in again.' });
-  }
-
-  const merchant = await readForAuth('read the merchant row', () => storage.getMerchant(decoded.merchantId));
-  if (merchant === STORAGE_UNAVAILABLE) return respondAuthBackendUnavailable(res);
-
-  // A row that is absent, unverified or suspended — the database answered, and
-  // the answer is that this login has no usable account behind it.
-  if (!merchant || (merchant.status !== 'verified' && merchant.status !== 'active')) {
-    return res.status(401).json({ code: 'ACCESS_REVOKED', message: 'Access revoked' });
-  }
-
-  // The database role is authoritative; stale JWT role claims are ignored.
-  req.user = user;
-  return next();
+  return res.status(401).json({ code: 'INVALID_SESSION', message: 'Please sign in again.' });
 }
 
 // ============================================
@@ -591,27 +439,14 @@ async function resolveSessionLogin(
  * out, and its login is re-read. The cookie's secret is not presented again (the daily swap replaces it
  * while a stream stays open, and a replaced secret presented late would end the session as a stolen
  * copy), nothing is written, and the check is not a use: an open stream does not keep a session alive.
- * A token's stream (until phase E3) re-runs the request's whole authentication.
  */
 export async function isStreamSessionActive(
-  signIn: string | { id: string; realm: SessionRealm },
+  signIn: { id: string; realm: SessionRealm },
   merchantId?: number,
 ): Promise<boolean> {
-  const user = typeof signIn === 'string' ? await userOfAuthorization(signIn) : await userOfLiveSession(signIn);
+  const user = await userOfLiveSession(signIn);
   if (!user) return false;
   return merchantId === undefined || user.role === 'admin' || user.merchantId === merchantId;
-}
-
-/** The principal an Authorization header signs in now, by the request's own authentication; else null. */
-async function userOfAuthorization(authorization: string): Promise<User | null> {
-  let accepted = false;
-  const request = { headers: { authorization } } as AuthenticatedRequest;
-  // No response is sent: whatever the refusal would have said, the stream is simply closed.
-  const response = {
-    status() { return this; }, json() { return this; }, setHeader() { return this; },
-  } as unknown as Response;
-  await authenticateToken(request, response, () => { accepted = true; });
-  return accepted ? request.user ?? null : null;
 }
 
 /** The principal a session stands for now, when it has not been ended or run out; else null. */
@@ -686,7 +521,7 @@ export function hasSessionCookie(req: Request): boolean {
   return readSessionCookie(req, 'business') !== undefined || readSessionCookie(req, 'admin') !== undefined;
 }
 
-/** The page's CSRF token for the session a request was signed in by; undefined for a token sign-in. */
+/** The page's CSRF token for the session a request was signed in by. */
 export function csrfTokenForRequest(req: AuthenticatedRequest): string | undefined {
   return req.authSession ? csrfTokenFor(req.authSession.id, getBaseUrl(req)) : undefined;
 }
@@ -730,7 +565,7 @@ export { clearSessionCookie };
 
 // Enable the owner's login and return the real users-row principal. The merchant
 // hash writer synchronises/creates that owner row; re-reading it prevents Google
-// OAuth from minting a token whose uid is accidentally the merchant id.
+// OAuth from starting a session whose login id is accidentally the merchant id.
 export async function createUser(email: string, password: string, merchantId: number, role: 'merchant' | 'admin' = 'merchant'): Promise<User> {
   if (role === 'admin') {
     throw new Error('Admin identities cannot be created in the merchant users table');

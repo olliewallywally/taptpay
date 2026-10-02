@@ -3,7 +3,7 @@ import "./support/test-env";
 import crypto from "crypto";
 import request from "supertest";
 import { sseBroker } from "../sse-broker";
-import { VALID_PASSWORD, createOwnerPrincipal, createTestApp, resetTestStorage, storage } from "./support/http-harness";
+import { VALID_PASSWORD, createOwnerPrincipal, createTestApp, resetTestStorage, signedIn, storage } from "./support/http-harness";
 
 /**
  * C10 route review, batch 3b (2026-09-26): the password-reset link's routes
@@ -80,7 +80,7 @@ describe("POST /api/auth/reset-password", () => {
     expect(res.body).toEqual({ message: "Failed to reset password" });
     expect(disconnect).not.toHaveBeenCalled();
     // The link, the password and the sessions are as they were.
-    expect((await request(app).get("/api/auth/me").set("Authorization", `Bearer ${owner.token}`)).status).toBe(200);
+    expect((await request(app).get("/api/auth/me").set(signedIn(owner))).status).toBe(200);
     expect((await validate(app, raw)).body).toEqual({ valid: true });
     expect((await signIn(app, owner.user.email, VALID_PASSWORD)).status).toBe(200);
   });
@@ -96,7 +96,7 @@ describe("POST /api/auth/reset-password", () => {
     expect(res.status).toBe(500);
     expect(res.body).toEqual({ message: "Failed to reset password" });
     expect(disconnect).not.toHaveBeenCalled();
-    expect((await request(app).get("/api/auth/me").set("Authorization", `Bearer ${owner.token}`)).status).toBe(200);
+    expect((await request(app).get("/api/auth/me").set(signedIn(owner))).status).toBe(200);
     expect((await signIn(app, owner.user.email, VALID_PASSWORD)).status).toBe(200);
     // Nothing was spent: the same link still works.
     expect((await reset(app, raw)).status).toBe(200);

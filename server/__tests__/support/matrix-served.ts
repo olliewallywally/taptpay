@@ -8,7 +8,7 @@
 import request from "supertest";
 import { ROUTE_MATRIX, type MatrixCaller, type MatrixGate } from "../../route-matrix";
 import {
-  bearer,
+  signedIn,
   createAdminPrincipal,
   createMemberPrincipal,
   createOwnerPrincipal,
@@ -17,6 +17,7 @@ import {
   storage,
   type EventStream,
   type Principal,
+  type SignedIn,
 } from "./http-harness";
 
 /** The signed-in callers a gated route can serve. */
@@ -63,7 +64,7 @@ export async function servedContext(): Promise<ServedCtx> {
   const { app } = await createTestApp();
   const owner = await createOwnerPrincipal();
   const member = await createMemberPrincipal(owner.merchantId);
-  return { app, owner, member, admin: createAdminPrincipal(), merchantId: owner.merchantId };
+  return { app, owner, member, admin: await createAdminPrincipal(), merchantId: owner.merchantId };
 }
 
 export function principalFor(ctx: ServedCtx, caller: ServedCaller): Principal {
@@ -80,7 +81,7 @@ function bytes(res: any, done: (error: Error | null, body: Buffer) => void) {
 /** Sends a recipe's request, as the signed-in caller when there is one. */
 export async function sendServed(ctx: ServedCtx, who: Principal | null, req: ServedRequest) {
   let pending = request(ctx.app)[req.method](req.path);
-  if (who) pending = pending.set(bearer(who));
+  if (who) pending = pending.set(signedIn(who));
   for (const [name, value] of Object.entries(req.headers ?? {})) pending = pending.set(name, value);
   if (req.attach) pending = pending.attach(req.attach.field, req.attach.bytes, { filename: req.attach.filename, contentType: req.attach.contentType });
   else if (req.body) pending = pending.send(req.body);
@@ -89,12 +90,12 @@ export async function sendServed(ctx: ServedCtx, who: Principal | null, req: Ser
 }
 
 /** Short requests as one caller, for fixtures and for reading back what a success did. */
-export function as(ctx: ServedCtx, who: Principal) {
+export function as(ctx: Pick<ServedCtx, "app">, who: SignedIn) {
   return {
-    get: (path: string) => request(ctx.app).get(path).set(bearer(who)),
-    post: (path: string, body: Record<string, unknown> = {}) => request(ctx.app).post(path).set(bearer(who)).send(body),
-    put: (path: string, body: Record<string, unknown>) => request(ctx.app).put(path).set(bearer(who)).send(body),
-    delete: (path: string) => request(ctx.app).delete(path).set(bearer(who)),
+    get: (path: string) => request(ctx.app).get(path).set(signedIn(who)),
+    post: (path: string, body: Record<string, unknown> = {}) => request(ctx.app).post(path).set(signedIn(who)).send(body),
+    put: (path: string, body: Record<string, unknown>) => request(ctx.app).put(path).set(signedIn(who)).send(body),
+    delete: (path: string) => request(ctx.app).delete(path).set(signedIn(who)),
   };
 }
 
@@ -185,7 +186,7 @@ async function expectSuccess(ctx: ServedCtx, who: Principal | null, caller: stri
 
 /** A live event stream is served when it opens with the route's status; the check reads its events. */
 async function expectStreamServed(ctx: ServedCtx, who: Principal | null, caller: string, served: Served) {
-  const stream = await openEventStream(ctx.app, served.req.path, { ...(who ? bearer(who) : {}), ...served.req.headers });
+  const stream = await openEventStream(ctx.app, served.req.path, { ...(who ? signedIn(who) : {}), ...served.req.headers });
   try {
     expect({ caller, status: stream.status }).toEqual({ caller, status: served.status });
     const first = await stream.nextEvent();

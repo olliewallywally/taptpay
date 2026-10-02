@@ -591,7 +591,7 @@ describe("desktop settings: sign out of all devices", () => {
         return jsonResponse({ history: [] });
       }
       if (method === "PUT" && path === "/api/merchants/42/change-password") {
-        return jsonResponse({ message: "Password updated successfully", token: "fresh.jwt.token", csrfToken: "fresh-csrf-token" });
+        return jsonResponse({ message: "Password updated successfully", csrfToken: "fresh-csrf-token" });
       }
       throw new Error(`Unexpected apiRequest: ${method} ${path}`);
     });

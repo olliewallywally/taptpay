@@ -71,8 +71,6 @@ const exportButton = () => screen.getByRole("button", { name: "Export" });
 
 beforeEach(() => {
   fetchMock.mockReset();
-  localStorage.setItem("authToken", "h.e30.s");
-  localStorage.setItem("merchantId", "77");
 });
 
 describe("trades analytics when invoices fail to load (R1-T9)", () => {

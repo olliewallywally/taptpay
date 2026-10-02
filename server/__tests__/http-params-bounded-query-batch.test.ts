@@ -3,7 +3,7 @@ import "./support/test-env";
 import request from "supertest";
 import { strictBoundedIntegerQueryParam } from "../http-params";
 import {
-  bearer,
+  signedIn,
   createOwnerPrincipal,
   createTestApp,
   resetTestStorage,
@@ -59,16 +59,16 @@ describe("R1-T6 — bounded query values reject garbage and default only when ab
       const board = await storage.createNextTaptStone(owner.merchantId);
       const path = `/api/merchants/${owner.merchantId}/stone/${board.id}/qr`;
 
-      const ok = await request(app).get(path).set(bearer(owner));
+      const ok = await request(app).get(path).set(signedIn(owner));
       expect(ok.status).toBe(200);
 
       for (const raw of ["abc", "0", "-1", "1.5"]) {
-        const bad = await request(app).get(path).query({ size: raw }).set(bearer(owner));
+        const bad = await request(app).get(path).query({ size: raw }).set(signedIn(owner));
         expect({ raw, status: bad.status }).toEqual({ raw, status: 400 });
         expect(bad.body.message).toBe("Invalid size");
       }
 
-      const repeated = await request(app).get(`${path}?size=200&size=300`).set(bearer(owner));
+      const repeated = await request(app).get(`${path}?size=200&size=300`).set(signedIn(owner));
       expect(repeated.status).toBe(400);
     });
   });

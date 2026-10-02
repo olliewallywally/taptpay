@@ -1,6 +1,6 @@
 import './support/test-env';
 import request from 'supertest';
-import { bearer, createOwnerPrincipal, createTestApp, resetTestStorage, storage } from './support/http-harness';
+import { signedIn, createOwnerPrincipal, createTestApp, resetTestStorage, storage } from './support/http-harness';
 import * as delivery from '../trades-delivery';
 import * as billing from '../billing-card';
 
@@ -17,7 +17,7 @@ beforeEach(() => {
 test.each([{ skipClient: true }, { recipient: { name: 'Sam Smith', email: 'sam@example.test', address: '1 Road' } }])('creates a merchant-owned hidden prospect and shareable quote for %j', async mode => {
   const { app } = await createTestApp();
   const owner = await createOwnerPrincipal();
-  const result = await request(app).post('/api/trades/quotes').set(bearer(owner)).send({ ...base, ...mode });
+  const result = await request(app).post('/api/trades/quotes').set(signedIn(owner)).send({ ...base, ...mode });
   expect(result.status).toBe(201);
   expect(result.body.token).toBeTruthy();
   expect(result.body.totalCents).toBe(10000);
@@ -28,7 +28,7 @@ test('existing client must belong to the merchant; rejection writes nothing', as
   const { app } = await createTestApp();
   const owner = await createOwnerPrincipal();
   jest.spyOn(storage, 'getClientProfile').mockResolvedValue({ id: clientId, merchantId: owner.merchantId + 1 } as any);
-  const result = await request(app).post('/api/trades/quotes').set(bearer(owner)).send({ ...base, clientProfileId: clientId });
+  const result = await request(app).post('/api/trades/quotes').set(signedIn(owner)).send({ ...base, clientProfileId: clientId });
   expect(result.status).toBe(404);
   expect(storage.createClientProfile).not.toHaveBeenCalled();
   expect(storage.createQuote).not.toHaveBeenCalled();
@@ -36,10 +36,10 @@ test('existing client must belong to the merchant; rejection writes nothing', as
 test('billing and invalid client combinations reject before creating prospects', async () => {
   const { app } = await createTestApp();
   const owner = await createOwnerPrincipal();
-  const invalid = await request(app).post('/api/trades/quotes').set(bearer(owner)).send({ ...base, skipClient: true, clientProfileId: clientId });
+  const invalid = await request(app).post('/api/trades/quotes').set(signedIn(owner)).send({ ...base, skipClient: true, clientProfileId: clientId });
   expect(invalid.status).toBe(400);
   jest.mocked(billing.billingCardIsReady).mockReturnValue(false);
-  const blocked = await request(app).post('/api/trades/quotes').set(bearer(owner)).send({ ...base, skipClient: true });
+  const blocked = await request(app).post('/api/trades/quotes').set(signedIn(owner)).send({ ...base, skipClient: true });
   expect(blocked.status).toBe(402);
   expect(storage.createClientProfile).not.toHaveBeenCalled();
   expect(storage.createQuote).not.toHaveBeenCalled();

@@ -3,7 +3,7 @@ import "./support/test-env";
 import request from "supertest";
 import * as propertyCron from "../property-cron";
 import { ROUTE_POLICY } from "../route-policy";
-import { bearer, createMemberPrincipal, createOwnerPrincipal, createTestApp, resetTestStorage, storage, storageSnapshot } from "./support/http-harness";
+import { signedIn, type SignedIn, createMemberPrincipal, createOwnerPrincipal, createTestApp, resetTestStorage, storage, storageSnapshot } from "./support/http-harness";
 import { INVOICE, MISSING, SCHEDULE, TENANT, fakeProperty, inDays, seedProperty as seed } from "./support/property-fake";
 
 /**
@@ -39,8 +39,8 @@ const BY_ID: Call[] = [
 ];
 const idOf = (label: string) => (label.includes("/schedules/:id") ? SCHEDULE : label.includes("/invoices/") ? INVOICE : TENANT);
 
-async function send(app: any, principal: { token: string }, method: Method, address: string, body?: Record<string, unknown>) {
-  let pending = request(app)[method](address).set(bearer(principal));
+async function send(app: any, principal: SignedIn, method: Method, address: string, body?: Record<string, unknown>) {
+  let pending = request(app)[method](address).set(signedIn(principal));
   if (body) pending = pending.send(body);
   return pending;
 }
@@ -61,7 +61,7 @@ describe("the two property routes no screen calls are removed (owner decision 20
     const fake = fakeProperty();
     seed(fake, owner.merchantId);
 
-    const res = await request(app).get(address).set(bearer(owner));
+    const res = await request(app).get(address).set(signedIn(owner));
 
     expect(res.status).toBe(404);
     expect(res.headers["content-type"]).not.toMatch(/json/);
@@ -74,10 +74,10 @@ describe("the two property routes no screen calls are removed (owner decision 20
     const fake = fakeProperty();
     seed(fake, owner.merchantId);
 
-    expect((await request(app).get("/api/property/invoices").set(bearer(owner))).status).toBe(200);
-    expect((await request(app).get("/api/property/schedules").set(bearer(owner))).status).toBe(200);
-    expect((await request(app).post(`/api/property/invoices/${INVOICE}/resend`).set(bearer(owner))).status).toBe(200);
-    const created = await request(app).post(`/api/property/tenants/${TENANT}/schedules`).set(bearer(owner))
+    expect((await request(app).get("/api/property/invoices").set(signedIn(owner))).status).toBe(200);
+    expect((await request(app).get("/api/property/schedules").set(signedIn(owner))).status).toBe(200);
+    expect((await request(app).post(`/api/property/invoices/${INVOICE}/resend`).set(signedIn(owner))).status).toBe(200);
+    const created = await request(app).post(`/api/property/tenants/${TENANT}/schedules`).set(signedIn(owner))
       .send({ amountCents: 50_000, frequency: "weekly", deliveryChannel: "email", startDate: inDays(7).toISOString() });
     expect(created.status).toBe(201);
   });
@@ -112,8 +112,8 @@ describe("another business's property record is not found, like a missing one", 
     seed(fake, owner.merchantId);
     const bill = (tenantProfileId: string) => ({ tenantProfileId, amountCents: 5_000, deliveryChannel: "email", dueAt: inDays(7).toISOString() });
 
-    const missing = await request(app).post("/api/property/invoices").set(bearer(other)).send(bill(MISSING));
-    const theirs = await request(app).post("/api/property/invoices").set(bearer(other)).send(bill(TENANT));
+    const missing = await request(app).post("/api/property/invoices").set(signedIn(other)).send(bill(MISSING));
+    const theirs = await request(app).post("/api/property/invoices").set(signedIn(other)).send(bill(TENANT));
 
     expect(missing.status).toBe(404);
     expect(theirs.status).toBe(404);
@@ -128,9 +128,9 @@ describe("another business's property record is not found, like a missing one", 
     const fake = fakeProperty();
     seed(fake, owner.merchantId);
 
-    expect((await request(app).get(`/api/property/tenants/${TENANT}`).set(bearer(member))).status).toBe(200);
-    expect((await request(app).get(`/api/property/tenants/${TENANT}`).set(bearer(owner))).status).toBe(200);
-    expect((await request(app).post(`/api/property/invoices/${INVOICE}/void`).set(bearer(member))).status).toBe(200);
+    expect((await request(app).get(`/api/property/tenants/${TENANT}`).set(signedIn(member))).status).toBe(200);
+    expect((await request(app).get(`/api/property/tenants/${TENANT}`).set(signedIn(owner))).status).toBe(200);
+    expect((await request(app).post(`/api/property/invoices/${INVOICE}/void`).set(signedIn(member))).status).toBe(200);
   });
 });
 
@@ -156,7 +156,7 @@ describe("property ids are read strictly", () => {
     const fake = fakeProperty();
     seed(fake, owner.merchantId);
 
-    const res = await request(app).get("/api/property/invoices?tenantProfileId=not-a-uuid").set(bearer(owner));
+    const res = await request(app).get("/api/property/invoices?tenantProfileId=not-a-uuid").set(signedIn(owner));
 
     expect(res.status).toBe(400);
     expect(fake.reads).toEqual([]);
@@ -168,7 +168,7 @@ describe("property ids are read strictly", () => {
     const fake = fakeProperty();
     seed(fake, owner.merchantId);
 
-    const res = await request(app).get(`/api/property/invoices?tenantProfileId=${TENANT}`).set(bearer(owner));
+    const res = await request(app).get(`/api/property/invoices?tenantProfileId=${TENANT}`).set(signedIn(owner));
 
     expect(res.status).toBe(200);
     expect(storage.getInvoiceRentRequestsByMerchant).toHaveBeenCalledWith(owner.merchantId, expect.objectContaining({ tenantProfileId: TENANT }));
@@ -183,7 +183,7 @@ describe("property ids are read strictly", () => {
     const fake = fakeProperty();
     seed(fake, owner.merchantId);
 
-    const res = await request(app).post("/api/property/invoices").set(bearer(owner))
+    const res = await request(app).post("/api/property/invoices").set(signedIn(owner))
       .send({ amountCents: 5_000, deliveryChannel: "email", dueAt: inDays(7).toISOString(), ...change });
 
     expect(res.status).toBe(400);
@@ -201,7 +201,7 @@ describe("the property screens' state rules hold on the server", () => {
     const fake = fakeProperty();
     seed(fake, owner.merchantId, { schedule: { status: "terminated" } });
 
-    const res = await request(app).put(`/api/property/schedules/${SCHEDULE}`).set(bearer(owner)).send({ status });
+    const res = await request(app).put(`/api/property/schedules/${SCHEDULE}`).set(signedIn(owner)).send({ status });
 
     expect(res.status).toBe(409);
     expect(fake.schedules.get(SCHEDULE).status).toBe("terminated");
@@ -214,11 +214,11 @@ describe("the property screens' state rules hold on the server", () => {
     const fake = fakeProperty();
     seed(fake, owner.merchantId);
 
-    const put = await request(app).put(`/api/property/schedules/${SCHEDULE}`).set(bearer(owner)).send({ status: "terminated" });
+    const put = await request(app).put(`/api/property/schedules/${SCHEDULE}`).set(signedIn(owner)).send({ status: "terminated" });
     expect(put.status).toBe(400);
     expect(fake.writes).toEqual([]);
 
-    const del = await request(app).delete(`/api/property/schedules/${SCHEDULE}`).set(bearer(owner));
+    const del = await request(app).delete(`/api/property/schedules/${SCHEDULE}`).set(signedIn(owner));
     expect(del.status).toBe(200);
     expect(fake.schedules.get(SCHEDULE)).toMatchObject({ status: "terminated", terminatedAt: expect.any(Date) });
   });
@@ -229,7 +229,7 @@ describe("the property screens' state rules hold on the server", () => {
     const fake = fakeProperty();
     seed(fake, owner.merchantId, { tenant: { status: "archived" } });
 
-    const res = await request(app).post(`/api/property/tenants/${TENANT}/schedules`).set(bearer(owner))
+    const res = await request(app).post(`/api/property/tenants/${TENANT}/schedules`).set(signedIn(owner))
       .send({ amountCents: 50_000, frequency: "weekly", deliveryChannel: "email", startDate: inDays(7).toISOString() });
 
     expect(res.status).toBe(409);
@@ -242,7 +242,7 @@ describe("the property screens' state rules hold on the server", () => {
     const fake = fakeProperty();
     seed(fake, owner.merchantId, { invoice: { status: "voided" } });
 
-    const res = await request(app).post(`/api/property/invoices/${INVOICE}/mark-paid-external`).set(bearer(owner)).send({});
+    const res = await request(app).post(`/api/property/invoices/${INVOICE}/mark-paid-external`).set(signedIn(owner)).send({});
 
     expect(res.status).toBe(409);
     expect(fake.invoices.get(INVOICE).status).toBe("voided");
@@ -255,12 +255,12 @@ describe("the property screens' state rules hold on the server", () => {
     const fake = fakeProperty();
     seed(fake, owner.merchantId);
 
-    expect((await request(app).put(`/api/property/schedules/${SCHEDULE}`).set(bearer(owner)).send({ status: "paused" })).status).toBe(200);
-    expect((await request(app).put(`/api/property/schedules/${SCHEDULE}`).set(bearer(owner)).send({ status: "active" })).status).toBe(200);
-    const created = await request(app).post(`/api/property/tenants/${TENANT}/schedules`).set(bearer(owner))
+    expect((await request(app).put(`/api/property/schedules/${SCHEDULE}`).set(signedIn(owner)).send({ status: "paused" })).status).toBe(200);
+    expect((await request(app).put(`/api/property/schedules/${SCHEDULE}`).set(signedIn(owner)).send({ status: "active" })).status).toBe(200);
+    const created = await request(app).post(`/api/property/tenants/${TENANT}/schedules`).set(signedIn(owner))
       .send({ amountCents: 50_000, frequency: "weekly", deliveryChannel: "email", startDate: inDays(7).toISOString() });
     expect(created.status).toBe(201);
-    const paid = await request(app).post(`/api/property/invoices/${INVOICE}/mark-paid-external`).set(bearer(owner)).send({ externalPaymentReference: "Cash" });
+    const paid = await request(app).post(`/api/property/invoices/${INVOICE}/mark-paid-external`).set(signedIn(owner)).send({ externalPaymentReference: "Cash" });
     expect(paid.status).toBe(200);
     expect(fake.invoices.get(INVOICE).status).toBe("paid_external");
   });
@@ -280,7 +280,7 @@ describe("resuming a paused automation skips the paused time (owner decision 202
     const fake = fakeProperty();
     seed(fake, owner.merchantId, { schedule: { status: "paused", ...schedule } });
     const before = new Date();
-    const res = await request(app).put(`/api/property/schedules/${SCHEDULE}`).set(bearer(owner)).send({ status: "active" });
+    const res = await request(app).put(`/api/property/schedules/${SCHEDULE}`).set(signedIn(owner)).send({ status: "active" });
     return { res, fake, before };
   }
 
@@ -336,9 +336,9 @@ describe("resuming a paused automation skips the paused time (owner decision 202
     const due = new Date(Date.now() - 3_600_000); // due now: the next cron run sends it
     seed(fake, owner.merchantId, { schedule: { nextRunDate: due } });
 
-    expect((await request(app).put(`/api/property/schedules/${SCHEDULE}`).set(bearer(owner)).send({ amountCents: 52_000 })).status).toBe(200);
+    expect((await request(app).put(`/api/property/schedules/${SCHEDULE}`).set(signedIn(owner)).send({ amountCents: 52_000 })).status).toBe(200);
     expect(fake.schedules.get(SCHEDULE).nextRunDate).toEqual(due);
-    expect((await request(app).put(`/api/property/schedules/${SCHEDULE}`).set(bearer(owner)).send({ status: "paused" })).status).toBe(200);
+    expect((await request(app).put(`/api/property/schedules/${SCHEDULE}`).set(signedIn(owner)).send({ status: "paused" })).status).toBe(200);
     expect(fake.schedules.get(SCHEDULE).nextRunDate).toEqual(due);
   });
 });
@@ -371,7 +371,7 @@ describe("a new rent automation replaces the tenant's old one (owner decision 20
   it("cancels the tenant's running and paused automations, and records when", async () => {
     const { app, owner, fake } = await withAutomations();
 
-    const res = await request(app).post(`/api/property/tenants/${TENANT}/schedules`).set(bearer(owner)).send(weekly(52_000));
+    const res = await request(app).post(`/api/property/tenants/${TENANT}/schedules`).set(signedIn(owner)).send(weekly(52_000));
 
     expect(res.status).toBe(201);
     expect(fake.schedules.get(res.body.id)).toMatchObject({ status: "active", amountCents: 52_000 });
@@ -384,7 +384,7 @@ describe("a new rent automation replaces the tenant's old one (owner decision 20
   it("leaves an automation already cancelled, and another tenant's, as they were", async () => {
     const { app, owner, fake } = await withAutomations();
 
-    const res = await request(app).post(`/api/property/tenants/${TENANT}/schedules`).set(bearer(owner)).send(weekly(52_000));
+    const res = await request(app).post(`/api/property/tenants/${TENANT}/schedules`).set(signedIn(owner)).send(weekly(52_000));
 
     expect(res.status).toBe(201);
     expect(fake.schedules.get(CANCELLED)).toMatchObject({ status: "terminated", terminatedAt: cancelledAt });
@@ -393,7 +393,7 @@ describe("a new rent automation replaces the tenant's old one (owner decision 20
 
   it("then the tenant gets one rent request a period, at the new amount", async () => {
     const { app, owner, fake } = await withAutomations();
-    await request(app).post(`/api/property/tenants/${TENANT}/schedules`).set(bearer(owner)).send(weekly(52_000));
+    await request(app).post(`/api/property/tenants/${TENANT}/schedules`).set(signedIn(owner)).send(weekly(52_000));
     jest.spyOn(storage, "getSubscription").mockResolvedValue({} as any);
     jest.spyOn(storage, "getDueActiveSchedules").mockImplementation(async (at: Date) =>
       [...fake.schedules.values()].filter((s) => s.status === "active" && s.nextRunDate <= at) as any);
@@ -407,7 +407,7 @@ describe("a new rent automation replaces the tenant's old one (owner decision 20
   it("a refused automation cancels nothing", async () => {
     const { app, owner, fake } = await withAutomations();
 
-    const res = await request(app).post(`/api/property/tenants/${TENANT}/schedules`).set(bearer(owner))
+    const res = await request(app).post(`/api/property/tenants/${TENANT}/schedules`).set(signedIn(owner))
       .send({ ...weekly(52_000), frequency: "daily" });
 
     expect(res.status).toBe(400);
@@ -430,7 +430,7 @@ describe("a rejected upload says why", () => {
     const owner = await createOwnerPrincipal();
     const before = storageSnapshot();
 
-    const res = await request(app).post(address(owner.merchantId)).set(bearer(owner))
+    const res = await request(app).post(address(owner.merchantId)).set(signedIn(owner))
       .attach(field, Buffer.from("<b>not a document</b>"), { filename: "page.html", contentType: "text/html" });
 
     expect(res.status).toBe(400);
@@ -443,7 +443,7 @@ describe("a rejected upload says why", () => {
     const owner = await createOwnerPrincipal();
     const before = storageSnapshot();
 
-    const res = await request(app).post(address(owner.merchantId)).set(bearer(owner)).attach(field, TOO_BIG, { filename, contentType });
+    const res = await request(app).post(address(owner.merchantId)).set(signedIn(owner)).attach(field, TOO_BIG, { filename, contentType });
 
     expect(res.status).toBe(413);
     expect(res.body).toEqual({ message: "The file is larger than 20 MB" });
@@ -454,7 +454,7 @@ describe("a rejected upload says why", () => {
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
 
-    const res = await request(app).post(address(owner.merchantId)).set(bearer(owner))
+    const res = await request(app).post(address(owner.merchantId)).set(signedIn(owner))
       .attach("somethingElse", Buffer.from("%PDF-1.4\n"), { filename, contentType });
 
     expect(res.status).toBe(400);
@@ -476,7 +476,7 @@ describe("an emptied tenant field is cleared (owner decision 2026-09-27)", () =>
     const fake = fakeProperty();
     seed(fake, owner.merchantId, { tenant: { phone: "021 555 0100" } });
 
-    const res = await request(app).put(`/api/property/tenants/${TENANT}`).set(bearer(owner)).send({ ...FORM, phone: "" });
+    const res = await request(app).put(`/api/property/tenants/${TENANT}`).set(signedIn(owner)).send({ ...FORM, phone: "" });
 
     expect(res.status).toBe(200);
     expect(fake.tenants.get(TENANT)).toMatchObject({ phone: null, email: "tess@example.test", firstName: "Tess" });
@@ -488,11 +488,11 @@ describe("an emptied tenant field is cleared (owner decision 2026-09-27)", () =>
     const fake = fakeProperty();
     seed(fake, owner.merchantId, { tenant: { phone: "021 555 0100", coTenantsText: "Sam" } });
 
-    const cleared = await request(app).put(`/api/property/tenants/${TENANT}`).set(bearer(owner)).send({ ...FORM, email: "", preferredChannel: "sms" });
+    const cleared = await request(app).put(`/api/property/tenants/${TENANT}`).set(signedIn(owner)).send({ ...FORM, email: "", preferredChannel: "sms" });
     expect(cleared.status).toBe(200);
     expect(fake.tenants.get(TENANT)).toMatchObject({ email: null, phone: "021 555 0100", coTenantsText: "Sam" });
 
-    const renamed = await request(app).put(`/api/property/tenants/${TENANT}`).set(bearer(owner)).send({ firstName: "Tessa" });
+    const renamed = await request(app).put(`/api/property/tenants/${TENANT}`).set(signedIn(owner)).send({ firstName: "Tessa" });
     expect(renamed.status).toBe(200);
     expect(fake.tenants.get(TENANT)).toMatchObject({ firstName: "Tessa", email: null, phone: "021 555 0100", coTenantsText: "Sam" });
   });
@@ -510,7 +510,7 @@ describe("a settled rent invoice's conflicts are 409 (R1-T3, P2.2)", () => {
     const fake = fakeProperty();
     seed(fake, owner.merchantId, { invoice: { status } });
 
-    let pending = request(app).post(address(INVOICE)).set(bearer(owner));
+    let pending = request(app).post(address(INVOICE)).set(signedIn(owner));
     if (body) pending = pending.send(body);
     const res = await pending;
 

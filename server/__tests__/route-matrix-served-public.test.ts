@@ -26,7 +26,7 @@ import { config } from "../config";
 import { ownerTransactionDto, publicTransactionDto } from "../http-contracts";
 import { NO_BOARD_ADDRESS_RETIRED, noBoardAddressRetiredHtml } from "../no-board-address";
 import { getWindcaveEnv } from "../windcave";
-import { bearer, resetTestStorage, storage } from "./support/http-harness";
+import { signedIn, resetTestStorage, storage } from "./support/http-harness";
 import {
   expectOwnServed,
   familyRows,
@@ -235,7 +235,7 @@ const RECIPES: Record<string, OwnServedRecipe> = {
   }),
   // A business's logo, public for its board's page and receipts.
   "GET /uploads/:folder/:name": async (ctx) => {
-    const uploaded = await request(ctx.app).post(`/api/merchants/${ctx.merchantId}/logo`).set(bearer(ctx.owner))
+    const uploaded = await request(ctx.app).post(`/api/merchants/${ctx.merchantId}/logo`).set(signedIn(ctx.owner))
       .attach("logo", PNG, { filename: "logo.png", contentType: "image/png" });
     if (uploaded.status !== 200) throw new Error(`fixture: logo failed ${uploaded.status}`);
     return {

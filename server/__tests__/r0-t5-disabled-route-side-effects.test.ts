@@ -6,7 +6,7 @@ import * as push from "../push";
 import { sseBroker } from "../sse-broker";
 import {
   apiKeyHeader,
-  bearer,
+  signedIn, type SignedIn,
   createOwnerPrincipal,
   createTestApp,
   resetTestStorage,
@@ -62,11 +62,11 @@ const DISABLED_ROUTES = [
  * creating one is itself a write - doing it per request would change the
  * snapshot this suite exists to compare.
  */
-async function fire(route: (typeof DISABLED_ROUTES)[number], principal: { token: string; merchantId: number }) {
+async function fire(route: (typeof DISABLED_ROUTES)[number], principal: SignedIn & { merchantId: number }) {
   const { app } = await createTestApp();
   return (request(app) as any)
     [route.method](route.path(principal.merchantId))
-    .set(bearer({ token: principal.token }))
+    .set(signedIn(principal))
     .send(route.body(principal.merchantId));
 }
 

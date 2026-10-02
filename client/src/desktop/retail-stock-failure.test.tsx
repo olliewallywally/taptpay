@@ -54,7 +54,6 @@ const settle = () => act(async () => {
 
 beforeEach(() => {
   fetchMock.mockReset();
-  localStorage.setItem("authToken", "h.e30.s");
 });
 
 describe("retail stock when products fail to load (R1-T9)", () => {

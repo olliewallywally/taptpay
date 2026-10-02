@@ -3,7 +3,7 @@ import "./support/test-env";
 import request from "supertest";
 import * as tradesCron from "../trades-cron";
 import { ROUTE_POLICY } from "../route-policy";
-import { bearer, createMemberPrincipal, createOwnerPrincipal, createTestApp, resetTestStorage, storage, useFakeClock } from "./support/http-harness";
+import { signedIn, type SignedIn, createMemberPrincipal, createOwnerPrincipal, createTestApp, resetTestStorage, storage, useFakeClock } from "./support/http-harness";
 import { CLIENT, INVOICE, MISSING, QUOTE, SCHEDULE, fakeTrades, inDays, seedTrades as seed } from "./support/trades-fake";
 
 /**
@@ -43,8 +43,8 @@ const BY_ID: Call[] = [
 const idOf = (label: string) =>
   label.includes("/schedules/") ? SCHEDULE : label.includes("/invoices/") ? INVOICE : label.includes("/quotes/") ? QUOTE : CLIENT;
 
-async function send(app: any, principal: { token: string }, method: Method, address: string, body?: Record<string, unknown>) {
-  let pending = request(app)[method](address).set(bearer(principal));
+async function send(app: any, principal: SignedIn, method: Method, address: string, body?: Record<string, unknown>) {
+  let pending = request(app)[method](address).set(signedIn(principal));
   if (body) pending = pending.send(body);
   return pending;
 }
@@ -71,7 +71,7 @@ describe("the three trades routes no screen calls are removed (owner decision 20
   it.each(RETIRED)("%s answers the owner as an unknown address, and reads and sends nothing", async (_key, method, address) => {
     const { app, owner, fake } = await ownerWithTrades({ quote: { status: "sent" } });
 
-    const res = await request(app)[method](address).set(bearer(owner));
+    const res = await request(app)[method](address).set(signedIn(owner));
 
     expect(res.status).toBe(404);
     expect(res.headers["content-type"]).not.toMatch(/json/);
@@ -82,12 +82,12 @@ describe("the three trades routes no screen calls are removed (owner decision 20
   it("the routes that stay beside them still answer the owner", async () => {
     const { app, owner } = await ownerWithTrades();
 
-    expect((await request(app).get("/api/trades/quotes").set(bearer(owner))).status).toBe(200);
-    const pdf = await request(app).get(`/api/trades/quotes/${QUOTE}/pdf`).set(bearer(owner));
+    expect((await request(app).get("/api/trades/quotes").set(signedIn(owner))).status).toBe(200);
+    const pdf = await request(app).get(`/api/trades/quotes/${QUOTE}/pdf`).set(signedIn(owner));
     expect(pdf.status).toBe(200);
     expect(pdf.headers["content-type"]).toMatch(/application\/pdf/);
-    expect((await request(app).get("/api/trades/invoices").set(bearer(owner))).status).toBe(200);
-    expect((await request(app).post(`/api/trades/invoices/${INVOICE}/void`).set(bearer(owner))).status).toBe(200);
+    expect((await request(app).get("/api/trades/invoices").set(signedIn(owner))).status).toBe(200);
+    expect((await request(app).post(`/api/trades/invoices/${INVOICE}/void`).set(signedIn(owner))).status).toBe(200);
   });
 });
 
@@ -129,7 +129,7 @@ describe("trades ids are read strictly", () => {
   ])("the invoice list refuses %s as its filter (400) before reading", async (_label, query) => {
     const { app, owner, fake } = await ownerWithTrades();
 
-    const res = await request(app).get(`/api/trades/invoices?${query}`).set(bearer(owner));
+    const res = await request(app).get(`/api/trades/invoices?${query}`).set(signedIn(owner));
 
     expect(res.status).toBe(400);
     expect(res.body).toEqual({ message: "Invalid clientProfileId" });
@@ -139,7 +139,7 @@ describe("trades ids are read strictly", () => {
   it("the invoice list still filters by a well-formed client (the client page's request)", async () => {
     const { app, owner } = await ownerWithTrades();
 
-    const res = await request(app).get(`/api/trades/invoices?clientProfileId=${CLIENT}`).set(bearer(owner));
+    const res = await request(app).get(`/api/trades/invoices?clientProfileId=${CLIENT}`).set(signedIn(owner));
 
     expect(res.status).toBe(200);
     expect(storage.getJobInvoicesByMerchant).toHaveBeenCalledWith(owner.merchantId, { status: undefined, clientProfileId: CLIENT });
@@ -151,7 +151,7 @@ describe("trades ids are read strictly", () => {
   ])("the %s list takes its status filter only as text: a repeated one is not passed on", async (_label, address, method) => {
     const { app, owner } = await ownerWithTrades();
 
-    const res = await request(app).get(`${address}?status=sent&status=viewed`).set(bearer(owner));
+    const res = await request(app).get(`${address}?status=sent&status=viewed`).set(signedIn(owner));
 
     expect(res.status).toBe(200);
     expect((storage as any)[method]).toHaveBeenCalledWith(owner.merchantId, expect.objectContaining({ status: undefined }));
@@ -160,7 +160,7 @@ describe("trades ids are read strictly", () => {
   it("the quote list still filters by one status", async () => {
     const { app, owner } = await ownerWithTrades();
 
-    expect((await request(app).get("/api/trades/quotes?status=sent").set(bearer(owner))).status).toBe(200);
+    expect((await request(app).get("/api/trades/quotes?status=sent").set(signedIn(owner))).status).toBe(200);
     expect(storage.getQuotesByMerchant).toHaveBeenCalledWith(owner.merchantId, { status: "sent" });
   });
 });
@@ -170,7 +170,7 @@ describe("the trades screens' state rules hold on the server", () => {
   it.each([["paid"], ["paid_external"]])("an invoice %s cannot be voided (409), and stays as it was", async (status) => {
     const { app, owner, fake } = await ownerWithTrades({ invoice: { status } });
 
-    const res = await request(app).post(`/api/trades/invoices/${INVOICE}/void`).set(bearer(owner));
+    const res = await request(app).post(`/api/trades/invoices/${INVOICE}/void`).set(signedIn(owner));
 
     expect(res.status).toBe(409);
     expect(fake.invoices.get(INVOICE).status).toBe(status);
@@ -184,7 +184,7 @@ describe("the trades screens' state rules hold on the server", () => {
   ])("an invoice %s cannot be marked paid outside TaptPay (409): nothing changes and no receipt is emailed", async (status, message) => {
     const { app, owner, fake } = await ownerWithTrades({ invoice: { status } });
 
-    const res = await request(app).post(`/api/trades/invoices/${INVOICE}/mark-paid-external`).set(bearer(owner)).send({ externalPaymentReference: "Cash" });
+    const res = await request(app).post(`/api/trades/invoices/${INVOICE}/mark-paid-external`).set(signedIn(owner)).send({ externalPaymentReference: "Cash" });
 
     expect(res.status).toBe(409);
     expect(res.body).toEqual({ message });
@@ -195,7 +195,7 @@ describe("the trades screens' state rules hold on the server", () => {
   it.each([["active"], ["paused"]])("a cancelled recurring invoice cannot be set %s (409), and nothing changes", async (status) => {
     const { app, owner, fake } = await ownerWithTrades({ schedule: { status: "terminated" } });
 
-    const res = await request(app).put(`/api/trades/schedules/${SCHEDULE}`).set(bearer(owner)).send({ status });
+    const res = await request(app).put(`/api/trades/schedules/${SCHEDULE}`).set(signedIn(owner)).send({ status });
 
     expect(res.status).toBe(409);
     expect(fake.schedules.get(SCHEDULE).status).toBe("terminated");
@@ -205,11 +205,11 @@ describe("the trades screens' state rules hold on the server", () => {
   it("a recurring invoice is cancelled only by DELETE, which records when (PUT refuses 'terminated', 400)", async () => {
     const { app, owner, fake } = await ownerWithTrades();
 
-    const put = await request(app).put(`/api/trades/schedules/${SCHEDULE}`).set(bearer(owner)).send({ status: "terminated" });
+    const put = await request(app).put(`/api/trades/schedules/${SCHEDULE}`).set(signedIn(owner)).send({ status: "terminated" });
     expect(put.status).toBe(400);
     expect(fake.writes).toEqual([]);
 
-    const del = await request(app).delete(`/api/trades/schedules/${SCHEDULE}`).set(bearer(owner));
+    const del = await request(app).delete(`/api/trades/schedules/${SCHEDULE}`).set(signedIn(owner));
     expect(del.status).toBe(200);
     expect(fake.schedules.get(SCHEDULE)).toMatchObject({ status: "terminated", terminatedAt: expect.any(Date) });
   });
@@ -217,16 +217,16 @@ describe("the trades screens' state rules hold on the server", () => {
   it("what the screens do is unchanged: pause, resume, cancel a sent invoice, mark one received, complete a paid job", async () => {
     const { app, owner, fake } = await ownerWithTrades();
 
-    expect((await request(app).put(`/api/trades/schedules/${SCHEDULE}`).set(bearer(owner)).send({ status: "paused" })).status).toBe(200);
-    expect((await request(app).put(`/api/trades/schedules/${SCHEDULE}`).set(bearer(owner)).send({ status: "active" })).status).toBe(200);
-    const paid = await request(app).post(`/api/trades/invoices/${INVOICE}/mark-paid-external`).set(bearer(owner)).send({ externalPaymentReference: "Cash" });
+    expect((await request(app).put(`/api/trades/schedules/${SCHEDULE}`).set(signedIn(owner)).send({ status: "paused" })).status).toBe(200);
+    expect((await request(app).put(`/api/trades/schedules/${SCHEDULE}`).set(signedIn(owner)).send({ status: "active" })).status).toBe(200);
+    const paid = await request(app).post(`/api/trades/invoices/${INVOICE}/mark-paid-external`).set(signedIn(owner)).send({ externalPaymentReference: "Cash" });
     expect(paid.status).toBe(200);
     expect(fake.invoices.get(INVOICE)).toMatchObject({ status: "paid_external", externalPaymentReference: "Cash" });
     expect(fake.writes.filter((name) => name === "sendTradePaymentInvoice")).toHaveLength(1);
-    expect((await request(app).post(`/api/trades/invoices/${INVOICE}/complete`).set(bearer(owner))).status).toBe(200);
+    expect((await request(app).post(`/api/trades/invoices/${INVOICE}/complete`).set(signedIn(owner))).status).toBe(200);
 
     fake.invoices.set(INVOICE, { ...fake.invoices.get(INVOICE), status: "dispatched", completedAt: null });
-    expect((await request(app).post(`/api/trades/invoices/${INVOICE}/void`).set(bearer(owner))).status).toBe(200);
+    expect((await request(app).post(`/api/trades/invoices/${INVOICE}/void`).set(signedIn(owner))).status).toBe(200);
     expect(fake.invoices.get(INVOICE).status).toBe("voided");
   });
 });
@@ -240,7 +240,7 @@ describe("marking an invoice received without a reference, as the screens send i
   it("trades: the screens' null reference is taken as none (200), and the receipt is emailed once", async () => {
     const { app, owner, fake } = await ownerWithTrades();
 
-    const res = await request(app).post(`/api/trades/invoices/${INVOICE}/mark-paid-external`).set(bearer(owner)).send({ externalPaymentReference: null });
+    const res = await request(app).post(`/api/trades/invoices/${INVOICE}/mark-paid-external`).set(signedIn(owner)).send({ externalPaymentReference: null });
 
     expect(res.status).toBe(200);
     expect(fake.invoices.get(INVOICE)).toMatchObject({ status: "paid_external", externalPaymentReference: null });
@@ -257,7 +257,7 @@ describe("marking an invoice received without a reference, as the screens send i
     const update = jest.spyOn(storage, "updateInvoiceRentRequest").mockImplementation(async (id: string, updates: any) => ({ id, ...updates }) as any);
     jest.spyOn(storage, "logTransactionEvent").mockResolvedValue({} as any);
 
-    const res = await request(app).post(`/api/property/invoices/${RENT_INVOICE}/mark-paid-external`).set(bearer(owner)).send({ externalPaymentReference: null });
+    const res = await request(app).post(`/api/property/invoices/${RENT_INVOICE}/mark-paid-external`).set(signedIn(owner)).send({ externalPaymentReference: null });
 
     expect(res.status).toBe(200);
     expect(update).toHaveBeenCalledWith(RENT_INVOICE, expect.objectContaining({ status: "paid_external", externalPaymentReference: null }));
@@ -269,7 +269,7 @@ describe("marking an invoice received without a reference, as the screens send i
   ])("trades: %s is still refused (400), and nothing changes", async (_label, body) => {
     const { app, owner, fake } = await ownerWithTrades();
 
-    const res = await request(app).post(`/api/trades/invoices/${INVOICE}/mark-paid-external`).set(bearer(owner)).send(body);
+    const res = await request(app).post(`/api/trades/invoices/${INVOICE}/mark-paid-external`).set(signedIn(owner)).send(body);
 
     expect(res.status).toBe(400);
     expect(fake.writes).toEqual([]);
@@ -289,7 +289,7 @@ describe("the invoice create makes only what the screens send", () => {
   it.each([["balance"], ["recurring"]])("a %s invoice is refused (400): nothing is made or sent", async (kind) => {
     const { app, owner, fake } = await ownerWithTrades();
 
-    const res = await request(app).post("/api/trades/invoices").set(bearer(owner)).send(invoice({ kind, quoteId: QUOTE }));
+    const res = await request(app).post("/api/trades/invoices").set(signedIn(owner)).send(invoice({ kind, quoteId: QUOTE }));
 
     expect(res.status).toBe(400);
     expect(fake.writes).toEqual([]);
@@ -302,7 +302,7 @@ describe("the invoice create makes only what the screens send", () => {
     fake.clients.set(OTHER_CLIENT, { ...fake.clients.get(CLIENT), id: OTHER_CLIENT, firstName: "Olive" });
     fake.quotes.set(THEIR_QUOTE, { ...fake.quotes.get(QUOTE), id: THEIR_QUOTE, clientProfileId: OTHER_CLIENT });
 
-    const res = await request(app).post("/api/trades/invoices").set(bearer(owner))
+    const res = await request(app).post("/api/trades/invoices").set(signedIn(owner))
       .send(invoice({ kind: "deposit", amountCents: 20_000, quoteId: THEIR_QUOTE }));
 
     expect(res.status).toBe(404);
@@ -313,14 +313,14 @@ describe("the invoice create makes only what the screens send", () => {
   it("what the screens send is made: a full invoice, a quick invoice, and a deposit on the client's own quote", async () => {
     const { app, owner, fake } = await ownerWithTrades();
 
-    const full = await request(app).post("/api/trades/invoices").set(bearer(owner)).send(invoice({ splitEnabled: false }));
+    const full = await request(app).post("/api/trades/invoices").set(signedIn(owner)).send(invoice({ splitEnabled: false }));
     expect(full.status).toBe(201);
-    const quick = await request(app).post("/api/trades/invoices").set(bearer(owner)).send({
+    const quick = await request(app).post("/api/trades/invoices").set(signedIn(owner)).send({
       recipient: { name: "Quinn Quick", email: "quinn@example.test", channel: "email" },
       amountCents: 12_000, deliveryChannel: "email", dueAt: inDays(7).toISOString(), kind: "full", splitEnabled: true,
     });
     expect(quick.status).toBe(201);
-    const deposit = await request(app).post("/api/trades/invoices").set(bearer(owner))
+    const deposit = await request(app).post("/api/trades/invoices").set(signedIn(owner))
       .send(invoice({ kind: "deposit", amountCents: 20_000, quoteId: QUOTE }));
     expect(deposit.status).toBe(201);
     expect(fake.invoices.get(deposit.body.id)).toMatchObject({ kind: "deposit", quoteId: QUOTE, clientProfileId: CLIENT });
@@ -337,7 +337,7 @@ describe("sending the balance takes only its own switch", () => {
   ])("refuses %s (400): no balance is made or sent", async (_label, body) => {
     const { app, owner, fake } = await ownerWithTrades(PAID_DEPOSIT);
 
-    const res = await request(app).post(`/api/trades/invoices/${INVOICE}/send-balance`).set(bearer(owner)).send(body);
+    const res = await request(app).post(`/api/trades/invoices/${INVOICE}/send-balance`).set(signedIn(owner)).send(body);
 
     expect(res.status).toBe(400);
     expect(fake.writes).toEqual([]);
@@ -368,7 +368,7 @@ describe("the trades GST settings are the owner's to change", () => {
     const owner = await createOwnerPrincipal();
     const member = await createMemberPrincipal(owner.merchantId);
 
-    const res = await request(app).put("/api/trades/gst-settings").set(bearer(member)).send({ gstRegistered: true, tradeGstMode: "exclusive" });
+    const res = await request(app).put("/api/trades/gst-settings").set(signedIn(member)).send({ gstRegistered: true, tradeGstMode: "exclusive" });
 
     expect(res.status).toBe(403);
     const merchant = await storage.getMerchant(owner.merchantId);
@@ -381,10 +381,10 @@ describe("the trades GST settings are the owner's to change", () => {
     const owner = await createOwnerPrincipal();
     const member = await createMemberPrincipal(owner.merchantId);
 
-    const changed = await request(app).put("/api/trades/gst-settings").set(bearer(owner)).send({ gstRegistered: true, tradeGstMode: "exclusive" });
+    const changed = await request(app).put("/api/trades/gst-settings").set(signedIn(owner)).send({ gstRegistered: true, tradeGstMode: "exclusive" });
     expect(changed.status).toBe(200);
     expect(changed.body).toEqual({ gstRegistered: true, tradeGstMode: "exclusive" });
-    const read = await request(app).get("/api/trades/gst-settings").set(bearer(member));
+    const read = await request(app).get("/api/trades/gst-settings").set(signedIn(member));
     expect(read.status).toBe(200);
     expect(read.body).toEqual({ gstRegistered: true, tradeGstMode: "exclusive" });
   });
@@ -396,13 +396,13 @@ describe("the trades GST settings are the owner's to change", () => {
     const fake = fakeTrades();
     seed(fake, owner.merchantId);
 
-    const made = await request(app).post("/api/trades/invoices").set(bearer(member))
+    const made = await request(app).post("/api/trades/invoices").set(signedIn(member))
       .send({ clientProfileId: CLIENT, amountCents: 50_000, deliveryChannel: "email", dueAt: inDays(7).toISOString(), kind: "full" });
     expect(made.status).toBe(201);
-    expect((await request(app).put(`/api/trades/schedules/${SCHEDULE}`).set(bearer(member)).send({ status: "paused" })).status).toBe(200);
-    expect((await request(app).post(`/api/trades/invoices/${INVOICE}/mark-paid-external`).set(bearer(member)).send({ externalPaymentReference: "Cash" })).status).toBe(200);
-    expect((await request(app).post(`/api/trades/invoices/${made.body.id}/void`).set(bearer(member))).status).toBe(200);
-    expect((await request(app).put("/api/trades/reminder-settings").set(bearer(member)).send({ tradeRemindersEnabled: false })).status).toBe(200);
+    expect((await request(app).put(`/api/trades/schedules/${SCHEDULE}`).set(signedIn(member)).send({ status: "paused" })).status).toBe(200);
+    expect((await request(app).post(`/api/trades/invoices/${INVOICE}/mark-paid-external`).set(signedIn(member)).send({ externalPaymentReference: "Cash" })).status).toBe(200);
+    expect((await request(app).post(`/api/trades/invoices/${made.body.id}/void`).set(signedIn(member))).status).toBe(200);
+    expect((await request(app).put("/api/trades/reminder-settings").set(signedIn(member)).send({ tradeRemindersEnabled: false })).status).toBe(200);
   });
 });
 
@@ -415,7 +415,7 @@ describe("resuming a paused recurring invoice skips the paused time (owner decis
   async function resume(schedule: object) {
     const { app, owner, fake } = await ownerWithTrades({ schedule: { status: "paused", ...schedule } });
     const before = new Date();
-    const res = await request(app).put(`/api/trades/schedules/${SCHEDULE}`).set(bearer(owner)).send({ status: "active" });
+    const res = await request(app).put(`/api/trades/schedules/${SCHEDULE}`).set(signedIn(owner)).send({ status: "active" });
     return { res, fake, before };
   }
 
@@ -471,9 +471,9 @@ describe("resuming a paused recurring invoice skips the paused time (owner decis
     const due = new Date(Date.now() - 3_600_000); // due now: the next cron run sends it
     const { app, owner, fake } = await ownerWithTrades({ schedule: { nextRunDate: due } });
 
-    expect((await request(app).put(`/api/trades/schedules/${SCHEDULE}`).set(bearer(owner)).send({ amountCents: 52_000 })).status).toBe(200);
+    expect((await request(app).put(`/api/trades/schedules/${SCHEDULE}`).set(signedIn(owner)).send({ amountCents: 52_000 })).status).toBe(200);
     expect(fake.schedules.get(SCHEDULE).nextRunDate).toEqual(due);
-    expect((await request(app).put(`/api/trades/schedules/${SCHEDULE}`).set(bearer(owner)).send({ status: "paused" })).status).toBe(200);
+    expect((await request(app).put(`/api/trades/schedules/${SCHEDULE}`).set(signedIn(owner)).send({ status: "paused" })).status).toBe(200);
     expect(fake.schedules.get(SCHEDULE).nextRunDate).toEqual(due);
   });
 });
@@ -502,7 +502,7 @@ describe("archiving a trades client cancels their recurring invoices (owner deci
   it("cancels the client's running and paused recurring invoices, and records when", async () => {
     const { app, owner, fake } = await withRecurring();
 
-    const res = await request(app).post(`/api/trades/clients/${CLIENT}/archive`).set(bearer(owner));
+    const res = await request(app).post(`/api/trades/clients/${CLIENT}/archive`).set(signedIn(owner));
 
     expect(res.status).toBe(200);
     expect(fake.clients.get(CLIENT).status).toBe("archived");
@@ -515,7 +515,7 @@ describe("archiving a trades client cancels their recurring invoices (owner deci
   it("leaves one already cancelled, and another client's, as they were", async () => {
     const { app, owner, fake } = await withRecurring();
 
-    await request(app).post(`/api/trades/clients/${CLIENT}/archive`).set(bearer(owner));
+    await request(app).post(`/api/trades/clients/${CLIENT}/archive`).set(signedIn(owner));
 
     expect(fake.schedules.get(CANCELLED)).toMatchObject({ status: "terminated", terminatedAt: cancelledAt });
     expect(fake.schedules.get(THEIRS).status).toBe("active");
@@ -524,7 +524,7 @@ describe("archiving a trades client cancels their recurring invoices (owner deci
 
   it("then the cron bills the archived client nothing, and the other client as before", async () => {
     const { app, owner, fake } = await withRecurring();
-    await request(app).post(`/api/trades/clients/${CLIENT}/archive`).set(bearer(owner));
+    await request(app).post(`/api/trades/clients/${CLIENT}/archive`).set(signedIn(owner));
     jest.spyOn(storage, "getDueJobSchedules").mockImplementation(async (at: Date) =>
       [...fake.schedules.values()].filter((s) => s.status === "active" && s.nextRunDate <= at) as any);
 
@@ -537,8 +537,8 @@ describe("archiving a trades client cancels their recurring invoices (owner deci
   it("restoring the client does not restart them", async () => {
     const { app, owner, fake } = await withRecurring();
 
-    await request(app).post(`/api/trades/clients/${CLIENT}/archive`).set(bearer(owner));
-    const res = await request(app).post(`/api/trades/clients/${CLIENT}/unarchive`).set(bearer(owner));
+    await request(app).post(`/api/trades/clients/${CLIENT}/archive`).set(signedIn(owner));
+    const res = await request(app).post(`/api/trades/clients/${CLIENT}/unarchive`).set(signedIn(owner));
 
     expect(res.status).toBe(200);
     expect(fake.clients.get(CLIENT).status).toBe("active");
@@ -549,7 +549,7 @@ describe("archiving a trades client cancels their recurring invoices (owner deci
   it("an archived client gets no new recurring invoice (409), and nothing is made", async () => {
     const { app, owner, fake } = await ownerWithTrades({ client: { status: "archived" } });
 
-    const res = await request(app).post("/api/trades/schedules").set(bearer(owner)).send({
+    const res = await request(app).post("/api/trades/schedules").set(signedIn(owner)).send({
       clientProfileId: CLIENT, amountCents: 50_000, frequency: "monthly", deliveryChannel: "email", startDate: inDays(7).toISOString(),
     });
 
@@ -577,7 +577,7 @@ describe("a recurring invoice cannot start in the past (owner decision 2026-09-2
   ])("a start date %s is refused (400), and nothing is made", async (_label, start) => {
     const { app, owner, fake } = await ownerWithTrades();
 
-    const res = await request(app).post("/api/trades/schedules").set(bearer(owner)).send(recurring(start()));
+    const res = await request(app).post("/api/trades/schedules").set(signedIn(owner)).send(recurring(start()));
 
     expect(res.status).toBe(400);
     expect(res.body).toEqual({ message: "The start date can't be in the past" });
@@ -592,7 +592,7 @@ describe("a recurring invoice cannot start in the past (owner decision 2026-09-2
     const { app, owner, fake } = await ownerWithTrades();
     const startDate = start();
 
-    const res = await request(app).post("/api/trades/schedules").set(bearer(owner)).send(recurring(startDate));
+    const res = await request(app).post("/api/trades/schedules").set(signedIn(owner)).send(recurring(startDate));
 
     expect(res.status).toBe(201);
     expect(fake.schedules.get(res.body.id)).toMatchObject({ startDate, nextRunDate: startDate, status: "active" });
@@ -613,7 +613,7 @@ describe("an emptied client field is cleared (owner decision 2026-09-27)", () =>
   it("the edit screen's emptied email, phone and notes clear them, and the rest stay", async () => {
     const { app, owner, fake } = await ownerWithTrades({ client: { phone: "021 555 0100", notes: "Gate code 1234" } });
 
-    const res = await request(app).put(`/api/trades/clients/${CLIENT}`).set(bearer(owner))
+    const res = await request(app).put(`/api/trades/clients/${CLIENT}`).set(signedIn(owner))
       .send({ ...FORM, email: "", phone: "", notes: "" });
 
     expect(res.status).toBe(200);
@@ -623,7 +623,7 @@ describe("an emptied client field is cleared (owner decision 2026-09-27)", () =>
   it("a field left out is left as it was", async () => {
     const { app, owner, fake } = await ownerWithTrades({ client: { phone: "021 555 0100", notes: "Gate code 1234" } });
 
-    const res = await request(app).put(`/api/trades/clients/${CLIENT}`).set(bearer(owner)).send({ firstName: "Callum" });
+    const res = await request(app).put(`/api/trades/clients/${CLIENT}`).set(signedIn(owner)).send({ firstName: "Callum" });
 
     expect(res.status).toBe(200);
     expect(fake.clients.get(CLIENT)).toMatchObject({ firstName: "Callum", email: "cal@example.test", phone: "021 555 0100", notes: "Gate code 1234" });
@@ -635,7 +635,7 @@ describe("an emptied client field is cleared (owner decision 2026-09-27)", () =>
   ])("%s is still refused (400), and nothing changes", async (_label, change) => {
     const { app, owner, fake } = await ownerWithTrades();
 
-    const res = await request(app).put(`/api/trades/clients/${CLIENT}`).set(bearer(owner)).send({ ...FORM, ...change });
+    const res = await request(app).put(`/api/trades/clients/${CLIENT}`).set(signedIn(owner)).send({ ...FORM, ...change });
 
     expect(res.status).toBe(400);
     expect(fake.writes).toEqual([]);
@@ -650,7 +650,7 @@ describe("voiding a trades invoice is recorded in the client's history (owner de
   it("records an invoice_voided event for the client and the invoice", async () => {
     const { app, owner } = await ownerWithTrades();
 
-    const res = await request(app).post(`/api/trades/invoices/${INVOICE}/void`).set(bearer(owner));
+    const res = await request(app).post(`/api/trades/invoices/${INVOICE}/void`).set(signedIn(owner));
 
     expect(res.status).toBe(200);
     expect(storage.createJobEvent).toHaveBeenCalledWith(expect.objectContaining({
@@ -661,7 +661,7 @@ describe("voiding a trades invoice is recorded in the client's history (owner de
   it("a refused void (a paid invoice) records nothing", async () => {
     const { app, owner, fake } = await ownerWithTrades({ invoice: { status: "paid" } });
 
-    const res = await request(app).post(`/api/trades/invoices/${INVOICE}/void`).set(bearer(owner));
+    const res = await request(app).post(`/api/trades/invoices/${INVOICE}/void`).set(signedIn(owner));
 
     expect(res.status).toBe(409);
     expect(fake.writes).toEqual([]);
@@ -673,7 +673,7 @@ describe("saving a client already saved is 409 (R1-T3, P2.2)", () => {
   it("promote on a listed client: 409, and nothing changes", async () => {
     const { app, owner, fake } = await ownerWithTrades();
 
-    const res = await request(app).post(`/api/trades/clients/${CLIENT}/promote`).set(bearer(owner));
+    const res = await request(app).post(`/api/trades/clients/${CLIENT}/promote`).set(signedIn(owner));
 
     expect(res.status).toBe(409);
     expect(fake.clients.get(CLIENT).status).toBe("active");
@@ -683,7 +683,7 @@ describe("saving a client already saved is 409 (R1-T3, P2.2)", () => {
   it("promote still saves a hidden quick-invoice prospect", async () => {
     const { app, owner, fake } = await ownerWithTrades({ client: { status: "prospect" } });
 
-    const res = await request(app).post(`/api/trades/clients/${CLIENT}/promote`).set(bearer(owner));
+    const res = await request(app).post(`/api/trades/clients/${CLIENT}/promote`).set(signedIn(owner));
 
     expect(res.status).toBe(200);
     expect(fake.clients.get(CLIENT).status).toBe("active");

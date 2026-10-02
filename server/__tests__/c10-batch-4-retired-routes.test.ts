@@ -9,7 +9,7 @@ import request from "supertest";
 import * as emailService from "../email-service";
 import { ROUTE_POLICY } from "../route-policy";
 import {
-  bearer, createAdminPrincipal, createOwnerPrincipal, createTestApp, resetTestStorage, storageSnapshot,
+  signedIn, createAdminPrincipal, createOwnerPrincipal, createTestApp, resetTestStorage, storageSnapshot,
 } from "./support/http-harness";
 
 const sendEmailMock = emailService.sendEmail as unknown as jest.Mock;
@@ -73,9 +73,10 @@ describe("the admin routes no screen calls are removed (batch 4)", () => {
   it.each(RETIRED)("%s answers the platform admin as an unknown address and changes nothing", async (_key, method, address, body) => {
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
+    const admin = await createAdminPrincipal();
     const before = storageSnapshot();
 
-    let pending = request(app)[method](address.replace("{business}", String(owner.merchantId))).set(bearer(createAdminPrincipal()));
+    let pending = request(app)[method](address.replace("{business}", String(owner.merchantId))).set(signedIn(admin));
     if (body) pending = pending.send(body);
     const res = await pending;
 
@@ -93,7 +94,7 @@ describe("the admin routes no screen calls are removed (batch 4)", () => {
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
 
-    const res = await request(app).get(`/api/admin/merchants/${owner.merchantId}`).set(bearer(createAdminPrincipal()));
+    const res = await request(app).get(`/api/admin/merchants/${owner.merchantId}`).set(signedIn(await createAdminPrincipal()));
 
     expect(res.status).toBe(200);
     expect(res.body.id).toBe(owner.merchantId);

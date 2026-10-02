@@ -25,14 +25,16 @@ import { ROUTE_REVIEW } from "./route-review";
 /** The callers the matrix answers for, and what each is (the inventory table lists them). */
 export const MATRIX_CALLER_MEANING = {
   "signed-out": "no credential at all; on a public route, anyone",
-  "invalid-token": "a token that does not verify (malformed, forged or expired)",
-  "disabled-login": "a teammate whose login the owner disabled, holding a token minted before",
+  "invalid-session": "a session cookie that is no one's: a real session's id with a secret that is not its own",
+  "disabled-login": "a teammate whose login the owner disabled, holding a session begun before",
   "suspended-business": "the owner of a business that is no longer verified or active",
   owner: "the business's owner",
   member: "a teammate of the business",
   "other-owner": "the owner of another business",
   "platform-admin": "the validated platform admin (no business of its own)",
-  "link-as-sign-in": "a payment link's token presented as a sign-in (Authorization: Bearer)",
+  "link-as-sign-in": "a payment link's token presented as a sign-in (as the session cookie, and as Authorization: Bearer)",
+  "old-token": "the owner's account token of the kind the app held before sessions (Authorization: Bearer, correctly signed, unexpired)",
+  "old-admin-token": "the platform admin's account token of that kind",
   "no-secret": "the scheduler's routes without x-cron-secret",
   "wrong-secret": "the scheduler's routes with a secret that is not the scheduler's",
   "no-key": "the ecommerce API without a key",
@@ -86,9 +88,20 @@ export const RECORD_ROUTES_NAMING_THE_BUSINESS: Record<string, string> = {
 
 /**
  * Callers every gated route refuses before any route-specific work. A payment link's token is never a
- * sign-in (the plan's safe default: a public checkout token never grants merchant API access).
+ * sign-in (the plan's safe default: a public checkout token never grants merchant API access). Nor is an
+ * Authorization header: the sign-in is the session cookie and nothing else (R1-T4 phase E3), so the
+ * account token the app once held is refused however well it is signed.
  */
-export const GATE_REFUSED: readonly MatrixCaller[] = ["signed-out", "invalid-token", "disabled-login", "suspended-business", "link-as-sign-in"];
+export const GATE_REFUSED: readonly MatrixCaller[] = [
+  "signed-out", "invalid-session", "disabled-login", "suspended-business", "link-as-sign-in", "old-token", "old-admin-token",
+];
+
+/**
+ * The gate-refused callers who bring only an Authorization header. On the two reads a business also
+ * makes signed in (below), which are told a signed-in read by its session cookie, a header is not
+ * looked at: these callers are answered as anyone is, not refused as a sign-in.
+ */
+export const HEADER_ONLY_CALLERS: readonly MatrixCaller[] = ["old-token", "old-admin-token"];
 
 /**
  * A link route's answer to a token, state or code that is no one's, where it is not 404: each is the
@@ -140,11 +153,13 @@ export function matrixRowFor(key: string, recorded: RecordedRouteFacts = ROUTE_P
     if (principals.has("provider")) answers.provider = "allowed";
     if (principals.has("cron")) answers.scheduler = "allowed";
     if (principals.has("api-key")) answers["api-key"] = "allowed";
-    // A business reading its own board routes signed in (its open sale, its live updates): with an
-    // Authorization header the handler runs the sign-in gate and the business check itself.
+    // A business reading its own board routes signed in (its open sale, its live updates): with a session
+    // cookie and no board named, the handler runs the sign-in gate and the business check itself.
     const signedIn = branches.find((branch) => branch.principal === "merchant");
     if (signedIn) {
-      for (const caller of GATE_REFUSED) if (caller !== "signed-out") answers[caller] = 401;
+      for (const caller of GATE_REFUSED) {
+        if (caller !== "signed-out" && !HEADER_ONLY_CALLERS.includes(caller)) answers[caller] = 401;
+      }
       answers.owner = "allowed";
       answers.member = signedIn.roles?.includes("member") ? "allowed" : 403;
       answers["platform-admin"] = signedIn.platformAdmin ? "allowed" : 403;
@@ -173,9 +188,10 @@ export function matrixRowFor(key: string, recorded: RecordedRouteFacts = ROUTE_P
   }
   for (const caller of GATE_REFUSED) answers[caller] = 401;
   if (gate === "admin") {
-    // authenticateAdmin: signed in, but not the validated platform admin.
-    answers.owner = 403;
-    answers.member = 403;
+    // authenticateAdmin reads only the admin area's own session (R1-T4 phase E): a business's session is
+    // not a sign-in there, so its logins are answered as anyone not signed in to the admin area is.
+    answers.owner = 401;
+    answers.member = 401;
     answers["platform-admin"] = "allowed";
     return { gate, answers };
   }

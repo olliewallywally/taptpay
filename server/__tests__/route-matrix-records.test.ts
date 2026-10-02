@@ -10,7 +10,7 @@ import request from "supertest";
 import { ROUTE_MATRIX } from "../route-matrix";
 import * as windcave from "../windcave";
 import {
-  bearer,
+  signedIn,
   createMemberPrincipal,
   createOwnerPrincipal,
   createTestApp,
@@ -49,14 +49,14 @@ const invited = async (ctx: Ctx) => {
   // A seat to invite into: the team plan (a new business is on solo, the owner's one seat).
   await storage.getOrCreateSubscription(ctx.merchantId);
   await storage.changeSubscriptionPlan(ctx.merchantId, "team");
-  const res = await request(ctx.app).post("/api/team/invite").set(bearer(ctx.owner)).send({ email: email("invitee") });
+  const res = await request(ctx.app).post("/api/team/invite").set(signedIn(ctx.owner)).send({ email: email("invitee") });
   if (res.status >= 300) throw new Error(`fixture: invite failed ${res.status}`);
   return String(res.body.member.id);
 };
 const teammate = async (ctx: Ctx) => String((await createMemberPrincipal(ctx.merchantId)).user.id);
 const PDF = Buffer.from("%PDF-1.4\n%matrix\n");
 const document = async (ctx: Ctx) => {
-  const res = await request(ctx.app).post("/api/property/invoices/document").set(bearer(ctx.owner))
+  const res = await request(ctx.app).post("/api/property/invoices/document").set(signedIn(ctx.owner))
     .attach("document", PDF, { filename: "bill.pdf", contentType: "application/pdf" });
   if (res.status >= 300) throw new Error(`fixture: upload failed ${res.status}`);
   return String(res.body.documentUrl).split("/").pop()!;
@@ -88,7 +88,7 @@ const RECIPES: Record<string, Recipe> = {
 };
 
 async function send(ctx: Ctx, who: Principal, req: Req) {
-  let pending = request(ctx.app)[req.method](req.path).set(bearer(who));
+  let pending = request(ctx.app)[req.method](req.path).set(signedIn(who));
   if (req.body) pending = pending.send(req.body);
   return pending;
 }

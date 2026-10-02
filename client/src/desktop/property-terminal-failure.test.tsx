@@ -70,7 +70,6 @@ const heroes = () => document.querySelectorAll(".pt-hero");
 
 beforeEach(() => {
   fetchMock.mockReset();
-  localStorage.setItem("authToken", "h.e30.s");
   window.history.replaceState({}, "", "/property/terminal");
 });
 

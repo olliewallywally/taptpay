@@ -9,7 +9,8 @@ process.env.ENV_VALIDATION_MODE = "enforce";
 
 import { memberMerchantSettingsDto, ownerMerchantDto } from "../http-contracts";
 import * as windcave from "../windcave";
-import { resetTestStorage, storage, VALID_PASSWORD } from "./support/http-harness";
+import { resetTestStorage, storage, VALID_PASSWORD, type SignedIn } from "./support/http-harness";
+import { businessSessionBegunBy } from "./support/session-browser";
 import {
   as,
   expectServed,
@@ -75,7 +76,7 @@ async function refund(ctx: ServedCtx, transactionId: number) {
 }
 const ids = (rows: Array<{ id: number }>) => rows.map((row) => row.id);
 const merchant = async (ctx: ServedCtx) => (await storage.getMerchant(ctx.merchantId))!;
-const signedIn = async (ctx: ServedCtx, token: string) => (await as(ctx, { token } as any).get("/api/auth/me")).status;
+const meStatus = async (ctx: ServedCtx, who: SignedIn) => (await as(ctx, who).get("/api/auth/me")).status;
 
 /** Per route: a request each allowed caller is served, and what that success looks like. */
 const RECIPES: Record<string, ServedRecipe> = {
@@ -147,11 +148,12 @@ const RECIPES: Record<string, ServedRecipe> = {
     },
     status: 200,
     check: async (res) => {
-      expect(res.body).toEqual({ message: "Password updated successfully", token: expect.any(String), csrfToken: expect.any(String) });
-      // This login's other sessions end; this device carries on under the fresh token and a new session
-      // (R1-T4 phase E).
-      expect(await signedIn(ctx, who.token)).toBe(401);
-      expect(await signedIn(ctx, res.body.token)).toBe(200);
+      // No token is handed out (E3): the page gets the new session's CSRF token, the browser its cookie.
+      expect(res.body).toEqual({ message: "Password updated successfully", csrfToken: expect.any(String) });
+      // This login's other sessions end, the one that asked included; this device carries on under a
+      // new session (R1-T4 phase E).
+      expect(await meStatus(ctx, who)).toBe(401);
+      expect(await meStatus(ctx, businessSessionBegunBy(res))).toBe(200);
       expect(String(res.headers["set-cookie"])).toMatch(/__Host-taptpay-session=[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43};/);
     },
   }),

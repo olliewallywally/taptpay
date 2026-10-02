@@ -5,7 +5,7 @@ import * as push from "../push";
 import { seedDatabase } from "../seed";
 import { sseBroker } from "../sse-broker";
 import {
-  bearer, createAdminPrincipal, createMemberPrincipal, createOwnerPrincipal,
+  signedIn, createAdminPrincipal, createMemberPrincipal, createOwnerPrincipal,
   createTestApp, resetTestStorage, storage,
 } from "./support/http-harness";
 
@@ -23,7 +23,7 @@ describe("R0-T4 runtime clearing and direct-seed safety", () => {
     const owner = await createOwnerPrincipal();
     const other = await createOwnerPrincipal();
     const member = await createMemberPrincipal(owner.merchantId);
-    const admin = createAdminPrincipal();
+    const admin = await createAdminPrincipal();
     const before = snapshot();
     const transport = jest.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Unexpected transport"));
     const broadcast = jest.spyOn(sseBroker, "broadcast").mockImplementation(() => {});
@@ -41,7 +41,7 @@ describe("R0-T4 runtime clearing and direct-seed safety", () => {
     for (let retry = 0; retry < 2; retry++) {
       await Promise.all(cases.map(async ({ principal, id }) => {
         const response = await request(app).post(`/api/merchants/${id}/clear-transactions`)
-          .set(principal ? bearer(principal) : {});
+          .set(principal ? signedIn(principal) : {});
         expect(response.status).toBe(404);
         expect(response.headers["content-type"]).not.toMatch(/json/);
       }));

@@ -2,7 +2,7 @@ import "./support/test-env";
 
 import request from "supertest";
 import {
-  bearer,
+  signedIn,
   createAdminPrincipal,
   createMemberPrincipal,
   createOwnerPrincipal,
@@ -110,7 +110,7 @@ describe("no response hands out the business-wide address", () => {
     const member = await createMemberPrincipal(owner.merchantId);
 
     for (const principal of [owner, member]) {
-      const response = await request(app).get(`/api/merchants/${owner.merchantId}/profile`).set(bearer(principal));
+      const response = await request(app).get(`/api/merchants/${owner.merchantId}/profile`).set(signedIn(principal));
       expect(response.status).toBe(200);
       expect(response.body).not.toHaveProperty("paymentUrl");
       expect(response.body).not.toHaveProperty("qrCodeUrl");
@@ -122,7 +122,7 @@ describe("no response hands out the business-wide address", () => {
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
 
-    const response = await request(app).get(`/api/admin/merchants/${owner.merchantId}`).set(bearer(createAdminPrincipal()));
+    const response = await request(app).get(`/api/admin/merchants/${owner.merchantId}`).set(signedIn(await createAdminPrincipal()));
 
     expect(response.status).toBe(200);
     expect(response.body).not.toHaveProperty("paymentUrl");
@@ -136,13 +136,13 @@ describe("no response hands out the business-wide address", () => {
     const linked = await privateLinkSale(owner.merchantId);
     const { board, sale } = await boardSale(owner.merchantId);
 
-    const cancelledLinked = await request(app).post(`/api/transactions/${linked.id}/cancel`).set(bearer(owner)).send({});
+    const cancelledLinked = await request(app).post(`/api/transactions/${linked.id}/cancel`).set(signedIn(owner)).send({});
     expect(cancelledLinked.status).toBe(200);
     expect(cancelledLinked.body).toMatchObject({ id: linked.id, status: "cancelled" });
     expect(cancelledLinked.body).not.toHaveProperty("paymentUrl");
     expect(cancelledLinked.body).not.toHaveProperty("qrCodeUrl");
 
-    const cancelledBoard = await request(app).post(`/api/transactions/${sale.id}/cancel`).set(bearer(owner)).send({});
+    const cancelledBoard = await request(app).post(`/api/transactions/${sale.id}/cancel`).set(signedIn(owner)).send({});
     expect(cancelledBoard.status).toBe(200);
     expect(cancelledBoard.body).toMatchObject({
       paymentUrl: `https://harness.test/pay/${owner.merchantId}/stone/${board.id}`,

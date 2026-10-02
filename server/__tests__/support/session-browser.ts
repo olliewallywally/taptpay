@@ -29,6 +29,19 @@ export const cookieValueOf = (line: string | undefined) => line?.split(";")[0].s
 export const sessionIdOf = (cookieValue: string) => cookieValue.split(".")[0];
 const cleared = (line: string | undefined) => /Expires=Thu, 01 Jan 1970|Max-Age=0/i.test(line ?? "");
 
+/**
+ * The session a response began (a sign-in, a password change), as the page that got the response sends
+ * it from then on: the new cookie, and the CSRF token the response handed the page.
+ */
+function sessionBegunBy(res: request.Response, name: string): { cookie: string; csrf: string } {
+  const line = setCookies(res).get(name);
+  if (!line || cleared(line)) throw new Error(`fixture: the response set no ${name} cookie`);
+  if (typeof res.body?.csrfToken !== "string") throw new Error("fixture: the response handed the page no CSRF token");
+  return { cookie: `${name}=${cookieValueOf(line)}`, csrf: res.body.csrfToken };
+}
+export const businessSessionBegunBy = (res: request.Response) => sessionBegunBy(res, BUSINESS_COOKIE);
+export const adminSessionBegunBy = (res: request.Response) => sessionBegunBy(res, ADMIN_COOKIE);
+
 function follow(browser: Browser, res: request.Response): request.Response {
   const next = setCookies(res).get(browser.name);
   if (next && !cleared(next)) browser.cookie = cookieValueOf(next);

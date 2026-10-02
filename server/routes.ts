@@ -15,7 +15,7 @@ import {
 import { TUTORIAL_PAGE_KEYS, isTutorialPageKey } from "@shared/tutorial";
 import { inviteTeamMemberSchema, acceptInviteSchema, retailTransactionCreateRequestSchema, cashSaleRequestSchema, updateMerchantDetailsSchema, updateThemeSchema, updateDailyGoalSchema, forgotPasswordSchema, resetPasswordSchema, changePasswordSchema, newPasswordSchema, createRefundSchema, insertRefundSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, merchantOnboardingSchema, pushNotificationPreferencesSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createClientProfileSchema, updateClientProfileSchema, createQuoteSchema, acceptQuoteSchema, createJobInvoiceSchema, markJobPaidExternalSchema, sendJobBalanceSchema, createJobScheduleSchema, updateJobScheduleSchema, updateTradeReminderSettingsSchema, updateTradeGstSettingsSchema } from "@shared/schema";
 import { isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, getWindcaveEnv, submitGooglePayToken, createAttendedSession, submitTapToPayToken, createCardStorageSession, queryStoredCardSession, chargeStoredCard } from "./windcave";
-import { authenticateUser, checkPasswordEvenly, passwordCheckBudget, generateToken, authenticateToken, createUser, issueTokenForUserId, tokenForUserRow, isAccountOwner, requestPasswordReset, resetPassword, validateResetToken, type AuthenticatedRequest, logSecurityEvent, syncVerifiedMerchants, startBusinessSession, startAdminSession, endAuthSession, endLoginSessions, csrfTokenForRequest, clearSessionCookie, hasSessionCookie, readBusinessSession, respondAuthBackendUnavailable, isStreamSessionActive } from "./auth";
+import { authenticateUser, checkPasswordEvenly, passwordCheckBudget, authenticateToken, createUser, loginForUserId, sessionLoginForUserRow, isAccountOwner, requestPasswordReset, resetPassword, validateResetToken, type AuthenticatedRequest, logSecurityEvent, syncVerifiedMerchants, startBusinessSession, startAdminSession, endAuthSession, endLoginSessions, csrfTokenForRequest, clearSessionCookie, hasSessionCookie, readBusinessSession, respondAuthBackendUnavailable, isStreamSessionActive } from "./auth";
 import {
   HANDOFF_CODE_TTL_MS, clearSignInCookie, googleVerifiedEmail, handoffCodeHash, newHandoffCode, readCookie,
   signInCookies, startGoogleSignIn, verifyGoogleSignInState,
@@ -533,8 +533,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // cannot sit behind authenticateAdmin): true only for the validated platform
   // admin principal — the admin role, a zero merchant scope and the configured
   // admin email. A role string alone is never enough (plan §8.5):
-  // authenticateToken already refuses an admin token that lacks the dedicated
-  // principal, and this re-checks the resulting `req.user`.
+  // authenticateToken checks the admin session's principal and current credential
+  // tag, and this re-checks the resulting `req.user`.
   //
   // This is deliberately the SAME predicate authenticateAdmin enforces, kept as
   // a separate function so that middleware (whose exact shape a source guard in
@@ -772,7 +772,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   });
 
   // The login page's half of Google sign-in: redeem the one-time code, once, for
-  // the account token — in the response body, never cached, never in a URL.
+  // the session cookie and the page's CSRF token; never cached.
   app.post("/api/auth/google/session", async (req, res) => {
     res.set('Cache-Control', 'no-store');
     const codeHash = handoffCodeHash(readCookie(req.headers.cookie, googleCookies.handoff.name));
@@ -783,14 +783,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const redeemed = await storage.consumeAuthHandoffCode(codeHash, new Date());
       if (!redeemed) return expired();
-      const issued = await issueTokenForUserId(redeemed.userId);
+      const issued = await loginForUserId(redeemed.userId);
       if (!issued) {
         return res.status(403).json({ code: 'ACCOUNT_UNAVAILABLE', message: 'This account cannot sign in right now.' });
       }
-      // R1-T4 phase E: the sign-in is a session cookie; the token stays in the body until the app stops
-      // reading it (phase E2), then goes (E3).
+      // R1-T4 phase E3: only the HttpOnly cookie signs the browser in.
       const session = await startBusinessSession(req, res, issued);
-      return res.json({ token: issued.token, merchantId: issued.merchantId, newUser: redeemed.newUser, csrfToken: session.csrfToken });
+      return res.json({ merchantId: issued.merchantId, newUser: redeemed.newUser, csrfToken: session.csrfToken });
     } catch (err) {
       console.error('[GOOGLE_SESSION]', err);
       return res.status(500).json({ message: 'Google sign in failed. Please try again.' });
@@ -798,7 +797,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   });
 
   // R1-T4 phase D: end every session of the signed-in login, this one included.
-  // Advancing the login's session version spends every token issued before it.
+  // Advancing the login's session version ends every session begun before it.
   app.post("/api/auth/sign-out-everywhere", authenticateToken, async (req: AuthenticatedRequest, res) => {
     res.set('Cache-Control', 'no-store');
     const userId = req.user?.userId;
@@ -826,7 +825,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   });
 
   // R1-T4 phase E: Log Out ends this session only, clears its cookie and closes its live streams.
-  // A token sign-in (until phase E3) has no session here: the app discards its token itself.
   app.post("/api/auth/logout", authenticateToken, async (req: AuthenticatedRequest, res) => {
     res.set('Cache-Control', 'no-store');
     // The admin area has its own Log Out (POST /api/admin/auth/logout), as sign out everywhere refuses it.
@@ -907,17 +905,14 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       markSignInDevice(res, merchantDeviceCookie, device, email);
       logSecurityEvent('LOGIN_SUCCESS', { email, ip: clientIp, userId: user.id });
 
-      // R1-T4 phase E: the sign-in is a session cookie; the token stays in the body until the app stops
-      // reading it (phase E2), then goes (E3).
+      // R1-T4 phase E3: only the HttpOnly cookie signs the browser in.
       const session = await startBusinessSession(req, res, {
         userId: user.userId ?? user.id,
         sessionVersion: user.sessionVersion ?? 0,
       });
-      const token = generateToken(user);
       
       res.set("Cache-Control", "no-store");
       res.json({
-        token,
         csrfToken: session.csrfToken,
         user: {
           id: user.id,
@@ -1118,14 +1113,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         createdAt: new Date(),
       };
 
-      // R1-T4 phase E: the admin's sign-in is a session cookie of its own; the token stays in the body
-      // until the admin area stops reading it (phase E2), then goes (E3).
+      // R1-T4 phase E3: the admin signs in by its own HttpOnly cookie.
       const session = await startAdminSession(req, res);
-      const token = generateToken(adminUser);
       
       res.set("Cache-Control", "no-store");
       return res.json({
-        token,
         csrfToken: session.csrfToken,
         user: {
           id: adminUser.id,
@@ -2356,8 +2348,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     // R1-T4 phase E: the terminal is told by its session cookie, as its event stream is (the app sends
     // no token). A board's page names its board, and reads it as any customer does even in a browser
     // signed in to the business.
-    const signedIn = req.headers.authorization !== undefined ||
-      (stoneId === undefined && hasSessionCookie(req));
+    const signedIn = stoneId === undefined && hasSessionCookie(req);
     if (signedIn) {
       let authenticated = false;
       await authenticateToken(req as AuthenticatedRequest, res, () => {
@@ -3690,7 +3681,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       const newPasswordHash = await bcrypt.hash(newPassword, 12);
       // Also ends every session of this login (R1-T4 phase D, owner decision
-      // 2026-09-22): this device carries on under the fresh token returned below.
+      // 2026-09-22): this device carries on under the new session below.
       const updated = await storage.updateUserPassword(userId, newPasswordHash);
 
       if (!updated) {
@@ -3698,21 +3689,21 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
       sseBroker.disconnectUser(merchantId, userId);
       // Every device of this login stops getting notifications; this one
-      // re-registers under the fresh token (client/src/lib/push-device.ts).
+      // re-registers under the new session (client/src/lib/push-device.ts).
       await storage.deactivatePushSubscriptionsForLogin(merchantId, userId)
         .catch((error) => console.error("[PASSWORD_CHANGE_PUSH_STOP]", error));
-      const token = tokenForUserRow(updated);
-      if (!token) {
+      const login = sessionLoginForUserRow(updated);
+      if (!login) {
         return res.status(500).json({ message: "Password changed. Please sign in again." });
       }
       // R1-T4 phase E: the change advanced the version, which ends every session of this login,
       // this one included (recorded on each); this device carries on under a new session.
       await endLoginSessions(userId, "password_change")
         .catch((error) => console.error("[PASSWORD_CHANGE_SESSIONS]", error));
-      const session = await startBusinessSession(req, res, { userId, sessionVersion: updated.sessionVersion ?? 0 });
+      const session = await startBusinessSession(req, res, login);
 
       res.set("Cache-Control", "no-store");
-      res.json({ message: "Password updated successfully", token, csrfToken: session.csrfToken });
+      res.json({ message: "Password updated successfully", csrfToken: session.csrfToken });
 
     } catch (error) {
       console.error("Change password error:", error);
@@ -5203,7 +5194,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       return res.status(400).json({ message: "Invalid merchant ID" });
     }
     if (req.query.token !== undefined) {
-      return res.status(400).json({ message: "SSE credentials must use the Authorization header" });
+      return res.status(400).json({ message: "SSE credentials must use a session cookie" });
     }
 
     // An unguarded throw while resolving the audience would leave the request
@@ -5213,11 +5204,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       let audience: SseAudience;
       // Whether the stream's sign-in still stands; a board's stream has none to check.
       let stillSignedIn: (() => Promise<boolean>) | undefined;
-      const authorization = req.headers.authorization;
-      // R1-T4 phase E: a browser's EventSource sends the session cookie, never a header. A board's
+      // R1-T4 phase E: a browser's live-update request sends the session cookie, never a header. A board's
       // page names its board, and keeps its board stream even in a browser signed in to the business.
-      const signedIn = authorization !== undefined ||
-        (req.query.stoneId === undefined && hasSessionCookie(req));
+      const signedIn = req.query.stoneId === undefined && hasSessionCookie(req);
       if (signedIn) {
         let authenticated = false;
         await authenticateToken(req as AuthenticatedRequest, res, () => {
@@ -5242,8 +5231,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         };
         // External review 2026-09-29: the sign-in is read again before each event and every few
         // seconds while the stream is idle, so an ending made on another instance closes it here.
-        // A session cookie's stream is checked by its session; a token's (until phase E3) by its token.
-        const signIn = authenticatedRequest.authSession ?? authorization ?? "";
+        // The stream is checked by its session id, never by a bearer or the cookie's rotating secret.
+        const signIn = authenticatedRequest.authSession!;
         stillSignedIn = () => isStreamSessionActive(signIn, merchantId);
       } else if (req.query.stoneId !== undefined) {
         const stoneId = strictPositiveIntegerQueryParam(req.query.stoneId);

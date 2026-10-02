@@ -2,7 +2,7 @@ import "./support/test-env";
 
 import request from "supertest";
 import {
-  bearer, createAdminPrincipal, createMemberPrincipal, createOwnerPrincipal, createTestApp, resetTestStorage,
+  signedIn, type SignedIn, createAdminPrincipal, createMemberPrincipal, createOwnerPrincipal, createTestApp, resetTestStorage,
 } from "./support/http-harness";
 
 /**
@@ -40,14 +40,14 @@ beforeEach(() => {
 async function businessWithBoard(overrides: { businessName?: string } = {}) {
   const { app } = await createTestApp();
   const owner = await createOwnerPrincipal({ businessName: overrides.businessName ?? "Kōwhai Café" });
-  const board = await request(app).post(`/api/merchants/${owner.merchantId}/tapt-stones`).set(bearer(owner)).send({});
+  const board = await request(app).post(`/api/merchants/${owner.merchantId}/tapt-stones`).set(signedIn(owner)).send({});
   expect(board.status).toBe(200);
   return { app, owner, boardId: board.body.id as number, boardName: board.body.name as string };
 }
 
-function send(app: Parameters<typeof request>[0], body: Record<string, unknown>, auth?: { token: string }) {
+function send(app: Parameters<typeof request>[0], body: Record<string, unknown>, auth?: SignedIn) {
   const pending = request(app).post(SUBMIT);
-  return (auth ? pending.set(bearer(auth)) : pending).send(body);
+  return (auth ? pending.set(signedIn(auth)) : pending).send(body);
 }
 
 const boardSend = (boardId: number, pdf = pdfOf(1_500_000)) => ({
@@ -117,7 +117,7 @@ describe("Send to Print, for signed-in businesses only", () => {
   it("refuses the platform admin, who has no business to send for", async () => {
     const { app, boardId } = await businessWithBoard();
 
-    const res = await send(app, boardSend(boardId, pdfOf(2_000)), createAdminPrincipal());
+    const res = await send(app, boardSend(boardId, pdfOf(2_000)), await createAdminPrincipal());
 
     expect(res.status).toBe(403);
     expect(sendMock).not.toHaveBeenCalled();

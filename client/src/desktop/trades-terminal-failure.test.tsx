@@ -107,7 +107,6 @@ async function keyInAmount(keys: string[]) {
 beforeEach(() => {
   fetchMock.mockReset();
   mockToast.mockReset();
-  localStorage.setItem("authToken", "h.e30.s");
 });
 afterEach(() => {
   window.history.pushState({}, "", "/");

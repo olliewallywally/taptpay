@@ -3,7 +3,7 @@ import "./support/push-test-env";
 
 import request from "supertest";
 import {
-  bearer, createMemberPrincipal, createOwnerPrincipal, createTestApp, resetTestStorage, storage, storageSnapshot,
+  signedIn, createMemberPrincipal, createOwnerPrincipal, createTestApp, resetTestStorage, storage, storageSnapshot,
 } from "./support/http-harness";
 
 /**
@@ -19,7 +19,7 @@ const web = (name: string) => ({
   keys: { p256dh: `p256dh-${name}`, auth: `auth-${name}` },
 });
 const subscribeWeb = (app: App, who: Principal, name: string) =>
-  request(app).post("/api/push/subscribe").set(bearer(who)).send({ subscription: web(name) });
+  request(app).post("/api/push/subscribe").set(signedIn(who)).send({ subscription: web(name) });
 const activeEndpoints = async (merchantId: number) =>
   (await storage.getPushSubscriptionsByMerchant(merchantId)).map((s) => s.endpoint).sort();
 const fromBefore = (merchantId: number, name: string) => storage.createPushSubscription({
@@ -42,7 +42,7 @@ describe("removing a teammate stops their devices' notifications, as disabling d
     await subscribeWeb(app, member, "member-laptop");
     await fromBefore(owner.merchantId, "from-before");
 
-    const res = await request(app).delete(`/api/team/${member.user.id}`).set(bearer(owner));
+    const res = await request(app).delete(`/api/team/${member.user.id}`).set(signedIn(owner));
 
     expect(res.status).toBe(200);
     expect(await activeEndpoints(owner.merchantId)).toEqual([web("owner-laptop").endpoint]);
@@ -56,7 +56,7 @@ describe("removing a teammate stops their devices' notifications, as disabling d
     await subscribeWeb(app, elsewhere, "elsewhere-laptop");
     await fromBefore(elsewhere.merchantId, "elsewhere-from-before");
 
-    expect((await request(app).delete(`/api/team/${member.user.id}`).set(bearer(owner))).status).toBe(200);
+    expect((await request(app).delete(`/api/team/${member.user.id}`).set(signedIn(owner))).status).toBe(200);
 
     expect(await activeEndpoints(elsewhere.merchantId)).toEqual([
       web("elsewhere-from-before").endpoint, web("elsewhere-laptop").endpoint,
@@ -70,7 +70,7 @@ describe("removing a teammate stops their devices' notifications, as disabling d
     const stop = jest.spyOn(storage, "deactivatePushSubscriptionsForLogin").mockRejectedValueOnce(new Error("database down"));
     const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
 
-    const res = await request(app).delete(`/api/team/${member.user.id}`).set(bearer(owner));
+    const res = await request(app).delete(`/api/team/${member.user.id}`).set(signedIn(owner));
 
     expect(res.status).toBe(200);
     expect(await storage.getUserById(member.user.id)).toBeUndefined();
@@ -92,7 +92,7 @@ describe("only the account owner changes the plan (guards for isAccountOwner)", 
     const member = await createMemberPrincipal(owner.merchantId);
     const before = storageSnapshot();
 
-    const res = await request(app)[method](path).set(bearer(member)).send(body);
+    const res = await request(app)[method](path).set(signedIn(member)).send(body);
 
     expect(res.status).toBe(403);
     expect(res.body).toEqual({ message });
@@ -103,9 +103,9 @@ describe("only the account owner changes the plan (guards for isAccountOwner)", 
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
 
-    const cancelled = await request(app).post("/api/subscription/cancel").set(bearer(owner)).send({ reason: "Too dear" });
+    const cancelled = await request(app).post("/api/subscription/cancel").set(signedIn(owner)).send({ reason: "Too dear" });
     expect(cancelled.status).toBe(200);
-    const resumed = await request(app).post("/api/subscription/resume").set(bearer(owner)).send({});
+    const resumed = await request(app).post("/api/subscription/resume").set(signedIn(owner)).send({});
     expect([200, 409]).toContain(resumed.status);
     expect(resumed.status).not.toBe(403);
   });
@@ -119,11 +119,11 @@ describe("turning notifications off is never reported done when it failed", () =
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
     await subscribeWeb(app, owner, "owner-laptop");
-    await request(app).post("/api/push/native-subscribe").set(bearer(owner)).send({ deviceToken: "owner-phone-token" });
+    await request(app).post("/api/push/native-subscribe").set(signedIn(owner)).send({ deviceToken: "owner-phone-token" });
     const stop = jest.spyOn(storage, "deactivatePushSubscriptionByEndpoint").mockRejectedValueOnce(new Error("database down"));
     const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
 
-    const res = await request(app).post(path).set(bearer(owner)).send(body);
+    const res = await request(app).post(path).set(signedIn(owner)).send(body);
 
     expect(res.status).toBe(500);
     expect(res.body.success).not.toBe(true);

@@ -20,7 +20,7 @@ import express from "express";
 import { existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import type { AddressInfo } from "node:net";
-import { chromium, type BrowserContext, type Page, type Response as PwResponse } from "playwright";
+import { chromium, type BrowserContext, type Page, type Request as PwRequest, type Response as PwResponse } from "playwright";
 import { CHROMIUM_PATH } from "./desktop-shots/retail-fixtures.mjs";
 
 const OWNER_EMAIL = "owner@probe.test";
@@ -93,12 +93,19 @@ const check = (name: string, ok: boolean, detail = "") => {
   console.log(`${ok ? "PASS" : "FAIL"} ${name}${detail ? ` — ${detail}` : ""}`);
 };
 
-interface Seen { method: string; url: string; headers: Record<string, string> }
+interface Seen { request: PwRequest; method: string; url: string; headers: Record<string, string> }
 const seen: Seen[] = [];
+/** Only these explicitly captured negative probes may omit CSRF after sign-in. */
+const deliberateBareRequests = new Set<PwRequest>();
 const offMachine: string[] = [];
 const dialogs: string[] = [];
 /** Secrets the browser was given, as they are learned: none may appear in an address, storage or a log. */
 const secrets = new Set<string>();
+const credentialResponses: string[] = [];
+const authResponseKeys = new Map<string, string[]>();
+const isAuthAnswer = (pathname: string) =>
+  ["/api/auth/session", "/api/auth/me", "/api/auth/login", "/api/auth/google/session", "/api/admin/auth/login", "/api/admin/auth/me"].includes(pathname)
+  || /^\/api\/merchants\/[1-9][0-9]*\/change-password$/.test(pathname);
 
 const browser = await chromium.launch({ executablePath: CHROMIUM_PATH, headless: true });
 
@@ -107,14 +114,30 @@ async function newContext(options: Parameters<typeof browser.newContext>[0]): Pr
   // Sandboxed Chromium has only loopback and reports itself offline; the app would cover itself with
   // "Connection Lost". A string, not a function: tsx wraps nested functions in a helper the page lacks.
   await context.addInitScript('Object.defineProperty(Navigator.prototype, "onLine", { get: function () { return true; } });');
-  await context.route("**/*", (route) => {
+  await context.route("**/*", async (route) => {
     const url = route.request().url();
-    if (url.startsWith(base) || url.startsWith(otherSite)) return route.continue();
+    if (url.startsWith(base) || url.startsWith(otherSite)) {
+      const pathname = new URL(url).pathname;
+      if (isAuthAnswer(pathname)) {
+        // Inspect before fulfillment: login navigates immediately, after which Chromium may have
+        // discarded the response body. No credential is printed or kept as an artifact.
+        const response = await route.fetch({ maxRedirects: 0 });
+        const body = await response.json().catch(() => null);
+        if (body) {
+          authResponseKeys.set(`${route.request().method()} ${pathname}`, Object.keys(body).sort());
+          for (const key of ["token", "accessToken", "refreshToken", "sessionSecret"]) {
+            if (key in body) credentialResponses.push(`${pathname}: ${key}`);
+          }
+        }
+        return route.fulfill({ response });
+      }
+      return route.continue();
+    }
     offMachine.push(url);
     return route.abort();
   });
   context.on("request", (request) => {
-    void request.allHeaders().then((headers) => seen.push({ method: request.method(), url: request.url(), headers }))
+    void request.allHeaders().then((headers) => seen.push({ request, method: request.method(), url: request.url(), headers }))
       .catch(() => undefined);
   });
   context.on("response", (response) => {
@@ -139,10 +162,13 @@ async function learnSecrets(response: PwResponse) {
       if (match && match[1].includes(".")) secrets.add(decodeURIComponent(match[1]).split(".")[1]);
     }
     const url = new URL(response.url());
-    if (["/api/auth/session", "/api/auth/login", "/api/admin/auth/login", "/api/admin/auth/me"].includes(url.pathname)) {
+    if (["/api/auth/session", "/api/auth/me", "/api/auth/login", "/api/auth/google/session", "/api/admin/auth/login", "/api/admin/auth/me"].includes(url.pathname)
+      || /^\/api\/merchants\/[1-9][0-9]*\/change-password$/.test(url.pathname)) {
       const body = await response.json().catch(() => null);
       if (typeof body?.csrfToken === "string") secrets.add(body.csrfToken);
-      if (typeof body?.token === "string") secrets.add(body.token);
+      for (const key of ["token", "accessToken", "refreshToken", "sessionSecret"]) {
+        if (body && key in body) credentialResponses.push(`${url.pathname}: ${key}`);
+      }
     }
   } catch {
     // A response that was torn down with its page.
@@ -188,7 +214,7 @@ const LEGACY_KEYS = ["authToken", "user", "merchantId", "adminAuthToken", "admin
 
 try {
   // ── 1. What the page kept before the switch is removed on the first load. ──────────────────────
-  const desktop = await newContext({ viewport: { width: 1280, height: 800 } });
+  const desktop = await newContext({ viewport: { width: 1440, height: 900 } });
   let page = await openLogin(desktop);
   await page.evaluate((keys) => { for (const key of keys) localStorage.setItem(key, "left.from.before"); }, LEGACY_KEYS);
   await page.reload({ waitUntil: "domcontentloaded" });
@@ -202,6 +228,8 @@ try {
   // ── 2. Signing in. ─────────────────────────────────────────────────────────────────────────────
   const login = await signIn(page);
   check("the business signs in on its laptop", login.status() === 200, `HTTP ${login.status()}`);
+  check("the password sign-in returns no account credential to the page",
+    JSON.stringify(authResponseKeys.get("POST /api/auth/login")) === JSON.stringify(["csrfToken", "user"]));
   const cookie = await sessionCookieOf(desktop);
   check("the sign-in is a cookie the server set", Boolean(cookie));
   check("the cookie is HttpOnly, SameSite=Lax, for the whole site, and not a session-only cookie",
@@ -231,10 +259,12 @@ try {
   await checked;
   await page.waitForURL("**/dashboard", { timeout: 60_000 });
   check("a reload keeps the business signed in, from the cookie alone", page.url().endsWith("/dashboard"), page.url());
+  const bareAttempt = responseTo(page, "POST", "/api/tutorial/restart");
   const withoutToken = await page.evaluate(async () => {
     const res = await fetch("/api/tutorial/restart", { method: "POST" });
     return { status: res.status, code: (await res.json().catch(() => ({}))).code };
   });
+  deliberateBareRequests.add((await bareAttempt).request());
   check("a change sent with the cookie but without the page's token is refused",
     withoutToken.status === 403 && withoutToken.code === "CSRF_REJECTED", JSON.stringify(withoutToken));
   const withToken = await page.evaluate(async (token) => {
@@ -266,9 +296,25 @@ try {
   const phoneCookie = await sessionCookieOf(phone);
   check("the phone holds a session of its own", Boolean(phoneCookie) && phoneCookie?.value !== cookie?.value);
 
+  // The shared tablet UI also starts and restores a real cookie session.
+  const tablet = await newContext({ viewport: { width: 1194, height: 834 }, hasTouch: true });
+  const tabletPage = await openLogin(tablet);
+  const tabletLogin = await signIn(tabletPage);
+  check("the tablet signs in by its own cookie", tabletLogin.status() === 200 && Boolean(await sessionCookieOf(tablet)));
+  const tabletCheck = responseTo(tabletPage, "GET", "/api/auth/session");
+  await tabletPage.reload({ waitUntil: "domcontentloaded" });
+  await tabletCheck;
+  const tabletBody = await sessionAnswer(tabletPage);
+  check("a tablet reload restores the cookie session", tabletBody.signedIn === true && tabletBody.user?.email === OWNER_EMAIL);
+  check("the shared tablet dashboard loads", (await shownText(tabletPage, "sales revenue")).includes("sales revenue"));
+  if (out) await tabletPage.screenshot({ path: `${out}/signed-in-tablet.png` });
+  await tablet.close();
+
   // ── 5. Another website cannot act as the signed-in business. ───────────────────────────────────
   const hostile = await desktop.newPage();
   await hostile.goto(`${otherSite}/api/push/capabilities`);
+  const hostileFetchRequest = hostile.waitForRequest((r) =>
+    r.url() === `${base}/api/auth/sign-out-everywhere` && r.method() === "POST");
   const crossFetch = await hostile.evaluate(async (target) => {
     try {
       const res = await fetch(`${target}/api/auth/sign-out-everywhere`, { method: "POST", credentials: "include" });
@@ -277,6 +323,7 @@ try {
       return `blocked: ${String(error)}`;
     }
   }, base);
+  deliberateBareRequests.add(await hostileFetchRequest);
   check("another site's fetch gets no answer it can read", crossFetch.startsWith("blocked"), crossFetch);
   const formPost = hostile.waitForResponse((r) => r.url() === `${base}/api/auth/sign-out-everywhere`, { timeout: 30_000 });
   await hostile.evaluate((target) => {
@@ -287,6 +334,7 @@ try {
     form.submit();
   }, base);
   const formAnswer = await formPost;
+  deliberateBareRequests.add(formAnswer.request());
   check("another site's form post is refused", formAnswer.status() === 403, `HTTP ${formAnswer.status()}`);
   await hostile.close();
   const stillSignedIn = await sessionAnswer(page);
@@ -363,6 +411,8 @@ try {
   const adminCheck = responseTo(page, "GET", "/api/admin/auth/me", 180_000);
   await page.getByTestId("button-login").click();
   check("the admin signs in", (await adminLogin).status() === 200);
+  check("the admin sign-in returns no account credential to the page",
+    JSON.stringify(authResponseKeys.get("POST /api/admin/auth/login")) === JSON.stringify(["csrfToken", "user"]));
   check("the admin area asks by its own cookie, and is let in", (await adminCheck).status() === 200);
   const adminCookie = await sessionCookieOf(desktop, true);
   check("the admin's cookie is its own, HttpOnly, and lasts 12 hours at most",
@@ -405,14 +455,21 @@ try {
   const loggedSecrets = requestLog.filter((line) => secretList.some((secret) => line.includes(secret)));
   check("no credential appeared in the server's request log", loggedSecrets.length === 0,
     `${requestLog.length} lines, ${secretList.length} secrets learned`);
+  check("no account credential appeared in an authentication response", credentialResponses.length === 0,
+    `${credentialResponses.length} credential fields`);
   const PRE_SESSION = new Set(["/api/auth/login", "/api/admin/auth/login"]);
   const changes = api.filter((request) => !["GET", "HEAD", "OPTIONS"].includes(request.method) &&
     request.url.startsWith(base) && !PRE_SESSION.has(new URL(request.url).pathname));
   const fromTheApp = changes.filter((request) => request.headers["x-csrf-token"] !== undefined);
+  const unexpectedBareChanges = changes.filter((request) =>
+    request.headers["x-csrf-token"] === undefined && !deliberateBareRequests.has(request.request));
+  console.log(`INFO unexpected changes without CSRF: ${JSON.stringify(unexpectedBareChanges.map((request) => ({
+    method: request.method, path: new URL(request.url).pathname,
+    origin: request.headers.origin, site: request.headers["sec-fetch-site"],
+  })))}`);
   check("every change the app itself sent carried a CSRF token",
-    // The probe's own two bare requests (one without a token, on purpose; the other site's) carry none.
-    changes.length - fromTheApp.length <= 3 && fromTheApp.length >= 6,
-    `${fromTheApp.length} of ${changes.length} changes carried one`);
+    unexpectedBareChanges.length === 0 && deliberateBareRequests.size === 3 && fromTheApp.length >= 6,
+    `${fromTheApp.length} changes carried one; ${unexpectedBareChanges.length} unexplained omissions; 3 deliberate refusal probes`);
   const analytics = offMachine.filter((url) => /google-analytics|googletagmanager|analytics/.test(url));
   console.log(`INFO dialogs accepted: ${JSON.stringify([...new Set(dialogs)])}`);
   console.log(`INFO ${seen.length} requests on this machine; ${offMachine.length} aborted off it (${analytics.length} to analytics); ${secretList.length} secrets tracked`);

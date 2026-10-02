@@ -12,7 +12,7 @@ import { ROUTE_MATRIX } from "../route-matrix";
 import * as windcave from "../windcave";
 import {
   VALID_PASSWORD,
-  bearer,
+  signedIn,
   createMemberPrincipal,
   createOwnerPrincipal,
   createTestApp,
@@ -56,17 +56,17 @@ const ONBOARDING = {
 const email = (who: string) => `${who}.${crypto.randomBytes(4).toString("hex")}@harness.test`;
 
 async function invited(ctx: Ctx): Promise<number> {
-  const res = await request(ctx.app).post("/api/team/invite").set(bearer(ctx.owner)).send({ email: email("invitee") });
+  const res = await request(ctx.app).post("/api/team/invite").set(signedIn(ctx.owner)).send({ email: email("invitee") });
   if (res.status >= 300) throw new Error(`fixture: invite failed ${res.status} ${JSON.stringify(res.body)}`);
   return res.body.member.id;
 }
 async function board(ctx: Ctx): Promise<number> {
-  const res = await request(ctx.app).post(`/api/merchants/${ctx.merchantId}/tapt-stones`).set(bearer(ctx.owner)).send({ name: "Front till" });
+  const res = await request(ctx.app).post(`/api/merchants/${ctx.merchantId}/tapt-stones`).set(signedIn(ctx.owner)).send({ name: "Front till" });
   if (res.status >= 300) throw new Error(`fixture: board failed ${res.status}`);
   return res.body.id;
 }
 async function item(ctx: Ctx): Promise<number> {
-  const res = await request(ctx.app).post(`/api/merchants/${ctx.merchantId}/stock-items`).set(bearer(ctx.owner)).send({ name: "Seed", cost: "1.00" });
+  const res = await request(ctx.app).post(`/api/merchants/${ctx.merchantId}/stock-items`).set(signedIn(ctx.owner)).send({ name: "Seed", cost: "1.00" });
   if (res.status >= 300) throw new Error(`fixture: stock item failed ${res.status}`);
   return res.body.id;
 }
@@ -149,7 +149,7 @@ const RECIPES: Record<string, (ctx: Ctx) => Promise<Req> | Req> = {
 };
 
 async function send(ctx: Ctx, who: Principal, req: Req) {
-  let pending = request(ctx.app)[req.method](req.path).set(bearer(who));
+  let pending = request(ctx.app)[req.method](req.path).set(signedIn(who));
   if (req.png) return pending.attach("logo", PNG, { filename: "logo.png", contentType: "image/png" });
   if (req.body) pending = pending.send(req.body);
   return pending;

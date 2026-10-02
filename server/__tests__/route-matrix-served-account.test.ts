@@ -16,7 +16,7 @@ import * as emailService from "../email-service-multi";
 import { subscriptionCardSessionState } from "../storage";
 import * as windcave from "../windcave";
 import { TUTORIAL_PAGE_KEYS } from "@shared/tutorial";
-import { bearer, resetTestStorage, storage, type Principal } from "./support/http-harness";
+import { signedIn, resetTestStorage, storage, type Principal } from "./support/http-harness";
 import {
   CARD,
   as,
@@ -64,13 +64,13 @@ async function board(ctx: Ctx): Promise<number> {
 }
 const PDF = Buffer.from("%PDF-1.4\n%matrix\n");
 async function document(ctx: Ctx): Promise<string> {
-  const res = await request(ctx.app).post("/api/property/invoices/document").set(bearer(ctx.owner))
+  const res = await request(ctx.app).post("/api/property/invoices/document").set(signedIn(ctx.owner))
     .attach("document", PDF, { filename: "bill.pdf", contentType: "application/pdf" });
   if (res.status >= 300) throw new Error(`fixture: upload failed ${res.status}`);
   return String(res.body.documentUrl).split("/").pop()!;
 }
 const pushStatus = async (ctx: Ctx, who: Principal) => (await as(ctx, who).get("/api/push/status")).body;
-const signedIn = async (ctx: Ctx, who: Principal) => (await as(ctx, who).get("/api/auth/me")).status;
+const meStatus = async (ctx: Ctx, who: Principal) => (await as(ctx, who).get("/api/auth/me")).status;
 const teamIds = async (ctx: Ctx) => ((await as(ctx, ctx.owner).get("/api/team")).body.members as Array<{ id: number }>).map((m) => m.id);
 
 /** Per route: a request each allowed caller is served, and what that success looks like. */
@@ -91,21 +91,21 @@ const RECIPES: Record<string, Recipe> = {
       }
     },
   }),
-  // R1-T4 phase E: Log Out ends the session that signed the request in. The served callers sign in with
-  // their token (until phase E3), which has no session here: served, and nothing is ended.
+  // Log Out ends the cookie session that signed the request in; the other login's session stays live.
   "POST /api/auth/logout": (ctx, who) => ({
     req: { method: "post", path: "/api/auth/logout" }, status: 204,
     check: async (res) => {
       expect(res.headers["cache-control"]).toBe("no-store");
-      expect(await signedIn(ctx, who)).toBe(200);
+      expect(await meStatus(ctx, who)).toBe(401);
+      expect(await meStatus(ctx, who === ctx.owner ? ctx.member : ctx.owner)).toBe(200);
     },
   }),
   "POST /api/auth/sign-out-everywhere": (ctx, who) => ({
     req: { method: "post", path: "/api/auth/sign-out-everywhere" }, status: 204,
     check: async () => {
       // Every session of this login has ended, this one's included; the other login's has not.
-      expect(await signedIn(ctx, who)).toBe(401);
-      expect(await signedIn(ctx, who === ctx.owner ? ctx.member : ctx.owner)).toBe(200);
+      expect(await meStatus(ctx, who)).toBe(401);
+      expect(await meStatus(ctx, who === ctx.owner ? ctx.member : ctx.owner)).toBe(200);
     },
   }),
   // The tutorials.
@@ -283,14 +283,14 @@ const RECIPES: Record<string, Recipe> = {
     req: { method: "put", path: `/api/team/${ctx.member.user.id}/status`, body: { status: "disabled" } }, status: 200,
     check: async (res) => {
       expect(res.body.member).toMatchObject({ id: ctx.member.user.id, status: "disabled" });
-      expect(await signedIn(ctx, ctx.member)).toBe(401);
+      expect(await meStatus(ctx, ctx.member)).toBe(401);
     },
   }),
   "DELETE /api/team/:userId": (ctx) => ({
     req: { method: "delete", path: `/api/team/${ctx.member.user.id}` }, status: 200,
     check: async (res) => {
       expect(res.body).toEqual({ message: "Login removed" });
-      expect(await signedIn(ctx, ctx.member)).toBe(401);
+      expect(await meStatus(ctx, ctx.member)).toBe(401);
       expect(await teamIds(ctx)).not.toContain(ctx.member.user.id);
     },
   }),
