@@ -1,5 +1,8 @@
 # Full integration continuation — 2026-10-02
 
+Latest continuation: [R1-T7 S0/S1 handoff](HANDOFF-2026-10-02-r1-t7-storage.md), code commit `47fdab71`.
+The E3 recovery evidence below is retained; use the newer handoff and ledger for the next step.
+
 Branch: `remediation/r1-continuation-20260907`. This is the security/full-integration program.
 The supplied `attached_assets/full_intergration_plan_-_taptpay_1787816180424.txt` governs its PDF
 rendering. Read `CLAUDE.md`, the ledger's newest entries, and this handoff before continuing.
