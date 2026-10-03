@@ -1,5 +1,33 @@
 # Full integration continuation audit — 2026-09-07
 
+Latest continuation **2026-10-03 — R1-T7 S2 engineering scope implemented**:
+S2a `ea4759cf`, S2b1 `42792fd8`, S2b2 `cb8a61cf`, all local, independent review
+still owed. [Refund evidence](r1/R1-T7-S2b-refund-writes-2026-10-03.md),
+[creation evidence](r1/R1-T7-S2b2-transaction-creation-2026-10-03.md).
+Owner explicitly directed finishing all R1 work without routine permission questions;
+[dated authorization](../../decisions/2026-10-03-finish-r1-general-authorization.md).
+
+- Refund reservation/release/creation/status now require tenant at the write;
+  parent-locked creation/status; false-success/foreign-compensation races refuse
+  with reconciliation-required 503. Retired unused globally keyed refund mutators.
+- Sale creation checks active owned board under a lock through insert and uses
+  explicit merchant scope. Retail/API-key token minting unchanged; cash defaults
+  preserved. Disabled native reads/writes scoped, stale-success fallback removed.
+- Tests failed first for both batches. Latest affected **12 suites / 268 pass**,
+  real PostgreSQL **25 pass**, typecheck/build/whitespace and inventories pass
+  (**187 routes / 0 unclassified / 0 gaps; 229 methods**). Prior S2b1 focused 19
+  and policy/inventory 31 pass; no new full-server claim.
+- Disposable PostgreSQL stopped; no application database, live migration/provider,
+  UI change, feature enablement, push or deployment.
+
+**Next in active finish-R1 work:** S3 property, S4 trades, S5 settings/exports,
+S6 private upload/scanner/download/retention lifecycle, Apple implementation and
+R1-T10 typed-route/device/tutorial/accessibility acceptance. Existing September 29
+decisions already authorize Apple with stand-ins, ClamAV and 12-month orphan cleanup;
+do not ask those questions again. Real provisioning/device and independent review
+evidence cannot be inferred from code or stand-in tests. R3/R4 enablement gates,
+Keychain A-T4 assignment and owner development 0030/0031 actions remain explicit.
+
 Latest continuation **2026-10-03 — R1-T7 S2a is code-complete: `ea4759cf`, local,
 awaiting independent review** ([evidence](r1/R1-T7-S2a-transactions-refunds-2026-10-03.md),
 [immediate handoff](../../HANDOFF-2026-10-03-r1-t7-transactions.md),
