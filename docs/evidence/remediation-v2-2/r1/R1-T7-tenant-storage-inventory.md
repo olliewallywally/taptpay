@@ -1,10 +1,10 @@
 # R1-T7 tenant/storage execution inventory
 
-Generated from working-tree sources on base `6c2fafab7ca77e6346f106c47525c9b4e5ce1cd6`; the phase evidence names the final commit.
+Generated from working-tree sources on base `c7741b3f977ee9f8d024f04d73b6acab17bc2f94`; the phase evidence names the final commit.
 
 Registrations: **187**; registrations with session/admin authentication: **119**;
 registrations calling checkMerchantOwnership: **25**.
-IStorage: **223** declared methods;
+IStorage: **224** declared methods;
 PaymentAttemptRepository: **8** inherited methods.
 
 Classifications come from the reviewed per-route branches, including mixed public/signed-in routes.
@@ -29,7 +29,7 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | DELETE /api/merchants/:id/logo | tenant (merchant/path-merchant) | `deleteUploadedFile`, `getMerchant`, `updateMerchantLogoUrl` |
 | DELETE /api/merchants/:merchantId/stock-items/:itemId | tenant (merchant/path-merchant) | `deleteStockItemForMerchant`, `getStockItemForMerchant` |
 | DELETE /api/merchants/:merchantId/tapt-stones/:stoneId | tenant (merchant/path-merchant) | `deleteTaptStoneForMerchant`, `getTaptStoneForMerchant` |
-| DELETE /api/property/schedules/:id | tenant (merchant/resource) | `getActiveSchedule`, `logTransactionEvent`, `terminateActiveSchedule` |
+| DELETE /api/property/schedules/:id | tenant (merchant/resource) | `getActiveScheduleForMerchant`, `terminateActiveScheduleForMerchant` |
 | DELETE /api/team/:userId | tenant (merchant/resource) | `deactivatePushSubscriptionsForLogin`, `getUserById`, `removeTeamMember` |
 | DELETE /api/team/:userId/invite | tenant (merchant/resource) | `revokeTeamInvite` |
 | DELETE /api/trades/schedules/:id | tenant (merchant/resource) | `createJobEvent`, `getJobSchedule`, `terminateJobSchedule` |
@@ -155,7 +155,7 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | POST /api/property/tenants | tenant (merchant/session) | `createTenantProfileForMerchant`, `logTransactionEvent` |
 | POST /api/property/tenants/:id/archive | tenant (merchant/resource) | `archiveTenantProfileForMerchant`, `getTenantProfileForMerchant`, `logTransactionEvent` |
 | POST /api/property/tenants/:id/unarchive | tenant (merchant/resource) | `getTenantProfileForMerchant`, `logTransactionEvent`, `unarchiveTenantProfileForMerchant` |
-| POST /api/property/tenants/:tenantId/schedules | tenant (merchant/resource) | `createActiveSchedule`, `getActiveSchedulesByTenant`, `getOrCreateSubscription`, `getTenantProfile`, `logTransactionEvent`, `terminateActiveSchedule` |
+| POST /api/property/tenants/:tenantId/schedules | tenant (merchant/resource) | `createActiveScheduleForMerchant`, `getOrCreateSubscription`, `getTenantProfileForMerchant` |
 | POST /api/push/native-subscribe | tenant (merchant/session) | `createPushSubscription` |
 | POST /api/push/native-unsubscribe | tenant (merchant/session) | `deactivateNativePushSubscriptionsForLogin`, `deactivatePushSubscriptionByEndpoint`, `getPushSubscriptionsByMerchant` |
 | POST /api/push/subscribe | tenant (merchant/session) | `createPushSubscription` |
@@ -198,7 +198,7 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | PUT /api/merchants/:merchantId/stock-items/:itemId | tenant (merchant/path-merchant) | `getStockItemForMerchant`, `updateStockItemForMerchant` |
 | PUT /api/merchants/:merchantId/tapt-stones/:stoneId | tenant (merchant/path-merchant) | `getTaptStoneForMerchant`, `updateTaptStoneForMerchant` |
 | PUT /api/property/reminder-settings | tenant (merchant/session) | `updateMerchant` |
-| PUT /api/property/schedules/:id | tenant (merchant/resource) | `getActiveSchedule`, `logTransactionEvent`, `updateActiveSchedule` |
+| PUT /api/property/schedules/:id | tenant (merchant/resource) | `getActiveScheduleForMerchant`, `updateActiveScheduleForMerchant` |
 | PUT /api/property/tenants/:id | tenant (merchant/resource) | `getTenantProfileForMerchant`, `updateTenantProfileForMerchant` |
 | PUT /api/push/preferences | tenant (merchant/session) | `updatePushNotificationPreferences` |
 | PUT /api/subscription/plan | tenant (merchant/session) | `changeSubscriptionPlan`, `countSeatsInUse`, `getOrCreateSubscription` |
@@ -356,12 +356,13 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | IStorage | getTransactionEventsByTenantForMerchant | yes | `getTransactionEventsByTenantForMerchant(tenantProfileId: string, merchantId: number, limit?: number): Promise<any[]>` |
 | IStorage | getTenantProfile | no | `getTenantProfile(id: string): Promise<any \| undefined>` |
 | IStorage | getTenantProfilesByMerchant | yes | `getTenantProfilesByMerchant(merchantId: number, opts?: { search?: string; includeArchived?: boolean }): Promise<any[]>` |
-| IStorage | createActiveSchedule | no | `createActiveSchedule(data: any): Promise<any>` |
+| IStorage | createActiveScheduleForMerchant | yes | `createActiveScheduleForMerchant(tenantProfileId: string, merchantId: number, data: ActiveScheduleInput): Promise<PropertyScheduleMutationResult>` |
+| IStorage | getActiveScheduleForMerchant | yes | `getActiveScheduleForMerchant(id: string, merchantId: number): Promise<any \| undefined>` |
+| IStorage | updateActiveScheduleForMerchant | yes | `updateActiveScheduleForMerchant(id: string, merchantId: number, updates: ActiveScheduleChanges): Promise<PropertyScheduleMutationResult>` |
+| IStorage | terminateActiveScheduleForMerchant | yes | `terminateActiveScheduleForMerchant(id: string, merchantId: number): Promise<PropertyScheduleMutationResult>` |
 | IStorage | getActiveSchedule | no | `getActiveSchedule(id: string): Promise<any \| undefined>` |
-| IStorage | getActiveSchedulesByTenant | no | `getActiveSchedulesByTenant(tenantProfileId: string): Promise<any[]>` |
 | IStorage | getActiveSchedulesByMerchant | yes | `getActiveSchedulesByMerchant(merchantId: number): Promise<any[]>` |
 | IStorage | updateActiveSchedule | no | `updateActiveSchedule(id: string, updates: any): Promise<any \| undefined>` |
-| IStorage | terminateActiveSchedule | no | `terminateActiveSchedule(id: string): Promise<any \| undefined>` |
 | IStorage | getDueActiveSchedules | no | `getDueActiveSchedules(now: Date): Promise<any[]>` |
 | IStorage | createInvoiceRentRequest | no | `createInvoiceRentRequest(data: any): Promise<any>` |
 | IStorage | getInvoiceRentRequest | no | `getInvoiceRentRequest(id: string): Promise<any \| undefined>` |

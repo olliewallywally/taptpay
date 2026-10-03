@@ -100,3 +100,22 @@ test("property profile operations and history have explicit merchant contracts",
     expect(facts.get(key)?.storageMethods).not.toContain("getTenantProfile");
   }
 });
+
+test("property schedule management uses explicit scope and retains only separate public and cron lanes", () => {
+  const contract = storageContract();
+  for (const name of ["createActiveSchedule", "terminateActiveSchedule", "getActiveSchedulesByTenant"]) {
+    expect(contract.find(method => method.name === name)).toBeUndefined();
+  }
+  for (const [key, name] of [
+    ["POST /api/property/tenants/:tenantId/schedules", "createActiveScheduleForMerchant"],
+    ["PUT /api/property/schedules/:id", "updateActiveScheduleForMerchant"],
+    ["DELETE /api/property/schedules/:id", "terminateActiveScheduleForMerchant"],
+  ]) {
+    expect(contract.find(method => method.name === name)?.requiredTenant).toBe(true);
+    const methods = currentRouteFacts().get(key)!.storageMethods;
+    expect(methods).toContain(name);
+    expect(methods).not.toContain("getActiveSchedule");
+    expect(methods).not.toContain("updateActiveSchedule");
+    expect(methods).not.toContain("getTenantProfile");
+  }
+});

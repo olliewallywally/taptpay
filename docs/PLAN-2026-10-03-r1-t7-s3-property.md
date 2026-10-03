@@ -68,3 +68,85 @@ global methods. Profile reads remain needed by public checkout/email services. A
 and unarchive log only after a returned mutation; no resurrected schedules. Schema
 allows contact/address/channel edits, not identity/status metadata. History needs its
 own scoped query despite a checked route parent. **Approve the same S3a scope.**
+
+## S3b preflight — property schedules
+
+Base: `c7741b3f`. This recovery independently repeated the profile storage/HTTP and
+existing property contracts: **3 suites / 78 tests pass**. The sandbox refused HTTP
+listening; the identical command passed outside it. Actual PostgreSQL profile
+verification is repeated before building on its locking contract.
+
+### Verification of Prior Fixes
+
+Reread S3a predicates, archive transaction, schedule callers, schemas, cron and the
+2026-09-27 decisions. A new schedule replaces running/paused schedules; resuming
+skips missed cycles; cancelled schedules remain cancelled. Owners and members retain
+the same actions. No schema or UI change.
+
+### Blocking Issues
+
+None for the bounded S3b design. Replacement currently inserts, then lists and
+terminates globally, independently; concurrent replacements can cancel each other.
+Routes also write by id after an ownership/state lookup. Tests must demonstrate
+these defects before implementation.
+
+### High-Risk Concerns
+
+Use explicit merchant contracts, runtime field projection, and a transaction for
+replacement and its events. Lock the owned parent profile before its schedules,
+matching archive's lock order. Mutation rereads the schedule after acquiring that
+parent lock, including tenant/profile identity and cancellation state. Resume date
+is derived from the locked row, not the route's stale read. Event failure rolls back
+the schedule changes. A moved parent/child refuses without an event or delivery.
+
+### Missing Steps
+
+Storage/HTTP red first; scoped implementations and fakes; concurrent replacement,
+archive/replacement, ownership/state waits and event-failure rollback on real SQL;
+existing owner/member contracts; inventory, typecheck/build, evidence and commit.
+
+### Unsafe Assumptions
+
+Keep global schedule read for public checkout and global update for cron's date
+advance in their existing separate lanes. Retire global create/terminate and unused
+tenant schedule list after checking consumers. Merchant schedule list also requires
+its current parent's ownership. Memory property remains DB-only.
+
+### Required Ordering Changes
+
+Extract the existing pure UTC date calculation so storage can use it without
+importing the cron module and causing a storage/cron import cycle. Preserve its
+public re-export and behavior. Tests and fresh SQL proof precede final claims.
+
+### Open Product / Provider / Legal Questions
+
+None for this scope; replacement, cancellation and missed-cycle behavior already
+have dated owner decisions. End-date/backdated-start cron policy remains outside S3b.
+
+### Compliance and Data-Handling Notes
+
+Synthetic loopback database only. No application database/provider, live migration,
+capability enablement, upload, UI, deployment or push.
+
+### Test and Rollback Adequacy
+
+Invalid merchant causes no query; foreign and missing are indistinguishable.
+Projected fields cannot reassign identities or inject lifecycle/cron fields.
+Terminated/archived races produce the existing 409 or tenant-safe 404. Eight
+concurrent replacements must leave one active schedule and correct history;
+failures must roll back replacement and history together. Fix forward without
+restoring globally keyed authenticated writes.
+
+### Final Recommendation (Approve / Do not approve)
+
+**Approve S3b on `c7741b3f`**, tests first, with actual SQL verification.
+
+### Separate reread
+
+Separately traced parent archive, replacement, public checkout and cron consumers.
+Locking a schedule before its parent would deadlock against archive: acquire parent
+first and recheck the child with its original parent identity afterwards. Concurrent
+replacement is serialized by the parent's row even when no schedule exists yet.
+Cancellation is checked under the child lock, and resume uses the latest cycle.
+Persist schedule history inside the same transaction; HTTP fakes alone cannot prove
+rollback/concurrency. **Approve the same S3b scope**, no S3c/whole-R1 closure.

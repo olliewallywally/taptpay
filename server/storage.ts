@@ -3,6 +3,7 @@ import { DEFAULT_PLAN_ID, isUpgrade, planFor, planForOrDefault, type PlanId } fr
 import { decideBilling, failedPaymentUpdates, immediatePlanUpdates, MAX_PAYMENT_ATTEMPTS, nextBillingPeriodStart, nextPeriodUpdates, proratedUpgradeCents, queuedPlanUpdates, renewalPlan } from "./subscription-billing";
 import { getDb, isDatabaseConnected } from "./database";
 import { config } from "./config";
+import { nextRunDateAfter } from "./property-schedule";
 import { eq, ne, desc, asc, and, inArray, notInArray, gt, gte, lte, lt, or, ilike, like, sql, isNull, isNotNull } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
 import { authHandoffCodes, authSessions, authThrottle, invoiceDocumentAccessAudit, invoiceDocumentReadLimits, invoiceSplitSessions, type AuthSession, type InvoiceSplitSession, type NewAuthSession } from "@shared/schema";
@@ -45,6 +46,22 @@ export type TenantProfileChanges = Partial<Pick<typeof tenantProfiles.$inferInse
 function tenantProfileChanges(data: TenantProfileChanges): TenantProfileChanges {
   return Object.fromEntries(["firstName", "lastName", "email", "phone", "propertyAddress", "coTenantsText", "preferredChannel"]
     .filter(key => (data as any)[key] !== undefined).map(key => [key, (data as any)[key]]));
+}
+
+export type ActiveScheduleInput = Pick<typeof activeSchedules.$inferInsert,
+  "amountCents" | "frequency" | "deliveryChannel" | "startDate" | "endDate">;
+export type ActiveScheduleChanges = Partial<Pick<typeof activeSchedules.$inferInsert,
+  "amountCents" | "frequency" | "deliveryChannel">> & { status?: "active" | "paused" };
+export type PropertyScheduleMutationResult =
+  | { kind: "ok"; schedule: typeof activeSchedules.$inferSelect }
+  | { kind: "not-found" }
+  | { kind: "conflict"; reason: "archived" | "terminated" };
+
+function activeScheduleChanges(data: ActiveScheduleChanges): ActiveScheduleChanges {
+  const patch = Object.fromEntries(["amountCents", "frequency", "deliveryChannel"]
+    .filter(key => (data as any)[key] !== undefined).map(key => [key, (data as any)[key]]));
+  if (data.status === "active" || data.status === "paused") patch.status = data.status;
+  return patch;
 }
 
 export type MerchantRefundInput = Pick<InsertRefund, "refundAmount" | "refundReason" | "refundMethod">;
@@ -857,12 +874,15 @@ export interface IStorage extends PaymentAttemptRepository {
   getTenantProfile(id: string): Promise<any | undefined>;
   getTenantProfilesByMerchant(merchantId: number, opts?: { search?: string; includeArchived?: boolean }): Promise<any[]>;
 
-  createActiveSchedule(data: any): Promise<any>;
+  createActiveScheduleForMerchant(tenantProfileId: string, merchantId: number, data: ActiveScheduleInput): Promise<PropertyScheduleMutationResult>;
+  getActiveScheduleForMerchant(id: string, merchantId: number): Promise<any | undefined>;
+  updateActiveScheduleForMerchant(id: string, merchantId: number, updates: ActiveScheduleChanges): Promise<PropertyScheduleMutationResult>;
+  terminateActiveScheduleForMerchant(id: string, merchantId: number): Promise<PropertyScheduleMutationResult>;
+  /** Public invoice checkout only; authenticated schedule management uses explicit scope. */
   getActiveSchedule(id: string): Promise<any | undefined>;
-  getActiveSchedulesByTenant(tenantProfileId: string): Promise<any[]>;
   getActiveSchedulesByMerchant(merchantId: number): Promise<any[]>;
+  /** Internal cron date advance; not an authenticated management mutation. */
   updateActiveSchedule(id: string, updates: any): Promise<any | undefined>;
-  terminateActiveSchedule(id: string): Promise<any | undefined>;
   getDueActiveSchedules(now: Date): Promise<any[]>;
 
   createInvoiceRentRequest(data: any): Promise<any>;
@@ -3341,12 +3361,13 @@ export class MemStorage implements IStorage {
   async getTenantProfile(id: string): Promise<any> { return undefined; }
   async getTenantProfilesByMerchant(merchantId: number, opts?: any): Promise<any[]> { return []; }
 
-  async createActiveSchedule(data: any): Promise<any> { throw new Error("Property management requires database"); }
+  async createActiveScheduleForMerchant(tenantProfileId: string, merchantId: number, data: ActiveScheduleInput): Promise<PropertyScheduleMutationResult> { throw new Error("Property management requires database"); }
+  async getActiveScheduleForMerchant(id: string, merchantId: number): Promise<any> { return undefined; }
+  async updateActiveScheduleForMerchant(id: string, merchantId: number, updates: ActiveScheduleChanges): Promise<PropertyScheduleMutationResult> { return { kind: "not-found" }; }
+  async terminateActiveScheduleForMerchant(id: string, merchantId: number): Promise<PropertyScheduleMutationResult> { return { kind: "not-found" }; }
   async getActiveSchedule(id: string): Promise<any> { return undefined; }
-  async getActiveSchedulesByTenant(tenantProfileId: string): Promise<any[]> { return []; }
   async getActiveSchedulesByMerchant(merchantId: number): Promise<any[]> { return []; }
   async updateActiveSchedule(id: string, updates: any): Promise<any> { return undefined; }
-  async terminateActiveSchedule(id: string): Promise<any> { return undefined; }
   async getDueActiveSchedules(now: Date): Promise<any[]> { return []; }
   async createInvoiceRentRequest(data: any): Promise<any> { throw new Error("Property management requires database"); }
   async getInvoiceRentRequest(id: string): Promise<any> { return undefined; }
@@ -8024,28 +8045,86 @@ export class DatabaseStorage implements IStorage {
     }
     return db.select().from(tenantProfiles).where(and(...conds)).orderBy(desc(tenantProfiles.createdAt));
   }
-  async createActiveSchedule(data: any): Promise<any> {
-    const db = getDb(); if (!db) throw new Error('No database');
-    const [r] = await db.insert(activeSchedules).values(data).returning(); return r;
+  async createActiveScheduleForMerchant(tenantProfileId: string, merchantId: number, data: ActiveScheduleInput): Promise<PropertyScheduleMutationResult> {
+    if (!isManagementTenantId(merchantId)) return { kind: "not-found" };
+    const db = this.db; if (!db) throw new Error("Property management requires database");
+    return db.transaction(async (tx: any) => {
+      // Parent first, as in archive. Serializes replacements even before any child exists.
+      const [parent] = await tx.select().from(tenantProfiles)
+        .where(and(eq(tenantProfiles.id, tenantProfileId), eq(tenantProfiles.merchantId, merchantId)))
+        .limit(1).for("update");
+      if (!parent) return { kind: "not-found" };
+      if (parent.status === "archived") return { kind: "conflict", reason: "archived" };
+      const now = new Date();
+      const replaced = await tx.update(activeSchedules).set({ status: "terminated", terminatedAt: now, updatedAt: now })
+        .where(and(eq(activeSchedules.tenantProfileId, tenantProfileId), eq(activeSchedules.merchantId, merchantId), sql`${activeSchedules.status} <> 'terminated'`)).returning();
+      const values = Object.fromEntries(["amountCents", "frequency", "deliveryChannel", "startDate", "endDate"]
+        .filter(key => (data as any)[key] !== undefined).map(key => [key, (data as any)[key]]));
+      const [schedule] = await tx.insert(activeSchedules).values({ ...values, merchantId, tenantProfileId, status: "active", nextRunDate: data.startDate }).returning();
+      await tx.insert(transactionEvents).values([
+        { merchantId, tenantProfileId, scheduleId: schedule.id, eventType: "Schedule_Created", payload: { amountCents: schedule.amountCents, frequency: schedule.frequency } },
+        ...replaced.map((old: any) => ({ merchantId, tenantProfileId, scheduleId: old.id, eventType: "Schedule_Terminated", payload: { replacedBy: schedule.id } })),
+      ]);
+      return { kind: "ok", schedule };
+    });
+  }
+  async getActiveScheduleForMerchant(id: string, merchantId: number): Promise<any> {
+    if (!isManagementTenantId(merchantId)) return undefined;
+    const db = this.db; if (!db) return undefined;
+    const [row] = await db.select().from(activeSchedules).where(and(
+      eq(activeSchedules.id, id), eq(activeSchedules.merchantId, merchantId),
+      sql`exists (select 1 from ${tenantProfiles} where ${tenantProfiles.id} = ${activeSchedules.tenantProfileId} and ${tenantProfiles.merchantId} = ${merchantId})`,
+    )).limit(1);
+    return row;
+  }
+  private async mutateActiveScheduleForMerchant(id: string, merchantId: number, updates?: ActiveScheduleChanges): Promise<PropertyScheduleMutationResult> {
+    if (!isManagementTenantId(merchantId)) return { kind: "not-found" };
+    const db = this.db; if (!db) return { kind: "not-found" };
+    return db.transaction(async (tx: any) => {
+      const [candidate] = await tx.select({ tenantProfileId: activeSchedules.tenantProfileId }).from(activeSchedules)
+        .where(and(eq(activeSchedules.id, id), eq(activeSchedules.merchantId, merchantId))).limit(1);
+      if (!candidate) return { kind: "not-found" };
+      const tenantProfileId = candidate.tenantProfileId;
+      const [parent] = await tx.select().from(tenantProfiles)
+        .where(and(eq(tenantProfiles.id, tenantProfileId), eq(tenantProfiles.merchantId, merchantId)))
+        .limit(1).for("update");
+      if (!parent) return { kind: "not-found" };
+      const scope = and(eq(activeSchedules.id, id), eq(activeSchedules.merchantId, merchantId), eq(activeSchedules.tenantProfileId, tenantProfileId));
+      const [current] = await tx.select().from(activeSchedules).where(scope).limit(1).for("update");
+      if (!current) return { kind: "not-found" };
+      if (updates && current.status === "terminated") return { kind: "conflict", reason: "terminated" };
+      if (updates && parent.status === "archived") return { kind: "conflict", reason: "archived" };
+      const now = new Date();
+      const patch: any = updates ? activeScheduleChanges(updates) : { status: "terminated", terminatedAt: now };
+      if (current.status === "paused" && patch.status === "active") {
+        patch.nextRunDate = nextRunDateAfter(new Date(current.nextRunDate), patch.frequency ?? current.frequency, now);
+      }
+      const [schedule] = await tx.update(activeSchedules).set({ ...patch, updatedAt: now }).where(scope).returning();
+      if (!schedule) return { kind: "not-found" };
+      const eventType = !updates ? "Schedule_Terminated" : patch.status === "paused" ? "Schedule_Paused" : patch.status === "active" ? "Schedule_Resumed" : undefined;
+      if (eventType) await tx.insert(transactionEvents).values({ merchantId, tenantProfileId, scheduleId: id, eventType, payload: {} });
+      return { kind: "ok", schedule };
+    });
+  }
+  async updateActiveScheduleForMerchant(id: string, merchantId: number, updates: ActiveScheduleChanges): Promise<PropertyScheduleMutationResult> {
+    return this.mutateActiveScheduleForMerchant(id, merchantId, updates);
+  }
+  async terminateActiveScheduleForMerchant(id: string, merchantId: number): Promise<PropertyScheduleMutationResult> {
+    return this.mutateActiveScheduleForMerchant(id, merchantId);
   }
   async getActiveSchedule(id: string): Promise<any> {
-    const db = getDb(); if (!db) return undefined;
+    const db = this.db; if (!db) return undefined;
     const [r] = await db.select().from(activeSchedules).where(eq(activeSchedules.id, id)).limit(1); return r;
   }
-  async getActiveSchedulesByTenant(tenantProfileId: string): Promise<any[]> {
-    const db = getDb(); if (!db) return [];
-    return db.select().from(activeSchedules).where(eq(activeSchedules.tenantProfileId, tenantProfileId));
-  }
   async getActiveSchedulesByMerchant(merchantId: number): Promise<any[]> {
-    const db = getDb(); if (!db) return [];
-    return db.select().from(activeSchedules).where(eq(activeSchedules.merchantId, merchantId));
+    if (!isManagementTenantId(merchantId)) return [];
+    const db = this.db; if (!db) return [];
+    return db.select().from(activeSchedules).where(and(eq(activeSchedules.merchantId, merchantId),
+      sql`exists (select 1 from ${tenantProfiles} where ${tenantProfiles.id} = ${activeSchedules.tenantProfileId} and ${tenantProfiles.merchantId} = ${merchantId})`));
   }
   async updateActiveSchedule(id: string, updates: any): Promise<any> {
     const db = getDb(); if (!db) return undefined;
     const [r] = await db.update(activeSchedules).set({ ...updates, updatedAt: new Date() }).where(eq(activeSchedules.id, id)).returning(); return r;
-  }
-  async terminateActiveSchedule(id: string): Promise<any> {
-    return this.updateActiveSchedule(id, { status: "terminated", terminatedAt: new Date() });
   }
   async getDueActiveSchedules(now: Date): Promise<any[]> {
     const db = getDb(); if (!db) return [];

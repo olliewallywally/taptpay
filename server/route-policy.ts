@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 6c2fafab7ca77e6346f106c47525c9b4e5ce1cd6 on 2026-10-03.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ c7741b3f977ee9f8d024f04d73b6acab17bc2f94 on 2026-10-03.
  *
  * 187 registrations (78 GET, 77 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -1985,7 +1985,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       middleware: ["authenticateToken"],
       params: ["tenantId: strictUuidParam"],
       authChecks: ["compares tenant.merchantId !== merchantId"],
-      storageMethods: ["createActiveSchedule","getActiveSchedulesByTenant","getOrCreateSubscription","getTenantProfile","logTransactionEvent","terminateActiveSchedule"],
+      storageMethods: ["createActiveScheduleForMerchant","getOrCreateSubscription","getTenantProfileForMerchant"],
       statuses: [201,400,401,402,403,404,409,500,503],
       errorTextInResponse: ["err.errors"],
       entitlementGates: ["BILLING_CARD_REQUIRED","billingCardIsReady","requireBillingCard"],
@@ -2002,7 +2002,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       params: ["id: strictUuidParam"],
       body: ["schema: updateActiveScheduleSchema"],
       authChecks: ["compares existing.merchantId !== merchantId"],
-      storageMethods: ["getActiveSchedule","logTransactionEvent","updateActiveSchedule"],
+      storageMethods: ["getActiveScheduleForMerchant","updateActiveScheduleForMerchant"],
       statuses: [200,400,401,403,404,409,500,503],
       errorTextInResponse: ["err.errors"],
     },
@@ -2016,7 +2016,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       middleware: ["authenticateToken"],
       params: ["id: strictUuidParam"],
       authChecks: ["compares existing.merchantId !== merchantId"],
-      storageMethods: ["getActiveSchedule","logTransactionEvent","terminateActiveSchedule"],
+      storageMethods: ["getActiveScheduleForMerchant","terminateActiveScheduleForMerchant"],
       statuses: [200,400,401,403,404,500,503],
     },
   },

@@ -9,6 +9,7 @@
  */
 import * as billing from "../../billing-card";
 import * as propertyCron from "../../property-cron";
+import { nextRunDateAfter } from "../../property-schedule";
 import { storage } from "./http-harness";
 
 export const TENANT = "22222222-2222-4222-8222-222222222222";
@@ -46,6 +47,11 @@ export function fakeProperty(): PropertyFake {
     return row?.merchantId === merchantId ? row : undefined;
   });
   read("getActiveSchedule", fake.schedules);
+  jest.spyOn(storage, "getActiveScheduleForMerchant").mockImplementation(async (id, merchantId) => {
+    fake.reads.push("getActiveSchedule");
+    const row = fake.schedules.get(id);
+    return row?.merchantId === merchantId && fake.tenants.get(row.tenantProfileId)?.merchantId === merchantId ? row : undefined;
+  });
   read("getInvoiceRentRequest", fake.invoices);
   const list = (name: string, rows: (...args: any[]) => any[]) =>
     jest.spyOn(storage as any, name).mockImplementation(async (...args: any[]) => {
@@ -53,11 +59,8 @@ export function fakeProperty(): PropertyFake {
       return rows(...args);
     });
   list("getTenantProfilesByMerchant", () => [...fake.tenants.values()]);
-  list("getActiveSchedulesByMerchant", () => [...fake.schedules.values()]);
-  jest.spyOn(storage as any, "getActiveSchedulesByTenant").mockImplementation(async (tenantId: unknown) => {
-    fake.reads.push("getActiveSchedulesByTenant");
-    return [...fake.schedules.values()].filter((row) => row.tenantProfileId === tenantId);
-  });
+  list("getActiveSchedulesByMerchant", (merchantId: number) => [...fake.schedules.values()]
+    .filter(row => row.merchantId === merchantId && fake.tenants.get(row.tenantProfileId)?.merchantId === merchantId));
   list("getInvoiceRentRequestsByMerchant", () => [...fake.invoices.values()]);
   // Newest first, as the tenant's history screen reads it.
   list("getTransactionEventsByTenant", (tenantId: string) => fake.events.filter((row) => row.tenantProfileId === tenantId).reverse());
@@ -98,13 +101,35 @@ export function fakeProperty(): PropertyFake {
     return row;
   });
   write("unarchiveTenantProfileForMerchant", (id: string) => Object.assign(fake.tenants.get(id), { status: "active" }));
-  write("createActiveSchedule", (data: any) => {
-    const row = { id: MADE_SCHEDULE, status: "active", ...data };
-    fake.schedules.set(row.id, row);
-    return row;
+  jest.spyOn(storage, "createActiveScheduleForMerchant").mockImplementation(async (tenantProfileId, merchantId, data) => {
+    const parent = fake.tenants.get(tenantProfileId);
+    if (parent?.merchantId !== merchantId) return { kind: "not-found" };
+    if (parent.status === "archived") return { kind: "conflict", reason: "archived" };
+    const replaced = [...fake.schedules.values()].filter(row => row.tenantProfileId === tenantProfileId && row.merchantId === merchantId && row.status !== "terminated");
+    fake.writes.push("createActiveSchedule");
+    const schedule = { ...data, id: MADE_SCHEDULE, merchantId, tenantProfileId, status: "active", nextRunDate: data.startDate } as any;
+    for (const old of replaced) Object.assign(old, { status: "terminated", terminatedAt: new Date() });
+    fake.schedules.set(schedule.id, schedule);
+    await storage.logTransactionEvent({ merchantId, tenantProfileId, scheduleId: schedule.id, eventType: "Schedule_Created", payload: { amountCents: schedule.amountCents, frequency: schedule.frequency } });
+    for (const old of replaced) await storage.logTransactionEvent({ merchantId, tenantProfileId, scheduleId: old.id, eventType: "Schedule_Terminated", payload: { replacedBy: schedule.id } });
+    return { kind: "ok", schedule };
   });
   write("updateActiveSchedule", (id: string, updates: any) => Object.assign(fake.schedules.get(id), updates));
-  write("terminateActiveSchedule", (id: string) => Object.assign(fake.schedules.get(id), { status: "terminated", terminatedAt: new Date() }));
+  const mutateSchedule = async (id: string, merchantId: number, data?: any): Promise<any> => {
+    const schedule = fake.schedules.get(id); const parent = fake.tenants.get(schedule?.tenantProfileId);
+    if (schedule?.merchantId !== merchantId || parent?.merchantId !== merchantId) return { kind: "not-found" };
+    if (data && schedule.status === "terminated") return { kind: "conflict", reason: "terminated" };
+    if (data && parent.status === "archived") return { kind: "conflict", reason: "archived" };
+    const updates = data ? { ...data } : { status: "terminated", terminatedAt: new Date() };
+    if (schedule.status === "paused" && updates.status === "active") updates.nextRunDate = nextRunDateAfter(new Date(schedule.nextRunDate), updates.frequency ?? schedule.frequency, new Date());
+    fake.writes.push(data ? "updateActiveSchedule" : "terminateActiveSchedule");
+    Object.assign(schedule, updates);
+    const eventType = !data ? "Schedule_Terminated" : data.status === "paused" ? "Schedule_Paused" : data.status === "active" ? "Schedule_Resumed" : undefined;
+    if (eventType) await storage.logTransactionEvent({ merchantId, tenantProfileId: schedule.tenantProfileId, scheduleId: id, eventType, payload: {} });
+    return { kind: "ok", schedule };
+  };
+  jest.spyOn(storage, "updateActiveScheduleForMerchant").mockImplementation(mutateSchedule);
+  jest.spyOn(storage, "terminateActiveScheduleForMerchant").mockImplementation((id, merchantId) => mutateSchedule(id, merchantId));
   write("createInvoiceRentRequest", (data: any) => {
     const row = { id: MADE_INVOICE, ...data };
     fake.invoices.set(row.id, row);

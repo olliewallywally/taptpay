@@ -18,6 +18,8 @@ import { sendEmail } from "./email-service";
 import { isWhatsAppConfigured, sendWhatsApp } from "./whatsapp-service";
 import { isSmsConfigured, sendSms } from "./sms-service";
 import { billingCardIsReady } from "./billing-card";
+import { computeNextRunDate } from "./property-schedule";
+export { nextRunDateAfter } from "./property-schedule";
 
 // Remaining owing on a split invoice (null for non-split). Shares 1..n-1 are
 // each floor(total/n); the remainder lands on the final share, so after k
@@ -27,25 +29,6 @@ function splitOwing(invoice: any): { owingCents: number; paid: number; count: nu
   const base = Math.floor(invoice.amountCents / invoice.splitCount);
   const paid = invoice.splitPaidCount || 0;
   return { owingCents: invoice.amountCents - paid * base, paid, count: invoice.splitCount, sharesLeft: invoice.splitCount - paid };
-}
-
-// UTC-based math so the run time doesn't drift an hour across DST boundaries.
-function computeNextRunDate(from: Date, frequency: string): Date {
-  const d = new Date(from);
-  if (frequency === "weekly")           d.setUTCDate(d.getUTCDate() + 7);
-  else if (frequency === "fortnightly") d.setUTCDate(d.getUTCDate() + 14);
-  else                                  d.setUTCMonth(d.getUTCMonth() + 1);
-  return d;
-}
-
-/**
- * The first date on an automation's cycle after `now`, counting on from `from`. Resuming a paused
- * automation starts there (owner decision 2026-09-27): nothing is sent for the paused time.
- */
-export function nextRunDateAfter(from: Date, frequency: string, now: Date): Date {
-  let next = new Date(from);
-  while (next <= now) next = computeNextRunDate(next, frequency);
-  return next;
 }
 
 function addDaysUTC(from: Date, days: number): Date {

@@ -40,7 +40,7 @@ import path from "path";
 import fs from "fs";
 import { sendPushToMerchant } from "./push";
 import { isPushServiceEndpoint } from "./push-endpoint";
-import { nextRunDateAfter, resendInvoiceEmail } from "./property-cron";
+import { resendInvoiceEmail } from "./property-cron";
 import { INVOICE_DOCUMENT_FOLDER, isInvoiceDocumentName, isPublicUploadFolder, parseInvoiceDocumentRef } from "./upload-policy";
 import { INVOICE_DOCUMENT_EXTENSIONS } from "./invoice-document-security";
 import { resendTradeInvoice, sendTradePaymentInvoice, sendTradeQuote } from "./trades-delivery";
@@ -7256,22 +7256,16 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const tenantId = strictUuidParam(req.params.tenantId);
       if (tenantId === null) return res.status(400).json({ message: "Invalid id" });
-      const tenant = await storage.getTenantProfile(tenantId);
+      const tenant = await storage.getTenantProfileForMerchant(tenantId, merchantId);
       if (!tenant || tenant.merchantId !== merchantId) return res.status(404).json({ message: "Tenant not found" });
       // Archiving a tenant cancels its automations, and the screens offer only current tenants.
       if (tenant.status === "archived") return res.status(409).json({ message: "This tenant is archived" });
       if (!(await requireBillingCard(merchantId, res))) return;
       const data = createActiveScheduleSchema.parse({ ...req.body, tenantProfileId: tenantId });
-      const schedule = await storage.createActiveSchedule({ ...data, merchantId, nextRunDate: data.startDate });
-      await storage.logTransactionEvent({ merchantId, tenantProfileId: tenantId, scheduleId: schedule.id, eventType: "Schedule_Created", payload: { amountCents: schedule.amountCents, frequency: schedule.frequency } });
-      // A tenant has one rent automation (owner decision 2026-09-27): the new one replaces any the
-      // tenant already had, running or paused, which went on billing beside it every period.
-      for (const old of await storage.getActiveSchedulesByTenant(tenantId)) {
-        if (old.id === schedule.id || old.status === "terminated") continue;
-        await storage.terminateActiveSchedule(old.id);
-        await storage.logTransactionEvent({ merchantId, tenantProfileId: tenantId, scheduleId: old.id, eventType: "Schedule_Terminated", payload: { replacedBy: schedule.id } });
-      }
-      res.status(201).json(schedule);
+      const result = await storage.createActiveScheduleForMerchant(tenantId, merchantId, data);
+      if (result.kind === "not-found") return res.status(404).json({ message: "Tenant not found" });
+      if (result.kind === "conflict") return res.status(409).json({ message: "This tenant is archived" });
+      res.status(201).json(result.schedule);
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: "Validation error", errors: err.errors });
       console.error("[PROP_SCHEDULE_CREATE]", err); res.status(500).json({ message: "Failed to create schedule" });
@@ -7284,22 +7278,16 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
-      const existing = await storage.getActiveSchedule(id);
+      const existing = await storage.getActiveScheduleForMerchant(id, merchantId);
       if (!existing || existing.merchantId !== merchantId) return res.status(404).json({ message: "Schedule not found" });
       // A cancelled automation stays cancelled: the screens hide cancelled ones, and resuming one
       // would bill again, even a tenant archived since. DELETE is how one is cancelled.
       if (existing.status === "terminated") return res.status(409).json({ message: "This automation was cancelled" });
       const data = updateActiveScheduleSchema.parse(req.body);
-      // Resuming skips the paused time (owner decision 2026-09-27): the next date moves to the
-      // first date on the automation's cycle after now, instead of billing every period it missed.
-      const resuming = existing.status === "paused" && data.status === "active";
-      const schedule = await storage.updateActiveSchedule(id, resuming
-        ? { ...data, nextRunDate: nextRunDateAfter(new Date(existing.nextRunDate), data.frequency ?? existing.frequency, new Date()) }
-        : data);
-      if (data.status === "paused" || data.status === "active") {
-        await storage.logTransactionEvent({ merchantId, tenantProfileId: existing.tenantProfileId, scheduleId: id, eventType: data.status === "paused" ? "Schedule_Paused" : "Schedule_Resumed", payload: {} });
-      }
-      res.json(schedule);
+      const result = await storage.updateActiveScheduleForMerchant(id, merchantId, data);
+      if (result.kind === "not-found") return res.status(404).json({ message: "Schedule not found" });
+      if (result.kind === "conflict") return res.status(409).json({ message: result.reason === "terminated" ? "This automation was cancelled" : "This tenant is archived" });
+      res.json(result.schedule);
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: "Validation error", errors: err.errors });
       console.error("[PROP_SCHEDULE_UPDATE]", err); res.status(500).json({ message: "Failed to update schedule" });
@@ -7312,11 +7300,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
-      const existing = await storage.getActiveSchedule(id);
+      const existing = await storage.getActiveScheduleForMerchant(id, merchantId);
       if (!existing || existing.merchantId !== merchantId) return res.status(404).json({ message: "Schedule not found" });
-      const schedule = await storage.terminateActiveSchedule(id);
-      await storage.logTransactionEvent({ merchantId, tenantProfileId: existing.tenantProfileId, scheduleId: id, eventType: "Schedule_Terminated", payload: {} });
-      res.json(schedule);
+      const result = await storage.terminateActiveScheduleForMerchant(id, merchantId);
+      if (result.kind !== "ok") return res.status(404).json({ message: "Schedule not found" });
+      res.json(result.schedule);
     } catch (err) { console.error("[PROP_SCHEDULE_DELETE]", err); res.status(500).json({ message: "Failed to terminate schedule" }); }
   });
 
