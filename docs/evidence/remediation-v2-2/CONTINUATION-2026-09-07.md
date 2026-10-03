@@ -1,5 +1,27 @@
 # Full integration continuation audit — 2026-09-07
 
+Latest continuation **2026-10-03 — S3a property profiles code-complete `8e7f315f`**,
+local, awaiting independent review. [Evidence](r1/R1-T7-S3a-property-profiles-2026-10-03.md),
+[S3 plan/preflight](../../PLAN-2026-10-03-r1-t7-s3-property.md).
+Owner instruction to finish all R1 work without routine permission questions persists.
+
+- Six merchant-required contracts, narrow create/update projection, scoped read/write
+  predicates, atomic same-tenant archive cascade, no resumed schedules on restore,
+  and event/current-parent scoped history. Retired four global profile mutations.
+- Red first: storage 15 fail; corrected/replayed actual HTTP base 4 fail. Final
+  focused 19 pass; affected **10 suites / 227 pass**; actual PostgreSQL **9 pass**
+  including real rollback and all three waited ownership races; final inventory
+  **33 pass**; typecheck/build/whitespace pass. **187 routes / 0 gaps; 231 methods**.
+- Instance DB used for real profile reads; memory remains DB-only. No client/schema,
+  application DB/provider, live migration, capability enablement, push or deployment.
+  Disposable PostgreSQL is stopped. No full-server rerun claimed for this slice.
+
+**Active next:** S3b property schedules (atomic create/replacement and scoped mutations),
+S3c invoices/scoped delivery; then S4 trades, S5 settings/exports, S6 upload lifecycle,
+Apple implementation and R1-T10 acceptance. This is still active finish-R1 work,
+not authorization to mark R1 complete from a batch. Existing owner decisions and
+external/device/provider gates below remain in force.
+
 Latest continuation **2026-10-03 — R1-T7 S2 engineering scope implemented**:
 S2a `ea4759cf`, S2b1 `42792fd8`, S2b2 `cb8a61cf`, all local, independent review
 still owed. [Refund evidence](r1/R1-T7-S2b-refund-writes-2026-10-03.md),
