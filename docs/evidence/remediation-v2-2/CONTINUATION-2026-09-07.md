@@ -1,5 +1,26 @@
 # Full integration continuation audit — 2026-09-07
 
+Latest continuation **2026-10-03 — S3b property schedules code-complete `17a9f71d`**,
+local, awaiting independent review. [Evidence](r1/R1-T7-S3b-property-schedules-2026-10-03.md),
+[S3 preflight/separate reread](../../PLAN-2026-10-03-r1-t7-s3-property.md).
+Owner direction to finish all R1 work without routine permission questions persists.
+
+- Replacement and creation/termination history now commit together under the owned
+  parent's lock. Scoped reads and parent-then-child mutations recheck ownership/state;
+  resume derives its next date from the current locked cycle. Three global contracts
+  retired; public checkout and cron lanes preserved; runtime fields projected.
+- Independently reverified S3a **78 tests + 9 actual PostgreSQL checks**. Red first:
+  storage **17 fail**, corrected committed-base HTTP replay **8 fail**. Final affected
+  **14 suites / 419 pass**, fresh actual PostgreSQL **17 pass**, typecheck/build and
+  whitespace pass. Inventories **187 routes / 0 gaps; 232 contracts**.
+- No application DB/provider, live migration, schema/client change, push or deploy.
+  Disposable PostgreSQL stays running only for S3c in this turn; stop before handoff.
+  No new full-server/client/browser run is claimed.
+
+**Active next:** S3c property invoices and scoped authenticated delivery; S4 trades,
+S5 settings/exports, S6 upload lifecycle, Apple implementation and R1-T10 acceptance.
+S3b does not close S3/R1-T7/R1. Independent review and existing external gates remain.
+
 Latest continuation **2026-10-03 — S3a property profiles code-complete `8e7f315f`**,
 local, awaiting independent review. [Evidence](r1/R1-T7-S3a-property-profiles-2026-10-03.md),
 [S3 plan/preflight](../../PLAN-2026-10-03-r1-t7-s3-property.md).
