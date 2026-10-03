@@ -1,5 +1,29 @@
 # Full integration continuation audit — 2026-09-07
 
+Latest continuation **2026-10-03 — S4b1 trades invoice state changes, receipts and
+quote PDF code-complete `394da7d6`**, local, awaiting independent review.
+[Evidence/handoff](r1/R1-T7-S4b1-trades-invoices-2026-10-03.md),
+[S4 preflights](../../PLAN-2026-10-03-r1-t7-s4-trades.md).
+Owner finish-R1 authorization persists.
+
+- Quote and invoice reads/lists need the row and its current client; void, external
+  payment and job complete lock the owned client then the invoice, recheck state and
+  commit fixed fields with history; the signed-in PDF and the external-payment
+  receipt use one joined row/owned-client read; the receipt's history is scoped.
+  The global invoice, quote, client and event methods stay for the public, checkout,
+  provider, WhatsApp and cron lanes and, until S4b2, authenticated creation/sending.
+- Red **51 of 51** on `c0fb5bc3` (11 genuine HTTP races, a foreign client printed in
+  the PDF); affected **31 suites / 1,693 pass**; fresh actual PostgreSQL **27 pass**;
+  **28 of 28** planted mutations caught; the payment lane's receipt byte-identical
+  across the extraction; **full server 156 suites / 3,847 pass**.
+  Typecheck/build/whitespace and **187 routes / 0 gaps; 246 contracts** pass.
+- No app DB/provider, live migration, client/schema change, enablement, push or
+  deploy. Disposable PostgreSQL stopped and deleted.
+
+**Active next:** S4b2 authenticated quote/invoice/balance creation and delivery
+(preflight and separate reread approve it on `394da7d6`), S4c schedules; S5–S6, Apple
+and R1-T10. Independent/external gates remain below.
+
 Latest continuation **2026-10-03 — S4a trades clients code-complete `22c6dc9c`**,
 local, awaiting independent review.
 [Evidence/handoff](r1/R1-T7-S4a-trades-clients-2026-10-03.md),

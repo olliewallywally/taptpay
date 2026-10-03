@@ -217,3 +217,125 @@ invoice only, so no lock cycle is introduced. An archived client keeps its issue
 invoices manageable (owner decision 2026-09-27). The fake must refuse a row whose
 client is foreign, or the HTTP race tests prove nothing. **Approve the same S4b1
 scope.**
+
+## S4b2 preflight — authenticated quote, invoice and balance creation and their delivery
+
+Base `394da7d6` (the S4b1 code; the documentation commit above it changes no code).
+Three registrations: `POST /api/trades/quotes`,
+`POST /api/trades/invoices` and `POST /api/trades/invoices/:id/send-balance`.
+
+### Verification of Prior Fixes
+
+S4b1 (`394da7d6`) was checked at completion in this session: 51 new tests red
+first, then green; 31 affected suites / 1,693 tests; 27 actual PostgreSQL checks; 28
+of 28 planted mutations caught; the payment lane's receipt byte-identical across the
+extraction; typecheck, build and inventories; and the full server suite on that commit (156
+suites / 3,847 tests). Reread for this
+scope: the three creates and their recorded reviews, the delivery module's quote and
+invoice senders, the public quote acceptance (which also creates invoices), the cron
+generate and dispatch passes, the gap-13 document ownership rule, and the S3c2
+property creation/delivery contract this mirrors.
+
+### Blocking Issues
+
+None. To demonstrate before production edits: a client named in the body is read
+through a global key and compared in the route, then the quote or invoice is created
+and sent by global id, so a client moved after the lookup is still quoted, invoiced
+and messaged; a linked quote and a deposit are held the same way; the hidden
+prospect, the quote or invoice and its history are separate writes; and two balance
+sends at the same moment each find no balance and each bill one (recorded R3 finding).
+
+### High-Risk Concerns
+
+Creation locks the owned client (or inserts the hidden prospect) and commits the
+row and its creation history in one transaction. Input is projected at runtime: the
+server makes the token and the status; identity, ownership, payment and lifecycle
+fields are never taken from the caller. A linked quote must be the business's and
+that client's, and an attached document the business's own upload, both held under a
+share lock through the insert. The balance create locks the client, then the
+deposit, rechecks kind, paid state and quote under those locks, and computes what is
+left from the client's unvoided invoices on that quote inside the same transaction,
+so authenticated balance sends serialize. Delivery uses an explicit-business service
+and one joined row/owned-client snapshot; no lock is held across a provider call; the
+delivery record locks client then invoice and saves state and history together.
+
+### Missing Steps
+
+Storage, service and HTTP tests red first; contracts in both implementations; the
+three routes; the shared fake and the existing create fixtures (mobile quote,
+attachment ownership, gap-13 regressions, served recipes); actual SQL for projection,
+prospect atomicity, linked-quote and document rechecks, concurrent balance sends,
+history rollback, waited ownership/reparent/state changes and delivery records;
+route reviews and both inventories; affected and full server runs, typecheck, build,
+evidence.
+
+### Unsafe Assumptions
+
+A delivery snapshot authorizes a point-in-time message to its captured owned
+contact; it cannot promise zero external effect after a later change or a provider
+exception. After an attempted send, an uncertain outcome or a refused or failed
+delivery record returns a fixed reconciliation-required 503 with no row, as S3c2
+does; it replaces today's 500 for the same cases and never claims no message was
+sent. A known failed send keeps today's 201 with `delivered: false` and its fixed
+reason, and the quote's second failure line stays. The public acceptance and the
+cron keep the global `createJobInvoice`, `resendTradeInvoice`, `getJobInvoice`,
+`updateJobInvoice` and `createJobEvent`; they take none of these locks, so a balance
+raced by a customer's acceptance stays an R3 finding. An archived client can still
+be quoted or invoiced here, as recorded. HTTP fakes prove decisions, not SQL. Memory
+stays DB-only.
+
+### Required Ordering Changes
+
+Creation contracts and history first; snapshots and delivery records next; then the
+explicit-business services and the routes. Retire the global `createQuote` and the
+unscoped `sendTradeQuote` once nothing signed-in or public calls them; keep
+`createJobInvoice` and `resendTradeInvoice` for the public and cron lanes.
+
+### Open Product / Provider / Legal Questions
+
+None. Validation order, statuses, messages, DTOs, roles and the billing gate are
+preserved. A deposit's amount not being checked against its quote's deposit, and
+hidden prospects never being removed, stay recorded findings. Serializing balance
+sends closes the recorded one-balance race for signed-in callers without changing
+the one-balance rule.
+
+### Compliance and Data-Handling Notes
+
+Synthetic loopback PostgreSQL and stubbed email, WhatsApp and SMS only; no real
+contact or provider call, application database, live migration, client UI, flag,
+push or deployment. No contact data in evidence.
+
+### Test and Rollback Adequacy
+
+Two businesses; foreign and missing indistinguishable; an invalid business issues no
+query. Projection cannot set identity, ownership, token, status or payment fields. A
+refused create leaves no prospect, row, history or message. A history failure rolls
+back the prospect and the row. Eight concurrent balance sends make one balance.
+Waited client ownership, deposit ownership, reparent and paid-state changes are
+refused after the wait. The services are observed on every channel and on every
+global escape hatch; post-send refusal is 503 and never a success. Final responses
+are read back through scoped storage. Fix forward without restoring global
+authenticated operations.
+
+### Final Recommendation (Approve / Do not approve)
+
+**Approve S4b2 on `394da7d6`**, failing tests first. S4c remains separately
+reviewed; no closure of S4, R1-T7 or R1 is inferred.
+
+### Separate reread
+
+Retraced the callers by call site. The global quote create and the unscoped quote
+sender are called only by the signed-in quote create: both can be retired. The
+global invoice create and the unscoped invoice sender are also called by the public
+quote acceptance (the deposit or full invoice it issues) and by the cron's generate,
+dispatch and reminder passes: both stay, in those lanes only. A transaction that
+returns a refusal after an insert would still commit that insert, so every check
+(client, linked quote, document) comes before the hidden prospect is made. The
+balance's sum must read the client's unvoided invoices on the quote inside the
+client's lock, or two sends still race. The existing tests fix what must not move:
+the statuses and messages of each refusal and their order, 201 with `delivered` and a
+fixed reason for a known failed send, the server's totals and deposit, one creation
+event, the balance of what is left with the deposit's channel and the caller's split
+switch, and a refused attachment writing nothing. Fixtures that stub the retired
+global create and sender must move to the scoped contracts, or they would pass
+without exercising the route. **Approve the same S4b2 scope.**
