@@ -8044,7 +8044,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const parsed = createClientProfileSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
-      const row = await storage.createClientProfile({ ...parsed.data, merchantId });
+      const row = await storage.createClientProfileForMerchant(merchantId, parsed.data);
       res.status(201).json(row);
     } catch (err) { console.error("[TRADES_CLIENTS_POST]", err); res.status(500).json({ message: "Failed to create client" }); }
   });
@@ -8056,8 +8056,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
-      const row = await storage.getClientProfile(id);
-      if (!row || row.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
+      const row = await storage.getClientProfileForMerchant(id, merchantId);
+      if (!row) return res.status(404).json({ message: "Not found" });
       res.json(row);
     } catch (err) { console.error("[TRADES_CLIENTS_GET_ID]", err); res.status(500).json({ message: "Failed to fetch client" }); }
   });
@@ -8067,11 +8067,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
-      const existing = await storage.getClientProfile(id);
-      if (!existing || existing.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
+      const existing = await storage.getClientProfileForMerchant(id, merchantId);
+      if (!existing) return res.status(404).json({ message: "Not found" });
       const parsed = updateClientProfileSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
-      res.json(await storage.updateClientProfile(id, parsed.data));
+      const updated = await storage.updateClientProfileForMerchant(id, merchantId, parsed.data);
+      if (!updated) return res.status(404).json({ message: "Not found" });
+      res.json(updated);
     } catch (err) { console.error("[TRADES_CLIENTS_PUT]", err); res.status(500).json({ message: "Failed to update client" }); }
   });
   app.post("/api/trades/clients/:id/archive", authenticateToken, async (req: AuthenticatedRequest, res) => {
@@ -8080,16 +8082,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
-      const existing = await storage.getClientProfile(id);
-      if (!existing || existing.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
-      const client = await storage.archiveClientProfile(id);
-      // Archiving cancels the client's recurring invoices (owner decision 2026-09-27), as archiving a
-      // rent tenant cancels its automations: they went on billing the archived client every period.
-      for (const schedule of await storage.getJobSchedulesByMerchant(merchantId)) {
-        if (schedule.clientProfileId !== id || schedule.status === "terminated") continue;
-        await storage.terminateJobSchedule(schedule.id);
-        await storage.createJobEvent({ merchantId, clientProfileId: id, scheduleId: schedule.id, eventType: "schedule_terminated", payload: { reason: "client_archived" } });
-      }
+      const existing = await storage.getClientProfileForMerchant(id, merchantId);
+      if (!existing) return res.status(404).json({ message: "Not found" });
+      const client = await storage.archiveClientProfileForMerchant(id, merchantId);
+      if (!client) return res.status(404).json({ message: "Not found" });
       res.json(client);
     } catch (err) { console.error("[TRADES_CLIENTS_ARCHIVE]", err); res.status(500).json({ message: "Failed to archive client" }); }
   });
@@ -8099,10 +8095,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
-      const existing = await storage.getClientProfile(id);
-      if (!existing || existing.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
+      const existing = await storage.getClientProfileForMerchant(id, merchantId);
+      if (!existing) return res.status(404).json({ message: "Not found" });
       // Recurring invoices cancelled by the archive stay cancelled, as a restored rent tenant's do.
-      res.json(await storage.unarchiveClientProfile(id));
+      const client = await storage.unarchiveClientProfileForMerchant(id, merchantId);
+      if (!client) return res.status(404).json({ message: "Not found" });
+      res.json(client);
     } catch (err) { console.error("[TRADES_CLIENTS_UNARCHIVE]", err); res.status(500).json({ message: "Failed to restore client" }); }
   });
   // Promote a quick-invoice 'prospect' profile into a real (visible) client.
@@ -8112,10 +8110,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
-      const existing = await storage.getClientProfile(id);
-      if (!existing || existing.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
+      const existing = await storage.getClientProfileForMerchant(id, merchantId);
+      if (!existing) return res.status(404).json({ message: "Not found" });
       if (existing.status !== "prospect") return res.status(409).json({ message: "Client is already saved" }); // P2.2 (R1-T3): was 400
-      res.json(await storage.updateClientProfile(id, { status: "active" }));
+      const result = await storage.promoteClientProfileForMerchant(id, merchantId);
+      if (result.kind === "not-found") return res.status(404).json({ message: "Not found" });
+      if (result.kind === "conflict") return res.status(409).json({ message: "Client is already saved" });
+      res.json(result.client);
     } catch (err) { console.error("[TRADES_CLIENTS_PROMOTE]", err); res.status(500).json({ message: "Failed to save client" }); }
   });
   app.get("/api/trades/clients/:id/events", authenticateToken, async (req: AuthenticatedRequest, res) => {
@@ -8124,9 +8125,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
-      const existing = await storage.getClientProfile(id);
-      if (!existing || existing.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
-      res.json(await storage.getJobEventsByClient(id));
+      const existing = await storage.getClientProfileForMerchant(id, merchantId);
+      if (!existing) return res.status(404).json({ message: "Not found" });
+      res.json(await storage.getJobEventsByClientForMerchant(id, merchantId));
     } catch (err) { console.error("[TRADES_CLIENTS_EVENTS]", err); res.status(500).json({ message: "Failed to fetch client events" }); }
   });
 
@@ -8162,8 +8163,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         // details are intentional for a link-only quote; never invent contact data.
         const name = parsed.data.recipient?.name ?? "";
         const split = name.indexOf(" ");
-        client = await storage.createClientProfile({
-          merchantId,
+        client = await storage.createClientProfileForMerchant(merchantId, {
           firstName: split > 0 ? name.slice(0, split) : name,
           lastName: split > 0 ? name.slice(split + 1) : "",
           email: parsed.data.recipient?.email ?? null,
@@ -8390,8 +8390,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         // The merchant can promote it to a real client from the success screen.
         const nm = parsed.data.recipient.name.trim();
         const spaceIdx = nm.indexOf(" ");
-        client = await storage.createClientProfile({
-          merchantId,
+        client = await storage.createClientProfileForMerchant(merchantId, {
           firstName: spaceIdx > 0 ? nm.slice(0, spaceIdx) : nm,
           lastName: spaceIdx > 0 ? nm.slice(spaceIdx + 1) : "",
           email: parsed.data.recipient.email ?? null,

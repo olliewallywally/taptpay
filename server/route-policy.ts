@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 5f532095b1507f076a8cde2380e9f9896f702529 on 2026-10-03.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ c5260cc1af8846e79975194cef514f16380fe5cc on 2026-10-03.
  *
  * 187 registrations (78 GET, 77 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -2370,7 +2370,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       middleware: ["authenticateToken"],
       body: ["schema: createClientProfileSchema"],
-      storageMethods: ["createClientProfile"],
+      storageMethods: ["createClientProfileForMerchant"],
       statuses: [201,400,401,403,500,503],
       errorTextInResponse: ["parsed.error.errors"],
     },
@@ -2383,8 +2383,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       middleware: ["authenticateToken"],
       params: ["id: strictUuidParam"],
-      authChecks: ["compares row.merchantId !== merchantId"],
-      storageMethods: ["getClientProfile"],
+      storageMethods: ["getClientProfileForMerchant"],
       statuses: [200,400,401,403,404,500,503],
     },
   },
@@ -2397,8 +2396,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       middleware: ["authenticateToken"],
       params: ["id: strictUuidParam"],
       body: ["schema: updateClientProfileSchema"],
-      authChecks: ["compares existing.merchantId !== merchantId"],
-      storageMethods: ["getClientProfile","updateClientProfile"],
+      storageMethods: ["getClientProfileForMerchant","updateClientProfileForMerchant"],
       statuses: [200,400,401,403,404,500,503],
       errorTextInResponse: ["parsed.error.errors"],
     },
@@ -2411,8 +2409,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       middleware: ["authenticateToken"],
       params: ["id: strictUuidParam"],
-      authChecks: ["compares existing.merchantId !== merchantId"],
-      storageMethods: ["archiveClientProfile","createJobEvent","getClientProfile","getJobSchedulesByMerchant","terminateJobSchedule"],
+      storageMethods: ["archiveClientProfileForMerchant","getClientProfileForMerchant"],
       statuses: [200,400,401,403,404,500,503],
     },
   },
@@ -2424,8 +2421,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       middleware: ["authenticateToken"],
       params: ["id: strictUuidParam"],
-      authChecks: ["compares existing.merchantId !== merchantId"],
-      storageMethods: ["getClientProfile","unarchiveClientProfile"],
+      storageMethods: ["getClientProfileForMerchant","unarchiveClientProfileForMerchant"],
       statuses: [200,400,401,403,404,500,503],
     },
   },
@@ -2437,8 +2433,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       middleware: ["authenticateToken"],
       params: ["id: strictUuidParam"],
-      authChecks: ["compares existing.merchantId !== merchantId"],
-      storageMethods: ["getClientProfile","updateClientProfile"],
+      storageMethods: ["getClientProfileForMerchant","promoteClientProfileForMerchant"],
       statuses: [200,400,401,403,404,409,500,503],
     },
   },
@@ -2450,8 +2445,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       middleware: ["authenticateToken"],
       params: ["id: strictUuidParam"],
-      authChecks: ["compares existing.merchantId !== merchantId"],
-      storageMethods: ["getClientProfile","getJobEventsByClient"],
+      storageMethods: ["getClientProfileForMerchant","getJobEventsByClientForMerchant"],
       statuses: [200,400,401,403,404,500,503],
     },
   },
@@ -2476,7 +2470,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       middleware: ["authenticateToken"],
       body: ["schema: createQuoteSchema"],
       authChecks: ["compares client.merchantId !== merchantId"],
-      storageMethods: ["createClientProfile","createJobEvent","createQuote","getClientProfile","getMerchant","getOrCreateSubscription","uploadedFileOwnedByMerchant"],
+      storageMethods: ["createClientProfileForMerchant","createJobEvent","createQuote","getClientProfile","getMerchant","getOrCreateSubscription","uploadedFileOwnedByMerchant"],
       sideEffects: ["email/SMS: sendTradeQuote"],
       statuses: [201,400,401,402,403,404,500,503],
       errorTextInResponse: ["parsed.error.errors"],
@@ -2561,7 +2555,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       middleware: ["authenticateToken"],
       body: ["schema: createJobInvoiceSchema"],
       authChecks: ["compares client.merchantId !== merchantId","compares linkedQuote.merchantId !== merchantId"],
-      storageMethods: ["createClientProfile","createJobEvent","createJobInvoice","getClientProfile","getOrCreateSubscription","getQuote","uploadedFileOwnedByMerchant"],
+      storageMethods: ["createClientProfileForMerchant","createJobEvent","createJobInvoice","getClientProfile","getOrCreateSubscription","getQuote","uploadedFileOwnedByMerchant"],
       sideEffects: ["email/SMS: resendTradeInvoice"],
       statuses: [201,400,401,402,403,404,500,503],
       errorTextInResponse: ["parsed.error.errors"],

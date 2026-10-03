@@ -43,6 +43,10 @@ export function fakeTrades(): TradesFake {
       return rows.get(id as string);
     });
   read("getClientProfile", fake.clients);
+  jest.spyOn(storage, "getClientProfileForMerchant").mockImplementation(async (id, merchantId) => {
+    fake.reads.push("getClientProfile"); const row = fake.clients.get(id);
+    return row?.merchantId === merchantId ? row : undefined;
+  });
   read("getQuote", fake.quotes);
   read("getJobInvoice", fake.invoices);
   read("getJobSchedule", fake.schedules);
@@ -51,28 +55,53 @@ export function fakeTrades(): TradesFake {
       fake.reads.push(name);
       return rows(...args);
     });
-  list("getClientProfilesByMerchant", () => [...fake.clients.values()]);
+  list("getClientProfilesByMerchant", (merchantId: number) => [...fake.clients.values()].filter(row => row.merchantId === merchantId));
   list("getQuotesByMerchant", () => [...fake.quotes.values()]);
   list("getJobInvoicesByMerchant", (_merchantId: number, opts: { clientProfileId?: string } = {}) =>
     [...fake.invoices.values()].filter((row) => !opts.clientProfileId || row.clientProfileId === opts.clientProfileId));
   list("getJobSchedulesByMerchant", () => [...fake.schedules.values()]);
   // Newest first, as the client's history screen reads it.
-  list("getJobEventsByClient", (clientId: string) => fake.events.filter((row) => row.clientProfileId === clientId).reverse());
+  jest.spyOn(storage, "getJobEventsByClientForMerchant").mockImplementation(async (clientId, merchantId, limit = 50) => {
+    fake.reads.push("getJobEventsByClient");
+    if (fake.clients.get(clientId)?.merchantId !== merchantId) return [];
+    return fake.events.filter(row => row.clientProfileId === clientId && row.merchantId === merchantId).reverse().slice(0, limit);
+  });
   const write = (name: string, apply: (...args: any[]) => any) =>
     jest.spyOn(storage as any, name).mockImplementation(async (...args: any[]) => {
-      fake.writes.push(name);
+      if (["updateClientProfileForMerchant", "archiveClientProfileForMerchant", "unarchiveClientProfileForMerchant"].includes(name)) {
+        const [id, merchantId, updates] = args;
+        if (fake.clients.get(id)?.merchantId !== merchantId) return undefined;
+        fake.writes.push(name.replace("ForMerchant", "")); return apply(id, updates);
+      }
+      fake.writes.push(name.replace("ForMerchant", ""));
       return apply(...args);
     });
-  write("createClientProfile", (data: any) => {
+  write("createClientProfileForMerchant", (merchantId: number, input: any) => {
+    const data = { ...input, merchantId };
     const row = { id: MADE_CLIENT, status: "active", ...data };
     fake.clients.set(row.id, row);
     return row;
   });
   // As Drizzle does (mapUpdateSet), an update leaves out every field whose value is undefined.
-  write("updateClientProfile", (id: string, updates: any) =>
+  write("updateClientProfileForMerchant", (id: string, updates: any) =>
     Object.assign(fake.clients.get(id), Object.fromEntries(Object.entries(updates).filter(([, value]) => value !== undefined))));
-  write("archiveClientProfile", (id: string) => Object.assign(fake.clients.get(id), { status: "archived", archivedAt: new Date() }));
-  write("unarchiveClientProfile", (id: string) => Object.assign(fake.clients.get(id), { status: "active", archivedAt: null }));
+  write("archiveClientProfileForMerchant", async (id: string) => {
+    const row = Object.assign(fake.clients.get(id), { status: "archived", archivedAt: new Date() });
+    for (const schedule of fake.schedules.values()) {
+      if (schedule.clientProfileId === id && schedule.merchantId === row.merchantId && schedule.status !== "terminated") {
+        Object.assign(schedule, { status: "terminated", terminatedAt: new Date() }); fake.writes.push("terminateJobSchedule");
+        await storage.createJobEvent({ merchantId: row.merchantId, clientProfileId: id, scheduleId: schedule.id, eventType: "schedule_terminated", payload: { reason: "client_archived" } });
+      }
+    }
+    return row;
+  });
+  write("unarchiveClientProfileForMerchant", (id: string) => Object.assign(fake.clients.get(id), { status: "active", archivedAt: null }));
+  jest.spyOn(storage, "promoteClientProfileForMerchant").mockImplementation(async (id, merchantId) => {
+    const row = fake.clients.get(id); if (row?.merchantId !== merchantId) return { kind: "not-found" };
+    if (row.status !== "prospect") return { kind: "conflict" };
+    fake.writes.push("updateClientProfile"); Object.assign(row, { status: "active", updatedAt: new Date() });
+    return { kind: "ok", client: row };
+  });
   write("createQuote", (data: any) => {
     const row = { id: MADE_QUOTE, ...data };
     fake.quotes.set(row.id, row);

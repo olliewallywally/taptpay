@@ -3382,7 +3382,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       "body: createClientProfileSchema (a first and last name of 1 to 80 characters, the site address of 1 to 200, an optional email of at most 200 and phone of at most 40, notes of at most 1,000, the preferred channel: email, WhatsApp or SMS; other fields are dropped, so the business is the session's and the client active; 400 with the first issue)",
     capability: null,
     entitlement: null,
-    idempotency: "none: each call adds another client (no check for the same person)",
+    idempotency: "createClientProfileForMerchant projects profile fields and forces explicit merchant and active status; each call adds another client (no check for the same person). Internal quote/invoice prospect creation uses the same explicit merchant contract with server-selected prospect status",
     sideEffects: null,
     successDto: `201 with the client, ${CLIENT_ROW}`,
     errorDisclosure: ["input-issues"],
@@ -3390,7 +3390,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
 
   "GET /api/trades/clients/:id": {
     branches: [
-      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${tradesRecord("client", "getClientProfile")}; ${TRADES_ADMIN}` },
+      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${tradesRecord("client", "getClientProfileForMerchant")}; ${TRADES_ADMIN}` },
     ],
     input: tradesId("id"),
     capability: null,
@@ -3403,12 +3403,12 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
 
   "PUT /api/trades/clients/:id": {
     branches: [
-      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${tradesRecord("client", "getClientProfile")}; ${TRADES_ADMIN}` },
+      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${tradesRecord("client", "getClientProfileForMerchant")}, rechecked in the update's id/merchant predicate; ${TRADES_ADMIN}` },
     ],
     input: `${tradesId("id")}; body: updateClientProfileSchema (the create rules, each field optional: one left out stays as it is, and an emptied email, phone or notes is cleared, since 2026-09-27, when the edit screen's emptied field was dropped and the old value kept; other fields are dropped, so the status cannot be set here; 400 with the first issue)`,
     capability: null,
     entitlement: null,
-    idempotency: "sets the given fields and clears the emptied ones (updateClientProfile), an archived client's or a prospect's too; the same again changes nothing but the time changed",
+    idempotency: "updateClientProfileForMerchant projects the given editable fields and clears explicit nulls, an archived client's or a prospect's too; identity/status/archive metadata cannot be injected; a moved row is 404 without mutation; the same again changes nothing but the time changed",
     sideEffects: null,
     successDto: `the client afterwards, ${CLIENT_ROW}`,
     errorDisclosure: ["input-issues"],
@@ -3416,30 +3416,27 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
 
   "POST /api/trades/clients/:id/archive": {
     branches: [
-      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${tradesRecord("client", "getClientProfile")}; ${TRADES_ADMIN}` },
+      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${tradesRecord("client", "getClientProfileForMerchant")}, rechecked by archiveClientProfileForMerchant at its write; parent locks before only same-merchant children; ${TRADES_ADMIN}` },
     ],
     input: tradesId("id"),
     capability: null,
     entitlement: null,
     idempotency:
-      "archives the client (archiveClientProfile), then cancels each of the client's recurring invoices not already cancelled, recording when (terminateJobSchedule) with a schedule_terminated event (owner decision 2026-09-27: they went on billing the archived client every period); invoices already sent stay payable. Again archives again, with a new time, and has nothing left to cancel",
+      "archiveClientProfileForMerchant archives the owned client, cancels its owned recurring schedules not already cancelled and saves each schedule_terminated event in one transaction (owner decision 2026-09-27); any history failure rolls back the entire archive. Issued invoices stay payable. Again archives again, with a new time, and has nothing left to cancel",
     sideEffects: null,
     successDto: `the client afterwards, ${CLIENT_ROW}`,
     errorDisclosure: ["fixed"],
-    findings: [
-      "The archive and the cancellations are separate writes: a failure between them leaves the client archived with recurring invoices still running, until the archive is repeated.",
-    ],
   },
 
   "POST /api/trades/clients/:id/unarchive": {
     branches: [
-      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${tradesRecord("client", "getClientProfile")}; ${TRADES_ADMIN}` },
+      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${tradesRecord("client", "getClientProfileForMerchant")}, rechecked in the restore's id/merchant predicate; ${TRADES_ADMIN}` },
     ],
     input: tradesId("id"),
     capability: null,
     entitlement: null,
     idempotency:
-      "sets the client active, whatever it was (a hidden prospect too), with no archive time (unarchiveClientProfile); recurring invoices cancelled by the archive stay cancelled. Again changes nothing but the time",
+      "unarchiveClientProfileForMerchant sets the owned client active, whatever it was (a hidden prospect too), with no archive time; a moved row is 404 without mutation; recurring invoices cancelled by archive stay cancelled. Again changes nothing but the time",
     sideEffects: null,
     successDto: `the client afterwards, ${CLIENT_ROW}`,
     errorDisclosure: ["fixed"],
@@ -3447,12 +3444,12 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
 
   "POST /api/trades/clients/:id/promote": {
     branches: [
-      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${tradesRecord("client", "getClientProfile")}; ${TRADES_ADMIN}` },
+      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${tradesRecord("client", "getClientProfileForMerchant")}, rechecked by promoteClientProfileForMerchant with current status under a row lock; ${TRADES_ADMIN}` },
     ],
     input: tradesId("id"),
     capability: null,
     entitlement: null,
-    idempotency: "a hidden quick-invoice prospect becomes a listed client (status active); any other client is 409 'Client is already saved' (400 until 2026-09-27, P2.2)",
+    idempotency: "promoteClientProfileForMerchant makes the currently owned hidden prospect active; any other current status is 409 'Client is already saved' (400 until 2026-09-27, P2.2); a moved row is 404 without mutation",
     sideEffects: null,
     successDto: `the client afterwards, ${CLIENT_ROW}`,
     errorDisclosure: ["fixed"],
@@ -3460,7 +3457,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
 
   "GET /api/trades/clients/:id/events": {
     branches: [
-      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${tradesRecord("client", "getClientProfile")}; ${TRADES_ADMIN}` },
+      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${tradesRecord("client", "getClientProfileForMerchant")}; getJobEventsByClientForMerchant requires both event and current profile ownership in one SQL predicate; ${TRADES_ADMIN}` },
     ],
     input: tradesId("id"),
     capability: null,
@@ -3468,7 +3465,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     idempotency: "read-only",
     sideEffects: null,
     successDto:
-      "the client's history, newest first, at most 50 (getJobEventsByClient): whole event rows (what happened, the quote, invoice or recurring invoice, and what it carried: amounts, channels, a failed send's reason, WhatsApp statuses, split shares, the provider's transaction ids)",
+      "the owned client's same-merchant history, newest first, at most 50 (getJobEventsByClientForMerchant): whole event rows (what happened, the quote, invoice or recurring invoice, and what it carried: amounts, channels, a failed send's reason, WhatsApp statuses, split shares, the provider's transaction ids)",
     errorDisclosure: ["fixed"],
   },
 

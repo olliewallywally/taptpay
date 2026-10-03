@@ -1,10 +1,10 @@
 # R1-T7 tenant/storage execution inventory
 
-Generated from working-tree sources on base `5f532095b1507f076a8cde2380e9f9896f702529`; the phase evidence names the final commit.
+Generated from working-tree sources on base `c5260cc1af8846e79975194cef514f16380fe5cc`; the phase evidence names the final commit.
 
 Registrations: **187**; registrations with session/admin authentication: **119**;
 registrations calling checkMerchantOwnership: **25**.
-IStorage: **229** declared methods;
+IStorage: **231** declared methods;
 PaymentAttemptRepository: **8** inherited methods.
 
 Classifications come from the reviewed per-route branches, including mixed public/signed-in routes.
@@ -89,8 +89,8 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | GET /api/subscription/billing-history | tenant (merchant/session) | `getBillingHistory` |
 | GET /api/team | tenant (merchant/session) | `countSeatsInUse`, `getOrCreateSubscription`, `getTeamMembers` |
 | GET /api/trades/clients | tenant (merchant/session) | `getClientProfilesByMerchant` |
-| GET /api/trades/clients/:id | tenant (merchant/resource) | `getClientProfile` |
-| GET /api/trades/clients/:id/events | tenant (merchant/resource) | `getClientProfile`, `getJobEventsByClient` |
+| GET /api/trades/clients/:id | tenant (merchant/resource) | `getClientProfileForMerchant` |
+| GET /api/trades/clients/:id/events | tenant (merchant/resource) | `getClientProfileForMerchant`, `getJobEventsByClientForMerchant` |
 | GET /api/trades/gst-settings | tenant (merchant/session) | `getMerchant` |
 | GET /api/trades/invoices | tenant (merchant/session) | `getJobInvoicesByMerchant` |
 | GET /api/trades/quotes | tenant (merchant/session) | `getQuotesByMerchant` |
@@ -165,16 +165,16 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | POST /api/team/:userId/resend | tenant (merchant/resource) | `getMerchant`, `getUserById`, `revokeTeamInvite`, `rotateTeamInvite` |
 | POST /api/team/accept-invite | single-resource bearer (public-bearer/token) | `activateInvitedUser`, `getUserByInviteToken` |
 | POST /api/team/invite | tenant (merchant/session) | `getMerchant`, `getOrCreateSubscription`, `inviteTeamMember`, `revokeTeamInvite` |
-| POST /api/trades/clients | tenant (merchant/session) | `createClientProfile` |
-| POST /api/trades/clients/:id/archive | tenant (merchant/resource) | `archiveClientProfile`, `createJobEvent`, `getClientProfile`, `getJobSchedulesByMerchant`, `terminateJobSchedule` |
-| POST /api/trades/clients/:id/promote | tenant (merchant/resource) | `getClientProfile`, `updateClientProfile` |
-| POST /api/trades/clients/:id/unarchive | tenant (merchant/resource) | `getClientProfile`, `unarchiveClientProfile` |
-| POST /api/trades/invoices | tenant (merchant/resource) | `createClientProfile`, `createJobEvent`, `createJobInvoice`, `getClientProfile`, `getOrCreateSubscription`, `getQuote`, `uploadedFileOwnedByMerchant` |
+| POST /api/trades/clients | tenant (merchant/session) | `createClientProfileForMerchant` |
+| POST /api/trades/clients/:id/archive | tenant (merchant/resource) | `archiveClientProfileForMerchant`, `getClientProfileForMerchant` |
+| POST /api/trades/clients/:id/promote | tenant (merchant/resource) | `getClientProfileForMerchant`, `promoteClientProfileForMerchant` |
+| POST /api/trades/clients/:id/unarchive | tenant (merchant/resource) | `getClientProfileForMerchant`, `unarchiveClientProfileForMerchant` |
+| POST /api/trades/invoices | tenant (merchant/resource) | `createClientProfileForMerchant`, `createJobEvent`, `createJobInvoice`, `getClientProfile`, `getOrCreateSubscription`, `getQuote`, `uploadedFileOwnedByMerchant` |
 | POST /api/trades/invoices/:id/complete | tenant (merchant/resource) | `createJobEvent`, `getJobInvoice`, `updateJobInvoice` |
 | POST /api/trades/invoices/:id/mark-paid-external | tenant (merchant/resource) | `createJobEvent`, `getJobInvoice`, `updateJobInvoice` |
 | POST /api/trades/invoices/:id/send-balance | tenant (merchant/resource) | `createJobEvent`, `createJobInvoice`, `getJobInvoice`, `getJobInvoicesByMerchant`, `getOrCreateSubscription`, `getQuote` |
 | POST /api/trades/invoices/:id/void | tenant (merchant/resource) | `createJobEvent`, `getJobInvoice`, `updateJobInvoice` |
-| POST /api/trades/quotes | tenant (merchant/resource) | `createClientProfile`, `createJobEvent`, `createQuote`, `getClientProfile`, `getMerchant`, `getOrCreateSubscription`, `uploadedFileOwnedByMerchant` |
+| POST /api/trades/quotes | tenant (merchant/resource) | `createClientProfileForMerchant`, `createJobEvent`, `createQuote`, `getClientProfile`, `getMerchant`, `getOrCreateSubscription`, `uploadedFileOwnedByMerchant` |
 | POST /api/trades/quotes/token/:token/respond | single-resource bearer (public-bearer/token) | `createJobEvent`, `createJobInvoice`, `getOrCreateSubscription`, `getQuoteByToken`, `updateQuote` |
 | POST /api/trades/schedules | tenant (merchant/resource) | `createJobEvent`, `createJobSchedule`, `getClientProfile`, `getOrCreateSubscription` |
 | POST /api/transactions | tenant (merchant/path-merchant) | `createTransactionForMerchant`, `getOrCreateSubscription`, `getTaptStoneForMerchant` |
@@ -203,7 +203,7 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | PUT /api/push/preferences | tenant (merchant/session) | `updatePushNotificationPreferences` |
 | PUT /api/subscription/plan | tenant (merchant/session) | `changeSubscriptionPlan`, `countSeatsInUse`, `getOrCreateSubscription` |
 | PUT /api/team/:userId/status | tenant (merchant/resource) | `deactivatePushSubscriptionsForLogin`, `setTeamMemberStatus` |
-| PUT /api/trades/clients/:id | tenant (merchant/resource) | `getClientProfile`, `updateClientProfile` |
+| PUT /api/trades/clients/:id | tenant (merchant/resource) | `getClientProfileForMerchant`, `updateClientProfileForMerchant` |
 | PUT /api/trades/gst-settings | tenant (merchant/session) | `updateMerchant` |
 | PUT /api/trades/reminder-settings | tenant (merchant/session) | `updateMerchant` |
 | PUT /api/trades/schedules/:id | tenant (merchant/resource) | `createJobEvent`, `getJobSchedule`, `updateJobSchedule` |
@@ -389,12 +389,15 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | IStorage | logTransactionEvent | no | `logTransactionEvent(data: any): Promise<any>` |
 | IStorage | getTransactionEventsByTenant | no | `getTransactionEventsByTenant(tenantProfileId: string, limit?: number): Promise<any[]>` |
 | IStorage | getTransactionEventsByInvoice | no | `getTransactionEventsByInvoice(invoiceId: string): Promise<any[]>` |
-| IStorage | createClientProfile | no | `createClientProfile(data: any): Promise<any>` |
+| IStorage | createClientProfileForMerchant | yes | `createClientProfileForMerchant(merchantId: number, data: ClientProfileInput): Promise<any>` |
+| IStorage | getClientProfileForMerchant | yes | `getClientProfileForMerchant(id: string, merchantId: number): Promise<any \| undefined>` |
+| IStorage | updateClientProfileForMerchant | yes | `updateClientProfileForMerchant(id: string, merchantId: number, updates: ClientProfileChanges): Promise<any \| undefined>` |
+| IStorage | archiveClientProfileForMerchant | yes | `archiveClientProfileForMerchant(id: string, merchantId: number): Promise<any \| undefined>` |
+| IStorage | unarchiveClientProfileForMerchant | yes | `unarchiveClientProfileForMerchant(id: string, merchantId: number): Promise<any \| undefined>` |
+| IStorage | promoteClientProfileForMerchant | yes | `promoteClientProfileForMerchant(id: string, merchantId: number): Promise<ClientProfilePromotionResult>` |
+| IStorage | getJobEventsByClientForMerchant | yes | `getJobEventsByClientForMerchant(clientProfileId: string, merchantId: number, limit?: number): Promise<any[]>` |
 | IStorage | getClientProfile | no | `getClientProfile(id: string): Promise<any \| undefined>` |
 | IStorage | getClientProfilesByMerchant | yes | `getClientProfilesByMerchant(merchantId: number): Promise<any[]>` |
-| IStorage | updateClientProfile | no | `updateClientProfile(id: string, updates: any): Promise<any \| undefined>` |
-| IStorage | archiveClientProfile | no | `archiveClientProfile(id: string): Promise<any \| undefined>` |
-| IStorage | unarchiveClientProfile | no | `unarchiveClientProfile(id: string): Promise<any \| undefined>` |
 | IStorage | createQuote | no | `createQuote(data: any): Promise<any>` |
 | IStorage | getQuote | no | `getQuote(id: string): Promise<any \| undefined>` |
 | IStorage | getQuoteByToken | no | `getQuoteByToken(token: string): Promise<any \| undefined>` |
@@ -420,7 +423,6 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | IStorage | updateJobSchedule | no | `updateJobSchedule(id: string, updates: any): Promise<any \| undefined>` |
 | IStorage | terminateJobSchedule | no | `terminateJobSchedule(id: string): Promise<any \| undefined>` |
 | IStorage | createJobEvent | no | `createJobEvent(data: any): Promise<any>` |
-| IStorage | getJobEventsByClient | no | `getJobEventsByClient(clientProfileId: string, limit?: number): Promise<any[]>` |
 | IStorage | saveUploadedFile | yes | `saveUploadedFile(relPath: string, mimeType: string, data: Buffer, merchantId: number): Promise<void>` |
 | IStorage | getUploadedFile | no | `getUploadedFile(relPath: string): Promise<{ mimeType: string; data: Buffer } \| undefined>` |
 | IStorage | getUploadedFileForMerchant | yes | `getUploadedFileForMerchant(relPath: string, merchantId: number): Promise<{ mimeType: string; data: Buffer } \| undefined>` |

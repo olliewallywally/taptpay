@@ -14,7 +14,7 @@ it.each(["bill.", "bill.abcdefghijklmnop", "bill.p-df", "bill.PDF", "bill"])(
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
     jest.spyOn(billing, "billingCardIsReady").mockReturnValue(true);
-    jest.spyOn(storage, "createClientProfile").mockImplementation(async (data: any) => ({ ...data, id: "client" }));
+    jest.spyOn(storage, "createClientProfileForMerchant").mockImplementation(async (merchantId, data) => ({ ...data, merchantId, id: "client" }));
     jest.spyOn(storage, "createQuote").mockImplementation(async (data: any) => ({ ...data, id: "quote" }));
     jest.spyOn(storage, "createJobEvent").mockResolvedValue({} as any);
     jest.spyOn(delivery, "sendTradeQuote").mockResolvedValue({ sent: false, reason: "no-contact" } as any);

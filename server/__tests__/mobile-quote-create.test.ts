@@ -10,7 +10,7 @@ beforeEach(() => {
   resetTestStorage();
   jest.spyOn(billing, 'billingCardIsReady').mockReturnValue(true);
   jest.spyOn(delivery, 'sendTradeQuote').mockResolvedValue({ sent: false, reason: 'no-contact' } as any);
-  jest.spyOn(storage, 'createClientProfile').mockImplementation(async data => ({ ...data, id: clientId }));
+  jest.spyOn(storage, 'createClientProfileForMerchant').mockImplementation(async (merchantId, data) => ({ ...data, merchantId, id: clientId }));
   jest.spyOn(storage, 'createQuote').mockImplementation(async data => ({ ...data, id: 'quote-id' }));
   jest.spyOn(storage, 'createJobEvent').mockResolvedValue({} as any);
 });
@@ -22,7 +22,7 @@ test.each([{ skipClient: true }, { recipient: { name: 'Sam Smith', email: 'sam@e
   expect(result.body.token).toBeTruthy();
   expect(result.body.totalCents).toBe(10000);
   expect(result.body.clientProfileId).toBe(clientId);
-  expect(storage.createClientProfile).toHaveBeenCalledWith(expect.objectContaining({ merchantId: owner.merchantId, status: 'prospect', email: 'recipient' in mode ? mode.recipient?.email : null }));
+  expect(storage.createClientProfileForMerchant).toHaveBeenCalledWith(owner.merchantId, expect.objectContaining({ status: 'prospect', email: 'recipient' in mode ? mode.recipient?.email : null }));
 });
 test('existing client must belong to the merchant; rejection writes nothing', async () => {
   const { app } = await createTestApp();
@@ -30,7 +30,7 @@ test('existing client must belong to the merchant; rejection writes nothing', as
   jest.spyOn(storage, 'getClientProfile').mockResolvedValue({ id: clientId, merchantId: owner.merchantId + 1 } as any);
   const result = await request(app).post('/api/trades/quotes').set(signedIn(owner)).send({ ...base, clientProfileId: clientId });
   expect(result.status).toBe(404);
-  expect(storage.createClientProfile).not.toHaveBeenCalled();
+  expect(storage.createClientProfileForMerchant).not.toHaveBeenCalled();
   expect(storage.createQuote).not.toHaveBeenCalled();
 });
 test('billing and invalid client combinations reject before creating prospects', async () => {
@@ -41,6 +41,6 @@ test('billing and invalid client combinations reject before creating prospects',
   jest.mocked(billing.billingCardIsReady).mockReturnValue(false);
   const blocked = await request(app).post('/api/trades/quotes').set(signedIn(owner)).send({ ...base, skipClient: true });
   expect(blocked.status).toBe(402);
-  expect(storage.createClientProfile).not.toHaveBeenCalled();
+  expect(storage.createClientProfileForMerchant).not.toHaveBeenCalled();
   expect(storage.createQuote).not.toHaveBeenCalled();
 });

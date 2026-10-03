@@ -69,7 +69,7 @@ const ROUTES: CreateRoute[] = [
       ...doc,
     }),
     created: () => storage.createQuote as jest.Mock,
-    sideEffects: () => [storage.createClientProfile as jest.Mock, storage.createJobEvent as jest.Mock, delivery.sendTradeQuote as jest.Mock],
+    sideEffects: () => [storage.createClientProfileForMerchant as jest.Mock, storage.createJobEvent as jest.Mock, delivery.sendTradeQuote as jest.Mock],
   },
   {
     label: "trades invoice",
@@ -83,7 +83,7 @@ const ROUTES: CreateRoute[] = [
       ...doc,
     }),
     created: () => storage.createJobInvoice as jest.Mock,
-    sideEffects: () => [storage.createClientProfile as jest.Mock, storage.createJobEvent as jest.Mock, delivery.resendTradeInvoice as jest.Mock],
+    sideEffects: () => [storage.createClientProfileForMerchant as jest.Mock, storage.createJobEvent as jest.Mock, delivery.resendTradeInvoice as jest.Mock],
   },
 ];
 
@@ -93,7 +93,7 @@ beforeEach(() => {
   jest.spyOn(delivery, "sendTradeQuote").mockResolvedValue({ sent: false, reason: "no-contact" } as any);
   jest.spyOn(delivery, "resendTradeInvoice").mockResolvedValue({ sent: false, reason: "no-contact" } as any);
   jest.spyOn(propertyCron, "resendInvoiceEmailForMerchant").mockResolvedValue({ ok: false, reason: "test" });
-  jest.spyOn(storage, "createClientProfile").mockImplementation(async (data: any) => ({ ...data, id: CLIENT_ID }));
+  jest.spyOn(storage, "createClientProfileForMerchant").mockImplementation(async (merchantId, data) => ({ ...data, merchantId, id: CLIENT_ID }));
   jest.spyOn(storage, "createQuote").mockImplementation(async (data: any) => ({ ...data, id: "quote-id" }));
   jest.spyOn(storage, "createJobInvoice").mockImplementation(async (data: any) => ({ ...data, id: "job-invoice-id" }));
   jest.spyOn(storage, "createJobEvent").mockResolvedValue({} as any);

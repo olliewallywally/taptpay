@@ -153,3 +153,27 @@ test("property creation/resend have no global invoice management escape hatch", 
   }
   expect(facts.get("POST /api/property/invoices")!.storageMethods).toContain("createOrReuseInvoiceRentRequestForMerchant");
 });
+
+test("trades client management and hidden-prospect creation require merchant scope", () => {
+  const contract = storageContract();
+  for (const name of ["createClientProfile", "updateClientProfile", "archiveClientProfile", "unarchiveClientProfile", "getJobEventsByClient"]) {
+    expect(contract.find(method => method.name === name)).toBeUndefined();
+  }
+  const facts = currentRouteFacts();
+  for (const [key, name] of [
+    ["POST /api/trades/clients", "createClientProfileForMerchant"],
+    ["GET /api/trades/clients/:id", "getClientProfileForMerchant"],
+    ["PUT /api/trades/clients/:id", "updateClientProfileForMerchant"],
+    ["POST /api/trades/clients/:id/archive", "archiveClientProfileForMerchant"],
+    ["POST /api/trades/clients/:id/unarchive", "unarchiveClientProfileForMerchant"],
+    ["POST /api/trades/clients/:id/promote", "promoteClientProfileForMerchant"],
+    ["GET /api/trades/clients/:id/events", "getJobEventsByClientForMerchant"],
+  ]) {
+    expect(contract.find(method => method.name === name)?.requiredTenant).toBe(true);
+    expect(facts.get(key)?.storageMethods).toContain(name); expect(facts.get(key)?.storageMethods).not.toContain("getClientProfile");
+  }
+  for (const key of ["POST /api/trades/quotes", "POST /api/trades/invoices"]) {
+    expect(facts.get(key)?.storageMethods).toContain("createClientProfileForMerchant");
+    expect(facts.get(key)?.storageMethods).not.toContain("createClientProfile");
+  }
+});

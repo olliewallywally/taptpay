@@ -81,6 +81,19 @@ function propertyInvoiceInput(data: PropertyInvoiceInput): PropertyInvoiceInput 
     chargeType: data.chargeType, description: data.description, documentUrl: data.documentUrl, documentName: data.documentName };
 }
 
+export type ClientProfileInput = Pick<typeof clientProfiles.$inferInsert,
+  "firstName" | "lastName" | "email" | "phone" | "siteAddress" | "notes" | "preferredChannel"> & { status?: "active" | "prospect" };
+export type ClientProfileChanges = Partial<Omit<ClientProfileInput, "status">>;
+export type ClientProfilePromotionResult =
+  | { kind: "ok"; client: typeof clientProfiles.$inferSelect }
+  | { kind: "not-found" }
+  | { kind: "conflict" };
+
+function clientProfileChanges(data: ClientProfileChanges): ClientProfileChanges {
+  return Object.fromEntries(["firstName", "lastName", "email", "phone", "siteAddress", "notes", "preferredChannel"]
+    .filter(key => (data as any)[key] !== undefined).map(key => [key, (data as any)[key]]));
+}
+
 function activeScheduleChanges(data: ActiveScheduleChanges): ActiveScheduleChanges {
   const patch = Object.fromEntries(["amountCents", "frequency", "deliveryChannel"]
     .filter(key => (data as any)[key] !== undefined).map(key => [key, (data as any)[key]]));
@@ -944,12 +957,16 @@ export interface IStorage extends PaymentAttemptRepository {
   getTransactionEventsByInvoice(invoiceId: string): Promise<any[]>;
 
   // ── Trades vertical ───────────────────────────────────────────────────────
-  createClientProfile(data: any): Promise<any>;
+  createClientProfileForMerchant(merchantId: number, data: ClientProfileInput): Promise<any>;
+  getClientProfileForMerchant(id: string, merchantId: number): Promise<any | undefined>;
+  updateClientProfileForMerchant(id: string, merchantId: number, updates: ClientProfileChanges): Promise<any | undefined>;
+  archiveClientProfileForMerchant(id: string, merchantId: number): Promise<any | undefined>;
+  unarchiveClientProfileForMerchant(id: string, merchantId: number): Promise<any | undefined>;
+  promoteClientProfileForMerchant(id: string, merchantId: number): Promise<ClientProfilePromotionResult>;
+  getJobEventsByClientForMerchant(clientProfileId: string, merchantId: number, limit?: number): Promise<any[]>;
+  /** Public/provider/delivery lane; authenticated client management uses explicit scope. */
   getClientProfile(id: string): Promise<any | undefined>;
   getClientProfilesByMerchant(merchantId: number): Promise<any[]>;
-  updateClientProfile(id: string, updates: any): Promise<any | undefined>;
-  archiveClientProfile(id: string): Promise<any | undefined>;
-  unarchiveClientProfile(id: string): Promise<any | undefined>;
 
   createQuote(data: any): Promise<any>;
   getQuote(id: string): Promise<any | undefined>;
@@ -979,7 +996,6 @@ export interface IStorage extends PaymentAttemptRepository {
   terminateJobSchedule(id: string): Promise<any | undefined>;
 
   createJobEvent(data: any): Promise<any>;
-  getJobEventsByClient(clientProfileId: string, limit?: number): Promise<any[]>;
 
   // Uploaded file blobs (logos, invoice attachments), keyed by their
   // /uploads/<path> — R1-T7: routes.ts used to query the uploaded_files table
@@ -3455,12 +3471,15 @@ export class MemStorage implements IStorage {
   async getTransactionEventsByInvoice(invoiceId: string): Promise<any[]> { return []; }
 
   // ── Trades — MemStorage stubs (DB-only feature) ───────────────────────────
-  async createClientProfile(data: any): Promise<any> { throw new Error("Trades requires database"); }
+  async createClientProfileForMerchant(merchantId: number, data: ClientProfileInput): Promise<any> { throw new Error("Trades requires database"); }
+  async getClientProfileForMerchant(id: string, merchantId: number): Promise<any> { return undefined; }
+  async updateClientProfileForMerchant(id: string, merchantId: number, updates: ClientProfileChanges): Promise<any> { return undefined; }
+  async archiveClientProfileForMerchant(id: string, merchantId: number): Promise<any> { return undefined; }
+  async unarchiveClientProfileForMerchant(id: string, merchantId: number): Promise<any> { return undefined; }
+  async promoteClientProfileForMerchant(id: string, merchantId: number): Promise<ClientProfilePromotionResult> { return { kind: "not-found" }; }
+  async getJobEventsByClientForMerchant(clientProfileId: string, merchantId: number, limit?: number): Promise<any[]> { return []; }
   async getClientProfile(id: string): Promise<any> { return undefined; }
   async getClientProfilesByMerchant(merchantId: number): Promise<any[]> { return []; }
-  async updateClientProfile(id: string, updates: any): Promise<any> { return undefined; }
-  async archiveClientProfile(id: string): Promise<any> { return undefined; }
-  async unarchiveClientProfile(id: string): Promise<any> { return undefined; }
   async createQuote(data: any): Promise<any> { throw new Error("Trades requires database"); }
   async getQuote(id: string): Promise<any> { return undefined; }
   async getQuoteByToken(token: string): Promise<any> { return undefined; }
@@ -3486,7 +3505,6 @@ export class MemStorage implements IStorage {
   async updateJobSchedule(id: string, updates: any): Promise<any> { return undefined; }
   async terminateJobSchedule(id: string): Promise<any> { return undefined; }
   async createJobEvent(data: any): Promise<any> { return undefined; }
-  async getJobEventsByClient(clientProfileId: string, limit?: number): Promise<any[]> { return []; }
 
   // ── Subscriptions and team seats — database-free development parity ────────
   async resumeSubscription(merchantId: number): Promise<MerchantSubscription | null> {
@@ -8413,42 +8431,74 @@ export class DatabaseStorage implements IStorage {
   }
 
   // ───────── Trades: clients ─────────
-  async createClientProfile(data: any): Promise<any> {
-    const db = getDb(); if (!db) throw new Error('No database');
-    const [row] = await db.insert(clientProfiles).values(data).returning();
+  async createClientProfileForMerchant(merchantId: number, data: ClientProfileInput): Promise<any> {
+    if (!isManagementTenantId(merchantId)) throw new Error("Invalid tenant scope");
+    const db = this.db; if (!db) throw new Error("Trades requires database");
+    const [row] = await db.insert(clientProfiles).values({ ...clientProfileChanges(data), merchantId,
+      status: data.status === "prospect" ? "prospect" : "active" } as any).returning();
+    return row;
+  }
+  async getClientProfileForMerchant(id: string, merchantId: number): Promise<any> {
+    if (!isManagementTenantId(merchantId)) return undefined;
+    const db = this.db; if (!db) return undefined;
+    const [row] = await db.select().from(clientProfiles).where(and(eq(clientProfiles.id, id), eq(clientProfiles.merchantId, merchantId))).limit(1);
     return row;
   }
   async getClientProfile(id: string): Promise<any> {
-    const db = getDb(); if (!db) return undefined;
+    const db = this.db; if (!db) return undefined;
     const [row] = await db.select().from(clientProfiles).where(eq(clientProfiles.id, id));
     return row;
   }
   async getClientProfilesByMerchant(merchantId: number): Promise<any[]> {
-    const db = getDb(); if (!db) return [];
+    if (!isManagementTenantId(merchantId)) return [];
+    const db = this.db; if (!db) return [];
     return db.select().from(clientProfiles)
       .where(eq(clientProfiles.merchantId, merchantId))
       .orderBy(desc(clientProfiles.createdAt));
   }
-  async updateClientProfile(id: string, updates: any): Promise<any> {
-    const db = getDb(); if (!db) return undefined;
+  async updateClientProfileForMerchant(id: string, merchantId: number, updates: ClientProfileChanges): Promise<any> {
+    if (!isManagementTenantId(merchantId)) return undefined;
+    const db = this.db; if (!db) return undefined;
     const [row] = await db.update(clientProfiles)
-      .set({ ...updates, updatedAt: new Date() })
-      .where(eq(clientProfiles.id, id)).returning();
+      .set({ ...clientProfileChanges(updates), updatedAt: new Date() })
+      .where(and(eq(clientProfiles.id, id), eq(clientProfiles.merchantId, merchantId))).returning();
     return row;
   }
-  async archiveClientProfile(id: string): Promise<any> {
-    const db = getDb(); if (!db) return undefined;
-    const [row] = await db.update(clientProfiles)
-      .set({ status: "archived", archivedAt: new Date(), updatedAt: new Date() })
-      .where(eq(clientProfiles.id, id)).returning();
-    return row;
+  async archiveClientProfileForMerchant(id: string, merchantId: number): Promise<any> {
+    if (!isManagementTenantId(merchantId)) return undefined;
+    const db = this.db; if (!db) return undefined;
+    return db.transaction(async (tx: any) => {
+      const now = new Date();
+      // UPDATE locks the owned parent first, matching schedule management's order.
+      const [row] = await tx.update(clientProfiles).set({ status: "archived", archivedAt: now, updatedAt: now })
+        .where(and(eq(clientProfiles.id, id), eq(clientProfiles.merchantId, merchantId))).returning();
+      if (!row) return undefined;
+      const cancelled = await tx.update(jobSchedules).set({ status: "terminated", terminatedAt: now, updatedAt: now })
+        .where(and(eq(jobSchedules.merchantId, merchantId), eq(jobSchedules.clientProfileId, id), ne(jobSchedules.status, "terminated"))).returning();
+      for (const schedule of cancelled) await tx.insert(jobEvents).values({ merchantId, clientProfileId: id,
+        scheduleId: schedule.id, eventType: "schedule_terminated", payload: { reason: "client_archived" } });
+      return row;
+    });
   }
-  async unarchiveClientProfile(id: string): Promise<any> {
-    const db = getDb(); if (!db) return undefined;
+  async unarchiveClientProfileForMerchant(id: string, merchantId: number): Promise<any> {
+    if (!isManagementTenantId(merchantId)) return undefined;
+    const db = this.db; if (!db) return undefined;
     const [row] = await db.update(clientProfiles)
       .set({ status: "active", archivedAt: null, updatedAt: new Date() })
-      .where(eq(clientProfiles.id, id)).returning();
+      .where(and(eq(clientProfiles.id, id), eq(clientProfiles.merchantId, merchantId))).returning();
     return row;
+  }
+  async promoteClientProfileForMerchant(id: string, merchantId: number): Promise<ClientProfilePromotionResult> {
+    if (!isManagementTenantId(merchantId)) return { kind: "not-found" };
+    const db = this.db; if (!db) return { kind: "not-found" };
+    return db.transaction(async (tx: any) => {
+      const scope = and(eq(clientProfiles.id, id), eq(clientProfiles.merchantId, merchantId));
+      const [client] = await tx.select().from(clientProfiles).where(scope).limit(1).for("update");
+      if (!client) return { kind: "not-found" };
+      if (client.status !== "prospect") return { kind: "conflict" };
+      const [updated] = await tx.update(clientProfiles).set({ status: "active", updatedAt: new Date() }).where(scope).returning();
+      return updated ? { kind: "ok", client: updated } : { kind: "not-found" };
+    });
   }
 
   // ───────── Trades: quotes ─────────
@@ -8631,10 +8681,12 @@ export class DatabaseStorage implements IStorage {
     const [row] = await db.insert(jobEvents).values(data).returning();
     return row;
   }
-  async getJobEventsByClient(clientProfileId: string, limit = 50): Promise<any[]> {
-    const db = getDb(); if (!db) return [];
+  async getJobEventsByClientForMerchant(clientProfileId: string, merchantId: number, limit = 50): Promise<any[]> {
+    if (!isManagementTenantId(merchantId)) return [];
+    const db = this.db; if (!db) return [];
     return db.select().from(jobEvents)
-      .where(eq(jobEvents.clientProfileId, clientProfileId))
+      .where(and(eq(jobEvents.clientProfileId, clientProfileId), eq(jobEvents.merchantId, merchantId),
+        sql`exists (select 1 from ${clientProfiles} where ${clientProfiles.id} = ${jobEvents.clientProfileId} and ${clientProfiles.merchantId} = ${merchantId})`))
       .orderBy(desc(jobEvents.createdAt)).limit(limit);
   }
 
