@@ -40,6 +40,11 @@ export function fakeProperty(): PropertyFake {
       return rows.get(id as string);
     });
   read("getTenantProfile", fake.tenants);
+  jest.spyOn(storage, "getTenantProfileForMerchant").mockImplementation(async (id, merchantId) => {
+    fake.reads.push("getTenantProfile");
+    const row = fake.tenants.get(id);
+    return row?.merchantId === merchantId ? row : undefined;
+  });
   read("getActiveSchedule", fake.schedules);
   read("getInvoiceRentRequest", fake.invoices);
   const list = (name: string, rows: (...args: any[]) => any[]) =>
@@ -56,22 +61,43 @@ export function fakeProperty(): PropertyFake {
   list("getInvoiceRentRequestsByMerchant", () => [...fake.invoices.values()]);
   // Newest first, as the tenant's history screen reads it.
   list("getTransactionEventsByTenant", (tenantId: string) => fake.events.filter((row) => row.tenantProfileId === tenantId).reverse());
+  jest.spyOn(storage, "getTransactionEventsByTenantForMerchant").mockImplementation(async (id, merchantId, limit = 100) => {
+    fake.reads.push("getTransactionEventsByTenant");
+    if (fake.tenants.get(id)?.merchantId !== merchantId) return [];
+    return fake.events.filter(row => row.tenantProfileId === id && row.merchantId === merchantId).reverse().slice(0, limit);
+  });
   jest.spyOn(storage, "getLiveInvoiceByTenant").mockResolvedValue(undefined as any);
   const write = (name: string, apply: (...args: any[]) => any) =>
     jest.spyOn(storage as any, name).mockImplementation(async (...args: any[]) => {
-      fake.writes.push(name);
+      if (["updateTenantProfileForMerchant", "archiveTenantProfileForMerchant", "unarchiveTenantProfileForMerchant"].includes(name)) {
+        const [id, merchantId, updates] = args;
+        if (fake.tenants.get(id)?.merchantId !== merchantId) return undefined;
+        fake.writes.push(name.replace("ForMerchant", ""));
+        return apply(id, updates);
+      }
+      fake.writes.push(name.replace("ForMerchant", ""));
       return apply(...args);
     });
-  write("createTenantProfile", (data: any) => {
+  write("createTenantProfileForMerchant", (merchantId: number, input: any) => {
+    const data = { ...input, merchantId };
     const row = { id: MADE_TENANT, status: "active", ...data };
     fake.tenants.set(row.id, row);
     return row;
   });
   // As Drizzle does (mapUpdateSet), an update leaves out every field whose value is undefined.
-  write("updateTenantProfile", (id: string, updates: any) =>
+  write("updateTenantProfileForMerchant", (id: string, updates: any) =>
     Object.assign(fake.tenants.get(id), Object.fromEntries(Object.entries(updates).filter(([, value]) => value !== undefined))));
-  write("archiveTenantProfile", (id: string) => Object.assign(fake.tenants.get(id), { status: "archived" }));
-  write("unarchiveTenantProfile", (id: string) => Object.assign(fake.tenants.get(id), { status: "active" }));
+  write("archiveTenantProfileForMerchant", (id: string) => {
+    const row = fake.tenants.get(id);
+    Object.assign(row, { status: "archived" });
+    for (const schedule of fake.schedules.values()) {
+      if (schedule.tenantProfileId === id && schedule.merchantId === row.merchantId && schedule.status !== "terminated") {
+        Object.assign(schedule, { status: "terminated", terminatedAt: new Date() });
+      }
+    }
+    return row;
+  });
+  write("unarchiveTenantProfileForMerchant", (id: string) => Object.assign(fake.tenants.get(id), { status: "active" }));
   write("createActiveSchedule", (data: any) => {
     const row = { id: MADE_SCHEDULE, status: "active", ...data };
     fake.schedules.set(row.id, row);

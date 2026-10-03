@@ -7150,7 +7150,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const merchantId = req.user?.merchantId;
       if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const data = createTenantProfileSchema.parse(req.body);
-      const tenant = await storage.createTenantProfile({ ...data, merchantId });
+      const tenant = await storage.createTenantProfileForMerchant(merchantId, data);
       await storage.logTransactionEvent({ merchantId, tenantProfileId: tenant.id, eventType: "Tenant_Created", payload: { firstName: tenant.firstName, lastName: tenant.lastName, propertyAddress: tenant.propertyAddress } });
       res.status(201).json(tenant);
     } catch (err) {
@@ -7168,7 +7168,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
-      const tenant = await storage.getTenantProfile(id);
+      const tenant = await storage.getTenantProfileForMerchant(id, merchantId);
       if (!tenant || tenant.merchantId !== merchantId) return res.status(404).json({ message: "Tenant not found" });
       res.json(tenant);
     } catch (err) { console.error("[PROP_TENANT_GET]", err); res.status(500).json({ message: "Failed to fetch tenant" }); }
@@ -7180,10 +7180,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
-      const existing = await storage.getTenantProfile(id);
+      const existing = await storage.getTenantProfileForMerchant(id, merchantId);
       if (!existing || existing.merchantId !== merchantId) return res.status(404).json({ message: "Tenant not found" });
       const data = updateTenantProfileSchema.parse(req.body);
-      const tenant = await storage.updateTenantProfile(id, data);
+      const tenant = await storage.updateTenantProfileForMerchant(id, merchantId, data);
+      if (!tenant) return res.status(404).json({ message: "Tenant not found" });
       res.json(tenant);
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: "Validation error", errors: err.errors });
@@ -7197,9 +7198,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
-      const existing = await storage.getTenantProfile(id);
+      const existing = await storage.getTenantProfileForMerchant(id, merchantId);
       if (!existing || existing.merchantId !== merchantId) return res.status(404).json({ message: "Tenant not found" });
-      const tenant = await storage.archiveTenantProfile(id);
+      const tenant = await storage.archiveTenantProfileForMerchant(id, merchantId);
+      if (!tenant) return res.status(404).json({ message: "Tenant not found" });
       await storage.logTransactionEvent({ merchantId, tenantProfileId: id, eventType: "Tenant_Archived", payload: {} });
       res.json(tenant);
     } catch (err) { console.error("[PROP_TENANT_ARCHIVE]", err); res.status(500).json({ message: "Failed to archive tenant" }); }
@@ -7211,9 +7213,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
-      const existing = await storage.getTenantProfile(id);
+      const existing = await storage.getTenantProfileForMerchant(id, merchantId);
       if (!existing || existing.merchantId !== merchantId) return res.status(404).json({ message: "Tenant not found" });
-      const tenant = await storage.unarchiveTenantProfile(id);
+      const tenant = await storage.unarchiveTenantProfileForMerchant(id, merchantId);
+      if (!tenant) return res.status(404).json({ message: "Tenant not found" });
       await storage.logTransactionEvent({ merchantId, tenantProfileId: id, eventType: "Tenant_Restored", payload: {} });
       res.json(tenant);
     } catch (err) { console.error("[PROP_TENANT_UNARCHIVE]", err); res.status(500).json({ message: "Failed to restore tenant" }); }
@@ -7225,11 +7228,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
-      const tenant = await storage.getTenantProfile(id);
+      const tenant = await storage.getTenantProfileForMerchant(id, merchantId);
       if (!tenant || tenant.merchantId !== merchantId) return res.status(404).json({ message: "Tenant not found" });
       const limit = strictBoundedIntegerQueryParam(req.query.limit, { fallback: 50, max: 200 });
       if (limit === null) return res.status(400).json({ message: "Invalid limit" });
-      const events = await storage.getTransactionEventsByTenant(id, limit);
+      const events = await storage.getTransactionEventsByTenantForMerchant(id, merchantId, limit);
       res.json(events);
     } catch (err) { console.error("[PROP_EVENTS]", err); res.status(500).json({ message: "Failed to fetch events" }); }
   });

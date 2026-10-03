@@ -3045,7 +3045,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
 
   "GET /api/property/tenants/:id": {
     branches: [
-      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${propertyRecord("tenant", "getTenantProfile")}; ${PROPERTY_ADMIN}` },
+      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${propertyRecord("tenant", "getTenantProfileForMerchant")}; ${PROPERTY_ADMIN}` },
     ],
     input: propertyId("id"),
     capability: null,
@@ -3058,12 +3058,12 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
 
   "PUT /api/property/tenants/:id": {
     branches: [
-      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${propertyRecord("tenant", "getTenantProfile")}; ${PROPERTY_ADMIN}` },
+      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${propertyRecord("tenant", "getTenantProfileForMerchant")}; ${PROPERTY_ADMIN}` },
     ],
     input: `${propertyId("id")}; body: updateTenantProfileSchema (the create rules, each field optional: one left out stays as it is, and an emptied email, phone or co-tenants is cleared, since 2026-09-27, when the edit screen's emptied field was dropped and the old value kept; other fields are dropped; 400 with the issues)`,
     capability: null,
     entitlement: null,
-    idempotency: "sets the given fields and clears the emptied ones (updateTenantProfile), an archived tenant's too; the same again changes nothing but the time changed",
+    idempotency: "sets the given fields and clears the emptied ones (updateTenantProfileForMerchant), an archived tenant's too; the same again changes nothing but the time changed",
     sideEffects: null,
     successDto: `the tenant afterwards, ${TENANT_ROW}`,
     errorDisclosure: ["input-issues"],
@@ -3071,13 +3071,13 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
 
   "POST /api/property/tenants/:id/archive": {
     branches: [
-      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${propertyRecord("tenant", "getTenantProfile")}; ${PROPERTY_ADMIN}` },
+      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${propertyRecord("tenant", "getTenantProfileForMerchant")}; ${PROPERTY_ADMIN}` },
     ],
     input: propertyId("id"),
     capability: null,
     entitlement: null,
     idempotency:
-      "archives the tenant and cancels every automation of theirs not already cancelled (archiveTenantProfile); invoices already sent stay payable. Again archives again, with a new time, and logs again",
+      "archives the tenant and cancels only same-merchant automations not already cancelled in one SQL transaction (archiveTenantProfileForMerchant); a refused parent changes no child and logs no event; invoices already sent stay payable. Again archives again, with a new time, and logs again",
     sideEffects: null,
     successDto: `the tenant afterwards, ${TENANT_ROW}`,
     errorDisclosure: ["fixed"],
@@ -3085,13 +3085,13 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
 
   "POST /api/property/tenants/:id/unarchive": {
     branches: [
-      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${propertyRecord("tenant", "getTenantProfile")}; ${PROPERTY_ADMIN}` },
+      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${propertyRecord("tenant", "getTenantProfileForMerchant")}; ${PROPERTY_ADMIN}` },
     ],
     input: propertyId("id"),
     capability: null,
     entitlement: null,
     idempotency:
-      "restores the tenant (unarchiveTenantProfile); automations cancelled by the archive stay cancelled. Again changes nothing but the time, and logs again",
+      "restores the tenant (unarchiveTenantProfileForMerchant); automations cancelled by the archive stay cancelled. Again changes nothing but the time, and logs again",
     sideEffects: null,
     successDto: `the tenant afterwards, ${TENANT_ROW}`,
     errorDisclosure: ["fixed"],
@@ -3099,7 +3099,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
 
   "GET /api/property/tenants/:id/events": {
     branches: [
-      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${propertyRecord("tenant", "getTenantProfile")}; ${PROPERTY_ADMIN}` },
+      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${propertyRecord("tenant", "getTenantProfileForMerchant")}; history checks event merchant AND current parent merchant in one query; ${PROPERTY_ADMIN}` },
     ],
     input: `${propertyId("id")}; limit: strictBoundedIntegerQueryParam (50 by default, at most 200; 400 otherwise)`,
     capability: null,

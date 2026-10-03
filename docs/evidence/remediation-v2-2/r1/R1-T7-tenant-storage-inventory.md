@@ -1,10 +1,10 @@
 # R1-T7 tenant/storage execution inventory
 
-Generated from working-tree sources on base `42792fd80a6075ce63071ddc27fe6aa2e742b06a`; the phase evidence names the final commit.
+Generated from working-tree sources on base `6c2fafab7ca77e6346f106c47525c9b4e5ce1cd6`; the phase evidence names the final commit.
 
 Registrations: **187**; registrations with session/admin authentication: **119**;
 registrations calling checkMerchantOwnership: **25**.
-IStorage: **221** declared methods;
+IStorage: **223** declared methods;
 PaymentAttemptRepository: **8** inherited methods.
 
 Classifications come from the reviewed per-route branches, including mixed public/signed-in routes.
@@ -78,8 +78,8 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | GET /api/property/reminder-settings | tenant (merchant/session) | `getMerchant` |
 | GET /api/property/schedules | tenant (merchant/session) | `getActiveSchedulesByMerchant` |
 | GET /api/property/tenants | tenant (merchant/session) | `getTenantProfilesByMerchant` |
-| GET /api/property/tenants/:id | tenant (merchant/resource) | `getTenantProfile` |
-| GET /api/property/tenants/:id/events | tenant (merchant/resource) | `getTenantProfile`, `getTransactionEventsByTenant` |
+| GET /api/property/tenants/:id | tenant (merchant/resource) | `getTenantProfileForMerchant` |
+| GET /api/property/tenants/:id/events | tenant (merchant/resource) | `getTenantProfileForMerchant`, `getTransactionEventsByTenantForMerchant` |
 | GET /api/push/capabilities | public (public/none) | — |
 | GET /api/push/preferences | tenant (merchant/session) | `getPushNotificationPreferences` |
 | GET /api/push/status | tenant (merchant/session) | `getPushNotificationPreferences`, `getPushSubscriptionsForLogin` |
@@ -152,9 +152,9 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | POST /api/property/invoices/:id/resend | tenant (merchant/resource) | `getInvoiceRentRequest`, `getOrCreateSubscription` |
 | POST /api/property/invoices/:id/void | tenant (merchant/resource) | `getInvoiceRentRequest`, `logTransactionEvent`, `updateInvoiceRentRequest` |
 | POST /api/property/invoices/document | tenant (merchant/session) | `saveUploadedFile` |
-| POST /api/property/tenants | tenant (merchant/session) | `createTenantProfile`, `logTransactionEvent` |
-| POST /api/property/tenants/:id/archive | tenant (merchant/resource) | `archiveTenantProfile`, `getTenantProfile`, `logTransactionEvent` |
-| POST /api/property/tenants/:id/unarchive | tenant (merchant/resource) | `getTenantProfile`, `logTransactionEvent`, `unarchiveTenantProfile` |
+| POST /api/property/tenants | tenant (merchant/session) | `createTenantProfileForMerchant`, `logTransactionEvent` |
+| POST /api/property/tenants/:id/archive | tenant (merchant/resource) | `archiveTenantProfileForMerchant`, `getTenantProfileForMerchant`, `logTransactionEvent` |
+| POST /api/property/tenants/:id/unarchive | tenant (merchant/resource) | `getTenantProfileForMerchant`, `logTransactionEvent`, `unarchiveTenantProfileForMerchant` |
 | POST /api/property/tenants/:tenantId/schedules | tenant (merchant/resource) | `createActiveSchedule`, `getActiveSchedulesByTenant`, `getOrCreateSubscription`, `getTenantProfile`, `logTransactionEvent`, `terminateActiveSchedule` |
 | POST /api/push/native-subscribe | tenant (merchant/session) | `createPushSubscription` |
 | POST /api/push/native-unsubscribe | tenant (merchant/session) | `deactivateNativePushSubscriptionsForLogin`, `deactivatePushSubscriptionByEndpoint`, `getPushSubscriptionsByMerchant` |
@@ -199,7 +199,7 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | PUT /api/merchants/:merchantId/tapt-stones/:stoneId | tenant (merchant/path-merchant) | `getTaptStoneForMerchant`, `updateTaptStoneForMerchant` |
 | PUT /api/property/reminder-settings | tenant (merchant/session) | `updateMerchant` |
 | PUT /api/property/schedules/:id | tenant (merchant/resource) | `getActiveSchedule`, `logTransactionEvent`, `updateActiveSchedule` |
-| PUT /api/property/tenants/:id | tenant (merchant/resource) | `getTenantProfile`, `updateTenantProfile` |
+| PUT /api/property/tenants/:id | tenant (merchant/resource) | `getTenantProfileForMerchant`, `updateTenantProfileForMerchant` |
 | PUT /api/push/preferences | tenant (merchant/session) | `updatePushNotificationPreferences` |
 | PUT /api/subscription/plan | tenant (merchant/session) | `changeSubscriptionPlan`, `countSeatsInUse`, `getOrCreateSubscription` |
 | PUT /api/team/:userId/status | tenant (merchant/resource) | `deactivatePushSubscriptionsForLogin`, `setTeamMemberStatus` |
@@ -348,12 +348,14 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | IStorage | getSplitPaymentById | no | `getSplitPaymentById(id: number): Promise<any \| undefined>` |
 | IStorage | updateSplitPaymentStatus | no | `updateSplitPaymentStatus(id: number, status: string, windcaveTransactionId?: string): Promise<any>` |
 | IStorage | getNextPendingSplit | no | `getNextPendingSplit(transactionId: number): Promise<any \| undefined>` |
-| IStorage | createTenantProfile | no | `createTenantProfile(data: any): Promise<any>` |
+| IStorage | createTenantProfileForMerchant | yes | `createTenantProfileForMerchant(merchantId: number, data: TenantProfileChanges): Promise<any>` |
+| IStorage | getTenantProfileForMerchant | yes | `getTenantProfileForMerchant(id: string, merchantId: number): Promise<any \| undefined>` |
+| IStorage | updateTenantProfileForMerchant | yes | `updateTenantProfileForMerchant(id: string, merchantId: number, updates: TenantProfileChanges): Promise<any \| undefined>` |
+| IStorage | archiveTenantProfileForMerchant | yes | `archiveTenantProfileForMerchant(id: string, merchantId: number): Promise<any \| undefined>` |
+| IStorage | unarchiveTenantProfileForMerchant | yes | `unarchiveTenantProfileForMerchant(id: string, merchantId: number): Promise<any \| undefined>` |
+| IStorage | getTransactionEventsByTenantForMerchant | yes | `getTransactionEventsByTenantForMerchant(tenantProfileId: string, merchantId: number, limit?: number): Promise<any[]>` |
 | IStorage | getTenantProfile | no | `getTenantProfile(id: string): Promise<any \| undefined>` |
 | IStorage | getTenantProfilesByMerchant | yes | `getTenantProfilesByMerchant(merchantId: number, opts?: { search?: string; includeArchived?: boolean }): Promise<any[]>` |
-| IStorage | updateTenantProfile | no | `updateTenantProfile(id: string, updates: any): Promise<any \| undefined>` |
-| IStorage | archiveTenantProfile | no | `archiveTenantProfile(id: string): Promise<any \| undefined>` |
-| IStorage | unarchiveTenantProfile | no | `unarchiveTenantProfile(id: string): Promise<any \| undefined>` |
 | IStorage | createActiveSchedule | no | `createActiveSchedule(data: any): Promise<any>` |
 | IStorage | getActiveSchedule | no | `getActiveSchedule(id: string): Promise<any \| undefined>` |
 | IStorage | getActiveSchedulesByTenant | no | `getActiveSchedulesByTenant(tenantProfileId: string): Promise<any[]>` |

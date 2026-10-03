@@ -39,6 +39,14 @@ export type ActiveTransactionScope =
   | { kind: "merchant-any" }
   | { kind: "board"; stoneId: number };
 
+export type TenantProfileChanges = Partial<Pick<typeof tenantProfiles.$inferInsert,
+  "firstName" | "lastName" | "email" | "phone" | "propertyAddress" | "coTenantsText" | "preferredChannel">>;
+
+function tenantProfileChanges(data: TenantProfileChanges): TenantProfileChanges {
+  return Object.fromEntries(["firstName", "lastName", "email", "phone", "propertyAddress", "coTenantsText", "preferredChannel"]
+    .filter(key => (data as any)[key] !== undefined).map(key => [key, (data as any)[key]]));
+}
+
 export type MerchantRefundInput = Pick<InsertRefund, "refundAmount" | "refundReason" | "refundMethod">;
 
 function scopedRefundInput(transactionId: number, merchantId: number, input: MerchantRefundInput): InsertRefund {
@@ -840,12 +848,14 @@ export interface IStorage extends PaymentAttemptRepository {
   getNextPendingSplit(transactionId: number): Promise<any | undefined>;
 
   // ── Property management vertical ──────────────────────────────────────────
-  createTenantProfile(data: any): Promise<any>;
+  createTenantProfileForMerchant(merchantId: number, data: TenantProfileChanges): Promise<any>;
+  getTenantProfileForMerchant(id: string, merchantId: number): Promise<any | undefined>;
+  updateTenantProfileForMerchant(id: string, merchantId: number, updates: TenantProfileChanges): Promise<any | undefined>;
+  archiveTenantProfileForMerchant(id: string, merchantId: number): Promise<any | undefined>;
+  unarchiveTenantProfileForMerchant(id: string, merchantId: number): Promise<any | undefined>;
+  getTransactionEventsByTenantForMerchant(tenantProfileId: string, merchantId: number, limit?: number): Promise<any[]>;
   getTenantProfile(id: string): Promise<any | undefined>;
   getTenantProfilesByMerchant(merchantId: number, opts?: { search?: string; includeArchived?: boolean }): Promise<any[]>;
-  updateTenantProfile(id: string, updates: any): Promise<any | undefined>;
-  archiveTenantProfile(id: string): Promise<any | undefined>;
-  unarchiveTenantProfile(id: string): Promise<any | undefined>;
 
   createActiveSchedule(data: any): Promise<any>;
   getActiveSchedule(id: string): Promise<any | undefined>;
@@ -3322,12 +3332,15 @@ export class MemStorage implements IStorage {
   }
 
   // ── Property management — MemStorage stubs (DB-only feature) ────────────────
-  async createTenantProfile(data: any): Promise<any> { throw new Error("Property management requires database"); }
+  async createTenantProfileForMerchant(merchantId: number, data: TenantProfileChanges): Promise<any> { throw new Error("Property requires database"); }
+  async getTenantProfileForMerchant(id: string, merchantId: number): Promise<any> { return undefined; }
+  async updateTenantProfileForMerchant(id: string, merchantId: number, updates: TenantProfileChanges): Promise<any> { return undefined; }
+  async archiveTenantProfileForMerchant(id: string, merchantId: number): Promise<any> { return undefined; }
+  async unarchiveTenantProfileForMerchant(id: string, merchantId: number): Promise<any> { return undefined; }
+  async getTransactionEventsByTenantForMerchant(tenantProfileId: string, merchantId: number, limit?: number): Promise<any[]> { return []; }
   async getTenantProfile(id: string): Promise<any> { return undefined; }
   async getTenantProfilesByMerchant(merchantId: number, opts?: any): Promise<any[]> { return []; }
-  async updateTenantProfile(id: string, updates: any): Promise<any> { return undefined; }
-  async archiveTenantProfile(id: string): Promise<any> { return undefined; }
-  async unarchiveTenantProfile(id: string): Promise<any> { return undefined; }
+
   async createActiveSchedule(data: any): Promise<any> { throw new Error("Property management requires database"); }
   async getActiveSchedule(id: string): Promise<any> { return undefined; }
   async getActiveSchedulesByTenant(tenantProfileId: string): Promise<any[]> { return []; }
@@ -7949,16 +7962,60 @@ export class DatabaseStorage implements IStorage {
   }
 
   // ── Property management — DatabaseStorage implementations ──────────────────
-  async createTenantProfile(data: any): Promise<any> {
-    const db = getDb(); if (!db) throw new Error('No database');
-    const [r] = await db.insert(tenantProfiles).values(data).returning(); return r;
+  async createTenantProfileForMerchant(merchantId: number, data: TenantProfileChanges): Promise<any> {
+    if (!isManagementTenantId(merchantId)) throw new Error("Invalid tenant scope");
+    const db = this.db; if (!db) throw new Error("Property requires database");
+    const [row] = await db.insert(tenantProfiles).values({ ...tenantProfileChanges(data), merchantId } as any).returning();
+    return row;
+  }
+  async getTenantProfileForMerchant(id: string, merchantId: number): Promise<any> {
+    if (!isManagementTenantId(merchantId)) return undefined;
+    const db = this.db; if (!db) return undefined;
+    const [row] = await db.select().from(tenantProfiles)
+      .where(and(eq(tenantProfiles.id, id), eq(tenantProfiles.merchantId, merchantId))).limit(1);
+    return row;
+  }
+  async updateTenantProfileForMerchant(id: string, merchantId: number, updates: TenantProfileChanges): Promise<any> {
+    if (!isManagementTenantId(merchantId)) return undefined;
+    const db = this.db; if (!db) return undefined;
+    const [row] = await db.update(tenantProfiles).set({ ...tenantProfileChanges(updates), updatedAt: new Date() })
+      .where(and(eq(tenantProfiles.id, id), eq(tenantProfiles.merchantId, merchantId))).returning();
+    return row;
+  }
+  async archiveTenantProfileForMerchant(id: string, merchantId: number): Promise<any> {
+    if (!isManagementTenantId(merchantId)) return undefined;
+    const db = this.db; if (!db) return undefined;
+    return db.transaction(async (tx: any) => {
+      const now = new Date();
+      const [row] = await tx.update(tenantProfiles).set({ status: "archived", archivedAt: now, updatedAt: now })
+        .where(and(eq(tenantProfiles.id, id), eq(tenantProfiles.merchantId, merchantId))).returning();
+      if (!row) return undefined;
+      await tx.update(activeSchedules).set({ status: "terminated", terminatedAt: now, updatedAt: now })
+        .where(and(eq(activeSchedules.tenantProfileId, id), eq(activeSchedules.merchantId, merchantId), sql`${activeSchedules.status} <> 'terminated'`));
+      return row;
+    });
+  }
+  async unarchiveTenantProfileForMerchant(id: string, merchantId: number): Promise<any> {
+    if (!isManagementTenantId(merchantId)) return undefined;
+    const db = this.db; if (!db) return undefined;
+    const [row] = await db.update(tenantProfiles).set({ status: "active", archivedAt: null, updatedAt: new Date() })
+      .where(and(eq(tenantProfiles.id, id), eq(tenantProfiles.merchantId, merchantId))).returning();
+    return row;
+  }
+  async getTransactionEventsByTenantForMerchant(tenantProfileId: string, merchantId: number, limit = 100): Promise<any[]> {
+    if (!isManagementTenantId(merchantId)) return [];
+    const db = this.db; if (!db) return [];
+    return db.select().from(transactionEvents).where(and(
+      eq(transactionEvents.tenantProfileId, tenantProfileId), eq(transactionEvents.merchantId, merchantId),
+      sql`exists (select 1 from ${tenantProfiles} where ${tenantProfiles.id} = ${transactionEvents.tenantProfileId} and ${tenantProfiles.merchantId} = ${merchantId})`,
+    )).orderBy(desc(transactionEvents.createdAt)).limit(limit);
   }
   async getTenantProfile(id: string): Promise<any> {
-    const db = getDb(); if (!db) return undefined;
+    const db = this.db; if (!db) return undefined;
     const [r] = await db.select().from(tenantProfiles).where(eq(tenantProfiles.id, id)).limit(1); return r;
   }
   async getTenantProfilesByMerchant(merchantId: number, opts: { search?: string; includeArchived?: boolean } = {}): Promise<any[]> {
-    const db = getDb(); if (!db) return [];
+    const db = this.db; if (!db) return [];
     const conds: any[] = [eq(tenantProfiles.merchantId, merchantId)];
     if (!opts.includeArchived) conds.push(eq(tenantProfiles.status, "active"));
     if (opts.search?.trim()) {
@@ -7966,25 +8023,6 @@ export class DatabaseStorage implements IStorage {
       conds.push(or(ilike(tenantProfiles.firstName, p), ilike(tenantProfiles.lastName, p), ilike(tenantProfiles.propertyAddress, p)));
     }
     return db.select().from(tenantProfiles).where(and(...conds)).orderBy(desc(tenantProfiles.createdAt));
-  }
-  async updateTenantProfile(id: string, updates: any): Promise<any> {
-    const db = getDb(); if (!db) return undefined;
-    const [r] = await db.update(tenantProfiles).set({ ...updates, updatedAt: new Date() }).where(eq(tenantProfiles.id, id)).returning(); return r;
-  }
-  async archiveTenantProfile(id: string): Promise<any> {
-    const db = getDb(); if (!db) return undefined;
-    const now = new Date();
-    const [r] = await db.update(tenantProfiles).set({ status: "archived", archivedAt: now, updatedAt: now }).where(eq(tenantProfiles.id, id)).returning();
-    await db.update(activeSchedules).set({ status: "terminated", terminatedAt: now, updatedAt: now }).where(and(eq(activeSchedules.tenantProfileId, id), sql`${activeSchedules.status} <> 'terminated'`));
-    return r;
-  }
-  async unarchiveTenantProfile(id: string): Promise<any> {
-    const db = getDb(); if (!db) return undefined;
-    const now = new Date();
-    // Reactivate the profile only — schedules terminated at archive time stay
-    // terminated; the merchant can set up a fresh schedule if they want one.
-    const [r] = await db.update(tenantProfiles).set({ status: "active", archivedAt: null, updatedAt: now }).where(eq(tenantProfiles.id, id)).returning();
-    return r;
   }
   async createActiveSchedule(data: any): Promise<any> {
     const db = getDb(); if (!db) throw new Error('No database');

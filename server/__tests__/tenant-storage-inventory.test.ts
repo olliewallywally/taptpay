@@ -79,3 +79,24 @@ test("authenticated sale creation and disabled native writes have explicit tenan
   expect(native).toContain("updateTransactionStatusForMerchant");
   expect(native).toContain("updateTransactionPaymentMethodForMerchant");
 });
+
+test("property profile operations and history have explicit merchant contracts", () => {
+  const contract = storageContract();
+  const facts = currentRouteFacts();
+  for (const name of ["createTenantProfile", "updateTenantProfile", "archiveTenantProfile", "unarchiveTenantProfile"]) {
+    expect(contract.find(method => method.name === name)).toBeUndefined();
+  }
+  const registrations = [
+    ["POST /api/property/tenants", "createTenantProfileForMerchant"],
+    ["GET /api/property/tenants/:id", "getTenantProfileForMerchant"],
+    ["PUT /api/property/tenants/:id", "updateTenantProfileForMerchant"],
+    ["POST /api/property/tenants/:id/archive", "archiveTenantProfileForMerchant"],
+    ["POST /api/property/tenants/:id/unarchive", "unarchiveTenantProfileForMerchant"],
+    ["GET /api/property/tenants/:id/events", "getTransactionEventsByTenantForMerchant"],
+  ];
+  for (const [key, name] of registrations) {
+    expect(contract.find(method => method.name === name)?.requiredTenant).toBe(true);
+    expect(facts.get(key)?.storageMethods).toContain(name);
+    expect(facts.get(key)?.storageMethods).not.toContain("getTenantProfile");
+  }
+});
