@@ -4,8 +4,9 @@ import { decideBilling, failedPaymentUpdates, immediatePlanUpdates, MAX_PAYMENT_
 import { getDb, isDatabaseConnected } from "./database";
 import { config } from "./config";
 import { nextRunDateAfter } from "./property-schedule";
+import { parseInvoiceDocumentRef } from "./upload-policy";
 import { eq, ne, desc, asc, and, inArray, notInArray, gt, gte, lte, lt, or, ilike, like, sql, isNull, isNotNull } from "drizzle-orm";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { authHandoffCodes, authSessions, authThrottle, invoiceDocumentAccessAudit, invoiceDocumentReadLimits, invoiceSplitSessions, type AuthSession, type InvoiceSplitSession, type NewAuthSession } from "@shared/schema";
 import { SESSION_RECLAIM_AFTER_MS } from "./auth-sessions";
 import {
@@ -61,6 +62,24 @@ export type PropertyInvoiceMutationResult =
   | { kind: "ok"; invoice: typeof invoicesRentRequests.$inferSelect }
   | { kind: "not-found" }
   | { kind: "conflict"; reason: "paid" | "voided" };
+
+export type PropertyInvoiceInput = Pick<typeof invoicesRentRequests.$inferInsert,
+  "amountCents" | "deliveryChannel" | "dueAt" | "splitEnabled" | "kind" | "chargeType" | "description" | "documentUrl" | "documentName">;
+export type PropertyInvoiceCreationResult =
+  | { kind: "ok"; invoice: typeof invoicesRentRequests.$inferSelect; reused: boolean }
+  | { kind: "not-found" }
+  | { kind: "invalid-document" };
+export type PropertyInvoiceDeliverySnapshot = {
+  invoice: typeof invoicesRentRequests.$inferSelect;
+  tenant: typeof tenantProfiles.$inferSelect;
+};
+export type PropertyInvoiceDeliveryInput = { channel?: string; messageId?: string };
+
+function propertyInvoiceInput(data: PropertyInvoiceInput): PropertyInvoiceInput {
+  return { amountCents: data.amountCents, deliveryChannel: data.deliveryChannel, dueAt: data.dueAt,
+    splitEnabled: data.splitEnabled, kind: data.kind === "charge" ? "charge" : "rent",
+    chargeType: data.chargeType, description: data.description, documentUrl: data.documentUrl, documentName: data.documentName };
+}
 
 function activeScheduleChanges(data: ActiveScheduleChanges): ActiveScheduleChanges {
   const patch = Object.fromEntries(["amountCents", "frequency", "deliveryChannel"]
@@ -893,12 +912,17 @@ export interface IStorage extends PaymentAttemptRepository {
   getInvoiceRentRequestForMerchant(id: string, merchantId: number): Promise<any | undefined>;
   voidInvoiceRentRequestForMerchant(id: string, merchantId: number): Promise<PropertyInvoiceMutationResult>;
   markInvoiceRentRequestPaidExternalForMerchant(id: string, merchantId: number, externalPaymentReference?: string): Promise<PropertyInvoiceMutationResult>;
+  createOrReuseInvoiceRentRequestForMerchant(tenantProfileId: string, merchantId: number, data: PropertyInvoiceInput): Promise<PropertyInvoiceCreationResult>;
+  getInvoiceRentRequestDeliveryForMerchant(id: string, merchantId: number): Promise<PropertyInvoiceDeliverySnapshot | undefined>;
+  recordInvoiceRentRequestDeliveryForMerchant(id: string, merchantId: number, tenantProfileId: string, data: PropertyInvoiceDeliveryInput): Promise<PropertyInvoiceMutationResult>;
+  /** Internal recurring generation only; authenticated creation uses explicit scope. */
   createInvoiceRentRequest(data: any): Promise<any>;
   /** Provider, cron and public-checkout lane; authenticated management uses explicit scope. */
   getInvoiceRentRequest(id: string): Promise<any | undefined>;
   getInvoiceRentRequestByToken(token: string): Promise<any | undefined>;
   getInvoiceRentRequestByWindcaveSessionId(sessionId: string): Promise<any | undefined>;
   getInvoiceRentRequestsByMerchant(merchantId: number, opts?: { status?: string; tenantProfileId?: string }): Promise<any[]>;
+  /** Provider, cron and public-checkout lane; never authenticated invoice management. */
   updateInvoiceRentRequest(id: string, updates: any): Promise<any | undefined>;
   atomicClaimSplitShare(invoiceId: string, sessionId: string): Promise<any | null>;
   /**
@@ -914,7 +938,6 @@ export interface IStorage extends PaymentAttemptRepository {
   getPendingDispatchInvoices(): Promise<any[]>;
   getOverdueEligibleInvoices(now: Date): Promise<any[]>;
   getReminderEligibleInvoices(): Promise<any[]>;
-  getLiveInvoiceByTenant(tenantProfileId: string): Promise<any | undefined>;
 
   logTransactionEvent(data: any): Promise<any>;
   getTransactionEventsByTenant(tenantProfileId: string, limit?: number): Promise<any[]>;
@@ -3381,6 +3404,9 @@ export class MemStorage implements IStorage {
   async getInvoiceRentRequestForMerchant(id: string, merchantId: number): Promise<any> { return undefined; }
   async voidInvoiceRentRequestForMerchant(id: string, merchantId: number): Promise<PropertyInvoiceMutationResult> { return { kind: "not-found" }; }
   async markInvoiceRentRequestPaidExternalForMerchant(id: string, merchantId: number, externalPaymentReference?: string): Promise<PropertyInvoiceMutationResult> { return { kind: "not-found" }; }
+  async createOrReuseInvoiceRentRequestForMerchant(tenantProfileId: string, merchantId: number, data: PropertyInvoiceInput): Promise<PropertyInvoiceCreationResult> { throw new Error("Property management requires database"); }
+  async getInvoiceRentRequestDeliveryForMerchant(id: string, merchantId: number): Promise<PropertyInvoiceDeliverySnapshot | undefined> { return undefined; }
+  async recordInvoiceRentRequestDeliveryForMerchant(id: string, merchantId: number, tenantProfileId: string, data: PropertyInvoiceDeliveryInput): Promise<PropertyInvoiceMutationResult> { return { kind: "not-found" }; }
   async createInvoiceRentRequest(data: any): Promise<any> { throw new Error("Property management requires database"); }
   async getInvoiceRentRequest(id: string): Promise<any> { return undefined; }
   async getInvoiceRentRequestByToken(token: string): Promise<any> { return undefined; }
@@ -3424,7 +3450,6 @@ export class MemStorage implements IStorage {
   async getPendingDispatchInvoices(): Promise<any[]> { return []; }
   async getOverdueEligibleInvoices(now: Date): Promise<any[]> { return []; }
   async getReminderEligibleInvoices(): Promise<any[]> { return []; }
-  async getLiveInvoiceByTenant(tenantProfileId: string): Promise<any> { return undefined; }
   async logTransactionEvent(data: any): Promise<any> { return {}; }
   async getTransactionEventsByTenant(tenantProfileId: string, limit?: number): Promise<any[]> { return []; }
   async getTransactionEventsByInvoice(invoiceId: string): Promise<any[]> { return []; }
@@ -8151,7 +8176,8 @@ export class DatabaseStorage implements IStorage {
     )).limit(1);
     return row;
   }
-  private async mutatePropertyInvoiceForMerchant(id: string, merchantId: number, operation: "void" | "paid-external", externalPaymentReference?: string): Promise<PropertyInvoiceMutationResult> {
+  private async mutatePropertyInvoiceForMerchant(id: string, merchantId: number, operation: "void" | "paid-external" | "resent", externalPaymentReference?: string,
+    delivery?: { tenantProfileId: string; data: PropertyInvoiceDeliveryInput }): Promise<PropertyInvoiceMutationResult> {
     if (!isManagementTenantId(merchantId)) return { kind: "not-found" };
     const db = this.db; if (!db) return { kind: "not-found" };
     return db.transaction(async (tx: any) => {
@@ -8161,6 +8187,7 @@ export class DatabaseStorage implements IStorage {
         eq(invoicesRentRequests.id, id), eq(invoicesRentRequests.merchantId, merchantId),
       )).limit(1);
       if (!candidate) return { kind: "not-found" };
+      if (delivery && candidate.tenantProfileId !== delivery.tenantProfileId) return { kind: "not-found" };
       const [parent] = await tx.select().from(tenantProfiles).where(and(
         eq(tenantProfiles.id, candidate.tenantProfileId), eq(tenantProfiles.merchantId, merchantId),
       )).limit(1).for("update");
@@ -8170,18 +8197,22 @@ export class DatabaseStorage implements IStorage {
       const [invoice] = await tx.select().from(invoicesRentRequests).where(scope).limit(1).for("update");
       if (!invoice) return { kind: "not-found" };
       if (invoice.status === "paid" || invoice.status === "paid_external") return { kind: "conflict", reason: "paid" };
-      if (operation === "paid-external" && invoice.status === "voided") return { kind: "conflict", reason: "voided" };
+      if (operation !== "void" && invoice.status === "voided") return { kind: "conflict", reason: "voided" };
       // Issued invoices stay payable when the profile is archived (owner decision
       // 2026-09-27). Only ownership and current invoice state gate this write.
       const now = new Date();
       const patch = operation === "void"
         ? { status: "voided", voidedAt: now, updatedAt: now }
-        : { status: "paid_external", paidAt: now, externalPaymentReference: externalPaymentReference ?? null, updatedAt: now };
+        : operation === "paid-external"
+          ? { status: "paid_external", paidAt: now, externalPaymentReference: externalPaymentReference ?? null, updatedAt: now }
+          : { dispatchedAt: now, sentAt: now, updatedAt: now,
+              ...(invoice.status === "pending_dispatch" || invoice.status === "dispatch_failed" ? { status: "dispatched" } : {}),
+              ...(delivery?.data.channel === "whatsapp" && delivery.data.messageId ? { whatsappMessageId: delivery.data.messageId } : {}) };
       const [updated] = await tx.update(invoicesRentRequests).set(patch).where(scope).returning();
       if (!updated) return { kind: "not-found" };
       await tx.insert(transactionEvents).values({ merchantId, tenantProfileId: parent.id, invoiceId: id,
-        eventType: operation === "void" ? "Invoice_Voided" : "Payment_External",
-        payload: operation === "void" ? {} : { externalPaymentReference } });
+        eventType: operation === "void" ? "Invoice_Voided" : operation === "paid-external" ? "Payment_External" : "Invoice_Resent",
+        payload: operation === "void" ? {} : operation === "paid-external" ? { externalPaymentReference } : { channel: delivery?.data.channel, status: updated.status } });
       return { kind: "ok", invoice: updated };
     });
   }
@@ -8190,6 +8221,61 @@ export class DatabaseStorage implements IStorage {
   }
   async markInvoiceRentRequestPaidExternalForMerchant(id: string, merchantId: number, externalPaymentReference?: string): Promise<PropertyInvoiceMutationResult> {
     return this.mutatePropertyInvoiceForMerchant(id, merchantId, "paid-external", externalPaymentReference);
+  }
+  async recordInvoiceRentRequestDeliveryForMerchant(id: string, merchantId: number, tenantProfileId: string, data: PropertyInvoiceDeliveryInput): Promise<PropertyInvoiceMutationResult> {
+    return this.mutatePropertyInvoiceForMerchant(id, merchantId, "resent", undefined, { tenantProfileId, data });
+  }
+  async getInvoiceRentRequestDeliveryForMerchant(id: string, merchantId: number): Promise<PropertyInvoiceDeliverySnapshot | undefined> {
+    if (!isManagementTenantId(merchantId)) return undefined;
+    const db = this.db; if (!db) return undefined;
+    // One statement snapshots invoice and current owned contact together.
+    const [row] = await db.select({ invoice: invoicesRentRequests, tenant: tenantProfiles }).from(invoicesRentRequests)
+      .innerJoin(tenantProfiles, eq(tenantProfiles.id, invoicesRentRequests.tenantProfileId))
+      .where(and(eq(invoicesRentRequests.id, id), eq(invoicesRentRequests.merchantId, merchantId), eq(tenantProfiles.merchantId, merchantId))).limit(1);
+    return row;
+  }
+  async createOrReuseInvoiceRentRequestForMerchant(tenantProfileId: string, merchantId: number, data: PropertyInvoiceInput): Promise<PropertyInvoiceCreationResult> {
+    if (!isManagementTenantId(merchantId)) return { kind: "not-found" };
+    const db = this.db; if (!db) throw new Error("No database");
+    const input = propertyInvoiceInput(data);
+    return db.transaction(async (tx: any) => {
+      const [parent] = await tx.select().from(tenantProfiles).where(and(
+        eq(tenantProfiles.id, tenantProfileId), eq(tenantProfiles.merchantId, merchantId),
+      )).limit(1).for("update");
+      if (!parent) return { kind: "not-found" };
+      if (input.documentUrl) {
+        const ref = parseInvoiceDocumentRef(input.documentUrl);
+        if (!ref) return { kind: "invalid-document" };
+        const [document] = await tx.select({ id: uploadedFiles.id }).from(uploadedFiles).where(and(
+          eq(uploadedFiles.path, ref.relPath), eq(uploadedFiles.merchantId, merchantId),
+        )).limit(1).for("share");
+        if (!document) return { kind: "invalid-document" };
+      }
+      if (input.kind !== "charge") {
+        // Preserve the existing latest-live rule: if the latest live invoice is
+        // a charge, create rent separately rather than searching past that charge.
+        const [live] = await tx.select().from(invoicesRentRequests).where(and(
+          eq(invoicesRentRequests.tenantProfileId, parent.id), eq(invoicesRentRequests.merchantId, merchantId),
+          inArray(invoicesRentRequests.status, ["pending_dispatch", "dispatched", "overdue", "dispatch_failed"]),
+        )).orderBy(desc(invoicesRentRequests.createdAt)).limit(1).for("update");
+        if (live && live.kind !== "charge") {
+          let invoice = live;
+          if (input.amountCents !== live.amountCents) {
+            [invoice] = await tx.update(invoicesRentRequests).set({ amountCents: input.amountCents, updatedAt: new Date() })
+              .where(and(eq(invoicesRentRequests.id, live.id), eq(invoicesRentRequests.merchantId, merchantId), eq(invoicesRentRequests.tenantProfileId, parent.id))).returning();
+          }
+          if (!invoice) return { kind: "not-found" };
+          return { kind: "ok", invoice, reused: true };
+        }
+      }
+      const [invoice] = await tx.insert(invoicesRentRequests).values({ ...input, merchantId, tenantProfileId: parent.id,
+        token: randomBytes(20).toString("base64url"), status: "pending_dispatch" }).returning();
+      await tx.insert(transactionEvents).values({ merchantId, tenantProfileId: parent.id, invoiceId: invoice.id,
+        eventType: input.kind === "charge" ? "Charge_Created" : "Invoice_Generated",
+        payload: { amountCents: invoice.amountCents, channel: invoice.deliveryChannel,
+          ...(input.kind === "charge" ? { chargeType: input.chargeType, description: input.description } : {}) } });
+      return { kind: "ok", invoice, reused: false };
+    });
   }
   async createInvoiceRentRequest(data: any): Promise<any> {
     const db = getDb(); if (!db) throw new Error('No database');
@@ -8312,18 +8398,6 @@ export class DatabaseStorage implements IStorage {
     const db = getDb(); if (!db) return [];
     // Overdue, still unpaid — the reminder pass applies the per-merchant timing policy.
     return db.select().from(invoicesRentRequests).where(eq(invoicesRentRequests.status, "overdue")).orderBy(invoicesRentRequests.dueAt);
-  }
-  async getLiveInvoiceByTenant(tenantProfileId: string): Promise<any> {
-    const db = getDb(); if (!db) return undefined;
-    // Most recent unpaid / non-voided invoice for this tenant (the one a "send" should resend).
-    const [r] = await db.select().from(invoicesRentRequests)
-      .where(and(
-        eq(invoicesRentRequests.tenantProfileId, tenantProfileId),
-        inArray(invoicesRentRequests.status, ["pending_dispatch", "dispatched", "overdue", "dispatch_failed"]),
-      ))
-      .orderBy(desc(invoicesRentRequests.createdAt))
-      .limit(1);
-    return r;
   }
   async logTransactionEvent(data: any): Promise<any> {
     const db = getDb(); if (!db) return {};

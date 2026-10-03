@@ -13,7 +13,7 @@
  * Triggered via POST /api/internal/cron (x-cron-secret header).
  */
 
-import { storage } from "./storage";
+import { storage, type PropertyInvoiceDeliverySnapshot } from "./storage";
 import { sendEmail } from "./email-service";
 import { isWhatsAppConfigured, sendWhatsApp } from "./whatsapp-service";
 import { isSmsConfigured, sendSms } from "./sms-service";
@@ -155,8 +155,9 @@ function buildRentWhatsAppText(opts: {
 // Channel-aware delivery for one invoice. Tries WhatsApp when that's the chosen
 // channel and it's configured + a phone exists, otherwise falls back to email.
 // Returns { sent, channel, reason }.
-async function deliverInvoice(invoice: any, baseUrl: string, opts: { reminder?: boolean; amountCents?: number; splitNote?: string; payLabel?: string } = {}): Promise<{ sent: boolean; channel?: string; reason?: string; messageId?: string }> {
-  const [merchant, tenant] = await Promise.all([
+async function deliverInvoice(invoice: any, baseUrl: string, opts: { reminder?: boolean; amountCents?: number; splitNote?: string; payLabel?: string } = {},
+  parties?: { merchant: any; tenant: PropertyInvoiceDeliverySnapshot["tenant"] }): Promise<{ sent: boolean; channel?: string; reason?: string; messageId?: string }> {
+  const [merchant, tenant] = parties ? [parties.merchant, parties.tenant] : await Promise.all([
     storage.getMerchant(invoice.merchantId),
     storage.getTenantProfile(invoice.tenantProfileId),
   ]);
@@ -220,28 +221,34 @@ function deliverOptsFor(invoice: any, reminder: boolean): { reminder: boolean; a
   };
 }
 
-export async function resendInvoiceEmail(invoiceId: string, baseUrl: string): Promise<{ ok: boolean; reason?: string; invoice?: any }> {
-  const invoice = await storage.getInvoiceRentRequest(invoiceId);
-  if (!invoice) return { ok: false, reason: "not_found" };
+export async function resendInvoiceEmailForMerchant(invoiceId: string, merchantId: number, baseUrl: string): Promise<{ ok: boolean; reason?: string; invoice?: any }> {
+  const [merchant, subscription] = await Promise.all([storage.getMerchant(merchantId), storage.getSubscription(merchantId)]);
+  if (!billingCardIsReady(subscription)) return { ok: false, reason: "billing_card_required" };
+  if (!merchant) return { ok: false, reason: "missing_data" };
+  // Read both owned rows together after the other awaited prerequisites. Delivery
+  // uses this captured contact; it never refetches a parent through a global key.
+  const snapshot = await storage.getInvoiceRentRequestDeliveryForMerchant(invoiceId, merchantId);
+  if (!snapshot) return { ok: false, reason: "not_found" };
+  const { invoice, tenant } = snapshot;
   if (["paid", "paid_external", "voided"].includes(invoice.status)) return { ok: false, reason: "not_payable" };
-  if (!billingCardIsReady(await storage.getSubscription(invoice.merchantId))) {
-    return { ok: false, reason: "billing_card_required" };
+  let delivery;
+  try {
+    delivery = await deliverInvoice(invoice, baseUrl, deliverOptsFor(invoice, invoice.status === "overdue"), { merchant, tenant });
+  } catch {
+    // An attempted provider call may have succeeded despite its exception. Do
+    // not retry it here or return a successful invoice DTO.
+    return { ok: false, reason: "reconciliation_required" };
   }
-
-  const delivery = await deliverInvoice(invoice, baseUrl, deliverOptsFor(invoice, invoice.status === "overdue"));
   if (!delivery.sent) return { ok: false, reason: delivery.reason || "send_failed" };
-
-  const updates: any = { dispatchedAt: new Date(), sentAt: new Date() };
-  if (delivery.messageId && delivery.channel === "whatsapp") updates.whatsappMessageId = delivery.messageId;
-  // pending/failed invoices move to "dispatched"; dispatched/overdue keep their status.
-  if (invoice.status === "pending_dispatch" || invoice.status === "dispatch_failed") updates.status = "dispatched";
-  const updated = await storage.updateInvoiceRentRequest(invoiceId, updates);
-
-  await storage.logTransactionEvent({
-    merchantId: invoice.merchantId, tenantProfileId: invoice.tenantProfileId,
-    invoiceId, eventType: "Invoice_Resent", payload: { channel: delivery.channel, status: updated?.status },
-  });
-  return { ok: true, invoice: updated };
+  try {
+    const result = await storage.recordInvoiceRentRequestDeliveryForMerchant(invoiceId, merchantId, invoice.tenantProfileId,
+      { channel: delivery.channel, messageId: delivery.messageId });
+    if (result.kind !== "ok") return { ok: false, reason: "reconciliation_required" };
+    return { ok: true, invoice: result.invoice };
+  } catch {
+    // The message was sent, but its scoped record/history did not commit.
+    return { ok: false, reason: "reconciliation_required" };
+  }
 }
 
 // ── Pass 1: generate invoices for due schedules ───────────────────────────────

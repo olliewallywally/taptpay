@@ -40,7 +40,7 @@ import path from "path";
 import fs from "fs";
 import { sendPushToMerchant } from "./push";
 import { isPushServiceEndpoint } from "./push-endpoint";
-import { resendInvoiceEmail } from "./property-cron";
+import { resendInvoiceEmailForMerchant } from "./property-cron";
 import { INVOICE_DOCUMENT_FOLDER, isInvoiceDocumentName, isPublicUploadFolder, parseInvoiceDocumentRef } from "./upload-policy";
 import { INVOICE_DOCUMENT_EXTENSIONS } from "./invoice-document-security";
 import { resendTradeInvoice, sendTradePaymentInvoice, sendTradeQuote } from "./trades-delivery";
@@ -7422,36 +7422,20 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       // The body's rules first: the tenant was read from the raw body before them.
       const data = createAdHocInvoiceSchema.parse(req.body);
-      const tenant = await storage.getTenantProfile(data.tenantProfileId);
-      if (!tenant || tenant.merchantId !== merchantId) return res.status(404).json({ message: "Tenant not found" });
+      const tenant = await storage.getTenantProfileForMerchant(data.tenantProfileId, merchantId);
+      if (!tenant) return res.status(404).json({ message: "Tenant not found" });
       if (!(await requireBillingCard(merchantId, res))) return;
       // Gap 13: an attached document must be this merchant's own upload.
       if (!(await requireOwnedInvoiceDocument(merchantId, data.documentUrl, res))) return;
       const baseUrl = getBaseUrl(req);
-      const isCharge = data.kind === "charge";
-
-      // Dedupe: if this tenant already has a live (unpaid) RENT invoice, update its
-      // amount and resend it rather than creating a duplicate. One-off charges are
-      // never deduped — they must coexist with rent (and with each other) instead of
-      // overwriting the tenant's live rent invoice.
-      if (!isCharge) {
-        const existing = await storage.getLiveInvoiceByTenant(data.tenantProfileId);
-        if (existing && existing.kind !== "charge") {
-          if (data.amountCents && data.amountCents !== existing.amountCents) {
-            await storage.updateInvoiceRentRequest(existing.id, { amountCents: data.amountCents });
-          }
-          const delivery = await resendInvoiceEmail(existing.id, baseUrl);
-          const fresh = await storage.getInvoiceRentRequest(existing.id);
-          return res.status(200).json({ ...fresh, resent: true, delivered: delivery.ok, deliveryReason: delivery.reason });
-        }
-      }
-
-      const invoice = await storage.createInvoiceRentRequest({ ...data, merchantId, token: generateInvoiceToken(), status: "pending_dispatch" });
-      await storage.logTransactionEvent({ merchantId, tenantProfileId: data.tenantProfileId, invoiceId: invoice.id, eventType: isCharge ? "Charge_Created" : "Invoice_Generated", payload: { amountCents: invoice.amountCents, channel: invoice.deliveryChannel, ...(isCharge ? { chargeType: data.chargeType, description: data.description } : {}) } });
-      // Send the link immediately; if delivery fails it stays pending and the cron retries.
-      const delivery = await resendInvoiceEmail(invoice.id, baseUrl);
-      const fresh = await storage.getInvoiceRentRequest(invoice.id);
-      res.status(201).json({ ...fresh, resent: false, delivered: delivery.ok, deliveryReason: delivery.reason });
+      const result = await storage.createOrReuseInvoiceRentRequestForMerchant(data.tenantProfileId, merchantId, data);
+      if (result.kind === "not-found") return res.status(404).json({ message: "Tenant not found" });
+      if (result.kind === "invalid-document") return res.status(400).json({ message: "Invalid document attachment" });
+      const delivery = await resendInvoiceEmailForMerchant(result.invoice.id, merchantId, baseUrl);
+      if (delivery.reason === "reconciliation_required") return res.status(503).json({ message: "Invoice delivery requires reconciliation", code: "PROPERTY_INVOICE_DELIVERY_RECONCILIATION_REQUIRED" });
+      const fresh = await storage.getInvoiceRentRequestForMerchant(result.invoice.id, merchantId);
+      if (!fresh) return res.status(404).json({ message: "Invoice not found" });
+      res.status(result.reused ? 200 : 201).json({ ...fresh, resent: result.reused, delivered: delivery.ok, deliveryReason: delivery.reason });
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: "Validation error", errors: err.errors });
       console.error("[PROP_INVOICE_CREATE]", err); res.status(500).json({ message: "Failed to create invoice" });
@@ -7464,11 +7448,14 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
-      const invoice = await storage.getInvoiceRentRequest(id);
-      if (!invoice || invoice.merchantId !== merchantId) return res.status(404).json({ message: "Invoice not found" });
+      const invoice = await storage.getInvoiceRentRequestForMerchant(id, merchantId);
+      if (!invoice) return res.status(404).json({ message: "Invoice not found" });
       if (!(await requireBillingCard(merchantId, res))) return;
       if (["paid", "paid_external", "voided"].includes(invoice.status)) return res.status(409).json({ message: "Invoice is not payable" }); // P2.2 (R1-T3): was 400
-      const delivery = await resendInvoiceEmail(id, getBaseUrl(req));
+      const delivery = await resendInvoiceEmailForMerchant(id, merchantId, getBaseUrl(req));
+      if (delivery.reason === "reconciliation_required") return res.status(503).json({ message: "Invoice delivery requires reconciliation", code: "PROPERTY_INVOICE_DELIVERY_RECONCILIATION_REQUIRED" });
+      if (delivery.reason === "not_found") return res.status(404).json({ message: "Invoice not found" });
+      if (delivery.reason === "not_payable") return res.status(409).json({ message: "Invoice is not payable" });
       if (!delivery.ok) return res.status(502).json({ message: "Could not resend", reason: delivery.reason });
       res.json(delivery.invoice);
     } catch (err) { console.error("[PROP_INVOICE_RESEND]", err); res.status(500).json({ message: "Failed to resend invoice" }); }

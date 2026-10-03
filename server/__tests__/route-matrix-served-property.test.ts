@@ -193,7 +193,7 @@ const RECIPES: Record<string, ServedRecipe> = {
           status: "pending_dispatch", resent: false, delivered: true,
         });
         expect(fake.invoices.get(MADE_INVOICE)?.token).toEqual(expect.any(String));
-        expect(propertyCron.resendInvoiceEmail).toHaveBeenCalledWith(MADE_INVOICE, expect.any(String));
+        expect(propertyCron.resendInvoiceEmailForMerchant).toHaveBeenCalledWith(MADE_INVOICE, ctx.merchantId, expect.any(String));
         expect(eventTypes()).toEqual(["Charge_Created"]);
       },
     };
@@ -204,7 +204,7 @@ const RECIPES: Record<string, ServedRecipe> = {
       req: { method: "post", path: `/api/property/invoices/${INVOICE}/resend` }, status: 200,
       check: (res) => {
         expect(res.body).toMatchObject({ id: INVOICE, status: "dispatched" });
-        expect(propertyCron.resendInvoiceEmail).toHaveBeenCalledWith(INVOICE, expect.any(String));
+        expect(propertyCron.resendInvoiceEmailForMerchant).toHaveBeenCalledWith(INVOICE, ctx.merchantId, expect.any(String));
       },
     };
   },

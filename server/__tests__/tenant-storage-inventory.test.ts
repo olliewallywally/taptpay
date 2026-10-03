@@ -138,3 +138,18 @@ test("property invoice void and external-payment writes require explicit merchan
   expect(list).toContain("getTenantProfileForMerchant");
   expect(list).not.toContain("getTenantProfile");
 });
+
+test("property creation/resend have no global invoice management escape hatch", () => {
+  const contract = storageContract();
+  expect(contract.find(method => method.name === "getLiveInvoiceByTenant")).toBeUndefined();
+  for (const name of ["createOrReuseInvoiceRentRequestForMerchant", "getInvoiceRentRequestDeliveryForMerchant", "recordInvoiceRentRequestDeliveryForMerchant"]) {
+    expect(contract.find(method => method.name === name)?.requiredTenant).toBe(true);
+  }
+  const facts = currentRouteFacts();
+  for (const key of ["POST /api/property/invoices", "POST /api/property/invoices/:id/resend"]) {
+    const methods = facts.get(key)!.storageMethods;
+    expect(methods).toContain("getInvoiceRentRequestForMerchant");
+    for (const name of ["getInvoiceRentRequest", "createInvoiceRentRequest", "updateInvoiceRentRequest", "getTenantProfile", "logTransactionEvent"]) expect(methods).not.toContain(name);
+  }
+  expect(facts.get("POST /api/property/invoices")!.storageMethods).toContain("createOrReuseInvoiceRentRequestForMerchant");
+});

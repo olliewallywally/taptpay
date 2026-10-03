@@ -222,3 +222,91 @@ and child reread prevents reparent/ownership races after waiting. Current invoic
 ownership and parent ownership must both hold in a read query. Void repeats remain
 allowed; externally paid repeats and voided external payments remain 409. History
 must use the persisted invoice's parent, not the route's stale row. **Approve c1.**
+
+## S3c2 preflight — authenticated invoice creation/reuse and delivery
+
+Base `5f532095`; S3c1 independently checked at completion: 17 suites / 528 pass,
+18 actual PostgreSQL checks, typecheck/build. This scope moves the two remaining
+authenticated global invoice workflows; provider/public/cron lanes stay explicit.
+
+### Verification of Prior Fixes
+
+Reread S3c1 predicates, parent-before-child locks and transaction history against
+its test and SQL evidence, plus the current creation, attachment and cron consumers.
+Its affected suites and actual PostgreSQL checks independently passed in this turn.
+
+Create/reuse must lock the owned profile before deciding whether to update or
+insert an invoice. Creation history belongs in that transaction. Manual delivery
+needs an explicit merchant service, a joined invoice/parent snapshot and a scoped
+transaction for the delivery record/history. Preserve current billing, roles,
+validation, delivery rendering/fallbacks, archived-profile and rent/charge behavior.
+
+### Blocking Issues
+
+None. Demonstrate current post-lookup ownership races and missing scoped contracts
+before editing production. No application database or provider calls for verification.
+
+### High-Risk Concerns
+
+Project input at runtime; generate tokens on the server, never accept caller identity,
+ownership, payment or lifecycle fields. Recheck attached-document ownership under a
+share lock through the write. Reuse only current same-merchant children and recheck
+post-wait state. Parent-before-child locking matches S3a–c1. No network under locks.
+
+### Missing Steps
+
+Red storage/service/HTTP tests; contracts in both implementations; atomic creation
+and scoped delivery-record history; migrate callers/fakes/attachment expectations;
+actual concurrent create, history rollback, ownership/reparent/settlement waits and
+document reassignment checks. Regenerate inventories, affected/full server checks,
+typecheck/build, evidence and independent review brief.
+
+### Unsafe Assumptions
+
+A delivery snapshot authorizes a point-in-time message to its captured owned contact;
+it cannot promise zero external effects after a later concurrent change or a provider
+exception. After an attempted send, any uncertain outcome or refused/failed delivery
+record returns fixed reconciliation-required 503 without another tenant's invoice or
+a false success. Before sending, missing/settled scope refuses with no message. No
+locks are held over providers. Revalidate the final response using scoped storage.
+
+### Required Ordering Changes
+
+Create/reuse and history first; snapshot and record contracts next; then the explicit
+merchant service and routes. Retire unused global live-invoice lookup and unscoped
+manual resend; retain internal cron delivery and provider/public storage operations.
+
+### Open Product / Provider / Legal Questions
+
+No new policy decision needed. Preserve the existing latest-live-invoice dedupe rule
+(a latest charge causes a new rent invoice), amount-only rent reuse and every separate
+charge. The partial-split/open-session amount edit and payment-finalization races stay
+R3/R4 findings. This does not claim idempotence against the separately scoped cron.
+
+### Compliance and Data-Handling Notes
+
+Synthetic loopback SQL and stubbed delivery only; no real contact/provider call,
+application migration, live database, UI, flag enablement, push or deployment.
+
+### Test and Rollback Adequacy
+
+Verify foreign/missing/invalid tenants, input projection, archive compatibility,
+dedupe/charge rules, concurrent creation, transactional rollback and actual waited
+races. Service tests must observe every channel and global escape hatch; post-send
+refusal is 503, preserves moved/settled rows and never claims no message was sent.
+Fix forward without restoring global authenticated operations.
+
+### Final Recommendation (Approve / Do not approve)
+
+**Approve S3c2 on `5f532095`**, failing tests first; S4–S6 remain separate scopes.
+
+### Separate reread
+
+Rechecked creation/dedupe, document reference parsing, cron/provider consumers and
+manual resend. Preserve parent archive behavior and the exact latest-live query
+selection. Joined snapshots prevent mixing invoices with a later foreign profile;
+merchant/subscription reads precede the final snapshot. Record rechecks original
+parent and current ownership/state under locks, projecting only delivery metadata
+and deriving status from the locked row. Never report success on undefined rows,
+post-send scope loss or history rollback. Both final create response and unsuccessful
+send response must fetch only the currently owned invoice. **Approve c2.**

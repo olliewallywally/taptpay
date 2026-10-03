@@ -10,6 +10,8 @@
 import * as billing from "../../billing-card";
 import * as propertyCron from "../../property-cron";
 import { nextRunDateAfter } from "../../property-schedule";
+import { parseInvoiceDocumentRef } from "../../upload-policy";
+import { randomUUID } from "node:crypto";
 import { storage } from "./http-harness";
 
 export const TENANT = "22222222-2222-4222-8222-222222222222";
@@ -75,7 +77,6 @@ export function fakeProperty(): PropertyFake {
     if (fake.tenants.get(id)?.merchantId !== merchantId) return [];
     return fake.events.filter(row => row.tenantProfileId === id && row.merchantId === merchantId).reverse().slice(0, limit);
   });
-  jest.spyOn(storage, "getLiveInvoiceByTenant").mockResolvedValue(undefined as any);
   const write = (name: string, apply: (...args: any[]) => any) =>
     jest.spyOn(storage as any, name).mockImplementation(async (...args: any[]) => {
       if (["updateTenantProfileForMerchant", "archiveTenantProfileForMerchant", "unarchiveTenantProfileForMerchant"].includes(name)) {
@@ -141,6 +142,31 @@ export function fakeProperty(): PropertyFake {
     fake.invoices.set(row.id, row);
     return row;
   });
+  jest.spyOn(storage, "createOrReuseInvoiceRentRequestForMerchant").mockImplementation(async (tenantProfileId, merchantId, data) => {
+    if (fake.tenants.get(tenantProfileId)?.merchantId !== merchantId) return { kind: "not-found" };
+    if (data.documentUrl) {
+      const ref = parseInvoiceDocumentRef(data.documentUrl);
+      if (!ref || !(await storage.uploadedFileOwnedByMerchant(ref.relPath, merchantId))) return { kind: "invalid-document" };
+    }
+    if (data.kind !== "charge") {
+      const live = [...fake.invoices.values()].filter(row => row.tenantProfileId === tenantProfileId && row.merchantId === merchantId
+        && ["pending_dispatch", "dispatched", "overdue", "dispatch_failed"].includes(row.status))
+        .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0))[0];
+      if (live && live.kind !== "charge") {
+        if (live.amountCents !== data.amountCents) { fake.writes.push("updateInvoiceRentRequest"); Object.assign(live, { amountCents: data.amountCents, updatedAt: new Date() }); }
+        return { kind: "ok", invoice: live, reused: true };
+      }
+    }
+    fake.writes.push("createInvoiceRentRequest");
+    const invoice = { ...data, id: fake.invoices.has(MADE_INVOICE) ? randomUUID() : MADE_INVOICE,
+      merchantId, tenantProfileId, kind: data.kind || "rent", status: "pending_dispatch", token: `synthetic-${randomUUID()}`, createdAt: new Date() } as any;
+    fake.invoices.set(invoice.id, invoice);
+    await storage.logTransactionEvent({ merchantId, tenantProfileId, invoiceId: invoice.id,
+      eventType: data.kind === "charge" ? "Charge_Created" : "Invoice_Generated",
+      payload: { amountCents: invoice.amountCents, channel: invoice.deliveryChannel,
+        ...(data.kind === "charge" ? { chargeType: data.chargeType, description: data.description } : {}) } });
+    return { kind: "ok", invoice, reused: false };
+  });
   write("updateInvoiceRentRequest", (id: string, updates: any) => Object.assign(fake.invoices.get(id), updates));
   const mutateInvoice = async (id: string, merchantId: number, operation: "void" | "paid-external", externalPaymentReference?: string): Promise<any> => {
     const invoice = fake.invoices.get(id); const parent = fake.tenants.get(invoice?.tenantProfileId);
@@ -164,9 +190,12 @@ export function fakeProperty(): PropertyFake {
     return row;
   });
   jest.spyOn(billing, "billingCardIsReady").mockReturnValue(true);
-  jest.spyOn(propertyCron, "resendInvoiceEmail").mockImplementation(async (id: string) => {
+  jest.spyOn(propertyCron, "resendInvoiceEmailForMerchant").mockImplementation(async (id: string, merchantId: number) => {
+    const invoice = fake.invoices.get(id);
+    if (invoice?.merchantId !== merchantId || fake.tenants.get(invoice.tenantProfileId)?.merchantId !== merchantId) return { ok: false, reason: "not_found" };
+    if (["paid", "paid_external", "voided"].includes(invoice.status)) return { ok: false, reason: "not_payable" };
     fake.writes.push("resendInvoiceEmail");
-    return { ok: true, invoice: fake.invoices.get(id) };
+    return { ok: true, invoice };
   });
   return fake;
 }

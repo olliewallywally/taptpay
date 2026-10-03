@@ -1,10 +1,10 @@
 # R1-T7 tenant/storage execution inventory
 
-Generated from working-tree sources on base `c250343fdeeee1df2cb3a03035bf143501505784`; the phase evidence names the final commit.
+Generated from working-tree sources on base `5f532095b1507f076a8cde2380e9f9896f702529`; the phase evidence names the final commit.
 
 Registrations: **187**; registrations with session/admin authentication: **119**;
 registrations calling checkMerchantOwnership: **25**.
-IStorage: **227** declared methods;
+IStorage: **229** declared methods;
 PaymentAttemptRepository: **8** inherited methods.
 
 Classifications come from the reviewed per-route branches, including mixed public/signed-in routes.
@@ -147,9 +147,9 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | POST /api/pay/t/:token/receipt-pdf | single-resource bearer (public-bearer/token) | `getMerchant`, `getSplitPaymentsByTransaction` |
 | POST /api/pay/t/:token/session | single-resource bearer (public-bearer/token) | `getMerchant`, `getNextPendingSplit`, `updateTransactionStatus` |
 | POST /api/pay/t/:token/split | single-resource bearer (public-bearer/token) | `createBillSplit`, `getMerchant` |
-| POST /api/property/invoices | tenant (merchant/resource) | `createInvoiceRentRequest`, `getInvoiceRentRequest`, `getLiveInvoiceByTenant`, `getOrCreateSubscription`, `getTenantProfile`, `logTransactionEvent`, `updateInvoiceRentRequest`, `uploadedFileOwnedByMerchant` |
+| POST /api/property/invoices | tenant (merchant/resource) | `createOrReuseInvoiceRentRequestForMerchant`, `getInvoiceRentRequestForMerchant`, `getOrCreateSubscription`, `getTenantProfileForMerchant`, `uploadedFileOwnedByMerchant` |
 | POST /api/property/invoices/:id/mark-paid-external | tenant (merchant/resource) | `getInvoiceRentRequestForMerchant`, `markInvoiceRentRequestPaidExternalForMerchant` |
-| POST /api/property/invoices/:id/resend | tenant (merchant/resource) | `getInvoiceRentRequest`, `getOrCreateSubscription` |
+| POST /api/property/invoices/:id/resend | tenant (merchant/resource) | `getInvoiceRentRequestForMerchant`, `getOrCreateSubscription` |
 | POST /api/property/invoices/:id/void | tenant (merchant/resource) | `getInvoiceRentRequestForMerchant`, `voidInvoiceRentRequestForMerchant` |
 | POST /api/property/invoices/document | tenant (merchant/session) | `saveUploadedFile` |
 | POST /api/property/tenants | tenant (merchant/session) | `createTenantProfileForMerchant`, `logTransactionEvent` |
@@ -367,6 +367,9 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | IStorage | getInvoiceRentRequestForMerchant | yes | `getInvoiceRentRequestForMerchant(id: string, merchantId: number): Promise<any \| undefined>` |
 | IStorage | voidInvoiceRentRequestForMerchant | yes | `voidInvoiceRentRequestForMerchant(id: string, merchantId: number): Promise<PropertyInvoiceMutationResult>` |
 | IStorage | markInvoiceRentRequestPaidExternalForMerchant | yes | `markInvoiceRentRequestPaidExternalForMerchant(id: string, merchantId: number, externalPaymentReference?: string): Promise<PropertyInvoiceMutationResult>` |
+| IStorage | createOrReuseInvoiceRentRequestForMerchant | yes | `createOrReuseInvoiceRentRequestForMerchant(tenantProfileId: string, merchantId: number, data: PropertyInvoiceInput): Promise<PropertyInvoiceCreationResult>` |
+| IStorage | getInvoiceRentRequestDeliveryForMerchant | yes | `getInvoiceRentRequestDeliveryForMerchant(id: string, merchantId: number): Promise<PropertyInvoiceDeliverySnapshot \| undefined>` |
+| IStorage | recordInvoiceRentRequestDeliveryForMerchant | yes | `recordInvoiceRentRequestDeliveryForMerchant(id: string, merchantId: number, tenantProfileId: string, data: PropertyInvoiceDeliveryInput): Promise<PropertyInvoiceMutationResult>` |
 | IStorage | createInvoiceRentRequest | no | `createInvoiceRentRequest(data: any): Promise<any>` |
 | IStorage | getInvoiceRentRequest | no | `getInvoiceRentRequest(id: string): Promise<any \| undefined>` |
 | IStorage | getInvoiceRentRequestByToken | no | `getInvoiceRentRequestByToken(token: string): Promise<any \| undefined>` |
@@ -383,7 +386,6 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | IStorage | getPendingDispatchInvoices | no | `getPendingDispatchInvoices(): Promise<any[]>` |
 | IStorage | getOverdueEligibleInvoices | no | `getOverdueEligibleInvoices(now: Date): Promise<any[]>` |
 | IStorage | getReminderEligibleInvoices | no | `getReminderEligibleInvoices(): Promise<any[]>` |
-| IStorage | getLiveInvoiceByTenant | no | `getLiveInvoiceByTenant(tenantProfileId: string): Promise<any \| undefined>` |
 | IStorage | logTransactionEvent | no | `logTransactionEvent(data: any): Promise<any>` |
 | IStorage | getTransactionEventsByTenant | no | `getTransactionEventsByTenant(tenantProfileId: string, limit?: number): Promise<any[]>` |
 | IStorage | getTransactionEventsByInvoice | no | `getTransactionEventsByInvoice(invoiceId: string): Promise<any[]>` |

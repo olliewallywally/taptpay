@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ c250343fdeeee1df2cb3a03035bf143501505784 on 2026-10-03.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 5f532095b1507f076a8cde2380e9f9896f702529 on 2026-10-03.
  *
  * 187 registrations (78 GET, 77 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -2068,13 +2068,12 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       middleware: ["authenticateToken"],
       body: ["schema: createAdHocInvoiceSchema"],
-      authChecks: ["compares tenant.merchantId !== merchantId"],
-      storageMethods: ["createInvoiceRentRequest","getInvoiceRentRequest","getLiveInvoiceByTenant","getOrCreateSubscription","getTenantProfile","logTransactionEvent","updateInvoiceRentRequest","uploadedFileOwnedByMerchant"],
-      sideEffects: ["email: resendInvoiceEmail"],
+      storageMethods: ["createOrReuseInvoiceRentRequestForMerchant","getInvoiceRentRequestForMerchant","getOrCreateSubscription","getTenantProfileForMerchant","uploadedFileOwnedByMerchant"],
+      sideEffects: ["email: resendInvoiceEmailForMerchant"],
       statuses: [200,201,400,401,402,403,404,500,503],
       errorTextInResponse: ["err.errors"],
       entitlementGates: ["BILLING_CARD_REQUIRED","billingCardIsReady","requireBillingCard"],
-      helpers: ["generateInvoiceToken","requireBillingCard","requireOwnedInvoiceDocument"],
+      helpers: ["requireBillingCard","requireOwnedInvoiceDocument"],
     },
   },
   "POST /api/property/invoices/:id/resend": {
@@ -2085,9 +2084,8 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       middleware: ["authenticateToken"],
       params: ["id: strictUuidParam"],
-      authChecks: ["compares invoice.merchantId !== merchantId"],
-      storageMethods: ["getInvoiceRentRequest","getOrCreateSubscription"],
-      sideEffects: ["email: resendInvoiceEmail"],
+      storageMethods: ["getInvoiceRentRequestForMerchant","getOrCreateSubscription"],
+      sideEffects: ["email: resendInvoiceEmailForMerchant"],
       statuses: [200,400,401,402,403,404,409,500,502,503],
       entitlementGates: ["BILLING_CARD_REQUIRED","billingCardIsReady","requireBillingCard"],
       helpers: ["requireBillingCard"],

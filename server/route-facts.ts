@@ -109,7 +109,7 @@ const AUTH_CHECK_CALLS = new Set([
 const SIDE_EFFECT_CALLS: Record<string, string> = {
   sendEmail: "email",
   sendTeamInviteEmail: "email",
-  resendInvoiceEmail: "email",
+  resendInvoiceEmailForMerchant: "email",
   resendTradeInvoice: "email/SMS",
   sendTradePaymentInvoice: "email/SMS",
   sendTradeQuote: "email/SMS",

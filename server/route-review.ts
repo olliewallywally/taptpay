@@ -230,7 +230,7 @@ const AUTOMATION_ROW =
 const RENT_INVOICE_ROW =
   "a whole invoice row (the tenant and automation, amount, the checkout token, channel, rent or a charge with its type and description, the attached document's reference and name, status and its dates, the external payment reference, reminders sent, the provider's session and transaction ids, the split, the WhatsApp message id)";
 const RENT_DELIVERY =
-  "sends the tenant the payment link by the invoice's channel: WhatsApp or SMS when chosen, configured and the tenant has a phone, otherwise email (resendInvoiceEmail, then deliverInvoice, server/property-cron.ts)";
+  "sends the tenant the payment link by the invoice's channel: WhatsApp or SMS when chosen, configured and the tenant has a phone, otherwise email (resendInvoiceEmailForMerchant, then deliverInvoice with captured owned contact, server/property-cron.ts); no DB locks over providers; an uncertain send or refused/failed post-send record is reconciliation-required 503";
 const paidElsewhereFinding = (action: string) =>
   `${action} while the tenant is paying: the provider's completion then finds the invoice settled (finalizeRentInvoice), so a single payment's charge is recorded nowhere; a split share's is logged (Split_Share_Unrecorded). R3 (payment attempts).`;
 
@@ -3208,7 +3208,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         principal: "merchant",
         roles: ["owner", "member"],
         tenant: "resource",
-        tenantRule: `the tenant named in the body (getTenantProfile) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403); ${PROPERTY_ADMIN}`,
+        tenantRule: `the tenant named in the body (getTenantProfileForMerchant) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403); createOrReuseInvoiceRentRequestForMerchant locks/rechecks that parent and only current owned live children; document ownership is rechecked under a share lock; final response is scoped; ${PROPERTY_ADMIN}`,
       },
     ],
     input:
@@ -3216,9 +3216,9 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     capability: null,
     entitlement: "paid access (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise)",
     idempotency:
-      "Rent, when the tenant has a live rent invoice (getLiveInvoiceByTenant): that invoice takes the new amount and is sent again (200, resent: true). Otherwise, and for every charge, a new invoice with a fresh checkout token (201)",
+      "createOrReuseInvoiceRentRequestForMerchant serializes authenticated creation on the owned profile. Rent reuses the latest live owned invoice if it is rent, changing only its amount (200, resent: true); a latest charge causes new rent. Otherwise, and for every charge, a new invoice with a server-generated checkout token and creation history commits together (201). Existing amount/session R3 semantics are retained",
     sideEffects: `${RENT_DELIVERY}, at once; one that fails to send stays pending and the cron retries it`,
-    successDto: `${RENT_INVOICE_ROW}, with resent, delivered and deliveryReason (a fixed code: not_found, not_payable, billing_card_required, missing_data, send_failed or no_deliverable)`,
+    successDto: `${RENT_INVOICE_ROW}, with resent, delivered and deliveryReason (a fixed code: not_payable, billing_card_required, missing_data, send_failed or no_deliverable); lost final scope is 404; uncertain post-send results are fixed reconciliation-required 503 without an invoice DTO`,
     errorDisclosure: ["input-issues"],
     findings: [
       "Sending rent to a tenant with a live rent invoice changes that invoice's amount, even with split shares paid or a payment session open: the shares paid were worked out on the old amount, and an open session charges the old one (R3: payment attempts).",
@@ -3227,13 +3227,13 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
 
   "POST /api/property/invoices/:id/resend": {
     branches: [
-      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${propertyRecord("invoice", "getInvoiceRentRequest")}; ${PROPERTY_ADMIN}` },
+      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${propertyRecord("invoice", "getInvoiceRentRequestForMerchant")}, including current parent ownership; resendInvoiceEmailForMerchant reads a joined owned snapshot after awaited prerequisites and records under parent-then-child locks with original parent identity; ${PROPERTY_ADMIN}` },
     ],
     input: propertyId("id"),
     capability: null,
     entitlement: "paid access (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise)",
     idempotency:
-      "none: each call sends the link again, and a pending or failed invoice becomes dispatched; a paid, externally paid or voided one is 409 'Invoice is not payable' (400 until 2026-09-27, P2.2), and a send that fails is 502 with its reason, a fixed code",
+      "none: each call sends the link again; a pending or failed invoice becomes dispatched using its current locked status, with delivery history in the same transaction. A paid, externally paid or voided one is 409 'Invoice is not payable' (400 until 2026-09-27, P2.2); lost pre-send scope is 404; a known send failure is 502 with a fixed reason; uncertainty or post-send record refusal/failure is fixed reconciliation-required 503",
     sideEffects: RENT_DELIVERY,
     successDto: `the invoice afterwards, ${RENT_INVOICE_ROW}`,
     errorDisclosure: ["domain-errors"],

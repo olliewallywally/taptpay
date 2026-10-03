@@ -57,8 +57,8 @@ const ROUTES: CreateRoute[] = [
       description: "Power",
       ...doc,
     }),
-    created: () => storage.createInvoiceRentRequest as jest.Mock,
-    sideEffects: () => [storage.logTransactionEvent as jest.Mock, propertyCron.resendInvoiceEmail as jest.Mock],
+    created: () => storage.createOrReuseInvoiceRentRequestForMerchant as jest.Mock,
+    sideEffects: () => [storage.logTransactionEvent as jest.Mock, propertyCron.resendInvoiceEmailForMerchant as jest.Mock],
   },
   {
     label: "trades quote",
@@ -92,26 +92,28 @@ beforeEach(() => {
   jest.spyOn(billing, "billingCardIsReady").mockReturnValue(true);
   jest.spyOn(delivery, "sendTradeQuote").mockResolvedValue({ sent: false, reason: "no-contact" } as any);
   jest.spyOn(delivery, "resendTradeInvoice").mockResolvedValue({ sent: false, reason: "no-contact" } as any);
-  jest.spyOn(propertyCron, "resendInvoiceEmail").mockResolvedValue({ ok: false, reason: "test" });
+  jest.spyOn(propertyCron, "resendInvoiceEmailForMerchant").mockResolvedValue({ ok: false, reason: "test" });
   jest.spyOn(storage, "createClientProfile").mockImplementation(async (data: any) => ({ ...data, id: CLIENT_ID }));
   jest.spyOn(storage, "createQuote").mockImplementation(async (data: any) => ({ ...data, id: "quote-id" }));
   jest.spyOn(storage, "createJobInvoice").mockImplementation(async (data: any) => ({ ...data, id: "job-invoice-id" }));
   jest.spyOn(storage, "createJobEvent").mockResolvedValue({} as any);
-  jest.spyOn(storage, "createInvoiceRentRequest").mockImplementation(async (data: any) => ({ ...data, id: "prop-invoice-id" }));
+  jest.spyOn(storage, "createOrReuseInvoiceRentRequestForMerchant").mockImplementation(async (tenantProfileId, merchantId, data) => ({
+    kind: "ok", reused: false, invoice: { ...data, id: "prop-invoice-id", merchantId, tenantProfileId } as any,
+  }));
   jest.spyOn(storage, "logTransactionEvent").mockResolvedValue(undefined as any);
-  jest.spyOn(storage, "getInvoiceRentRequest").mockImplementation(async (id: string) => ({ id, status: "pending_dispatch" }) as any);
+  jest.spyOn(storage, "getInvoiceRentRequestForMerchant").mockImplementation(async (id: string, merchantId: number) => ({ id, merchantId, status: "pending_dispatch" }) as any);
 });
 
 describe.each(ROUTES)("gap 13 — $label create validates an attached document", (route) => {
   beforeEach(() => {
     // The property route resolves the tenant before anything else; scope it to
     // whichever merchant is calling.
-    jest.spyOn(storage, "getTenantProfile").mockImplementation(async () => null as any);
+    jest.spyOn(storage, "getTenantProfileForMerchant").mockImplementation(async () => null as any);
   });
 
   async function callerWithTenant() {
     const owner = await createOwnerPrincipal();
-    jest.spyOn(storage, "getTenantProfile").mockResolvedValue({
+    jest.spyOn(storage, "getTenantProfileForMerchant").mockResolvedValue({
       id: TENANT_ID,
       merchantId: owner.merchantId,
       firstName: "Tess",
@@ -130,9 +132,10 @@ describe.each(ROUTES)("gap 13 — $label create validates an attached document",
     const res = await request(app).post(route.path).set(signedIn(owner)).send(route.body(doc));
 
     expect(res.status).toBe(201);
-    expect(route.created()).toHaveBeenCalledWith(
-      expect.objectContaining({ documentUrl: doc.documentUrl, documentName: doc.documentName }),
-    );
+    const attached = expect.objectContaining({ documentUrl: doc.documentUrl, documentName: doc.documentName });
+    if (route.path === "/api/property/invoices") {
+      expect(route.created()).toHaveBeenCalledWith(TENANT_ID, owner.merchantId, attached);
+    } else expect(route.created()).toHaveBeenCalledWith(attached);
   });
 
   it("is unchanged when no document is attached", async () => {
