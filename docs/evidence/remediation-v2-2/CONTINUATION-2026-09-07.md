@@ -1,5 +1,29 @@
 # Full integration continuation audit — 2026-09-07
 
+Latest continuation **2026-10-03 — S4a trades clients code-complete `22c6dc9c`**,
+local, awaiting independent review.
+[Evidence/handoff](r1/R1-T7-S4a-trades-clients-2026-10-03.md),
+[S4 preflights](../../PLAN-2026-10-03-r1-t7-s4-trades.md).
+Picked up from the preceding session's uncommitted, unverified draft: its logs and
+disposable PostgreSQL were gone, so the draft was reread and every check repeated
+before commit. Owner finish-R1 authorization persists.
+
+- Seven merchant-required client contracts (create, read, update, archive, restore,
+  promote, history); runtime field projection; atomic same-business archive cascade
+  with its history; no restart on restore; promotion under a row lock. Five global
+  client mutators/history reader retired; the global profile read kept for the
+  public, checkout, PDF, delivery and provider lanes until S4b.
+- Red replayed on `c5260cc1`: **23 of 23 fail** (17 storage, 6 genuine HTTP races).
+  Affected **28 suites / 1,641 pass**; fresh actual PostgreSQL **16 pass**; **16 of
+  16** planted storage mutations caught; **full server 153 suites / 3,795 pass**.
+  Typecheck/build/whitespace and **187 routes / 0 gaps; 239 contracts** pass.
+- No app DB/provider, live migration, client/schema change, enablement, push or
+  deploy. Disposable PostgreSQL stopped and deleted.
+
+**Active next:** S4b1 trades quote/invoice reads, signed-in PDF and manual state
+changes (preflight and separate reread approve it on `22c6dc9c`), S4b2 creation and
+delivery, S4c schedules; S5–S6, Apple and R1-T10. Independent/external gates remain below.
+
 Latest continuation **2026-10-03 — S3c2 property creation/delivery code-complete
 `1b80cb8d`**, local, awaiting independent review.
 [Evidence/handoff](r1/R1-T7-S3c2-property-invoice-send-2026-10-03.md).
