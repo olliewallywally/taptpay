@@ -2909,7 +2909,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         roles: ["owner"],
         tenant: "resource",
         tenantRule:
-          "getTransactionForMerchant scopes the lookup to the session's business; another business's is answered as a missing one (404); the platform admin, with no business, is refused (403 'Merchant access required'). Refund mutations still need the S2b/R4 scoped durable contract",
+          "getTransactionForMerchant and all four refund writes require the session's business; creation/status also lock and recheck the parent. Another business's sale is 404; the platform admin without a business is 403. Persistence refusal after reservation/provider returns 503 REFUND_RECONCILIATION_REQUIRED without success events. R4 durable operations remain gated",
       },
     ],
     input:
@@ -2917,7 +2917,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     capability: "refunds must be on (config.features.refundInitiation: 503 otherwise), and the provider configured with the sale's provider transaction (isWindcaveConfigured: 503 otherwise)",
     entitlement: null,
     idempotency:
-      "reserves the amount against what is left to refund (reserveRefundAmount: 409 when it exceeds it or another refund is in progress), records the refund, asks the provider, and gives the amount back if the provider refuses",
+      "reserves against the remaining balance with tenant/status/cap predicates (409 on refusal), creates the scoped refund, calls the provider, and releases only the same tenant's balance on failure; persistence refusal after reservation/provider requires reconciliation (503), with no success event. This legacy choreography is not durable/idempotent and remains disabled pending R4",
     sideEffects: "refunds at the provider (createWindcaveRefund); a live update (sseBroker, via broadcastToStone); a push notification (sendPushToMerchant)",
     successDto: "{ success, message, refund: the whole refund row, transaction: the whole sale row }",
     errorDisclosure: ["input-issues", "provider-text"],

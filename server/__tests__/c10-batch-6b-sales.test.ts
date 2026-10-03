@@ -137,7 +137,7 @@ describe("a refund's amount is a plain amount of money", () => {
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
     const sale = await completedSale(owner.merchantId);
-    const reserve = jest.spyOn(storage, "reserveRefundAmount");
+    const reserve = jest.spyOn(storage, "reserveRefundAmountForMerchant");
     const before = storageSnapshot();
 
     const res = await request(app).post(`/api/transactions/${sale.id}/refunds`).set(signedIn(owner))

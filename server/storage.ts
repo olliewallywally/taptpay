@@ -39,6 +39,13 @@ export type ActiveTransactionScope =
   | { kind: "merchant-any" }
   | { kind: "board"; stoneId: number };
 
+export type MerchantRefundInput = Pick<InsertRefund, "refundAmount" | "refundReason" | "refundMethod">;
+
+function scopedRefundInput(transactionId: number, merchantId: number, input: MerchantRefundInput): InsertRefund {
+  return { transactionId, merchantId, refundAmount: input.refundAmount,
+    refundReason: input.refundReason, refundMethod: input.refundMethod, status: "pending" };
+}
+
 export type TransactionCancellationResult =
   | { kind: "cancelled"; transaction: Transaction }
   | { kind: "not-found" }
@@ -630,15 +637,11 @@ export interface IStorage extends PaymentAttemptRepository {
   getRefund(id: number): Promise<Refund | undefined>;
   getRefundsForTransactionForMerchant(transactionId: number, merchantId: number): Promise<Refund[]>;
   getRefundsByMerchant(merchantId: number): Promise<Refund[]>;
-  updateRefundStatus(id: number, status: string, windcaveRefundId?: string): Promise<Refund | undefined>;
-  updateTransactionAfterRefund(id: number, refundAmount: number): Promise<Transaction | undefined>;
-  // Atomically reserve a refund against the remaining refundable balance, guarding
-  // against concurrent/double-submitted refunds over-refunding. Returns the updated
-  // transaction, or null if the reservation would exceed the refundable amount.
-  reserveRefundAmount(id: number, refundAmount: number): Promise<Transaction | null | undefined>;
-  // Compensating action: release a previously-reserved amount (e.g. the gateway
-  // refund failed), restoring the refundable balance.
-  releaseRefundAmount(id: number, refundAmount: number): Promise<void>;
+  createRefundForMerchant(transactionId: number, merchantId: number, data: MerchantRefundInput): Promise<Refund | undefined>;
+  updateRefundStatusForMerchant(id: number, merchantId: number, status: "failed" | "completed", windcaveRefundId?: string): Promise<Refund | undefined>;
+  /** Legacy balance reservation; R4 must add durable operation/idempotency before enablement. */
+  reserveRefundAmountForMerchant(id: number, merchantId: number, refundAmount: number): Promise<Transaction | null>;
+  releaseRefundAmountForMerchant(id: number, merchantId: number, refundAmount: number): Promise<boolean>;
 
   // Tapt Stone operations
   createTaptStone(data: InsertTaptStone): Promise<TaptStone>;
@@ -1936,43 +1939,28 @@ export class MemStorage implements IStorage {
     );
   }
 
-  async updateRefundStatus(id: number, status: string, windcaveRefundId?: string): Promise<Refund | undefined> {
-    const refund = this.refunds.get(id);
-    if (!refund) return undefined;
-    
-    const updatedRefund = {
-      ...refund,
-      status,
-      windcaveRefundId: windcaveRefundId || refund.windcaveRefundId,
-      completedAt: status === "completed" ? new Date() : refund.completedAt,
-    };
-    this.refunds.set(id, updatedRefund);
-    return updatedRefund;
+  async createRefundForMerchant(transactionId: number, merchantId: number, data: MerchantRefundInput): Promise<Refund | undefined> {
+    if (!isManagementTenantId(merchantId)) return undefined;
+    if (this.transactions.get(transactionId)?.merchantId !== merchantId) return undefined;
+    // createRefund mutates synchronously; no yield separates ownership check and insert.
+    return this.createRefund(scopedRefundInput(transactionId, merchantId, data));
   }
 
-  async updateTransactionAfterRefund(id: number, refundAmount: number): Promise<Transaction | undefined> {
-    const transaction = this.transactions.get(id);
-    if (!transaction) return undefined;
-
-    const prevRefunded = parseFloat(transaction.totalRefunded || "0");
-    const newTotalRefunded = prevRefunded + refundAmount;
-    const originalPrice = parseFloat(transaction.price);
-    const newRefundableAmount = Math.max(0, originalPrice - newTotalRefunded);
-    const newStatus = newRefundableAmount <= 0 ? "refunded" : "partially_refunded";
-
-    const updated = {
-      ...transaction,
-      totalRefunded: newTotalRefunded.toFixed(2),
-      refundableAmount: newRefundableAmount.toFixed(2),
-      status: newStatus,
-    };
-    this.transactions.set(id, updated);
+  async updateRefundStatusForMerchant(id: number, merchantId: number, status: "failed" | "completed", windcaveRefundId?: string): Promise<Refund | undefined> {
+    if (!isManagementTenantId(merchantId)) return undefined;
+    const refund = this.refunds.get(id);
+    if (!refund || refund.merchantId !== merchantId || refund.transactionId === null
+      || this.transactions.get(refund.transactionId)?.merchantId !== merchantId) return undefined;
+    const updated = { ...refund, status, windcaveRefundId: windcaveRefundId || refund.windcaveRefundId,
+      completedAt: status === "completed" ? new Date() : refund.completedAt };
+    this.refunds.set(id, updated);
     return updated;
   }
 
-  async reserveRefundAmount(id: number, refundAmount: number): Promise<Transaction | null | undefined> {
+  async reserveRefundAmountForMerchant(id: number, merchantId: number, refundAmount: number): Promise<Transaction | null> {
+    if (!isManagementTenantId(merchantId)) return null;
     const transaction = this.transactions.get(id);
-    if (!transaction) return undefined;
+    if (!transaction || transaction.merchantId !== merchantId) return null;
     if (transaction.status !== "completed" && transaction.status !== "partially_refunded") return null;
     const prevRefunded = parseFloat(transaction.totalRefunded || "0");
     const price = parseFloat(transaction.price);
@@ -1990,9 +1978,10 @@ export class MemStorage implements IStorage {
     return updated;
   }
 
-  async releaseRefundAmount(id: number, refundAmount: number): Promise<void> {
+  async releaseRefundAmountForMerchant(id: number, merchantId: number, refundAmount: number): Promise<boolean> {
+    if (!isManagementTenantId(merchantId)) return false;
     const transaction = this.transactions.get(id);
-    if (!transaction) return;
+    if (!transaction || transaction.merchantId !== merchantId) return false;
     const prevRefunded = parseFloat(transaction.totalRefunded || "0");
     const price = parseFloat(transaction.price);
     const newTotalRefunded = Math.max(0, prevRefunded - refundAmount);
@@ -2003,6 +1992,7 @@ export class MemStorage implements IStorage {
       refundableAmount: newRefundableAmount.toFixed(2),
       status: newTotalRefunded <= 0 ? "completed" : "partially_refunded",
     });
+    return true;
   }
 
   async updateTransactionStatus(id: number, status: string, windcaveTransactionId?: string): Promise<Transaction | undefined> {
@@ -5555,49 +5545,42 @@ export class DatabaseStorage implements IStorage {
     return await this.db.select().from(refunds).where(eq(refunds.merchantId, merchantId));
   }
 
-  async updateRefundStatus(id: number, status: string, windcaveRefundId?: string): Promise<Refund | undefined> {
+  async createRefundForMerchant(transactionId: number, merchantId: number, data: MerchantRefundInput): Promise<Refund | undefined> {
+    if (!isManagementTenantId(merchantId)) return undefined;
     if (!this.db) throw new Error('Database not available');
-    const updateData: any = { status };
-    if (windcaveRefundId) {
-      updateData.windcaveRefundId = windcaveRefundId;
-    }
-    if (status === "completed") {
-      updateData.completedAt = new Date();
-    }
-    
-    const result = await this.db
-      .update(refunds)
-      .set(updateData)
-      .where(eq(refunds.id, id))
-      .returning();
-    return result[0];
+    return this.db.transaction(async (tx: any) => {
+      const [parent] = await tx.select().from(transactions)
+        .where(and(eq(transactions.id, transactionId), eq(transactions.merchantId, merchantId)))
+        .limit(1).for("update");
+      if (!parent) return undefined;
+      const [refund] = await tx.insert(refunds).values(scopedRefundInput(transactionId, merchantId, data)).returning();
+      return refund;
+    });
   }
 
-  async updateTransactionAfterRefund(id: number, refundAmount: number): Promise<Transaction | undefined> {
+  async updateRefundStatusForMerchant(id: number, merchantId: number, status: "failed" | "completed", windcaveRefundId?: string): Promise<Refund | undefined> {
+    if (!isManagementTenantId(merchantId)) return undefined;
     if (!this.db) throw new Error('Database not available');
-
-    const [transaction] = await this.db.select().from(transactions).where(eq(transactions.id, id)).limit(1);
-    if (!transaction) return undefined;
-
-    const prevRefunded = parseFloat(transaction.totalRefunded || "0");
-    const newTotalRefunded = prevRefunded + refundAmount;
-    const originalPrice = parseFloat(transaction.price);
-    const newRefundableAmount = Math.max(0, originalPrice - newTotalRefunded);
-    const newStatus = newRefundableAmount <= 0 ? "refunded" : "partially_refunded";
-
-    const result = await this.db
-      .update(transactions)
-      .set({
-        totalRefunded: newTotalRefunded.toFixed(2),
-        refundableAmount: newRefundableAmount.toFixed(2),
-        status: newStatus,
-      })
-      .where(eq(transactions.id, id))
-      .returning();
-    return result[0];
+    return this.db.transaction(async (tx: any) => {
+      const [refund] = await tx.select().from(refunds)
+        .where(and(eq(refunds.id, id), eq(refunds.merchantId, merchantId))).limit(1);
+      if (!refund || refund.transactionId === null) return undefined;
+      // Parent first: same lock ordering as finalization/creation, protecting current ownership.
+      const [parent] = await tx.select().from(transactions)
+        .where(and(eq(transactions.id, refund.transactionId), eq(transactions.merchantId, merchantId)))
+        .limit(1).for("update");
+      if (!parent) return undefined;
+      const changes: any = { status };
+      if (windcaveRefundId) changes.windcaveRefundId = windcaveRefundId;
+      if (status === "completed") changes.completedAt = new Date();
+      const [updated] = await tx.update(refunds).set(changes)
+        .where(and(eq(refunds.id, id), eq(refunds.merchantId, merchantId), eq(refunds.transactionId, parent.id))).returning();
+      return updated;
+    });
   }
 
-  async reserveRefundAmount(id: number, refundAmount: number): Promise<Transaction | null | undefined> {
+  async reserveRefundAmountForMerchant(id: number, merchantId: number, refundAmount: number): Promise<Transaction | null> {
+    if (!isManagementTenantId(merchantId)) return null;
     if (!this.db) throw new Error('Database not available');
     const amt = refundAmount.toFixed(2);
     // Single atomic UPDATE: increment totalRefunded, recompute refundableAmount and
@@ -5613,7 +5596,7 @@ export class DatabaseStorage implements IStorage {
         status: sql`CASE WHEN ${transactions.price}::numeric - (COALESCE(${transactions.totalRefunded}, '0')::numeric + ${amt}::numeric) <= 0 THEN 'refunded' ELSE 'partially_refunded' END`,
       })
       .where(and(
-        eq(transactions.id, id),
+        eq(transactions.id, id), eq(transactions.merchantId, merchantId),
         inArray(transactions.status, ['completed', 'partially_refunded']),
         sql`(${transactions.price}::numeric - COALESCE(${transactions.totalRefunded}, '0')::numeric) >= ${amt}::numeric`,
       ))
@@ -5621,17 +5604,19 @@ export class DatabaseStorage implements IStorage {
     return result[0] ?? null;
   }
 
-  async releaseRefundAmount(id: number, refundAmount: number): Promise<void> {
+  async releaseRefundAmountForMerchant(id: number, merchantId: number, refundAmount: number): Promise<boolean> {
+    if (!isManagementTenantId(merchantId)) return false;
     if (!this.db) throw new Error('Database not available');
     const amt = refundAmount.toFixed(2);
-    await this.db
+    const result = await this.db
       .update(transactions)
       .set({
         totalRefunded: sql`GREATEST(0, COALESCE(${transactions.totalRefunded}, '0')::numeric - ${amt}::numeric)`,
         refundableAmount: sql`LEAST(${transactions.price}::numeric, ${transactions.price}::numeric - GREATEST(0, COALESCE(${transactions.totalRefunded}, '0')::numeric - ${amt}::numeric))`,
         status: sql`CASE WHEN GREATEST(0, COALESCE(${transactions.totalRefunded}, '0')::numeric - ${amt}::numeric) <= 0 THEN 'completed' ELSE 'partially_refunded' END`,
       })
-      .where(eq(transactions.id, id));
+      .where(and(eq(transactions.id, id), eq(transactions.merchantId, merchantId))).returning();
+    return result.length > 0;
   }
 
   // API Key operations - placeholder implementations

@@ -5593,7 +5593,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // BEFORE moving any money. Serializes concurrent / double-submitted refunds at
       // the DB so they can never over-refund (the old check-then-act read the balance,
       // then called Windcave, with no lock in between). null = reservation rejected.
-      const reserved = await storage.reserveRefundAmount(transactionId, requestedAmount);
+      const reserved = await storage.reserveRefundAmountForMerchant(transactionId, merchantId, requestedAmount);
       if (!reserved) {
         const remaining = parseFloat(transaction.refundableAmount || transaction.price);
         return res.status(409).json({
@@ -5602,16 +5602,15 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
 
       // Create refund record
-      const refund = await storage.createRefund({
-        transactionId,
-        merchantId,
+      const refund = await storage.createRefundForMerchant(transactionId, merchantId, {
         refundAmount,
         refundReason,
         refundMethod,
-        status: "pending",
-        windcaveRefundId: null,
-        completedAt: null,
       });
+      if (!refund) {
+        // Preserve the reservation rather than undo a different tenant's balance.
+        return res.status(503).json({ code: "REFUND_RECONCILIATION_REQUIRED", message: "Refund needs reconciliation before retrying" });
+      }
 
       let windcaveRefundId: string;
       {
@@ -5626,8 +5625,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         if (!refundResult.success) {
           // Money did not move — release the reservation so the balance is restored
           // and the merchant can retry.
-          await storage.releaseRefundAmount(transactionId, requestedAmount);
-          await storage.updateRefundStatus(refund.id, "failed");
+          const released = await storage.releaseRefundAmountForMerchant(transactionId, merchantId, requestedAmount);
+          const failed = released && await storage.updateRefundStatusForMerchant(refund.id, merchantId, "failed");
+          if (!failed) {
+            return res.status(503).json({ code: "REFUND_RECONCILIATION_REQUIRED", message: "Refund needs reconciliation before retrying" });
+          }
           return res.status(502).json({
             message: refundResult.error || "Windcave refund failed. Please try again."
           });
@@ -5638,7 +5640,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       // Mark refund record as completed. Transaction totals were already updated
       // atomically by reserveRefundAmount above.
-      const completedRefund = await storage.updateRefundStatus(refund.id, "completed", windcaveRefundId);
+      const completedRefund = await storage.updateRefundStatusForMerchant(refund.id, merchantId, "completed", windcaveRefundId);
+      if (!completedRefund) {
+        return res.status(503).json({ code: "REFUND_RECONCILIATION_REQUIRED", message: "Refund needs reconciliation before retrying" });
+      }
       const updatedTransaction = reserved;
 
       // Broadcast real-time update

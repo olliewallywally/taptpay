@@ -52,3 +52,16 @@ test("S2a merchant transaction/refund reads and cancellation require tenant scop
   // Its explicit validated-admin branch may resolve a target by global id; HTTP tests hold
   // merchant callers to the scoped branch and prevent falling back to that admin authority.
 });
+
+test("authenticated refunds use scoped writes and no retired global mutator", () => {
+  const contract = storageContract();
+  for (const name of ["reserveRefundAmount", "releaseRefundAmount", "updateRefundStatus", "updateTransactionAfterRefund"]) {
+    expect(contract.find(method => method.name === name)).toBeUndefined();
+  }
+  const methods = currentRouteFacts().get("POST /api/transactions/:transactionId/refunds")!.storageMethods;
+  expect(methods).not.toContain("createRefund");
+  for (const name of ["reserveRefundAmountForMerchant", "releaseRefundAmountForMerchant", "createRefundForMerchant", "updateRefundStatusForMerchant"]) {
+    expect(contract.find(method => method.name === name)?.requiredTenant).toBe(true);
+    expect(methods).toContain(name);
+  }
+});

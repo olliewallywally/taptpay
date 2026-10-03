@@ -105,6 +105,71 @@ try {
     assert.deepEqual(await one.getTransaction(row.id), row);
   });
 
+  await check("refund writes refuse foreign scope and enforce refund/parent ownership", async () => {
+    const row = await sale(a, "completed");
+    const refund = await one.createRefund({ transactionId: row.id, merchantId: a, refundAmount: "2.00" });
+    assert.equal(await one.reserveRefundAmountForMerchant(row.id, b, 2), null);
+    assert.equal(await one.releaseRefundAmountForMerchant(row.id, b, 2), false);
+    assert.equal(await one.createRefundForMerchant(row.id, b, { refundAmount: "2.00" }), undefined);
+    assert.equal(await one.updateRefundStatusForMerchant(refund.id, b, "completed"), undefined);
+    assert.deepEqual(await one.getTransaction(row.id), row);
+    await pool.query("UPDATE transactions SET merchant_id=$1 WHERE id=$2", [b, row.id]);
+    assert.equal(await one.updateRefundStatusForMerchant(refund.id, a, "completed"), undefined);
+    assert.equal(await one.updateRefundStatusForMerchant(refund.id, b, "completed"), undefined);
+    assert.deepEqual(await one.getRefund(refund.id), refund);
+  });
+  await check("refund reservation preserves cap under simultaneous writes", async () => {
+    const row = await sale(a, "completed");
+    const result = await Promise.all([one.reserveRefundAmountForMerchant(row.id, a, 6), two.reserveRefundAmountForMerchant(row.id, a, 6)]);
+    assert.equal(result.filter(Boolean).length, 1);
+    assert.equal((await one.getTransaction(row.id))!.totalRefunded, "6.00");
+    assert.equal(await one.releaseRefundAmountForMerchant(row.id, a, 6), true);
+    assert.equal((await one.getTransaction(row.id))!.totalRefunded, "0.00");
+  });
+  await check("scoped refund creation projects fields and status update preserves bindings", async () => {
+    const row = await sale(a, "completed");
+    const refund = await one.createRefundForMerchant(row.id, a, { refundAmount: "2.00", merchantId: b, transactionId: 99999, status: "completed" } as any);
+    assert.ok(refund);
+    assert.equal(refund.merchantId, a);
+    assert.equal(refund.transactionId, row.id);
+    assert.equal(refund.status, "pending");
+    assert.equal((await one.updateRefundStatusForMerchant(refund.id, a, "completed", "synthetic-refund"))!.status, "completed");
+  });
+  for (const operation of ["reserve", "release", "create", "status"] as const) {
+    await check(`refund ${operation} waits and refuses committed ownership change`, async () => {
+      const row = await sale(a, "completed");
+      const refund = await one.createRefund({ transactionId: row.id, merchantId: a, refundAmount: "2.00" });
+      const locker = await pool.connect();
+      let pending: Promise<unknown> | undefined;
+      let open = false;
+      try {
+        await locker.query("BEGIN"); open = true;
+        await locker.query("UPDATE transactions SET merchant_id=$1 WHERE id=$2", [b, row.id]);
+        pending = operation === "reserve" ? two.reserveRefundAmountForMerchant(row.id, a, 2)
+          : operation === "release" ? two.releaseRefundAmountForMerchant(row.id, a, 2)
+          : operation === "create" ? two.createRefundForMerchant(row.id, a, { refundAmount: "2.00" })
+          : two.updateRefundStatusForMerchant(refund.id, a, "completed");
+        void pending.catch(() => undefined);
+        let waited = false;
+        for (let i = 0; i < 200; i++) {
+          const wait = await pool.query("SELECT 1 FROM pg_stat_activity WHERE application_name=$1 AND wait_event_type='Lock'", ["taptpay-t7-s2-writer"]);
+          if (wait.rowCount) { waited = true; break; }
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+        assert.ok(waited, "refund write must actually wait for the parent lock");
+        await locker.query("COMMIT"); open = false;
+        assert.equal(await pending, operation === "reserve" ? null : operation === "release" ? false : undefined);
+        assert.deepEqual(await one.getTransaction(row.id), { ...row, merchantId: b });
+        assert.deepEqual(await one.getRefund(refund.id), refund);
+        assert.equal((await pool.query("SELECT count(*)::int n FROM refunds WHERE transaction_id=$1", [row.id])).rows[0].n, 1);
+      } finally {
+        if (open) await locker.query("ROLLBACK");
+        await pending?.catch(() => undefined);
+        locker.release();
+      }
+    });
+  }
+
   for (const change of ["ownership", "completed"] as const) {
     await check(`cancellation waits and refuses a committed concurrent ${change} change`, async () => {
       const row = await sale(a);

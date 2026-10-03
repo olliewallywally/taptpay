@@ -1,6 +1,6 @@
 # R1-T7 tenant/storage execution inventory
 
-Generated from working-tree sources on base `31f64efc2d405d60e071f364a29d918cde66137b`; the phase evidence names the final commit.
+Generated from working-tree sources on base `8d5354267dc39a3277362dae12631e5fe07784f3`; the phase evidence names the final commit.
 
 Registrations: **187**; registrations with session/admin authentication: **119**;
 registrations calling checkMerchantOwnership: **25**.
@@ -184,7 +184,7 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | POST /api/transactions/:id/pay | public (public/number) | `getMerchant`, `getNextPendingSplit`, `getTaptStone`, `getTransaction`, `updateTransactionStatus`, `updateTransactionWindcaveSession` |
 | POST /api/transactions/:id/receipt-pdf | public (public/number) | `getMerchant`, `getSplitPaymentById`, `getSplitPaymentsByTransaction`, `getTransaction` |
 | POST /api/transactions/:id/split | public (public/number) | `createBillSplit`, `getTransaction` |
-| POST /api/transactions/:transactionId/refunds | tenant (merchant/resource) | `createRefund`, `getTransactionForMerchant`, `releaseRefundAmount`, `reserveRefundAmount`, `updateRefundStatus` |
+| POST /api/transactions/:transactionId/refunds | tenant (merchant/resource) | `createRefundForMerchant`, `getTransactionForMerchant`, `releaseRefundAmountForMerchant`, `reserveRefundAmountForMerchant`, `updateRefundStatusForMerchant` |
 | POST /api/transactions/cash-sale | tenant (merchant/path-merchant) | `createTransaction`, `getOrCreateSubscription`, `getTaptStone` |
 | POST /api/transactions/tap-to-pay | tenant (merchant/path-merchant) | `createTransaction`, `getActiveTransactionByMerchant`, `getOrCreateSubscription`, `getTransaction`, `updateTransactionPaymentMethod`, `updateTransactionStatus` |
 | POST /api/tutorial/restart | tenant (merchant/session) | `restartMerchantTutorial` |
@@ -258,10 +258,10 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | IStorage | getRefund | no | `getRefund(id: number): Promise<Refund \| undefined>` |
 | IStorage | getRefundsForTransactionForMerchant | yes | `getRefundsForTransactionForMerchant(transactionId: number, merchantId: number): Promise<Refund[]>` |
 | IStorage | getRefundsByMerchant | yes | `getRefundsByMerchant(merchantId: number): Promise<Refund[]>` |
-| IStorage | updateRefundStatus | no | `updateRefundStatus(id: number, status: string, windcaveRefundId?: string): Promise<Refund \| undefined>` |
-| IStorage | updateTransactionAfterRefund | no | `updateTransactionAfterRefund(id: number, refundAmount: number): Promise<Transaction \| undefined>` |
-| IStorage | reserveRefundAmount | no | `reserveRefundAmount(id: number, refundAmount: number): Promise<Transaction \| null \| undefined>` |
-| IStorage | releaseRefundAmount | no | `releaseRefundAmount(id: number, refundAmount: number): Promise<void>` |
+| IStorage | createRefundForMerchant | yes | `createRefundForMerchant(transactionId: number, merchantId: number, data: MerchantRefundInput): Promise<Refund \| undefined>` |
+| IStorage | updateRefundStatusForMerchant | yes | `updateRefundStatusForMerchant(id: number, merchantId: number, status: "failed" \| "completed", windcaveRefundId?: string): Promise<Refund \| undefined>` |
+| IStorage | reserveRefundAmountForMerchant | yes | `reserveRefundAmountForMerchant(id: number, merchantId: number, refundAmount: number): Promise<Transaction \| null>` |
+| IStorage | releaseRefundAmountForMerchant | yes | `releaseRefundAmountForMerchant(id: number, merchantId: number, refundAmount: number): Promise<boolean>` |
 | IStorage | createTaptStone | no | `createTaptStone(data: InsertTaptStone): Promise<TaptStone>` |
 | IStorage | createNextTaptStone | yes | `createNextTaptStone(merchantId: number, name?: string): Promise<TaptStone>` |
 | IStorage | getTaptStone | no | `getTaptStone(id: number): Promise<TaptStone \| undefined>` |
