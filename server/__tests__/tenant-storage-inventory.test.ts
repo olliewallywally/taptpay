@@ -33,3 +33,22 @@ test("stock and board management has no unscoped mutation escape hatch", () => {
     }
   }
 });
+
+test("S2a merchant transaction/refund reads and cancellation require tenant scope", () => {
+  const contract = storageContract();
+  expect(contract.find((method) => method.name === "getRefundsByTransaction")).toBeUndefined();
+  for (const name of ["getTransactionForMerchant", "getRefundsForTransactionForMerchant", "cancelTransactionForMerchant"]) {
+    expect(contract.find((method) => method.name === name)?.requiredTenant).toBe(true);
+  }
+  const facts = currentRouteFacts();
+  for (const key of ["POST /api/transactions/:transactionId/refunds", "GET /api/transactions/:transactionId/refunds", "GET /api/v1/transactions/:id"]) {
+    expect(facts.get(key)?.storageMethods).toContain("getTransactionForMerchant");
+    expect(facts.get(key)?.storageMethods).not.toContain("getTransaction");
+  }
+  expect(facts.get("GET /api/transactions/:transactionId/refunds")?.storageMethods).toContain("getRefundsForTransactionForMerchant");
+  const cancel = facts.get("POST /api/transactions/:id/cancel")!.storageMethods;
+  expect(cancel).toContain("cancelTransactionForMerchant");
+  expect(cancel).not.toContain("updateTransactionStatus");
+  // Its explicit validated-admin branch may resolve a target by global id; HTTP tests hold
+  // merchant callers to the scoped branch and prevent falling back to that admin authority.
+});

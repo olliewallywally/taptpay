@@ -2807,7 +2807,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const transactionId = strictPositiveIntegerParam(req.params.id);
       if (transactionId === null) return res.status(400).json({ message: "Invalid id" });
-      const transaction = await storage.getTransaction(transactionId);
+      // Validated platform admins retain the reviewed platform-wide cancellation permission.
+      // Merchant sessions always supply their own tenant at the storage boundary.
+      const transaction = req.user?.role === "admin"
+        ? await storage.getTransaction(transactionId)
+        : await storage.getTransactionForMerchant(transactionId, req.user!.merchantId);
 
       if (!transaction) {
         return res.status(404).json({ message: "Transaction not found" });
@@ -2826,21 +2830,23 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(400).json({ message: `Cannot cancel transaction with status: ${transaction.status}` });
       }
 
-      // Update transaction status to cancelled
-      await storage.updateTransactionStatus(transactionId, "cancelled");
-      const updatedTransaction = await storage.getTransaction(transactionId);
-      if (!updatedTransaction) {
-        return res.status(500).json({ message: "Transaction cancellation was not persisted" });
+      const cancellation = await storage.cancelTransactionForMerchant(transactionId, transaction.merchantId!);
+      if (cancellation.kind === "not-found") {
+        return res.status(404).json({ message: "Transaction not found" });
       }
+      if (cancellation.kind === "conflict") {
+        return res.status(400).json({ message: `Cannot cancel transaction with status: ${cancellation.status}` });
+      }
+      const updatedTransaction = cancellation.transaction;
       
       // A board sale's board address; a no-board sale has none to give here.
       const transactionWithUrls = {
         ...updatedTransaction,
-        ...boardSaleUrls(transaction.merchantId!, transaction.taptStoneId, req),
+        ...boardSaleUrls(updatedTransaction.merchantId!, updatedTransaction.taptStoneId, req),
       };
 
       // Notify connected clients about the cancellation
-      broadcastToStone(transaction.merchantId!, transaction.taptStoneId, { 
+      broadcastToStone(updatedTransaction.merchantId!, updatedTransaction.taptStoneId, {
         type: 'transaction_update', 
         transaction: transactionWithUrls 
       });
@@ -5554,7 +5560,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const { refundAmount, refundReason, refundMethod } = validation.data;
 
       // Get the original transaction
-      const transaction = await storage.getTransaction(transactionId);
+      const transaction = await storage.getTransactionForMerchant(transactionId, merchantId);
       if (!transaction) {
         return res.status(404).json({ message: "Transaction not found" });
       }
@@ -5676,7 +5682,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
 
       // Get the transaction to verify ownership
-      const transaction = await storage.getTransaction(transactionId);
+      const transaction = await storage.getTransactionForMerchant(transactionId, merchantId);
       if (!transaction) {
         return res.status(404).json({ message: "Transaction not found" });
       }
@@ -5687,7 +5693,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(404).json({ message: "Transaction not found" });
       }
 
-      const refunds = await storage.getRefundsByTransaction(transactionId);
+      const refunds = await storage.getRefundsForTransactionForMerchant(transactionId, merchantId);
       res.json(refunds);
 
     } catch (error) {
@@ -6006,7 +6012,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(403).json({ error: 'Insufficient permissions' });
       }
 
-      const transaction = await storage.getTransaction(transactionId);
+      const transaction = await storage.getTransactionForMerchant(transactionId, req.apiKey.merchantId);
 
       // Another merchant's sale is answered exactly as a missing one, so a key
       // cannot tell which sale numbers exist (P2.2).

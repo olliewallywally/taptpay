@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ bc5eba3c55ed95c360b08b6545dc748f0911aab0 on 2026-10-02.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 31f64efc2d405d60e071f364a29d918cde66137b on 2026-10-03.
  *
  * 187 registrations (78 GET, 77 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -719,12 +719,12 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     method: "POST",
     path: "/api/transactions/:id/cancel",
     principal: "merchant-user",
-    markers: ["authenticateToken","checkMerchantOwnership"],
+    markers: ["authenticateToken","checkMerchantOwnership","req.user?.role === \"admin\""],
     facts: {
       middleware: ["authenticateToken"],
       params: ["id: strictPositiveIntegerParam"],
-      authChecks: ["checkMerchantOwnership"],
-      storageMethods: ["getTransaction","updateTransactionStatus"],
+      authChecks: ["checkMerchantOwnership","compares req.user?.role === \"admin\""],
+      storageMethods: ["cancelTransactionForMerchant","getTransaction","getTransactionForMerchant"],
       sideEffects: ["live update: sseBroker.broadcast"],
       statuses: [200,400,401,403,404,500,503],
       dtos: ["ownerTransactionDto"],
@@ -1460,7 +1460,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       middleware: ["authenticateToken"],
       params: ["transactionId: strictPositiveIntegerParam"],
       authChecks: ["compares transaction.merchantId !== merchantId","isAccountOwner"],
-      storageMethods: ["createRefund","getTransaction","releaseRefundAmount","reserveRefundAmount","updateRefundStatus"],
+      storageMethods: ["createRefund","getTransactionForMerchant","releaseRefundAmount","reserveRefundAmount","updateRefundStatus"],
       sideEffects: ["live update: sseBroker.broadcast","provider: createWindcaveRefund","push: sendPushToMerchant"],
       statuses: [200,400,401,403,404,409,500,502,503],
       errorTextInResponse: ["refundResult.error","validation.error.errors"],
@@ -1477,7 +1477,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       middleware: ["authenticateToken"],
       params: ["transactionId: strictPositiveIntegerParam"],
       authChecks: ["compares transaction.merchantId !== merchantId"],
-      storageMethods: ["getRefundsByTransaction","getTransaction"],
+      storageMethods: ["getRefundsForTransactionForMerchant","getTransactionForMerchant"],
       statuses: [200,400,401,403,404,500,503],
     },
   },
@@ -1576,7 +1576,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       middleware: ["requireEcommerceApi","authenticateApiKey"],
       params: ["id: raw | strictPositiveIntegerParam"],
       authChecks: ["compares transaction.merchantId !== req.apiKey.merchantId"],
-      storageMethods: ["getApiKeyByKey","getTransaction","logApiRequest","updateApiKeyLastUsed"],
+      storageMethods: ["getApiKeyByKey","getTransactionForMerchant","logApiRequest","updateApiKeyLastUsed"],
       statuses: [200,400,401,403,404,500],
       capabilityGates: ["config.features.ecommerceApi","requireEcommerceApi"],
       helpers: ["authenticateApiKey","requireEcommerceApi"],

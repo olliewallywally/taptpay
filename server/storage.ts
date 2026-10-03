@@ -39,6 +39,11 @@ export type ActiveTransactionScope =
   | { kind: "merchant-any" }
   | { kind: "board"; stoneId: number };
 
+export type TransactionCancellationResult =
+  | { kind: "cancelled"; transaction: Transaction }
+  | { kind: "not-found" }
+  | { kind: "conflict"; status: string };
+
 export class PushSessionEndedError extends Error {
   constructor() { super("The session registering this device has ended"); }
 }
@@ -585,7 +590,11 @@ export interface IStorage extends PaymentAttemptRepository {
   deleteMerchant(id: number): Promise<boolean>;
   
   // Transaction operations
+  /** Global read for reviewed public-resource, provider and validated-admin operations. */
   getTransaction(id: number): Promise<Transaction | undefined>;
+  getTransactionForMerchant(id: number, merchantId: number): Promise<Transaction | undefined>;
+  /** Recheck tenant and pending/processing state at the write boundary. */
+  cancelTransactionForMerchant(id: number, merchantId: number): Promise<TransactionCancellationResult>;
   getTransactionByPaymentTokenHash(paymentTokenHash: string): Promise<Transaction | undefined>;
   /**
    * Find the merchant's newest active transaction within an explicit scope: a
@@ -619,7 +628,7 @@ export interface IStorage extends PaymentAttemptRepository {
   // Refund operations
   createRefund(data: InsertRefund): Promise<Refund>;
   getRefund(id: number): Promise<Refund | undefined>;
-  getRefundsByTransaction(transactionId: number): Promise<Refund[]>;
+  getRefundsForTransactionForMerchant(transactionId: number, merchantId: number): Promise<Refund[]>;
   getRefundsByMerchant(merchantId: number): Promise<Refund[]>;
   updateRefundStatus(id: number, status: string, windcaveRefundId?: string): Promise<Refund | undefined>;
   updateTransactionAfterRefund(id: number, refundAmount: number): Promise<Transaction | undefined>;
@@ -1411,6 +1420,25 @@ export class MemStorage implements IStorage {
     return this.transactions.get(id);
   }
 
+  async getTransactionForMerchant(id: number, merchantId: number): Promise<Transaction | undefined> {
+    if (!isManagementTenantId(merchantId)) return undefined;
+    const row = this.transactions.get(id);
+    return row?.merchantId === merchantId ? row : undefined;
+  }
+
+  async cancelTransactionForMerchant(id: number, merchantId: number): Promise<TransactionCancellationResult> {
+    if (!isManagementTenantId(merchantId)) return { kind: "not-found" };
+    // No await between checking and replacing: the memory mutation is atomic.
+    const row = this.transactions.get(id);
+    if (!row || row.merchantId !== merchantId) return { kind: "not-found" };
+    if (row.status !== "pending" && row.status !== "processing") {
+      return { kind: "conflict", status: row.status };
+    }
+    const transaction = { ...row, status: "cancelled" };
+    this.transactions.set(id, transaction);
+    return { kind: "cancelled", transaction };
+  }
+
   async getTransactionByPaymentTokenHash(
     paymentTokenHash: string,
   ): Promise<Transaction | undefined> {
@@ -1894,9 +1922,11 @@ export class MemStorage implements IStorage {
     return this.refunds.get(id);
   }
 
-  async getRefundsByTransaction(transactionId: number): Promise<Refund[]> {
+  async getRefundsForTransactionForMerchant(transactionId: number, merchantId: number): Promise<Refund[]> {
+    if (!isManagementTenantId(merchantId)) return [];
+    if (this.transactions.get(transactionId)?.merchantId !== merchantId) return [];
     return Array.from(this.refunds.values()).filter(
-      (refund) => refund.transactionId === transactionId
+      (refund) => refund.transactionId === transactionId && refund.merchantId === merchantId
     );
   }
 
@@ -4590,6 +4620,35 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
+  async getTransactionForMerchant(id: number, merchantId: number): Promise<Transaction | undefined> {
+    if (!isManagementTenantId(merchantId)) return undefined;
+    if (!this.db) throw new Error('Database not available');
+    const rows = await this.db.select().from(transactions)
+      .where(and(eq(transactions.id, id), eq(transactions.merchantId, merchantId))).limit(1);
+    return rows[0];
+  }
+
+  async cancelTransactionForMerchant(id: number, merchantId: number): Promise<TransactionCancellationResult> {
+    if (!isManagementTenantId(merchantId)) return { kind: "not-found" };
+    if (!this.db) throw new Error('Database not available');
+    return this.db.transaction(async (tx: any): Promise<TransactionCancellationResult> => {
+      // The payment finalizer locks this same parent. Re-read tenant/state after waiting on it.
+      const [row] = await tx.select().from(transactions)
+        .where(and(eq(transactions.id, id), eq(transactions.merchantId, merchantId)))
+        .limit(1).for("update");
+      if (!row) return { kind: "not-found" };
+      if (row.status !== "pending" && row.status !== "processing") {
+        return { kind: "conflict", status: row.status };
+      }
+      const [transaction] = await tx.update(transactions).set({ status: "cancelled" })
+        .where(and(
+          eq(transactions.id, id), eq(transactions.merchantId, merchantId),
+          inArray(transactions.status, ["pending", "processing"]),
+        )).returning();
+      return transaction ? { kind: "cancelled", transaction } : { kind: "not-found" };
+    });
+  }
+
   async getTransactionByPaymentTokenHash(
     paymentTokenHash: string,
   ): Promise<Transaction | undefined> {
@@ -5481,9 +5540,14 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async getRefundsByTransaction(transactionId: number): Promise<Refund[]> {
+  async getRefundsForTransactionForMerchant(transactionId: number, merchantId: number): Promise<Refund[]> {
+    if (!isManagementTenantId(merchantId)) return [];
     if (!this.db) throw new Error('Database not available');
-    return await this.db.select().from(refunds).where(eq(refunds.transactionId, transactionId));
+    return this.db.select().from(refunds).where(and(
+      eq(refunds.transactionId, transactionId), eq(refunds.merchantId, merchantId),
+      sql`exists (select 1 from ${transactions} where ${transactions.id} = ${refunds.transactionId}
+        and ${transactions.merchantId} = ${merchantId})`,
+    ));
   }
 
   async getRefundsByMerchant(merchantId: number): Promise<Refund[]> {

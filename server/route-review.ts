@@ -362,7 +362,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         principal: "api-key",
         tenant: "resource",
         tenantRule:
-          "storage.getTransaction(id), then the sale's merchant must equal the key's merchant; another merchant's sale answers the same 404 as a missing one",
+          "storage.getTransactionForMerchant(id, key.merchantId) scopes the read itself; another merchant's sale answers the same 404 as a missing one",
       },
     ],
     input: "id: strictPositiveIntegerParam (400 otherwise); the raw id is only echoed into the error log row",
@@ -2889,13 +2889,13 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         roles: ["owner", "member"],
         platformAdmin: true,
         tenant: "resource",
-        tenantRule: `the sale read by id (getTransaction) must be the session's business's, by ${SIGNED_IN_BUSINESS_RULE}; another business's is answered as a missing one (404, since 2026-09-27: its 403 told which sale numbers exist)`,
+        tenantRule: `getTransactionForMerchant scopes a merchant session's read; the validated platform admin alone may resolve the sale globally. cancelTransactionForMerchant locks and rechecks the sale's business and pending/processing state at the write; another business's is answered as a missing one (404), by ${SIGNED_IN_BUSINESS_RULE}`,
       },
     ],
     input: "id: strictPositiveIntegerParam (400 otherwise)",
     capability: null,
     entitlement: null,
-    idempotency: "cancels a pending or processing sale; any other state is 400 (so again is 400)",
+    idempotency: "cancels a pending or processing sale under the parent row lock, rechecking tenant/state after any concurrent write; any other state is 400 (so again is 400); only a persisted cancellation broadcasts",
     sideEffects: "a live update to the business, and to the board's page for a board sale (sseBroker, via broadcastToStone)",
     successDto: "ownerTransactionDto with the board's addresses for a board sale",
     errorDisclosure: ["fixed"],
@@ -2909,7 +2909,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         roles: ["owner"],
         tenant: "resource",
         tenantRule:
-          "the sale read by id (getTransaction) must be the session's business's: another business's is answered as a missing one (404, since 2026-09-27: its 403 told which sale numbers exist); the platform admin, with no business, is refused (403 'Merchant access required', since 2026-09-27; it was 401)",
+          "getTransactionForMerchant scopes the lookup to the session's business; another business's is answered as a missing one (404); the platform admin, with no business, is refused (403 'Merchant access required'). Refund mutations still need the S2b/R4 scoped durable contract",
       },
     ],
     input:
@@ -2934,7 +2934,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         roles: ["owner", "member"],
         tenant: "resource",
         tenantRule:
-          "the sale read by id (getTransaction) must be the session's business's: another business's is answered as a missing one (404, since 2026-09-27: its 403 told which sale numbers exist); the platform admin, with no business, is refused (403 'Merchant access required', since 2026-09-27; it was 401)",
+          "getTransactionForMerchant scopes the lookup to the session's business; getRefundsForTransactionForMerchant checks both the refund and its current parent's business in one SQL query; another business's sale is answered as a missing one (404); the platform admin, with no business, is refused (403 'Merchant access required')",
       },
     ],
     input: "transactionId: strictPositiveIntegerParam (400 otherwise)",

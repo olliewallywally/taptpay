@@ -1,10 +1,10 @@
 # R1-T7 tenant/storage execution inventory
 
-Generated from working-tree sources on base `bc5eba3c55ed95c360b08b6545dc748f0911aab0`; the phase evidence names the final commit.
+Generated from working-tree sources on base `31f64efc2d405d60e071f364a29d918cde66137b`; the phase evidence names the final commit.
 
 Registrations: **187**; registrations with session/admin authentication: **119**;
 registrations calling checkMerchantOwnership: **25**.
-IStorage: **217** declared methods;
+IStorage: **219** declared methods;
 PaymentAttemptRepository: **8** inherited methods.
 
 Classifications come from the reviewed per-route branches, including mixed public/signed-in routes.
@@ -101,9 +101,9 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | GET /api/trades/schedules | tenant (merchant/session) | `getJobSchedulesByMerchant` |
 | GET /api/transactions/:id | public (public/number) | `getMerchant`, `getTransaction` |
 | GET /api/transactions/:id/receipt-qr | public (public/number) | `getTransaction` |
-| GET /api/transactions/:transactionId/refunds | tenant (merchant/resource) | `getRefundsByTransaction`, `getTransaction` |
+| GET /api/transactions/:transactionId/refunds | tenant (merchant/resource) | `getRefundsForTransactionForMerchant`, `getTransactionForMerchant` |
 | GET /api/tutorial/state | tenant (merchant/session) | `getMerchant`, `getMerchantTutorialProgress` |
-| GET /api/v1/transactions/:id | API-key tenant (api-key/resource) | `getApiKeyByKey`, `getTransaction`, `logApiRequest`, `updateApiKeyLastUsed` |
+| GET /api/v1/transactions/:id | API-key tenant (api-key/resource) | `getApiKeyByKey`, `getTransactionForMerchant`, `logApiRequest`, `updateApiKeyLastUsed` |
 | GET /api/windcave/callback | public (public/number) | `getNextPendingSplit`, `getTransaction`, `getTransactionByWindcaveSessionId`, `incrementTransactionCount`, `updateSplitPaymentStatus`, `updateTransactionSessionState`, `updateTransactionStatus` |
 | GET /api/windcave/env | public (public/none) | — |
 | GET /nfc/:merchantId | public (public/none) | — |
@@ -178,13 +178,13 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | POST /api/trades/quotes/token/:token/respond | single-resource bearer (public-bearer/token) | `createJobEvent`, `createJobInvoice`, `getOrCreateSubscription`, `getQuoteByToken`, `updateQuote` |
 | POST /api/trades/schedules | tenant (merchant/resource) | `createJobEvent`, `createJobSchedule`, `getClientProfile`, `getOrCreateSubscription` |
 | POST /api/transactions | tenant (merchant/path-merchant) | `getOrCreateSubscription`, `getTaptStone` |
-| POST /api/transactions/:id/cancel | tenant (merchant/resource) | `getTransaction`, `updateTransactionStatus` |
+| POST /api/transactions/:id/cancel | tenant (merchant/resource) | `cancelTransactionForMerchant`, `getTransaction`, `getTransactionForMerchant` |
 | POST /api/transactions/:id/googlepay-complete | public (public/number) | `getNextPendingSplit`, `getTransaction`, `incrementTransactionCount`, `updateSplitPaymentStatus`, `updateTransactionPaymentMethod`, `updateTransactionSessionState`, `updateTransactionStatus` |
 | POST /api/transactions/:id/hosted-fields-complete | public (public/number) | `getNextPendingSplit`, `getTransaction`, `incrementTransactionCount`, `updateSplitPaymentStatus`, `updateTransactionPaymentMethod`, `updateTransactionSessionState`, `updateTransactionStatus` |
 | POST /api/transactions/:id/pay | public (public/number) | `getMerchant`, `getNextPendingSplit`, `getTaptStone`, `getTransaction`, `updateTransactionStatus`, `updateTransactionWindcaveSession` |
 | POST /api/transactions/:id/receipt-pdf | public (public/number) | `getMerchant`, `getSplitPaymentById`, `getSplitPaymentsByTransaction`, `getTransaction` |
 | POST /api/transactions/:id/split | public (public/number) | `createBillSplit`, `getTransaction` |
-| POST /api/transactions/:transactionId/refunds | tenant (merchant/resource) | `createRefund`, `getTransaction`, `releaseRefundAmount`, `reserveRefundAmount`, `updateRefundStatus` |
+| POST /api/transactions/:transactionId/refunds | tenant (merchant/resource) | `createRefund`, `getTransactionForMerchant`, `releaseRefundAmount`, `reserveRefundAmount`, `updateRefundStatus` |
 | POST /api/transactions/cash-sale | tenant (merchant/path-merchant) | `createTransaction`, `getOrCreateSubscription`, `getTaptStone` |
 | POST /api/transactions/tap-to-pay | tenant (merchant/path-merchant) | `createTransaction`, `getActiveTransactionByMerchant`, `getOrCreateSubscription`, `getTransaction`, `updateTransactionPaymentMethod`, `updateTransactionStatus` |
 | POST /api/tutorial/restart | tenant (merchant/session) | `restartMerchantTutorial` |
@@ -236,6 +236,8 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | IStorage | getAllMerchants | no | `getAllMerchants(): Promise<Merchant[]>` |
 | IStorage | deleteMerchant | no | `deleteMerchant(id: number): Promise<boolean>` |
 | IStorage | getTransaction | no | `getTransaction(id: number): Promise<Transaction \| undefined>` |
+| IStorage | getTransactionForMerchant | yes | `getTransactionForMerchant(id: number, merchantId: number): Promise<Transaction \| undefined>` |
+| IStorage | cancelTransactionForMerchant | yes | `cancelTransactionForMerchant(id: number, merchantId: number): Promise<TransactionCancellationResult>` |
 | IStorage | getTransactionByPaymentTokenHash | no | `getTransactionByPaymentTokenHash(paymentTokenHash: string): Promise<Transaction \| undefined>` |
 | IStorage | getActiveTransactionByMerchant | yes | `getActiveTransactionByMerchant(merchantId: number, scope: ActiveTransactionScope): Promise<Transaction \| undefined>` |
 | IStorage | getTransactionByNfcSession | no | `getTransactionByNfcSession(nfcSessionId: string): Promise<Transaction \| undefined>` |
@@ -254,7 +256,7 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | IStorage | getSubscriptionRevenue | no | `getSubscriptionRevenue(): Promise<SubscriptionRevenue>` |
 | IStorage | createRefund | no | `createRefund(data: InsertRefund): Promise<Refund>` |
 | IStorage | getRefund | no | `getRefund(id: number): Promise<Refund \| undefined>` |
-| IStorage | getRefundsByTransaction | no | `getRefundsByTransaction(transactionId: number): Promise<Refund[]>` |
+| IStorage | getRefundsForTransactionForMerchant | yes | `getRefundsForTransactionForMerchant(transactionId: number, merchantId: number): Promise<Refund[]>` |
 | IStorage | getRefundsByMerchant | yes | `getRefundsByMerchant(merchantId: number): Promise<Refund[]>` |
 | IStorage | updateRefundStatus | no | `updateRefundStatus(id: number, status: string, windcaveRefundId?: string): Promise<Refund \| undefined>` |
 | IStorage | updateTransactionAfterRefund | no | `updateTransactionAfterRefund(id: number, refundAmount: number): Promise<Transaction \| undefined>` |
