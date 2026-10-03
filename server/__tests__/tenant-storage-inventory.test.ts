@@ -119,3 +119,22 @@ test("property schedule management uses explicit scope and retains only separate
     expect(methods).not.toContain("getTenantProfile");
   }
 });
+
+test("property invoice void and external-payment writes require explicit merchant scope", () => {
+  const contract = storageContract();
+  for (const [key, name] of [
+    ["POST /api/property/invoices/:id/void", "voidInvoiceRentRequestForMerchant"],
+    ["POST /api/property/invoices/:id/mark-paid-external", "markInvoiceRentRequestPaidExternalForMerchant"],
+  ]) {
+    expect(contract.find(method => method.name === name)?.requiredTenant).toBe(true);
+    const methods = currentRouteFacts().get(key)!.storageMethods;
+    expect(methods).toContain(name);
+    expect(methods).toContain("getInvoiceRentRequestForMerchant");
+    expect(methods).not.toContain("getInvoiceRentRequest");
+    expect(methods).not.toContain("updateInvoiceRentRequest");
+    expect(methods).not.toContain("logTransactionEvent");
+  }
+  const list = currentRouteFacts().get("GET /api/property/invoices")!.storageMethods;
+  expect(list).toContain("getTenantProfileForMerchant");
+  expect(list).not.toContain("getTenantProfile");
+});

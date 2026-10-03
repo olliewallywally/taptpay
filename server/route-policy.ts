@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ c7741b3f977ee9f8d024f04d73b6acab17bc2f94 on 2026-10-03.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ c250343fdeeee1df2cb3a03035bf143501505784 on 2026-10-03.
  *
  * 187 registrations (78 GET, 77 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -2028,7 +2028,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       middleware: ["authenticateToken"],
       query: ["status: raw","tenantProfileId: strictUuidParam"],
-      storageMethods: ["getInvoiceRentRequestsByMerchant","getTenantProfile"],
+      storageMethods: ["getInvoiceRentRequestsByMerchant","getTenantProfileForMerchant"],
       statuses: [200,400,401,403,500,503],
     },
   },
@@ -2101,8 +2101,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       middleware: ["authenticateToken"],
       params: ["id: strictUuidParam"],
-      authChecks: ["compares invoice.merchantId !== merchantId"],
-      storageMethods: ["getInvoiceRentRequest","logTransactionEvent","updateInvoiceRentRequest"],
+      storageMethods: ["getInvoiceRentRequestForMerchant","voidInvoiceRentRequestForMerchant"],
       statuses: [200,400,401,403,404,409,500,503],
     },
   },
@@ -2115,8 +2114,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       middleware: ["authenticateToken"],
       params: ["id: strictUuidParam"],
       body: ["schema: markInvoicePaidExternalSchema"],
-      authChecks: ["compares invoice.merchantId !== merchantId"],
-      storageMethods: ["getInvoiceRentRequest","logTransactionEvent","updateInvoiceRentRequest"],
+      storageMethods: ["getInvoiceRentRequestForMerchant","markInvoiceRentRequestPaidExternalForMerchant"],
       statuses: [200,400,401,403,404,409,500,503],
       errorTextInResponse: ["err.errors"],
     },

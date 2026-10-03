@@ -7322,7 +7322,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const cache = new Map<string, { tenantName: string; propertyAddress: string }>();
       const enriched = await Promise.all(invoices.map(async (inv: any) => {
         if (!cache.has(inv.tenantProfileId)) {
-          const t = await storage.getTenantProfile(inv.tenantProfileId).catch(() => null);
+          const t = await storage.getTenantProfileForMerchant(inv.tenantProfileId, merchantId).catch(() => null);
           cache.set(inv.tenantProfileId, t
             ? { tenantName: `${t.firstName} ${t.lastName}`, propertyAddress: t.propertyAddress }
             : { tenantName: "—", propertyAddress: "—" });
@@ -7483,12 +7483,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
-      const invoice = await storage.getInvoiceRentRequest(id);
-      if (!invoice || invoice.merchantId !== merchantId) return res.status(404).json({ message: "Invoice not found" });
+      const invoice = await storage.getInvoiceRentRequestForMerchant(id, merchantId);
+      if (!invoice) return res.status(404).json({ message: "Invoice not found" });
       if (["paid", "paid_external"].includes(invoice.status)) return res.status(409).json({ message: "Cannot void a paid invoice" }); // P2.2 (R1-T3): was 400
-      const updated = await storage.updateInvoiceRentRequest(id, { status: "voided", voidedAt: new Date() });
-      await storage.logTransactionEvent({ merchantId, tenantProfileId: invoice.tenantProfileId, invoiceId: id, eventType: "Invoice_Voided", payload: {} });
-      res.json(updated);
+      const result = await storage.voidInvoiceRentRequestForMerchant(id, merchantId);
+      if (result.kind === "not-found") return res.status(404).json({ message: "Invoice not found" });
+      if (result.kind === "conflict") return res.status(409).json({ message: "Cannot void a paid invoice" });
+      res.json(result.invoice);
     } catch (err) { console.error("[PROP_INVOICE_VOID]", err); res.status(500).json({ message: "Failed to void invoice" }); }
   });
 
@@ -7498,15 +7499,16 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
-      const invoice = await storage.getInvoiceRentRequest(id);
-      if (!invoice || invoice.merchantId !== merchantId) return res.status(404).json({ message: "Invoice not found" });
+      const invoice = await storage.getInvoiceRentRequestForMerchant(id, merchantId);
+      if (!invoice) return res.status(404).json({ message: "Invoice not found" });
       // A voided invoice stays voided: the screens hide voided invoices.
       if (invoice.status === "voided") return res.status(409).json({ message: "This invoice was voided" });
       if (invoice.status === "paid" || invoice.status === "paid_external") return res.status(409).json({ message: "Invoice is already paid" }); // P2.2 (R1-T3): was 400
       const { externalPaymentReference } = markInvoicePaidExternalSchema.parse(req.body);
-      const updated = await storage.updateInvoiceRentRequest(id, { status: "paid_external", paidAt: new Date(), externalPaymentReference: externalPaymentReference ?? null });
-      await storage.logTransactionEvent({ merchantId, tenantProfileId: invoice.tenantProfileId, invoiceId: id, eventType: "Payment_External", payload: { externalPaymentReference } });
-      res.json(updated);
+      const result = await storage.markInvoiceRentRequestPaidExternalForMerchant(id, merchantId, externalPaymentReference);
+      if (result.kind === "not-found") return res.status(404).json({ message: "Invoice not found" });
+      if (result.kind === "conflict") return res.status(409).json({ message: result.reason === "voided" ? "This invoice was voided" : "Invoice is already paid" });
+      res.json(result.invoice);
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: "Validation error", errors: err.errors });
       console.error("[PROP_INVOICE_MARK_PAID]", err); res.status(500).json({ message: "Failed to mark invoice paid" });

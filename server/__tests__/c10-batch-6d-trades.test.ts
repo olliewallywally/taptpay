@@ -251,16 +251,19 @@ describe("marking an invoice received without a reference, as the screens send i
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
     const RENT_INVOICE = "abababab-abab-4bab-8bab-abababababab";
-    jest.spyOn(storage, "getInvoiceRentRequest").mockResolvedValue({
+    const invoice = {
       id: RENT_INVOICE, merchantId: owner.merchantId, tenantProfileId: CLIENT, amountCents: 50_000, status: "dispatched",
-    } as any);
-    const update = jest.spyOn(storage, "updateInvoiceRentRequest").mockImplementation(async (id: string, updates: any) => ({ id, ...updates }) as any);
-    jest.spyOn(storage, "logTransactionEvent").mockResolvedValue({} as any);
+    };
+    jest.spyOn(storage, "getInvoiceRentRequestForMerchant").mockResolvedValue(invoice as any);
+    const update = jest.spyOn(storage, "markInvoiceRentRequestPaidExternalForMerchant").mockResolvedValue({
+      kind: "ok", invoice: { ...invoice, status: "paid_external", externalPaymentReference: null } as any,
+    });
 
     const res = await request(app).post(`/api/property/invoices/${RENT_INVOICE}/mark-paid-external`).set(signedIn(owner)).send({ externalPaymentReference: null });
 
     expect(res.status).toBe(200);
-    expect(update).toHaveBeenCalledWith(RENT_INVOICE, expect.objectContaining({ status: "paid_external", externalPaymentReference: null }));
+    expect(update).toHaveBeenCalledWith(RENT_INVOICE, owner.merchantId, undefined);
+    expect(res.body).toMatchObject({ status: "paid_external", externalPaymentReference: null });
   });
 
   it.each([

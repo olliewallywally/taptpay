@@ -150,3 +150,75 @@ replacement is serialized by the parent's row even when no schedule exists yet.
 Cancellation is checked under the child lock, and resume uses the latest cycle.
 Persist schedule history inside the same transaction; HTTP fakes alone cannot prove
 rollback/concurrency. **Approve the same S3b scope**, no S3c/whole-R1 closure.
+
+## S3c1 preflight — invoice reads, void and external-payment records
+
+Base: `c250343f`. S3b was independently rechecked: 419 affected tests, 17 fresh
+PostgreSQL checks, typecheck/build and inventories passed. S3c is split into c1
+(read/void/external-payment storage) and c2 (creation, reuse and scoped delivery).
+
+### Verification of Prior Fixes
+
+Reread invoice routes/storage, attachment tests, provider/public checkout and cron
+consumers. Existing archive leaves issued invoices payable. Owner/member permissions
+and existing settled-state 409 messages remain. Earlier provider money-state findings
+remain R3/R4; this scope changes no capture/split/provider semantics.
+
+### Blocking Issues
+
+None for c1. Current route lookup followed by globally keyed update can write a
+moved or newly settled invoice and log false success. Demonstrate races first.
+
+### High-Risk Concerns
+
+Invoice AND current parent merchant scope on reads/lists. Mutations lock owned
+parent then invoice, recheck the original parent identity and current settled state,
+and commit void/external-payment history with the mutation. External payment is a
+manual record, never provider approval. Archived parents remain readable/payable.
+
+### Missing Steps
+
+SQL/storage and HTTP red first; scoped contracts and callers/fakes; actual ownership,
+reparent and settlement waits; event-failure rollback; existing family and inventory
+checks; final typecheck/build/evidence. Authenticated list enrichment also uses a
+scoped profile read so it never fetches another merchant's current contact details.
+
+### Unsafe Assumptions
+
+Retain global invoice read/create/update for their separately reviewed provider,
+public and cron lanes; c2 moves authenticated creation/resend later. No interface
+retirement yet. Memory stays DB-only. HTTP fake decisions are not SQL proof.
+
+### Required Ordering Changes
+
+c1 precedes c2. Introduce specific void/external-payment methods rather than a
+generic editable invoice patch. Preserve current input/status/DTO behavior.
+
+### Open Product / Provider / Legal Questions
+
+None for c1 tenant/transaction hardening. Existing split-paid void/manual-paid and
+amount-edit/provider-race concerns remain explicitly tracked for R3/R4.
+
+### Compliance and Data-Handling Notes
+
+Synthetic disposable loopback verification; no application database/provider, live
+migration, UI, payment enablement, deployment or push.
+
+### Test and Rollback Adequacy
+
+Foreign/missing results match; invalid tenant performs no query. Concurrent ownership
+or settlement refuses without history or delivery. Trigger failure rolls state and
+history back together. Fix forward without restoring global authenticated writes.
+
+### Final Recommendation (Approve / Do not approve)
+
+**Approve S3c1 on `c250343f`**, tests first. S3c2/whole S3 remain separately reviewed.
+
+### Separate reread
+
+Rechecked invoice parent identity, both settled branches, archived-profile behavior,
+public/provider/cron consumers and attachment callers. Parent-first locks match S3a/b
+and child reread prevents reparent/ownership races after waiting. Current invoice
+ownership and parent ownership must both hold in a read query. Void repeats remain
+allowed; externally paid repeats and voided external payments remain 409. History
+must use the persisted invoice's parent, not the route's stale row. **Approve c1.**

@@ -1,10 +1,10 @@
 # R1-T7 tenant/storage execution inventory
 
-Generated from working-tree sources on base `c7741b3f977ee9f8d024f04d73b6acab17bc2f94`; the phase evidence names the final commit.
+Generated from working-tree sources on base `c250343fdeeee1df2cb3a03035bf143501505784`; the phase evidence names the final commit.
 
 Registrations: **187**; registrations with session/admin authentication: **119**;
 registrations calling checkMerchantOwnership: **25**.
-IStorage: **224** declared methods;
+IStorage: **227** declared methods;
 PaymentAttemptRepository: **8** inherited methods.
 
 Classifications come from the reviewed per-route branches, including mixed public/signed-in routes.
@@ -74,7 +74,7 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | GET /api/pay/t/:token/qr | single-resource bearer (public-bearer/token) | — |
 | GET /api/pay/t/:token/receipt | single-resource bearer (public-bearer/token) | `getMerchant`, `getSplitPaymentsByTransaction` |
 | GET /api/pay/t/:token/receipt-qr | single-resource bearer (public-bearer/token) | `getMerchant`, `getSplitPaymentsByTransaction` |
-| GET /api/property/invoices | tenant (merchant/session) | `getInvoiceRentRequestsByMerchant`, `getTenantProfile` |
+| GET /api/property/invoices | tenant (merchant/session) | `getInvoiceRentRequestsByMerchant`, `getTenantProfileForMerchant` |
 | GET /api/property/reminder-settings | tenant (merchant/session) | `getMerchant` |
 | GET /api/property/schedules | tenant (merchant/session) | `getActiveSchedulesByMerchant` |
 | GET /api/property/tenants | tenant (merchant/session) | `getTenantProfilesByMerchant` |
@@ -148,9 +148,9 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | POST /api/pay/t/:token/session | single-resource bearer (public-bearer/token) | `getMerchant`, `getNextPendingSplit`, `updateTransactionStatus` |
 | POST /api/pay/t/:token/split | single-resource bearer (public-bearer/token) | `createBillSplit`, `getMerchant` |
 | POST /api/property/invoices | tenant (merchant/resource) | `createInvoiceRentRequest`, `getInvoiceRentRequest`, `getLiveInvoiceByTenant`, `getOrCreateSubscription`, `getTenantProfile`, `logTransactionEvent`, `updateInvoiceRentRequest`, `uploadedFileOwnedByMerchant` |
-| POST /api/property/invoices/:id/mark-paid-external | tenant (merchant/resource) | `getInvoiceRentRequest`, `logTransactionEvent`, `updateInvoiceRentRequest` |
+| POST /api/property/invoices/:id/mark-paid-external | tenant (merchant/resource) | `getInvoiceRentRequestForMerchant`, `markInvoiceRentRequestPaidExternalForMerchant` |
 | POST /api/property/invoices/:id/resend | tenant (merchant/resource) | `getInvoiceRentRequest`, `getOrCreateSubscription` |
-| POST /api/property/invoices/:id/void | tenant (merchant/resource) | `getInvoiceRentRequest`, `logTransactionEvent`, `updateInvoiceRentRequest` |
+| POST /api/property/invoices/:id/void | tenant (merchant/resource) | `getInvoiceRentRequestForMerchant`, `voidInvoiceRentRequestForMerchant` |
 | POST /api/property/invoices/document | tenant (merchant/session) | `saveUploadedFile` |
 | POST /api/property/tenants | tenant (merchant/session) | `createTenantProfileForMerchant`, `logTransactionEvent` |
 | POST /api/property/tenants/:id/archive | tenant (merchant/resource) | `archiveTenantProfileForMerchant`, `getTenantProfileForMerchant`, `logTransactionEvent` |
@@ -364,6 +364,9 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | IStorage | getActiveSchedulesByMerchant | yes | `getActiveSchedulesByMerchant(merchantId: number): Promise<any[]>` |
 | IStorage | updateActiveSchedule | no | `updateActiveSchedule(id: string, updates: any): Promise<any \| undefined>` |
 | IStorage | getDueActiveSchedules | no | `getDueActiveSchedules(now: Date): Promise<any[]>` |
+| IStorage | getInvoiceRentRequestForMerchant | yes | `getInvoiceRentRequestForMerchant(id: string, merchantId: number): Promise<any \| undefined>` |
+| IStorage | voidInvoiceRentRequestForMerchant | yes | `voidInvoiceRentRequestForMerchant(id: string, merchantId: number): Promise<PropertyInvoiceMutationResult>` |
+| IStorage | markInvoiceRentRequestPaidExternalForMerchant | yes | `markInvoiceRentRequestPaidExternalForMerchant(id: string, merchantId: number, externalPaymentReference?: string): Promise<PropertyInvoiceMutationResult>` |
 | IStorage | createInvoiceRentRequest | no | `createInvoiceRentRequest(data: any): Promise<any>` |
 | IStorage | getInvoiceRentRequest | no | `getInvoiceRentRequest(id: string): Promise<any \| undefined>` |
 | IStorage | getInvoiceRentRequestByToken | no | `getInvoiceRentRequestByToken(token: string): Promise<any \| undefined>` |

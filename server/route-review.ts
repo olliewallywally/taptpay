@@ -3178,7 +3178,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
   },
 
   "GET /api/property/invoices": {
-    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: sessionBusiness(ADMIN_403) }],
+    branches: [{ principal: "merchant", roles: ["owner", "member"], tenant: "session", tenantRule: `${sessionBusiness(ADMIN_403)}; getInvoiceRentRequestsByMerchant requires both invoice and current parent ownership, including archived profiles; name/address enrichment uses getTenantProfileForMerchant` }],
     input:
       "tenantProfileId: strictUuidParam when given (400 'Invalid tenantProfileId' otherwise; since 2026-09-27, a 500 before); status: raw, a string only, compared as text with each invoice's status (one that no invoice has matches nothing)",
     capability: null,
@@ -3244,13 +3244,13 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
 
   "POST /api/property/invoices/:id/void": {
     branches: [
-      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${propertyRecord("invoice", "getInvoiceRentRequest")}; ${PROPERTY_ADMIN}` },
+      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${propertyRecord("invoice", "getInvoiceRentRequestForMerchant")}, including current parent ownership, rechecked under parent-then-child locks; ${PROPERTY_ADMIN}` },
     ],
     input: propertyId("id"),
     capability: null,
     entitlement: null,
     idempotency:
-      "voids an invoice that is not paid (a paid or externally paid one is 409 'Cannot void a paid invoice', 400 until 2026-09-27, P2.2); a voided one is voided again, with a new time, and logged again",
+      "voidInvoiceRentRequestForMerchant checks the current locked status and commits the scoped invoice update and history together; a paid or externally paid one is 409 'Cannot void a paid invoice' (400 until 2026-09-27, P2.2); a voided one is voided again, with a new time, and logged again. Ownership refusal changes nothing; history failure rolls back the write",
     sideEffects: null,
     successDto: `the invoice afterwards, ${RENT_INVOICE_ROW}`,
     errorDisclosure: ["fixed"],
@@ -3267,13 +3267,13 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         principal: "merchant",
         roles: ["owner", "member"],
         tenant: "resource",
-        tenantRule: `${propertyRecord("invoice", "getInvoiceRentRequest")}, and not voided (409, since 2026-09-27: a voided one stays voided); ${PROPERTY_ADMIN}`,
+        tenantRule: `${propertyRecord("invoice", "getInvoiceRentRequestForMerchant")}, including current parent ownership, rechecked under parent-then-child locks; not voided (409, since 2026-09-27); ${PROPERTY_ADMIN}`,
       },
     ],
     input: `${propertyId("id")}; body: markInvoicePaidExternalSchema (an optional reference of at most 200 characters, null or empty for none: both screens send null when no reference is typed, which was refused until 2026-09-27, batch 6d; 400 with the issues)`,
     capability: null,
     entitlement: null,
-    idempotency: "marks the invoice paid outside TaptPay with the reference and the time; a paid or externally paid one is 409 'Invoice is already paid' (400 until 2026-09-27, P2.2)",
+    idempotency: "markInvoiceRentRequestPaidExternalForMerchant checks the current locked status and commits the scoped external-payment record and history together; a paid or externally paid one is 409 'Invoice is already paid' (400 until 2026-09-27, P2.2), and a voided one stays voided. Issued invoices remain payable after profile archival. Ownership refusal changes nothing; history failure rolls back the write",
     sideEffects: null,
     successDto: `the invoice afterwards, ${RENT_INVOICE_ROW}`,
     errorDisclosure: ["input-issues"],

@@ -57,6 +57,11 @@ export type PropertyScheduleMutationResult =
   | { kind: "not-found" }
   | { kind: "conflict"; reason: "archived" | "terminated" };
 
+export type PropertyInvoiceMutationResult =
+  | { kind: "ok"; invoice: typeof invoicesRentRequests.$inferSelect }
+  | { kind: "not-found" }
+  | { kind: "conflict"; reason: "paid" | "voided" };
+
 function activeScheduleChanges(data: ActiveScheduleChanges): ActiveScheduleChanges {
   const patch = Object.fromEntries(["amountCents", "frequency", "deliveryChannel"]
     .filter(key => (data as any)[key] !== undefined).map(key => [key, (data as any)[key]]));
@@ -885,7 +890,11 @@ export interface IStorage extends PaymentAttemptRepository {
   updateActiveSchedule(id: string, updates: any): Promise<any | undefined>;
   getDueActiveSchedules(now: Date): Promise<any[]>;
 
+  getInvoiceRentRequestForMerchant(id: string, merchantId: number): Promise<any | undefined>;
+  voidInvoiceRentRequestForMerchant(id: string, merchantId: number): Promise<PropertyInvoiceMutationResult>;
+  markInvoiceRentRequestPaidExternalForMerchant(id: string, merchantId: number, externalPaymentReference?: string): Promise<PropertyInvoiceMutationResult>;
   createInvoiceRentRequest(data: any): Promise<any>;
+  /** Provider, cron and public-checkout lane; authenticated management uses explicit scope. */
   getInvoiceRentRequest(id: string): Promise<any | undefined>;
   getInvoiceRentRequestByToken(token: string): Promise<any | undefined>;
   getInvoiceRentRequestByWindcaveSessionId(sessionId: string): Promise<any | undefined>;
@@ -3369,6 +3378,9 @@ export class MemStorage implements IStorage {
   async getActiveSchedulesByMerchant(merchantId: number): Promise<any[]> { return []; }
   async updateActiveSchedule(id: string, updates: any): Promise<any> { return undefined; }
   async getDueActiveSchedules(now: Date): Promise<any[]> { return []; }
+  async getInvoiceRentRequestForMerchant(id: string, merchantId: number): Promise<any> { return undefined; }
+  async voidInvoiceRentRequestForMerchant(id: string, merchantId: number): Promise<PropertyInvoiceMutationResult> { return { kind: "not-found" }; }
+  async markInvoiceRentRequestPaidExternalForMerchant(id: string, merchantId: number, externalPaymentReference?: string): Promise<PropertyInvoiceMutationResult> { return { kind: "not-found" }; }
   async createInvoiceRentRequest(data: any): Promise<any> { throw new Error("Property management requires database"); }
   async getInvoiceRentRequest(id: string): Promise<any> { return undefined; }
   async getInvoiceRentRequestByToken(token: string): Promise<any> { return undefined; }
@@ -8130,6 +8142,55 @@ export class DatabaseStorage implements IStorage {
     const db = getDb(); if (!db) return [];
     return db.select().from(activeSchedules).where(and(eq(activeSchedules.status, "active"), lte(activeSchedules.nextRunDate, now)));
   }
+  async getInvoiceRentRequestForMerchant(id: string, merchantId: number): Promise<any> {
+    if (!isManagementTenantId(merchantId)) return undefined;
+    const db = this.db; if (!db) return undefined;
+    const [row] = await db.select().from(invoicesRentRequests).where(and(
+      eq(invoicesRentRequests.id, id), eq(invoicesRentRequests.merchantId, merchantId),
+      sql`exists (select 1 from ${tenantProfiles} where ${tenantProfiles.id} = ${invoicesRentRequests.tenantProfileId} and ${tenantProfiles.merchantId} = ${merchantId})`,
+    )).limit(1);
+    return row;
+  }
+  private async mutatePropertyInvoiceForMerchant(id: string, merchantId: number, operation: "void" | "paid-external", externalPaymentReference?: string): Promise<PropertyInvoiceMutationResult> {
+    if (!isManagementTenantId(merchantId)) return { kind: "not-found" };
+    const db = this.db; if (!db) return { kind: "not-found" };
+    return db.transaction(async (tx: any) => {
+      // Find the parent without taking a child lock. Every management mutation
+      // locks parent first, so it has the same lock order as profile archival.
+      const [candidate] = await tx.select().from(invoicesRentRequests).where(and(
+        eq(invoicesRentRequests.id, id), eq(invoicesRentRequests.merchantId, merchantId),
+      )).limit(1);
+      if (!candidate) return { kind: "not-found" };
+      const [parent] = await tx.select().from(tenantProfiles).where(and(
+        eq(tenantProfiles.id, candidate.tenantProfileId), eq(tenantProfiles.merchantId, merchantId),
+      )).limit(1).for("update");
+      if (!parent) return { kind: "not-found" };
+      const scope = and(eq(invoicesRentRequests.id, id), eq(invoicesRentRequests.merchantId, merchantId),
+        eq(invoicesRentRequests.tenantProfileId, parent.id));
+      const [invoice] = await tx.select().from(invoicesRentRequests).where(scope).limit(1).for("update");
+      if (!invoice) return { kind: "not-found" };
+      if (invoice.status === "paid" || invoice.status === "paid_external") return { kind: "conflict", reason: "paid" };
+      if (operation === "paid-external" && invoice.status === "voided") return { kind: "conflict", reason: "voided" };
+      // Issued invoices stay payable when the profile is archived (owner decision
+      // 2026-09-27). Only ownership and current invoice state gate this write.
+      const now = new Date();
+      const patch = operation === "void"
+        ? { status: "voided", voidedAt: now, updatedAt: now }
+        : { status: "paid_external", paidAt: now, externalPaymentReference: externalPaymentReference ?? null, updatedAt: now };
+      const [updated] = await tx.update(invoicesRentRequests).set(patch).where(scope).returning();
+      if (!updated) return { kind: "not-found" };
+      await tx.insert(transactionEvents).values({ merchantId, tenantProfileId: parent.id, invoiceId: id,
+        eventType: operation === "void" ? "Invoice_Voided" : "Payment_External",
+        payload: operation === "void" ? {} : { externalPaymentReference } });
+      return { kind: "ok", invoice: updated };
+    });
+  }
+  async voidInvoiceRentRequestForMerchant(id: string, merchantId: number): Promise<PropertyInvoiceMutationResult> {
+    return this.mutatePropertyInvoiceForMerchant(id, merchantId, "void");
+  }
+  async markInvoiceRentRequestPaidExternalForMerchant(id: string, merchantId: number, externalPaymentReference?: string): Promise<PropertyInvoiceMutationResult> {
+    return this.mutatePropertyInvoiceForMerchant(id, merchantId, "paid-external", externalPaymentReference);
+  }
   async createInvoiceRentRequest(data: any): Promise<any> {
     const db = getDb(); if (!db) throw new Error('No database');
     if (data.scheduleId && data.billingPeriodStart) {
@@ -8227,8 +8288,10 @@ export class DatabaseStorage implements IStorage {
     const [r] = await db.select().from(invoicesRentRequests).where(eq(invoicesRentRequests.whatsappMessageId, messageId)).limit(1); return r;
   }
   async getInvoiceRentRequestsByMerchant(merchantId: number, opts: { status?: string; tenantProfileId?: string } = {}): Promise<any[]> {
-    const db = getDb(); if (!db) return [];
-    const conds: any[] = [eq(invoicesRentRequests.merchantId, merchantId)];
+    if (!isManagementTenantId(merchantId)) return [];
+    const db = this.db; if (!db) return [];
+    const conds: any[] = [eq(invoicesRentRequests.merchantId, merchantId),
+      sql`exists (select 1 from ${tenantProfiles} where ${tenantProfiles.id} = ${invoicesRentRequests.tenantProfileId} and ${tenantProfiles.merchantId} = ${merchantId})`];
     if (opts.status) conds.push(eq(invoicesRentRequests.status, opts.status));
     if (opts.tenantProfileId) conds.push(eq(invoicesRentRequests.tenantProfileId, opts.tenantProfileId));
     return db.select().from(invoicesRentRequests).where(and(...conds)).orderBy(desc(invoicesRentRequests.createdAt));

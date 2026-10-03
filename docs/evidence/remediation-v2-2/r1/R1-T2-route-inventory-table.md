@@ -1,4 +1,4 @@
-# R1-T2 route inventory — generated 2026-10-03 @ `c7741b3f977ee9f8d024f04d73b6acab17bc2f94`
+# R1-T2 route inventory — generated 2026-10-03 @ `c250343fdeeee1df2cb3a03035bf143501505784`
 
 Regenerate with `npx tsx scripts/generate-route-policy.ts`. This table is
 evidence for the SHA named above, not a timeless constant — see
@@ -312,49 +312,49 @@ address's success is its notice (410), which it gives everyone.
 | POST | `/api/property/invoices` | 7419 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
 | POST | `/api/property/invoices/:id/resend` | 7461 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
 | POST | `/api/property/invoices/:id/void` | 7480 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| POST | `/api/property/invoices/:id/mark-paid-external` | 7495 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| GET | `/api/checkout/resolve/:token` | 7518 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 404: `unknown-link` |
-| GET | `/api/checkout/document/:token` | 7604 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 404: `unknown-link` |
-| POST | `/api/checkout/:token/split` | 7628 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 404: `unknown-link` |
-| POST | `/api/checkout/:token/session` | 7659 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 404: `unknown-link` |
-| POST | `/api/checkout/:token/hosted-fields-complete` | 7737 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 404: `unknown-link` |
-| POST | `/api/checkout/:token/googlepay-complete` | 7773 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 404: `unknown-link` |
-| GET | `/api/checkout/callback` | 7831 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 302: `unknown-link` |
-| ALL | `/api/windcave/rent-notification` | 7858 | provider | — | `provider` | 200: `unknown-reference` |
-| ALL | `/api/windcave/trades-notification` | 7880 | provider | — | `provider` | 200: `unknown-reference` |
-| POST | `/api/webhooks/whatsapp` | 7905 | provider | req.headers["apikey"] | `provider` | 200: `wrong-webhook-key`, `unknown-reference` |
-| GET | `/api/property/reminder-settings` | 7955 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| PUT | `/api/property/reminder-settings` | 7965 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| GET | `/api/trades/reminder-settings` | 7985 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| PUT | `/api/trades/reminder-settings` | 7995 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| GET | `/api/trades/gst-settings` | 8008 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| PUT | `/api/trades/gst-settings` | 8024 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
-| GET | `/api/trades/clients` | 8044 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| POST | `/api/trades/clients` | 8052 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| GET | `/api/trades/clients/:id` | 8064 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| PUT | `/api/trades/clients/:id` | 8075 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| POST | `/api/trades/clients/:id/archive` | 8088 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| POST | `/api/trades/clients/:id/unarchive` | 8107 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| POST | `/api/trades/clients/:id/promote` | 8120 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| GET | `/api/trades/clients/:id/events` | 8132 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| GET | `/api/trades/quotes` | 8144 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| POST | `/api/trades/quotes` | 8153 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| GET | `/api/trades/quotes/:id/pdf` | 8250 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| GET | `/api/trades/quotes/token/:token/pdf` | 8265 | public-bearer | getQuoteByToken( | `link-holder` | 404: `unknown-link` |
-| GET | `/api/trades/quotes/token/:token` | 8280 | public-bearer | getQuoteByToken( | `link-holder` | 404: `unknown-link` |
-| POST | `/api/trades/quotes/token/:token/respond` | 8325 | public-bearer | getQuoteByToken( | `link-holder` | 404: `unknown-link` |
-| GET | `/api/trades/invoices` | 8374 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| POST | `/api/trades/invoices` | 8386 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| POST | `/api/trades/invoices/:id/send-balance` | 8444 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| POST | `/api/trades/invoices/:id/mark-paid-external` | 8485 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| POST | `/api/trades/invoices/:id/complete` | 8508 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| POST | `/api/trades/invoices/:id/void` | 8527 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| GET | `/api/trades/schedules` | 8544 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| POST | `/api/trades/schedules` | 8551 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| PUT | `/api/trades/schedules/:id` | 8576 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| DELETE | `/api/trades/schedules/:id` | 8599 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| GET | `/api/internal/cron/status` | 8615 | cron | authorizeCronRequest | `scheduler` | 401: `no-secret`, `wrong-secret` |
-| POST | `/api/internal/cron` | 8625 | cron | authorizeCronRequest | `scheduler` | 401: `no-secret`, `wrong-secret` |
+| POST | `/api/property/invoices/:id/mark-paid-external` | 7496 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/checkout/resolve/:token` | 7520 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 404: `unknown-link` |
+| GET | `/api/checkout/document/:token` | 7606 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 404: `unknown-link` |
+| POST | `/api/checkout/:token/split` | 7630 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 404: `unknown-link` |
+| POST | `/api/checkout/:token/session` | 7661 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 404: `unknown-link` |
+| POST | `/api/checkout/:token/hosted-fields-complete` | 7739 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 404: `unknown-link` |
+| POST | `/api/checkout/:token/googlepay-complete` | 7775 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 404: `unknown-link` |
+| GET | `/api/checkout/callback` | 7833 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 302: `unknown-link` |
+| ALL | `/api/windcave/rent-notification` | 7860 | provider | — | `provider` | 200: `unknown-reference` |
+| ALL | `/api/windcave/trades-notification` | 7882 | provider | — | `provider` | 200: `unknown-reference` |
+| POST | `/api/webhooks/whatsapp` | 7907 | provider | req.headers["apikey"] | `provider` | 200: `wrong-webhook-key`, `unknown-reference` |
+| GET | `/api/property/reminder-settings` | 7957 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| PUT | `/api/property/reminder-settings` | 7967 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| GET | `/api/trades/reminder-settings` | 7987 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| PUT | `/api/trades/reminder-settings` | 7997 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| GET | `/api/trades/gst-settings` | 8010 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| PUT | `/api/trades/gst-settings` | 8026 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
+| GET | `/api/trades/clients` | 8046 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| POST | `/api/trades/clients` | 8054 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| GET | `/api/trades/clients/:id` | 8066 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| PUT | `/api/trades/clients/:id` | 8077 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/trades/clients/:id/archive` | 8090 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/trades/clients/:id/unarchive` | 8109 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/trades/clients/:id/promote` | 8122 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/trades/clients/:id/events` | 8134 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/trades/quotes` | 8146 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| POST | `/api/trades/quotes` | 8155 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/trades/quotes/:id/pdf` | 8252 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/trades/quotes/token/:token/pdf` | 8267 | public-bearer | getQuoteByToken( | `link-holder` | 404: `unknown-link` |
+| GET | `/api/trades/quotes/token/:token` | 8282 | public-bearer | getQuoteByToken( | `link-holder` | 404: `unknown-link` |
+| POST | `/api/trades/quotes/token/:token/respond` | 8327 | public-bearer | getQuoteByToken( | `link-holder` | 404: `unknown-link` |
+| GET | `/api/trades/invoices` | 8376 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| POST | `/api/trades/invoices` | 8388 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/trades/invoices/:id/send-balance` | 8446 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/trades/invoices/:id/mark-paid-external` | 8487 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/trades/invoices/:id/complete` | 8510 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/trades/invoices/:id/void` | 8529 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/trades/schedules` | 8546 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| POST | `/api/trades/schedules` | 8553 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| PUT | `/api/trades/schedules/:id` | 8578 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| DELETE | `/api/trades/schedules/:id` | 8601 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/internal/cron/status` | 8617 | cron | authorizeCronRequest | `scheduler` | 401: `no-secret`, `wrong-secret` |
+| POST | `/api/internal/cron` | 8627 | cron | authorizeCronRequest | `scheduler` | 401: `no-secret`, `wrong-secret` |
 
 ## Per-route facts
 
@@ -3044,12 +3044,12 @@ Reviewed policy:
 
 - middleware: `authenticateToken`
 - query: `status: raw`, `tenantProfileId: strictUuidParam`
-- storageMethods: `getInvoiceRentRequestsByMerchant`, `getTenantProfile`
+- storageMethods: `getInvoiceRentRequestsByMerchant`, `getTenantProfileForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `500`, `503`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
+- **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3)); getInvoiceRentRequestsByMerchant requires both invoice and current parent ownership, including archived profiles; name/address enrichment uses getTenantProfileForMerchant
 - **Input:** tenantProfileId: strictUuidParam when given (400 'Invalid tenantProfileId' otherwise; since 2026-09-27, a 500 before); status: raw, a string only, compared as text with each invoice's status (one that no invoice has matches nothing)
 - **Idempotency:** read-only
 - **Success:** the business's invoices (or one tenant's, or those of one status), a whole invoice row (the tenant and automation, amount, the checkout token, channel, rent or a charge with its type and description, the attached document's reference and name, status and its dates, the external payment reference, reminders sent, the provider's session and transaction ids, the split, the WhatsApp message id) each, with the tenant's name and property address and what is still owed (owingCents, sharesLeft), newest first, all at once (no paging)
@@ -3142,15 +3142,14 @@ Reviewed policy:
 
 - middleware: `authenticateToken`
 - params: `id: strictUuidParam`
-- authChecks: `compares invoice.merchantId !== merchantId`
-- storageMethods: `getInvoiceRentRequest`, `logTransactionEvent`, `updateInvoiceRentRequest`
+- storageMethods: `getInvoiceRentRequestForMerchant`, `voidInvoiceRentRequestForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member). **Tenant (resource):** the invoice read by id (getInvoiceRentRequest) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403); the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
+- **Who:** merchant (owner, member). **Tenant (resource):** the invoice read by id (getInvoiceRentRequestForMerchant) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403), including current parent ownership, rechecked under parent-then-child locks; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500)
-- **Idempotency:** voids an invoice that is not paid (a paid or externally paid one is 409 'Cannot void a paid invoice', 400 until 2026-09-27, P2.2); a voided one is voided again, with a new time, and logged again
+- **Idempotency:** voidInvoiceRentRequestForMerchant checks the current locked status and commits the scoped invoice update and history together; a paid or externally paid one is 409 'Cannot void a paid invoice' (400 until 2026-09-27, P2.2); a voided one is voided again, with a new time, and logged again. Ownership refusal changes nothing; history failure rolls back the write
 - **Success:** the invoice afterwards, a whole invoice row (the tenant and automation, amount, the checkout token, channel, rent or a charge with its type and description, the attached document's reference and name, status and its dates, the external payment reference, reminders sent, the provider's session and transaction ids, the split, the WhatsApp message id)
 - **Error disclosure:** fixed
 - **Finding:** Voiding while the tenant is paying: the provider's completion then finds the invoice settled (finalizeRentInvoice), so a single payment's charge is recorded nowhere; a split share's is logged (Split_Share_Unrecorded). R3 (payment attempts).
@@ -3162,16 +3161,15 @@ Reviewed policy:
 - middleware: `authenticateToken`
 - params: `id: strictUuidParam`
 - body: `schema: markInvoicePaidExternalSchema`
-- authChecks: `compares invoice.merchantId !== merchantId`
-- storageMethods: `getInvoiceRentRequest`, `logTransactionEvent`, `updateInvoiceRentRequest`
+- storageMethods: `getInvoiceRentRequestForMerchant`, `markInvoiceRentRequestPaidExternalForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
 - errorTextInResponse: `err.errors`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member). **Tenant (resource):** the invoice read by id (getInvoiceRentRequest) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403), and not voided (409, since 2026-09-27: a voided one stays voided); the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
+- **Who:** merchant (owner, member). **Tenant (resource):** the invoice read by id (getInvoiceRentRequestForMerchant) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403), including current parent ownership, rechecked under parent-then-child locks; not voided (409, since 2026-09-27); the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500); body: markInvoicePaidExternalSchema (an optional reference of at most 200 characters, null or empty for none: both screens send null when no reference is typed, which was refused until 2026-09-27, batch 6d; 400 with the issues)
-- **Idempotency:** marks the invoice paid outside TaptPay with the reference and the time; a paid or externally paid one is 409 'Invoice is already paid' (400 until 2026-09-27, P2.2)
+- **Idempotency:** markInvoiceRentRequestPaidExternalForMerchant checks the current locked status and commits the scoped external-payment record and history together; a paid or externally paid one is 409 'Invoice is already paid' (400 until 2026-09-27, P2.2), and a voided one stays voided. Issued invoices remain payable after profile archival. Ownership refusal changes nothing; history failure rolls back the write
 - **Success:** the invoice afterwards, a whole invoice row (the tenant and automation, amount, the checkout token, channel, rent or a charge with its type and description, the attached document's reference and name, status and its dates, the external payment reference, reminders sent, the provider's session and transaction ids, the split, the WhatsApp message id)
 - **Error disclosure:** input-issues
 - **Finding:** Marking an invoice paid outside TaptPay while the tenant is paying: the provider's completion then finds the invoice settled (finalizeRentInvoice), so a single payment's charge is recorded nowhere; a split share's is logged (Split_Share_Unrecorded). R3 (payment attempts).

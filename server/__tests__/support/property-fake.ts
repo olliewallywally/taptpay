@@ -53,6 +53,11 @@ export function fakeProperty(): PropertyFake {
     return row?.merchantId === merchantId && fake.tenants.get(row.tenantProfileId)?.merchantId === merchantId ? row : undefined;
   });
   read("getInvoiceRentRequest", fake.invoices);
+  jest.spyOn(storage, "getInvoiceRentRequestForMerchant").mockImplementation(async (id, merchantId) => {
+    fake.reads.push("getInvoiceRentRequest");
+    const row = fake.invoices.get(id);
+    return row?.merchantId === merchantId && fake.tenants.get(row.tenantProfileId)?.merchantId === merchantId ? row : undefined;
+  });
   const list = (name: string, rows: (...args: any[]) => any[]) =>
     jest.spyOn(storage as any, name).mockImplementation(async (...args: any[]) => {
       fake.reads.push(name);
@@ -61,7 +66,8 @@ export function fakeProperty(): PropertyFake {
   list("getTenantProfilesByMerchant", () => [...fake.tenants.values()]);
   list("getActiveSchedulesByMerchant", (merchantId: number) => [...fake.schedules.values()]
     .filter(row => row.merchantId === merchantId && fake.tenants.get(row.tenantProfileId)?.merchantId === merchantId));
-  list("getInvoiceRentRequestsByMerchant", () => [...fake.invoices.values()]);
+  list("getInvoiceRentRequestsByMerchant", (merchantId: number) => [...fake.invoices.values()]
+    .filter(row => row.merchantId === merchantId && fake.tenants.get(row.tenantProfileId)?.merchantId === merchantId));
   // Newest first, as the tenant's history screen reads it.
   list("getTransactionEventsByTenant", (tenantId: string) => fake.events.filter((row) => row.tenantProfileId === tenantId).reverse());
   jest.spyOn(storage, "getTransactionEventsByTenantForMerchant").mockImplementation(async (id, merchantId, limit = 100) => {
@@ -136,6 +142,22 @@ export function fakeProperty(): PropertyFake {
     return row;
   });
   write("updateInvoiceRentRequest", (id: string, updates: any) => Object.assign(fake.invoices.get(id), updates));
+  const mutateInvoice = async (id: string, merchantId: number, operation: "void" | "paid-external", externalPaymentReference?: string): Promise<any> => {
+    const invoice = fake.invoices.get(id); const parent = fake.tenants.get(invoice?.tenantProfileId);
+    if (invoice?.merchantId !== merchantId || parent?.merchantId !== merchantId) return { kind: "not-found" };
+    if (["paid", "paid_external"].includes(invoice.status)) return { kind: "conflict", reason: "paid" };
+    if (operation === "paid-external" && invoice.status === "voided") return { kind: "conflict", reason: "voided" };
+    fake.writes.push("updateInvoiceRentRequest");
+    const now = new Date();
+    Object.assign(invoice, operation === "void" ? { status: "voided", voidedAt: now, updatedAt: now }
+      : { status: "paid_external", paidAt: now, externalPaymentReference: externalPaymentReference ?? null, updatedAt: now });
+    await storage.logTransactionEvent({ merchantId, tenantProfileId: parent.id, invoiceId: id,
+      eventType: operation === "void" ? "Invoice_Voided" : "Payment_External",
+      payload: operation === "void" ? {} : { externalPaymentReference } });
+    return { kind: "ok", invoice };
+  };
+  jest.spyOn(storage, "voidInvoiceRentRequestForMerchant").mockImplementation((id, merchantId) => mutateInvoice(id, merchantId, "void"));
+  jest.spyOn(storage, "markInvoiceRentRequestPaidExternalForMerchant").mockImplementation((id, merchantId, reference) => mutateInvoice(id, merchantId, "paid-external", reference));
   write("logTransactionEvent", (data: any) => {
     const row = { id: `event-${fake.events.length + 1}`, createdAt: new Date(), ...data };
     fake.events.push(row);
