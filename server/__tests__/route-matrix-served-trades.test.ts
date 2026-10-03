@@ -166,7 +166,7 @@ const RECIPES: Record<string, ServedRecipe> = {
           id: MADE_QUOTE, merchantId: ctx.merchantId, clientProfileId: CLIENT, status: "sent",
           subtotalCents: 80_000, gstCents: 0, totalCents: 80_000, depositCents: 20_000, delivered: true,
         });
-        expect(delivery.sendTradeQuote).toHaveBeenCalledWith(MADE_QUOTE, expect.any(String));
+        expect(delivery.sendTradeQuoteForMerchant).toHaveBeenCalledWith(MADE_QUOTE, ctx.merchantId, expect.any(String));
         expect(eventTypes()).toEqual(["quote_sent"]);
       },
     };
@@ -203,7 +203,8 @@ const RECIPES: Record<string, ServedRecipe> = {
           id: MADE_INVOICE, merchantId: ctx.merchantId, clientProfileId: CLIENT, quoteId: QUOTE, kind: "deposit",
           amountCents: 30_000, status: "pending_dispatch", delivered: true,
         });
-        expect(delivery.resendTradeInvoice).toHaveBeenCalledWith(MADE_INVOICE, expect.any(String));
+        expect(delivery.resendTradeInvoiceForMerchant).toHaveBeenCalledWith(MADE_INVOICE, ctx.merchantId, expect.any(String));
+        expect(delivery.resendTradeInvoice).not.toHaveBeenCalled();
         expect(eventTypes()).toEqual(["invoice_sent"]);
       },
     };

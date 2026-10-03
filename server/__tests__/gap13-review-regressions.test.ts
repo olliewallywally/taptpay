@@ -14,10 +14,12 @@ it.each(["bill.", "bill.abcdefghijklmnop", "bill.p-df", "bill.PDF", "bill"])(
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
     jest.spyOn(billing, "billingCardIsReady").mockReturnValue(true);
-    jest.spyOn(storage, "createClientProfileForMerchant").mockImplementation(async (merchantId, data) => ({ ...data, merchantId, id: "client" }));
-    jest.spyOn(storage, "createQuote").mockImplementation(async (data: any) => ({ ...data, id: "quote" }));
-    jest.spyOn(storage, "createJobEvent").mockResolvedValue({} as any);
-    jest.spyOn(delivery, "sendTradeQuote").mockResolvedValue({ sent: false, reason: "no-contact" } as any);
+    jest.spyOn(storage, "createQuoteForMerchant").mockImplementation(async (merchantId, _client, data) => ({
+      kind: "ok", quote: { ...data, id: "quote", merchantId, clientProfileId: "client" } as any, client: { id: "client", merchantId } as any,
+    }));
+    jest.spyOn(storage, "recordQuoteDeliveryForMerchant").mockResolvedValue(true);
+    jest.spyOn(storage, "getQuoteDeliveryForMerchant").mockImplementation(async (id, merchantId) => ({ quote: { id, merchantId } as any, client: { id: "client", merchantId } as any }));
+    jest.spyOn(delivery, "sendTradeQuoteForMerchant").mockResolvedValue({ sent: false, reason: "no-contact" } as any);
     const uploaded = await request(app).post("/api/property/invoices/document")
       .set(signedIn(owner)).attach("document", Buffer.from("%PDF-1.4\nsynthetic"),
         { filename, contentType: "application/pdf" });

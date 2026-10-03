@@ -108,6 +108,42 @@ export type TradesInvoiceDeliverySnapshot = {
 };
 export type TradesReceiptRecord = { sent: boolean; reference: string };
 
+/** The business's own saved client, or the hidden prospect a quote or quick invoice is made with. */
+export type TradesClientRef = { clientProfileId: string } | { prospect: ClientProfileChanges };
+export type QuoteInput = Pick<typeof quotes.$inferInsert,
+  "lineItems" | "subtotalCents" | "gstCents" | "gstMode" | "totalCents" | "depositEnabled" | "depositType" | "depositValue" | "depositCents"
+  | "deliveryChannel" | "validUntil" | "notes" | "documentUrl" | "documentName">;
+export type QuoteCreationResult =
+  | { kind: "ok"; quote: typeof quotes.$inferSelect; client: typeof clientProfiles.$inferSelect }
+  | { kind: "not-found" }
+  | { kind: "invalid-document" };
+export type JobInvoiceInput = Pick<typeof jobInvoices.$inferInsert,
+  "kind" | "amountCents" | "deliveryChannel" | "jobDetails" | "dueAt" | "scheduledSendAt" | "splitEnabled" | "documentUrl" | "documentName" | "quoteId">;
+export type JobInvoiceCreationResult =
+  | { kind: "ok"; invoice: typeof jobInvoices.$inferSelect; client: typeof clientProfiles.$inferSelect }
+  | { kind: "not-found" }
+  | { kind: "quote-not-found" }
+  | { kind: "invalid-document" };
+export type JobBalanceCreationResult =
+  | { kind: "ok"; invoice: typeof jobInvoices.$inferSelect }
+  | { kind: "not-found" }
+  | { kind: "conflict"; reason: "not-deposit" | "unpaid" | "no-quote" | "quote-not-found" | "exists" | "none-remaining" };
+export type TradesQuoteDeliveryRecord = { sent: boolean; channel?: string; reason?: string };
+export type TradesInvoiceDeliveryRecord = { channel?: string; messageId?: string };
+
+function quoteInput(data: QuoteInput): QuoteInput {
+  return { lineItems: data.lineItems, subtotalCents: data.subtotalCents, gstCents: data.gstCents, gstMode: data.gstMode, totalCents: data.totalCents,
+    depositEnabled: data.depositEnabled, depositType: data.depositType, depositValue: data.depositValue, depositCents: data.depositCents,
+    deliveryChannel: data.deliveryChannel, validUntil: data.validUntil, notes: data.notes, documentUrl: data.documentUrl, documentName: data.documentName };
+}
+
+// A balance is made by its own contract and a recurring invoice by the cron: this create takes a deposit or a full invoice.
+function jobInvoiceInput(data: JobInvoiceInput): JobInvoiceInput {
+  return { kind: data.kind === "deposit" ? "deposit" : "full", amountCents: data.amountCents, deliveryChannel: data.deliveryChannel,
+    jobDetails: data.jobDetails ?? null, dueAt: data.dueAt, scheduledSendAt: data.scheduledSendAt ?? null, splitEnabled: !!data.splitEnabled,
+    documentUrl: data.documentUrl ?? null, documentName: data.documentName ?? null, quoteId: data.quoteId ?? null };
+}
+
 function activeScheduleChanges(data: ActiveScheduleChanges): ActiveScheduleChanges {
   const patch = Object.fromEntries(["amountCents", "frequency", "deliveryChannel"]
     .filter(key => (data as any)[key] !== undefined).map(key => [key, (data as any)[key]]));
@@ -982,8 +1018,9 @@ export interface IStorage extends PaymentAttemptRepository {
   getClientProfile(id: string): Promise<any | undefined>;
   getClientProfilesByMerchant(merchantId: number): Promise<any[]>;
 
-  createQuote(data: any): Promise<any>;
-  /** Public quote, checkout and delivery lanes; signed-in reads use explicit scope. */
+  createQuoteForMerchant(merchantId: number, client: TradesClientRef, data: QuoteInput): Promise<QuoteCreationResult>;
+  recordQuoteDeliveryForMerchant(id: string, merchantId: number, clientProfileId: string, record: TradesQuoteDeliveryRecord): Promise<boolean>;
+  /** Checkout lane; signed-in reads use explicit scope. */
   getQuote(id: string): Promise<any | undefined>;
   getQuoteByToken(token: string): Promise<any | undefined>;
   getQuotesByMerchant(merchantId: number, opts?: { status?: string }): Promise<any[]>;
@@ -996,6 +1033,10 @@ export interface IStorage extends PaymentAttemptRepository {
   markJobInvoicePaidExternalForMerchant(id: string, merchantId: number, externalPaymentReference?: string): Promise<JobInvoiceMutationResult>;
   completeJobInvoiceForMerchant(id: string, merchantId: number): Promise<JobInvoiceMutationResult>;
   recordJobInvoiceReceiptForMerchant(id: string, merchantId: number, clientProfileId: string, receipt: TradesReceiptRecord): Promise<boolean>;
+  createJobInvoiceForMerchant(merchantId: number, client: TradesClientRef, data: JobInvoiceInput): Promise<JobInvoiceCreationResult>;
+  createJobBalanceInvoiceForMerchant(depositInvoiceId: string, merchantId: number, splitEnabled: boolean): Promise<JobBalanceCreationResult>;
+  recordJobInvoiceDeliveryForMerchant(id: string, merchantId: number, clientProfileId: string, record: TradesInvoiceDeliveryRecord): Promise<JobInvoiceMutationResult>;
+  /** The public quote acceptance and the cron's generate pass; a signed-in create uses explicit scope. */
   createJobInvoice(data: any): Promise<any>;
   /** Checkout, provider, WhatsApp status, cron and delivery lanes; signed-in management uses explicit scope. */
   getJobInvoice(id: string): Promise<any | undefined>;
@@ -3503,7 +3544,8 @@ export class MemStorage implements IStorage {
   async getJobEventsByClientForMerchant(clientProfileId: string, merchantId: number, limit?: number): Promise<any[]> { return []; }
   async getClientProfile(id: string): Promise<any> { return undefined; }
   async getClientProfilesByMerchant(merchantId: number): Promise<any[]> { return []; }
-  async createQuote(data: any): Promise<any> { throw new Error("Trades requires database"); }
+  async createQuoteForMerchant(merchantId: number, client: TradesClientRef, data: QuoteInput): Promise<QuoteCreationResult> { throw new Error("Trades requires database"); }
+  async recordQuoteDeliveryForMerchant(id: string, merchantId: number, clientProfileId: string, record: TradesQuoteDeliveryRecord): Promise<boolean> { return false; }
   async getQuote(id: string): Promise<any> { return undefined; }
   async getQuoteByToken(token: string): Promise<any> { return undefined; }
   async getQuotesByMerchant(merchantId: number, opts?: any): Promise<any[]> { return []; }
@@ -3515,6 +3557,9 @@ export class MemStorage implements IStorage {
   async markJobInvoicePaidExternalForMerchant(id: string, merchantId: number, externalPaymentReference?: string): Promise<JobInvoiceMutationResult> { return { kind: "not-found" }; }
   async completeJobInvoiceForMerchant(id: string, merchantId: number): Promise<JobInvoiceMutationResult> { return { kind: "not-found" }; }
   async recordJobInvoiceReceiptForMerchant(id: string, merchantId: number, clientProfileId: string, receipt: TradesReceiptRecord): Promise<boolean> { return false; }
+  async createJobInvoiceForMerchant(merchantId: number, client: TradesClientRef, data: JobInvoiceInput): Promise<JobInvoiceCreationResult> { throw new Error("Trades requires database"); }
+  async createJobBalanceInvoiceForMerchant(depositInvoiceId: string, merchantId: number, splitEnabled: boolean): Promise<JobBalanceCreationResult> { throw new Error("Trades requires database"); }
+  async recordJobInvoiceDeliveryForMerchant(id: string, merchantId: number, clientProfileId: string, record: TradesInvoiceDeliveryRecord): Promise<JobInvoiceMutationResult> { return { kind: "not-found" }; }
   async createJobInvoice(data: any): Promise<any> { throw new Error("Trades requires database"); }
   async getJobInvoice(id: string): Promise<any> { return undefined; }
   async getJobInvoiceByToken(token: string): Promise<any> { return undefined; }
@@ -8532,10 +8577,57 @@ export class DatabaseStorage implements IStorage {
   }
 
   // ───────── Trades: quotes ─────────
-  async createQuote(data: any): Promise<any> {
-    const db = getDb(); if (!db) throw new Error('No database');
-    const [row] = await db.insert(quotes).values(data).returning();
+  /** The business's own client, row-locked for a create: the same first lock as the client's archive. */
+  private async lockOwnedTradesClient(tx: any, id: string, merchantId: number): Promise<any | undefined> {
+    const [parent] = await tx.select().from(clientProfiles)
+      .where(and(eq(clientProfiles.id, id), eq(clientProfiles.merchantId, merchantId))).limit(1).for("update");
+    return parent;
+  }
+  /** No attachment, or the business's own upload held under a share lock through the insert (gap 13). */
+  private async holdOwnedInvoiceDocument(tx: any, merchantId: number, documentUrl: string | null | undefined): Promise<boolean> {
+    if (!documentUrl) return true;
+    const ref = parseInvoiceDocumentRef(documentUrl);
+    if (!ref) return false;
+    const [document] = await tx.select({ id: uploadedFiles.id }).from(uploadedFiles)
+      .where(and(eq(uploadedFiles.path, ref.relPath), eq(uploadedFiles.merchantId, merchantId))).limit(1).for("share");
+    return !!document;
+  }
+  private async insertTradesProspect(tx: any, merchantId: number, prospect: ClientProfileChanges): Promise<any> {
+    const [row] = await tx.insert(clientProfiles).values({ ...clientProfileChanges(prospect), merchantId, status: "prospect" } as any).returning();
     return row;
+  }
+  async createQuoteForMerchant(merchantId: number, client: TradesClientRef, data: QuoteInput): Promise<QuoteCreationResult> {
+    if (!isManagementTenantId(merchantId)) return { kind: "not-found" };
+    const db = this.db; if (!db) throw new Error("Trades requires database");
+    const input = quoteInput(data);
+    return db.transaction(async (tx: any) => {
+      // A refusal returned from here still commits what was written before it, so
+      // every check comes first and the hidden prospect is made last.
+      let parent = "clientProfileId" in client ? await this.lockOwnedTradesClient(tx, client.clientProfileId, merchantId) : undefined;
+      if ("clientProfileId" in client && !parent) return { kind: "not-found" };
+      if (!(await this.holdOwnedInvoiceDocument(tx, merchantId, input.documentUrl))) return { kind: "invalid-document" };
+      if (!parent) parent = await this.insertTradesProspect(tx, merchantId, (client as { prospect: ClientProfileChanges }).prospect);
+      const [quote] = await tx.insert(quotes).values({ ...input, merchantId, clientProfileId: parent.id,
+        token: randomBytes(20).toString("base64url"), status: "sent", sentAt: new Date() }).returning();
+      await tx.insert(jobEvents).values({ merchantId, clientProfileId: parent.id, quoteId: quote.id, eventType: "quote_sent" });
+      return { kind: "ok", quote, client: parent };
+    });
+  }
+  async recordQuoteDeliveryForMerchant(id: string, merchantId: number, clientProfileId: string, record: TradesQuoteDeliveryRecord): Promise<boolean> {
+    if (!isManagementTenantId(merchantId)) return false;
+    const db = this.db; if (!db) return false;
+    return db.transaction(async (tx: any) => {
+      // The quote went (or failed to go) to this captured client: its history line
+      // needs that client and the quote both still the business's, client first.
+      const parent = await this.lockOwnedTradesClient(tx, clientProfileId, merchantId);
+      if (!parent) return false;
+      const [quote] = await tx.select({ id: quotes.id }).from(quotes)
+        .where(and(eq(quotes.id, id), eq(quotes.merchantId, merchantId), eq(quotes.clientProfileId, parent.id))).limit(1).for("share");
+      if (!quote) return false;
+      await tx.insert(jobEvents).values({ merchantId, clientProfileId: parent.id, quoteId: id,
+        eventType: record.sent ? "quote_dispatched" : "quote_dispatch_failed", payload: { channel: record.channel, reason: record.reason } });
+      return true;
+    });
   }
   async getQuote(id: string): Promise<any> {
     const db = getDb(); if (!db) return undefined;
@@ -8596,8 +8688,8 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(jobInvoices.id, id), eq(jobInvoices.merchantId, merchantId), eq(clientProfiles.merchantId, merchantId))).limit(1);
     return row;
   }
-  private async mutateJobInvoiceForMerchant(id: string, merchantId: number, operation: "void" | "paid-external" | "complete",
-    externalPaymentReference?: string): Promise<JobInvoiceMutationResult> {
+  private async mutateJobInvoiceForMerchant(id: string, merchantId: number, operation: "void" | "paid-external" | "complete" | "dispatched",
+    externalPaymentReference?: string, delivery?: { clientProfileId: string; record: TradesInvoiceDeliveryRecord }): Promise<JobInvoiceMutationResult> {
     if (!isManagementTenantId(merchantId)) return { kind: "not-found" };
     const db = this.db; if (!db) return { kind: "not-found" };
     return db.transaction(async (tx: any) => {
@@ -8606,6 +8698,8 @@ export class DatabaseStorage implements IStorage {
       const [candidate] = await tx.select({ clientProfileId: jobInvoices.clientProfileId }).from(jobInvoices)
         .where(and(eq(jobInvoices.id, id), eq(jobInvoices.merchantId, merchantId))).limit(1);
       if (!candidate) return { kind: "not-found" };
+      // A delivery is recorded only for the client its message was sent to.
+      if (delivery && candidate.clientProfileId !== delivery.clientProfileId) return { kind: "not-found" };
       const [parent] = await tx.select().from(clientProfiles)
         .where(and(eq(clientProfiles.id, candidate.clientProfileId), eq(clientProfiles.merchantId, merchantId)))
         .limit(1).for("update");
@@ -8620,7 +8714,7 @@ export class DatabaseStorage implements IStorage {
         if (invoice.kind === "deposit") return { kind: "conflict", reason: "deposit" };
         if (!paid) return { kind: "conflict", reason: "unpaid" };
       } else {
-        if (operation === "paid-external" && invoice.status === "voided") return { kind: "conflict", reason: "voided" };
+        if (operation !== "void" && invoice.status === "voided") return { kind: "conflict", reason: "voided" };
         if (paid) return { kind: "conflict", reason: "paid" };
       }
       const now = new Date();
@@ -8628,11 +8722,18 @@ export class DatabaseStorage implements IStorage {
         ? { status: "voided", voidedAt: now, updatedAt: now }
         : operation === "paid-external"
           ? { status: "paid_external", paidAt: now, externalPaymentReference: externalPaymentReference ?? null, updatedAt: now }
-          : { completedAt: now, updatedAt: now };
+          : operation === "complete"
+            ? { completedAt: now, updatedAt: now }
+            // A delivery: only an invoice still waiting to go becomes dispatched, and
+            // only WhatsApp's message id is kept (its status callback looks it up).
+            : { dispatchedAt: now, sentAt: now, updatedAt: now,
+                ...(invoice.status === "pending_dispatch" || invoice.status === "dispatch_failed" ? { status: "dispatched" } : {}),
+                ...(delivery?.record.channel === "whatsapp" && delivery.record.messageId ? { whatsappMessageId: delivery.record.messageId } : {}) };
       const [updated] = await tx.update(jobInvoices).set(patch).where(scope).returning();
       if (!updated) return { kind: "not-found" };
       await tx.insert(jobEvents).values({ merchantId, clientProfileId: parent.id, jobInvoiceId: id,
-        eventType: operation === "void" ? "invoice_voided" : operation === "paid-external" ? "paid_external" : "job_completed" });
+        eventType: operation === "void" ? "invoice_voided" : operation === "paid-external" ? "paid_external" : operation === "complete" ? "job_completed" : "invoice_dispatched",
+        ...(operation === "dispatched" ? { payload: { channel: delivery?.record.channel } } : {}) });
       return { kind: "ok", invoice: updated };
     });
   }
@@ -8662,6 +8763,70 @@ export class DatabaseStorage implements IStorage {
       await tx.insert(jobEvents).values({ merchantId, clientProfileId: parent.id, jobInvoiceId: id,
         eventType: receipt.sent ? "invoice_email_sent" : "invoice_email_failed", payload: { reference: receipt.reference } });
       return true;
+    });
+  }
+  async recordJobInvoiceDeliveryForMerchant(id: string, merchantId: number, clientProfileId: string, record: TradesInvoiceDeliveryRecord): Promise<JobInvoiceMutationResult> {
+    return this.mutateJobInvoiceForMerchant(id, merchantId, "dispatched", undefined, { clientProfileId, record });
+  }
+  async createJobInvoiceForMerchant(merchantId: number, client: TradesClientRef, data: JobInvoiceInput): Promise<JobInvoiceCreationResult> {
+    if (!isManagementTenantId(merchantId)) return { kind: "not-found" };
+    const db = this.db; if (!db) throw new Error("Trades requires database");
+    const input = jobInvoiceInput(data);
+    return db.transaction(async (tx: any) => {
+      // As the quote create: every check first, the hidden prospect last.
+      let parent = "clientProfileId" in client ? await this.lockOwnedTradesClient(tx, client.clientProfileId, merchantId) : undefined;
+      if ("clientProfileId" in client && !parent) return { kind: "not-found" };
+      if (input.quoteId) {
+        // A deposit's quote must be the business's and this client's, held through
+        // the insert. A quick invoice's prospect has no quote.
+        if (!parent) return { kind: "quote-not-found" };
+        const [quote] = await tx.select({ id: quotes.id }).from(quotes)
+          .where(and(eq(quotes.id, input.quoteId), eq(quotes.merchantId, merchantId), eq(quotes.clientProfileId, parent.id))).limit(1).for("share");
+        if (!quote) return { kind: "quote-not-found" };
+      }
+      if (!(await this.holdOwnedInvoiceDocument(tx, merchantId, input.documentUrl))) return { kind: "invalid-document" };
+      if (!parent) parent = await this.insertTradesProspect(tx, merchantId, (client as { prospect: ClientProfileChanges }).prospect);
+      const [invoice] = await tx.insert(jobInvoices).values({ ...input, merchantId, clientProfileId: parent.id,
+        token: randomBytes(20).toString("base64url"), status: "pending_dispatch" }).returning();
+      await tx.insert(jobEvents).values({ merchantId, clientProfileId: parent.id, jobInvoiceId: invoice.id, eventType: "invoice_sent" });
+      return { kind: "ok", invoice, client: parent };
+    });
+  }
+  async createJobBalanceInvoiceForMerchant(depositInvoiceId: string, merchantId: number, splitEnabled: boolean): Promise<JobBalanceCreationResult> {
+    if (!isManagementTenantId(merchantId)) return { kind: "not-found" };
+    const db = this.db; if (!db) throw new Error("Trades requires database");
+    return db.transaction(async (tx: any) => {
+      const [candidate] = await tx.select({ clientProfileId: jobInvoices.clientProfileId }).from(jobInvoices)
+        .where(and(eq(jobInvoices.id, depositInvoiceId), eq(jobInvoices.merchantId, merchantId))).limit(1);
+      if (!candidate) return { kind: "not-found" };
+      const parent = await this.lockOwnedTradesClient(tx, candidate.clientProfileId, merchantId);
+      if (!parent) return { kind: "not-found" };
+      const [deposit] = await tx.select().from(jobInvoices)
+        .where(and(eq(jobInvoices.id, depositInvoiceId), eq(jobInvoices.merchantId, merchantId), eq(jobInvoices.clientProfileId, parent.id)))
+        .limit(1).for("update");
+      if (!deposit) return { kind: "not-found" };
+      if (deposit.kind !== "deposit") return { kind: "conflict", reason: "not-deposit" };
+      if (!["paid", "paid_external", "deposit_paid"].includes(deposit.status)) return { kind: "conflict", reason: "unpaid" };
+      if (!deposit.quoteId) return { kind: "conflict", reason: "no-quote" };
+      const [quote] = await tx.select().from(quotes)
+        .where(and(eq(quotes.id, deposit.quoteId), eq(quotes.merchantId, merchantId))).limit(1).for("share");
+      if (!quote) return { kind: "conflict", reason: "quote-not-found" };
+      // Everything already billed to this client on the quote and not voided (the
+      // deposit plus any other invoice), read inside the client's lock: two sends
+      // cannot both find no balance, and a balance never double-bills.
+      const onQuote = await tx.select().from(jobInvoices)
+        .where(and(eq(jobInvoices.merchantId, merchantId), eq(jobInvoices.clientProfileId, parent.id),
+          eq(jobInvoices.quoteId, deposit.quoteId), ne(jobInvoices.status, "voided")));
+      if (onQuote.some((invoice: any) => invoice.kind === "balance")) return { kind: "conflict", reason: "exists" };
+      const alreadyBilled = onQuote.reduce((sum: number, invoice: any) => sum + (invoice.amountCents || 0), 0);
+      const balanceCents = Math.max(quote.totalCents - alreadyBilled, 0);
+      if (balanceCents <= 0) return { kind: "conflict", reason: "none-remaining" };
+      const due = new Date(); due.setDate(due.getDate() + 7);
+      const [invoice] = await tx.insert(jobInvoices).values({ merchantId, clientProfileId: parent.id, quoteId: deposit.quoteId,
+        kind: "balance", amountCents: balanceCents, token: randomBytes(20).toString("base64url"),
+        deliveryChannel: deposit.deliveryChannel, status: "pending_dispatch", dueAt: due, splitEnabled: !!splitEnabled }).returning();
+      await tx.insert(jobEvents).values({ merchantId, clientProfileId: parent.id, jobInvoiceId: invoice.id, eventType: "balance_sent" });
+      return { kind: "ok", invoice };
     });
   }
   async createJobInvoice(data: any): Promise<any> {

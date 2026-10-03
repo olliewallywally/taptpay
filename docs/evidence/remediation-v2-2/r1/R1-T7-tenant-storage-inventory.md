@@ -1,10 +1,10 @@
 # R1-T7 tenant/storage execution inventory
 
-Generated from working-tree sources on base `c0fb5bc3981cbedd8a46f864f0e224092c417369`; the phase evidence names the final commit.
+Generated from working-tree sources on base `51e0b186348615c2a93c3b434757874ced1423ce`; the phase evidence names the final commit.
 
 Registrations: **187**; registrations with session/admin authentication: **119**;
 registrations calling checkMerchantOwnership: **25**.
-IStorage: **238** declared methods;
+IStorage: **242** declared methods;
 PaymentAttemptRepository: **8** inherited methods.
 
 Classifications come from the reviewed per-route branches, including mixed public/signed-in routes.
@@ -169,12 +169,12 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | POST /api/trades/clients/:id/archive | tenant (merchant/resource) | `archiveClientProfileForMerchant`, `getClientProfileForMerchant` |
 | POST /api/trades/clients/:id/promote | tenant (merchant/resource) | `getClientProfileForMerchant`, `promoteClientProfileForMerchant` |
 | POST /api/trades/clients/:id/unarchive | tenant (merchant/resource) | `getClientProfileForMerchant`, `unarchiveClientProfileForMerchant` |
-| POST /api/trades/invoices | tenant (merchant/resource) | `createClientProfileForMerchant`, `createJobEvent`, `createJobInvoice`, `getClientProfile`, `getOrCreateSubscription`, `getQuote`, `uploadedFileOwnedByMerchant` |
+| POST /api/trades/invoices | tenant (merchant/resource) | `createJobInvoiceForMerchant`, `getClientProfileForMerchant`, `getJobInvoiceForMerchant`, `getOrCreateSubscription`, `getQuoteDeliveryForMerchant`, `uploadedFileOwnedByMerchant` |
 | POST /api/trades/invoices/:id/complete | tenant (merchant/resource) | `completeJobInvoiceForMerchant`, `getJobInvoiceForMerchant` |
 | POST /api/trades/invoices/:id/mark-paid-external | tenant (merchant/resource) | `getJobInvoiceForMerchant`, `markJobInvoicePaidExternalForMerchant` |
-| POST /api/trades/invoices/:id/send-balance | tenant (merchant/resource) | `createJobEvent`, `createJobInvoice`, `getJobInvoice`, `getJobInvoicesByMerchant`, `getOrCreateSubscription`, `getQuote` |
+| POST /api/trades/invoices/:id/send-balance | tenant (merchant/resource) | `createJobBalanceInvoiceForMerchant`, `getJobInvoiceForMerchant`, `getOrCreateSubscription` |
 | POST /api/trades/invoices/:id/void | tenant (merchant/resource) | `getJobInvoiceForMerchant`, `voidJobInvoiceForMerchant` |
-| POST /api/trades/quotes | tenant (merchant/resource) | `createClientProfileForMerchant`, `createJobEvent`, `createQuote`, `getClientProfile`, `getMerchant`, `getOrCreateSubscription`, `uploadedFileOwnedByMerchant` |
+| POST /api/trades/quotes | tenant (merchant/resource) | `createQuoteForMerchant`, `getClientProfileForMerchant`, `getMerchant`, `getOrCreateSubscription`, `getQuoteDeliveryForMerchant`, `recordQuoteDeliveryForMerchant`, `uploadedFileOwnedByMerchant` |
 | POST /api/trades/quotes/token/:token/respond | single-resource bearer (public-bearer/token) | `createJobEvent`, `createJobInvoice`, `getOrCreateSubscription`, `getQuoteByToken`, `updateQuote` |
 | POST /api/trades/schedules | tenant (merchant/resource) | `createJobEvent`, `createJobSchedule`, `getClientProfile`, `getOrCreateSubscription` |
 | POST /api/transactions | tenant (merchant/path-merchant) | `createTransactionForMerchant`, `getOrCreateSubscription`, `getTaptStoneForMerchant` |
@@ -398,7 +398,8 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | IStorage | getJobEventsByClientForMerchant | yes | `getJobEventsByClientForMerchant(clientProfileId: string, merchantId: number, limit?: number): Promise<any[]>` |
 | IStorage | getClientProfile | no | `getClientProfile(id: string): Promise<any \| undefined>` |
 | IStorage | getClientProfilesByMerchant | yes | `getClientProfilesByMerchant(merchantId: number): Promise<any[]>` |
-| IStorage | createQuote | no | `createQuote(data: any): Promise<any>` |
+| IStorage | createQuoteForMerchant | yes | `createQuoteForMerchant(merchantId: number, client: TradesClientRef, data: QuoteInput): Promise<QuoteCreationResult>` |
+| IStorage | recordQuoteDeliveryForMerchant | yes | `recordQuoteDeliveryForMerchant(id: string, merchantId: number, clientProfileId: string, record: TradesQuoteDeliveryRecord): Promise<boolean>` |
 | IStorage | getQuote | no | `getQuote(id: string): Promise<any \| undefined>` |
 | IStorage | getQuoteByToken | no | `getQuoteByToken(token: string): Promise<any \| undefined>` |
 | IStorage | getQuotesByMerchant | yes | `getQuotesByMerchant(merchantId: number, opts?: { status?: string }): Promise<any[]>` |
@@ -410,6 +411,9 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | IStorage | markJobInvoicePaidExternalForMerchant | yes | `markJobInvoicePaidExternalForMerchant(id: string, merchantId: number, externalPaymentReference?: string): Promise<JobInvoiceMutationResult>` |
 | IStorage | completeJobInvoiceForMerchant | yes | `completeJobInvoiceForMerchant(id: string, merchantId: number): Promise<JobInvoiceMutationResult>` |
 | IStorage | recordJobInvoiceReceiptForMerchant | yes | `recordJobInvoiceReceiptForMerchant(id: string, merchantId: number, clientProfileId: string, receipt: TradesReceiptRecord): Promise<boolean>` |
+| IStorage | createJobInvoiceForMerchant | yes | `createJobInvoiceForMerchant(merchantId: number, client: TradesClientRef, data: JobInvoiceInput): Promise<JobInvoiceCreationResult>` |
+| IStorage | createJobBalanceInvoiceForMerchant | yes | `createJobBalanceInvoiceForMerchant(depositInvoiceId: string, merchantId: number, splitEnabled: boolean): Promise<JobBalanceCreationResult>` |
+| IStorage | recordJobInvoiceDeliveryForMerchant | yes | `recordJobInvoiceDeliveryForMerchant(id: string, merchantId: number, clientProfileId: string, record: TradesInvoiceDeliveryRecord): Promise<JobInvoiceMutationResult>` |
 | IStorage | createJobInvoice | no | `createJobInvoice(data: any): Promise<any>` |
 | IStorage | getJobInvoice | no | `getJobInvoice(id: string): Promise<any \| undefined>` |
 | IStorage | getJobInvoiceByToken | no | `getJobInvoiceByToken(token: string): Promise<any \| undefined>` |

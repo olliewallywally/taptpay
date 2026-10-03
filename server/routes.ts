@@ -11,6 +11,7 @@ import {
   TaptStoneCapacityError,
   TaptStoneConflictError,
   subscriptionCardSessionState,
+  type JobBalanceCreationResult, type TradesClientRef,
 } from "./storage";
 import { TUTORIAL_PAGE_KEYS, isTutorialPageKey } from "@shared/tutorial";
 import { inviteTeamMemberSchema, acceptInviteSchema, retailTransactionCreateRequestSchema, cashSaleRequestSchema, updateMerchantDetailsSchema, updateThemeSchema, updateDailyGoalSchema, forgotPasswordSchema, resetPasswordSchema, changePasswordSchema, newPasswordSchema, createRefundSchema, insertRefundSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, merchantOnboardingSchema, pushNotificationPreferencesSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createClientProfileSchema, updateClientProfileSchema, createQuoteSchema, acceptQuoteSchema, createJobInvoiceSchema, markJobPaidExternalSchema, sendJobBalanceSchema, createJobScheduleSchema, updateJobScheduleSchema, updateTradeReminderSettingsSchema, updateTradeGstSettingsSchema } from "@shared/schema";
@@ -43,7 +44,7 @@ import { isPushServiceEndpoint } from "./push-endpoint";
 import { resendInvoiceEmailForMerchant } from "./property-cron";
 import { INVOICE_DOCUMENT_FOLDER, isInvoiceDocumentName, isPublicUploadFolder, parseInvoiceDocumentRef } from "./upload-policy";
 import { INVOICE_DOCUMENT_EXTENSIONS } from "./invoice-document-security";
-import { resendTradeInvoice, sendTradePaymentInvoice, sendTradePaymentInvoiceForMerchant, sendTradeQuote } from "./trades-delivery";
+import { resendTradeInvoice, resendTradeInvoiceForMerchant, sendTradePaymentInvoice, sendTradePaymentInvoiceForMerchant, sendTradeQuoteForMerchant } from "./trades-delivery";
 import { nextJobRunDateAfter } from "./trades-cron";
 import { QUOTE_ACCEPTANCE_UNAVAILABLE, tellBusinessQuoteAcceptanceBlocked } from "./quote-acceptance-notice";
 import { sendGstInvoices, extractEmails } from "./gst-invoice";
@@ -7969,6 +7970,22 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   /** How far back a recurring invoice's start date may be (owner decision 2026-09-27): a day. */
   const RECURRING_START_GRACE_MS = 24 * 60 * 60 * 1000;
 
+  /**
+   * After an attempted send, an uncertain outcome is answered with one of these and no row
+   * (R1-T7 S4b2): the message may have gone, so it is neither a success nor a "nothing was sent".
+   */
+  const TRADES_QUOTE_RECONCILIATION = { message: "Quote delivery requires reconciliation", code: "TRADES_QUOTE_DELIVERY_RECONCILIATION_REQUIRED" } as const;
+  const TRADES_INVOICE_RECONCILIATION = { message: "Invoice delivery requires reconciliation", code: "TRADES_INVOICE_DELIVERY_RECONCILIATION_REQUIRED" } as const;
+  /** Why a deposit's balance is not sent: the same status and words whether the route or storage finds it. */
+  const BALANCE_REFUSALS: Record<Extract<JobBalanceCreationResult, { kind: "conflict" }>["reason"], [number, string]> = {
+    "not-deposit": [400, "Balance can only be sent for a deposit invoice"],
+    unpaid: [409, "Deposit must be paid before sending the balance"],
+    "no-quote": [400, "This deposit is not linked to a quote, so a balance can't be calculated"],
+    "quote-not-found": [404, "Linked quote not found"],
+    exists: [409, "Balance invoice already exists"],
+    "none-remaining": [400, "No balance remaining"],
+  };
+
   // Trades job-invoice reminders have their own on/off switch (cadence reuses the
   // rent* day settings) so disabling rent reminders doesn't silently stop them.
   app.get("/api/trades/reminder-settings", authenticateToken, async (req: AuthenticatedRequest, res) => {
@@ -8152,26 +8169,26 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (parsed.data.depositEnabled && parsed.data.depositType === "percent" && (parsed.data.depositValue ?? 0) > 100)
         return res.status(400).json({ message: "Deposit percentage cannot exceed 100" });
       // Gap 13: an attached document must be this merchant's own upload. Checked
-      // before the hidden prospect below is created, so a rejection writes nothing.
+      // before anything is made, so a rejection writes nothing.
       if (!(await requireOwnedInvoiceDocument(merchantId, parsed.data.documentUrl, res))) return;
-      let client;
+      let client: TradesClientRef;
       if (parsed.data.clientProfileId) {
-        client = await storage.getClientProfile(parsed.data.clientProfileId);
-        if (!client || client.merchantId !== merchantId) return res.status(404).json({ message: "Client not found" });
+        const saved = await storage.getClientProfileForMerchant(parsed.data.clientProfileId, merchantId);
+        if (!saved) return res.status(404).json({ message: "Client not found" });
+        client = { clientProfileId: saved.id };
       } else {
-        // Like quick invoices, unsaved recipients use a hidden prospect. Empty
+        // Like quick invoices, unsaved recipients use a hidden prospect, made with the quote. Empty
         // details are intentional for a link-only quote; never invent contact data.
         const name = parsed.data.recipient?.name ?? "";
         const split = name.indexOf(" ");
-        client = await storage.createClientProfileForMerchant(merchantId, {
+        client = { prospect: {
           firstName: split > 0 ? name.slice(0, split) : name,
           lastName: split > 0 ? name.slice(split + 1) : "",
           email: parsed.data.recipient?.email ?? null,
           phone: null,
           siteAddress: parsed.data.recipient?.address ?? "",
           preferredChannel: "email",
-          status: "prospect",
-        });
+        } };
       }
       const merchant = await storage.getMerchant(merchantId);
       const lineItems = parsed.data.lineItems.map(item => ({
@@ -8186,11 +8203,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         depositType: parsed.data.depositType,
         depositValue: parsed.data.depositValue,
       });
-      const token = generateInvoiceToken();
-      const row = await storage.createQuote({
-        merchantId,
-        clientProfileId: client.id,
-        token, status: "sent",
+      // Storage rechecks the client and the document at the write, makes the link's token, and
+      // commits the hidden prospect (if any), the quote and its quote_sent history together.
+      const result = await storage.createQuoteForMerchant(merchantId, client, {
         lineItems,
         subtotalCents: totals.subtotalCents,
         gstCents: totals.gstCents,
@@ -8205,15 +8220,19 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         notes: parsed.data.notes ?? null,
         documentUrl: parsed.data.documentUrl ?? null,
         documentName: parsed.data.documentName ?? null,
-        sentAt: new Date(),
       });
-      await storage.createJobEvent({ merchantId, clientProfileId: client.id, quoteId: row.id, eventType: "quote_sent" });
-      const delivery = await sendTradeQuote(row.id, getBaseUrl(req));
+      if (result.kind === "not-found") return res.status(404).json({ message: "Client not found" });
+      if (result.kind === "invalid-document") return res.status(400).json({ message: "Invalid document attachment" });
+      const delivery = await sendTradeQuoteForMerchant(result.quote.id, merchantId, getBaseUrl(req));
+      if (delivery.reason === "reconciliation_required") return res.status(503).json(TRADES_QUOTE_RECONCILIATION);
       // Record undelivered quotes so the list/timeline can distinguish them from
       // ones the client actually received (status stays "sent" so the manually
       // shared link still works).
-      if (!delivery.sent) await storage.createJobEvent({ merchantId, clientProfileId: client.id, quoteId: row.id, eventType: "quote_dispatch_failed", payload: { reason: delivery.reason } });
-      res.status(201).json({ ...row, delivered: delivery.sent, deliveryReason: delivery.reason });
+      if (!delivery.sent) await storage.recordQuoteDeliveryForMerchant(result.quote.id, merchantId, result.client.id, { sent: false, reason: delivery.reason });
+      // The answer is read back through the business's scope, not from a row held across the send.
+      const fresh = await storage.getQuoteDeliveryForMerchant(result.quote.id, merchantId);
+      if (!fresh) return res.status(404).json({ message: "Not found" });
+      res.status(201).json({ ...fresh.quote, delivered: delivery.sent, deliveryReason: delivery.reason });
     } catch (err) { console.error("[TRADES_QUOTES_POST]", err); res.status(500).json({ message: "Failed to create quote" }); }
   });
   // (Removed GET /api/trades/quotes/:id, owner decision 2026-09-27: no screen called it; the screens
@@ -8385,50 +8404,58 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const parsed = createJobInvoiceSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
       // Gap 13: an attached document must be this merchant's own upload. Checked
-      // before the hidden prospect below is created, so a rejection writes nothing.
+      // before anything is made, so a rejection writes nothing.
       if (!(await requireOwnedInvoiceDocument(merchantId, parsed.data.documentUrl, res))) return;
-      let client: any;
+      let client: TradesClientRef;
       if (parsed.data.recipient) {
-        // Quick invoice: no pre-existing client. Create a HIDDEN 'prospect'
-        // profile carrying the typed contact details so the NOT NULL FK and
-        // all downstream systems (dispatch, checkout, events) work unchanged.
+        // Quick invoice: no pre-existing client. Storage makes a HIDDEN 'prospect'
+        // profile carrying the typed contact details, with the invoice, so the NOT NULL FK
+        // and all downstream systems (dispatch, checkout, events) work unchanged.
         // The merchant can promote it to a real client from the success screen.
         const nm = parsed.data.recipient.name.trim();
         const spaceIdx = nm.indexOf(" ");
-        client = await storage.createClientProfileForMerchant(merchantId, {
+        client = { prospect: {
           firstName: spaceIdx > 0 ? nm.slice(0, spaceIdx) : nm,
           lastName: spaceIdx > 0 ? nm.slice(spaceIdx + 1) : "",
           email: parsed.data.recipient.email ?? null,
           phone: parsed.data.recipient.phone ?? null,
           siteAddress: "",
           preferredChannel: parsed.data.recipient.channel,
-          status: "prospect",
-        });
+        } };
       } else {
-        client = await storage.getClientProfile(parsed.data.clientProfileId!);
-        if (!client || client.merchantId !== merchantId) return res.status(404).json({ message: "Client not found" });
+        const saved = await storage.getClientProfileForMerchant(parsed.data.clientProfileId!, merchantId);
+        if (!saved) return res.status(404).json({ message: "Client not found" });
+        client = { clientProfileId: saved.id };
       }
       if (parsed.data.quoteId) {
-        const linkedQuote = await storage.getQuote(parsed.data.quoteId);
+        const linked = await storage.getQuoteDeliveryForMerchant(parsed.data.quoteId, merchantId);
         // The quote must be this client's (C10 batch 6d): a deposit on another client's quote billed
         // this client, and its balance was then worked out from the other client's quote.
-        if (!linkedQuote || linkedQuote.merchantId !== merchantId || linkedQuote.clientProfileId !== client.id)
+        if (!linked || !("clientProfileId" in client) || linked.quote.clientProfileId !== client.clientProfileId)
           return res.status(404).json({ message: "Quote not found" });
       }
-      const row = await storage.createJobInvoice({
-        merchantId, clientProfileId: client.id,
+      // Storage rechecks the client, the quote and the document at the write, makes the checkout
+      // token, and commits the hidden prospect (if any), the invoice and its history together.
+      const result = await storage.createJobInvoiceForMerchant(merchantId, client, {
         quoteId: parsed.data.quoteId ?? null, kind: parsed.data.kind,
-        amountCents: parsed.data.amountCents, token: generateInvoiceToken(),
+        amountCents: parsed.data.amountCents,
         deliveryChannel: parsed.data.deliveryChannel, jobDetails: parsed.data.jobDetails ?? null,
-        status: "pending_dispatch", dueAt: parsed.data.dueAt,
+        dueAt: parsed.data.dueAt,
         scheduledSendAt: parsed.data.scheduledSendAt ?? null,
         splitEnabled: !!parsed.data.splitEnabled,
         documentUrl: parsed.data.documentUrl ?? null, documentName: parsed.data.documentName ?? null,
       });
-      await storage.createJobEvent({ merchantId, clientProfileId: client.id, jobInvoiceId: row.id, eventType: "invoice_sent" });
+      if (result.kind === "not-found") return res.status(404).json({ message: "Client not found" });
+      if (result.kind === "quote-not-found") return res.status(404).json({ message: "Quote not found" });
+      if (result.kind === "invalid-document") return res.status(400).json({ message: "Invalid document attachment" });
+      const row = result.invoice;
       const shouldSendNow = !row.scheduledSendAt || new Date(row.scheduledSendAt) <= new Date();
-      const delivery = shouldSendNow ? await resendTradeInvoice(row.id, getBaseUrl(req)) : { sent: false, reason: "scheduled" };
-      res.status(201).json({ ...(("invoice" in delivery && delivery.invoice) || row), delivered: delivery.sent, deliveryReason: delivery.reason });
+      const delivery = shouldSendNow ? await resendTradeInvoiceForMerchant(row.id, merchantId, getBaseUrl(req)) : { sent: false, reason: "scheduled" };
+      if (delivery.reason === "reconciliation_required") return res.status(503).json(TRADES_INVOICE_RECONCILIATION);
+      // The answer is read back through the business's scope, not from a row held across the send.
+      const fresh = await storage.getJobInvoiceForMerchant(row.id, merchantId);
+      if (!fresh) return res.status(404).json({ message: "Not found" });
+      res.status(201).json({ ...fresh, delivered: delivery.sent, deliveryReason: delivery.reason });
     } catch (err) { console.error("[TRADES_INVOICES_POST]", err); res.status(500).json({ message: "Failed to create invoice" }); }
   });
   // (Removed POST /api/trades/invoices/:id/resend, owner decision 2026-09-27: no screen called it; the
@@ -8444,35 +8471,29 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const body = sendJobBalanceSchema.safeParse(req.body);
       if (!body.success) return res.status(400).json({ message: body.error.errors[0].message });
       // Issue the remaining balance for a deposit-paid job.
-      const dep = await storage.getJobInvoice(id);
-      if (!dep || dep.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
+      const dep = await storage.getJobInvoiceForMerchant(id, merchantId);
+      if (!dep) return res.status(404).json({ message: "Not found" });
       if (!(await requireBillingCard(merchantId, res))) return;
-      if (dep.kind !== "deposit") return res.status(400).json({ message: "Balance can only be sent for a deposit invoice" });
+      if (dep.kind !== "deposit") return res.status(400).json({ message: BALANCE_REFUSALS["not-deposit"][1] });
       if (!["paid", "paid_external", "deposit_paid"].includes(dep.status))
-        return res.status(409).json({ message: "Deposit must be paid before sending the balance" });
-      if (!dep.quoteId) return res.status(400).json({ message: "This deposit is not linked to a quote, so a balance can't be calculated" });
-      const quote = await storage.getQuote(dep.quoteId);
-      if (!quote) return res.status(404).json({ message: "Linked quote not found" });
-      const existingInvoices = await storage.getJobInvoicesByMerchant(merchantId, { clientProfileId: dep.clientProfileId });
-      const onQuote = existingInvoices.filter((invoice: any) => invoice.quoteId === dep.quoteId && invoice.status !== "voided");
-      if (onQuote.some((invoice: any) => invoice.kind === "balance"))
-        return res.status(409).json({ message: "Balance invoice already exists" });
-      // Subtract everything already billed against this quote (the deposit plus any
-      // other non-voided invoices), not just this one deposit, so a balance can
-      // never double-bill amounts already covered.
-      const alreadyBilled = onQuote.reduce((sum: number, invoice: any) => sum + (invoice.amountCents || 0), 0);
-      const balanceCents = Math.max(quote.totalCents - alreadyBilled, 0);
-      if (balanceCents <= 0) return res.status(400).json({ message: "No balance remaining" });
-      const due = new Date(); due.setDate(due.getDate() + 7);
-      const bal = await storage.createJobInvoice({
-        merchantId: dep.merchantId, clientProfileId: dep.clientProfileId, quoteId: dep.quoteId,
-        kind: "balance", amountCents: balanceCents, token: generateInvoiceToken(),
-        deliveryChannel: dep.deliveryChannel, status: "pending_dispatch", dueAt: due,
-        splitEnabled: !!body.data.splitEnabled,
-      });
-      await storage.createJobEvent({ merchantId: dep.merchantId, clientProfileId: dep.clientProfileId, jobInvoiceId: bal.id, eventType: "balance_sent" });
-      const delivery = await resendTradeInvoice(bal.id, getBaseUrl(req));
-      res.status(201).json({ ...(delivery.invoice ?? bal), delivered: delivery.sent, deliveryReason: delivery.reason });
+        return res.status(409).json({ message: BALANCE_REFUSALS.unpaid[1] });
+      if (!dep.quoteId) return res.status(400).json({ message: BALANCE_REFUSALS["no-quote"][1] });
+      // Storage rechecks the deposit under the client's and its own row locks, subtracts everything
+      // already billed to the client on the quote and not voided (the deposit plus any other invoice,
+      // so a balance never double-bills), and commits the one balance with its history: two sends
+      // at the same moment make one (R1-T7 S4b2).
+      const result = await storage.createJobBalanceInvoiceForMerchant(id, merchantId, !!body.data.splitEnabled);
+      if (result.kind === "not-found") return res.status(404).json({ message: "Not found" });
+      if (result.kind === "conflict") {
+        const [status, message] = BALANCE_REFUSALS[result.reason];
+        return res.status(status).json({ message });
+      }
+      const delivery = await resendTradeInvoiceForMerchant(result.invoice.id, merchantId, getBaseUrl(req));
+      if (delivery.reason === "reconciliation_required") return res.status(503).json(TRADES_INVOICE_RECONCILIATION);
+      // The answer is read back through the business's scope, not from a row held across the send.
+      const fresh = await storage.getJobInvoiceForMerchant(result.invoice.id, merchantId);
+      if (!fresh) return res.status(404).json({ message: "Not found" });
+      res.status(201).json({ ...fresh, delivered: delivery.sent, deliveryReason: delivery.reason });
     } catch (err) { console.error("[TRADES_INVOICES_SEND_BALANCE]", err); res.status(500).json({ message: "Failed to send balance invoice" }); }
   });
   app.post("/api/trades/invoices/:id/mark-paid-external", authenticateToken, async (req: AuthenticatedRequest, res) => {

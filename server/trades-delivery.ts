@@ -113,38 +113,104 @@ async function deliver(
   return { sent: false, reason: 'no_deliverable' };
 }
 
-export async function sendTradeQuote(
+/**
+ * Sends a quote for the signed-in business that made it (R1-T7 S4b2). The quote and its client are
+ * read together and must both be that business's; the message goes to that captured contact, and
+ * its history line is written only while both still are. No database lock is held across a
+ * provider call. After an attempted send, an uncertain outcome is "reconciliation_required":
+ * never a success, and never a claim that nothing was sent.
+ */
+export async function sendTradeQuoteForMerchant(
   quoteId: string,
+  merchantId: number,
   baseUrl: string
 ): Promise<DeliveryResult> {
-  const quote = await storage.getQuote(quoteId);
-  if (!quote) return { sent: false, reason: 'not_found' };
-  const [client, merchant] = await Promise.all([
-    storage.getClientProfile(quote.clientProfileId),
-    storage.getMerchant(quote.merchantId),
+  const [merchant, subscription] = await Promise.all([
+    storage.getMerchant(merchantId),
+    storage.getSubscription(merchantId),
   ]);
-  if (!client || !merchant) return { sent: false, reason: 'missing_data' };
-  if (!billingCardIsReady(await storage.getSubscription(merchant.id))) {
+  // Read both owned rows together after the other awaited prerequisites. Delivery
+  // uses this captured contact; it never refetches the client through a global key.
+  const snapshot = await storage.getQuoteDeliveryForMerchant(quoteId, merchantId);
+  if (!snapshot) return { sent: false, reason: 'not_found' };
+  if (!merchant) return { sent: false, reason: 'missing_data' };
+  if (!billingCardIsReady(subscription)) {
     return { sent: false, reason: 'billing_card_required' };
   }
+  const { quote, client } = snapshot;
   const ref = String(quote.token || quote.id).slice(0, 8).toUpperCase();
   const pdf = generateQuotePdf(quote, client, merchant, baseUrl);
-  const result = await deliver(
-    quote.deliveryChannel || client.preferredChannel || 'email',
-    client,
-    quoteCopy(quote, client, merchant, baseUrl),
-    [{ filename: `quote-${ref}.pdf`, content: pdf }]
-  );
-  await storage.createJobEvent({
-    merchantId: quote.merchantId,
-    clientProfileId: quote.clientProfileId,
-    quoteId,
-    eventType: result.sent ? 'quote_dispatched' : 'quote_dispatch_failed',
-    payload: { channel: result.channel, reason: result.reason },
-  });
-  return result;
+  let result: DeliveryResult;
+  try {
+    result = await deliver(
+      quote.deliveryChannel || client.preferredChannel || 'email',
+      client,
+      quoteCopy(quote, client, merchant, baseUrl),
+      [{ filename: `quote-${ref}.pdf`, content: pdf }]
+    );
+  } catch {
+    // An attempted provider call may have succeeded despite its exception. Do
+    // not retry it here or report a delivery either way.
+    return { sent: false, reason: 'reconciliation_required' };
+  }
+  const record = { sent: result.sent, channel: result.channel, reason: result.reason };
+  if (!result.sent) {
+    // A known failed send: its line is logged as before; nothing was delivered.
+    await storage.recordQuoteDeliveryForMerchant(quoteId, merchantId, quote.clientProfileId, record);
+    return result;
+  }
+  try {
+    const recorded = await storage.recordQuoteDeliveryForMerchant(quoteId, merchantId, quote.clientProfileId, record);
+    // The message was sent, but its scoped history was refused.
+    if (!recorded) return { sent: false, reason: 'reconciliation_required' };
+    return result;
+  } catch {
+    // The message was sent, but its scoped history did not commit.
+    return { sent: false, reason: 'reconciliation_required' };
+  }
 }
 
+/**
+ * Sends an invoice's payment link for the signed-in business that made it (R1-T7 S4b2): the same
+ * snapshot, captured contact and reconciliation rule as the quote above. The delivery record
+ * locks the client then the invoice and saves its state and history together.
+ */
+export async function resendTradeInvoiceForMerchant(
+  invoiceId: string,
+  merchantId: number,
+  baseUrl: string
+): Promise<DeliveryResult & { invoice?: any }> {
+  const merchant = await storage.getMerchant(merchantId);
+  const snapshot = await storage.getJobInvoiceDeliveryForMerchant(invoiceId, merchantId);
+  if (!snapshot) return { sent: false, reason: 'not_found' };
+  const { invoice, client } = snapshot;
+  if (['paid', 'paid_external', 'voided'].includes(invoice.status))
+    return { sent: false, reason: 'not_payable' };
+  if (!merchant) return { sent: false, reason: 'missing_data' };
+  let result: DeliveryResult;
+  try {
+    result = await deliver(
+      invoice.deliveryChannel || client.preferredChannel || 'email',
+      client,
+      invoiceCopy(invoice, client, merchant, baseUrl)
+    );
+  } catch {
+    return { sent: false, reason: 'reconciliation_required' };
+  }
+  if (!result.sent) return result;
+  try {
+    const recorded = await storage.recordJobInvoiceDeliveryForMerchant(invoiceId, merchantId, invoice.clientProfileId, {
+      channel: result.channel,
+      messageId: result.messageId,
+    });
+    if (recorded.kind !== 'ok') return { sent: false, reason: 'reconciliation_required' };
+    return { ...result, invoice: recorded.invoice };
+  } catch {
+    return { sent: false, reason: 'reconciliation_required' };
+  }
+}
+
+/** The public quote acceptance's and the cron's sender: the invoice is read by its own id. */
 export async function resendTradeInvoice(
   invoiceId: string,
   baseUrl: string,

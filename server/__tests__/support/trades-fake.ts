@@ -116,10 +116,69 @@ export function fakeTrades(): TradesFake {
     fake.writes.push("updateClientProfile"); Object.assign(row, { status: "active", updatedAt: new Date() });
     return { kind: "ok", client: row };
   });
-  write("createQuote", (data: any) => {
-    const row = { id: MADE_QUOTE, ...data };
-    fake.quotes.set(row.id, row);
+  // The scoped creates (R1-T7 S4b2): the business's own saved client, or a hidden prospect made with
+  // the row; then the row and its creation history, recorded as the writes they replace.
+  const clientFor = (merchantId: number, ref: any) => {
+    if ("clientProfileId" in ref) { const row = fake.clients.get(ref.clientProfileId); return row?.merchantId === merchantId ? row : undefined; }
+    const row = { id: MADE_CLIENT, ...ref.prospect, merchantId, status: "prospect" };
+    fake.clients.set(row.id, row); fake.writes.push("createClientProfile");
     return row;
+  };
+  jest.spyOn(storage, "createQuoteForMerchant").mockImplementation(async (merchantId, ref, data) => {
+    const client = clientFor(merchantId, ref);
+    if (!client) return { kind: "not-found" };
+    const quote = { id: MADE_QUOTE, ...data, merchantId, clientProfileId: client.id, token: "made-quote-token", status: "sent", sentAt: new Date() } as any;
+    fake.quotes.set(quote.id, quote); fake.writes.push("createQuote");
+    await storage.createJobEvent({ merchantId, clientProfileId: client.id, quoteId: quote.id, eventType: "quote_sent" });
+    return { kind: "ok", quote, client };
+  });
+  jest.spyOn(storage, "createJobInvoiceForMerchant").mockImplementation(async (merchantId, ref, data) => {
+    // As storage: the client and the linked quote are checked before a prospect is made.
+    if ("clientProfileId" in ref && fake.clients.get(ref.clientProfileId)?.merchantId !== merchantId) return { kind: "not-found" };
+    if (data.quoteId) {
+      const quote = fake.quotes.get(data.quoteId);
+      if (!("clientProfileId" in ref) || quote?.merchantId !== merchantId || quote.clientProfileId !== ref.clientProfileId) return { kind: "quote-not-found" };
+    }
+    const client = clientFor(merchantId, ref);
+    const invoice = { id: MADE_INVOICE, ...data, merchantId, clientProfileId: client.id, token: "made-invoice-token", status: "pending_dispatch" } as any;
+    fake.invoices.set(invoice.id, invoice); fake.writes.push("createJobInvoice");
+    await storage.createJobEvent({ merchantId, clientProfileId: client.id, jobInvoiceId: invoice.id, eventType: "invoice_sent" });
+    return { kind: "ok", invoice, client };
+  });
+  jest.spyOn(storage, "createJobBalanceInvoiceForMerchant").mockImplementation(async (id, merchantId, splitEnabled) => {
+    const deposit = owned(fake.invoices.get(id), merchantId);
+    if (!deposit) return { kind: "not-found" };
+    if (deposit.kind !== "deposit") return { kind: "conflict", reason: "not-deposit" };
+    if (!["paid", "paid_external", "deposit_paid"].includes(deposit.status)) return { kind: "conflict", reason: "unpaid" };
+    if (!deposit.quoteId) return { kind: "conflict", reason: "no-quote" };
+    const quote = fake.quotes.get(deposit.quoteId);
+    if (quote?.merchantId !== merchantId) return { kind: "conflict", reason: "quote-not-found" };
+    const onQuote = [...fake.invoices.values()].filter((row) => row.merchantId === merchantId && row.clientProfileId === deposit.clientProfileId
+      && row.quoteId === deposit.quoteId && row.status !== "voided");
+    if (onQuote.some((row) => row.kind === "balance")) return { kind: "conflict", reason: "exists" };
+    const balanceCents = Math.max(quote.totalCents - onQuote.reduce((sum, row) => sum + (row.amountCents || 0), 0), 0);
+    if (balanceCents <= 0) return { kind: "conflict", reason: "none-remaining" };
+    const invoice = { id: MADE_INVOICE, merchantId, clientProfileId: deposit.clientProfileId, quoteId: deposit.quoteId, kind: "balance", amountCents: balanceCents,
+      token: "made-balance-token", deliveryChannel: deposit.deliveryChannel, status: "pending_dispatch", dueAt: inDays(7), splitEnabled: !!splitEnabled } as any;
+    fake.invoices.set(invoice.id, invoice); fake.writes.push("createJobInvoice");
+    await storage.createJobEvent({ merchantId, clientProfileId: deposit.clientProfileId, jobInvoiceId: invoice.id, eventType: "balance_sent" });
+    return { kind: "ok", invoice };
+  });
+  jest.spyOn(storage, "recordQuoteDeliveryForMerchant").mockImplementation(async (id, merchantId, clientProfileId, record) => {
+    const quote = owned(fake.quotes.get(id), merchantId);
+    if (!quote || quote.clientProfileId !== clientProfileId) return false;
+    await storage.createJobEvent({ merchantId, clientProfileId, quoteId: id, eventType: record.sent ? "quote_dispatched" : "quote_dispatch_failed", payload: { channel: record.channel, reason: record.reason } });
+    return true;
+  });
+  jest.spyOn(storage, "recordJobInvoiceDeliveryForMerchant").mockImplementation(async (id, merchantId, clientProfileId, record) => {
+    const invoice = owned(fake.invoices.get(id), merchantId);
+    if (!invoice || invoice.clientProfileId !== clientProfileId) return { kind: "not-found" };
+    if (invoice.status === "voided") return { kind: "conflict", reason: "voided" };
+    if (settled(invoice)) return { kind: "conflict", reason: "paid" };
+    fake.writes.push("updateJobInvoice");
+    Object.assign(invoice, { dispatchedAt: new Date(), sentAt: new Date() }, ["pending_dispatch", "dispatch_failed"].includes(invoice.status) ? { status: "dispatched" } : {});
+    await storage.createJobEvent({ merchantId, clientProfileId, jobInvoiceId: id, eventType: "invoice_dispatched", payload: { channel: record.channel } });
+    return { kind: "ok", invoice };
   });
   write("createJobInvoice", (data: any) => {
     const row = { id: MADE_INVOICE, ...data };
@@ -171,8 +230,10 @@ export function fakeTrades(): TradesFake {
       fake.writes.push(name.replace("ForMerchant", ""));
       return answer(...args);
     });
-  send("sendTradeQuote", () => ({ sent: true, channel: "email" }));
+  send("sendTradeQuoteForMerchant", () => ({ sent: true, channel: "email" }));
+  // The public quote acceptance's and the cron's sender, and the signed-in business's.
   send("resendTradeInvoice", (id: string) => ({ sent: true, channel: "email", invoice: fake.invoices.get(id) }));
+  send("resendTradeInvoiceForMerchant", (id: string) => ({ sent: true, channel: "email", invoice: fake.invoices.get(id) }));
   send("sendTradePaymentInvoice", () => 1);
   send("sendTradePaymentInvoiceForMerchant", () => 1);
   return fake;

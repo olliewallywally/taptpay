@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ c0fb5bc3981cbedd8a46f864f0e224092c417369 on 2026-10-03.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 51e0b186348615c2a93c3b434757874ced1423ce on 2026-10-03.
  *
  * 187 registrations (78 GET, 77 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -2469,13 +2469,12 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       middleware: ["authenticateToken"],
       body: ["schema: createQuoteSchema"],
-      authChecks: ["compares client.merchantId !== merchantId"],
-      storageMethods: ["createClientProfileForMerchant","createJobEvent","createQuote","getClientProfile","getMerchant","getOrCreateSubscription","uploadedFileOwnedByMerchant"],
-      sideEffects: ["email/SMS: sendTradeQuote"],
+      storageMethods: ["createQuoteForMerchant","getClientProfileForMerchant","getMerchant","getOrCreateSubscription","getQuoteDeliveryForMerchant","recordQuoteDeliveryForMerchant","uploadedFileOwnedByMerchant"],
+      sideEffects: ["email/SMS: sendTradeQuoteForMerchant"],
       statuses: [201,400,401,402,403,404,500,503],
       errorTextInResponse: ["parsed.error.errors"],
       entitlementGates: ["BILLING_CARD_REQUIRED","billingCardIsReady","requireBillingCard"],
-      helpers: ["generateInvoiceToken","requireBillingCard","requireOwnedInvoiceDocument"],
+      helpers: ["requireBillingCard","requireOwnedInvoiceDocument"],
     },
   },
   "GET /api/trades/quotes/:id/pdf": {
@@ -2553,13 +2552,12 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       middleware: ["authenticateToken"],
       body: ["schema: createJobInvoiceSchema"],
-      authChecks: ["compares client.merchantId !== merchantId","compares linkedQuote.merchantId !== merchantId"],
-      storageMethods: ["createClientProfileForMerchant","createJobEvent","createJobInvoice","getClientProfile","getOrCreateSubscription","getQuote","uploadedFileOwnedByMerchant"],
-      sideEffects: ["email/SMS: resendTradeInvoice"],
+      storageMethods: ["createJobInvoiceForMerchant","getClientProfileForMerchant","getJobInvoiceForMerchant","getOrCreateSubscription","getQuoteDeliveryForMerchant","uploadedFileOwnedByMerchant"],
+      sideEffects: ["email/SMS: resendTradeInvoiceForMerchant"],
       statuses: [201,400,401,402,403,404,500,503],
       errorTextInResponse: ["parsed.error.errors"],
       entitlementGates: ["BILLING_CARD_REQUIRED","billingCardIsReady","requireBillingCard"],
-      helpers: ["generateInvoiceToken","requireBillingCard","requireOwnedInvoiceDocument"],
+      helpers: ["requireBillingCard","requireOwnedInvoiceDocument"],
     },
   },
   "POST /api/trades/invoices/:id/send-balance": {
@@ -2571,13 +2569,12 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       middleware: ["authenticateToken"],
       params: ["id: strictUuidParam"],
       body: ["schema: sendJobBalanceSchema"],
-      authChecks: ["compares dep.merchantId !== merchantId"],
-      storageMethods: ["createJobEvent","createJobInvoice","getJobInvoice","getJobInvoicesByMerchant","getOrCreateSubscription","getQuote"],
-      sideEffects: ["email/SMS: resendTradeInvoice"],
+      storageMethods: ["createJobBalanceInvoiceForMerchant","getJobInvoiceForMerchant","getOrCreateSubscription"],
+      sideEffects: ["email/SMS: resendTradeInvoiceForMerchant"],
       statuses: [201,400,401,402,403,404,409,500,503],
       errorTextInResponse: ["body.error.errors"],
       entitlementGates: ["BILLING_CARD_REQUIRED","billingCardIsReady","requireBillingCard"],
-      helpers: ["generateInvoiceToken","requireBillingCard"],
+      helpers: ["requireBillingCard"],
     },
   },
   "POST /api/trades/invoices/:id/mark-paid-external": {

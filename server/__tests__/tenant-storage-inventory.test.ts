@@ -172,9 +172,11 @@ test("trades client management and hidden-prospect creation require merchant sco
     expect(contract.find(method => method.name === name)?.requiredTenant).toBe(true);
     expect(facts.get(key)?.storageMethods).toContain(name); expect(facts.get(key)?.storageMethods).not.toContain("getClientProfile");
   }
-  for (const key of ["POST /api/trades/quotes", "POST /api/trades/invoices"]) {
-    expect(facts.get(key)?.storageMethods).toContain("createClientProfileForMerchant");
+  // Since S4b2 the hidden prospect is made inside the scoped quote/invoice create, not by the route.
+  for (const [key, name] of [["POST /api/trades/quotes", "createQuoteForMerchant"], ["POST /api/trades/invoices", "createJobInvoiceForMerchant"]]) {
+    expect(facts.get(key)?.storageMethods).toContain(name);
     expect(facts.get(key)?.storageMethods).not.toContain("createClientProfile");
+    expect(facts.get(key)?.storageMethods).not.toContain("createClientProfileForMerchant");
   }
 });
 
@@ -199,4 +201,25 @@ test("trades invoice state changes, the signed-in quote PDF and the receipt requ
     expect(contract.find(method => method.name === name)?.requiredTenant).toBe(true);
   }
   expect(facts.get("POST /api/trades/invoices/:id/mark-paid-external")?.sideEffects).toEqual(["email: sendTradePaymentInvoiceForMerchant"]);
+});
+
+test("trades quote, invoice and balance creation and their delivery require merchant scope", () => {
+  const contract = storageContract();
+  expect(contract.find(method => method.name === "createQuote")).toBeUndefined();
+  const facts = currentRouteFacts();
+  for (const [key, names, effect] of [
+    ["POST /api/trades/quotes", ["getClientProfileForMerchant", "createQuoteForMerchant", "recordQuoteDeliveryForMerchant", "getQuoteDeliveryForMerchant"], "email/SMS: sendTradeQuoteForMerchant"],
+    ["POST /api/trades/invoices", ["getClientProfileForMerchant", "getQuoteDeliveryForMerchant", "createJobInvoiceForMerchant", "getJobInvoiceForMerchant"], "email/SMS: resendTradeInvoiceForMerchant"],
+    ["POST /api/trades/invoices/:id/send-balance", ["getJobInvoiceForMerchant", "createJobBalanceInvoiceForMerchant"], "email/SMS: resendTradeInvoiceForMerchant"],
+  ] as const) {
+    for (const name of names) {
+      expect(contract.find(method => method.name === name)?.requiredTenant).toBe(true);
+      expect(facts.get(key)?.storageMethods).toContain(name);
+    }
+    for (const name of ["getClientProfile", "getQuote", "getJobInvoice", "createJobInvoice", "updateJobInvoice", "createJobEvent", "getJobInvoicesByMerchant"]) {
+      expect(facts.get(key)?.storageMethods).not.toContain(name);
+    }
+    expect(facts.get(key)?.sideEffects).toEqual([effect]);
+  }
+  expect(contract.find(method => method.name === "recordJobInvoiceDeliveryForMerchant")?.requiredTenant).toBe(true);
 });
