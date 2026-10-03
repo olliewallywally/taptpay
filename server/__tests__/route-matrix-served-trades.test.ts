@@ -226,8 +226,9 @@ const RECIPES: Record<string, ServedRecipe> = {
       status: 200,
       check: (res) => {
         expect(res.body).toMatchObject({ id: INVOICE, status: "paid_external", externalPaymentReference: "Cash on site" });
-        // The client is sent the paid invoice.
-        expect(delivery.sendTradePaymentInvoice).toHaveBeenCalledWith(expect.objectContaining({ id: INVOICE }));
+        // The client is sent the paid invoice, by the service that takes the business (R1-T7 S4b1).
+        expect(delivery.sendTradePaymentInvoiceForMerchant).toHaveBeenCalledWith(INVOICE, ctx.merchantId);
+        expect(delivery.sendTradePaymentInvoice).not.toHaveBeenCalled();
         expect(eventTypes()).toEqual(["paid_external"]);
       },
     };

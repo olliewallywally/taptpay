@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ c5260cc1af8846e79975194cef514f16380fe5cc on 2026-10-03.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ c0fb5bc3981cbedd8a46f864f0e224092c417369 on 2026-10-03.
  *
  * 187 registrations (78 GET, 77 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -2486,10 +2486,9 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       middleware: ["authenticateToken"],
       params: ["id: strictUuidParam"],
-      authChecks: ["compares quote.merchantId !== merchantId"],
-      storageMethods: ["getClientProfile","getMerchant","getQuote"],
+      storageMethods: ["getMerchant","getQuoteDeliveryForMerchant"],
       statuses: [200,400,401,403,404,500,503],
-      helpers: ["streamQuotePdf"],
+      helpers: ["sendQuotePdf"],
     },
   },
   "GET /api/trades/quotes/token/:token/pdf": {
@@ -2502,7 +2501,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       authChecks: ["storage.getQuoteByToken"],
       storageMethods: ["getClientProfile","getMerchant","getQuoteByToken"],
       statuses: [200,404,500],
-      helpers: ["streamQuotePdf"],
+      helpers: ["sendQuotePdf"],
     },
   },
   "GET /api/trades/quotes/token/:token": {
@@ -2590,9 +2589,8 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       middleware: ["authenticateToken"],
       params: ["id: strictUuidParam"],
       body: ["schema: markJobPaidExternalSchema"],
-      authChecks: ["compares inv.merchantId !== merchantId"],
-      storageMethods: ["createJobEvent","getJobInvoice","updateJobInvoice"],
-      sideEffects: ["email/SMS: sendTradePaymentInvoice"],
+      storageMethods: ["getJobInvoiceForMerchant","markJobInvoicePaidExternalForMerchant"],
+      sideEffects: ["email: sendTradePaymentInvoiceForMerchant"],
       statuses: [200,400,401,403,404,409,500,503],
       errorTextInResponse: ["parsed.error.errors"],
     },
@@ -2605,8 +2603,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       middleware: ["authenticateToken"],
       params: ["id: strictUuidParam"],
-      authChecks: ["compares inv.merchantId !== merchantId"],
-      storageMethods: ["createJobEvent","getJobInvoice","updateJobInvoice"],
+      storageMethods: ["completeJobInvoiceForMerchant","getJobInvoiceForMerchant"],
       statuses: [200,400,401,403,404,409,500,503],
     },
   },
@@ -2618,8 +2615,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       middleware: ["authenticateToken"],
       params: ["id: strictUuidParam"],
-      authChecks: ["compares inv.merchantId !== merchantId"],
-      storageMethods: ["createJobEvent","getJobInvoice","updateJobInvoice"],
+      storageMethods: ["getJobInvoiceForMerchant","voidJobInvoiceForMerchant"],
       statuses: [200,400,401,403,404,409,500,503],
     },
   },

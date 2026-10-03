@@ -94,6 +94,20 @@ function clientProfileChanges(data: ClientProfileChanges): ClientProfileChanges 
     .filter(key => (data as any)[key] !== undefined).map(key => [key, (data as any)[key]]));
 }
 
+export type JobInvoiceMutationResult =
+  | { kind: "ok"; invoice: typeof jobInvoices.$inferSelect }
+  | { kind: "not-found" }
+  | { kind: "conflict"; reason: "paid" | "voided" | "deposit" | "unpaid" };
+export type TradesQuoteDeliverySnapshot = {
+  quote: typeof quotes.$inferSelect;
+  client: typeof clientProfiles.$inferSelect;
+};
+export type TradesInvoiceDeliverySnapshot = {
+  invoice: typeof jobInvoices.$inferSelect;
+  client: typeof clientProfiles.$inferSelect;
+};
+export type TradesReceiptRecord = { sent: boolean; reference: string };
+
 function activeScheduleChanges(data: ActiveScheduleChanges): ActiveScheduleChanges {
   const patch = Object.fromEntries(["amountCents", "frequency", "deliveryChannel"]
     .filter(key => (data as any)[key] !== undefined).map(key => [key, (data as any)[key]]));
@@ -969,12 +983,21 @@ export interface IStorage extends PaymentAttemptRepository {
   getClientProfilesByMerchant(merchantId: number): Promise<any[]>;
 
   createQuote(data: any): Promise<any>;
+  /** Public quote, checkout and delivery lanes; signed-in reads use explicit scope. */
   getQuote(id: string): Promise<any | undefined>;
   getQuoteByToken(token: string): Promise<any | undefined>;
   getQuotesByMerchant(merchantId: number, opts?: { status?: string }): Promise<any[]>;
+  getQuoteDeliveryForMerchant(id: string, merchantId: number): Promise<TradesQuoteDeliverySnapshot | undefined>;
   updateQuote(id: string, updates: any): Promise<any | undefined>;
 
+  getJobInvoiceForMerchant(id: string, merchantId: number): Promise<any | undefined>;
+  getJobInvoiceDeliveryForMerchant(id: string, merchantId: number): Promise<TradesInvoiceDeliverySnapshot | undefined>;
+  voidJobInvoiceForMerchant(id: string, merchantId: number): Promise<JobInvoiceMutationResult>;
+  markJobInvoicePaidExternalForMerchant(id: string, merchantId: number, externalPaymentReference?: string): Promise<JobInvoiceMutationResult>;
+  completeJobInvoiceForMerchant(id: string, merchantId: number): Promise<JobInvoiceMutationResult>;
+  recordJobInvoiceReceiptForMerchant(id: string, merchantId: number, clientProfileId: string, receipt: TradesReceiptRecord): Promise<boolean>;
   createJobInvoice(data: any): Promise<any>;
+  /** Checkout, provider, WhatsApp status, cron and delivery lanes; signed-in management uses explicit scope. */
   getJobInvoice(id: string): Promise<any | undefined>;
   getJobInvoiceByToken(token: string): Promise<any | undefined>;
   getJobInvoiceByWindcaveSessionId(sessionId: string): Promise<any | undefined>;
@@ -3484,7 +3507,14 @@ export class MemStorage implements IStorage {
   async getQuote(id: string): Promise<any> { return undefined; }
   async getQuoteByToken(token: string): Promise<any> { return undefined; }
   async getQuotesByMerchant(merchantId: number, opts?: any): Promise<any[]> { return []; }
+  async getQuoteDeliveryForMerchant(id: string, merchantId: number): Promise<TradesQuoteDeliverySnapshot | undefined> { return undefined; }
   async updateQuote(id: string, updates: any): Promise<any> { return undefined; }
+  async getJobInvoiceForMerchant(id: string, merchantId: number): Promise<any> { return undefined; }
+  async getJobInvoiceDeliveryForMerchant(id: string, merchantId: number): Promise<TradesInvoiceDeliverySnapshot | undefined> { return undefined; }
+  async voidJobInvoiceForMerchant(id: string, merchantId: number): Promise<JobInvoiceMutationResult> { return { kind: "not-found" }; }
+  async markJobInvoicePaidExternalForMerchant(id: string, merchantId: number, externalPaymentReference?: string): Promise<JobInvoiceMutationResult> { return { kind: "not-found" }; }
+  async completeJobInvoiceForMerchant(id: string, merchantId: number): Promise<JobInvoiceMutationResult> { return { kind: "not-found" }; }
+  async recordJobInvoiceReceiptForMerchant(id: string, merchantId: number, clientProfileId: string, receipt: TradesReceiptRecord): Promise<boolean> { return false; }
   async createJobInvoice(data: any): Promise<any> { throw new Error("Trades requires database"); }
   async getJobInvoice(id: string): Promise<any> { return undefined; }
   async getJobInvoiceByToken(token: string): Promise<any> { return undefined; }
@@ -8523,10 +8553,21 @@ export class DatabaseStorage implements IStorage {
     }
   }
   async getQuotesByMerchant(merchantId: number, opts: { status?: string } = {}): Promise<any[]> {
-    const db = getDb(); if (!db) return [];
-    const conds = [eq(quotes.merchantId, merchantId)];
+    if (!isManagementTenantId(merchantId)) return [];
+    const db = this.db; if (!db) return [];
+    const conds: any[] = [eq(quotes.merchantId, merchantId),
+      sql`exists (select 1 from ${clientProfiles} where ${clientProfiles.id} = ${quotes.clientProfileId} and ${clientProfiles.merchantId} = ${merchantId})`];
     if (opts.status) conds.push(eq(quotes.status, opts.status));
     return db.select().from(quotes).where(and(...conds)).orderBy(desc(quotes.createdAt));
+  }
+  async getQuoteDeliveryForMerchant(id: string, merchantId: number): Promise<TradesQuoteDeliverySnapshot | undefined> {
+    if (!isManagementTenantId(merchantId)) return undefined;
+    const db = this.db; if (!db) return undefined;
+    // One statement snapshots the quote and its current owned client together.
+    const [row] = await db.select({ quote: quotes, client: clientProfiles }).from(quotes)
+      .innerJoin(clientProfiles, eq(clientProfiles.id, quotes.clientProfileId))
+      .where(and(eq(quotes.id, id), eq(quotes.merchantId, merchantId), eq(clientProfiles.merchantId, merchantId))).limit(1);
+    return row;
   }
   async updateQuote(id: string, updates: any): Promise<any> {
     const db = getDb(); if (!db) return undefined;
@@ -8537,6 +8578,92 @@ export class DatabaseStorage implements IStorage {
   }
 
   // ───────── Trades: job invoices ─────────
+  async getJobInvoiceForMerchant(id: string, merchantId: number): Promise<any> {
+    if (!isManagementTenantId(merchantId)) return undefined;
+    const db = this.db; if (!db) return undefined;
+    const [row] = await db.select().from(jobInvoices).where(and(
+      eq(jobInvoices.id, id), eq(jobInvoices.merchantId, merchantId),
+      sql`exists (select 1 from ${clientProfiles} where ${clientProfiles.id} = ${jobInvoices.clientProfileId} and ${clientProfiles.merchantId} = ${merchantId})`,
+    )).limit(1);
+    return row;
+  }
+  async getJobInvoiceDeliveryForMerchant(id: string, merchantId: number): Promise<TradesInvoiceDeliverySnapshot | undefined> {
+    if (!isManagementTenantId(merchantId)) return undefined;
+    const db = this.db; if (!db) return undefined;
+    // One statement snapshots the invoice and its current owned client together.
+    const [row] = await db.select({ invoice: jobInvoices, client: clientProfiles }).from(jobInvoices)
+      .innerJoin(clientProfiles, eq(clientProfiles.id, jobInvoices.clientProfileId))
+      .where(and(eq(jobInvoices.id, id), eq(jobInvoices.merchantId, merchantId), eq(clientProfiles.merchantId, merchantId))).limit(1);
+    return row;
+  }
+  private async mutateJobInvoiceForMerchant(id: string, merchantId: number, operation: "void" | "paid-external" | "complete",
+    externalPaymentReference?: string): Promise<JobInvoiceMutationResult> {
+    if (!isManagementTenantId(merchantId)) return { kind: "not-found" };
+    const db = this.db; if (!db) return { kind: "not-found" };
+    return db.transaction(async (tx: any) => {
+      // Find the client without taking a child lock. Every management mutation
+      // locks the owned client first, the same order as the client's archive.
+      const [candidate] = await tx.select({ clientProfileId: jobInvoices.clientProfileId }).from(jobInvoices)
+        .where(and(eq(jobInvoices.id, id), eq(jobInvoices.merchantId, merchantId))).limit(1);
+      if (!candidate) return { kind: "not-found" };
+      const [parent] = await tx.select().from(clientProfiles)
+        .where(and(eq(clientProfiles.id, candidate.clientProfileId), eq(clientProfiles.merchantId, merchantId)))
+        .limit(1).for("update");
+      if (!parent) return { kind: "not-found" };
+      const scope = and(eq(jobInvoices.id, id), eq(jobInvoices.merchantId, merchantId), eq(jobInvoices.clientProfileId, parent.id));
+      const [invoice] = await tx.select().from(jobInvoices).where(scope).limit(1).for("update");
+      if (!invoice) return { kind: "not-found" };
+      // An archived client's issued invoices stay manageable (owner decision
+      // 2026-09-27). Only ownership and the invoice's current state gate the write.
+      const paid = invoice.status === "paid" || invoice.status === "paid_external";
+      if (operation === "complete") {
+        if (invoice.kind === "deposit") return { kind: "conflict", reason: "deposit" };
+        if (!paid) return { kind: "conflict", reason: "unpaid" };
+      } else {
+        if (operation === "paid-external" && invoice.status === "voided") return { kind: "conflict", reason: "voided" };
+        if (paid) return { kind: "conflict", reason: "paid" };
+      }
+      const now = new Date();
+      const patch = operation === "void"
+        ? { status: "voided", voidedAt: now, updatedAt: now }
+        : operation === "paid-external"
+          ? { status: "paid_external", paidAt: now, externalPaymentReference: externalPaymentReference ?? null, updatedAt: now }
+          : { completedAt: now, updatedAt: now };
+      const [updated] = await tx.update(jobInvoices).set(patch).where(scope).returning();
+      if (!updated) return { kind: "not-found" };
+      await tx.insert(jobEvents).values({ merchantId, clientProfileId: parent.id, jobInvoiceId: id,
+        eventType: operation === "void" ? "invoice_voided" : operation === "paid-external" ? "paid_external" : "job_completed" });
+      return { kind: "ok", invoice: updated };
+    });
+  }
+  async voidJobInvoiceForMerchant(id: string, merchantId: number): Promise<JobInvoiceMutationResult> {
+    return this.mutateJobInvoiceForMerchant(id, merchantId, "void");
+  }
+  async markJobInvoicePaidExternalForMerchant(id: string, merchantId: number, externalPaymentReference?: string): Promise<JobInvoiceMutationResult> {
+    return this.mutateJobInvoiceForMerchant(id, merchantId, "paid-external", externalPaymentReference);
+  }
+  async completeJobInvoiceForMerchant(id: string, merchantId: number): Promise<JobInvoiceMutationResult> {
+    return this.mutateJobInvoiceForMerchant(id, merchantId, "complete");
+  }
+  async recordJobInvoiceReceiptForMerchant(id: string, merchantId: number, clientProfileId: string, receipt: TradesReceiptRecord): Promise<boolean> {
+    if (!isManagementTenantId(merchantId)) return false;
+    const db = this.db; if (!db) return false;
+    return db.transaction(async (tx: any) => {
+      // The receipt went to this captured client: its history line needs that
+      // client and the invoice both still owned, client first as above.
+      const [parent] = await tx.select({ id: clientProfiles.id }).from(clientProfiles)
+        .where(and(eq(clientProfiles.id, clientProfileId), eq(clientProfiles.merchantId, merchantId)))
+        .limit(1).for("update");
+      if (!parent) return false;
+      const [invoice] = await tx.select({ id: jobInvoices.id }).from(jobInvoices)
+        .where(and(eq(jobInvoices.id, id), eq(jobInvoices.merchantId, merchantId), eq(jobInvoices.clientProfileId, parent.id)))
+        .limit(1).for("update");
+      if (!invoice) return false;
+      await tx.insert(jobEvents).values({ merchantId, clientProfileId: parent.id, jobInvoiceId: id,
+        eventType: receipt.sent ? "invoice_email_sent" : "invoice_email_failed", payload: { reference: receipt.reference } });
+      return true;
+    });
+  }
   async createJobInvoice(data: any): Promise<any> {
     const db = getDb(); if (!db) throw new Error('No database');
     const [row] = await db.insert(jobInvoices).values(data).returning();
@@ -8578,8 +8705,10 @@ export class DatabaseStorage implements IStorage {
     }
   }
   async getJobInvoicesByMerchant(merchantId: number, opts: { status?: string; clientProfileId?: string } = {}): Promise<any[]> {
-    const db = getDb(); if (!db) return [];
-    const conds: any[] = [eq(jobInvoices.merchantId, merchantId)];
+    if (!isManagementTenantId(merchantId)) return [];
+    const db = this.db; if (!db) return [];
+    const conds: any[] = [eq(jobInvoices.merchantId, merchantId),
+      sql`exists (select 1 from ${clientProfiles} where ${clientProfiles.id} = ${jobInvoices.clientProfileId} and ${clientProfiles.merchantId} = ${merchantId})`];
     if (opts.status) conds.push(eq(jobInvoices.status, opts.status));
     if (opts.clientProfileId) conds.push(eq(jobInvoices.clientProfileId, opts.clientProfileId));
     return db.select().from(jobInvoices).where(and(...conds)).orderBy(desc(jobInvoices.createdAt));

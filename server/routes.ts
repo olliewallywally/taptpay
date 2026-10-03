@@ -43,7 +43,7 @@ import { isPushServiceEndpoint } from "./push-endpoint";
 import { resendInvoiceEmailForMerchant } from "./property-cron";
 import { INVOICE_DOCUMENT_FOLDER, isInvoiceDocumentName, isPublicUploadFolder, parseInvoiceDocumentRef } from "./upload-policy";
 import { INVOICE_DOCUMENT_EXTENSIONS } from "./invoice-document-security";
-import { resendTradeInvoice, sendTradePaymentInvoice, sendTradeQuote } from "./trades-delivery";
+import { resendTradeInvoice, sendTradePaymentInvoice, sendTradePaymentInvoiceForMerchant, sendTradeQuote } from "./trades-delivery";
 import { nextJobRunDateAfter } from "./trades-cron";
 import { QUOTE_ACCEPTANCE_UNAVAILABLE, tellBusinessQuoteAcceptanceBlocked } from "./quote-acceptance-notice";
 import { sendGstInvoices, extractEmails } from "./gst-invoice";
@@ -8219,12 +8219,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // (Removed GET /api/trades/quotes/:id, owner decision 2026-09-27: no screen called it; the screens
   // read the quote list, and open a quote's PDF.)
 
-  async function streamQuotePdf(quote: any, req: any, res: any) {
-    const [client, merchant] = await Promise.all([
-      storage.getClientProfile(quote.clientProfileId),
-      storage.getMerchant(quote.merchantId),
-    ]);
-    if (!client || !merchant) return res.status(404).json({ message: "Quote details unavailable" });
+  // Makes the download from rows its caller already holds; it reads nothing itself (R1-T7 S4b1).
+  function sendQuotePdf(quote: any, client: any, merchant: any, req: any, res: any) {
     const pdf = generateQuotePdf(quote, client, merchant, getBaseUrl(req));
     const safeName = String(merchant.businessName || merchant.name || "quote")
       .toLowerCase()
@@ -8242,9 +8238,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
-      const quote = await storage.getQuote(id);
-      if (!quote || quote.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
-      await streamQuotePdf(quote, req, res);
+      // The quote and its client in one read, both the business's: never a client by a global key.
+      const snapshot = await storage.getQuoteDeliveryForMerchant(id, merchantId);
+      if (!snapshot) return res.status(404).json({ message: "Not found" });
+      const merchant = await storage.getMerchant(merchantId);
+      if (!merchant) return res.status(404).json({ message: "Quote details unavailable" });
+      sendQuotePdf(snapshot.quote, snapshot.client, merchant, req, res);
     } catch (err) {
       console.error("[TRADES_QUOTE_PDF]", err);
       res.status(500).json({ message: "Failed to generate quote PDF" });
@@ -8255,7 +8254,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const quote = await storage.getQuoteByToken(req.params.token);
       if (!quote) return res.status(404).json({ message: "Quote not found" });
-      await streamQuotePdf(quote, req, res);
+      // The link's holder has only the quote: its client and business are read by the quote's own ids.
+      const [client, merchant] = await Promise.all([
+        storage.getClientProfile(quote.clientProfileId),
+        storage.getMerchant(quote.merchantId),
+      ]);
+      if (!client || !merchant) return res.status(404).json({ message: "Quote details unavailable" });
+      sendQuotePdf(quote, client, merchant, req, res);
     } catch (err) {
       console.error("[TRADES_QUOTE_TOKEN_PDF]", err);
       res.status(500).json({ message: "Failed to generate quote PDF" });
@@ -8476,21 +8481,20 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
-      const inv = await storage.getJobInvoice(id);
-      if (!inv || inv.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
+      const inv = await storage.getJobInvoiceForMerchant(id, merchantId);
+      if (!inv) return res.status(404).json({ message: "Not found" });
       // A voided or paid invoice stays as it is (C10 batch 6d): the screens offer this only on an
       // unpaid one, and each call emailed the client another receipt.
       if (inv.status === "voided") return res.status(409).json({ message: "This invoice was voided" });
       if (inv.status === "paid" || inv.status === "paid_external") return res.status(409).json({ message: "This invoice is already paid" });
       const parsed = markJobPaidExternalSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
-      const row = await storage.updateJobInvoice(id, {
-        status: "paid_external", paidAt: new Date(),
-        externalPaymentReference: parsed.data.externalPaymentReference ?? null,
-      });
-      await storage.createJobEvent({ merchantId: inv.merchantId, clientProfileId: inv.clientProfileId, jobInvoiceId: inv.id, eventType: "paid_external" });
-      await sendTradePaymentInvoice(row);
-      res.json(row);
+      // Storage rechecks the business and the invoice's state at the write, and saves the history with it.
+      const result = await storage.markJobInvoicePaidExternalForMerchant(id, merchantId, parsed.data.externalPaymentReference);
+      if (result.kind === "not-found") return res.status(404).json({ message: "Not found" });
+      if (result.kind === "conflict") return res.status(409).json({ message: result.reason === "voided" ? "This invoice was voided" : "This invoice is already paid" });
+      await sendTradePaymentInvoiceForMerchant(id, merchantId);
+      res.json(result.invoice);
     } catch (err) { console.error("[TRADES_INVOICES_MARK_PAID]", err); res.status(500).json({ message: "Failed to mark invoice paid" }); }
   });
   app.post("/api/trades/invoices/:id/complete", authenticateToken, async (req: AuthenticatedRequest, res) => {
@@ -8499,17 +8503,18 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
-      const inv = await storage.getJobInvoice(id);
-      if (!inv || inv.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
+      const inv = await storage.getJobInvoiceForMerchant(id, merchantId);
+      if (!inv) return res.status(404).json({ message: "Not found" });
       // A paid deposit is only part-payment — the balance must still be collected,
       // so don't let a deposit invoice close out the job.
-      if (inv.kind === "deposit")
-        return res.status(409).json({ message: "Send and collect the balance before completing the job" });
-      if (!["paid", "paid_external"].includes(inv.status))
-        return res.status(409).json({ message: "Invoice must be paid before completing the job" });
-      const row = await storage.updateJobInvoice(id, { completedAt: new Date() });
-      await storage.createJobEvent({ merchantId: inv.merchantId, clientProfileId: inv.clientProfileId, jobInvoiceId: inv.id, eventType: "job_completed" });
-      res.json(row);
+      const DEPOSIT = { message: "Send and collect the balance before completing the job" };
+      const UNPAID = { message: "Invoice must be paid before completing the job" };
+      if (inv.kind === "deposit") return res.status(409).json(DEPOSIT);
+      if (!["paid", "paid_external"].includes(inv.status)) return res.status(409).json(UNPAID);
+      const result = await storage.completeJobInvoiceForMerchant(id, merchantId);
+      if (result.kind === "not-found") return res.status(404).json({ message: "Not found" });
+      if (result.kind === "conflict") return res.status(409).json(result.reason === "deposit" ? DEPOSIT : UNPAID);
+      res.json(result.invoice);
     } catch (err) { console.error("[TRADES_INVOICES_COMPLETE]", err); res.status(500).json({ message: "Failed to complete invoice" }); }
   });
   app.post("/api/trades/invoices/:id/void", authenticateToken, async (req: AuthenticatedRequest, res) => {
@@ -8518,14 +8523,16 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
-      const inv = await storage.getJobInvoice(id);
-      if (!inv || inv.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
+      const inv = await storage.getJobInvoiceForMerchant(id, merchantId);
+      if (!inv) return res.status(404).json({ message: "Not found" });
       // A paid invoice stays paid (C10 batch 6d): the screens offer cancelling only an unpaid one.
       if (inv.status === "paid" || inv.status === "paid_external") return res.status(409).json({ message: "This invoice is paid" });
-      const row = await storage.updateJobInvoice(id, { status: "voided", voidedAt: new Date() });
-      // The client's history shows the cancellation, as a rent invoice's does (owner decision 2026-09-27).
-      await storage.createJobEvent({ merchantId, clientProfileId: inv.clientProfileId, jobInvoiceId: id, eventType: "invoice_voided" });
-      res.json(row);
+      // The client's history shows the cancellation, as a rent invoice's does (owner decision
+      // 2026-09-27): storage saves it with the change.
+      const result = await storage.voidJobInvoiceForMerchant(id, merchantId);
+      if (result.kind === "not-found") return res.status(404).json({ message: "Not found" });
+      if (result.kind === "conflict") return res.status(409).json({ message: "This invoice is paid" });
+      res.json(result.invoice);
     } catch (err) { console.error("[TRADES_INVOICES_VOID]", err); res.status(500).json({ message: "Failed to void invoice" }); }
   });
 

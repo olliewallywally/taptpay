@@ -290,12 +290,8 @@ export async function runTradesReminderPass(
   return result;
 }
 
-export async function sendTradePaymentInvoice(invoice: any): Promise<number> {
-  const [client, merchant] = await Promise.all([
-    storage.getClientProfile(invoice.clientProfileId),
-    storage.getMerchant(invoice.merchantId),
-  ]);
-  if (!client?.email || !merchant) return 0;
+/** The receipt's email for one paid invoice, its client and its business: the same for both lanes below. */
+function paymentReceipt(invoice: any, client: any, merchant: any) {
   const total = invoice.amountCents;
   const gst = merchant.gstRegistered ? Math.round(total - total / (1 + GST_RATE)) : 0;
   const net = total - gst;
@@ -307,19 +303,56 @@ export async function sendTradePaymentInvoice(invoice: any): Promise<number> {
     : '';
   const html = `<!doctype html><html><body style="margin:0;background:#f4f4f4;font-family:Arial,sans-serif;color:#1a1d21"><table width="100%" cellpadding="0" cellspacing="0" style="padding:32px 12px"><tr><td align="center"><table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#fff;border-radius:18px;overflow:hidden"><tr><td style="background:#1a1d21;padding:30px 34px;color:#fff"><div style="color:#ff7a1a;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase">invoice</div><h1 style="margin:10px 0 4px;font-size:42px;color:#ff7a1a">${money(total)}</h1><div>Paid in full</div></td></tr><tr><td style="padding:28px 34px"><p><strong>Billed to:</strong> ${esc(`${client.firstName} ${client.lastName}`)}<br><strong>Site:</strong> ${esc(client.siteAddress)}</p><table width="100%" cellpadding="6" cellspacing="0"><tr><td>${esc(label)}${merchant.gstRegistered ? ' (excl. GST)' : ''}</td><td align="right">${money(net)}</td></tr>${gstHtml}<tr><td style="font-weight:700">Total paid</td><td align="right" style="font-weight:700">${money(total)}</td></tr></table><p style="font-size:12px;color:#687078">Reference: ${reference}<br>Date paid: ${date(invoice.paidAt || new Date())}${merchant.gstNumber ? `<br>GST no. ${esc(merchant.gstNumber)}` : ''}</p></td></tr></table></td></tr></table></body></html>`;
   const text = `INVOICE - ${merchantName}. Billed to ${client.firstName} ${client.lastName}, ${client.siteAddress}. ${label}: ${money(net)}. ${merchant.gstRegistered ? `GST (15%) incl.: ${money(gst)}. ` : ''}Total paid: ${money(total)}. Reference: ${reference}.`;
+  return { reference, subject: `Invoice - ${label} ${money(total)} - ${reference}`, html, text };
+}
+
+/** The payment lane's receipt (the provider's completion): the invoice it was handed, read by its own ids. */
+export async function sendTradePaymentInvoice(invoice: any): Promise<number> {
+  const [client, merchant] = await Promise.all([
+    storage.getClientProfile(invoice.clientProfileId),
+    storage.getMerchant(invoice.merchantId),
+  ]);
+  if (!client?.email || !merchant) return 0;
+  const receipt = paymentReceipt(invoice, client, merchant);
   const sent = await sendEmail({
     to: client.email,
     from: 'noreply@taptpay.co.nz',
-    subject: `Invoice - ${label} ${money(total)} - ${reference}`,
-    html,
-    text,
+    subject: receipt.subject,
+    html: receipt.html,
+    text: receipt.text,
   });
   await storage.createJobEvent({
     merchantId: invoice.merchantId,
     clientProfileId: invoice.clientProfileId,
     jobInvoiceId: invoice.id,
     eventType: sent ? 'invoice_email_sent' : 'invoice_email_failed',
-    payload: { reference },
+    payload: { reference: receipt.reference },
   });
+  return sent ? 1 : 0;
+}
+
+/**
+ * The receipt after a signed-in business marks its invoice paid outside TaptPay (R1-T7 S4b1).
+ * The invoice and its client are read together and must both be that business's; the receipt
+ * goes to that captured contact, and its history line is written only while both still are.
+ */
+export async function sendTradePaymentInvoiceForMerchant(invoiceId: string, merchantId: number): Promise<number> {
+  const merchant = await storage.getMerchant(merchantId);
+  // Read both owned rows together after the other awaited prerequisite. The receipt
+  // uses this captured contact; it never refetches the client through a global key.
+  const snapshot = await storage.getJobInvoiceDeliveryForMerchant(invoiceId, merchantId);
+  if (!snapshot?.client.email || !merchant) return 0;
+  const receipt = paymentReceipt(snapshot.invoice, snapshot.client, merchant);
+  const sent = await sendEmail({
+    to: snapshot.client.email,
+    from: 'noreply@taptpay.co.nz',
+    subject: receipt.subject,
+    html: receipt.html,
+    text: receipt.text,
+  });
+  const recorded = await storage.recordJobInvoiceReceiptForMerchant(invoiceId, merchantId, snapshot.invoice.clientProfileId, { sent, reference: receipt.reference });
+  // The email went to the contact owned when it was read. A line refused afterwards is
+  // never written through a global key; the id says which invoice to reconcile.
+  if (!recorded) console.error(`[TRADES_RECEIPT_UNRECORDED] invoice=${invoiceId}`);
   return sent ? 1 : 0;
 }

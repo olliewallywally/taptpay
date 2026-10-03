@@ -112,6 +112,7 @@ const SIDE_EFFECT_CALLS: Record<string, string> = {
   resendInvoiceEmailForMerchant: "email",
   resendTradeInvoice: "email/SMS",
   sendTradePaymentInvoice: "email/SMS",
+  sendTradePaymentInvoiceForMerchant: "email",
   sendTradeQuote: "email/SMS",
   tellBusinessQuoteAcceptanceBlocked: "email",
   sendGstInvoices: "email",

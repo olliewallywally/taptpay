@@ -1,10 +1,10 @@
 # R1-T7 tenant/storage execution inventory
 
-Generated from working-tree sources on base `c5260cc1af8846e79975194cef514f16380fe5cc`; the phase evidence names the final commit.
+Generated from working-tree sources on base `c0fb5bc3981cbedd8a46f864f0e224092c417369`; the phase evidence names the final commit.
 
 Registrations: **187**; registrations with session/admin authentication: **119**;
 registrations calling checkMerchantOwnership: **25**.
-IStorage: **231** declared methods;
+IStorage: **238** declared methods;
 PaymentAttemptRepository: **8** inherited methods.
 
 Classifications come from the reviewed per-route branches, including mixed public/signed-in routes.
@@ -94,7 +94,7 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | GET /api/trades/gst-settings | tenant (merchant/session) | `getMerchant` |
 | GET /api/trades/invoices | tenant (merchant/session) | `getJobInvoicesByMerchant` |
 | GET /api/trades/quotes | tenant (merchant/session) | `getQuotesByMerchant` |
-| GET /api/trades/quotes/:id/pdf | tenant (merchant/resource) | `getClientProfile`, `getMerchant`, `getQuote` |
+| GET /api/trades/quotes/:id/pdf | tenant (merchant/resource) | `getMerchant`, `getQuoteDeliveryForMerchant` |
 | GET /api/trades/quotes/token/:token | single-resource bearer (public-bearer/token) | `createJobEvent`, `getClientProfile`, `getJobInvoicesByQuote`, `getMerchant`, `getQuoteByToken`, `updateQuote` |
 | GET /api/trades/quotes/token/:token/pdf | single-resource bearer (public-bearer/token) | `getClientProfile`, `getMerchant`, `getQuoteByToken` |
 | GET /api/trades/reminder-settings | tenant (merchant/session) | `getMerchant` |
@@ -170,10 +170,10 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | POST /api/trades/clients/:id/promote | tenant (merchant/resource) | `getClientProfileForMerchant`, `promoteClientProfileForMerchant` |
 | POST /api/trades/clients/:id/unarchive | tenant (merchant/resource) | `getClientProfileForMerchant`, `unarchiveClientProfileForMerchant` |
 | POST /api/trades/invoices | tenant (merchant/resource) | `createClientProfileForMerchant`, `createJobEvent`, `createJobInvoice`, `getClientProfile`, `getOrCreateSubscription`, `getQuote`, `uploadedFileOwnedByMerchant` |
-| POST /api/trades/invoices/:id/complete | tenant (merchant/resource) | `createJobEvent`, `getJobInvoice`, `updateJobInvoice` |
-| POST /api/trades/invoices/:id/mark-paid-external | tenant (merchant/resource) | `createJobEvent`, `getJobInvoice`, `updateJobInvoice` |
+| POST /api/trades/invoices/:id/complete | tenant (merchant/resource) | `completeJobInvoiceForMerchant`, `getJobInvoiceForMerchant` |
+| POST /api/trades/invoices/:id/mark-paid-external | tenant (merchant/resource) | `getJobInvoiceForMerchant`, `markJobInvoicePaidExternalForMerchant` |
 | POST /api/trades/invoices/:id/send-balance | tenant (merchant/resource) | `createJobEvent`, `createJobInvoice`, `getJobInvoice`, `getJobInvoicesByMerchant`, `getOrCreateSubscription`, `getQuote` |
-| POST /api/trades/invoices/:id/void | tenant (merchant/resource) | `createJobEvent`, `getJobInvoice`, `updateJobInvoice` |
+| POST /api/trades/invoices/:id/void | tenant (merchant/resource) | `getJobInvoiceForMerchant`, `voidJobInvoiceForMerchant` |
 | POST /api/trades/quotes | tenant (merchant/resource) | `createClientProfileForMerchant`, `createJobEvent`, `createQuote`, `getClientProfile`, `getMerchant`, `getOrCreateSubscription`, `uploadedFileOwnedByMerchant` |
 | POST /api/trades/quotes/token/:token/respond | single-resource bearer (public-bearer/token) | `createJobEvent`, `createJobInvoice`, `getOrCreateSubscription`, `getQuoteByToken`, `updateQuote` |
 | POST /api/trades/schedules | tenant (merchant/resource) | `createJobEvent`, `createJobSchedule`, `getClientProfile`, `getOrCreateSubscription` |
@@ -402,7 +402,14 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | IStorage | getQuote | no | `getQuote(id: string): Promise<any \| undefined>` |
 | IStorage | getQuoteByToken | no | `getQuoteByToken(token: string): Promise<any \| undefined>` |
 | IStorage | getQuotesByMerchant | yes | `getQuotesByMerchant(merchantId: number, opts?: { status?: string }): Promise<any[]>` |
+| IStorage | getQuoteDeliveryForMerchant | yes | `getQuoteDeliveryForMerchant(id: string, merchantId: number): Promise<TradesQuoteDeliverySnapshot \| undefined>` |
 | IStorage | updateQuote | no | `updateQuote(id: string, updates: any): Promise<any \| undefined>` |
+| IStorage | getJobInvoiceForMerchant | yes | `getJobInvoiceForMerchant(id: string, merchantId: number): Promise<any \| undefined>` |
+| IStorage | getJobInvoiceDeliveryForMerchant | yes | `getJobInvoiceDeliveryForMerchant(id: string, merchantId: number): Promise<TradesInvoiceDeliverySnapshot \| undefined>` |
+| IStorage | voidJobInvoiceForMerchant | yes | `voidJobInvoiceForMerchant(id: string, merchantId: number): Promise<JobInvoiceMutationResult>` |
+| IStorage | markJobInvoicePaidExternalForMerchant | yes | `markJobInvoicePaidExternalForMerchant(id: string, merchantId: number, externalPaymentReference?: string): Promise<JobInvoiceMutationResult>` |
+| IStorage | completeJobInvoiceForMerchant | yes | `completeJobInvoiceForMerchant(id: string, merchantId: number): Promise<JobInvoiceMutationResult>` |
+| IStorage | recordJobInvoiceReceiptForMerchant | yes | `recordJobInvoiceReceiptForMerchant(id: string, merchantId: number, clientProfileId: string, receipt: TradesReceiptRecord): Promise<boolean>` |
 | IStorage | createJobInvoice | no | `createJobInvoice(data: any): Promise<any>` |
 | IStorage | getJobInvoice | no | `getJobInvoice(id: string): Promise<any \| undefined>` |
 | IStorage | getJobInvoiceByToken | no | `getJobInvoiceByToken(token: string): Promise<any \| undefined>` |

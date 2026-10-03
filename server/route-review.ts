@@ -3477,7 +3477,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     entitlement: null,
     idempotency: "read-only",
     sideEffects: null,
-    successDto: `the business's quotes, or those of one status, ${QUOTE_ROW} each, newest first, all at once (no paging)`,
+    successDto: `the business's quotes whose client is the business's too (getQuotesByMerchant), or those of one status, ${QUOTE_ROW} each, newest first, all at once (no paging)`,
     errorDisclosure: ["fixed"],
   },
 
@@ -3507,7 +3507,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
 
   "GET /api/trades/quotes/:id/pdf": {
     branches: [
-      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${tradesRecord("quote", "getQuote")}; ${TRADES_ADMIN}` },
+      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${tradesRecord("quote", "getQuoteDeliveryForMerchant")}, read in one statement with its client, which must be the business's too; ${TRADES_ADMIN}` },
     ],
     input: tradesId("id"),
     capability: null,
@@ -3515,7 +3515,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     idempotency: "read-only",
     sideEffects: null,
     successDto:
-      "the quote as a PDF download (quote-<business>-<reference>.pdf), made from the quote, its client and the business (generateQuotePdf); 404 'Quote details unavailable' when the client or the business is gone",
+      "the quote as a PDF download (quote-<business>-<reference>.pdf), made from the quote, the client read with it and the business (generateQuotePdf); 404 'Quote details unavailable' when the business is gone",
     errorDisclosure: ["fixed"],
   },
 
@@ -3527,7 +3527,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     entitlement: null,
     idempotency: "read-only",
     sideEffects: null,
-    successDto: `the business's invoices (or one client's, or those of one status), ${JOB_INVOICE_ROW} each, newest first, all at once (no paging)`,
+    successDto: `the business's invoices whose client is the business's too (getJobInvoicesByMerchant), or one client's, or those of one status, ${JOB_INVOICE_ROW} each, newest first, all at once (no paging)`,
     errorDisclosure: ["fixed"],
   },
 
@@ -3583,15 +3583,15 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         principal: "merchant",
         roles: ["owner", "member"],
         tenant: "resource",
-        tenantRule: `${tradesRecord("invoice", "getJobInvoice")}, and neither voided nor already paid (409 each, since 2026-09-27); ${TRADES_ADMIN}`,
+        tenantRule: `${tradesRecord("invoice", "getJobInvoiceForMerchant")}, and neither voided nor already paid (409 each, since 2026-09-27); markJobInvoicePaidExternalForMerchant rechecks the business, the client and that state at its write, under the client's and the invoice's row locks; ${TRADES_ADMIN}`,
       },
     ],
     input: `${tradesId("id")}; body: markJobPaidExternalSchema (an optional reference of at most 200 characters, null or empty for none: every screen sends null when no reference is typed, and the desktop always does, which was refused until 2026-09-27; 400 with the first issue)`,
     capability: null,
     entitlement: null,
     idempotency:
-      "marks the invoice paid outside TaptPay with the reference and the time, and logs it; a voided or paid one is 409 (since 2026-09-27: each call marked it again and emailed the client another receipt)",
-    sideEffects: "emails the client a receipt for the invoice, with the business's GST number (sendTradePaymentInvoice); nothing when the client has no email",
+      "markJobInvoicePaidExternalForMerchant marks the owned invoice paid outside TaptPay with the reference and the time, and saves its paid_external event in the same transaction; a voided or paid one is 409 (since 2026-09-27: each call marked it again and emailed the client another receipt); a row moved or settled after the lookup is 404 or 409 with nothing written or sent",
+    sideEffects: "emails the client a receipt for the invoice, with the business's GST number (sendTradePaymentInvoiceForMerchant: the invoice read in one statement with its owned client, and logged only while both are still the business's); nothing when the client has no email",
     successDto: `the invoice afterwards, ${JOB_INVOICE_ROW}`,
     errorDisclosure: ["input-issues"],
     findings: [tradesPaidElsewhereFinding("Marking an invoice paid outside TaptPay"), TRADES_TEAM],
@@ -3599,13 +3599,13 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
 
   "POST /api/trades/invoices/:id/complete": {
     branches: [
-      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${tradesRecord("invoice", "getJobInvoice")}; ${TRADES_ADMIN}` },
+      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${tradesRecord("invoice", "getJobInvoiceForMerchant")}; completeJobInvoiceForMerchant rechecks the business, the client and the invoice's state at its write, under the client's and the invoice's row locks; ${TRADES_ADMIN}` },
     ],
     input: tradesId("id"),
     capability: null,
     entitlement: null,
     idempotency:
-      "records the job complete, with the time and a job_completed event, on a paid invoice that is not a deposit: a deposit is 409 (the balance comes first), an unpaid invoice 409. Again records a new time, and logs again",
+      "completeJobInvoiceForMerchant records the job complete, with the time and a job_completed event saved in the same transaction, on a paid invoice that is not a deposit: a deposit is 409 (the balance comes first), an unpaid invoice 409. Again records a new time, and logs again; a row moved after the lookup is 404 with nothing written",
     sideEffects: null,
     successDto: `the invoice afterwards, ${JOB_INVOICE_ROW}`,
     errorDisclosure: ["fixed"],
@@ -3617,14 +3617,14 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         principal: "merchant",
         roles: ["owner", "member"],
         tenant: "resource",
-        tenantRule: `${tradesRecord("invoice", "getJobInvoice")}, and not paid (409 since 2026-09-27: the screens offer cancelling only an unpaid one); ${TRADES_ADMIN}`,
+        tenantRule: `${tradesRecord("invoice", "getJobInvoiceForMerchant")}, and not paid (409 since 2026-09-27: the screens offer cancelling only an unpaid one); voidJobInvoiceForMerchant rechecks the business, the client and that state at its write, under the client's and the invoice's row locks; ${TRADES_ADMIN}`,
       },
     ],
     input: tradesId("id"),
     capability: null,
     entitlement: null,
     idempotency:
-      "voids the invoice with the time and logs it in the client's history (invoice_voided, since 2026-09-27); a voided one is voided again, with a new time, and logged again",
+      "voidJobInvoiceForMerchant voids the owned invoice with the time and saves invoice_voided in the client's history in the same transaction (logged since 2026-09-27); a voided one is voided again, with a new time, and logged again; a row moved or paid after the lookup is 404 or 409 with nothing written",
     sideEffects: null,
     successDto: `the invoice afterwards, ${JOB_INVOICE_ROW}`,
     errorDisclosure: ["fixed"],

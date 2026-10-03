@@ -1,4 +1,4 @@
-# R1-T2 route inventory — generated 2026-10-03 @ `c5260cc1af8846e79975194cef514f16380fe5cc`
+# R1-T2 route inventory — generated 2026-10-03 @ `c0fb5bc3981cbedd8a46f864f0e224092c417369`
 
 Regenerate with `npx tsx scripts/generate-route-policy.ts`. This table is
 evidence for the SHA named above, not a timeless constant — see
@@ -338,22 +338,22 @@ address's success is its notice (410), which it gives everyone.
 | GET | `/api/trades/clients/:id/events` | 8122 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
 | GET | `/api/trades/quotes` | 8134 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
 | POST | `/api/trades/quotes` | 8143 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| GET | `/api/trades/quotes/:id/pdf` | 8239 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| GET | `/api/trades/quotes/token/:token/pdf` | 8254 | public-bearer | getQuoteByToken( | `link-holder` | 404: `unknown-link` |
-| GET | `/api/trades/quotes/token/:token` | 8269 | public-bearer | getQuoteByToken( | `link-holder` | 404: `unknown-link` |
-| POST | `/api/trades/quotes/token/:token/respond` | 8314 | public-bearer | getQuoteByToken( | `link-holder` | 404: `unknown-link` |
-| GET | `/api/trades/invoices` | 8363 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| POST | `/api/trades/invoices` | 8375 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| POST | `/api/trades/invoices/:id/send-balance` | 8432 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| POST | `/api/trades/invoices/:id/mark-paid-external` | 8473 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| POST | `/api/trades/invoices/:id/complete` | 8496 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| POST | `/api/trades/invoices/:id/void` | 8515 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| GET | `/api/trades/schedules` | 8532 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| POST | `/api/trades/schedules` | 8539 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| PUT | `/api/trades/schedules/:id` | 8564 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| DELETE | `/api/trades/schedules/:id` | 8587 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| GET | `/api/internal/cron/status` | 8603 | cron | authorizeCronRequest | `scheduler` | 401: `no-secret`, `wrong-secret` |
-| POST | `/api/internal/cron` | 8613 | cron | authorizeCronRequest | `scheduler` | 401: `no-secret`, `wrong-secret` |
+| GET | `/api/trades/quotes/:id/pdf` | 8235 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/trades/quotes/token/:token/pdf` | 8253 | public-bearer | getQuoteByToken( | `link-holder` | 404: `unknown-link` |
+| GET | `/api/trades/quotes/token/:token` | 8274 | public-bearer | getQuoteByToken( | `link-holder` | 404: `unknown-link` |
+| POST | `/api/trades/quotes/token/:token/respond` | 8319 | public-bearer | getQuoteByToken( | `link-holder` | 404: `unknown-link` |
+| GET | `/api/trades/invoices` | 8368 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| POST | `/api/trades/invoices` | 8380 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/trades/invoices/:id/send-balance` | 8437 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/trades/invoices/:id/mark-paid-external` | 8478 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/trades/invoices/:id/complete` | 8500 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/trades/invoices/:id/void` | 8520 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/trades/schedules` | 8539 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| POST | `/api/trades/schedules` | 8546 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| PUT | `/api/trades/schedules/:id` | 8571 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| DELETE | `/api/trades/schedules/:id` | 8594 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/internal/cron/status` | 8610 | cron | authorizeCronRequest | `scheduler` | 401: `no-secret`, `wrong-secret` |
+| POST | `/api/internal/cron` | 8620 | cron | authorizeCronRequest | `scheduler` | 401: `no-secret`, `wrong-secret` |
 
 ## Per-route facts
 
@@ -3639,7 +3639,7 @@ Reviewed policy:
 - **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** status: raw, a string only (since 2026-09-27; a repeated one reached the query as a list), compared as text with each quote's status (one that no quote has matches nothing)
 - **Idempotency:** read-only
-- **Success:** the business's quotes, or those of one status, a whole quote row (the client, the public link's token, status, line items, subtotal, GST and how it was counted, total, the deposit's type, value and amount, channel, valid until, notes, an attached document's reference and name, when sent, viewed, accepted or declined, made and changed) each, newest first, all at once (no paging)
+- **Success:** the business's quotes whose client is the business's too (getQuotesByMerchant), or those of one status, a whole quote row (the client, the public link's token, status, line items, subtotal, GST and how it was counted, total, the deposit's type, value and amount, channel, valid until, notes, an attached document's reference and name, when sent, viewed, accepted or declined, made and changed) each, newest first, all at once (no paging)
 - **Error disclosure:** fixed
 
 ### POST `/api/trades/quotes`
@@ -3670,17 +3670,16 @@ Reviewed policy:
 
 - middleware: `authenticateToken`
 - params: `id: strictUuidParam`
-- authChecks: `compares quote.merchantId !== merchantId`
-- storageMethods: `getClientProfile`, `getMerchant`, `getQuote`
+- storageMethods: `getMerchant`, `getQuoteDeliveryForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `500`, `503`
-- helpers: `streamQuotePdf`
+- helpers: `sendQuotePdf`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member). **Tenant (resource):** the quote read by id (getQuote) must be the session's business's: another business's is 404, the same as a missing one; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
+- **Who:** merchant (owner, member). **Tenant (resource):** the quote read by id (getQuoteDeliveryForMerchant) must be the session's business's: another business's is 404, the same as a missing one, read in one statement with its client, which must be the business's too; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500)
 - **Idempotency:** read-only
-- **Success:** the quote as a PDF download (quote-<business>-<reference>.pdf), made from the quote, its client and the business (generateQuotePdf); 404 'Quote details unavailable' when the client or the business is gone
+- **Success:** the quote as a PDF download (quote-<business>-<reference>.pdf), made from the quote, the client read with it and the business (generateQuotePdf); 404 'Quote details unavailable' when the business is gone
 - **Error disclosure:** fixed
 
 ### GET `/api/trades/quotes/token/:token/pdf`
@@ -3689,7 +3688,7 @@ Reviewed policy:
 - authChecks: `storage.getQuoteByToken`
 - storageMethods: `getClientProfile`, `getMerchant`, `getQuoteByToken`
 - statuses: `200`, `404`, `500`
-- helpers: `streamQuotePdf`
+- helpers: `sendQuotePdf`
 
 Reviewed policy:
 
@@ -3760,7 +3759,7 @@ Reviewed policy:
 - **Who:** merchant (owner, member). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** clientProfileId: strictUuidParam when given (400 'Invalid clientProfileId' otherwise; since 2026-09-27, a 500 before); status: raw, a string only (since 2026-09-27; a repeated one reached the query as a list), compared as text with each invoice's status (one that no invoice has matches nothing)
 - **Idempotency:** read-only
-- **Success:** the business's invoices (or one client's, or those of one status), a whole invoice row (the client, quote and recurring invoice, kind, amount, the checkout token, channel, job details, status and its dates, when the job was completed, the external payment reference, reminders sent, when to send, an attached document's reference and name, the provider's session and transaction ids, the split, the WhatsApp message id) each, newest first, all at once (no paging)
+- **Success:** the business's invoices whose client is the business's too (getJobInvoicesByMerchant), or one client's, or those of one status, a whole invoice row (the client, quote and recurring invoice, kind, amount, the checkout token, channel, job details, status and its dates, when the job was completed, the external payment reference, reminders sent, when to send, an attached document's reference and name, the provider's session and transaction ids, the split, the WhatsApp message id) each, newest first, all at once (no paging)
 - **Error disclosure:** fixed
 
 ### POST `/api/trades/invoices`
@@ -3816,18 +3815,17 @@ Reviewed policy:
 - middleware: `authenticateToken`
 - params: `id: strictUuidParam`
 - body: `schema: markJobPaidExternalSchema`
-- authChecks: `compares inv.merchantId !== merchantId`
-- storageMethods: `createJobEvent`, `getJobInvoice`, `updateJobInvoice`
-- sideEffects: `email/SMS: sendTradePaymentInvoice`
+- storageMethods: `getJobInvoiceForMerchant`, `markJobInvoicePaidExternalForMerchant`
+- sideEffects: `email: sendTradePaymentInvoiceForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
 - errorTextInResponse: `parsed.error.errors`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member). **Tenant (resource):** the invoice read by id (getJobInvoice) must be the session's business's: another business's is 404, the same as a missing one, and neither voided nor already paid (409 each, since 2026-09-27); the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
+- **Who:** merchant (owner, member). **Tenant (resource):** the invoice read by id (getJobInvoiceForMerchant) must be the session's business's: another business's is 404, the same as a missing one, and neither voided nor already paid (409 each, since 2026-09-27); markJobInvoicePaidExternalForMerchant rechecks the business, the client and that state at its write, under the client's and the invoice's row locks; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500); body: markJobPaidExternalSchema (an optional reference of at most 200 characters, null or empty for none: every screen sends null when no reference is typed, and the desktop always does, which was refused until 2026-09-27; 400 with the first issue)
-- **Idempotency:** marks the invoice paid outside TaptPay with the reference and the time, and logs it; a voided or paid one is 409 (since 2026-09-27: each call marked it again and emailed the client another receipt)
-- **Side effects:** emails the client a receipt for the invoice, with the business's GST number (sendTradePaymentInvoice); nothing when the client has no email
+- **Idempotency:** markJobInvoicePaidExternalForMerchant marks the owned invoice paid outside TaptPay with the reference and the time, and saves its paid_external event in the same transaction; a voided or paid one is 409 (since 2026-09-27: each call marked it again and emailed the client another receipt); a row moved or settled after the lookup is 404 or 409 with nothing written or sent
+- **Side effects:** emails the client a receipt for the invoice, with the business's GST number (sendTradePaymentInvoiceForMerchant: the invoice read in one statement with its owned client, and logged only while both are still the business's); nothing when the client has no email
 - **Success:** the invoice afterwards, a whole invoice row (the client, quote and recurring invoice, kind, amount, the checkout token, channel, job details, status and its dates, when the job was completed, the external payment reference, reminders sent, when to send, an attached document's reference and name, the provider's session and transaction ids, the split, the WhatsApp message id)
 - **Error disclosure:** input-issues
 - **Finding:** Marking an invoice paid outside TaptPay while the client is paying: the provider's completion then finds the invoice settled (finalizeTradeInvoice), so a single payment's charge is recorded nowhere; a split share's is logged (split_share_unrecorded). R3 (payment attempts).
@@ -3837,15 +3835,14 @@ Reviewed policy:
 
 - middleware: `authenticateToken`
 - params: `id: strictUuidParam`
-- authChecks: `compares inv.merchantId !== merchantId`
-- storageMethods: `createJobEvent`, `getJobInvoice`, `updateJobInvoice`
+- storageMethods: `completeJobInvoiceForMerchant`, `getJobInvoiceForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member). **Tenant (resource):** the invoice read by id (getJobInvoice) must be the session's business's: another business's is 404, the same as a missing one; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
+- **Who:** merchant (owner, member). **Tenant (resource):** the invoice read by id (getJobInvoiceForMerchant) must be the session's business's: another business's is 404, the same as a missing one; completeJobInvoiceForMerchant rechecks the business, the client and the invoice's state at its write, under the client's and the invoice's row locks; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500)
-- **Idempotency:** records the job complete, with the time and a job_completed event, on a paid invoice that is not a deposit: a deposit is 409 (the balance comes first), an unpaid invoice 409. Again records a new time, and logs again
+- **Idempotency:** completeJobInvoiceForMerchant records the job complete, with the time and a job_completed event saved in the same transaction, on a paid invoice that is not a deposit: a deposit is 409 (the balance comes first), an unpaid invoice 409. Again records a new time, and logs again; a row moved after the lookup is 404 with nothing written
 - **Success:** the invoice afterwards, a whole invoice row (the client, quote and recurring invoice, kind, amount, the checkout token, channel, job details, status and its dates, when the job was completed, the external payment reference, reminders sent, when to send, an attached document's reference and name, the provider's session and transaction ids, the split, the WhatsApp message id)
 - **Error disclosure:** fixed
 
@@ -3853,15 +3850,14 @@ Reviewed policy:
 
 - middleware: `authenticateToken`
 - params: `id: strictUuidParam`
-- authChecks: `compares inv.merchantId !== merchantId`
-- storageMethods: `createJobEvent`, `getJobInvoice`, `updateJobInvoice`
+- storageMethods: `getJobInvoiceForMerchant`, `voidJobInvoiceForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
 
 Reviewed policy:
 
-- **Who:** merchant (owner, member). **Tenant (resource):** the invoice read by id (getJobInvoice) must be the session's business's: another business's is 404, the same as a missing one, and not paid (409 since 2026-09-27: the screens offer cancelling only an unpaid one); the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
+- **Who:** merchant (owner, member). **Tenant (resource):** the invoice read by id (getJobInvoiceForMerchant) must be the session's business's: another business's is 404, the same as a missing one, and not paid (409 since 2026-09-27: the screens offer cancelling only an unpaid one); voidJobInvoiceForMerchant rechecks the business, the client and that state at its write, under the client's and the invoice's row locks; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500)
-- **Idempotency:** voids the invoice with the time and logs it in the client's history (invoice_voided, since 2026-09-27); a voided one is voided again, with a new time, and logged again
+- **Idempotency:** voidJobInvoiceForMerchant voids the owned invoice with the time and saves invoice_voided in the client's history in the same transaction (logged since 2026-09-27); a voided one is voided again, with a new time, and logged again; a row moved or paid after the lookup is 404 or 409 with nothing written
 - **Success:** the invoice afterwards, a whole invoice row (the client, quote and recurring invoice, kind, amount, the checkout token, channel, job details, status and its dates, when the job was completed, the external payment reference, reminders sent, when to send, an attached document's reference and name, the provider's session and transaction ids, the split, the WhatsApp message id)
 - **Error disclosure:** fixed
 - **Finding:** Voiding while the client is paying: the provider's completion then finds the invoice settled (finalizeTradeInvoice), so a single payment's charge is recorded nowhere; a split share's is logged (split_share_unrecorded). R3 (payment attempts).

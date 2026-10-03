@@ -50,15 +50,29 @@ export function fakeTrades(): TradesFake {
   read("getQuote", fake.quotes);
   read("getJobInvoice", fake.invoices);
   read("getJobSchedule", fake.schedules);
+  // As the scoped SQL: a quote or invoice is the business's only with its current client the business's too.
+  const owned = (row: any, merchantId: number) =>
+    row?.merchantId === merchantId && fake.clients.get(row.clientProfileId)?.merchantId === merchantId ? row : undefined;
+  jest.spyOn(storage, "getQuoteDeliveryForMerchant").mockImplementation(async (id, merchantId) => {
+    fake.reads.push("getQuote"); const quote = owned(fake.quotes.get(id), merchantId);
+    return quote ? { quote, client: fake.clients.get(quote.clientProfileId) } : undefined;
+  });
+  jest.spyOn(storage, "getJobInvoiceForMerchant").mockImplementation(async (id, merchantId) => {
+    fake.reads.push("getJobInvoice"); return owned(fake.invoices.get(id), merchantId);
+  });
+  jest.spyOn(storage, "getJobInvoiceDeliveryForMerchant").mockImplementation(async (id, merchantId) => {
+    fake.reads.push("getJobInvoice"); const invoice = owned(fake.invoices.get(id), merchantId);
+    return invoice ? { invoice, client: fake.clients.get(invoice.clientProfileId) } : undefined;
+  });
   const list = (name: string, rows: (...args: any[]) => any[]) =>
     jest.spyOn(storage as any, name).mockImplementation(async (...args: any[]) => {
       fake.reads.push(name);
       return rows(...args);
     });
   list("getClientProfilesByMerchant", (merchantId: number) => [...fake.clients.values()].filter(row => row.merchantId === merchantId));
-  list("getQuotesByMerchant", () => [...fake.quotes.values()]);
-  list("getJobInvoicesByMerchant", (_merchantId: number, opts: { clientProfileId?: string } = {}) =>
-    [...fake.invoices.values()].filter((row) => !opts.clientProfileId || row.clientProfileId === opts.clientProfileId));
+  list("getQuotesByMerchant", (merchantId: number) => [...fake.quotes.values()].filter(row => owned(row, merchantId)));
+  list("getJobInvoicesByMerchant", (merchantId: number, opts: { clientProfileId?: string } = {}) =>
+    [...fake.invoices.values()].filter((row) => owned(row, merchantId) && (!opts.clientProfileId || row.clientProfileId === opts.clientProfileId)));
   list("getJobSchedulesByMerchant", () => [...fake.schedules.values()]);
   // Newest first, as the client's history screen reads it.
   jest.spyOn(storage, "getJobEventsByClientForMerchant").mockImplementation(async (clientId, merchantId, limit = 50) => {
@@ -113,6 +127,32 @@ export function fakeTrades(): TradesFake {
     return row;
   });
   write("updateJobInvoice", (id: string, updates: any) => Object.assign(fake.invoices.get(id), updates));
+  // The scoped state changes: refused for a row that is not the business's, or whose state no longer
+  // allows it; otherwise the fixed change and its history line, recorded as the writes they replace.
+  const settled = (invoice: any) => invoice.status === "paid" || invoice.status === "paid_external";
+  const change = (name: string, decide: (invoice: any, reference?: string) => { reason: string } | { set: object; eventType: string }) =>
+    jest.spyOn(storage as any, name).mockImplementation(async (...args: any[]) => {
+      const [id, merchantId, reference] = args as [string, number, string | undefined];
+      const invoice = owned(fake.invoices.get(id), merchantId);
+      if (!invoice) return { kind: "not-found" };
+      const decided = decide(invoice, reference);
+      if ("reason" in decided) return { kind: "conflict", reason: decided.reason };
+      fake.writes.push("updateJobInvoice"); Object.assign(invoice, decided.set);
+      await storage.createJobEvent({ merchantId, clientProfileId: invoice.clientProfileId, jobInvoiceId: id, eventType: decided.eventType });
+      return { kind: "ok", invoice };
+    });
+  change("voidJobInvoiceForMerchant", (invoice) => settled(invoice) ? { reason: "paid" }
+    : { set: { status: "voided", voidedAt: new Date() }, eventType: "invoice_voided" });
+  change("markJobInvoicePaidExternalForMerchant", (invoice, reference) => invoice.status === "voided" ? { reason: "voided" } : settled(invoice) ? { reason: "paid" }
+    : { set: { status: "paid_external", paidAt: new Date(), externalPaymentReference: reference ?? null }, eventType: "paid_external" });
+  change("completeJobInvoiceForMerchant", (invoice) => invoice.kind === "deposit" ? { reason: "deposit" } : !settled(invoice) ? { reason: "unpaid" }
+    : { set: { completedAt: new Date() }, eventType: "job_completed" });
+  jest.spyOn(storage, "recordJobInvoiceReceiptForMerchant").mockImplementation(async (id, merchantId, clientProfileId, receipt) => {
+    const invoice = owned(fake.invoices.get(id), merchantId);
+    if (!invoice || invoice.clientProfileId !== clientProfileId) return false;
+    await storage.createJobEvent({ merchantId, clientProfileId, jobInvoiceId: id, eventType: receipt.sent ? "invoice_email_sent" : "invoice_email_failed", payload: { reference: receipt.reference } });
+    return true;
+  });
   write("createJobSchedule", (data: any) => {
     const row = { id: MADE_SCHEDULE, status: "active", ...data };
     fake.schedules.set(row.id, row);
@@ -128,12 +168,13 @@ export function fakeTrades(): TradesFake {
   jest.spyOn(billing, "billingCardIsReady").mockReturnValue(true);
   const send = (name: string, answer: (...args: any[]) => any) =>
     jest.spyOn(delivery as any, name).mockImplementation(async (...args: any[]) => {
-      fake.writes.push(name);
+      fake.writes.push(name.replace("ForMerchant", ""));
       return answer(...args);
     });
   send("sendTradeQuote", () => ({ sent: true, channel: "email" }));
   send("resendTradeInvoice", (id: string) => ({ sent: true, channel: "email", invoice: fake.invoices.get(id) }));
   send("sendTradePaymentInvoice", () => 1);
+  send("sendTradePaymentInvoiceForMerchant", () => 1);
   return fake;
 }
 
