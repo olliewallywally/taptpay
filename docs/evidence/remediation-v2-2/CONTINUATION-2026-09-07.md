@@ -1,5 +1,24 @@
 # Full integration continuation audit — 2026-09-07
 
+Latest continuation **2026-10-03 — S3c1 property invoice reads/settlement code-complete
+`ff237d24`**, local, awaiting independent review.
+[Evidence](r1/R1-T7-S3c1-property-invoices-2026-10-03.md),
+[preflight/separate reread](../../PLAN-2026-10-03-r1-t7-s3-property.md).
+Owner's finish-R1 authorization persists; continue without routine permission questions.
+
+- Invoice reads/list enrichment require current parent and invoice tenant. Void and
+  external-payment records lock parent then child, recheck current state/identity,
+  and commit fixed changes with history. Archived issued invoices stay payable.
+- Red first **14 storage + 7 HTTP fail**; final affected **17 suites / 528 pass**;
+  fresh actual PostgreSQL **18 pass**, including real rollback and waited races.
+  Typecheck/build/whitespace pass; **187 routes / 0 gaps; 235 contracts**.
+- No app DB/provider, live migration, schema/client, enablement, push or deploy.
+  Disposable PG stays running only for the next c2 verification; stop before handoff.
+
+**Active next:** S3c2 property creation/reuse and scoped authenticated delivery;
+then S4–S6, Apple and R1-T10. S3c1 does not close S3/R1-T7/R1. Independent reviews,
+existing owner decisions and external gates below remain in force.
+
 Latest continuation **2026-10-03 — S3b property schedules code-complete `17a9f71d`**,
 local, awaiting independent review. [Evidence](r1/R1-T7-S3b-property-schedules-2026-10-03.md),
 [S3 preflight/separate reread](../../PLAN-2026-10-03-r1-t7-s3-property.md).
