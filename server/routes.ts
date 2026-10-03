@@ -5,7 +5,7 @@ import { strictBoundedIntegerQueryParam, strictPositiveIntegerParam, strictPosit
 import { createServer, type Server } from "http";
 import { installAsyncRouteGuard } from "./async-route-guard";
 import {
-  storage, PushSessionEndedError,
+  storage, PushSessionEndedError, TransactionCreationScopeError,
   BillSplitConflictError,
   SubscriptionBillingBusyError,
   TaptStoneCapacityError,
@@ -2468,7 +2468,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
 
       if (selectedStoneId !== null) {
-        const stone = await storage.getTaptStone(selectedStoneId);
+        const stone = await storage.getTaptStoneForMerchant(selectedStoneId, validation.data.merchantId);
         if (!stone || stone.merchantId !== validation.data.merchantId || !stone.isActive) {
           return res.status(400).json({ message: "Selected payment board is unavailable" });
         }
@@ -2477,7 +2477,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(400).json({ message: "Per-payment links cannot use a payment board" });
       }
 
-      const { transaction, rawToken } = await createRetailTransaction(storage, {
+      const { transaction, rawToken } = await createRetailTransaction({ createTransaction: input => storage.createTransactionForMerchant(validation.data.merchantId, input) }, {
         merchantId: validation.data.merchantId,
         itemName: validation.data.itemName,
         price: validation.data.price,
@@ -2516,6 +2516,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       res.json(ownerTransactionDto(transactionWithUrls));
     } catch (error) {
+      if (error instanceof TransactionCreationScopeError) return res.status(400).json({ message: "Selected payment board is unavailable" });
       if (error instanceof PaymentCredentialCollisionError) {
         return res.status(503).json({ message: "Could not create a payment link. Please try again." });
       }
@@ -2538,7 +2539,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
       if (!(await requireBillingCard(merchantId, res))) return;
       if (stoneId != null) {
-        const stone = await storage.getTaptStone(stoneId);
+        const stone = await storage.getTaptStoneForMerchant(stoneId, merchantId);
         if (!stone || stone.merchantId !== merchantId || !stone.isActive) {
           return res.status(400).json({ message: "Selected payment board is unavailable" });
         }
@@ -2546,7 +2547,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const price = Number(validation.data.price).toFixed(2);
 
       // No per-transaction fee — merchants pay a monthly subscription.
-      const transaction = await storage.createTransaction({
+      const transaction = await storage.createTransactionForMerchant(merchantId, {
         merchantId,
         taptStoneId: stoneId ?? null,
         itemName,
@@ -2576,6 +2577,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       res.json({ transaction: ownerTransactionDto(transaction) });
     } catch (error) {
+      if (error instanceof TransactionCreationScopeError) return res.status(400).json({ message: "Selected payment board is unavailable" });
       console.error("Cash sale error:", error);
       res.status(500).json({ message: "Failed to record cash sale" });
     }
@@ -2613,7 +2615,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // Prefer the explicitly supplied transactionId, otherwise use the merchant's active pending one.
       let pendingTransaction: Awaited<ReturnType<typeof storage.getTransaction>> | undefined;
       if (transactionId) {
-        pendingTransaction = await storage.getTransaction(parseInt(transactionId));
+        pendingTransaction = await storage.getTransactionForMerchant(parseInt(transactionId), mid);
         if (!pendingTransaction || pendingTransaction.merchantId !== mid) {
           return res.status(404).json({ message: "Transaction not found" });
         }
@@ -2672,18 +2674,19 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (pendingTransaction) {
         // Finalize the existing pending transaction in place.
         // The stored price is unchanged — it was the source of truth for chargeAmount.
-        transaction = await storage.updateTransactionStatus(
-          pendingTransaction.id,
+        transaction = await storage.updateTransactionStatusForMerchant(
+          pendingTransaction.id, mid,
           finalStatus,
           paymentResult.windcaveTransactionId ?? undefined
         );
-        await storage.updateTransactionPaymentMethod(pendingTransaction.id, "tap_to_pay");
-        transaction = transaction ?? pendingTransaction;
+        const withMethod = transaction && await storage.updateTransactionPaymentMethodForMerchant(pendingTransaction.id, mid, "tap_to_pay");
+        if (!withMethod) return res.status(503).json({ message: "Payment outcome needs reconciliation" });
+        transaction = withMethod;
       } else {
         // No pending transaction exists — create a fresh record using the exact charged amount.
         // windcaveTransactionId is not part of the insert type (omitted from schema); set it
         // via updateTransactionStatus after creation so the type contract is preserved.
-        transaction = await storage.createTransaction({
+        transaction = await storage.createTransactionForMerchant(mid, {
           merchantId: mid,
           itemName: "Tap to Pay Sale",
           price: chargeAmount.toFixed(2),
@@ -2692,12 +2695,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           splitEnabled: false,
         });
         if (paymentResult.windcaveTransactionId) {
-          const updated = await storage.updateTransactionStatus(
-            transaction.id,
+          const updated = await storage.updateTransactionStatusForMerchant(
+            transaction.id, mid,
             finalStatus,
             paymentResult.windcaveTransactionId
           );
-          transaction = updated ?? transaction;
+          if (!updated) return res.status(503).json({ message: "Payment outcome needs reconciliation" });
+          transaction = updated;
         }
       }
 
@@ -5926,7 +5930,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       // API-v1 sales are independently addressable. The raw credential is
       // returned once in this authenticated response and never enters storage.
-      const { transaction, rawToken } = await createRetailTransaction(storage, {
+      const { transaction, rawToken } = await createRetailTransaction({ createTransaction: input => storage.createTransactionForMerchant(req.apiKey!.merchantId, input) }, {
         merchantId: req.apiKey.merchantId,
         itemName: item_name,
         price: amount,

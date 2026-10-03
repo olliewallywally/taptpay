@@ -1,10 +1,10 @@
 # R1-T7 tenant/storage execution inventory
 
-Generated from working-tree sources on base `8d5354267dc39a3277362dae12631e5fe07784f3`; the phase evidence names the final commit.
+Generated from working-tree sources on base `42792fd80a6075ce63071ddc27fe6aa2e742b06a`; the phase evidence names the final commit.
 
 Registrations: **187**; registrations with session/admin authentication: **119**;
 registrations calling checkMerchantOwnership: **25**.
-IStorage: **219** declared methods;
+IStorage: **221** declared methods;
 PaymentAttemptRepository: **8** inherited methods.
 
 Classifications come from the reviewed per-route branches, including mixed public/signed-in routes.
@@ -177,7 +177,7 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | POST /api/trades/quotes | tenant (merchant/resource) | `createClientProfile`, `createJobEvent`, `createQuote`, `getClientProfile`, `getMerchant`, `getOrCreateSubscription`, `uploadedFileOwnedByMerchant` |
 | POST /api/trades/quotes/token/:token/respond | single-resource bearer (public-bearer/token) | `createJobEvent`, `createJobInvoice`, `getOrCreateSubscription`, `getQuoteByToken`, `updateQuote` |
 | POST /api/trades/schedules | tenant (merchant/resource) | `createJobEvent`, `createJobSchedule`, `getClientProfile`, `getOrCreateSubscription` |
-| POST /api/transactions | tenant (merchant/path-merchant) | `getOrCreateSubscription`, `getTaptStone` |
+| POST /api/transactions | tenant (merchant/path-merchant) | `createTransactionForMerchant`, `getOrCreateSubscription`, `getTaptStoneForMerchant` |
 | POST /api/transactions/:id/cancel | tenant (merchant/resource) | `cancelTransactionForMerchant`, `getTransaction`, `getTransactionForMerchant` |
 | POST /api/transactions/:id/googlepay-complete | public (public/number) | `getNextPendingSplit`, `getTransaction`, `incrementTransactionCount`, `updateSplitPaymentStatus`, `updateTransactionPaymentMethod`, `updateTransactionSessionState`, `updateTransactionStatus` |
 | POST /api/transactions/:id/hosted-fields-complete | public (public/number) | `getNextPendingSplit`, `getTransaction`, `incrementTransactionCount`, `updateSplitPaymentStatus`, `updateTransactionPaymentMethod`, `updateTransactionSessionState`, `updateTransactionStatus` |
@@ -185,10 +185,10 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | POST /api/transactions/:id/receipt-pdf | public (public/number) | `getMerchant`, `getSplitPaymentById`, `getSplitPaymentsByTransaction`, `getTransaction` |
 | POST /api/transactions/:id/split | public (public/number) | `createBillSplit`, `getTransaction` |
 | POST /api/transactions/:transactionId/refunds | tenant (merchant/resource) | `createRefundForMerchant`, `getTransactionForMerchant`, `releaseRefundAmountForMerchant`, `reserveRefundAmountForMerchant`, `updateRefundStatusForMerchant` |
-| POST /api/transactions/cash-sale | tenant (merchant/path-merchant) | `createTransaction`, `getOrCreateSubscription`, `getTaptStone` |
-| POST /api/transactions/tap-to-pay | tenant (merchant/path-merchant) | `createTransaction`, `getActiveTransactionByMerchant`, `getOrCreateSubscription`, `getTransaction`, `updateTransactionPaymentMethod`, `updateTransactionStatus` |
+| POST /api/transactions/cash-sale | tenant (merchant/path-merchant) | `createTransactionForMerchant`, `getOrCreateSubscription`, `getTaptStoneForMerchant` |
+| POST /api/transactions/tap-to-pay | tenant (merchant/path-merchant) | `createTransactionForMerchant`, `getActiveTransactionByMerchant`, `getOrCreateSubscription`, `getTransactionForMerchant`, `updateTransactionPaymentMethodForMerchant`, `updateTransactionStatusForMerchant` |
 | POST /api/tutorial/restart | tenant (merchant/session) | `restartMerchantTutorial` |
-| POST /api/v1/transactions | API-key tenant (api-key/key) | `createWebhookDelivery`, `getApiKeyByKey`, `getOrCreateSubscription`, `logApiRequest`, `updateApiKeyLastUsed` |
+| POST /api/v1/transactions | API-key tenant (api-key/key) | `createTransactionForMerchant`, `createWebhookDelivery`, `getApiKeyByKey`, `getOrCreateSubscription`, `logApiRequest`, `updateApiKeyLastUsed` |
 | POST /api/webhooks/whatsapp | provider (provider/provider-session) | `createJobEvent`, `getInvoiceRentRequestByWhatsappMessageId`, `getJobInvoiceByWhatsappMessageId`, `logTransactionEvent`, `updateInvoiceRentRequest`, `updateJobInvoice` |
 | PUT /api/merchants/:id | tenant (merchant/path-merchant) | `updateMerchant` |
 | PUT /api/merchants/:id/change-password | account (merchant/path-merchant) | `deactivatePushSubscriptionsForLogin`, `getUserById`, `settleAuthThrottle`, `takeAuthThrottleSlot`, `updateUserPassword` |
@@ -242,6 +242,9 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | IStorage | getActiveTransactionByMerchant | yes | `getActiveTransactionByMerchant(merchantId: number, scope: ActiveTransactionScope): Promise<Transaction \| undefined>` |
 | IStorage | getTransactionByNfcSession | no | `getTransactionByNfcSession(nfcSessionId: string): Promise<Transaction \| undefined>` |
 | IStorage | createTransaction | no | `createTransaction(transaction: TransactionStorageInput): Promise<Transaction>` |
+| IStorage | createTransactionForMerchant | yes | `createTransactionForMerchant(merchantId: number, transaction: TransactionStorageInput): Promise<Transaction>` |
+| IStorage | updateTransactionStatusForMerchant | yes | `updateTransactionStatusForMerchant(id: number, merchantId: number, status: string, windcaveTransactionId?: string): Promise<Transaction \| undefined>` |
+| IStorage | updateTransactionPaymentMethodForMerchant | yes | `updateTransactionPaymentMethodForMerchant(id: number, merchantId: number, paymentMethod: string): Promise<Transaction \| undefined>` |
 | IStorage | updateTransactionStatus | no | `updateTransactionStatus(id: number, status: string, windcaveTransactionId?: string): Promise<Transaction \| undefined>` |
 | IStorage | updateTransactionPaymentMethod | no | `updateTransactionPaymentMethod(id: number, paymentMethod: string): Promise<Transaction \| undefined>` |
 | IStorage | updateTransactionSplitEnabled | no | `updateTransactionSplitEnabled(id: number, splitEnabled: boolean): Promise<Transaction \| undefined>` |
@@ -270,7 +273,6 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | IStorage | updateTaptStoneForMerchant | yes | `updateTaptStoneForMerchant(id: number, merchantId: number, data: Partial<{ name: string }>): Promise<TaptStone \| undefined>` |
 | IStorage | updateTaptStoneUrlsForMerchant | yes | `updateTaptStoneUrlsForMerchant(id: number, merchantId: number, qrCodeUrl: string, paymentUrl: string): Promise<TaptStone \| undefined>` |
 | IStorage | deleteTaptStoneForMerchant | yes | `deleteTaptStoneForMerchant(id: number, merchantId: number): Promise<boolean>` |
-| IStorage | associateTransactionWithStone | no | `associateTransactionWithStone(transactionId: number, stoneId: number): Promise<void>` |
 | IStorage | createStockItem | no | `createStockItem(data: InsertStockItem): Promise<StockItem>` |
 | IStorage | getStockItemForMerchant | yes | `getStockItemForMerchant(id: number, merchantId: number): Promise<StockItem \| undefined>` |
 | IStorage | getStockItemsByMerchant | yes | `getStockItemsByMerchant(merchantId: number): Promise<StockItem[]>` |

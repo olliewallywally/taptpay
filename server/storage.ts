@@ -46,6 +46,15 @@ function scopedRefundInput(transactionId: number, merchantId: number, input: Mer
     refundReason: input.refundReason, refundMethod: input.refundMethod, status: "pending" };
 }
 
+export class TransactionCreationScopeError extends Error {
+  constructor() { super("Selected payment board is unavailable"); this.name = "TransactionCreationScopeError"; }
+}
+
+function scopedTransactionInput(merchantId: number, input: TransactionStorageInput): TransactionStorageInput {
+  const { id: _id, createdAt: _createdAt, ...data } = sanitizeTransactionStorageInput(input) as TransactionStorageInput & { id?: unknown; createdAt?: unknown };
+  return { ...data, merchantId };
+}
+
 export type TransactionCancellationResult =
   | { kind: "cancelled"; transaction: Transaction }
   | { kind: "not-found" }
@@ -613,6 +622,9 @@ export interface IStorage extends PaymentAttemptRepository {
   getActiveTransactionByMerchant(merchantId: number, scope: ActiveTransactionScope): Promise<Transaction | undefined>;
   getTransactionByNfcSession(nfcSessionId: string): Promise<Transaction | undefined>;
   createTransaction(transaction: TransactionStorageInput): Promise<Transaction>;
+  createTransactionForMerchant(merchantId: number, transaction: TransactionStorageInput): Promise<Transaction>;
+  updateTransactionStatusForMerchant(id: number, merchantId: number, status: string, windcaveTransactionId?: string): Promise<Transaction | undefined>;
+  updateTransactionPaymentMethodForMerchant(id: number, merchantId: number, paymentMethod: string): Promise<Transaction | undefined>;
   updateTransactionStatus(id: number, status: string, windcaveTransactionId?: string): Promise<Transaction | undefined>;
   updateTransactionPaymentMethod(id: number, paymentMethod: string): Promise<Transaction | undefined>;
   updateTransactionSplitEnabled(id: number, splitEnabled: boolean): Promise<Transaction | undefined>;
@@ -653,7 +665,6 @@ export interface IStorage extends PaymentAttemptRepository {
   updateTaptStoneForMerchant(id: number, merchantId: number, data: Partial<{ name: string }>): Promise<TaptStone | undefined>;
   updateTaptStoneUrlsForMerchant(id: number, merchantId: number, qrCodeUrl: string, paymentUrl: string): Promise<TaptStone | undefined>;
   deleteTaptStoneForMerchant(id: number, merchantId: number): Promise<boolean>;
-  associateTransactionWithStone(transactionId: number, stoneId: number): Promise<void>;
   
   // Stock Item operations
   createStockItem(data: InsertStockItem): Promise<StockItem>;
@@ -1852,6 +1863,17 @@ export class MemStorage implements IStorage {
       .find(t => t.nfcSessionId === nfcSessionId);
   }
 
+  async createTransactionForMerchant(merchantId: number, input: TransactionStorageInput): Promise<Transaction> {
+    if (!isManagementTenantId(merchantId)) throw new TransactionCreationScopeError();
+    const data = scopedTransactionInput(merchantId, input);
+    if (data.taptStoneId != null) {
+      const board = this.taptStones.get(data.taptStoneId);
+      if (!board || board.merchantId !== merchantId || !board.isActive) throw new TransactionCreationScopeError();
+    }
+    // Existing memory constructor inserts synchronously, with no await/yield after the board check.
+    return this.createTransaction(data);
+  }
+
   async createTransaction(input: TransactionStorageInput): Promise<Transaction> {
     const insertTransaction = sanitizeTransactionStorageInput(input);
     const id = this.currentTransactionId++;
@@ -1995,6 +2017,22 @@ export class MemStorage implements IStorage {
     return true;
   }
 
+  async updateTransactionStatusForMerchant(id: number, merchantId: number, status: string, windcaveTransactionId?: string): Promise<Transaction | undefined> {
+    if (!isManagementTenantId(merchantId)) return undefined;
+    const transaction = this.transactions.get(id);
+    if (!transaction || transaction.merchantId !== merchantId) return undefined;
+    const now = new Date();
+    const updatedTransaction = {
+      ...transaction,
+      status,
+      completedAt:
+        status === "completed" ? transaction.completedAt ?? now : transaction.completedAt,
+      windcaveTransactionId: windcaveTransactionId || transaction.windcaveTransactionId,
+    };
+    this.transactions.set(id, updatedTransaction);
+    return updatedTransaction;
+  }
+
   async updateTransactionStatus(id: number, status: string, windcaveTransactionId?: string): Promise<Transaction | undefined> {
     const transaction = this.transactions.get(id);
     if (!transaction) return undefined;
@@ -2008,6 +2046,15 @@ export class MemStorage implements IStorage {
     };
     this.transactions.set(id, updatedTransaction);
     return updatedTransaction;
+  }
+
+  async updateTransactionPaymentMethodForMerchant(id: number, merchantId: number, paymentMethod: string): Promise<Transaction | undefined> {
+    if (!isManagementTenantId(merchantId)) return undefined;
+    const transaction = this.transactions.get(id);
+    if (!transaction || transaction.merchantId !== merchantId) return undefined;
+    const updated = { ...transaction, paymentMethod };
+    this.transactions.set(id, updated);
+    return updated;
   }
 
   async updateTransactionPaymentMethod(id: number, paymentMethod: string): Promise<Transaction | undefined> {
@@ -3131,12 +3178,6 @@ export class MemStorage implements IStorage {
       return true;
     }
     return false;
-  }
-
-  async associateTransactionWithStone(transactionId: number, stoneId: number): Promise<void> {
-    // For MemStorage, we could add a field to track stone associations
-    // but for simplicity, we'll just log this association
-    console.log(`Transaction ${transactionId} associated with stone ${stoneId}`);
   }
 
   // Stock Item operations
@@ -5208,6 +5249,22 @@ export class DatabaseStorage implements IStorage {
     return completedResult[0];
   }
 
+  async createTransactionForMerchant(merchantId: number, input: TransactionStorageInput): Promise<Transaction> {
+    if (!isManagementTenantId(merchantId)) throw new TransactionCreationScopeError();
+    if (!this.db) throw new Error('Database not available');
+    const data = scopedTransactionInput(merchantId, input);
+    return this.db.transaction(async (tx: any) => {
+      if (data.taptStoneId != null) {
+        const [board] = await tx.select().from(taptStones)
+          .where(and(eq(taptStones.id, data.taptStoneId), eq(taptStones.merchantId, merchantId), eq(taptStones.isActive, true)))
+          .limit(1).for("update");
+        if (!board) throw new TransactionCreationScopeError();
+      }
+      // Reuse the exact constructor/defaults with the transaction-bound DB handle.
+      return new DatabaseStorage(tx).createTransaction(data);
+    });
+  }
+
   async createTransaction(input: TransactionStorageInput): Promise<Transaction> {
     if (!this.db) throw new Error('Database not available');
     const insertTransaction = sanitizeTransactionStorageInput(input);
@@ -5236,6 +5293,27 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
+  async updateTransactionStatusForMerchant(id: number, merchantId: number, status: string, windcaveTransactionId?: string): Promise<Transaction | undefined> {
+    if (!isManagementTenantId(merchantId)) return undefined;
+    if (!this.db) throw new Error('Database not available');
+    const updateData: any = {
+      status,
+      ...(status === "completed"
+        ? { completedAt: sql`coalesce(${transactions.completedAt}, now())` }
+        : {}),
+    };
+    if (windcaveTransactionId) {
+      updateData.windcaveTransactionId = windcaveTransactionId;
+    }
+
+    const result = await this.db
+      .update(transactions)
+      .set(updateData)
+      .where(and(eq(transactions.id, id), eq(transactions.merchantId, merchantId)))
+      .returning();
+    return result[0];
+  }
+
   async updateTransactionStatus(id: number, status: string, windcaveTransactionId?: string): Promise<Transaction | undefined> {
     if (!this.db) throw new Error('Database not available');
     const updateData: any = {
@@ -5252,6 +5330,17 @@ export class DatabaseStorage implements IStorage {
       .update(transactions)
       .set(updateData)
       .where(eq(transactions.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async updateTransactionPaymentMethodForMerchant(id: number, merchantId: number, paymentMethod: string): Promise<Transaction | undefined> {
+    if (!isManagementTenantId(merchantId)) return undefined;
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db
+      .update(transactions)
+      .set({ paymentMethod })
+      .where(and(eq(transactions.id, id), eq(transactions.merchantId, merchantId)))
       .returning();
     return result[0];
   }
@@ -6308,12 +6397,6 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(taptStones.id, id), eq(taptStones.merchantId, merchantId)))
       .returning();
     return result.length > 0;
-  }
-
-  async associateTransactionWithStone(transactionId: number, stoneId: number): Promise<void> {
-    // For now, we'll just log the association. 
-    // In a full implementation, you might add a junction table or field to track this
-    console.log(`Transaction ${transactionId} associated with stone ${stoneId}`);
   }
 
   // Stock Item methods for DatabaseStorage

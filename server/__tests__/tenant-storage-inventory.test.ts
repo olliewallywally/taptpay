@@ -65,3 +65,17 @@ test("authenticated refunds use scoped writes and no retired global mutator", ()
     expect(methods).toContain(name);
   }
 });
+
+test("authenticated sale creation and disabled native writes have explicit tenant scope", () => {
+  expect(storageContract().find(method => method.name === "associateTransactionWithStone")).toBeUndefined();
+  const facts = currentRouteFacts();
+  for (const key of ["POST /api/transactions", "POST /api/transactions/cash-sale", "POST /api/v1/transactions", "POST /api/transactions/tap-to-pay"]) {
+    expect(facts.get(key)?.storageMethods).toContain("createTransactionForMerchant");
+    expect(facts.get(key)?.storageMethods).not.toContain("createTransaction");
+  }
+  const native = facts.get("POST /api/transactions/tap-to-pay")!.storageMethods;
+  expect(native).toContain("getTransactionForMerchant");
+  expect(native).not.toContain("getTransaction");
+  expect(native).toContain("updateTransactionStatusForMerchant");
+  expect(native).toContain("updateTransactionPaymentMethodForMerchant");
+});

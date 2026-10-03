@@ -331,7 +331,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       {
         principal: "api-key",
         tenant: "key",
-        tenantRule: "the sale is created for the API key's own merchant (req.apiKey.merchantId); no merchant id is read from the request",
+        tenantRule: "createTransactionForMerchant receives the API key's own merchant as explicit scope; no merchant id is read from the request",
       },
     ],
     input:
@@ -2818,7 +2818,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         roles: ["owner", "member"],
         platformAdmin: true,
         tenant: "path-merchant",
-        tenantRule: `the business named in the body (merchantId), checked with ${SIGNED_IN_BUSINESS_RULE}; a board must be one of its active boards (400 otherwise)`,
+        tenantRule: `the business named in the body (merchantId), checked with ${SIGNED_IN_BUSINESS_RULE}; createTransactionForMerchant uses explicit tenant scope and holds the active owned board's row lock through insert (400 on unavailable/raced board)`,
       },
     ],
     input:
@@ -2840,7 +2840,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         roles: ["owner", "member"],
         platformAdmin: true,
         tenant: "path-merchant",
-        tenantRule: `the business named in the body (merchantId), checked with ${SIGNED_IN_BUSINESS_RULE}; a board must be one of its active boards (getTaptStone: 400 otherwise, since 2026-09-27)`,
+        tenantRule: `the business named in the body (merchantId), checked with ${SIGNED_IN_BUSINESS_RULE}; getTaptStoneForMerchant scopes the read and createTransactionForMerchant locks and rechecks an active owned board through insert (400 on unavailable/raced board)`,
       },
     ],
     input:
@@ -2861,7 +2861,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         roles: ["owner", "member"],
         platformAdmin: true,
         tenant: "path-merchant",
-        tenantRule: `the business named in the body (merchantId), checked with ${SIGNED_IN_BUSINESS_RULE}; a sale named by transactionId must be the business's (404 otherwise) and pending (409)`,
+        tenantRule: `the business named in the body (merchantId), checked with ${SIGNED_IN_BUSINESS_RULE}; getTransactionForMerchant scopes the named sale (404 otherwise); pending state is 409; create/status/method writes require explicit tenant scope and a refused outcome write returns reconciliation-required 503 without stale-row success. Native capability remains off`,
       },
     ],
     input:

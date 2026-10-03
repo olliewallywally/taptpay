@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 8d5354267dc39a3277362dae12631e5fe07784f3 on 2026-10-03.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 42792fd80a6075ce63071ddc27fe6aa2e742b06a on 2026-10-03.
  *
  * 187 registrations (78 GET, 77 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -639,7 +639,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       middleware: ["authenticateToken"],
       body: ["schema: retailTransactionCreateRequestSchema"],
       authChecks: ["checkMerchantOwnership","compares stone.merchantId !== validation.data.merchantId"],
-      storageMethods: ["getOrCreateSubscription","getTaptStone"],
+      storageMethods: ["createTransactionForMerchant","getOrCreateSubscription","getTaptStoneForMerchant"],
       sideEffects: ["live update: sseBroker.broadcast","push: sendPushToMerchant"],
       statuses: [200,400,401,402,403,500,503],
       dtos: ["ownerTransactionDto"],
@@ -658,7 +658,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       middleware: ["authenticateToken"],
       body: ["schema: cashSaleRequestSchema"],
       authChecks: ["checkMerchantOwnership","compares stone.merchantId !== merchantId"],
-      storageMethods: ["createTransaction","getOrCreateSubscription","getTaptStone"],
+      storageMethods: ["createTransactionForMerchant","getOrCreateSubscription","getTaptStoneForMerchant"],
       sideEffects: ["live update: sseBroker.broadcast","push: sendPushToMerchant"],
       statuses: [200,400,401,402,403,500,503],
       dtos: ["ownerTransactionDto"],
@@ -676,7 +676,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       middleware: ["authenticateToken"],
       body: ["fields: amount, merchantId, transactionId, windcaveToken"],
       authChecks: ["checkMerchantOwnership","compares pendingTransaction.merchantId !== mid"],
-      storageMethods: ["createTransaction","getActiveTransactionByMerchant","getOrCreateSubscription","getTransaction","updateTransactionPaymentMethod","updateTransactionStatus"],
+      storageMethods: ["createTransactionForMerchant","getActiveTransactionByMerchant","getOrCreateSubscription","getTransactionForMerchant","updateTransactionPaymentMethodForMerchant","updateTransactionStatusForMerchant"],
       sideEffects: ["live update: sseBroker.broadcast","provider: createAttendedSession","provider: submitTapToPayToken","push: sendPushToMerchant"],
       statuses: [200,400,401,402,403,404,409,500,502,503],
       errorTextInResponse: ["paymentResult.error","sessionResult.error"],
@@ -1558,7 +1558,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       middleware: ["requireEcommerceApi","authenticateApiKey"],
       body: ["schema: apiV1CreateTransactionSchema"],
-      storageMethods: ["createWebhookDelivery","getApiKeyByKey","getOrCreateSubscription","logApiRequest","updateApiKeyLastUsed"],
+      storageMethods: ["createTransactionForMerchant","createWebhookDelivery","getApiKeyByKey","getOrCreateSubscription","logApiRequest","updateApiKeyLastUsed"],
       statuses: [200,400,401,402,403,404,500,503],
       dtos: ["publicTransactionDto"],
       errorTextInResponse: ["validation.error.errors"],

@@ -170,6 +170,56 @@ try {
     });
   }
 
+  await check("scoped creation supports no-board/board/cash without identity injection", async () => {
+    const board = await one.createNextTaptStone(a);
+    const row = await one.createTransactionForMerchant(a, { merchantId: b, itemName: "Synthetic cash", price: "10.00", status: "completed", paymentMethod: "cash", taptStoneId: board.id, id: 99999 } as any);
+    assert.equal(row.merchantId, a);
+    assert.notEqual(row.id, 99999);
+    assert.equal(row.taptStoneId, board.id);
+    assert.ok(row.completedAt);
+    await assert.rejects(one.createTransactionForMerchant(b, { merchantId: b, itemName: "Synthetic", price: "10.00", status: "pending", taptStoneId: board.id } as any));
+    const independent = await one.createTransactionForMerchant(a, { merchantId: a, itemName: "Synthetic independent", price: "1.00", status: "pending" } as any);
+    assert.equal(independent.taptStoneId, null);
+  });
+  for (const change of ["ownership", "inactive"] as const) {
+    await check(`scoped creation waits and refuses committed board ${change} change`, async () => {
+      const board = await one.createNextTaptStone(a);
+      const before = (await pool.query("SELECT count(*)::int n FROM transactions")).rows[0].n;
+      const locker = await pool.connect();
+      let pending: Promise<unknown> | undefined;
+      let open = false;
+      try {
+        await locker.query("BEGIN"); open = true;
+        if (change === "ownership") await locker.query("UPDATE tapt_stones SET merchant_id=$1 WHERE id=$2", [b, board.id]);
+        else await locker.query("UPDATE tapt_stones SET is_active=false WHERE id=$1", [board.id]);
+        pending = two.createTransactionForMerchant(a, { merchantId: a, itemName: "Synthetic board race", price: "10.00", status: "pending", taptStoneId: board.id } as any);
+        void pending.catch(() => undefined);
+        let waited = false;
+        for (let i = 0; i < 200; i++) {
+          const wait = await pool.query("SELECT 1 FROM pg_stat_activity WHERE application_name=$1 AND wait_event_type='Lock'", ["taptpay-t7-s2-writer"]);
+          if (wait.rowCount) { waited = true; break; }
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+        assert.ok(waited);
+        await locker.query("COMMIT"); open = false;
+        await assert.rejects(pending);
+        assert.equal((await pool.query("SELECT count(*)::int n FROM transactions")).rows[0].n, before);
+      } finally {
+        if (open) await locker.query("ROLLBACK");
+        await pending?.catch(() => undefined);
+        locker.release();
+      }
+    });
+  }
+  await check("native writes cannot modify another merchant's transaction", async () => {
+    const row = await sale(a);
+    assert.equal(await one.updateTransactionStatusForMerchant(row.id, b, "completed", "synthetic-provider"), undefined);
+    assert.equal(await one.updateTransactionPaymentMethodForMerchant(row.id, b, "tap_to_pay"), undefined);
+    assert.deepEqual(await one.getTransaction(row.id), row);
+    assert.equal((await one.updateTransactionStatusForMerchant(row.id, a, "completed", "synthetic-provider"))!.status, "completed");
+    assert.equal((await one.updateTransactionPaymentMethodForMerchant(row.id, a, "tap_to_pay"))!.paymentMethod, "tap_to_pay");
+  });
+
   for (const change of ["ownership", "completed"] as const) {
     await check(`cancellation waits and refuses a committed concurrent ${change} change`, async () => {
       const row = await sale(a);
