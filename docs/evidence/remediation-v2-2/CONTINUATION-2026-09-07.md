@@ -1,5 +1,24 @@
 # Full integration continuation audit — 2026-09-07
 
+Latest continuation **2026-10-03 — S3c2 property creation/delivery code-complete
+`1b80cb8d`**, local, awaiting independent review.
+[Evidence/handoff](r1/R1-T7-S3c2-property-invoice-send-2026-10-03.md).
+S3a/b/c1/c2 engineering scopes are implemented; S3/R1-T7/R1 are not independently closed.
+Owner finish-R1 authorization persists.
+
+- Atomic scoped create/reuse and creation history; attached document recheck under
+  share lock; explicit merchant manual delivery from a joined owned snapshot;
+  scoped locked delivery record/history; uncertainty is fixed 503 with no invoice DTO.
+  Unused global live lookup and unscoped manual resend retired; cron/provider kept.
+- Red **14 storage / 13 service / 3 HTTP fail**; affected **20 suites / 562 pass**;
+  fresh actual PostgreSQL **24 pass**; **full server 151 suites / 3,771 pass**.
+  Final typecheck/build/whitespace and **187 routes / 0 gaps; 237 contracts** pass.
+- No app DB/provider, live migration, client/schema change, enablement, push or deploy.
+  Disposable PG continues only for active S4 verification; stop before handoff.
+
+**Active next:** S4a trades clients/history (reviewed decomposition), S4b quote/invoice
+and S4c schedules; S5–S6, Apple and R1-T10. Independent/external gates remain below.
+
 Latest continuation **2026-10-03 — S3c1 property invoice reads/settlement code-complete
 `ff237d24`**, local, awaiting independent review.
 [Evidence](r1/R1-T7-S3c1-property-invoices-2026-10-03.md),
