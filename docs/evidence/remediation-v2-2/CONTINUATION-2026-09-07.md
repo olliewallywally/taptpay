@@ -1,5 +1,33 @@
 # Full integration continuation audit — 2026-09-07
 
+Latest continuation **2026-10-03 — R1-T7 S2a is code-complete: `ea4759cf`, local,
+awaiting independent review** ([evidence](r1/R1-T7-S2a-transactions-refunds-2026-10-03.md),
+[immediate handoff](../../HANDOFF-2026-10-03-r1-t7-transactions.md),
+[preflight](../../PLAN-2026-10-03-r1-t7-s2-transactions-refunds.md),
+[R1 exit assessment](r1/R1-exit-assessment-2026-10-03.md)). Recovered the timeout's
+uncommitted implementation from Git; historical temporary logs did not survive.
+
+- Explicit merchant transaction/refund readers in both storage implementations;
+  refunds require matching refund AND parent ownership. Cancellation locks and
+  rechecks tenant and pending/processing state, and broadcasts only the persisted row.
+  Four registrations migrated; current owner/member/admin/status/DTO policy preserved.
+- Prior session recorded red first **37 fail / 3 pass**, full server **138 suites /
+  3,631 tests pass**, and independent S1 PostgreSQL **10 pass**. These historical
+  counts were not repeated in the recovery; no new full-server claim is made.
+- Recovery independently reread the code/tests/verifier and repeated focused
+  **3 suites / 44 pass**, affected route/payment **11 suites / 372 pass**, actual
+  fresh isolated PostgreSQL **14 pass**, typecheck, build and whitespace.
+  Inventories regenerated: **187 routes / 0 unclassified / 0 gaps; 227 methods**.
+- No application database, provider, live migration, UI change, push or deployment.
+  Disposable PostgreSQL stopped. Only exact reviewed paths staged.
+
+**Next:** S2b scoped authenticated refund writes and transaction creation/board
+association, with preflight/separate reread and failing tests first; then S3–S6.
+S2a does not close S2 or R1-T7. Independent reviews, R1-T5 Apple and R1-T10 remain
+open. R3 gap-11 C2–C5, R4 durable refunds/unknown outcomes, S6 provider/scanner/
+retention decisions, Keychain A-T4 and owner development 0030/0031 actions retain
+their recorded gates. Production remains closed.
+
 Latest continuation **2026-10-02 — R1-T7 S0/S1 is code-complete: `47fdab71`, local,
 awaiting independent review** ([evidence and review brief](r1/R1-T7-S1-stock-board-storage-2026-10-02.md),
 [immediate handoff](../../HANDOFF-2026-10-02-r1-t7-storage.md),
