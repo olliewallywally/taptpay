@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import { currentRouteFacts } from "../route-facts";
+import { ROUTE_REVIEW } from "../route-review";
 import { storageContract, TENANT_INVENTORY_FILE, renderTenantInventory, tenantStorageInventory } from "../../scripts/generate-tenant-storage-inventory";
 
 test("tenant inventory covers every registration, including direct authentication middleware", () => {
@@ -22,9 +23,10 @@ test("the checked-in tenant/storage inventory matches the current source and rev
 
 test("stock and board management has no unscoped mutation escape hatch", () => {
   const contract = storageContract();
-  const retired = ["getStockItem", "updateStockItem", "deleteStockItem", "updateTaptStone", "updateTaptStoneUrls", "deleteTaptStone"];
+  // The stock create that took its business inside the data went with S5b.
+  const retired = ["createStockItem", "getStockItem", "updateStockItem", "deleteStockItem", "updateTaptStone", "updateTaptStoneUrls", "deleteTaptStone"];
   expect(contract.filter((m) => retired.includes(m.name))).toEqual([]);
-  for (const name of ["getStockItem", "updateStockItem", "deleteStockItem", "getTaptStone", "updateTaptStone", "updateTaptStoneUrls", "deleteTaptStone"]) {
+  for (const name of ["createStockItem", "getStockItem", "updateStockItem", "deleteStockItem", "getTaptStone", "updateTaptStone", "updateTaptStoneUrls", "deleteTaptStone"]) {
     expect(contract.find((m) => m.name === `${name}ForMerchant`)?.requiredTenant).toBe(true);
   }
   for (const [key, facts] of currentRouteFacts()) {
@@ -269,5 +271,95 @@ test("a signed-in business's settings are written by purpose; the general update
     "PUT /api/property/reminder-settings", "PUT /api/trades/reminder-settings", "PUT /api/trades/gst-settings",
   ]) {
     expect([key, facts.get(key)?.storageMethods.includes("updateMerchantSettings")]).toEqual([key, true]);
+  }
+});
+
+test("the S5b stragglers name the business to storage in the call itself", () => {
+  const contract = storageContract();
+  const facts = currentRouteFacts();
+  for (const [key, name, gone] of [
+    ["POST /api/merchants/:merchantId/stock-items", "createStockItemForMerchant", "createStockItem"],
+    ["POST /api/team/:userId/resend", "getTeamMemberForMerchant", "getUserById"],
+    ["DELETE /api/team/:userId", "getTeamMemberForMerchant", "getUserById"],
+    ["POST /api/push/unsubscribe", "deactivatePushSubscriptionForMerchant", "deactivatePushSubscriptionByEndpoint"],
+    ["POST /api/push/native-unsubscribe", "deactivatePushSubscriptionForMerchant", "deactivatePushSubscriptionByEndpoint"],
+    ["POST /api/board-builder/submit", "getTaptStoneForMerchant", "getTaptStone"],
+  ]) {
+    expect([name, contract.find(method => method.name === name)?.requiredTenant]).toEqual([name, true]);
+    expect([key, facts.get(key)?.storageMethods.includes(name)]).toEqual([key, true]);
+    expect([key, facts.get(key)?.storageMethods.includes(gone)]).toEqual([key, false]);
+  }
+  // The two stops no longer read the business's devices first: one statement decides.
+  for (const key of ["POST /api/push/unsubscribe", "POST /api/push/native-unsubscribe"]) {
+    expect(facts.get(key)?.storageMethods).not.toContain("getPushSubscriptionsByMerchant");
+  }
+  // A property tenant's history is written by its storage write, in its transaction: no route logs it.
+  for (const key of ["POST /api/property/tenants", "POST /api/property/tenants/:id/archive", "POST /api/property/tenants/:id/unarchive"]) {
+    expect([key, facts.get(key)?.storageMethods.includes("logTransactionEvent")]).toEqual([key, false]);
+  }
+  // The sender keeps the stop by address alone, for an address its push service reports gone.
+  expect(contract.find(method => method.name === "deactivatePushSubscriptionByEndpoint")).toBeDefined();
+});
+
+/**
+ * R1-T7 S5: what is left when every signed-in business route is asked which storage calls take no
+ * business. Each is a reviewed exception with its reason; a new one fails here until it is scoped or
+ * reviewed. A required argument proves nothing about a predicate: the batches' own tests do that.
+ */
+const REVIEWED_UNSCOPED: Record<string, Record<string, string>> = {
+  "POST /api/auth/sign-out-everywhere": {
+    advanceUserSessionVersion: "account scope: the signed-in login's own sessions, by the session's login id",
+  },
+  "PUT /api/merchants/:id/change-password": {
+    getUserById: "account scope: the signed-in login itself, by the session's login id (the path is only a precondition)",
+    takeAuthThrottleSlot: "account scope: the password check's counter, keyed by the signed-in login",
+    settleAuthThrottle: "account scope: the same counter",
+    updateUserPassword: "account scope: the signed-in login's own password",
+  },
+  "GET /api/merchants/:id/active-transaction": {
+    getTaptStone: "public branch: a board's customer page names its board; the signed-in branch reads by the business",
+  },
+  "GET /api/merchants/:id/events": {
+    getTaptStone: "public branch: a board's live updates; the signed-in branch is held to the session's business",
+  },
+  "POST /api/transactions/:id/cancel": {
+    getTransaction: "validated platform-admin branch only; a business's login reads through getTransactionForMerchant",
+  },
+  "POST /api/push/subscribe": {
+    createPushSubscription: "per login (owner decision 2026-09-22): the business rides in the data and is checked against the login under its row lock",
+  },
+  "POST /api/push/native-subscribe": {
+    createPushSubscription: "per login, as the web registration",
+  },
+  "POST /api/board-builder/submit": {
+    takeAuthThrottleSlot: "the business's own print limit: the counter's key is built from the session's business",
+    settleAuthThrottle: "the same counter, given back when the email could not be sent",
+  },
+  "GET /api/invoice-documents/:name": {
+    getUploadedFile: "validated platform-admin branch only; a business's login reads through getUploadedFileForMerchant",
+    recordInvoiceDocumentAdminRead: "validated platform-admin branch only: the audit line of that read",
+  },
+};
+
+test("every signed-in business route names its business to storage, or is a reviewed exception", () => {
+  const contract = new Map(storageContract().map((method) => [method.name, method.requiredTenant]));
+  const actual: Record<string, string[]> = {};
+  for (const [key, fact] of currentRouteFacts()) {
+    if (!ROUTE_REVIEW[key]?.branches.some((branch) => branch.principal === "merchant")) continue;
+    const unscoped = fact.storageMethods.filter((name) => contract.get(name) === false).sort();
+    if (unscoped.length) actual[key] = unscoped;
+  }
+  expect(actual).toEqual(Object.fromEntries(
+    Object.entries(REVIEWED_UNSCOPED).map(([key, methods]) => [key, Object.keys(methods).sort()]),
+  ));
+  for (const methods of Object.values(REVIEWED_UNSCOPED)) for (const reason of Object.values(methods)) expect(reason.length).toBeGreaterThan(20);
+  // The branch each exception names really is on the route.
+  for (const [key, principal] of [
+    ["GET /api/merchants/:id/active-transaction", "public"], ["GET /api/merchants/:id/events", "public"],
+    ["POST /api/transactions/:id/cancel", "platform-admin"], ["GET /api/invoice-documents/:name", "platform-admin"],
+  ]) {
+    const review = ROUTE_REVIEW[key];
+    const served = review.branches.some((branch) => branch.principal === principal || (principal === "platform-admin" && (branch as any).platformAdmin));
+    expect([key, principal, served]).toEqual([key, principal, true]);
   }
 });

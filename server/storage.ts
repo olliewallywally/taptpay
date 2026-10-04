@@ -239,6 +239,8 @@ export type TransactionServerOwnedFields = Readonly<{
 
 /** Management may change these fields, never the stock item's identity or business. */
 export type StockItemChanges = Partial<Pick<InsertStockItem, "name" | "description" | "cost" | "emoji" | "variations">>;
+/** A new stock item's fields; its business is the create's own argument, never one of these. */
+export type StockItemInput = Pick<InsertStockItem, "name" | "cost"> & StockItemChanges;
 
 function isManagementTenantId(merchantId: number): boolean {
   // merchants.id and these foreign keys are PostgreSQL serial/integer, not bigint.
@@ -843,7 +845,7 @@ export interface IStorage extends PaymentAttemptRepository {
   deleteTaptStoneForMerchant(id: number, merchantId: number): Promise<boolean>;
   
   // Stock Item operations
-  createStockItem(data: InsertStockItem): Promise<StockItem>;
+  createStockItemForMerchant(merchantId: number, data: StockItemInput): Promise<StockItem>;
   getStockItemForMerchant(id: number, merchantId: number): Promise<StockItem | undefined>;
   getStockItemsByMerchant(merchantId: number): Promise<StockItem[]>;
   updateStockItemForMerchant(id: number, merchantId: number, data: StockItemChanges): Promise<StockItem | undefined>;
@@ -920,6 +922,8 @@ export interface IStorage extends PaymentAttemptRepository {
 
   // Team seat operations
   getTeamMembers(merchantId: number): Promise<User[]>;
+  /** One login of the business, read through the business: another business's reads as missing. */
+  getTeamMemberForMerchant(userId: number, merchantId: number): Promise<User | undefined>;
   countSeatsInUse(merchantId: number): Promise<number>;
   inviteTeamMember(merchantId: number, input: InviteTeamMemberInput): Promise<InviteTeamMemberResult>;
   setTeamMemberStatus(merchantId: number, userId: number, status: UserStatus): Promise<TeamMemberStatusResult>;
@@ -964,6 +968,11 @@ export interface IStorage extends PaymentAttemptRepository {
   ): Promise<PushNotificationPreferences>;
   deactivatePushSubscription(id: number): Promise<void>;
   deactivatePushSubscriptionByEndpoint(endpoint: string): Promise<void>;
+  /**
+   * Stops the business's own active device at that address, in one statement, and says whether one
+   * was stopped. The stop by address alone above is the sender's, for an address its service reports gone.
+   */
+  deactivatePushSubscriptionForMerchant(merchantId: number, endpoint: string): Promise<boolean>;
   /**
    * R1-T4: that login's sessions ended — stop its devices, and the merchant's
    * unattributed subscriptions from before 0029, which cannot be shown to be
@@ -3192,6 +3201,14 @@ export class MemStorage implements IStorage {
     if (sub) sub.isActive = false;
   }
 
+  async deactivatePushSubscriptionForMerchant(merchantId: number, endpoint: string): Promise<boolean> {
+    if (!isManagementTenantId(merchantId)) return false;
+    const sub = this.pushSubs.find(s => s.endpoint === endpoint && s.merchantId === merchantId && s.isActive);
+    if (!sub) return false;
+    sub.isActive = false;
+    return true;
+  }
+
   async deactivatePushSubscriptionsForLogin(merchantId: number, userId: number): Promise<void> {
     for (const sub of this.pushSubs) {
       if (sub.userId === userId || (sub.merchantId === merchantId && sub.userId == null)) sub.isActive = false;
@@ -3404,14 +3421,16 @@ export class MemStorage implements IStorage {
   }
 
   // Stock Item operations
-  async createStockItem(data: InsertStockItem): Promise<StockItem> {
+  async createStockItemForMerchant(merchantId: number, data: StockItemInput): Promise<StockItem> {
+    if (!isManagementTenantId(merchantId)) throw new Error("Invalid tenant scope");
+    const fields = stockItemChanges(data) as StockItemInput;
     const id = this.currentStockItemId++;
     const stockItem: StockItem = {
-      ...data,
-      merchantId: data.merchantId ?? null,
-      description: data.description ?? null,
-      emoji: (data as any).emoji ?? null,
-      variations: (data as any).variations ?? null,
+      ...fields,
+      merchantId,
+      description: fields.description ?? null,
+      emoji: fields.emoji ?? null,
+      variations: fields.variations ?? null,
       id,
       isActive: true,
       createdAt: new Date(),
@@ -4180,6 +4199,12 @@ export class MemStorage implements IStorage {
     return Array.from(this.users.values())
       .filter((user) => user.merchantId === merchantId)
       .sort((a, b) => a.id - b.id);
+  }
+
+  async getTeamMemberForMerchant(userId: number, merchantId: number): Promise<User | undefined> {
+    if (!isManagementTenantId(merchantId)) return undefined;
+    const user = this.users.get(userId);
+    return user?.merchantId === merchantId ? user : undefined;
   }
 
   async countSeatsInUse(merchantId: number): Promise<number> {
@@ -6174,6 +6199,20 @@ export class DatabaseStorage implements IStorage {
       .where(eq(pushSubscriptions.endpoint, endpoint));
   }
 
+  // One statement names the business, the address and the active state (R1-T7 S5b): a device since
+  // registered to another business, or already stopped, is not this business's to stop. A fault
+  // reaches the caller.
+  async deactivatePushSubscriptionForMerchant(merchantId: number, endpoint: string): Promise<boolean> {
+    if (!this.db) throw new Error("Database not connected");
+    if (!isManagementTenantId(merchantId)) return false;
+    const stopped = await this.db
+      .update(pushSubscriptions)
+      .set({ isActive: false })
+      .where(and(eq(pushSubscriptions.merchantId, merchantId), eq(pushSubscriptions.endpoint, endpoint), eq(pushSubscriptions.isActive, true)))
+      .returning({ id: pushSubscriptions.id });
+    return stopped.length > 0;
+  }
+
   // The devices are locked in id order, then stopped. Each login's ending also stops the business's
   // unattributed devices, so endings that happen together share rows; taken in whatever order each
   // statement met them, they could deadlock, and the statement rolled back left its login's devices on
@@ -6666,9 +6705,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Stock Item methods for DatabaseStorage
-  async createStockItem(data: InsertStockItem): Promise<StockItem> {
+  async createStockItemForMerchant(merchantId: number, data: StockItemInput): Promise<StockItem> {
     if (!this.db) throw new Error('Database not available');
-    const result = await this.db.insert(stockItems).values(data).returning();
+    if (!isManagementTenantId(merchantId)) throw new Error("Invalid tenant scope");
+    // The business is the create's own argument; the data gives the five stock fields and nothing else.
+    const result = await this.db.insert(stockItems).values({ ...(stockItemChanges(data) as StockItemInput), merchantId }).returning();
     return result[0];
   }
 
@@ -8089,6 +8130,14 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
+  async getTeamMemberForMerchant(userId: number, merchantId: number): Promise<User | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    if (!isManagementTenantId(merchantId)) return undefined;
+    const result = await this.db.select().from(users)
+      .where(and(eq(users.id, userId), eq(users.merchantId, merchantId))).limit(1);
+    return result[0];
+  }
+
   async getUserByInviteToken(tokenHash: string): Promise<User | undefined> {
     if (!this.db) throw new Error('Database not available');
     const result = await this.db
@@ -8218,8 +8267,13 @@ export class DatabaseStorage implements IStorage {
   async createTenantProfileForMerchant(merchantId: number, data: TenantProfileChanges): Promise<any> {
     if (!isManagementTenantId(merchantId)) throw new Error("Invalid tenant scope");
     const db = this.db; if (!db) throw new Error("Property requires database");
-    const [row] = await db.insert(tenantProfiles).values({ ...tenantProfileChanges(data), merchantId } as any).returning();
-    return row;
+    // The tenant and its history line commit together (R1-T7 S5b): a history failure makes no tenant.
+    return db.transaction(async (tx: any) => {
+      const [row] = await tx.insert(tenantProfiles).values({ ...tenantProfileChanges(data), merchantId } as any).returning();
+      await tx.insert(transactionEvents).values({ merchantId, tenantProfileId: row.id, eventType: "Tenant_Created",
+        payload: { firstName: row.firstName, lastName: row.lastName, propertyAddress: row.propertyAddress } });
+      return row;
+    });
   }
   async getTenantProfileForMerchant(id: string, merchantId: number): Promise<any> {
     if (!isManagementTenantId(merchantId)) return undefined;
@@ -8245,15 +8299,20 @@ export class DatabaseStorage implements IStorage {
       if (!row) return undefined;
       await tx.update(activeSchedules).set({ status: "terminated", terminatedAt: now, updatedAt: now })
         .where(and(eq(activeSchedules.tenantProfileId, id), eq(activeSchedules.merchantId, merchantId), sql`${activeSchedules.status} <> 'terminated'`));
+      await tx.insert(transactionEvents).values({ merchantId, tenantProfileId: id, eventType: "Tenant_Archived", payload: {} });
       return row;
     });
   }
   async unarchiveTenantProfileForMerchant(id: string, merchantId: number): Promise<any> {
     if (!isManagementTenantId(merchantId)) return undefined;
     const db = this.db; if (!db) return undefined;
-    const [row] = await db.update(tenantProfiles).set({ status: "active", archivedAt: null, updatedAt: new Date() })
-      .where(and(eq(tenantProfiles.id, id), eq(tenantProfiles.merchantId, merchantId))).returning();
-    return row;
+    return db.transaction(async (tx: any) => {
+      const [row] = await tx.update(tenantProfiles).set({ status: "active", archivedAt: null, updatedAt: new Date() })
+        .where(and(eq(tenantProfiles.id, id), eq(tenantProfiles.merchantId, merchantId))).returning();
+      if (!row) return undefined;
+      await tx.insert(transactionEvents).values({ merchantId, tenantProfileId: id, eventType: "Tenant_Restored", payload: {} });
+      return row;
+    });
   }
   async getTransactionEventsByTenantForMerchant(tenantProfileId: string, merchantId: number, limit = 100): Promise<any[]> {
     if (!isManagementTenantId(merchantId)) return [];

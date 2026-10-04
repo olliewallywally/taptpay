@@ -120,7 +120,7 @@ describe("turning notifications off is never reported done when it failed", () =
     const owner = await createOwnerPrincipal();
     await subscribeWeb(app, owner, "owner-laptop");
     await request(app).post("/api/push/native-subscribe").set(signedIn(owner)).send({ deviceToken: "owner-phone-token" });
-    const stop = jest.spyOn(storage, "deactivatePushSubscriptionByEndpoint").mockRejectedValueOnce(new Error("database down"));
+    const stop = jest.spyOn(storage, "deactivatePushSubscriptionForMerchant").mockRejectedValueOnce(new Error("database down"));
     const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
 
     const res = await request(app).post(path).set(signedIn(owner)).send(body);

@@ -5373,13 +5373,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       }
 
-      const subs = await storage.getPushSubscriptionsByMerchant(merchantId);
-      const ownsSub = subs.some((s: any) => s.endpoint === endpoint);
-      if (!ownsSub) {
+      // One scoped statement (R1-T7 S5b): the business and the address together, so a device another
+      // business has since registered is never stopped on this one's say-so. Nothing stopped is 403.
+      const stopped = typeof endpoint === "string" && await storage.deactivatePushSubscriptionForMerchant(merchantId, endpoint);
+      if (!stopped) {
         return res.status(403).json({ message: "Not authorized to unsubscribe this endpoint" });
       }
 
-      await storage.deactivatePushSubscriptionByEndpoint(endpoint);
       res.json({ success: true });
     } catch (error) {
       console.error("Push unsubscribe error:", error);
@@ -5440,11 +5440,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           return res.status(400).json({ message: "Invalid device token" });
         }
         const endpoint = `apns://${deviceToken.trim()}`;
-        const subs = await storage.getPushSubscriptionsByMerchant(merchantId);
-        if (!subs.some((s) => s.endpoint === endpoint)) {
+        if (!(await storage.deactivatePushSubscriptionForMerchant(merchantId, endpoint))) {
           return res.status(403).json({ message: "Not authorized to unsubscribe this device" });
         }
-        await storage.deactivatePushSubscriptionByEndpoint(endpoint);
       } else {
         // Registered before device tokens were remembered: this login's iPhones.
         const userId = req.user?.userId;
@@ -5774,10 +5772,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       
       const validatedData = createStockItemSchema.parse(req.body);
       
-      const stockItem = await storage.createStockItem({
-        merchantId,
-        ...validatedData,
-      });
+      const stockItem = await storage.createStockItemForMerchant(merchantId, validatedData);
       
       res.status(201).json(stockItem);
     } catch (error) {
@@ -6352,8 +6347,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(429).json({ message: "Too many resend attempts. Please try again later." });
       }
 
-      const previous = await storage.getUserById(userId);
-      if (!previous || previous.merchantId !== merchantId || previous.status !== "invited" || !previous.inviteTokenHash) {
+      const previous = await storage.getTeamMemberForMerchant(userId, merchantId);
+      if (!previous || previous.status !== "invited" || !previous.inviteTokenHash) {
         return res.status(404).json({ message: "Invite not found" });
       }
 
@@ -6501,8 +6496,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
 
       if (!Number.isInteger(userId)) return res.status(400).json({ message: "Invalid login" });
-      const member = await storage.getUserById(userId);
-      if (!member || member.merchantId !== merchantId || member.role === "owner") {
+      const member = await storage.getTeamMemberForMerchant(userId, merchantId);
+      if (!member || member.role === "owner") {
         return res.status(404).json({ message: "Login not found, or it is the account owner" });
       }
       if (member.status === "invited") {
@@ -6820,8 +6815,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         const pdf = decodeBoardPrintPdf(validation.data.pdf);
         if (!pdf) return res.status(400).json({ message: "The board must be a PDF of at most 2 MB" });
 
-        const stone = await storage.getTaptStone(validation.data.stoneId);
-        if (!stone || !stone.isActive || stone.merchantId !== merchantId) {
+        const stone = await storage.getTaptStoneForMerchant(validation.data.stoneId, merchantId);
+        if (!stone || !stone.isActive) {
           return res.status(404).json({ message: "Payment board not found" });
         }
         const merchant = await storage.getMerchant(merchantId);
@@ -7148,8 +7143,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const merchantId = req.user?.merchantId;
       if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const data = createTenantProfileSchema.parse(req.body);
+      // Storage commits the tenant and its Tenant_Created history line together (R1-T7 S5b).
       const tenant = await storage.createTenantProfileForMerchant(merchantId, data);
-      await storage.logTransactionEvent({ merchantId, tenantProfileId: tenant.id, eventType: "Tenant_Created", payload: { firstName: tenant.firstName, lastName: tenant.lastName, propertyAddress: tenant.propertyAddress } });
       res.status(201).json(tenant);
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: "Validation error", errors: err.errors });
@@ -7200,7 +7195,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!existing || existing.merchantId !== merchantId) return res.status(404).json({ message: "Tenant not found" });
       const tenant = await storage.archiveTenantProfileForMerchant(id, merchantId);
       if (!tenant) return res.status(404).json({ message: "Tenant not found" });
-      await storage.logTransactionEvent({ merchantId, tenantProfileId: id, eventType: "Tenant_Archived", payload: {} });
       res.json(tenant);
     } catch (err) { console.error("[PROP_TENANT_ARCHIVE]", err); res.status(500).json({ message: "Failed to archive tenant" }); }
   });
@@ -7215,7 +7209,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!existing || existing.merchantId !== merchantId) return res.status(404).json({ message: "Tenant not found" });
       const tenant = await storage.unarchiveTenantProfileForMerchant(id, merchantId);
       if (!tenant) return res.status(404).json({ message: "Tenant not found" });
-      await storage.logTransactionEvent({ merchantId, tenantProfileId: id, eventType: "Tenant_Restored", payload: {} });
       res.json(tenant);
     } catch (err) { console.error("[PROP_TENANT_UNARCHIVE]", err); res.status(500).json({ message: "Failed to restore tenant" }); }
   });

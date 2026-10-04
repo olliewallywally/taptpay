@@ -63,7 +63,9 @@ try {
   const record = (store: typeof one, id: string, parent: string, data: any = { channel: "email" }, merchant = a) => store.recordInvoiceRentRequestDeliveryForMerchant(id, merchant, parent, data);
   const raw = async (id: string) => (await pool.query("SELECT * FROM invoices_rent_requests WHERE id=$1", [id])).rows[0];
   const rows = async (parent: string) => (await pool.query("SELECT * FROM invoices_rent_requests WHERE tenant_profile_id=$1 ORDER BY id", [parent])).rows;
-  const events = async (parent: string) => (await pool.query("SELECT * FROM transaction_events WHERE tenant_profile_id=$1 ORDER BY id", [parent])).rows;
+  // Not the tenant's own Tenant_Created line, which its storage create has written since R1-T7 S5b:
+  // these checks are about the history of what is done to the tenant afterwards.
+  const events = async (parent: string) => (await pool.query("SELECT * FROM transaction_events WHERE tenant_profile_id=$1 AND event_type <> 'Tenant_Created' ORDER BY id", [parent])).rows;
   const snapshot = async (parent: string) => ({ invoices: await rows(parent), events: await events(parent) });
   async function waited(sql: string, args: any[], run: () => Promise<any>, accept: (result: any) => Promise<void>) {
     const locker = await pool.connect(); let open = false; let pending: Promise<any> | undefined;

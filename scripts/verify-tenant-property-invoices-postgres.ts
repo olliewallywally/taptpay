@@ -60,7 +60,9 @@ try {
     [merchant, parent, `synthetic-${randomUUID()}`, status],
   )).rows[0].id as string;
   const rawInvoice = async (id: string) => (await pool.query("SELECT * FROM invoices_rent_requests WHERE id=$1", [id])).rows[0];
-  const events = async (parent: string) => (await pool.query("SELECT * FROM transaction_events WHERE tenant_profile_id=$1 ORDER BY id", [parent])).rows;
+  // Not the tenant's own Tenant_Created line, which its storage create has written since R1-T7 S5b:
+  // these checks are about the history of what is done to the tenant afterwards.
+  const events = async (parent: string) => (await pool.query("SELECT * FROM transaction_events WHERE tenant_profile_id=$1 AND event_type <> 'Tenant_Created' ORDER BY id", [parent])).rows;
   const snapshot = async (id: string, parent: string) => ({ invoice: await rawInvoice(id), events: await events(parent) });
   const mutate = (store: typeof one, action: "void" | "paid-external", id: string, merchant = a) => action === "void"
     ? store.voidInvoiceRentRequestForMerchant(id, merchant)
@@ -112,7 +114,8 @@ try {
     assert.equal((await rawInvoice(voidId)).status, "voided");
     assert.equal((await rawInvoice(paidId)).status, "paid_external");
     assert.equal((await rawInvoice(paidId)).external_payment_reference, null);
-    assert.deepEqual((await events(parent.id)).map(row => row.event_type).sort(), ["Invoice_Voided", "Payment_External"]);
+    // The archive's own line is storage's since R1-T7 S5b; the two management operations still log one each.
+    assert.deepEqual((await events(parent.id)).map(row => row.event_type).sort(), ["Invoice_Voided", "Payment_External", "Tenant_Archived"]);
   });
   await check("paid invoices and voided external-payment requests preserve state and history", async () => {
     const parent = await profile();

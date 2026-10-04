@@ -88,10 +88,14 @@ export function fakeProperty(): PropertyFake {
       fake.writes.push(name.replace("ForMerchant", ""));
       return apply(...args);
     });
+  // Since R1-T7 S5b storage commits a tenant's history line with its write; the routes log nothing.
+  const logged = (merchantId: number, tenantProfileId: string, eventType: string, payload: object) =>
+    fake.events.push({ id: `event-${fake.events.length + 1}`, createdAt: new Date(), merchantId, tenantProfileId, eventType, payload });
   write("createTenantProfileForMerchant", (merchantId: number, input: any) => {
     const data = { ...input, merchantId };
     const row = { id: MADE_TENANT, status: "active", ...data };
     fake.tenants.set(row.id, row);
+    logged(merchantId, row.id, "Tenant_Created", { firstName: row.firstName, lastName: row.lastName, propertyAddress: row.propertyAddress });
     return row;
   });
   // As Drizzle does (mapUpdateSet), an update leaves out every field whose value is undefined.
@@ -105,9 +109,14 @@ export function fakeProperty(): PropertyFake {
         Object.assign(schedule, { status: "terminated", terminatedAt: new Date() });
       }
     }
+    logged(row.merchantId, id, "Tenant_Archived", {});
     return row;
   });
-  write("unarchiveTenantProfileForMerchant", (id: string) => Object.assign(fake.tenants.get(id), { status: "active" }));
+  write("unarchiveTenantProfileForMerchant", (id: string) => {
+    const row = Object.assign(fake.tenants.get(id), { status: "active" });
+    logged(row.merchantId, id, "Tenant_Restored", {});
+    return row;
+  });
   jest.spyOn(storage, "createActiveScheduleForMerchant").mockImplementation(async (tenantProfileId, merchantId, data) => {
     const parent = fake.tenants.get(tenantProfileId);
     if (parent?.merchantId !== merchantId) return { kind: "not-found" };

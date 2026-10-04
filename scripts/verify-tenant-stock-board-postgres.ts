@@ -73,7 +73,7 @@ try {
   const b = await addMerchant("tenant-b");
 
   await check("stock reads and every mutation refuse the other tenant with identical stored rows", async () => {
-    const item = await one.createStockItem({ merchantId: b, name: "Other stock", cost: "9.00" });
+    const item = await one.createStockItemForMerchant(b, { name: "Other stock", cost: "9.00" });
     assert.equal(await one.getStockItemForMerchant(item.id, a), undefined);
     assert.equal(await one.updateStockItemForMerchant(item.id, a, { name: "Changed" }), undefined);
     assert.equal(await one.deleteStockItemForMerchant(item.id, a), false);
@@ -90,7 +90,7 @@ try {
   });
 
   await check("authorized stock changes preserve omitted/null fields, ownership and soft-delete behavior", async () => {
-    const item = await one.createStockItem({ merchantId: a, name: "Stock", cost: "1.00", description: "Keep", emoji: "x" });
+    const item = await one.createStockItemForMerchant(a, { name: "Stock", cost: "1.00", description: "Keep", emoji: "x" });
     const updated = await two.updateStockItemForMerchant(item.id, a, {
       name: "New", emoji: null, merchantId: b, id: 99999, isActive: false, createdAt: new Date(0),
     } as any);
@@ -128,7 +128,7 @@ try {
   });
 
   await check("invalid tenant arguments neither read nor change rows", async () => {
-    const item = await one.createStockItem({ merchantId: a, name: "Guarded", cost: "1.00" });
+    const item = await one.createStockItemForMerchant(a, { name: "Guarded", cost: "1.00" });
     const board = await one.createNextTaptStone(a);
     for (const invalid of [undefined, null, 0, -1, 1.5, NaN, 2_147_483_648, Number.MAX_SAFE_INTEGER + 1]) {
       assert.equal(await one.getStockItemForMerchant(item.id, invalid as any), undefined);
@@ -149,7 +149,7 @@ try {
     for (const operation of kind === "stock" ? ["rename", "delete"] : ["rename", "urls", "delete"]) {
       await check(`${kind} ${operation} refuses after a concurrent committed ownership change`, async () => {
         const row = kind === "stock"
-          ? await one.createStockItem({ merchantId: a, name: "Race stock", cost: "1.00" })
+          ? await one.createStockItemForMerchant(a, { name: "Race stock", cost: "1.00" })
           : await one.createTaptStone({ merchantId: a, name: "Race board", stoneNumber: 7 });
         const table = kind === "stock" ? "stock_items" : "tapt_stones";
         const locker = await pool.connect();

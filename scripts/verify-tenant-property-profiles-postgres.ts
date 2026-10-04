@@ -95,7 +95,8 @@ try {
   await check("history requires event and current parent ownership", async () => {
     const row = await profile(a);
     await pool.query("INSERT INTO transaction_events(merchant_id,tenant_profile_id,event_type) VALUES ($1,$3,'Synthetic A'),($2,$3,'Synthetic B')", [a,b,row.id]);
-    assert.equal((await one.getTransactionEventsByTenantForMerchant(row.id, a)).length, 1);
+    // Two for the first business: the synthetic line and the tenant's own Tenant_Created (S5b).
+    assert.equal((await one.getTransactionEventsByTenantForMerchant(row.id, a)).length, 2);
     assert.equal((await one.getTransactionEventsByTenantForMerchant(row.id, b)).length, 0);
     await pool.query("UPDATE tenant_profiles SET merchant_id=$1 WHERE id=$2", [b,row.id]);
     assert.equal((await one.getTransactionEventsByTenantForMerchant(row.id, a)).length, 0);

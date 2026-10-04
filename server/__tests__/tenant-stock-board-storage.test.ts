@@ -6,7 +6,7 @@ import { DatabaseStorage, MemStorage } from "../storage";
 describe("R1-T7 S1 — stock and board storage requires the business", () => {
   test("reads only records belonging to the requested business", async () => {
     const storage = new MemStorage();
-    const item = await storage.createStockItem({ merchantId: 11, name: "Coffee", cost: "4.50" });
+    const item = await storage.createStockItemForMerchant(11, { name: "Coffee", cost: "4.50" });
     const board = await storage.createTaptStone({ merchantId: 11, name: "Counter", stoneNumber: 1 });
     expect(await storage.getStockItemForMerchant(item.id, 11)).toEqual(item);
     expect(await storage.getTaptStoneForMerchant(board.id, 11)).toEqual(board);
@@ -18,7 +18,7 @@ describe("R1-T7 S1 — stock and board storage requires the business", () => {
 
   test("every mutation refuses the other business and changes no record", async () => {
     const storage = new MemStorage();
-    const item = await storage.createStockItem({ merchantId: 22, name: "Other stock", cost: "9.00" });
+    const item = await storage.createStockItemForMerchant(22, { name: "Other stock", cost: "9.00" });
     const board = await storage.createTaptStone({ merchantId: 22, name: "Other board", stoneNumber: 1 });
     const before = JSON.stringify({ item, board });
     expect(await storage.updateStockItemForMerchant(item.id, 11, { name: "Stolen" })).toBeUndefined();
@@ -34,7 +34,7 @@ describe("R1-T7 S1 — stock and board storage requires the business", () => {
 
   test("stock changes cannot transfer ownership or change server-owned fields", async () => {
     const storage = new MemStorage();
-    const item = await storage.createStockItem({ merchantId: 11, name: "Coffee", description: "Keep this", cost: "4.50", emoji: "x" });
+    const item = await storage.createStockItemForMerchant(11, { name: "Coffee", description: "Keep this", cost: "4.50", emoji: "x" });
     const changed = await storage.updateStockItemForMerchant(item.id, 11, {
       name: "Flat white", cost: "5.00", emoji: null,
       merchantId: 22, id: 9999, isActive: false, createdAt: new Date(0),
@@ -58,7 +58,7 @@ describe("R1-T7 S1 — stock and board storage requires the business", () => {
 
   test("soft deletion is repeatable and retains management reads and board-number reuse", async () => {
     const storage = new MemStorage();
-    const item = await storage.createStockItem({ merchantId: 11, name: "Coffee", cost: "4.50" });
+    const item = await storage.createStockItemForMerchant(11, { name: "Coffee", cost: "4.50" });
     const board = await storage.createTaptStone({ merchantId: 11, name: "Counter", stoneNumber: 1 });
     for (let i = 0; i < 2; i++) {
       expect(await storage.deleteStockItemForMerchant(item.id, 11)).toBe(true);
@@ -73,7 +73,9 @@ describe("R1-T7 S1 — stock and board storage requires the business", () => {
 
   test.each([undefined, null, 0, -1, NaN, 1.5, 2_147_483_648, Number.MAX_SAFE_INTEGER + 1])("invalid tenant %s cannot address an orphan or a business's record", async (tenant) => {
     const storage = new MemStorage();
-    const orphan = await storage.createStockItem({ merchantId: null, name: "Orphan", cost: "1.00" });
+    // An item with no business cannot be made through storage any more (S5b); plant one as old data.
+    const orphan = { ...(await storage.createStockItemForMerchant(11, { name: "Orphan", cost: "1.00" })), merchantId: null };
+    (storage as any).stockItems.set(orphan.id, orphan);
     const board = await storage.createTaptStone({ merchantId: 11, name: "Counter", stoneNumber: 1 });
     const before = JSON.stringify({ orphan, board });
     expect(await storage.getStockItemForMerchant(orphan.id, tenant as any)).toBeUndefined();

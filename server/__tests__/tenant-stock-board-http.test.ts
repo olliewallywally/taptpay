@@ -16,7 +16,7 @@ async function seed(kind: "stock" | "board") {
   const owner = await createOwnerPrincipal();
   const other = await createOwnerPrincipal();
   const row = kind === "stock"
-    ? await storage.createStockItem({ merchantId: owner.merchantId, name: "Original", cost: "1.00" })
+    ? await storage.createStockItemForMerchant(owner.merchantId, { name: "Original", cost: "1.00" })
     : await storage.createTaptStone({ merchantId: owner.merchantId, name: "Original", stoneNumber: 1 });
   return { app, owner, other, row };
 }

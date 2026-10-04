@@ -47,7 +47,7 @@ test("profile create/update project identity and metadata away", async () => {
   const { storage, calls } = capture();
   const data = { firstName: "Synthetic", lastName: "Profile", propertyAddress: "Test", email: null, merchantId: 22, id: "injected", status: "archived", createdAt: new Date(0) };
   await storage.createTenantProfileForMerchant(11, data);
-  expect(calls[0].values).toEqual({ firstName: "Synthetic", lastName: "Profile", propertyAddress: "Test", email: null, merchantId: 11 });
+  expect(calls.find(call => call.kind === "insert").values).toEqual({ firstName: "Synthetic", lastName: "Profile", propertyAddress: "Test", email: null, merchantId: 11 });
   await storage.updateTenantProfileForMerchant(id, 11, data);
   const patch = calls.find(call => call.kind === "update").set;
   expect(patch.email).toBeNull();

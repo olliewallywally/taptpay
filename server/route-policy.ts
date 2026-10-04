@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ e836c60adad1ac7b2c80d86fb884cb32085bf142 on 2026-10-04.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ dde8b1ef4306322cb31d0078262d48f3ea93ad53 on 2026-10-04.
  *
  * 187 registrations (78 GET, 77 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -1384,7 +1384,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       middleware: ["authenticateToken"],
       body: ["fields: endpoint"],
-      storageMethods: ["deactivatePushSubscriptionByEndpoint","getPushSubscriptionsByMerchant"],
+      storageMethods: ["deactivatePushSubscriptionForMerchant"],
       statuses: [200,400,401,403,500,503],
     },
   },
@@ -1409,7 +1409,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       middleware: ["authenticateToken"],
       body: ["fields: deviceToken"],
-      storageMethods: ["deactivateNativePushSubscriptionsForLogin","deactivatePushSubscriptionByEndpoint","getPushSubscriptionsByMerchant"],
+      storageMethods: ["deactivateNativePushSubscriptionsForLogin","deactivatePushSubscriptionForMerchant"],
       statuses: [200,400,401,403,500,503],
     },
   },
@@ -1517,7 +1517,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       params: ["merchantId: strictPositiveIntegerParam"],
       body: ["schema: createStockItemSchema"],
       authChecks: ["checkMerchantOwnership"],
-      storageMethods: ["createStockItem"],
+      storageMethods: ["createStockItemForMerchant"],
       statuses: [201,400,401,403,500,503],
       errorTextInResponse: ["error.errors"],
     },
@@ -1675,8 +1675,8 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       middleware: ["authenticateToken"],
       params: ["userId: strictPositiveIntegerParam"],
-      authChecks: ["compares previous.merchantId !== merchantId","isAccountOwner"],
-      storageMethods: ["getMerchant","getUserById","revokeTeamInvite","rotateTeamInvite"],
+      authChecks: ["isAccountOwner"],
+      storageMethods: ["getMerchant","getTeamMemberForMerchant","revokeTeamInvite","rotateTeamInvite"],
       sideEffects: ["email: sendTeamInviteEmail"],
       statuses: [200,400,401,403,404,409,429,500,502,503],
       dtos: ["teamMemberDto"],
@@ -1721,8 +1721,8 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       middleware: ["authenticateToken"],
       params: ["userId: strictPositiveIntegerParam"],
-      authChecks: ["compares member.merchantId !== merchantId","compares member.role === \"owner\"","isAccountOwner"],
-      storageMethods: ["deactivatePushSubscriptionsForLogin","getUserById","removeTeamMember"],
+      authChecks: ["compares member.role === \"owner\"","isAccountOwner"],
+      storageMethods: ["deactivatePushSubscriptionsForLogin","getTeamMemberForMerchant","removeTeamMember"],
       sideEffects: ["live update: sseBroker.disconnectUser"],
       statuses: [200,400,401,403,404,409,500,503],
     },
@@ -1851,8 +1851,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       middleware: ["authenticateToken","express.json(…)"],
       body: ["schema: boardPrintRequestSchema"],
-      authChecks: ["compares stone.merchantId !== merchantId"],
-      storageMethods: ["getMerchant","getTaptStone","settleAuthThrottle","takeAuthThrottleSlot"],
+      storageMethods: ["getMerchant","getTaptStoneForMerchant","settleAuthThrottle","takeAuthThrottleSlot"],
       sideEffects: ["email: sendBoardBuilderEmail"],
       statuses: [200,400,401,403,404,429,500,502,503],
       errorTextInResponse: ["validation.error.issues"],
@@ -1892,7 +1891,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       middleware: ["authenticateToken"],
       body: ["schema: createTenantProfileSchema"],
-      storageMethods: ["createTenantProfileForMerchant","logTransactionEvent"],
+      storageMethods: ["createTenantProfileForMerchant"],
       statuses: [201,400,401,403,500,503],
       errorTextInResponse: ["err.errors"],
     },
@@ -1934,7 +1933,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       middleware: ["authenticateToken"],
       params: ["id: strictUuidParam"],
       authChecks: ["compares existing.merchantId !== merchantId"],
-      storageMethods: ["archiveTenantProfileForMerchant","getTenantProfileForMerchant","logTransactionEvent"],
+      storageMethods: ["archiveTenantProfileForMerchant","getTenantProfileForMerchant"],
       statuses: [200,400,401,403,404,500,503],
     },
   },
@@ -1947,7 +1946,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       middleware: ["authenticateToken"],
       params: ["id: strictUuidParam"],
       authChecks: ["compares existing.merchantId !== merchantId"],
-      storageMethods: ["getTenantProfileForMerchant","logTransactionEvent","unarchiveTenantProfileForMerchant"],
+      storageMethods: ["getTenantProfileForMerchant","unarchiveTenantProfileForMerchant"],
       statuses: [200,400,401,403,404,500,503],
     },
   },

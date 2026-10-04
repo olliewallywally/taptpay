@@ -1,10 +1,10 @@
 # R1-T7 tenant/storage execution inventory
 
-Generated from working-tree sources on base `e836c60adad1ac7b2c80d86fb884cb32085bf142`; the phase evidence names the final commit.
+Generated from working-tree sources on base `dde8b1ef4306322cb31d0078262d48f3ea93ad53`; the phase evidence names the final commit.
 
 Registrations: **187**; registrations with session/admin authentication: **119**;
 registrations calling checkMerchantOwnership: **25**.
-IStorage: **245** declared methods;
+IStorage: **247** declared methods;
 PaymentAttemptRepository: **8** inherited methods.
 
 Classifications come from the reviewed per-route branches, including mixed public/signed-in routes.
@@ -30,7 +30,7 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | DELETE /api/merchants/:merchantId/stock-items/:itemId | tenant (merchant/path-merchant) | `deleteStockItemForMerchant`, `getStockItemForMerchant` |
 | DELETE /api/merchants/:merchantId/tapt-stones/:stoneId | tenant (merchant/path-merchant) | `deleteTaptStoneForMerchant`, `getTaptStoneForMerchant` |
 | DELETE /api/property/schedules/:id | tenant (merchant/resource) | `getActiveScheduleForMerchant`, `terminateActiveScheduleForMerchant` |
-| DELETE /api/team/:userId | tenant (merchant/resource) | `deactivatePushSubscriptionsForLogin`, `getUserById`, `removeTeamMember` |
+| DELETE /api/team/:userId | tenant (merchant/resource) | `deactivatePushSubscriptionsForLogin`, `getTeamMemberForMerchant`, `removeTeamMember` |
 | DELETE /api/team/:userId/invite | tenant (merchant/resource) | `revokeTeamInvite` |
 | DELETE /api/trades/schedules/:id | tenant (merchant/resource) | `getJobScheduleForMerchant`, `terminateJobScheduleForMerchant` |
 | GET /.well-known/apple-developer-merchantid-domain-association | public (public/none) | — |
@@ -130,7 +130,7 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | POST /api/billing/card/callback | public (public/none) | — |
 | POST /api/billing/card/confirm | tenant (merchant/session) | `completeSubscriptionCardSetup`, `countSeatsInUse`, `getSubscription` |
 | POST /api/billing/card/session | tenant (merchant/session) | `bindSubscriptionCardSession`, `getMerchant`, `getOrCreateSubscription` |
-| POST /api/board-builder/submit | tenant (merchant/session) | `getMerchant`, `getTaptStone`, `settleAuthThrottle`, `takeAuthThrottleSlot` |
+| POST /api/board-builder/submit | tenant (merchant/session) | `getMerchant`, `getTaptStoneForMerchant`, `settleAuthThrottle`, `takeAuthThrottleSlot` |
 | POST /api/checkout/:token/googlepay-complete | single-resource bearer (public-bearer/token) | `atomicClaimJobSplitShare`, `atomicClaimSplitShare`, `createJobEvent`, `getInvoiceRentRequest`, `getInvoiceRentRequestByToken`, `getInvoiceSplitSession`, `getJobInvoice`, `getJobInvoiceByToken`, `getMerchant`, `getPaidInvoiceSplitPayerEmails`, `getTenantProfile`, `logTransactionEvent`, `markInvoiceSplitSessionPaid`, `updateInvoiceRentRequest`, `updateJobInvoice` |
 | POST /api/checkout/:token/hosted-fields-complete | single-resource bearer (public-bearer/token) | `atomicClaimJobSplitShare`, `atomicClaimSplitShare`, `createJobEvent`, `getInvoiceRentRequest`, `getInvoiceRentRequestByToken`, `getInvoiceSplitSession`, `getJobInvoice`, `getJobInvoiceByToken`, `getMerchant`, `getPaidInvoiceSplitPayerEmails`, `getTenantProfile`, `logTransactionEvent`, `markInvoiceSplitSessionPaid`, `updateInvoiceRentRequest`, `updateJobInvoice` |
 | POST /api/checkout/:token/session | single-resource bearer (public-bearer/token) | `atomicClaimJobSplitShare`, `atomicClaimSplitShare`, `createJobEvent`, `getClientProfile`, `getInvoiceRentRequest`, `getInvoiceRentRequestByToken`, `getJobInvoice`, `getJobInvoiceByToken`, `getMerchant`, `getPaidInvoiceSplitPayerEmails`, `getTenantProfile`, `logTransactionEvent`, `markInvoiceSplitSessionPaid`, `recordInvoiceSplitSession`, `updateInvoiceRentRequest`, `updateJobInvoice` |
@@ -140,7 +140,7 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | POST /api/merchants/:id/logo | tenant (merchant/path-merchant) | `deleteUploadedFile`, `saveUploadedFile`, `updateMerchantLogoUrl` |
 | POST /api/merchants/:id/onboarding | tenant (merchant/path-merchant) | `getMerchant`, `updateMerchantSettings` |
 | POST /api/merchants/:id/tapt-stones | tenant (merchant/path-merchant) | `createNextTaptStone`, `getMerchant`, `updateTaptStoneUrlsForMerchant` |
-| POST /api/merchants/:merchantId/stock-items | tenant (merchant/path-merchant) | `createStockItem` |
+| POST /api/merchants/:merchantId/stock-items | tenant (merchant/path-merchant) | `createStockItemForMerchant` |
 | POST /api/merchants/signup | account entry/recovery (public/mailbox) | `createMerchantWithSignup`, `getMerchantByEmail`, `getUserByEmail`, `takeAuthThrottleSlot` |
 | POST /api/pay/t/:token/googlepay-complete | single-resource bearer (public-bearer/token) | — |
 | POST /api/pay/t/:token/hosted-fields-complete | single-resource bearer (public-bearer/token) | — |
@@ -152,17 +152,17 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | POST /api/property/invoices/:id/resend | tenant (merchant/resource) | `getInvoiceRentRequestForMerchant`, `getOrCreateSubscription` |
 | POST /api/property/invoices/:id/void | tenant (merchant/resource) | `getInvoiceRentRequestForMerchant`, `voidInvoiceRentRequestForMerchant` |
 | POST /api/property/invoices/document | tenant (merchant/session) | `saveUploadedFile` |
-| POST /api/property/tenants | tenant (merchant/session) | `createTenantProfileForMerchant`, `logTransactionEvent` |
-| POST /api/property/tenants/:id/archive | tenant (merchant/resource) | `archiveTenantProfileForMerchant`, `getTenantProfileForMerchant`, `logTransactionEvent` |
-| POST /api/property/tenants/:id/unarchive | tenant (merchant/resource) | `getTenantProfileForMerchant`, `logTransactionEvent`, `unarchiveTenantProfileForMerchant` |
+| POST /api/property/tenants | tenant (merchant/session) | `createTenantProfileForMerchant` |
+| POST /api/property/tenants/:id/archive | tenant (merchant/resource) | `archiveTenantProfileForMerchant`, `getTenantProfileForMerchant` |
+| POST /api/property/tenants/:id/unarchive | tenant (merchant/resource) | `getTenantProfileForMerchant`, `unarchiveTenantProfileForMerchant` |
 | POST /api/property/tenants/:tenantId/schedules | tenant (merchant/resource) | `createActiveScheduleForMerchant`, `getOrCreateSubscription`, `getTenantProfileForMerchant` |
 | POST /api/push/native-subscribe | tenant (merchant/session) | `createPushSubscription` |
-| POST /api/push/native-unsubscribe | tenant (merchant/session) | `deactivateNativePushSubscriptionsForLogin`, `deactivatePushSubscriptionByEndpoint`, `getPushSubscriptionsByMerchant` |
+| POST /api/push/native-unsubscribe | tenant (merchant/session) | `deactivateNativePushSubscriptionsForLogin`, `deactivatePushSubscriptionForMerchant` |
 | POST /api/push/subscribe | tenant (merchant/session) | `createPushSubscription` |
-| POST /api/push/unsubscribe | tenant (merchant/session) | `deactivatePushSubscriptionByEndpoint`, `getPushSubscriptionsByMerchant` |
+| POST /api/push/unsubscribe | tenant (merchant/session) | `deactivatePushSubscriptionForMerchant` |
 | POST /api/subscription/cancel | tenant (merchant/session) | `cancelSubscription`, `countSeatsInUse`, `getOrCreateSubscription` |
 | POST /api/subscription/resume | tenant (merchant/session) | `countSeatsInUse`, `resumeSubscription` |
-| POST /api/team/:userId/resend | tenant (merchant/resource) | `getMerchant`, `getUserById`, `revokeTeamInvite`, `rotateTeamInvite` |
+| POST /api/team/:userId/resend | tenant (merchant/resource) | `getMerchant`, `getTeamMemberForMerchant`, `revokeTeamInvite`, `rotateTeamInvite` |
 | POST /api/team/accept-invite | single-resource bearer (public-bearer/token) | `activateInvitedUser`, `getUserByInviteToken` |
 | POST /api/team/invite | tenant (merchant/session) | `getMerchant`, `getOrCreateSubscription`, `inviteTeamMember`, `revokeTeamInvite` |
 | POST /api/trades/clients | tenant (merchant/session) | `createClientProfileForMerchant` |
@@ -274,7 +274,7 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | IStorage | updateTaptStoneForMerchant | yes | `updateTaptStoneForMerchant(id: number, merchantId: number, data: Partial<{ name: string }>): Promise<TaptStone \| undefined>` |
 | IStorage | updateTaptStoneUrlsForMerchant | yes | `updateTaptStoneUrlsForMerchant(id: number, merchantId: number, qrCodeUrl: string, paymentUrl: string): Promise<TaptStone \| undefined>` |
 | IStorage | deleteTaptStoneForMerchant | yes | `deleteTaptStoneForMerchant(id: number, merchantId: number): Promise<boolean>` |
-| IStorage | createStockItem | no | `createStockItem(data: InsertStockItem): Promise<StockItem>` |
+| IStorage | createStockItemForMerchant | yes | `createStockItemForMerchant(merchantId: number, data: StockItemInput): Promise<StockItem>` |
 | IStorage | getStockItemForMerchant | yes | `getStockItemForMerchant(id: number, merchantId: number): Promise<StockItem \| undefined>` |
 | IStorage | getStockItemsByMerchant | yes | `getStockItemsByMerchant(merchantId: number): Promise<StockItem[]>` |
 | IStorage | updateStockItemForMerchant | yes | `updateStockItemForMerchant(id: number, merchantId: number, data: StockItemChanges): Promise<StockItem \| undefined>` |
@@ -308,6 +308,7 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | IStorage | releaseSubscriptionBillingClaim | no | `releaseSubscriptionBillingClaim(subscriptionId: number, claimToken: string): Promise<void>` |
 | IStorage | expireCancelledSubscriptions | no | `expireCancelledSubscriptions(now: Date): Promise<number>` |
 | IStorage | getTeamMembers | yes | `getTeamMembers(merchantId: number): Promise<User[]>` |
+| IStorage | getTeamMemberForMerchant | yes | `getTeamMemberForMerchant(userId: number, merchantId: number): Promise<User \| undefined>` |
 | IStorage | countSeatsInUse | yes | `countSeatsInUse(merchantId: number): Promise<number>` |
 | IStorage | inviteTeamMember | yes | `inviteTeamMember(merchantId: number, input: InviteTeamMemberInput): Promise<InviteTeamMemberResult>` |
 | IStorage | setTeamMemberStatus | yes | `setTeamMemberStatus(merchantId: number, userId: number, status: UserStatus): Promise<TeamMemberStatusResult>` |
@@ -330,6 +331,7 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | IStorage | updatePushNotificationPreferences | yes | `updatePushNotificationPreferences( merchantId: number, userId: number \| null, preferences: PushNotificationPreferences, ): Promise<PushNotificationPreferences>` |
 | IStorage | deactivatePushSubscription | no | `deactivatePushSubscription(id: number): Promise<void>` |
 | IStorage | deactivatePushSubscriptionByEndpoint | no | `deactivatePushSubscriptionByEndpoint(endpoint: string): Promise<void>` |
+| IStorage | deactivatePushSubscriptionForMerchant | yes | `deactivatePushSubscriptionForMerchant(merchantId: number, endpoint: string): Promise<boolean>` |
 | IStorage | deactivatePushSubscriptionsForLogin | yes | `deactivatePushSubscriptionsForLogin(merchantId: number, userId: number): Promise<void>` |
 | IStorage | deactivateNativePushSubscriptionsForLogin | yes | `deactivateNativePushSubscriptionsForLogin(merchantId: number, userId: number): Promise<void>` |
 | IStorage | getDailyPushPaymentSummaries | no | `getDailyPushPaymentSummaries(start: Date, end: Date): Promise<DailyPushPaymentSummary[]>` |
