@@ -187,3 +187,109 @@ repeat on `01e22c4b` passed 171 suites / 4,259 tests.
 [Evidence](evidence/remediation-v2-2/r1/R1-T5a-apple-token-boundary-2026-10-04.md).
 Nothing calls the boundary yet. T5b is next; its starting facts are in
 `docs/HANDOFF-2026-10-04-r1-t7-s6.md`.
+
+## T5b preflight — identities and sign-in
+
+Base `5019ee43` (T5a code `8b026aa7` + `01e22c4b`; the commits above are
+documentation and one development-only setting).
+
+### Verification of Prior Fixes
+
+T5a was verified in this session: 171 suites / 4,259 tests on `01e22c4b`. Reread for
+this scope: the three Google routes and their reviews, `server/google-sign-in.ts`,
+the cross-site guard and its list of callbacks, the handoff storage, how a new
+business and its owner login are made (`createMerchantWithPassword`,
+`syncOwnerUser`), `loginForUserId`, the throttle buckets, and how a new route is
+registered with the inventory, the review, the matrix and the served-route tests.
+
+### Blocking Issues
+
+None for the server side. The login page has no Apple button until T5d, so after T5b
+the routes exist and nothing on screen leads to them. Going live still needs the
+owner's Apple setup.
+
+### High-Risk Concerns
+
+- **No joining by email, ever.** An Apple identity signs in a login only if that
+  login was made with it (or, in T5c, connected to it from a signed-in owner's
+  session). An unknown identity whose email already has a business or a login gets
+  no session: a pending identity is recorded and the person is told to sign in and
+  connect Apple from Settings. This is the plan's rule and the opposite of Google's.
+- **A new business and its identity are one write.** The business, its owner login,
+  its subscription and the linked identity commit together. Otherwise a failure in
+  between would leave a business whose only way in (Apple) no longer recognises it.
+- **Apple's return is a cross-site POST.** It is admitted only from
+  `https://appleid.apple.com`, by exact origin, in the guard's list. The starting
+  cookie is `SameSite=None; Secure; HttpOnly` (the only way it comes back on that
+  POST), so the flow is refused on a non-https origin. The cookie carries the state
+  and the nonce under the server's signature, lasts ten minutes and is taken up once,
+  before Apple is asked anything.
+- **Only the verified token says who it is.** The form's `user` field (the name, on
+  the first authorization) is not signed: a display name is read from it and nothing
+  else. The email comes from the token, and must be one Apple verified.
+- **The session is never in an address.** As Google's: a 60-second one-time code in an
+  HttpOnly cookie, redeemed once by a same-origin POST.
+
+### Missing Steps
+
+Tests red first (the flow end to end against a stand-in Apple; storage in both
+implementations and the captured SQL); migration 0033 (`apple_identities`, additive)
+with its contract entry, test-list entry, schema declaration and regenerated
+fingerprint; the three routes; the cross-site entry; the throttle buckets; the route
+reviews, the public-path entries, the matrix answer and the served recipes; actual
+PostgreSQL for the identity rules and the atomic create; the mutation check;
+typecheck, build, affected and full runs, evidence.
+
+### Unsafe Assumptions
+
+A first sign-in whose token carries no email (Apple shares it once, and the identity
+is unknown here) cannot make a business, which needs an address: the person is told
+to remove TaptPay under "Sign in with Apple" in their Apple ID settings and try again,
+which makes Apple share it again. A relay address is a deliverable address only once
+the owner registers TaptPay's sender with Apple; until then such a business gets no
+email from TaptPay. A new business is named from Apple's display name, or the part
+of its address before the @, as a Google one is. Removing a login removes its
+identity row. Memory mirrors the rules for the harness; the SQL is proved on
+PostgreSQL.
+
+### Required Ordering Changes
+
+The table and storage first; then the starting cookie and buckets; then the routes;
+then the registrations (cross-site list, inventory, review, matrix, served recipes).
+
+### Open Product / Provider / Legal Questions
+
+None that block. The four defaults recorded at the top of this plan stand.
+
+### Compliance and Data-Handling Notes
+
+Stored about an Apple identity: Apple's issuer, the Services ID, the subject, the
+email as Apple gave it on the first authorization, whether it is a relay address,
+and when it was linked. No Apple token or code is stored or logged. Synthetic
+loopback PostgreSQL and a stand-in Apple only.
+
+### Test and Rollback Adequacy
+
+First sign-in, later sign-in with no name or email, a relay address, a wrong or
+missing state, a replayed start, a wrong nonce, audience or issuer, a withdrawn
+grant, Apple unreachable, a duplicate email (business or teammate), an unverified
+or missing email, a post from another site, and two first sign-ins at once. A refusal
+makes no business, login, identity link or session. Fix forward; the table is
+additive.
+
+### Final Recommendation (Approve / Do not approve)
+
+**Approve T5b on `5019ee43`**, failing tests first. It does not close R1-T5.
+
+### Separate reread
+
+Retraced by call site. The handoff storage is keyed by a code's hash and a login id
+and knows nothing of Google, so Apple's routes reuse it unchanged under their own
+cookie. `loginForUserId` already refuses a login that is not active or whose business
+is not, at redemption. The guard's list takes exact origins; the only entry today is
+the card callback with "any". `express.urlencoded` is global, so Apple's form is
+parsed before the route. `createMerchantWithPassword` is one transaction in the
+database implementation and can take the identity insert inside it without changing
+what Google's path does. What must not move: Google's three routes, byte for byte;
+the login page's handling of `?error=`; every existing cross-site refusal.
+**Approve the same T5b scope.**
