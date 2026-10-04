@@ -45,7 +45,6 @@ import { resendInvoiceEmailForMerchant } from "./property-cron";
 import { INVOICE_DOCUMENT_FOLDER, isInvoiceDocumentName, isPublicUploadFolder, parseInvoiceDocumentRef } from "./upload-policy";
 import { INVOICE_DOCUMENT_EXTENSIONS } from "./invoice-document-security";
 import { resendTradeInvoice, resendTradeInvoiceForMerchant, sendTradePaymentInvoice, sendTradePaymentInvoiceForMerchant, sendTradeQuoteForMerchant } from "./trades-delivery";
-import { nextJobRunDateAfter } from "./trades-cron";
 import { QUOTE_ACCEPTANCE_UNAVAILABLE, tellBusinessQuoteAcceptanceBlocked } from "./quote-acceptance-notice";
 import { sendGstInvoices, extractEmails } from "./gst-invoice";
 import {
@@ -8577,16 +8576,20 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // overdue invoice per cron run. A day's grace: the forms send today's UTC date at 09:00 UTC.
       if (parsed.data.startDate.getTime() < Date.now() - RECURRING_START_GRACE_MS)
         return res.status(400).json({ message: "The start date can't be in the past" });
-      const client = await storage.getClientProfile(parsed.data.clientProfileId);
-      if (!client || client.merchantId !== merchantId) return res.status(404).json({ message: "Client not found" });
+      const client = await storage.getClientProfileForMerchant(parsed.data.clientProfileId, merchantId);
+      if (!client) return res.status(404).json({ message: "Client not found" });
       // Archiving cancels a client's recurring invoices (owner decision 2026-09-27), and the screens
       // offer only current clients.
       if (client.status === "archived") return res.status(409).json({ message: "This client is archived" });
-      const row = await storage.createJobSchedule({
-        ...parsed.data, merchantId, nextRunDate: parsed.data.startDate,
+      // Storage locks the client, rechecks both at the write, and commits the recurring invoice,
+      // first run on its start date, with its history: an archive beside it cannot leave it live.
+      const result = await storage.createJobScheduleForMerchant(client.id, merchantId, {
+        amountCents: parsed.data.amountCents, frequency: parsed.data.frequency, deliveryChannel: parsed.data.deliveryChannel,
+        startDate: parsed.data.startDate, endDate: parsed.data.endDate,
       });
-      await storage.createJobEvent({ merchantId, clientProfileId: row.clientProfileId, scheduleId: row.id, eventType: "schedule_created", payload: { amountCents: row.amountCents, frequency: row.frequency } });
-      res.status(201).json(row);
+      if (result.kind === "not-found") return res.status(404).json({ message: "Client not found" });
+      if (result.kind === "conflict") return res.status(409).json({ message: "This client is archived" });
+      res.status(201).json(result.schedule);
     } catch (err) { console.error("[TRADES_SCHEDULES_POST]", err); res.status(500).json({ message: "Failed to create schedule" }); }
   });
   app.put("/api/trades/schedules/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
@@ -8595,21 +8598,22 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
-      const existing = await storage.getJobSchedule(id);
-      if (!existing || existing.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
+      const existing = await storage.getJobScheduleForMerchant(id, merchantId);
+      if (!existing) return res.status(404).json({ message: "Not found" });
       // A cancelled recurring invoice stays cancelled (C10 batch 6d): the screens hide its buttons, and
       // resuming it would bill again. DELETE is how one is cancelled.
-      if (existing.status === "terminated") return res.status(409).json({ message: "This recurring invoice was cancelled" });
+      const CANCELLED = { message: "This recurring invoice was cancelled" };
+      if (existing.status === "terminated") return res.status(409).json(CANCELLED);
       const parsed = updateJobScheduleSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
-      // Resuming skips the paused time (owner decision 2026-09-27), as for rent: the next date moves to
-      // the first date on its cycle after now, instead of billing every period it missed.
-      const resuming = existing.status === "paused" && parsed.data.status === "active";
-      const row = await storage.updateJobSchedule(id, resuming
-        ? { ...parsed.data, nextRunDate: nextJobRunDateAfter(new Date(existing.nextRunDate), parsed.data.frequency ?? existing.frequency, new Date(existing.startDate), new Date()) }
-        : parsed.data);
-      await storage.createJobEvent({ merchantId, clientProfileId: existing.clientProfileId, scheduleId: existing.id, eventType: parsed.data.status === "paused" ? "schedule_paused" : parsed.data.status === "active" ? "schedule_resumed" : "schedule_updated", payload: parsed.data });
-      res.json(row);
+      // Storage rechecks the business and the cancelled state at the write, and saves the change with
+      // its history. Resuming skips the paused time (owner decision 2026-09-27), as for rent: storage
+      // moves the next date to the first date on the locked row's own cycle after now, instead of
+      // billing every period it missed.
+      const result = await storage.updateJobScheduleForMerchant(id, merchantId, parsed.data);
+      if (result.kind === "not-found") return res.status(404).json({ message: "Not found" });
+      if (result.kind === "conflict") return res.status(409).json(CANCELLED);
+      res.json(result.schedule);
     } catch (err) { console.error("[TRADES_SCHEDULES_PUT]", err); res.status(500).json({ message: "Failed to update schedule" }); }
   });
   app.delete("/api/trades/schedules/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
@@ -8618,11 +8622,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const id = strictUuidParam(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
-      const existing = await storage.getJobSchedule(id);
-      if (!existing || existing.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
-      const row = await storage.terminateJobSchedule(id);
-      await storage.createJobEvent({ merchantId, clientProfileId: existing.clientProfileId, scheduleId: existing.id, eventType: "schedule_terminated" });
-      res.json(row);
+      const existing = await storage.getJobScheduleForMerchant(id, merchantId);
+      if (!existing) return res.status(404).json({ message: "Not found" });
+      // Storage rechecks the business at the write and saves the cancellation with its history.
+      const result = await storage.terminateJobScheduleForMerchant(id, merchantId);
+      if (result.kind !== "ok") return res.status(404).json({ message: "Not found" });
+      res.json(result.schedule);
     } catch (err) { console.error("[TRADES_SCHEDULES_DELETE]", err); res.status(500).json({ message: "Failed to delete schedule" }); }
   });
 

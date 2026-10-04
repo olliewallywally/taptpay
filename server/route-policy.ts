@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 51e0b186348615c2a93c3b434757874ced1423ce on 2026-10-03.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 22628b957a3d6e2aa1eca28fd0b843e57458dffb on 2026-10-04.
  *
  * 187 registrations (78 GET, 77 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -2635,8 +2635,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       middleware: ["authenticateToken"],
       body: ["schema: createJobScheduleSchema"],
-      authChecks: ["compares client.merchantId !== merchantId"],
-      storageMethods: ["createJobEvent","createJobSchedule","getClientProfile","getOrCreateSubscription"],
+      storageMethods: ["createJobScheduleForMerchant","getClientProfileForMerchant","getOrCreateSubscription"],
       statuses: [201,400,401,402,403,404,409,500,503],
       errorTextInResponse: ["parsed.error.errors"],
       entitlementGates: ["BILLING_CARD_REQUIRED","billingCardIsReady","requireBillingCard"],
@@ -2652,8 +2651,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       middleware: ["authenticateToken"],
       params: ["id: strictUuidParam"],
       body: ["schema: updateJobScheduleSchema"],
-      authChecks: ["compares existing.merchantId !== merchantId"],
-      storageMethods: ["createJobEvent","getJobSchedule","updateJobSchedule"],
+      storageMethods: ["getJobScheduleForMerchant","updateJobScheduleForMerchant"],
       statuses: [200,400,401,403,404,409,500,503],
       errorTextInResponse: ["parsed.error.errors"],
     },
@@ -2666,8 +2664,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       middleware: ["authenticateToken"],
       params: ["id: strictUuidParam"],
-      authChecks: ["compares existing.merchantId !== merchantId"],
-      storageMethods: ["createJobEvent","getJobSchedule","terminateJobSchedule"],
+      storageMethods: ["getJobScheduleForMerchant","terminateJobScheduleForMerchant"],
       statuses: [200,400,401,403,404,500,503],
     },
   },

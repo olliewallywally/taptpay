@@ -3642,7 +3642,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     entitlement: null,
     idempotency: "read-only",
     sideEffects: null,
-    successDto: `every recurring invoice of the business, cancelled ones included (the recurring-invoice page lists them with their status), ${RECURRING_ROW} each, newest first, all at once (no paging)`,
+    successDto: `every recurring invoice of the business whose client is the business's too (getJobSchedulesByMerchant), cancelled ones included (the recurring-invoice page lists them with their status), ${RECURRING_ROW} each, newest first, all at once (no paging)`,
     errorDisclosure: ["fixed"],
   },
 
@@ -3652,14 +3652,14 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         principal: "merchant",
         roles: ["owner", "member"],
         tenant: "resource",
-        tenantRule: `the client named in the body (getClientProfile) must be the session's business's: another business's is 404 'Client not found', the same as a missing one; and not archived (409 since 2026-09-27: archiving cancels a client's recurring invoices, owner decision); ${TRADES_ADMIN}`,
+        tenantRule: `the client named in the body (getClientProfileForMerchant) must be the session's business's: another business's is 404 'Client not found', the same as a missing one; and not archived (409 since 2026-09-27: archiving cancels a client's recurring invoices, owner decision); createJobScheduleForMerchant locks the client and rechecks both at the write; ${TRADES_ADMIN}`,
       },
     ],
     input:
       `body: createJobScheduleSchema (the client's UUID, an amount of 1 cent to $1,000,000, weekly, fortnightly or monthly, a channel, the start and an optional end as date-times; other fields are dropped; 400 with the first issue). An end before the start is 400, and a start more than a day before now is 400 "The start date can't be in the past" (owner decision 2026-09-27: it billed every period since, one overdue invoice per cron run; the day's grace is because the forms send today's UTC date at 09:00 UTC)`,
     capability: null,
     entitlement: "paid access (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise)",
-    idempotency: "none: each call adds another recurring invoice, first run on its start date; a client may have several, one per job",
+    idempotency: "none: each call adds another recurring invoice, first run on its start date; a client may have several, one per job. createJobScheduleForMerchant commits it with its schedule_created history under the client's row lock, and takes only the amount, frequency, channel and dates from the caller: an archive at the same moment either cancels it or refuses it (since R1-T7 S4c: it could be left live)",
     sideEffects: null,
     successDto: `201 with the recurring invoice, ${RECURRING_ROW}`,
     errorDisclosure: ["input-issues"],
@@ -3671,14 +3671,14 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         principal: "merchant",
         roles: ["owner", "member"],
         tenant: "resource",
-        tenantRule: `${tradesRecord("recurring invoice", "getJobSchedule")}, and not cancelled (409 since 2026-09-27: a cancelled one stays cancelled); ${TRADES_ADMIN}`,
+        tenantRule: `${tradesRecord("recurring invoice", "getJobScheduleForMerchant")}, and not cancelled (409 since 2026-09-27: a cancelled one stays cancelled); updateJobScheduleForMerchant rechecks the business, the client and that state at its write, under the client's and the row's locks; ${TRADES_ADMIN}`,
       },
     ],
     input: `${tradesId("id")}; body: updateJobScheduleSchema (the amount, frequency, channel, and active or paused: 'terminated' is refused since 2026-09-27, DELETE cancels; other fields are dropped; 400 with the first issue)`,
     capability: null,
     entitlement: null,
     idempotency:
-      "sets the given fields (updateJobSchedule). Resuming a paused one moves its next date to the first date on its cycle after now, a monthly one kept on its start date's day of the month (nextJobRunDateAfter; owner decision 2026-09-27), so nothing is sent for the paused time; it billed every period it missed. Every call logs an event (paused, resumed or updated, with the change), again too",
+      "updateJobScheduleForMerchant sets the given editable fields and saves its event in the same transaction. Resuming a paused one moves its next date to the first date on the locked row's own cycle after now, a monthly one kept on its start date's day of the month (nextJobRunDateAfter; owner decision 2026-09-27), so nothing is sent for the paused time; it billed every period it missed. Every call logs an event (paused, resumed or updated, with the change), again too; a row moved or cancelled after the lookup is 404 or 409 with nothing written",
     sideEffects: null,
     successDto: `the recurring invoice afterwards, ${RECURRING_ROW}`,
     errorDisclosure: ["input-issues"],
@@ -3686,13 +3686,13 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
 
   "DELETE /api/trades/schedules/:id": {
     branches: [
-      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${tradesRecord("recurring invoice", "getJobSchedule")}; ${TRADES_ADMIN}` },
+      { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${tradesRecord("recurring invoice", "getJobScheduleForMerchant")}; terminateJobScheduleForMerchant rechecks the business and the client at its write, under the client's and the row's locks; ${TRADES_ADMIN}` },
     ],
     input: tradesId("id"),
     capability: null,
     entitlement: null,
     idempotency:
-      "cancels the recurring invoice, recording when (terminateJobSchedule), and logs it; a cancelled one is cancelled again, with a new time, and logged again. Invoices it already made stay payable",
+      "terminateJobScheduleForMerchant cancels the owned recurring invoice, recording when, and saves its event in the same transaction; a cancelled one is cancelled again, with a new time, and logged again. Invoices it already made stay payable; a row moved after the lookup is 404 with nothing written",
     sideEffects: null,
     successDto: `the recurring invoice afterwards, ${RECURRING_ROW}`,
     errorDisclosure: ["fixed"],

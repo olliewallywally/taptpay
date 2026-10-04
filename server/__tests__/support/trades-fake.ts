@@ -9,6 +9,7 @@
  */
 import * as billing from "../../billing-card";
 import * as delivery from "../../trades-delivery";
+import { nextJobRunDateAfter } from "../../trades-schedule";
 import { storage } from "./http-harness";
 
 export const CLIENT = "22222222-2222-4222-8222-222222222222";
@@ -49,7 +50,6 @@ export function fakeTrades(): TradesFake {
   });
   read("getQuote", fake.quotes);
   read("getJobInvoice", fake.invoices);
-  read("getJobSchedule", fake.schedules);
   // As the scoped SQL: a quote or invoice is the business's only with its current client the business's too.
   const owned = (row: any, merchantId: number) =>
     row?.merchantId === merchantId && fake.clients.get(row.clientProfileId)?.merchantId === merchantId ? row : undefined;
@@ -73,7 +73,10 @@ export function fakeTrades(): TradesFake {
   list("getQuotesByMerchant", (merchantId: number) => [...fake.quotes.values()].filter(row => owned(row, merchantId)));
   list("getJobInvoicesByMerchant", (merchantId: number, opts: { clientProfileId?: string } = {}) =>
     [...fake.invoices.values()].filter((row) => owned(row, merchantId) && (!opts.clientProfileId || row.clientProfileId === opts.clientProfileId)));
-  list("getJobSchedulesByMerchant", () => [...fake.schedules.values()]);
+  list("getJobSchedulesByMerchant", (merchantId: number) => [...fake.schedules.values()].filter((row) => owned(row, merchantId)));
+  jest.spyOn(storage, "getJobScheduleForMerchant").mockImplementation(async (id, merchantId) => {
+    fake.reads.push("getJobSchedule"); return owned(fake.schedules.get(id), merchantId);
+  });
   // Newest first, as the client's history screen reads it.
   jest.spyOn(storage, "getJobEventsByClientForMerchant").mockImplementation(async (clientId, merchantId, limit = 50) => {
     fake.reads.push("getJobEventsByClient");
@@ -212,10 +215,36 @@ export function fakeTrades(): TradesFake {
     await storage.createJobEvent({ merchantId, clientProfileId, jobInvoiceId: id, eventType: receipt.sent ? "invoice_email_sent" : "invoice_email_failed", payload: { reference: receipt.reference } });
     return true;
   });
-  write("createJobSchedule", (data: any) => {
-    const row = { id: MADE_SCHEDULE, status: "active", ...data };
-    fake.schedules.set(row.id, row);
-    return row;
+  // The scoped recurring-invoice writes (R1-T7 S4c), recorded as the writes they replace: the
+  // business's own unarchived client for a create; the row and its current client for the others.
+  jest.spyOn(storage, "createJobScheduleForMerchant").mockImplementation(async (clientProfileId, merchantId, data) => {
+    const client = fake.clients.get(clientProfileId);
+    if (client?.merchantId !== merchantId) return { kind: "not-found" };
+    if (client.status === "archived") return { kind: "conflict", reason: "archived" };
+    const schedule = { id: MADE_SCHEDULE, ...data, merchantId, clientProfileId, status: "active", nextRunDate: data.startDate } as any;
+    fake.schedules.set(schedule.id, schedule); fake.writes.push("createJobSchedule");
+    await storage.createJobEvent({ merchantId, clientProfileId, scheduleId: schedule.id, eventType: "schedule_created", payload: { amountCents: schedule.amountCents, frequency: schedule.frequency } });
+    return { kind: "ok", schedule };
+  });
+  jest.spyOn(storage, "updateJobScheduleForMerchant").mockImplementation(async (id, merchantId, changes) => {
+    const schedule = owned(fake.schedules.get(id), merchantId);
+    if (!schedule) return { kind: "not-found" };
+    if (schedule.status === "terminated") return { kind: "conflict", reason: "terminated" };
+    // As storage: a resume's next date comes from the row as it is now, not from the route's read.
+    const resumed = schedule.status === "paused" && changes.status === "active"
+      ? { nextRunDate: nextJobRunDateAfter(new Date(schedule.nextRunDate), changes.frequency ?? schedule.frequency, new Date(schedule.startDate), new Date()) } : {};
+    fake.writes.push("updateJobSchedule");
+    Object.assign(schedule, Object.fromEntries(Object.entries(changes).filter(([, value]) => value !== undefined)), resumed);
+    await storage.createJobEvent({ merchantId, clientProfileId: schedule.clientProfileId, scheduleId: id,
+      eventType: changes.status === "paused" ? "schedule_paused" : changes.status === "active" ? "schedule_resumed" : "schedule_updated", payload: changes });
+    return { kind: "ok", schedule };
+  });
+  jest.spyOn(storage, "terminateJobScheduleForMerchant").mockImplementation(async (id, merchantId) => {
+    const schedule = owned(fake.schedules.get(id), merchantId);
+    if (!schedule) return { kind: "not-found" };
+    fake.writes.push("terminateJobSchedule"); Object.assign(schedule, { status: "terminated", terminatedAt: new Date() });
+    await storage.createJobEvent({ merchantId, clientProfileId: schedule.clientProfileId, scheduleId: id, eventType: "schedule_terminated" });
+    return { kind: "ok", schedule };
   });
   write("updateJobSchedule", (id: string, updates: any) => Object.assign(fake.schedules.get(id), updates));
   write("terminateJobSchedule", (id: string) => Object.assign(fake.schedules.get(id), { status: "terminated", terminatedAt: new Date() }));

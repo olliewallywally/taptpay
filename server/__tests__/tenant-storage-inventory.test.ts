@@ -223,3 +223,32 @@ test("trades quote, invoice and balance creation and their delivery require merc
   }
   expect(contract.find(method => method.name === "recordJobInvoiceDeliveryForMerchant")?.requiredTenant).toBe(true);
 });
+
+test("trades recurring-invoice management requires merchant scope; the cron keeps its own writes", () => {
+  const contract = storageContract();
+  for (const name of ["createJobSchedule", "getJobSchedule"]) expect(contract.find(method => method.name === name)).toBeUndefined();
+  for (const name of ["getDueJobSchedules", "updateJobSchedule", "terminateJobSchedule"]) expect(contract.find(method => method.name === name)).toBeDefined();
+  const facts = currentRouteFacts();
+  for (const [key, names] of [
+    ["GET /api/trades/schedules", ["getJobSchedulesByMerchant"]],
+    ["POST /api/trades/schedules", ["getClientProfileForMerchant", "createJobScheduleForMerchant"]],
+    ["PUT /api/trades/schedules/:id", ["getJobScheduleForMerchant", "updateJobScheduleForMerchant"]],
+    ["DELETE /api/trades/schedules/:id", ["getJobScheduleForMerchant", "terminateJobScheduleForMerchant"]],
+  ] as const) {
+    for (const name of names) {
+      expect(contract.find(method => method.name === name)?.requiredTenant).toBe(true);
+      expect(facts.get(key)?.storageMethods).toContain(name);
+    }
+    for (const name of ["getClientProfile", "updateJobSchedule", "terminateJobSchedule", "createJobEvent"]) expect(facts.get(key)?.storageMethods).not.toContain(name);
+  }
+});
+
+test("no signed-in trades route reads or writes a trades record through a global key", () => {
+  // The public quote, checkout, provider, WhatsApp and cron lanes keep these; a signed-in route must not.
+  const GLOBAL = ["getClientProfile", "getQuote", "getQuoteByToken", "updateQuote", "getJobInvoice", "createJobInvoice", "updateJobInvoice",
+    "getJobInvoicesByQuote", "updateJobSchedule", "terminateJobSchedule", "getDueJobSchedules", "createJobEvent"];
+  const facts = currentRouteFacts();
+  const signedIn = [...facts.entries()].filter(([key, fact]) => key.includes(" /api/trades/") && fact.middleware.includes("authenticateToken"));
+  expect(signedIn.length).toBe(25);
+  for (const [key, fact] of signedIn) for (const name of GLOBAL) expect([key, fact.storageMethods.includes(name)]).toEqual([key, false]);
+});

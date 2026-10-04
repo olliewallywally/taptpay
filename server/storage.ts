@@ -4,6 +4,7 @@ import { decideBilling, failedPaymentUpdates, immediatePlanUpdates, MAX_PAYMENT_
 import { getDb, isDatabaseConnected } from "./database";
 import { config } from "./config";
 import { nextRunDateAfter } from "./property-schedule";
+import { nextJobRunDateAfter } from "./trades-schedule";
 import { parseInvoiceDocumentRef } from "./upload-policy";
 import { eq, ne, desc, asc, and, inArray, notInArray, gt, gte, lte, lt, or, ilike, like, sql, isNull, isNotNull } from "drizzle-orm";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
@@ -128,6 +129,21 @@ export type JobBalanceCreationResult =
   | { kind: "ok"; invoice: typeof jobInvoices.$inferSelect }
   | { kind: "not-found" }
   | { kind: "conflict"; reason: "not-deposit" | "unpaid" | "no-quote" | "quote-not-found" | "exists" | "none-remaining" };
+export type JobScheduleInput = Pick<typeof jobSchedules.$inferInsert, "amountCents" | "frequency" | "deliveryChannel" | "startDate" | "endDate">;
+export type JobScheduleChanges = Partial<Pick<typeof jobSchedules.$inferInsert, "amountCents" | "frequency" | "deliveryChannel">> & { status?: "active" | "paused" };
+export type JobScheduleMutationResult =
+  | { kind: "ok"; schedule: typeof jobSchedules.$inferSelect }
+  | { kind: "not-found" }
+  | { kind: "conflict"; reason: "archived" | "terminated" };
+
+// What a signed-in edit may set. Cancelling is its own contract; identity and dates are never the caller's.
+function jobScheduleChanges(data: JobScheduleChanges): JobScheduleChanges {
+  const patch = Object.fromEntries(["amountCents", "frequency", "deliveryChannel"]
+    .filter(key => (data as any)[key] !== undefined).map(key => [key, (data as any)[key]]));
+  if (data.status === "active" || data.status === "paused") patch.status = data.status;
+  return patch;
+}
+
 export type TradesQuoteDeliveryRecord = { sent: boolean; channel?: string; reason?: string };
 export type TradesInvoiceDeliveryRecord = { channel?: string; messageId?: string };
 
@@ -1052,9 +1068,12 @@ export interface IStorage extends PaymentAttemptRepository {
   getOverdueEligibleJobInvoices(now: Date): Promise<any[]>;
   getReminderEligibleJobInvoices(): Promise<any[]>;
 
-  createJobSchedule(data: any): Promise<any>;
-  getJobSchedule(id: string): Promise<any | undefined>;
+  createJobScheduleForMerchant(clientProfileId: string, merchantId: number, data: JobScheduleInput): Promise<JobScheduleMutationResult>;
+  getJobScheduleForMerchant(id: string, merchantId: number): Promise<any | undefined>;
   getJobSchedulesByMerchant(merchantId: number): Promise<any[]>;
+  updateJobScheduleForMerchant(id: string, merchantId: number, updates: JobScheduleChanges): Promise<JobScheduleMutationResult>;
+  terminateJobScheduleForMerchant(id: string, merchantId: number): Promise<JobScheduleMutationResult>;
+  /** The cron's due list, and its advance and end-of-term cancel below; signed-in management uses explicit scope. */
   getDueJobSchedules(now: Date): Promise<any[]>;
   updateJobSchedule(id: string, updates: any): Promise<any | undefined>;
   terminateJobSchedule(id: string): Promise<any | undefined>;
@@ -3573,9 +3592,11 @@ export class MemStorage implements IStorage {
   async getPendingDispatchJobInvoices(): Promise<any[]> { return []; }
   async getOverdueEligibleJobInvoices(now: Date): Promise<any[]> { return []; }
   async getReminderEligibleJobInvoices(): Promise<any[]> { return []; }
-  async createJobSchedule(data: any): Promise<any> { throw new Error("Trades requires database"); }
-  async getJobSchedule(id: string): Promise<any> { return undefined; }
+  async createJobScheduleForMerchant(clientProfileId: string, merchantId: number, data: JobScheduleInput): Promise<JobScheduleMutationResult> { throw new Error("Trades requires database"); }
+  async getJobScheduleForMerchant(id: string, merchantId: number): Promise<any> { return undefined; }
   async getJobSchedulesByMerchant(merchantId: number): Promise<any[]> { return []; }
+  async updateJobScheduleForMerchant(id: string, merchantId: number, updates: JobScheduleChanges): Promise<JobScheduleMutationResult> { return { kind: "not-found" }; }
+  async terminateJobScheduleForMerchant(id: string, merchantId: number): Promise<JobScheduleMutationResult> { return { kind: "not-found" }; }
   async getDueJobSchedules(now: Date): Promise<any[]> { return []; }
   async updateJobSchedule(id: string, updates: any): Promise<any> { return undefined; }
   async terminateJobSchedule(id: string): Promise<any> { return undefined; }
@@ -8933,21 +8954,78 @@ export class DatabaseStorage implements IStorage {
   }
 
   // ───────── Trades: job schedules ─────────
-  async createJobSchedule(data: any): Promise<any> {
-    const db = getDb(); if (!db) throw new Error('No database');
-    const [row] = await db.insert(jobSchedules).values(data).returning();
-    return row;
+  async createJobScheduleForMerchant(clientProfileId: string, merchantId: number, data: JobScheduleInput): Promise<JobScheduleMutationResult> {
+    if (!isManagementTenantId(merchantId)) return { kind: "not-found" };
+    const db = this.db; if (!db) throw new Error("Trades requires database");
+    return db.transaction(async (tx: any) => {
+      // Client first, as in archive: an archive and a create at the same moment
+      // cannot leave an archived client with a live recurring invoice.
+      const parent = await this.lockOwnedTradesClient(tx, clientProfileId, merchantId);
+      if (!parent) return { kind: "not-found" };
+      if (parent.status === "archived") return { kind: "conflict", reason: "archived" };
+      const values = Object.fromEntries(["amountCents", "frequency", "deliveryChannel", "startDate", "endDate"]
+        .filter(key => (data as any)[key] !== undefined).map(key => [key, (data as any)[key]]));
+      const [schedule] = await tx.insert(jobSchedules).values({ ...values, merchantId, clientProfileId: parent.id,
+        status: "active", nextRunDate: data.startDate }).returning();
+      await tx.insert(jobEvents).values({ merchantId, clientProfileId: parent.id, scheduleId: schedule.id, eventType: "schedule_created",
+        payload: { amountCents: schedule.amountCents, frequency: schedule.frequency } });
+      return { kind: "ok", schedule };
+    });
   }
-  async getJobSchedule(id: string): Promise<any> {
-    const db = getDb(); if (!db) return undefined;
-    const [row] = await db.select().from(jobSchedules).where(eq(jobSchedules.id, id));
+  async getJobScheduleForMerchant(id: string, merchantId: number): Promise<any> {
+    if (!isManagementTenantId(merchantId)) return undefined;
+    const db = this.db; if (!db) return undefined;
+    const [row] = await db.select().from(jobSchedules).where(and(
+      eq(jobSchedules.id, id), eq(jobSchedules.merchantId, merchantId),
+      sql`exists (select 1 from ${clientProfiles} where ${clientProfiles.id} = ${jobSchedules.clientProfileId} and ${clientProfiles.merchantId} = ${merchantId})`,
+    )).limit(1);
     return row;
   }
   async getJobSchedulesByMerchant(merchantId: number): Promise<any[]> {
-    const db = getDb(); if (!db) return [];
+    if (!isManagementTenantId(merchantId)) return [];
+    const db = this.db; if (!db) return [];
     return db.select().from(jobSchedules)
-      .where(eq(jobSchedules.merchantId, merchantId))
+      .where(and(eq(jobSchedules.merchantId, merchantId),
+        sql`exists (select 1 from ${clientProfiles} where ${clientProfiles.id} = ${jobSchedules.clientProfileId} and ${clientProfiles.merchantId} = ${merchantId})`))
       .orderBy(desc(jobSchedules.createdAt));
+  }
+  private async mutateJobScheduleForMerchant(id: string, merchantId: number, updates?: JobScheduleChanges): Promise<JobScheduleMutationResult> {
+    if (!isManagementTenantId(merchantId)) return { kind: "not-found" };
+    const db = this.db; if (!db) return { kind: "not-found" };
+    return db.transaction(async (tx: any) => {
+      // Find the client without taking a child lock, then lock client before row:
+      // the same order as the client's archive, which cancels these rows.
+      const [candidate] = await tx.select({ clientProfileId: jobSchedules.clientProfileId }).from(jobSchedules)
+        .where(and(eq(jobSchedules.id, id), eq(jobSchedules.merchantId, merchantId))).limit(1);
+      if (!candidate) return { kind: "not-found" };
+      const parent = await this.lockOwnedTradesClient(tx, candidate.clientProfileId, merchantId);
+      if (!parent) return { kind: "not-found" };
+      const scope = and(eq(jobSchedules.id, id), eq(jobSchedules.merchantId, merchantId), eq(jobSchedules.clientProfileId, parent.id));
+      const [current] = await tx.select().from(jobSchedules).where(scope).limit(1).for("update");
+      if (!current) return { kind: "not-found" };
+      // A cancelled recurring invoice stays cancelled; cancelling one again is still taken.
+      if (updates && current.status === "terminated") return { kind: "conflict", reason: "terminated" };
+      const now = new Date();
+      const changes = updates ? jobScheduleChanges(updates) : undefined;
+      const patch: any = changes ? { ...changes } : { status: "terminated", terminatedAt: now };
+      // Resuming skips the paused time (owner decision 2026-09-27): the next date is the
+      // first on the locked row's own cycle after now, by the frequency asked for with it.
+      if (changes && current.status === "paused" && changes.status === "active") {
+        patch.nextRunDate = nextJobRunDateAfter(new Date(current.nextRunDate), changes.frequency ?? current.frequency, new Date(current.startDate), now);
+      }
+      const [schedule] = await tx.update(jobSchedules).set({ ...patch, updatedAt: now }).where(scope).returning();
+      if (!schedule) return { kind: "not-found" };
+      await tx.insert(jobEvents).values({ merchantId, clientProfileId: parent.id, scheduleId: id,
+        eventType: !changes ? "schedule_terminated" : changes.status === "paused" ? "schedule_paused" : changes.status === "active" ? "schedule_resumed" : "schedule_updated",
+        ...(changes ? { payload: changes } : {}) });
+      return { kind: "ok", schedule };
+    });
+  }
+  async updateJobScheduleForMerchant(id: string, merchantId: number, updates: JobScheduleChanges): Promise<JobScheduleMutationResult> {
+    return this.mutateJobScheduleForMerchant(id, merchantId, updates);
+  }
+  async terminateJobScheduleForMerchant(id: string, merchantId: number): Promise<JobScheduleMutationResult> {
+    return this.mutateJobScheduleForMerchant(id, merchantId);
   }
   async getDueJobSchedules(now: Date): Promise<any[]> {
     const db = getDb(); if (!db) return [];

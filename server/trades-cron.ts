@@ -1,37 +1,9 @@
 import crypto from "crypto";
 import { storage } from "./storage";
 import { billingCardIsReady } from "./billing-card";
-
-function nextRun(from: Date, frequency: string, anchorDom?: number): Date {
-  const date = new Date(from);
-  if (frequency === "weekly") date.setUTCDate(date.getUTCDate() + 7);
-  else if (frequency === "fortnightly") date.setUTCDate(date.getUTCDate() + 14);
-  else {
-    // Monthly: advance one month and clamp the anchor day-of-month to the target
-    // month's length. Plain setUTCMonth(+1) overflows for 29th–31st anchors
-    // (e.g. Jan 31 -> Mar 3), skipping a month and permanently drifting the
-    // billing date. Anchoring on the schedule's original day recovers the 31st
-    // in months that have it.
-    const dom = anchorDom ?? date.getUTCDate();
-    date.setUTCDate(1);
-    date.setUTCMonth(date.getUTCMonth() + 1);
-    const daysInMonth = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate();
-    date.setUTCDate(Math.min(dom, daysInMonth));
-  }
-  return date;
-}
-
-/**
- * The first date on a recurring invoice's cycle after `now`, counting on from `from` and keeping a
- * monthly one on its start date's day of the month. Resuming a paused one starts there (owner
- * decision 2026-09-27): nothing is sent for the paused time.
- */
-export function nextJobRunDateAfter(from: Date, frequency: string, startDate: Date, now: Date): Date {
-  const anchorDom = new Date(startDate).getUTCDate();
-  let next = new Date(from);
-  while (next <= now) next = nextRun(next, frequency, anchorDom);
-  return next;
-}
+import { nextJobRun } from "./trades-schedule";
+// The cycle math lives in a module storage can use without importing this one (R1-T7 S4c).
+export { nextJobRunDateAfter } from "./trades-schedule";
 
 export async function runTradesGeneratePass(now: Date = new Date()): Promise<{ generated: number; skipped: number; errors: number }> {
   const result = { generated: 0, skipped: 0, errors: 0 };
@@ -86,7 +58,7 @@ export async function runTradesGeneratePass(now: Date = new Date()): Promise<{ g
       }
 
       const anchorDom = new Date(schedule.startDate).getUTCDate();
-      const followingRun = nextRun(dueAt, schedule.frequency, anchorDom);
+      const followingRun = nextJobRun(dueAt, schedule.frequency, anchorDom);
       if (schedule.endDate && followingRun > new Date(schedule.endDate)) {
         await storage.updateJobSchedule(schedule.id, {
           lastRunDate: dueAt,

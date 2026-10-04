@@ -1,10 +1,10 @@
 # R1-T7 tenant/storage execution inventory
 
-Generated from working-tree sources on base `51e0b186348615c2a93c3b434757874ced1423ce`; the phase evidence names the final commit.
+Generated from working-tree sources on base `22628b957a3d6e2aa1eca28fd0b843e57458dffb`; the phase evidence names the final commit.
 
 Registrations: **187**; registrations with session/admin authentication: **119**;
 registrations calling checkMerchantOwnership: **25**.
-IStorage: **242** declared methods;
+IStorage: **244** declared methods;
 PaymentAttemptRepository: **8** inherited methods.
 
 Classifications come from the reviewed per-route branches, including mixed public/signed-in routes.
@@ -32,7 +32,7 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | DELETE /api/property/schedules/:id | tenant (merchant/resource) | `getActiveScheduleForMerchant`, `terminateActiveScheduleForMerchant` |
 | DELETE /api/team/:userId | tenant (merchant/resource) | `deactivatePushSubscriptionsForLogin`, `getUserById`, `removeTeamMember` |
 | DELETE /api/team/:userId/invite | tenant (merchant/resource) | `revokeTeamInvite` |
-| DELETE /api/trades/schedules/:id | tenant (merchant/resource) | `createJobEvent`, `getJobSchedule`, `terminateJobSchedule` |
+| DELETE /api/trades/schedules/:id | tenant (merchant/resource) | `getJobScheduleForMerchant`, `terminateJobScheduleForMerchant` |
 | GET /.well-known/apple-developer-merchantid-domain-association | public (public/none) | — |
 | GET /api/admin/analytics | validated admin (platform-admin/any-merchant) | `getAllMerchants`, `getMerchantAnalytics`, `getSubscriptionRevenue`, `getTransactionsByMerchant` |
 | GET /api/admin/auth/me | validated admin (platform-admin/none) | — |
@@ -176,7 +176,7 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | POST /api/trades/invoices/:id/void | tenant (merchant/resource) | `getJobInvoiceForMerchant`, `voidJobInvoiceForMerchant` |
 | POST /api/trades/quotes | tenant (merchant/resource) | `createQuoteForMerchant`, `getClientProfileForMerchant`, `getMerchant`, `getOrCreateSubscription`, `getQuoteDeliveryForMerchant`, `recordQuoteDeliveryForMerchant`, `uploadedFileOwnedByMerchant` |
 | POST /api/trades/quotes/token/:token/respond | single-resource bearer (public-bearer/token) | `createJobEvent`, `createJobInvoice`, `getOrCreateSubscription`, `getQuoteByToken`, `updateQuote` |
-| POST /api/trades/schedules | tenant (merchant/resource) | `createJobEvent`, `createJobSchedule`, `getClientProfile`, `getOrCreateSubscription` |
+| POST /api/trades/schedules | tenant (merchant/resource) | `createJobScheduleForMerchant`, `getClientProfileForMerchant`, `getOrCreateSubscription` |
 | POST /api/transactions | tenant (merchant/path-merchant) | `createTransactionForMerchant`, `getOrCreateSubscription`, `getTaptStoneForMerchant` |
 | POST /api/transactions/:id/cancel | tenant (merchant/resource) | `cancelTransactionForMerchant`, `getTransaction`, `getTransactionForMerchant` |
 | POST /api/transactions/:id/googlepay-complete | public (public/number) | `getNextPendingSplit`, `getTransaction`, `incrementTransactionCount`, `updateSplitPaymentStatus`, `updateTransactionPaymentMethod`, `updateTransactionSessionState`, `updateTransactionStatus` |
@@ -206,7 +206,7 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | PUT /api/trades/clients/:id | tenant (merchant/resource) | `getClientProfileForMerchant`, `updateClientProfileForMerchant` |
 | PUT /api/trades/gst-settings | tenant (merchant/session) | `updateMerchant` |
 | PUT /api/trades/reminder-settings | tenant (merchant/session) | `updateMerchant` |
-| PUT /api/trades/schedules/:id | tenant (merchant/resource) | `createJobEvent`, `getJobSchedule`, `updateJobSchedule` |
+| PUT /api/trades/schedules/:id | tenant (merchant/resource) | `getJobScheduleForMerchant`, `updateJobScheduleForMerchant` |
 
 ## Storage interface
 
@@ -427,9 +427,11 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | IStorage | getPendingDispatchJobInvoices | no | `getPendingDispatchJobInvoices(): Promise<any[]>` |
 | IStorage | getOverdueEligibleJobInvoices | no | `getOverdueEligibleJobInvoices(now: Date): Promise<any[]>` |
 | IStorage | getReminderEligibleJobInvoices | no | `getReminderEligibleJobInvoices(): Promise<any[]>` |
-| IStorage | createJobSchedule | no | `createJobSchedule(data: any): Promise<any>` |
-| IStorage | getJobSchedule | no | `getJobSchedule(id: string): Promise<any \| undefined>` |
+| IStorage | createJobScheduleForMerchant | yes | `createJobScheduleForMerchant(clientProfileId: string, merchantId: number, data: JobScheduleInput): Promise<JobScheduleMutationResult>` |
+| IStorage | getJobScheduleForMerchant | yes | `getJobScheduleForMerchant(id: string, merchantId: number): Promise<any \| undefined>` |
 | IStorage | getJobSchedulesByMerchant | yes | `getJobSchedulesByMerchant(merchantId: number): Promise<any[]>` |
+| IStorage | updateJobScheduleForMerchant | yes | `updateJobScheduleForMerchant(id: string, merchantId: number, updates: JobScheduleChanges): Promise<JobScheduleMutationResult>` |
+| IStorage | terminateJobScheduleForMerchant | yes | `terminateJobScheduleForMerchant(id: string, merchantId: number): Promise<JobScheduleMutationResult>` |
 | IStorage | getDueJobSchedules | no | `getDueJobSchedules(now: Date): Promise<any[]>` |
 | IStorage | updateJobSchedule | no | `updateJobSchedule(id: string, updates: any): Promise<any \| undefined>` |
 | IStorage | terminateJobSchedule | no | `terminateJobSchedule(id: string): Promise<any \| undefined>` |
