@@ -1,5 +1,31 @@
 # Full integration continuation audit — 2026-09-07
 
+Latest continuation **2026-10-04 — S5a the business's own settings row code-complete
+`c294f007`**, local, awaiting independent review.
+[Evidence](r1/R1-T7-S5a-merchant-settings-2026-10-04.md),
+[S5 preflights](../../PLAN-2026-10-04-r1-t7-s5-settings.md).
+Picked up from a clean tree at `e836c60a` after a usage-limit stop; nothing was in
+flight. Owner finish-R1 authorization persists.
+
+- The S5 starting query, rerun on the S4c commit: **41** signed-in registrations
+  with a storage call lacking a required business; all 41 handlers read. 26 touch
+  only the business's own row (this batch); 15 are S5b's.
+- Six routes left the general update (which writes any column but the Windcave key)
+  for `updateMerchantSettings`: each purpose writes its own columns, never another's
+  or the row's identity, sign-in, status, credential, billing or branding columns;
+  storage sets the onboarding flag. The row's own methods are named and guarded by
+  the business; the database's details update is projected. The served-route tests
+  now fail if a business's login is served from another business's row.
+- Red **50 of 64** and the pin on `e836c60a`; affected **76 suites / 2,663 pass**;
+  fresh actual PostgreSQL **18 pass**; **33 of 34** planted mutations caught (one
+  equivalent); **full server 163 suites / 4,053 pass** on `c294f007`.
+  Typecheck/build/whitespace and **187 routes / 0 gaps; 253 contracts** pass.
+- No app DB/provider, live migration, client/schema change, push or deploy.
+
+**Active next:** S5b the stragglers and the closing pin (preflight and separate
+reread approve it on `c294f007`); then S6, Apple and R1-T10. Independent/external
+gates remain below.
+
 Latest continuation **2026-10-04 — S4c trades recurring invoices code-complete
 `df54069e`; S4 engineering scope (a, b1, b2, c) implemented**, local, awaiting
 independent review. [Evidence](r1/R1-T7-S4c-trades-schedules-2026-10-04.md),
