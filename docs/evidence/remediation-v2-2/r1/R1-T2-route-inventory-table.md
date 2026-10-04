@@ -1,4 +1,4 @@
-# R1-T2 route inventory — generated 2026-10-04 @ `d1eb5fb4d76fcca6a36865b234c2d55e352b18a4`
+# R1-T2 route inventory — generated 2026-10-04 @ `910c89b1f2b6b2a0f163b12ccca8048fa62b6ea7`
 
 Regenerate with `npx tsx scripts/generate-route-policy.ts`. This table is
 evidence for the SHA named above, not a timeless constant — see
@@ -3951,7 +3951,7 @@ Reviewed policy:
 - **Who:** cron. **Tenant (system):** a scheduled run over every merchant's billing, invoices and reminders
 - **Input:** nothing is read but the x-cron-secret header (link URLs come from getBaseUrl(req))
 - **Idempotency:** one run at a time in this server process (409 while one runs); each pass is meant to act once per period. Another server instance can run at the same time (finding)
-- **Side effects:** charges stored cards for due subscriptions (server/subscription-cron.ts); generates and sends property and trades invoices and reminders by email or SMS (server/property-cron.ts, server/trades-cron.ts, server/trades-delivery.ts); daily payout notifications (server/daily-payout-notifications.ts)
+- **Side effects:** charges stored cards for due subscriptions (server/subscription-cron.ts); generates and sends property and trades invoices and reminders by email or SMS (server/property-cron.ts, server/trades-cron.ts, server/trades-delivery.ts); daily payout notifications (server/daily-payout-notifications.ts); scans a few invoice documents that have no scan verdict yet and records it, clean or infected, never without one (server/upload-lifecycle.ts, owner decision 2026-09-29); deletes invoice documents no invoice or quote names 12 calendar months after they were uploaded, never an attached one or a logo, and logs the count
 - **Success:** 200, or 207 when a pass failed: { ok, ranAt, failedPasses, and each pass's counts }
 - **Error disclosure:** fixed
 - **Authenticity:** x-cron-secret must equal CRON_SECRET, compared in constant time (authorizeCronRequest); 503 when CRON_SECRET is unset

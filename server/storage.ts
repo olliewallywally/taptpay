@@ -5,7 +5,8 @@ import { getDb, isDatabaseConnected } from "./database";
 import { config } from "./config";
 import { nextRunDateAfter } from "./property-schedule";
 import { nextJobRunDateAfter } from "./trades-schedule";
-import { parseInvoiceDocumentRef } from "./upload-policy";
+import { INVOICE_DOCUMENT_FOLDER, parseInvoiceDocumentRef } from "./upload-policy";
+import type { ScanResult } from "./malware-scanner";
 import { eq, ne, desc, asc, and, inArray, notInArray, gt, gte, lte, lt, or, ilike, like, sql, isNull, isNotNull } from "drizzle-orm";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { authHandoffCodes, authSessions, authThrottle, invoiceDocumentAccessAudit, invoiceDocumentReadLimits, invoiceSplitSessions, type AuthSession, type InvoiceSplitSession, type NewAuthSession } from "@shared/schema";
@@ -1169,6 +1170,15 @@ export interface IStorage extends PaymentAttemptRepository {
   getCleanUploadedFile(relPath: string): Promise<{ mimeType: string; data: Buffer } | undefined>;
   /** Whether the business owns that document and its scan says clean (never reads the blob): what an attach and the payment page ask. */
   cleanUploadedFileOwnedByMerchant(relPath: string, merchantId: number): Promise<boolean>;
+  //
+  // R1-T7 S6b: the two scheduled passes (server/upload-lifecycle.ts). None of these is a route's.
+  //
+  /** Documents with no scan on record, a bounded number in no fixed order; `version` names the bytes read. */
+  listUnscannedInvoiceDocuments(limit: number): Promise<UnscannedDocument[]>;
+  /** Records a verdict only if the file has none and still holds those bytes; says whether it did. */
+  recordUploadedFileScan(relPath: string, version: string, scan: ScanResult): Promise<boolean>;
+  /** Deletes documents uploaded before then that no invoice or quote names, up to `limit`; returns how many. */
+  deleteUnattachedInvoiceDocuments(uploadedBefore: Date, limit: number): Promise<number>;
   deleteUploadedFile(relPath: string, merchantId: number): Promise<void>;
   recordInvoiceDocumentAdminRead(adminUserId: number, documentName: string): Promise<void>;
   consumeInvoiceDocumentReadLimit(token: string): Promise<boolean>;
@@ -1225,6 +1235,31 @@ export interface IStorage extends PaymentAttemptRepository {
  * own WHERE, beside the business: a file with no verdict, or an infected one, matches none of them.
  */
 const CLEAN_SCAN_ON_RECORD = sql`exists (select 1 from ${uploadedFileScans} where ${uploadedFileScans.fileId} = ${uploadedFiles.id} and ${uploadedFileScans.verdict} = 'clean')`;
+
+/** A document the scan pass reads: its path, its business, and a token for exactly these bytes. */
+export type UnscannedDocument = { path: string; merchantId: number | null; version: string; data: Buffer };
+
+const INVOICE_DOCUMENT_PATHS = `${INVOICE_DOCUMENT_FOLDER}/%`;
+/**
+ * R1-T7 S6b: no property invoice, trades quote or trades invoice names the document. Deletion cannot
+ * be undone, so "names" is read widely: the file's own path anywhere in the stored address counts,
+ * whatever came before or after it (a full address, a query string). Names are random, so nothing
+ * else contains one.
+ */
+const NO_INVOICE_NAMES_IT = sql`not exists (select 1 from ${invoicesRentRequests} where position(${uploadedFiles.path} in ${invoicesRentRequests.documentUrl}) > 0) and not exists (select 1 from ${quotes} where position(${uploadedFiles.path} in ${quotes.documentUrl}) > 0) and not exists (select 1 from ${jobInvoices} where position(${uploadedFiles.path} in ${jobInvoices.documentUrl}) > 0)`;
+
+/** One pass reads or deletes a bounded number: a whole number from 1 to 50, or nothing at all. */
+function passLimit(limit: number): number {
+  return Number.isInteger(limit) && limit >= 1 && limit <= 50 ? limit : 0;
+}
+
+/** A verdict storage will record: clean, or infected with the name of what was found. */
+function assertScanVerdict(scan: ScanResult): void {
+  const named = scan?.verdict === "infected" && typeof scan.signature === "string" && scan.signature.length > 0;
+  if (!scan || typeof scan.scanner !== "string" || !scan.scanner || !(scan.verdict === "clean" || named)) {
+    throw new Error("A scan verdict is clean, or infected with a signature");
+  }
+}
 
 // A tenant id that can match a real merchant. 0 is the platform admin's
 // principal id and must never match a tenant; NaN/fractions are never valid.
@@ -1296,7 +1331,8 @@ export class MemStorage implements IStorage {
     claimedAt: Date;
   }>;
   private tutorialProgress: Map<string, MerchantTutorialProgress>;
-  private uploadedFileBlobs: Map<string, { mimeType: string; data: Buffer; merchantId: number; scan?: { verdict: "clean" | "infected"; scanner: string; signature?: string; scannedAt: Date } }>;
+  private uploadedFileBlobs: Map<string, { mimeType: string; data: Buffer; merchantId: number; createdAt: Date; version: string; scan?: { verdict: "clean" | "infected"; scanner: string; signature?: string; scannedAt: Date } }>;
+  private uploadVersions = 0;
   private documentReadLimits = new Map<string, { count: number; expiresAt: number }>();
   private authHandoffCodes = new Map<string, { userId: number; newUser: boolean; expiresAt: Date; consumedAt: Date | null }>();
   private authThrottleRows = new Map<string, AuthThrottleRow>();
@@ -2826,7 +2862,7 @@ export class MemStorage implements IStorage {
     if (!isTenantId(merchantId)) throw new Error("A valid merchantId is required to save an upload");
     const existing = this.uploadedFileBlobs.get(relPath);
     if (existing && existing.merchantId !== merchantId) throw new UploadPathOwnershipError();
-    this.uploadedFileBlobs.set(relPath, { mimeType, data, merchantId });
+    this.uploadedFileBlobs.set(relPath, { mimeType, data, merchantId, createdAt: new Date(), version: String(++this.uploadVersions) });
   }
 
   async getUploadedFile(relPath: string): Promise<{ mimeType: string; data: Buffer } | undefined> {
@@ -2838,7 +2874,7 @@ export class MemStorage implements IStorage {
     if (!isTenantId(merchantId)) throw new Error("A valid merchantId is required to save an upload");
     const existing = this.uploadedFileBlobs.get(relPath);
     if (existing && existing.merchantId !== merchantId) throw new UploadPathOwnershipError();
-    this.uploadedFileBlobs.set(relPath, { mimeType, data, merchantId, scan: { verdict: "clean", scanner: scan.scanner, scannedAt: new Date() } });
+    this.uploadedFileBlobs.set(relPath, { mimeType, data, merchantId, createdAt: new Date(), version: String(++this.uploadVersions), scan: { verdict: "clean", scanner: scan.scanner, scannedAt: new Date() } });
   }
 
   async getCleanUploadedFileForMerchant(relPath: string, merchantId: number): Promise<{ mimeType: string; data: Buffer } | undefined> {
@@ -2856,6 +2892,35 @@ export class MemStorage implements IStorage {
     if (!isTenantId(merchantId)) return false;
     const file = this.uploadedFileBlobs.get(relPath);
     return file?.merchantId === merchantId && file.scan?.verdict === "clean";
+  }
+
+  async listUnscannedInvoiceDocuments(limit: number): Promise<UnscannedDocument[]> {
+    const unscanned = [...this.uploadedFileBlobs.entries()]
+      .filter(([path, file]) => path.startsWith(`${INVOICE_DOCUMENT_FOLDER}/`) && !file.scan)
+      .map(([path, file]) => ({ path, merchantId: file.merchantId, version: file.version, data: file.data }));
+    // No fixed order, as the database's.
+    for (let i = unscanned.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [unscanned[i], unscanned[j]] = [unscanned[j], unscanned[i]];
+    }
+    return unscanned.slice(0, passLimit(limit));
+  }
+
+  async recordUploadedFileScan(relPath: string, version: string, scan: ScanResult): Promise<boolean> {
+    assertScanVerdict(scan);
+    const file = this.uploadedFileBlobs.get(relPath);
+    if (!file || file.scan || file.version !== version) return false;
+    file.scan = { verdict: scan.verdict, scanner: scan.scanner, scannedAt: new Date(), ...(scan.verdict === "infected" ? { signature: scan.signature } : {}) };
+    return true;
+  }
+
+  // Memory holds no property or trades records (they are database-only), so nothing here is attached.
+  async deleteUnattachedInvoiceDocuments(uploadedBefore: Date, limit: number): Promise<number> {
+    const old = [...this.uploadedFileBlobs.entries()]
+      .filter(([path, file]) => path.startsWith(`${INVOICE_DOCUMENT_FOLDER}/`) && file.createdAt.getTime() < uploadedBefore.getTime())
+      .slice(0, passLimit(limit));
+    for (const [path] of old) this.uploadedFileBlobs.delete(path);
+    return old.length;
   }
 
   async deleteUploadedFile(relPath: string, merchantId: number): Promise<void> {
@@ -9309,6 +9374,58 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(uploadedFiles.path, relPath), eq(uploadedFiles.merchantId, merchantId), CLEAN_SCAN_ON_RECORD))
       .limit(1);
     return !!row;
+  }
+
+  // In no fixed order, so a document the scanner can never judge does not hold the others back.
+  async listUnscannedInvoiceDocuments(limit: number): Promise<UnscannedDocument[]> {
+    const db = this.db; if (!db) throw new Error("Database not connected");
+    if (!passLimit(limit)) return [];
+    return db.select({
+      path: uploadedFiles.path, merchantId: uploadedFiles.merchantId,
+      // The stored time to the microsecond, as text: it names exactly the bytes read, with no
+      // rounding through a JavaScript date and no time zone.
+      version: sql<string>`${uploadedFiles.createdAt}::text`, data: uploadedFiles.data,
+    }).from(uploadedFiles)
+      .where(and(
+        like(uploadedFiles.path, INVOICE_DOCUMENT_PATHS),
+        sql`not exists (select 1 from ${uploadedFileScans} where ${uploadedFileScans.fileId} = ${uploadedFiles.id})`,
+      ))
+      .orderBy(sql`random()`).limit(passLimit(limit));
+  }
+
+  // Under the file's row lock: a replacement of its bytes either committed first (the version no
+  // longer matches) or waits, and then drops this verdict with the bytes it judged.
+  async recordUploadedFileScan(relPath: string, version: string, scan: ScanResult): Promise<boolean> {
+    assertScanVerdict(scan);
+    const db = this.db; if (!db) throw new Error("Database not connected");
+    return db.transaction(async (tx: any) => {
+      const [file] = await tx.select({ id: uploadedFiles.id }).from(uploadedFiles)
+        .where(and(eq(uploadedFiles.path, relPath), sql`${uploadedFiles.createdAt}::text = ${version}`)).limit(1).for("update");
+      if (!file) return false;
+      const written = await tx.insert(uploadedFileScans)
+        .values({ fileId: file.id, verdict: scan.verdict, signature: scan.verdict === "infected" ? scan.signature : null, scanner: scan.scanner })
+        .onConflictDoNothing({ target: uploadedFileScans.fileId })
+        .returning({ fileId: uploadedFileScans.fileId });
+      return written.length > 0;
+    });
+  }
+
+  // The candidates are locked first, skipping any an attach holds (its share lock): that one is
+  // being used. The delete is a later statement, so it sees every invoice committed before it and
+  // removes only what is still unattached. An attach that waited for this finds no file.
+  async deleteUnattachedInvoiceDocuments(uploadedBefore: Date, limit: number): Promise<number> {
+    const db = this.db; if (!db) throw new Error("Database not connected");
+    if (!passLimit(limit)) return 0;
+    return db.transaction(async (tx: any) => {
+      const candidates = await tx.select({ id: uploadedFiles.id }).from(uploadedFiles)
+        .where(and(like(uploadedFiles.path, INVOICE_DOCUMENT_PATHS), lt(uploadedFiles.createdAt, uploadedBefore), NO_INVOICE_NAMES_IT))
+        .limit(passLimit(limit)).for("update", { skipLocked: true });
+      if (candidates.length === 0) return 0;
+      const deleted = await tx.delete(uploadedFiles)
+        .where(and(inArray(uploadedFiles.id, candidates.map((row: { id: number }) => row.id)), like(uploadedFiles.path, INVOICE_DOCUMENT_PATHS), NO_INVOICE_NAMES_IT))
+        .returning({ id: uploadedFiles.id });
+      return deleted.length;
+    });
   }
 
   async deleteUploadedFile(relPath: string, merchantId: number): Promise<void> {

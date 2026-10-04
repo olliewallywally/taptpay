@@ -539,7 +539,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     idempotency:
       "one run at a time in this server process (409 while one runs); each pass is meant to act once per period. Another server instance can run at the same time (finding)",
     sideEffects:
-      "charges stored cards for due subscriptions (server/subscription-cron.ts); generates and sends property and trades invoices and reminders by email or SMS (server/property-cron.ts, server/trades-cron.ts, server/trades-delivery.ts); daily payout notifications (server/daily-payout-notifications.ts)",
+      "charges stored cards for due subscriptions (server/subscription-cron.ts); generates and sends property and trades invoices and reminders by email or SMS (server/property-cron.ts, server/trades-cron.ts, server/trades-delivery.ts); daily payout notifications (server/daily-payout-notifications.ts); scans a few invoice documents that have no scan verdict yet and records it, clean or infected, never without one (server/upload-lifecycle.ts, owner decision 2026-09-29); deletes invoice documents no invoice or quote names 12 calendar months after they were uploaded, never an attached one or a logo, and logs the count",
     successDto: "200, or 207 when a pass failed: { ok, ranAt, failedPasses, and each pass's counts }",
     errorDisclosure: ["fixed"],
     controls: {

@@ -385,3 +385,12 @@ test("a document is read and attached only through the clean readers; the unscan
     expect([key, facts.get(key)?.storageMethods.includes("cleanUploadedFileOwnedByMerchant")]).toEqual([key, true]);
   }
 });
+
+test("the upload lifecycle's storage is the scheduler's alone: no route lists, records or deletes", () => {
+  const contract = storageContract();
+  const facts = currentRouteFacts();
+  for (const name of ["listUnscannedInvoiceDocuments", "recordUploadedFileScan", "deleteUnattachedInvoiceDocuments"]) {
+    expect([name, contract.some(method => method.name === name)]).toEqual([name, true]);
+    expect([name, [...facts].filter(([, fact]) => fact.storageMethods.includes(name)).map(([key]) => key)]).toEqual([name, []]);
+  }
+});

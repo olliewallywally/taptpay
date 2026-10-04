@@ -1,10 +1,10 @@
 # R1-T7 tenant/storage execution inventory
 
-Generated from working-tree sources on base `d1eb5fb4d76fcca6a36865b234c2d55e352b18a4`; the phase evidence names the final commit.
+Generated from working-tree sources on base `910c89b1f2b6b2a0f163b12ccca8048fa62b6ea7`; the phase evidence names the final commit.
 
 Registrations: **187**; registrations with session/admin authentication: **119**;
 registrations calling checkMerchantOwnership: **25**.
-IStorage: **249** declared methods;
+IStorage: **252** declared methods;
 PaymentAttemptRepository: **8** inherited methods.
 
 Classifications come from the reviewed per-route branches, including mixed public/signed-in routes.
@@ -445,6 +445,9 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | IStorage | getCleanUploadedFileForMerchant | yes | `getCleanUploadedFileForMerchant(relPath: string, merchantId: number): Promise<{ mimeType: string; data: Buffer } \| undefined>` |
 | IStorage | getCleanUploadedFile | no | `getCleanUploadedFile(relPath: string): Promise<{ mimeType: string; data: Buffer } \| undefined>` |
 | IStorage | cleanUploadedFileOwnedByMerchant | yes | `cleanUploadedFileOwnedByMerchant(relPath: string, merchantId: number): Promise<boolean>` |
+| IStorage | listUnscannedInvoiceDocuments | no | `listUnscannedInvoiceDocuments(limit: number): Promise<UnscannedDocument[]>` |
+| IStorage | recordUploadedFileScan | no | `recordUploadedFileScan(relPath: string, version: string, scan: ScanResult): Promise<boolean>` |
+| IStorage | deleteUnattachedInvoiceDocuments | no | `deleteUnattachedInvoiceDocuments(uploadedBefore: Date, limit: number): Promise<number>` |
 | IStorage | deleteUploadedFile | yes | `deleteUploadedFile(relPath: string, merchantId: number): Promise<void>` |
 | IStorage | recordInvoiceDocumentAdminRead | no | `recordInvoiceDocumentAdminRead(adminUserId: number, documentName: string): Promise<void>` |
 | IStorage | consumeInvoiceDocumentReadLimit | no | `consumeInvoiceDocumentReadLimit(token: string): Promise<boolean>` |

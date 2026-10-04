@@ -8733,6 +8733,16 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           return runDailyPayoutNotificationPass(now);
         },
       );
+      // R1-T7 S6b: the private upload lifecycle, last so a slow scanner delays nothing else.
+      // Earlier documents get their verdict, then uploads no invoice uses are deleted at 12 months.
+      const uploadScans = await runPass("uploadScans", async () => {
+        const { runUploadScanPass } = await import("./upload-lifecycle");
+        return runUploadScanPass();
+      });
+      const uploadRetention = await runPass("uploadRetention", async () => {
+        const { runUploadRetentionPass } = await import("./upload-lifecycle");
+        return runUploadRetentionPass(now);
+      });
       const subscriptionBilling = await subscriptionBillingPromise;
       const finished = new Date();
       const ok = failedPasses.length === 0;
@@ -8758,6 +8768,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         reminders,
         tradesReminders,
         dailyPayoutNotifications,
+        uploadScans,
+        uploadRetention,
         subscriptionBilling,
       });
     } catch (err) {
