@@ -1,5 +1,29 @@
 # Full integration continuation audit — 2026-09-07
 
+Latest continuation **2026-10-04 — S4b2 trades quote, invoice and balance creation and
+delivery code-complete `9b124dea`**, local, awaiting independent review.
+[Evidence/handoff](r1/R1-T7-S4b2-trades-create-2026-10-03.md),
+[S4 preflights](../../PLAN-2026-10-03-r1-t7-s4-trades.md).
+Owner finish-R1 authorization persists.
+
+- Each create is one scoped storage call: the owned client locked (or the hidden
+  prospect made last), projected input, a server token, a linked quote and an attached
+  document held under share locks, and the row committed with its creation history.
+  The balance is worked out and made under the client's lock, so signed-in sends
+  serialize. Sending uses explicit-business services and one joined read; uncertain
+  post-send outcomes are a fixed 503 with no row. Global quote create and unscoped
+  quote sender retired; the invoice ones kept for the public acceptance and the cron.
+- Red **94 of 94** on `51e0b186` (7 genuine HTTP races); affected **34 suites / 1,788
+  pass**; fresh actual PostgreSQL **34 pass**; **49 of 49** planted mutations caught;
+  **full server 159 suites / 3,942 pass**. Typecheck/build/whitespace and **187 routes
+  / 0 gaps; 250 contracts** pass.
+- No app DB/provider, live migration, client/schema change, enablement, push or
+  deploy. Disposable PostgreSQL stopped and deleted.
+
+**Active next:** S4c trades recurring invoices (preflight and separate reread approve
+it on `9b124dea`), the last S4 batch; then S5–S6, Apple and R1-T10.
+Independent/external gates remain below.
+
 Latest continuation **2026-10-03 — S4b1 trades invoice state changes, receipts and
 quote PDF code-complete `394da7d6`**, local, awaiting independent review.
 [Evidence/handoff](r1/R1-T7-S4b1-trades-invoices-2026-10-03.md),

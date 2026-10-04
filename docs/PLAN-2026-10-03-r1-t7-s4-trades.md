@@ -339,3 +339,110 @@ event, the balance of what is left with the deposit's channel and the caller's s
 switch, and a refused attachment writing nothing. Fixtures that stub the retired
 global create and sender must move to the scoped contracts, or they would pass
 without exercising the route. **Approve the same S4b2 scope.**
+
+## S4c preflight — recurring invoices
+
+Base `9b124dea` (the S4b2 code; the documentation commit above it changes no code).
+Four registrations: `GET /api/trades/schedules`, `POST /api/trades/schedules`,
+`PUT /api/trades/schedules/:id` and `DELETE /api/trades/schedules/:id`. These are
+the last signed-in trades registrations still on globally keyed storage.
+
+### Verification of Prior Fixes
+
+S4b2 (`9b124dea`) was checked at completion in this session: 94 new tests red first,
+then green; 34 affected suites / 1,788 tests; 34 actual PostgreSQL checks; 49 of 49
+planted mutations caught; typecheck, build and inventories; and the full server suite on that commit (159
+suites / 3,942 tests). Reread
+for this scope: the four schedule routes and their recorded reviews, the S4a archive
+cascade these must lock in step with, the cron's generate pass (which advances and
+ends recurring invoices by global id), the resume date rule, the 2026-09-27 batch 6d
+decisions (skip the paused time; archive cancels; no new recurring invoice for an
+archived client; no past start date), and the S3b property schedule contract this
+mirrors.
+
+### Blocking Issues
+
+None. To demonstrate before production edits: the create reads its client through a
+global key and compares in the route, then inserts, so a client moved or archived
+after the lookup still gets a live recurring invoice (the gap S4a's evidence
+recorded); pause, resume, edit and cancel write by id after a route lookup, so a row
+moved or cancelled after it is still written and logged; and a resume works out its
+next date from the route's stale read.
+
+### High-Risk Concerns
+
+Create locks the owned client, refuses an archived one under that lock, and commits
+the row with its `schedule_created` history: an archive and a create at the same
+moment can no longer leave an archived client with a live recurring invoice. Update
+and cancel find their candidate, lock the owned client, then the row by id, business
+and that client, recheck the cancelled state, and commit with their history. The
+lock order is the archive's: client first. Fields are projected at runtime: amount,
+frequency, channel, and active or paused only; identity, dates and cancellation are
+never the caller's. A resume's next date comes from the locked row and the frequency
+asked for, by the existing cycle rule.
+
+### Missing Steps
+
+Storage and HTTP tests red first; contracts in both implementations; the four
+routes; the shared fake; the cycle helper moved to a pure module so storage can use
+it without importing the cron (the cron re-exports it); actual SQL for projection,
+refusals, resume dates, repeats, history rollback, the archive race, and waited
+ownership, reparent and cancelled-state changes; route reviews and both inventories;
+affected and full server runs, typecheck, build, evidence.
+
+### Unsafe Assumptions
+
+The cron keeps the global due-list read and its globally keyed advance and
+end-of-term cancel; it takes none of these locks, and its interleaving with a
+signed-in pause or cancel is unchanged (a signed-in write waits for the cron's row
+lock, then works from the row as the cron left it). A client may still have several
+recurring invoices: a create replaces nothing, unlike rent. A cancelled one is still
+cancelled again and logged again. Setting an active one active still logs a resume.
+No new refusal is added for an edit under an archived client: archiving already
+cancels every one. HTTP fakes prove decisions, not SQL. Memory stays DB-only.
+
+### Required Ordering Changes
+
+Move the pure cycle functions first, with the cron's behaviour and export unchanged.
+Then the contracts, the routes, and the retirement of the global create and read,
+which have no other caller.
+
+### Open Product / Provider / Legal Questions
+
+None. The start-date rule, the end-date rule, the billing gate, roles, statuses,
+messages and DTOs are preserved.
+
+### Compliance and Data-Handling Notes
+
+Synthetic loopback PostgreSQL only; no application database, provider, live
+migration, client UI, flag, push or deployment. No contact data in evidence.
+
+### Test and Rollback Adequacy
+
+Two businesses; foreign and missing indistinguishable; an invalid business issues no
+query. A refusal changes no row or history and sends nothing. A history failure
+rolls back create, edit and cancel. Twelve rounds of archive beside create leave no
+live recurring invoice under an archived client. Waited client and row ownership,
+reparent and cancelled-state changes are refused after the wait; a resume that
+waited for an advance is worked out from the advanced row. Fix forward without
+restoring globally keyed authenticated writes.
+
+### Final Recommendation (Approve / Do not approve)
+
+**Approve S4c on `9b124dea`**, failing tests first. This is the last S4 batch; S4,
+R1-T7 and R1 are not closed by it.
+
+### Separate reread
+
+Retraced the callers by call site. The global create and the global read are called
+only by the signed-in routes and can be retired. The global update and cancel are
+also the cron's (advance, and end-of-term) and stay for it. The cycle function is
+imported by the routes from the cron module and tested through it, so the cron must
+keep exporting it. The archive's cascade updates the client row and then its
+recurring invoices; a create that locks the client first either commits before the
+archive and is cancelled by it, or waits and is refused: both orders end safe, and
+neither holds two locks in the opposite order. The existing tests fix what must not
+move: the 400s for an end before the start and a past start, 404 'Client not found',
+409 for an archived client, 409 for editing a cancelled one, the resume dates on a
+weekly and a monthly cycle, one event per write with the change as its payload, and
+a repeat cancel answering 200. **Approve the same S4c scope.**
