@@ -176,3 +176,14 @@ groups are declared with `requireCompleteGroup` and need PUBLIC_ORIGIN outside t
 as Google's does. The harness refuses off-machine connections, so the boundary must
 take its transport as a parameter that the tests supply; production passes `fetch`.
 What must not move: nothing existing calls this. **Approve the same T5a scope.**
+
+## T5a completion
+
+Code `8b026aa7`, with the harness fix `01e22c4b`. The suite could not load on
+`7c6f0f69`; then 49 pass; 11 related suites / 274 tests; 36 of 36 planted defects
+caught after two weak tests were tightened; the first full server run failed one
+test (the harness's guard on provider secrets, which the new key tripped), and the
+repeat on `01e22c4b` passed 171 suites / 4,259 tests.
+[Evidence](evidence/remediation-v2-2/r1/R1-T5a-apple-token-boundary-2026-10-04.md).
+Nothing calls the boundary yet. T5b is next; its starting facts are in
+`docs/HANDOFF-2026-10-04-r1-t7-s6.md`.
