@@ -1320,15 +1320,15 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       // Save all KYC details to merchant record. The website, turnover and description were
       // emailed but never kept until 2026-09-27 (C10 batch 6).
-      await storage.updateMerchant(merchantId, {
+      // Storage marks onboarding complete itself (R1-T7 S5a): it is not a field a caller sends.
+      await storage.updateMerchantSettings(merchantId, { kind: "onboarding", details: {
         director,
         nzbn: nzbn || null,
         gstNumber: gstNumber || null,
         websiteUrl: websiteUrl || null,
         estimatedAnnualTurnover: estimatedAnnualTurnover || null,
         businessDescription: businessDescription || null,
-        onboardingCompleted: true,
-      });
+      } });
 
       // Send notification email to TaptPay admin
       // All user-supplied values are HTML-escaped via escHtml() to prevent injection.
@@ -3769,9 +3769,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(400).json({ message: "Invalid daily goal", errors: validation.error.errors });
       }
 
-      const updatedMerchant = await storage.updateMerchant(merchantId, { 
-        dailyGoal: validation.data.dailyGoal 
-      });
+      const updatedMerchant = await storage.updateMerchantSettings(merchantId, { kind: "daily-goal", dailyGoal: validation.data.dailyGoal });
       
       if (!updatedMerchant) {
         return res.status(404).json({ message: "Merchant not found" });
@@ -3828,7 +3826,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(400).json({ message: "No valid fields to update" });
       }
 
-      const updatedMerchant = await storage.updateMerchant(merchantId, filteredUpdates);
+      const updatedMerchant = await storage.updateMerchantSettings(merchantId, { kind: "profile", changes: filteredUpdates });
       if (!updatedMerchant) {
         return res.status(404).json({ message: "Merchant not found" });
       }
@@ -7956,7 +7954,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const merchantId = req.user?.merchantId;
       if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const data = updateRentReminderSettingsSchema.parse(req.body);
-      const merchant = await storage.updateMerchant(merchantId, data as any);
+      const merchant = await storage.updateMerchantSettings(merchantId, { kind: "rent-reminders", changes: data });
       res.json(reminderSettingsOf(merchant));
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: "Validation error", errors: err.errors });
@@ -8002,7 +8000,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const merchantId = req.user?.merchantId;
       if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const data = updateTradeReminderSettingsSchema.parse(req.body);
-      const merchant = await storage.updateMerchant(merchantId, data as any);
+      const merchant = await storage.updateMerchantSettings(merchantId, { kind: "trade-reminders", tradeRemindersEnabled: data.tradeRemindersEnabled });
       res.json({ tradeRemindersEnabled: merchant?.tradeRemindersEnabled ?? true });
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: "Validation error", errors: err.errors });
@@ -8034,7 +8032,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // settings page shows these to a teammate greyed out, with the business's other details.
       if (!isAccountOwner(req.user)) return res.status(403).json({ message: "Only the account owner can change GST settings" });
       const data = updateTradeGstSettingsSchema.parse(req.body);
-      const merchant = await storage.updateMerchant(merchantId, data as any);
+      const merchant = await storage.updateMerchantSettings(merchantId, { kind: "trade-gst", changes: data });
       res.json({
         gstRegistered: merchant?.gstRegistered ?? false,
         tradeGstMode: merchant?.tradeGstMode === "exclusive" ? "exclusive" : "inclusive",

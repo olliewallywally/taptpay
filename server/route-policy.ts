@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 22628b957a3d6e2aa1eca28fd0b843e57458dffb on 2026-10-04.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ e836c60adad1ac7b2c80d86fb884cb32085bf142 on 2026-10-04.
  *
  * 187 registrations (78 GET, 77 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -351,7 +351,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       params: ["id: strictPositiveIntegerParam"],
       body: ["schema: merchantOnboardingSchema"],
       authChecks: ["checkAccountOwnership","checkMerchantOwnership","isAccountOwner"],
-      storageMethods: ["getMerchant","updateMerchant"],
+      storageMethods: ["getMerchant","updateMerchantSettings"],
       sideEffects: ["email: sendEmail"],
       statuses: [200,400,401,403,404,500,503],
       errorTextInResponse: ["validation.error.issues"],
@@ -992,7 +992,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       params: ["id: strictPositiveIntegerParam"],
       body: ["schema: updateDailyGoalSchema"],
       authChecks: ["checkAccountOwnership","checkMerchantOwnership","isAccountOwner"],
-      storageMethods: ["updateMerchant"],
+      storageMethods: ["updateMerchantSettings"],
       statuses: [200,400,401,403,404,500,503],
       dtos: ["ownerMerchantDto"],
       errorTextInResponse: ["validation.error.errors"],
@@ -1008,7 +1008,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       params: ["id: strictPositiveIntegerParam"],
       body: ["schema: updateSchema"],
       authChecks: ["checkAccountOwnership","checkMerchantOwnership","isAccountOwner"],
-      storageMethods: ["updateMerchant"],
+      storageMethods: ["updateMerchantSettings"],
       statuses: [200,400,401,403,404,500,503],
       dtos: ["ownerMerchantDto"],
       errorTextInResponse: ["parseResult.error.errors"],
@@ -2296,7 +2296,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       middleware: ["authenticateToken"],
       body: ["schema: updateRentReminderSettingsSchema"],
-      storageMethods: ["updateMerchant"],
+      storageMethods: ["updateMerchantSettings"],
       statuses: [200,400,401,403,500,503],
       errorTextInResponse: ["err.errors"],
       helpers: ["reminderSettingsOf"],
@@ -2321,7 +2321,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       middleware: ["authenticateToken"],
       body: ["schema: updateTradeReminderSettingsSchema"],
-      storageMethods: ["updateMerchant"],
+      storageMethods: ["updateMerchantSettings"],
       statuses: [200,400,401,403,500,503],
       errorTextInResponse: ["err.errors"],
     },
@@ -2346,7 +2346,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       middleware: ["authenticateToken"],
       body: ["schema: updateTradeGstSettingsSchema"],
       authChecks: ["isAccountOwner"],
-      storageMethods: ["updateMerchant"],
+      storageMethods: ["updateMerchantSettings"],
       statuses: [200,400,401,403,500,503],
       errorTextInResponse: ["err.errors"],
     },

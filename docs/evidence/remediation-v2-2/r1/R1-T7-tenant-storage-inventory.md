@@ -1,10 +1,10 @@
 # R1-T7 tenant/storage execution inventory
 
-Generated from working-tree sources on base `22628b957a3d6e2aa1eca28fd0b843e57458dffb`; the phase evidence names the final commit.
+Generated from working-tree sources on base `e836c60adad1ac7b2c80d86fb884cb32085bf142`; the phase evidence names the final commit.
 
 Registrations: **187**; registrations with session/admin authentication: **119**;
 registrations calling checkMerchantOwnership: **25**.
-IStorage: **244** declared methods;
+IStorage: **245** declared methods;
 PaymentAttemptRepository: **8** inherited methods.
 
 Classifications come from the reviewed per-route branches, including mixed public/signed-in routes.
@@ -138,7 +138,7 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | POST /api/info-pack-leads | public (public/none) | `createInfoPackLead` |
 | POST /api/internal/cron | scheduler (cron/system) | — |
 | POST /api/merchants/:id/logo | tenant (merchant/path-merchant) | `deleteUploadedFile`, `saveUploadedFile`, `updateMerchantLogoUrl` |
-| POST /api/merchants/:id/onboarding | tenant (merchant/path-merchant) | `getMerchant`, `updateMerchant` |
+| POST /api/merchants/:id/onboarding | tenant (merchant/path-merchant) | `getMerchant`, `updateMerchantSettings` |
 | POST /api/merchants/:id/tapt-stones | tenant (merchant/path-merchant) | `createNextTaptStone`, `getMerchant`, `updateTaptStoneUrlsForMerchant` |
 | POST /api/merchants/:merchantId/stock-items | tenant (merchant/path-merchant) | `createStockItem` |
 | POST /api/merchants/signup | account entry/recovery (public/mailbox) | `createMerchantWithSignup`, `getMerchantByEmail`, `getUserByEmail`, `takeAuthThrottleSlot` |
@@ -190,29 +190,29 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | POST /api/tutorial/restart | tenant (merchant/session) | `restartMerchantTutorial` |
 | POST /api/v1/transactions | API-key tenant (api-key/key) | `createTransactionForMerchant`, `createWebhookDelivery`, `getApiKeyByKey`, `getOrCreateSubscription`, `logApiRequest`, `updateApiKeyLastUsed` |
 | POST /api/webhooks/whatsapp | provider (provider/provider-session) | `createJobEvent`, `getInvoiceRentRequestByWhatsappMessageId`, `getJobInvoiceByWhatsappMessageId`, `logTransactionEvent`, `updateInvoiceRentRequest`, `updateJobInvoice` |
-| PUT /api/merchants/:id | tenant (merchant/path-merchant) | `updateMerchant` |
+| PUT /api/merchants/:id | tenant (merchant/path-merchant) | `updateMerchantSettings` |
 | PUT /api/merchants/:id/change-password | account (merchant/path-merchant) | `deactivatePushSubscriptionsForLogin`, `getUserById`, `settleAuthThrottle`, `takeAuthThrottleSlot`, `updateUserPassword` |
-| PUT /api/merchants/:id/daily-goal | tenant (merchant/path-merchant) | `updateMerchant` |
+| PUT /api/merchants/:id/daily-goal | tenant (merchant/path-merchant) | `updateMerchantSettings` |
 | PUT /api/merchants/:id/details | tenant (merchant/path-merchant) | `updateMerchantDetails` |
 | PUT /api/merchants/:id/theme | tenant (merchant/path-merchant) | `updateMerchantTheme` |
 | PUT /api/merchants/:merchantId/stock-items/:itemId | tenant (merchant/path-merchant) | `getStockItemForMerchant`, `updateStockItemForMerchant` |
 | PUT /api/merchants/:merchantId/tapt-stones/:stoneId | tenant (merchant/path-merchant) | `getTaptStoneForMerchant`, `updateTaptStoneForMerchant` |
-| PUT /api/property/reminder-settings | tenant (merchant/session) | `updateMerchant` |
+| PUT /api/property/reminder-settings | tenant (merchant/session) | `updateMerchantSettings` |
 | PUT /api/property/schedules/:id | tenant (merchant/resource) | `getActiveScheduleForMerchant`, `updateActiveScheduleForMerchant` |
 | PUT /api/property/tenants/:id | tenant (merchant/resource) | `getTenantProfileForMerchant`, `updateTenantProfileForMerchant` |
 | PUT /api/push/preferences | tenant (merchant/session) | `updatePushNotificationPreferences` |
 | PUT /api/subscription/plan | tenant (merchant/session) | `changeSubscriptionPlan`, `countSeatsInUse`, `getOrCreateSubscription` |
 | PUT /api/team/:userId/status | tenant (merchant/resource) | `deactivatePushSubscriptionsForLogin`, `setTeamMemberStatus` |
 | PUT /api/trades/clients/:id | tenant (merchant/resource) | `getClientProfileForMerchant`, `updateClientProfileForMerchant` |
-| PUT /api/trades/gst-settings | tenant (merchant/session) | `updateMerchant` |
-| PUT /api/trades/reminder-settings | tenant (merchant/session) | `updateMerchant` |
+| PUT /api/trades/gst-settings | tenant (merchant/session) | `updateMerchantSettings` |
+| PUT /api/trades/reminder-settings | tenant (merchant/session) | `updateMerchantSettings` |
 | PUT /api/trades/schedules/:id | tenant (merchant/resource) | `getJobScheduleForMerchant`, `updateJobScheduleForMerchant` |
 
 ## Storage interface
 
 | Interface | Method | Required merchantId argument | Signature |
 |---|---|---|---|
-| IStorage | getMerchant | no | `getMerchant(id: number): Promise<Merchant \| undefined>` |
+| IStorage | getMerchant | yes | `getMerchant(merchantId: number): Promise<Merchant \| undefined>` |
 | IStorage | getMerchantByName | no | `getMerchantByName(name: string): Promise<Merchant \| undefined>` |
 | IStorage | getMerchantByEmail | no | `getMerchantByEmail(email: string): Promise<Merchant \| undefined>` |
 | IStorage | getMerchantByToken | no | `getMerchantByToken(token: string): Promise<Merchant \| undefined>` |
@@ -225,10 +225,11 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | IStorage | updateMerchantStatus | no | `updateMerchantStatus(id: number, status: string): Promise<Merchant \| undefined>` |
 | IStorage | updateMerchantPasswordHash | no | `updateMerchantPasswordHash(id: number, passwordHash: string): Promise<Merchant \| undefined>` |
 | IStorage | updateMerchant | no | `updateMerchant(id: number, updates: Partial<Merchant>): Promise<Merchant \| undefined>` |
-| IStorage | updateMerchantDetails | no | `updateMerchantDetails(id: number, details: { businessName: string; contactEmail: string; contactPhone: string; businessAddress: string }): Promise<Merchant \| undefined>` |
+| IStorage | updateMerchantSettings | yes | `updateMerchantSettings(merchantId: number, change: MerchantSettingsChange): Promise<Merchant \| undefined>` |
+| IStorage | updateMerchantDetails | yes | `updateMerchantDetails(merchantId: number, details: { businessName: string; contactEmail: string; contactPhone: string; businessAddress: string }): Promise<Merchant \| undefined>` |
 | IStorage | updateMerchantBankAccount | no | `updateMerchantBankAccount(id: number, bankDetails: { bankName: string; bankAccountNumber: string; bankBranch: string; accountHolderName: string }): Promise<Merchant \| undefined>` |
-| IStorage | updateMerchantTheme | no | `updateMerchantTheme(id: number, themeId: string): Promise<Merchant \| undefined>` |
-| IStorage | updateMerchantLogoUrl | no | `updateMerchantLogoUrl(id: number, logoUrl: string \| null): Promise<Merchant \| undefined>` |
+| IStorage | updateMerchantTheme | yes | `updateMerchantTheme(merchantId: number, themeId: string): Promise<Merchant \| undefined>` |
+| IStorage | updateMerchantLogoUrl | yes | `updateMerchantLogoUrl(merchantId: number, logoUrl: string \| null): Promise<Merchant \| undefined>` |
 | IStorage | updateMerchantBillingCard | no | `updateMerchantBillingCard(id: number, card: { last4: string; brand: string; expiry: string } \| null): Promise<Merchant \| undefined>` |
 | IStorage | getMerchantTutorialProgress | yes | `getMerchantTutorialProgress(merchantId: number, generation: number): Promise<MerchantTutorialProgress[]>` |
 | IStorage | upsertMerchantTutorialProgress | yes | `upsertMerchantTutorialProgress(merchantId: number, generation: number, pageKey: string, status: string, lastStep: number): Promise<MerchantTutorialProgress>` |

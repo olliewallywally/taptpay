@@ -245,6 +245,47 @@ function isManagementTenantId(merchantId: number): boolean {
   return isTenantId(merchantId) && merchantId <= 2_147_483_647;
 }
 
+type MerchantColumns<K extends keyof Merchant> = Partial<Pick<Merchant, K>>;
+
+/**
+ * What a signed-in business may change about itself, by purpose (R1-T7 S5a). Each purpose has its
+ * own columns: a route writes its own and can never reach another's, or the row's identity,
+ * sign-in, status, credentials, billing, branding or tutorial columns.
+ */
+export type MerchantSettingsChange =
+  | { kind: "profile"; changes: MerchantColumns<(typeof MERCHANT_SETTINGS_COLUMNS)["profile"][number]> }
+  | { kind: "daily-goal"; dailyGoal: Merchant["dailyGoal"] }
+  | { kind: "rent-reminders"; changes: MerchantColumns<(typeof MERCHANT_SETTINGS_COLUMNS)["rent-reminders"][number]> }
+  | { kind: "trade-reminders"; tradeRemindersEnabled: boolean }
+  | { kind: "trade-gst"; changes: MerchantColumns<(typeof MERCHANT_SETTINGS_COLUMNS)["trade-gst"][number]> }
+  | { kind: "onboarding"; details: MerchantColumns<(typeof MERCHANT_SETTINGS_COLUMNS)["onboarding"][number]> };
+
+const MERCHANT_SETTINGS_COLUMNS = {
+  profile: ["businessName", "director", "address", "nzbn", "phone", "gstNumber", "contactEmail", "contactPhone", "businessAddress"],
+  "daily-goal": ["dailyGoal"],
+  "rent-reminders": ["rentReminderEnabled", "rentReminderDelayDays", "rentReminderIntervalDays", "rentReminderMaxCount"],
+  "trade-reminders": ["tradeRemindersEnabled"],
+  "trade-gst": ["gstRegistered", "tradeGstMode"],
+  onboarding: ["director", "nzbn", "gstNumber", "websiteUrl", "estimatedAnnualTurnover", "businessDescription"],
+} as const satisfies Record<MerchantSettingsChange["kind"], readonly (keyof Merchant)[]>;
+
+/**
+ * The columns a settings change writes, or undefined for a purpose that is not one of ours (nothing
+ * is written). A runtime projection as well as a narrow type: omitted fields are kept, explicit
+ * nulls are written. Completing onboarding sets its own flag; no caller can.
+ */
+function merchantSettingsColumns(change: MerchantSettingsChange): Partial<Merchant> | undefined {
+  const kind = (change as { kind?: unknown } | null | undefined)?.kind;
+  if (typeof kind !== "string" || !Object.prototype.hasOwnProperty.call(MERCHANT_SETTINGS_COLUMNS, kind)) return undefined;
+  const allowed: readonly string[] = MERCHANT_SETTINGS_COLUMNS[kind as MerchantSettingsChange["kind"]];
+  const input = change as any;
+  const source: Record<string, unknown> = (kind === "onboarding" ? input.details : kind === "daily-goal" || kind === "trade-reminders" ? input : input.changes) ?? {};
+  const columns: Record<string, unknown> = {};
+  for (const key of allowed) if (source[key] !== undefined) columns[key] = source[key];
+  if (kind === "onboarding") columns.onboardingCompleted = true;
+  return columns as Partial<Merchant>;
+}
+
 function stockItemChanges(data: StockItemChanges): StockItemChanges {
   // Runtime projection as well as a narrow type: preserve omitted fields and explicit nulls.
   return {
@@ -709,7 +750,8 @@ function isNeonEmptyResultError(error: unknown): boolean {
 
 export interface IStorage extends PaymentAttemptRepository {
   // Merchant operations
-  getMerchant(id: number): Promise<Merchant | undefined>;
+  /** A business's own row, by the business itself; an id that cannot be a business reads nothing. */
+  getMerchant(merchantId: number): Promise<Merchant | undefined>;
   getMerchantByName(name: string): Promise<Merchant | undefined>;
   getMerchantByEmail(email: string): Promise<Merchant | undefined>;
   getMerchantByToken(token: string): Promise<Merchant | undefined>;
@@ -721,11 +763,17 @@ export interface IStorage extends PaymentAttemptRepository {
   confirmMerchantEmail(token: string, onboardingCompleted: boolean): Promise<Merchant | undefined>;
   updateMerchantStatus(id: number, status: string): Promise<Merchant | undefined>;
   updateMerchantPasswordHash(id: number, passwordHash: string): Promise<Merchant | undefined>;
+  /**
+   * Writes whatever columns it is handed (never the Windcave key): for linking a Google account and
+   * the admin's Windcave merchant id only. A signed-in business's settings go through
+   * updateMerchantSettings (pinned in tenant-storage-inventory.test.ts).
+   */
   updateMerchant(id: number, updates: Partial<Merchant>): Promise<Merchant | undefined>;
-  updateMerchantDetails(id: number, details: { businessName: string; contactEmail: string; contactPhone: string; businessAddress: string }): Promise<Merchant | undefined>;
+  updateMerchantSettings(merchantId: number, change: MerchantSettingsChange): Promise<Merchant | undefined>;
+  updateMerchantDetails(merchantId: number, details: { businessName: string; contactEmail: string; contactPhone: string; businessAddress: string }): Promise<Merchant | undefined>;
   updateMerchantBankAccount(id: number, bankDetails: { bankName: string; bankAccountNumber: string; bankBranch: string; accountHolderName: string }): Promise<Merchant | undefined>;
-  updateMerchantTheme(id: number, themeId: string): Promise<Merchant | undefined>;
-  updateMerchantLogoUrl(id: number, logoUrl: string | null): Promise<Merchant | undefined>;
+  updateMerchantTheme(merchantId: number, themeId: string): Promise<Merchant | undefined>;
+  updateMerchantLogoUrl(merchantId: number, logoUrl: string | null): Promise<Merchant | undefined>;
   updateMerchantBillingCard(id: number, card: { last4: string; brand: string; expiry: string } | null): Promise<Merchant | undefined>;
   getMerchantTutorialProgress(merchantId: number, generation: number): Promise<MerchantTutorialProgress[]>;
   upsertMerchantTutorialProgress(merchantId: number, generation: number, pageKey: string, status: string, lastStep: number): Promise<MerchantTutorialProgress>;
@@ -1356,8 +1404,9 @@ export class MemStorage implements IStorage {
     );
   }
 
-  async getMerchant(id: number): Promise<Merchant | undefined> {
-    return this.merchants.get(id);
+  async getMerchant(merchantId: number): Promise<Merchant | undefined> {
+    if (!isManagementTenantId(merchantId)) return undefined;
+    return this.merchants.get(merchantId);
   }
 
   async getMerchantByName(name: string): Promise<Merchant | undefined> {
@@ -2418,6 +2467,16 @@ export class MemStorage implements IStorage {
     return updatedMerchant;
   }
 
+  async updateMerchantSettings(merchantId: number, change: MerchantSettingsChange): Promise<Merchant | undefined> {
+    if (!isManagementTenantId(merchantId)) return undefined;
+    const columns = merchantSettingsColumns(change);
+    const merchant = this.merchants.get(merchantId);
+    if (!columns || !merchant) return undefined;
+    const updatedMerchant = { ...merchant, ...columns, updatedAt: new Date() };
+    this.merchants.set(merchantId, updatedMerchant);
+    return updatedMerchant;
+  }
+
   async getMerchantTutorialProgress(merchantId: number, generation: number): Promise<MerchantTutorialProgress[]> {
     return Array.from(this.tutorialProgress.values()).filter(
       row => row.merchantId === merchantId && row.generation === generation,
@@ -2453,8 +2512,9 @@ export class MemStorage implements IStorage {
     });
   }
 
-  async updateMerchantLogoUrl(id: number, logoUrl: string | null): Promise<Merchant | undefined> {
-    const merchant = this.merchants.get(id);
+  async updateMerchantLogoUrl(merchantId: number, logoUrl: string | null): Promise<Merchant | undefined> {
+    if (!isManagementTenantId(merchantId)) return undefined;
+    const merchant = this.merchants.get(merchantId);
     if (!merchant) return undefined;
     
     const updatedMerchant = {
@@ -2462,7 +2522,7 @@ export class MemStorage implements IStorage {
       customLogoUrl: logoUrl,
       updatedAt: new Date(),
     };
-    this.merchants.set(id, updatedMerchant);
+    this.merchants.set(merchantId, updatedMerchant);
     return updatedMerchant;
   }
 
@@ -2480,8 +2540,9 @@ export class MemStorage implements IStorage {
     return updatedMerchant;
   }
 
-  async updateMerchantDetails(id: number, details: { businessName: string; contactEmail: string; contactPhone: string; businessAddress: string }): Promise<Merchant | undefined> {
-    const merchant = this.merchants.get(id);
+  async updateMerchantDetails(merchantId: number, details: { businessName: string; contactEmail: string; contactPhone: string; businessAddress: string }): Promise<Merchant | undefined> {
+    if (!isManagementTenantId(merchantId)) return undefined;
+    const merchant = this.merchants.get(merchantId);
     if (!merchant) return undefined;
     
     const updatedMerchant = {
@@ -2491,7 +2552,7 @@ export class MemStorage implements IStorage {
       contactPhone: details.contactPhone,
       businessAddress: details.businessAddress,
     };
-    this.merchants.set(id, updatedMerchant);
+    this.merchants.set(merchantId, updatedMerchant);
     return updatedMerchant;
   }
 
@@ -2510,15 +2571,16 @@ export class MemStorage implements IStorage {
     return updatedMerchant;
   }
 
-  async updateMerchantTheme(id: number, themeId: string): Promise<Merchant | undefined> {
-    const merchant = this.merchants.get(id);
+  async updateMerchantTheme(merchantId: number, themeId: string): Promise<Merchant | undefined> {
+    if (!isManagementTenantId(merchantId)) return undefined;
+    const merchant = this.merchants.get(merchantId);
     if (!merchant) return undefined;
     
     const updatedMerchant = {
       ...merchant,
       themeId,
     };
-    this.merchants.set(id, updatedMerchant);
+    this.merchants.set(merchantId, updatedMerchant);
     return updatedMerchant;
   }
 
@@ -4442,9 +4504,10 @@ export class MemStorage implements IStorage {
 export class DatabaseStorage implements IStorage {
   constructor(private db = getDb()) {}
 
-  async getMerchant(id: number): Promise<Merchant | undefined> {
+  async getMerchant(merchantId: number): Promise<Merchant | undefined> {
     if (!this.db) throw new Error('Database not available');
-    const result = await this.db.select().from(merchants).where(eq(merchants.id, id)).limit(1);
+    if (!isManagementTenantId(merchantId)) return undefined;
+    const result = await this.db.select().from(merchants).where(eq(merchants.id, merchantId)).limit(1);
     return result[0];
   }
 
@@ -4508,6 +4571,19 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
+  async updateMerchantSettings(merchantId: number, change: MerchantSettingsChange): Promise<Merchant | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    if (!isManagementTenantId(merchantId)) return undefined;
+    const columns = merchantSettingsColumns(change);
+    if (!columns) return undefined;
+    const result = await this.db
+      .update(merchants)
+      .set({ ...columns, updatedAt: new Date() })
+      .where(eq(merchants.id, merchantId))
+      .returning();
+    return result[0];
+  }
+
   async getMerchantTutorialProgress(merchantId: number, generation: number): Promise<MerchantTutorialProgress[]> {
     if (!this.db) throw new Error('Database not available');
     return this.db
@@ -4562,12 +4638,13 @@ export class DatabaseStorage implements IStorage {
     return rows[0];
   }
 
-  async updateMerchantLogoUrl(id: number, logoUrl: string | null): Promise<Merchant | undefined> {
+  async updateMerchantLogoUrl(merchantId: number, logoUrl: string | null): Promise<Merchant | undefined> {
     if (!this.db) throw new Error('Database not available');
+    if (!isManagementTenantId(merchantId)) return undefined;
     const result = await this.db
       .update(merchants)
       .set({ customLogoUrl: logoUrl, updatedAt: new Date() })
-      .where(eq(merchants.id, id))
+      .where(eq(merchants.id, merchantId))
       .returning();
     return result[0];
   }
@@ -4587,12 +4664,15 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async updateMerchantDetails(id: number, details: { businessName: string; contactEmail: string; contactPhone: string; businessAddress: string }): Promise<Merchant | undefined> {
+  async updateMerchantDetails(merchantId: number, details: { businessName: string; contactEmail: string; contactPhone: string; businessAddress: string }): Promise<Merchant | undefined> {
     if (!this.db) throw new Error('Database not available');
+    if (!isManagementTenantId(merchantId)) return undefined;
+    // Four named columns, as the memory implementation writes: never the whole object handed over.
+    const { businessName, contactEmail, contactPhone, businessAddress } = details;
     const result = await this.db
       .update(merchants)
-      .set(details)
-      .where(eq(merchants.id, id))
+      .set({ businessName, contactEmail, contactPhone, businessAddress })
+      .where(eq(merchants.id, merchantId))
       .returning();
     return result[0];
   }
@@ -4607,12 +4687,13 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async updateMerchantTheme(id: number, themeId: string): Promise<Merchant | undefined> {
+  async updateMerchantTheme(merchantId: number, themeId: string): Promise<Merchant | undefined> {
     if (!this.db) throw new Error('Database not available');
+    if (!isManagementTenantId(merchantId)) return undefined;
     const result = await this.db
       .update(merchants)
       .set({ themeId })
-      .where(eq(merchants.id, id))
+      .where(eq(merchants.id, merchantId))
       .returning();
     return result[0];
   }

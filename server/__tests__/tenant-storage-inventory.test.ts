@@ -252,3 +252,22 @@ test("no signed-in trades route reads or writes a trades record through a global
   expect(signedIn.length).toBe(25);
   for (const [key, fact] of signedIn) for (const name of GLOBAL) expect([key, fact.storageMethods.includes(name)]).toEqual([key, false]);
 });
+
+test("a signed-in business's settings are written by purpose; the general update is not theirs", () => {
+  const contract = storageContract();
+  // The row's own methods are keyed by the business itself, and say so.
+  for (const name of ["getMerchant", "updateMerchantSettings", "updateMerchantDetails", "updateMerchantTheme", "updateMerchantLogoUrl"]) {
+    expect([name, contract.find(method => method.name === name)?.requiredTenant]).toEqual([name, true]);
+  }
+  // The general update writes any column it is handed: it stays for the Google link and the admin lane only.
+  expect(contract.find(method => method.name === "updateMerchant")?.requiredTenant).toBe(false);
+  const facts = currentRouteFacts();
+  expect([...facts].filter(([, fact]) => fact.storageMethods.includes("updateMerchant")).map(([key]) => key).sort())
+    .toEqual(["GET /api/auth/google/callback", "PATCH /api/admin/merchants/:id/windcave-merchant-id"]);
+  for (const key of [
+    "POST /api/merchants/:id/onboarding", "PUT /api/merchants/:id/daily-goal", "PUT /api/merchants/:id",
+    "PUT /api/property/reminder-settings", "PUT /api/trades/reminder-settings", "PUT /api/trades/gst-settings",
+  ]) {
+    expect([key, facts.get(key)?.storageMethods.includes("updateMerchantSettings")]).toEqual([key, true]);
+  }
+});

@@ -176,11 +176,42 @@ export async function expectServed(recipes: Record<string, ServedRecipe>, key: s
   await expectSuccess(ctx, who, caller, served);
 }
 
+/** The storage methods keyed by a business's own row (R1-T7 S5a); each takes the business first. */
+export const MERCHANT_ROW_METHODS = [
+  "getMerchant", "updateMerchantSettings", "updateMerchantDetails", "updateMerchantTheme", "updateMerchantLogoUrl",
+] as const;
+
+/**
+ * Runs a request and returns every business its handling named to the row's own methods. The methods
+ * are wrapped in place (a test's own stand-in included) and put back, so nothing a recipe set up moves.
+ */
+export async function namingMerchantRows<T>(send: () => Promise<T>): Promise<{ result: T; named: Array<[string, unknown]> }> {
+  const held = storage as any;
+  const named: Array<[string, unknown]> = [];
+  const originals = MERCHANT_ROW_METHODS.map((name) => [name, held[name]] as const);
+  for (const [name, original] of originals) {
+    held[name] = function (this: unknown, ...args: unknown[]) {
+      named.push([name, args[0]]);
+      return original.apply(this, args);
+    };
+  }
+  try {
+    return { result: await send(), named };
+  } finally {
+    for (const [name, original] of originals) held[name] = original;
+  }
+}
+
 async function expectSuccess(ctx: ServedCtx, who: Principal | null, caller: string, served: Served) {
   if (served.req.stream) return expectStreamServed(ctx, who, caller, served);
-  const res = await sendServed(ctx, who, served.req);
+  const { result: res, named } = await namingMerchantRows(() => sendServed(ctx, who, served.req));
   expect({ caller, status: res.status, body: res.status === served.status ? "…" : res.body })
     .toEqual({ caller, status: served.status, body: "…" });
+  // R1-T7 S5a: a business's login is only ever served from its own business's row. (The platform
+  // admin names a business by the path; a caller with no sign-in is the public lanes' own tests'.)
+  if (who && caller !== "platform-admin") {
+    expect(named.filter(([, merchantId]) => merchantId !== who.merchantId)).toEqual([]);
+  }
   await served.check(res);
 }
 
