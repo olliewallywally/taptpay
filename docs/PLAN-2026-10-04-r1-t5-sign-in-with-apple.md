@@ -93,6 +93,26 @@ on them.
 4. **Apple's server notifications** (consent withdrawn, account deleted at Apple) are
    not received in this plan; a withdrawn grant is met at the next sign-in, when
    Apple refuses the code. Receiving them is a small later addition.
+5. **Your password, to connect or disconnect Apple** (added with T5c). Default: the
+   owner types their current password, the same rule as changing the password, and
+   counted against the same limit. Adding a way to sign in is as serious as changing
+   the password, and it stops someone at an unlocked screen from adding their own
+   Apple account. Cost: an owner who only ever signed in with Google has no password
+   they know, and must set one with "Forgot password" first. The alternative is "only
+   in the ten minutes after signing in", which asks for nothing extra but is weaker.
+6. **Disconnecting Apple** (added with T5c). Default: built, behind the same password.
+   Without it a wrong Apple account, once connected, could never be removed by the
+   owner (one Apple account per login, and a connected one is never moved). Because it
+   needs the password, a login made with Apple (which has no known password) cannot
+   disconnect its only way in by accident. Disconnecting does not sign anyone out;
+   "sign out everywhere" does that.
+7. **Owners only** (the plan's wording, and what Google's sign-in does). A teammate
+   cannot sign in with Apple or connect it. A teammate whose email meets Apple's still
+   sees the "sign in, then connect Apple in Settings" message, which they cannot act
+   on.
+8. **No email is sent when Apple is connected or disconnected.** The app sends none
+   when a password changes either; both are written to the security log. A notice
+   email for both is a small later addition.
 
 ## T5a preflight — Apple's token boundary
 
@@ -303,6 +323,122 @@ migration 0033 through the runner, and the convergence rehearsal (35 applied) wi
 new recorded fingerprint; 44 of 44 planted defects caught after one weak test was
 tightened; full server 175 suites / 4,307 tests on the commit.
 [Evidence](evidence/remediation-v2-2/r1/R1-T5b-apple-identities-and-sign-in-2026-10-04.md).
+
+## T5c preflight — connecting Apple from a signed-in owner
+
+Base `81933759` (T5b code `0a12124a`; the commit above it is documentation).
+
+### Verification of Prior Fixes
+
+T5b was verified in this session: 175 suites / 4,307 tests on `0a12124a`. Reread for
+this scope: the three Apple routes and the starting cookie's signature and format;
+how a request is signed in (`authenticateToken`, the session row, the CSRF check on
+every change, `userOfLiveSession`); the session cookie's flags (`SameSite=Lax`: not
+sent with Apple's form post); the change-password route and its counted password
+check; `isAccountOwner` (which also answers yes for the platform admin, who has no
+login row); the identity table's rules (one identity per login, a linked identity
+never moved); and how a signed-in, owner-only route with no business in its address
+is reviewed and listed.
+
+### Blocking Issues
+
+None for the server side. Settings has no row for this until T5d, so after T5c the
+routes exist and nothing on screen leads to them.
+
+### High-Risk Concerns
+
+- **Who is being connected is never taken from Apple's post.** Apple's return is a
+  cross-site post, so the session cookie is not on it. The login and the session that
+  asked ride in the starting cookie, under the server's signature, with a key used
+  for nothing else, so a sign-in cookie can never be read as a connect cookie nor the
+  other way round. The cookie is HttpOnly and is set only on the answer to a
+  signed-in, CSRF-checked request that proved the password.
+- **The session that asked must still be live when Apple returns, and still the
+  owner's.** Checked before Apple is asked anything, and again just before the write.
+  Signing out, "sign out everywhere", a password change, or the login or business
+  being switched off in those ten minutes means nothing is connected. The write
+  itself re-reads the login under a row lock and refuses anything but an active
+  owner.
+- **A connected identity is never moved, and a login has one.** An identity already
+  another login's is refused; a login that already has a different identity is
+  refused; the same identity again is a no-op. Two connects at once resolve to one,
+  by the row lock and the table's two unique rules.
+- **A pending identity's email authorizes nothing.** It becomes the owner's because
+  the signed-in owner proved the password and Apple proved the identity, whatever
+  email the pending row holds.
+- **Adding a sign-in is a credential change.** It needs the current password, counted
+  in the same bucket as change-password so the two cannot be used to double the
+  guesses. Disconnecting needs it too.
+- **The start is a POST, not a link.** A GET could be started by another site's link
+  (the session cookie is Lax). The start answers with Apple's address for the page to
+  go to.
+- **Sign-in is untouched.** The callback's sign-in path stays as T5b verified it; the
+  connect path is taken only when the cookie is a connect cookie.
+
+### Missing Steps
+
+Tests red first (the connect flow end to end against the stand-in Apple, every
+refusal, the disconnect, the status; storage in both implementations and the captured
+SQL); the storage contracts; the connect cookie; one exported read of "the login a
+live session stands for"; the three routes and the callback's connect path; the route
+reviews, the matrix rows and served recipes, both inventories; actual PostgreSQL for
+the link rules and the races; the mutation check; typecheck, build, affected and full
+runs, evidence. No migration: the table from 0033 is enough.
+
+### Unsafe Assumptions
+
+The owner's browser returns to `/settings?apple=<one fixed word>`; the page that
+reads the word is T5d's. No session is made on a connect (the owner already has one),
+so there is no handoff code. The email kept on the row is the verified one in Apple's
+token when there is one, else what the row already had; it is shown to the owner and
+decides nothing. Disconnecting deletes the row: nothing about that Apple account is
+kept. Sessions that were begun by Apple before a disconnect stay until they end or
+the owner signs out everywhere.
+
+### Required Ordering Changes
+
+Storage first; then the connect cookie; then the routes; then the registrations.
+
+### Open Product / Provider / Legal Questions
+
+Defaults 5 to 8 at the top of this plan, recorded for the owner. None blocks.
+
+### Compliance and Data-Handling Notes
+
+Nothing new is stored: the same row, now with the owner's login on it. Connecting and
+disconnecting are written to the security log by login id, with no Apple subject,
+token or email. Synthetic loopback PostgreSQL and a stand-in Apple only.
+
+### Test and Rollback Adequacy
+
+Connect an unknown identity, a pending one, the same one again; refusals for an
+identity that is another login's, a login that has another, a teammate, the platform
+admin, no session, no CSRF token, a wrong password, too many wrong passwords, Apple
+not configured, a cancel, a wrong or replayed state, a sign-in cookie offered as a
+connect cookie and the reverse, a session ended before Apple returns and while Apple
+is being asked, and every Apple failure. A refusal changes no row. Fix forward; no
+schema change.
+
+### Final Recommendation (Approve / Do not approve)
+
+**Approve T5c on `81933759`**, failing tests first. It does not close R1-T5.
+
+### Separate reread
+
+Retraced by call site. `authenticateToken` sets `req.authSession` for every cookie
+session and checks the CSRF token on every change, so the start route gets the
+session id for free. `userOfLiveSession` already answers "who is this session, if it
+still stands" without presenting the cookie's secret and without counting as a use:
+it is private to `server/auth.ts` and needs only an exported name. The platform admin
+passes `isAccountOwner` but has no users row and no business session, so the gate
+must ask for a business session and an owner login by its row id, as change-password
+refuses the admin. The starting cookie's reader refuses anything but four parts, so a
+six-part connect cookie under another key cannot pass it, and the new reader must
+refuse four. The users table spells the owner's role `owner`. Apple needs one
+registered return address, so the connect uses the same callback path and the
+cross-site list does not change. What must not move: the three T5b routes' behaviour
+on a sign-in cookie, byte for byte (their 43 tests are the net); change-password.
+**Approve the same T5c scope.**
 
 ## T5c starting facts (read, not yet changed)
 
