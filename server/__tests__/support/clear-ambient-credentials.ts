@@ -25,6 +25,8 @@ export const PAIRED_CREDENTIAL_GROUPS: readonly (readonly string[])[] = [
   ["VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY"],
   ["APNS_KEY_P8", "APNS_KEY_ID", "APNS_TEAM_ID"],
   ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"],
+  // R1-T5: Sign in with Apple. A real key in the shell must never sign a test's client secret.
+  ["APPLE_SERVICES_ID", "APPLE_TEAM_ID", "APPLE_KEY_ID", "APPLE_PRIVATE_KEY"],
   ["GOOGLE_ANALYTICS_PROPERTY_ID", "GOOGLE_ANALYTICS_SERVICE_ACCOUNT"],
   ["SMTP_HOST", "SMTP_USER", "SMTP_PASS"],
   ["GMAIL_USER", "GMAIL_APP_PASSWORD"],
