@@ -138,7 +138,10 @@ jobs:
           # 2026-09-30 (R1-T4 phase E): 0031 added 1 table (auth_sessions), 18
           # columns, 6 constraints (4 checks, its key, 1 foreign key) and 3
           # indexes and removed nothing.
-          RECORDED: docs/evidence/remediation-v2-2/r1/R1-T4-phase-E-auth-sessions-empty-fingerprint-2026-09-30.json
+          # 2026-10-04 (R1-T7 S6a): 0032 added 1 table (uploaded_file_scans), 5
+          # columns, 4 constraints (2 checks, its key, 1 foreign key) and 1 index
+          # and removed nothing.
+          RECORDED: docs/evidence/remediation-v2-2/r1/R1-T7-S6a-upload-scans-empty-fingerprint-2026-10-04.json
         run: |
           node scripts/schema-fingerprint.mjs > "$RUNNER_TEMP/fingerprint.json"
           node -e "

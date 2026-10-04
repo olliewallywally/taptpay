@@ -82,7 +82,9 @@ try {
     events: await events(parent) });
   const addDocument = async (merchant = a) => {
     const path = `invoices/invoice-${1_700_000_000_000 + Math.floor(Math.random() * 1e9)}-${randomUUID().replace(/-/g, "").slice(0, 16)}.pdf`;
-    await pool.query("INSERT INTO uploaded_files(path,mime_type,data,merchant_id) VALUES ($1,'application/pdf',$2,$3)", [path, Buffer.from("%PDF-synthetic"), merchant]);
+    await pool.query(
+      // With its clean verdict, as a scanned upload is stored (R1-T7 S6a): only such a document can be attached.
+      "WITH f AS (INSERT INTO uploaded_files(path,mime_type,data,merchant_id) VALUES ($1,'application/pdf',$2,$3) RETURNING id) INSERT INTO uploaded_file_scans(file_id,verdict,scanner) SELECT id,'clean','verifier' FROM f", [path, Buffer.from("%PDF-synthetic"), merchant]);
     return { path, documentUrl: `/uploads/${path}`, documentName: "synthetic.pdf" };
   };
   async function waited(sql: string, args: any[], run: () => Promise<any>, accept: (result: any) => Promise<void>) {

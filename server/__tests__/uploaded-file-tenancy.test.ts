@@ -57,10 +57,10 @@ describe("gap 13 — uploaded files carry their tenant", () => {
 
     const { relPath } = await uploadInvoiceDocument(app, a);
 
-    expect((await storage.getUploadedFileForMerchant(relPath, a.merchantId))?.data.equals(PDF_BYTES)).toBe(true);
-    expect(await storage.getUploadedFileForMerchant(relPath, b.merchantId)).toBeUndefined();
-    expect(await storage.uploadedFileOwnedByMerchant(relPath, a.merchantId)).toBe(true);
-    expect(await storage.uploadedFileOwnedByMerchant(relPath, b.merchantId)).toBe(false);
+    expect((await storage.getCleanUploadedFileForMerchant(relPath, a.merchantId))?.data.equals(PDF_BYTES)).toBe(true);
+    expect(await storage.getCleanUploadedFileForMerchant(relPath, b.merchantId)).toBeUndefined();
+    expect(await storage.cleanUploadedFileOwnedByMerchant(relPath, a.merchantId)).toBe(true);
+    expect(await storage.cleanUploadedFileOwnedByMerchant(relPath, b.merchantId)).toBe(false);
   });
 
   it("a logo upload is stamped with its merchant", async () => {
@@ -73,16 +73,19 @@ describe("gap 13 — uploaded files carry their tenant", () => {
       .attach("logo", PNG_BYTES, "logo.png");
     expect(upload.status).toBe(200);
 
-    expect(await storage.uploadedFileOwnedByMerchant(`logos/merchant-${a.merchantId}.png`, a.merchantId)).toBe(true);
+    // A logo is not a document: it is not scanned, so no document reader finds it (R1-T7 S6a).
+    // Its stamp is what the tenant-scoped delete and the gap-13 ownership rule go by.
+    expect((storage as any).uploadedFileBlobs.get(`logos/merchant-${a.merchantId}.png`)).toMatchObject({ merchantId: a.merchantId });
+    expect(await storage.cleanUploadedFileOwnedByMerchant(`logos/merchant-${a.merchantId}.png`, a.merchantId)).toBe(false);
   });
 
   it("tenant-scoped reads reject a non-positive or non-integer tenant instead of matching anything", async () => {
     const a = await createOwnerPrincipal();
-    await storage.saveUploadedFile("invoices/invoice-1700000000000-aaaaaaaaaaaaaaaa.pdf", "application/pdf", PDF_BYTES, a.merchantId);
+    await storage.saveScannedUploadedFile("invoices/invoice-1700000000000-aaaaaaaaaaaaaaaa.pdf", "application/pdf", PDF_BYTES, a.merchantId, { scanner: "simulation" });
 
     for (const bad of [0, -1, 1.5, Number.NaN]) {
-      expect(await storage.getUploadedFileForMerchant("invoices/invoice-1700000000000-aaaaaaaaaaaaaaaa.pdf", bad)).toBeUndefined();
-      expect(await storage.uploadedFileOwnedByMerchant("invoices/invoice-1700000000000-aaaaaaaaaaaaaaaa.pdf", bad)).toBe(false);
+      expect(await storage.getCleanUploadedFileForMerchant("invoices/invoice-1700000000000-aaaaaaaaaaaaaaaa.pdf", bad)).toBeUndefined();
+      expect(await storage.cleanUploadedFileOwnedByMerchant("invoices/invoice-1700000000000-aaaaaaaaaaaaaaaa.pdf", bad)).toBe(false);
     }
   });
 
@@ -90,32 +93,32 @@ describe("gap 13 — uploaded files carry their tenant", () => {
     const a = await createOwnerPrincipal();
     const b = await createOwnerPrincipal();
     const samePath = "invoices/invoice-1700000000000-bbbbbbbbbbbbbbbb.pdf";
-    await storage.saveUploadedFile(samePath, "application/pdf", PDF_BYTES, a.merchantId);
+    await storage.saveScannedUploadedFile(samePath, "application/pdf", PDF_BYTES, a.merchantId, { scanner: "simulation" });
 
     await expect(
-      storage.saveUploadedFile(samePath, "application/pdf", Buffer.from("%PDF-1.4\nattacker"), b.merchantId),
+      storage.saveScannedUploadedFile(samePath, "application/pdf", Buffer.from("%PDF-1.4\nattacker"), b.merchantId, { scanner: "simulation" }),
     ).rejects.toThrow();
 
-    expect((await storage.getUploadedFileForMerchant(samePath, a.merchantId))?.data.equals(PDF_BYTES)).toBe(true);
-    expect(await storage.getUploadedFileForMerchant(samePath, b.merchantId)).toBeUndefined();
+    expect((await storage.getCleanUploadedFileForMerchant(samePath, a.merchantId))?.data.equals(PDF_BYTES)).toBe(true);
+    expect(await storage.getCleanUploadedFileForMerchant(samePath, b.merchantId)).toBeUndefined();
 
     // The owner may still overwrite their own path (logo re-upload relies on this).
     const v2 = Buffer.from("%PDF-1.4\nowner-v2");
-    await storage.saveUploadedFile(samePath, "application/pdf", v2, a.merchantId);
-    expect((await storage.getUploadedFileForMerchant(samePath, a.merchantId))?.data.equals(v2)).toBe(true);
+    await storage.saveScannedUploadedFile(samePath, "application/pdf", v2, a.merchantId, { scanner: "simulation" });
+    expect((await storage.getCleanUploadedFileForMerchant(samePath, a.merchantId))?.data.equals(v2)).toBe(true);
   });
 
   it("deleting is tenant-scoped: another merchant's delete removes nothing", async () => {
     const a = await createOwnerPrincipal();
     const b = await createOwnerPrincipal();
     const rel = "invoices/invoice-1700000000000-cccccccccccccccc.pdf";
-    await storage.saveUploadedFile(rel, "application/pdf", PDF_BYTES, a.merchantId);
+    await storage.saveScannedUploadedFile(rel, "application/pdf", PDF_BYTES, a.merchantId, { scanner: "simulation" });
 
     await storage.deleteUploadedFile(rel, b.merchantId);
-    expect(await storage.uploadedFileOwnedByMerchant(rel, a.merchantId)).toBe(true);
+    expect(await storage.cleanUploadedFileOwnedByMerchant(rel, a.merchantId)).toBe(true);
 
     await storage.deleteUploadedFile(rel, a.merchantId);
-    expect(await storage.uploadedFileOwnedByMerchant(rel, a.merchantId)).toBe(false);
+    expect(await storage.cleanUploadedFileOwnedByMerchant(rel, a.merchantId)).toBe(false);
   });
 
   it("logo delete cannot remove another merchant's blob even if this merchant's customLogoUrl points at it", async () => {

@@ -271,3 +271,44 @@ describe("TRUST_PROXY_HOPS", () => {
     expect(() => loadConfig({ ...BASE_ENV, TRUST_PROXY_HOPS: raw })).toThrow(/TRUST_PROXY_HOPS/);
   });
 });
+
+// R1-T7 S6a (owner decision 2026-09-29: "Add ClamAV on the server").
+describe("the upload scanner", () => {
+  const live = (appEnv: "staging" | "production") => ({
+    ...BASE_ENV, APP_ENV: appEnv, DATABASE_TARGET: appEnv, PUBLIC_ORIGIN: "https://taptpay.co.nz",
+  });
+
+  test("ClamAV is the default, on its standard port, with no host until one is set", () => {
+    expect(loadConfig(BASE_ENV).uploads).toEqual({ scanner: "clamav", clamavHost: undefined, clamavPort: 3310 });
+  });
+
+  test("a host and port are read as given", () => {
+    expect(loadConfig({ ...BASE_ENV, CLAMAV_HOST: "clamav.internal", CLAMAV_PORT: "3311" }).uploads)
+      .toEqual({ scanner: "clamav", clamavHost: "clamav.internal", clamavPort: 3311 });
+  });
+
+  test.each(["0", "65536", "33.1", "port", "-1", " 3310"])("port %p is refused", (port) => {
+    expect(() => loadConfig({ ...BASE_ENV, CLAMAV_PORT: port })).toThrow(/CLAMAV_PORT/);
+  });
+
+  test("an unknown scanner is refused without echoing it", () => {
+    try {
+      loadConfig({ ...BASE_ENV, UPLOAD_SCANNER: "do-not-echo-this-value" });
+      throw new Error("expected loadConfig to fail");
+    } catch (error) {
+      expect(String(error)).toContain("UPLOAD_SCANNER");
+      expect(String(error)).not.toContain("do-not-echo-this-value");
+    }
+  });
+
+  test("the stand-in is for development and tests", () => {
+    expect(loadConfig({ ...BASE_ENV, UPLOAD_SCANNER: "simulation" }).uploads.scanner).toBe("simulation");
+    expect(loadConfig({ ...BASE_ENV, APP_ENV: "development", DATABASE_TARGET: "local", UPLOAD_SCANNER: "simulation" }).uploads.scanner).toBe("simulation");
+  });
+
+  test.each(["staging", "production"] as const)("the stand-in is refused in %s, even in audit mode", (appEnv) => {
+    expect(loadConfig({ ...live(appEnv), UPLOAD_SCANNER: "clamav" }).uploads.scanner).toBe("clamav");
+    expect(() => loadConfig({ ...live(appEnv), UPLOAD_SCANNER: "simulation" })).toThrow(/UPLOAD_SCANNER/);
+    expect(() => loadConfig({ ...live(appEnv), ENV_VALIDATION_MODE: "audit", UPLOAD_SCANNER: "simulation" })).toThrow(/UPLOAD_SCANNER/);
+  });
+});

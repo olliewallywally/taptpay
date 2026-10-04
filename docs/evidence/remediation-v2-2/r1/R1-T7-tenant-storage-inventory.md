@@ -1,10 +1,10 @@
 # R1-T7 tenant/storage execution inventory
 
-Generated from working-tree sources on base `dde8b1ef4306322cb31d0078262d48f3ea93ad53`; the phase evidence names the final commit.
+Generated from working-tree sources on base `d1eb5fb4d76fcca6a36865b234c2d55e352b18a4`; the phase evidence names the final commit.
 
 Registrations: **187**; registrations with session/admin authentication: **119**;
 registrations calling checkMerchantOwnership: **25**.
-IStorage: **247** declared methods;
+IStorage: **249** declared methods;
 PaymentAttemptRepository: **8** inherited methods.
 
 Classifications come from the reviewed per-route branches, including mixed public/signed-in routes.
@@ -53,10 +53,10 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | GET /api/billing/card | tenant (merchant/session) | `getMerchant`, `getOrCreateSubscription` |
 | GET /api/billing/card/callback | public (public/none) | — |
 | GET /api/checkout/callback | single-resource bearer (public-bearer/token) | `atomicClaimJobSplitShare`, `atomicClaimSplitShare`, `createJobEvent`, `getInvoiceRentRequest`, `getInvoiceRentRequestByToken`, `getJobInvoice`, `getJobInvoiceByToken`, `getMerchant`, `getPaidInvoiceSplitPayerEmails`, `getTenantProfile`, `logTransactionEvent`, `markInvoiceSplitSessionPaid`, `updateInvoiceRentRequest`, `updateJobInvoice` |
-| GET /api/checkout/document/:token | single-resource bearer (public-bearer/token) | `consumeInvoiceDocumentReadLimit`, `getInvoiceRentRequestByToken`, `getJobInvoiceByToken`, `getUploadedFileForMerchant` |
-| GET /api/checkout/resolve/:token | single-resource bearer (public-bearer/token) | `getActiveSchedule`, `getClientProfile`, `getInvoiceRentRequestByToken`, `getJobInvoiceByToken`, `getMerchant`, `getQuote`, `getTenantProfile`, `uploadedFileOwnedByMerchant` |
+| GET /api/checkout/document/:token | single-resource bearer (public-bearer/token) | `consumeInvoiceDocumentReadLimit`, `getCleanUploadedFileForMerchant`, `getInvoiceRentRequestByToken`, `getJobInvoiceByToken` |
+| GET /api/checkout/resolve/:token | single-resource bearer (public-bearer/token) | `cleanUploadedFileOwnedByMerchant`, `getActiveSchedule`, `getClientProfile`, `getInvoiceRentRequestByToken`, `getJobInvoiceByToken`, `getMerchant`, `getQuote`, `getTenantProfile` |
 | GET /api/internal/cron/status | scheduler (cron/none) | — |
-| GET /api/invoice-documents/:name | tenant (merchant/resource); validated admin (platform-admin/any-merchant) | `getUploadedFile`, `getUploadedFileForMerchant`, `recordInvoiceDocumentAdminRead` |
+| GET /api/invoice-documents/:name | tenant (merchant/resource); validated admin (platform-admin/any-merchant) | `getCleanUploadedFile`, `getCleanUploadedFileForMerchant`, `recordInvoiceDocumentAdminRead` |
 | GET /api/merchants/:id/active-transaction | tenant (merchant/path-merchant); public (public/board) | `getActiveTransactionByMerchant`, `getTaptStone` |
 | GET /api/merchants/:id/events | tenant (merchant/path-merchant); public (public/board) | `getTaptStone` |
 | GET /api/merchants/:id/export/pdf | tenant (merchant/path-merchant) | `getMerchant`, `getMerchantAnalyticsWithDateRange`, `getTransactionsByMerchantWithDateRange` |
@@ -147,11 +147,11 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | POST /api/pay/t/:token/receipt-pdf | single-resource bearer (public-bearer/token) | `getMerchant`, `getSplitPaymentsByTransaction` |
 | POST /api/pay/t/:token/session | single-resource bearer (public-bearer/token) | `getMerchant`, `getNextPendingSplit`, `updateTransactionStatus` |
 | POST /api/pay/t/:token/split | single-resource bearer (public-bearer/token) | `createBillSplit`, `getMerchant` |
-| POST /api/property/invoices | tenant (merchant/resource) | `createOrReuseInvoiceRentRequestForMerchant`, `getInvoiceRentRequestForMerchant`, `getOrCreateSubscription`, `getTenantProfileForMerchant`, `uploadedFileOwnedByMerchant` |
+| POST /api/property/invoices | tenant (merchant/resource) | `cleanUploadedFileOwnedByMerchant`, `createOrReuseInvoiceRentRequestForMerchant`, `getInvoiceRentRequestForMerchant`, `getOrCreateSubscription`, `getTenantProfileForMerchant` |
 | POST /api/property/invoices/:id/mark-paid-external | tenant (merchant/resource) | `getInvoiceRentRequestForMerchant`, `markInvoiceRentRequestPaidExternalForMerchant` |
 | POST /api/property/invoices/:id/resend | tenant (merchant/resource) | `getInvoiceRentRequestForMerchant`, `getOrCreateSubscription` |
 | POST /api/property/invoices/:id/void | tenant (merchant/resource) | `getInvoiceRentRequestForMerchant`, `voidInvoiceRentRequestForMerchant` |
-| POST /api/property/invoices/document | tenant (merchant/session) | `saveUploadedFile` |
+| POST /api/property/invoices/document | tenant (merchant/session) | `saveScannedUploadedFile` |
 | POST /api/property/tenants | tenant (merchant/session) | `createTenantProfileForMerchant` |
 | POST /api/property/tenants/:id/archive | tenant (merchant/resource) | `archiveTenantProfileForMerchant`, `getTenantProfileForMerchant` |
 | POST /api/property/tenants/:id/unarchive | tenant (merchant/resource) | `getTenantProfileForMerchant`, `unarchiveTenantProfileForMerchant` |
@@ -169,12 +169,12 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | POST /api/trades/clients/:id/archive | tenant (merchant/resource) | `archiveClientProfileForMerchant`, `getClientProfileForMerchant` |
 | POST /api/trades/clients/:id/promote | tenant (merchant/resource) | `getClientProfileForMerchant`, `promoteClientProfileForMerchant` |
 | POST /api/trades/clients/:id/unarchive | tenant (merchant/resource) | `getClientProfileForMerchant`, `unarchiveClientProfileForMerchant` |
-| POST /api/trades/invoices | tenant (merchant/resource) | `createJobInvoiceForMerchant`, `getClientProfileForMerchant`, `getJobInvoiceForMerchant`, `getOrCreateSubscription`, `getQuoteDeliveryForMerchant`, `uploadedFileOwnedByMerchant` |
+| POST /api/trades/invoices | tenant (merchant/resource) | `cleanUploadedFileOwnedByMerchant`, `createJobInvoiceForMerchant`, `getClientProfileForMerchant`, `getJobInvoiceForMerchant`, `getOrCreateSubscription`, `getQuoteDeliveryForMerchant` |
 | POST /api/trades/invoices/:id/complete | tenant (merchant/resource) | `completeJobInvoiceForMerchant`, `getJobInvoiceForMerchant` |
 | POST /api/trades/invoices/:id/mark-paid-external | tenant (merchant/resource) | `getJobInvoiceForMerchant`, `markJobInvoicePaidExternalForMerchant` |
 | POST /api/trades/invoices/:id/send-balance | tenant (merchant/resource) | `createJobBalanceInvoiceForMerchant`, `getJobInvoiceForMerchant`, `getOrCreateSubscription` |
 | POST /api/trades/invoices/:id/void | tenant (merchant/resource) | `getJobInvoiceForMerchant`, `voidJobInvoiceForMerchant` |
-| POST /api/trades/quotes | tenant (merchant/resource) | `createQuoteForMerchant`, `getClientProfileForMerchant`, `getMerchant`, `getOrCreateSubscription`, `getQuoteDeliveryForMerchant`, `recordQuoteDeliveryForMerchant`, `uploadedFileOwnedByMerchant` |
+| POST /api/trades/quotes | tenant (merchant/resource) | `cleanUploadedFileOwnedByMerchant`, `createQuoteForMerchant`, `getClientProfileForMerchant`, `getMerchant`, `getOrCreateSubscription`, `getQuoteDeliveryForMerchant`, `recordQuoteDeliveryForMerchant` |
 | POST /api/trades/quotes/token/:token/respond | single-resource bearer (public-bearer/token) | `createJobEvent`, `createJobInvoice`, `getOrCreateSubscription`, `getQuoteByToken`, `updateQuote` |
 | POST /api/trades/schedules | tenant (merchant/resource) | `createJobScheduleForMerchant`, `getClientProfileForMerchant`, `getOrCreateSubscription` |
 | POST /api/transactions | tenant (merchant/path-merchant) | `createTransactionForMerchant`, `getOrCreateSubscription`, `getTaptStoneForMerchant` |
@@ -441,8 +441,10 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | IStorage | createJobEvent | no | `createJobEvent(data: any): Promise<any>` |
 | IStorage | saveUploadedFile | yes | `saveUploadedFile(relPath: string, mimeType: string, data: Buffer, merchantId: number): Promise<void>` |
 | IStorage | getUploadedFile | no | `getUploadedFile(relPath: string): Promise<{ mimeType: string; data: Buffer } \| undefined>` |
-| IStorage | getUploadedFileForMerchant | yes | `getUploadedFileForMerchant(relPath: string, merchantId: number): Promise<{ mimeType: string; data: Buffer } \| undefined>` |
-| IStorage | uploadedFileOwnedByMerchant | yes | `uploadedFileOwnedByMerchant(relPath: string, merchantId: number): Promise<boolean>` |
+| IStorage | saveScannedUploadedFile | yes | `saveScannedUploadedFile(relPath: string, mimeType: string, data: Buffer, merchantId: number, scan: { scanner: string }): Promise<void>` |
+| IStorage | getCleanUploadedFileForMerchant | yes | `getCleanUploadedFileForMerchant(relPath: string, merchantId: number): Promise<{ mimeType: string; data: Buffer } \| undefined>` |
+| IStorage | getCleanUploadedFile | no | `getCleanUploadedFile(relPath: string): Promise<{ mimeType: string; data: Buffer } \| undefined>` |
+| IStorage | cleanUploadedFileOwnedByMerchant | yes | `cleanUploadedFileOwnedByMerchant(relPath: string, merchantId: number): Promise<boolean>` |
 | IStorage | deleteUploadedFile | yes | `deleteUploadedFile(relPath: string, merchantId: number): Promise<void>` |
 | IStorage | recordInvoiceDocumentAdminRead | no | `recordInvoiceDocumentAdminRead(adminUserId: number, documentName: string): Promise<void>` |
 | IStorage | consumeInvoiceDocumentReadLimit | no | `consumeInvoiceDocumentReadLimit(token: string): Promise<boolean>` |

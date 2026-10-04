@@ -155,7 +155,7 @@ export function fakeProperty(): PropertyFake {
     if (fake.tenants.get(tenantProfileId)?.merchantId !== merchantId) return { kind: "not-found" };
     if (data.documentUrl) {
       const ref = parseInvoiceDocumentRef(data.documentUrl);
-      if (!ref || !(await storage.uploadedFileOwnedByMerchant(ref.relPath, merchantId))) return { kind: "invalid-document" };
+      if (!ref || !(await storage.cleanUploadedFileOwnedByMerchant(ref.relPath, merchantId))) return { kind: "invalid-document" };
     }
     if (data.kind !== "charge") {
       const live = [...fake.invoices.values()].filter(row => row.tenantProfileId === tenantProfileId && row.merchantId === merchantId

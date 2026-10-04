@@ -133,7 +133,9 @@ try {
   });
   await check("attachment references require current owned documents through the write", async () => {
     const parent = await profile(); const path = "invoices/invoice-1700000000000-0123456789abcdef.pdf";
-    await pool.query("INSERT INTO uploaded_files(path,mime_type,data,merchant_id) VALUES ($1,'application/pdf',$2,$3)", [path, Buffer.from("%PDF-synthetic"), a]);
+    await pool.query(
+      // With its clean verdict, as a scanned upload is stored (R1-T7 S6a): only such a document can be attached.
+      "WITH f AS (INSERT INTO uploaded_files(path,mime_type,data,merchant_id) VALUES ($1,'application/pdf',$2,$3) RETURNING id) INSERT INTO uploaded_file_scans(file_id,verdict,scanner) SELECT id,'clean','verifier' FROM f", [path, Buffer.from("%PDF-synthetic"), a]);
     const invoice = await make(parent.id, { ...input, kind: "charge", documentUrl: `/uploads/${path}`, documentName: "synthetic.pdf" });
     assert.equal(invoice.documentUrl, `/uploads/${path}`); const before = await snapshot(parent.id);
     await pool.query("UPDATE uploaded_files SET merchant_id=$1 WHERE path=$2", [b, path]);
@@ -171,7 +173,9 @@ try {
   });
   await check("create waits and refuses committed document reassignment", async () => {
     const parent = await profile(); const path = "invoices/invoice-1700000000001-0123456789abcdef.pdf"; const before = await snapshot(parent.id);
-    await pool.query("INSERT INTO uploaded_files(path,mime_type,data,merchant_id) VALUES ($1,'application/pdf',$2,$3)", [path, Buffer.from("%PDF-synthetic"), a]);
+    await pool.query(
+      // With its clean verdict, as a scanned upload is stored (R1-T7 S6a): only such a document can be attached.
+      "WITH f AS (INSERT INTO uploaded_files(path,mime_type,data,merchant_id) VALUES ($1,'application/pdf',$2,$3) RETURNING id) INSERT INTO uploaded_file_scans(file_id,verdict,scanner) SELECT id,'clean','verifier' FROM f", [path, Buffer.from("%PDF-synthetic"), a]);
     await waited("UPDATE uploaded_files SET merchant_id=$1 WHERE path=$2", [b, path], () => create(two, parent.id, { ...input, documentUrl: `/uploads/${path}` } as any), async result => {
       assert.deepEqual(result, { kind: "invalid-document" }); assert.deepEqual(await snapshot(parent.id), before);
     });

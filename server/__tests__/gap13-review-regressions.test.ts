@@ -39,7 +39,7 @@ it("does not serve an admin document when its durable audit write fails", async 
   const { app } = await createTestApp();
   const owner = await createOwnerPrincipal();
   const name = "invoice-1700000000000-aaaaaaaaaaaaaaaa.pdf";
-  await storage.saveUploadedFile(`invoices/${name}`, "application/pdf", Buffer.from("%PDF-secret"), owner.merchantId);
+  await storage.saveScannedUploadedFile(`invoices/${name}`, "application/pdf", Buffer.from("%PDF-secret"), owner.merchantId, { scanner: "simulation" });
   jest.spyOn(storage, "recordInvoiceDocumentAdminRead").mockRejectedValue(new Error("synthetic audit outage"));
   const response = await request(app).get(`/api/invoice-documents/${name}`).set(signedIn(await createAdminPrincipal()));
   expect(response.status).toBe(503);
@@ -50,7 +50,7 @@ it("awaits the admin audit commit before sending bytes and does not audit a tena
   const { app } = await createTestApp();
   const owner = await createOwnerPrincipal();
   const name = "invoice-1700000000000-dddddddddddddddd.pdf";
-  await storage.saveUploadedFile(`invoices/${name}`, "application/pdf", Buffer.from("%PDF-test"), owner.merchantId);
+  await storage.saveScannedUploadedFile(`invoices/${name}`, "application/pdf", Buffer.from("%PDF-test"), owner.merchantId, { scanner: "simulation" });
   let release!: () => void;
   let entered!: () => void;
   const started = new Promise<void>(resolve => { entered = resolve; });
@@ -84,7 +84,7 @@ it("awaits the admin audit commit before sending bytes and does not audit a tena
 async function invoiceWithDocument() {
   const owner = await createOwnerPrincipal();
   const name = `invoice-1700000000000-${crypto.randomBytes(8).toString("hex")}.pdf`;
-  await storage.saveUploadedFile(`invoices/${name}`, "application/pdf", Buffer.from("%PDF-1.4\nsynthetic"), owner.merchantId);
+  await storage.saveScannedUploadedFile(`invoices/${name}`, "application/pdf", Buffer.from("%PDF-1.4\nsynthetic"), owner.merchantId, { scanner: "simulation" });
   const token = crypto.randomBytes(20).toString("base64url");
   const invoice = { id: "prop-inv-budget", merchantId: owner.merchantId, token, status: "dispatched", kind: "charge",
     amountCents: 5000, documentUrl: `/uploads/invoices/${name}`, documentName: "bill.pdf" };
@@ -115,7 +115,7 @@ it("fails closed for a real invoice when the shared budget is unavailable, befor
   const { app } = await createTestApp();
   const { token } = await invoiceWithDocument();
   jest.spyOn(storage, "consumeInvoiceDocumentReadLimit").mockRejectedValue(new Error("synthetic limiter outage"));
-  const read = jest.spyOn(storage, "getUploadedFileForMerchant");
+  const read = jest.spyOn(storage, "getCleanUploadedFileForMerchant");
   const response = await request(app).get(`/api/checkout/document/${token}`);
   expect(response.status).toBe(503);
   expect(read).not.toHaveBeenCalled();
@@ -125,7 +125,7 @@ it("a link that has used its budget answers 429 with Retry-After, without readin
   const { app } = await createTestApp();
   const { token } = await invoiceWithDocument();
   jest.spyOn(storage, "consumeInvoiceDocumentReadLimit").mockResolvedValue(false);
-  const read = jest.spyOn(storage, "getUploadedFileForMerchant");
+  const read = jest.spyOn(storage, "getCleanUploadedFileForMerchant");
   const response = await request(app).get(`/api/checkout/document/${token}`);
   expect(response.status).toBe(429);
   expect(response.headers["retry-after"]).toBe("60");

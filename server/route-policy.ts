@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ dde8b1ef4306322cb31d0078262d48f3ea93ad53 on 2026-10-04.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ d1eb5fb4d76fcca6a36865b234c2d55e352b18a4 on 2026-10-04.
  *
  * 187 registrations (78 GET, 77 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -2039,9 +2039,9 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       middleware: ["authenticateToken","receiveUpload(…)"],
       body: ["file"],
-      storageMethods: ["saveUploadedFile"],
+      storageMethods: ["saveScannedUploadedFile"],
+      sideEffects: ["audit log: logSecurityEvent"],
       statuses: [200,400,401,403,500,503],
-      helpers: ["saveUploadedFile"],
     },
   },
   "GET /api/invoice-documents/:name": {
@@ -2053,7 +2053,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       middleware: ["authenticateToken"],
       params: ["name: raw"],
       authChecks: ["isValidatedPlatformAdmin"],
-      storageMethods: ["getUploadedFile","getUploadedFileForMerchant","recordInvoiceDocumentAdminRead"],
+      storageMethods: ["getCleanUploadedFile","getCleanUploadedFileForMerchant","recordInvoiceDocumentAdminRead"],
       sideEffects: ["audit log: logSecurityEvent"],
       statuses: [200,401,403,404,500,503],
       helpers: ["sendPrivateDocument"],
@@ -2067,7 +2067,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       middleware: ["authenticateToken"],
       body: ["schema: createAdHocInvoiceSchema"],
-      storageMethods: ["createOrReuseInvoiceRentRequestForMerchant","getInvoiceRentRequestForMerchant","getOrCreateSubscription","getTenantProfileForMerchant","uploadedFileOwnedByMerchant"],
+      storageMethods: ["cleanUploadedFileOwnedByMerchant","createOrReuseInvoiceRentRequestForMerchant","getInvoiceRentRequestForMerchant","getOrCreateSubscription","getTenantProfileForMerchant"],
       sideEffects: ["email: resendInvoiceEmailForMerchant"],
       statuses: [200,201,400,401,402,403,404,500,503],
       errorTextInResponse: ["err.errors"],
@@ -2124,7 +2124,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       params: ["token: raw"],
       authChecks: ["getCheckoutInvoiceByToken"],
-      storageMethods: ["getActiveSchedule","getClientProfile","getInvoiceRentRequestByToken","getJobInvoiceByToken","getMerchant","getQuote","getTenantProfile","uploadedFileOwnedByMerchant"],
+      storageMethods: ["cleanUploadedFileOwnedByMerchant","getActiveSchedule","getClientProfile","getInvoiceRentRequestByToken","getJobInvoiceByToken","getMerchant","getQuote","getTenantProfile"],
       statuses: [200,404,410,429,500],
       rateLimits: ["tokenRateLimit"],
       helpers: ["getCheckoutParty","invoiceHasCheckoutDocument","tokenRateLimit"],
@@ -2138,7 +2138,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       params: ["token: raw"],
       authChecks: ["getCheckoutInvoiceByToken"],
-      storageMethods: ["consumeInvoiceDocumentReadLimit","getInvoiceRentRequestByToken","getJobInvoiceByToken","getUploadedFileForMerchant"],
+      storageMethods: ["consumeInvoiceDocumentReadLimit","getCleanUploadedFileForMerchant","getInvoiceRentRequestByToken","getJobInvoiceByToken"],
       statuses: [200,404,410,429,500,503],
       rateLimits: ["storage.consumeInvoiceDocumentReadLimit"],
       helpers: ["sendPrivateDocument"],
@@ -2468,7 +2468,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       middleware: ["authenticateToken"],
       body: ["schema: createQuoteSchema"],
-      storageMethods: ["createQuoteForMerchant","getClientProfileForMerchant","getMerchant","getOrCreateSubscription","getQuoteDeliveryForMerchant","recordQuoteDeliveryForMerchant","uploadedFileOwnedByMerchant"],
+      storageMethods: ["cleanUploadedFileOwnedByMerchant","createQuoteForMerchant","getClientProfileForMerchant","getMerchant","getOrCreateSubscription","getQuoteDeliveryForMerchant","recordQuoteDeliveryForMerchant"],
       sideEffects: ["email/SMS: sendTradeQuoteForMerchant"],
       statuses: [201,400,401,402,403,404,500,503],
       errorTextInResponse: ["parsed.error.errors"],
@@ -2551,7 +2551,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       middleware: ["authenticateToken"],
       body: ["schema: createJobInvoiceSchema"],
-      storageMethods: ["createJobInvoiceForMerchant","getClientProfileForMerchant","getJobInvoiceForMerchant","getOrCreateSubscription","getQuoteDeliveryForMerchant","uploadedFileOwnedByMerchant"],
+      storageMethods: ["cleanUploadedFileOwnedByMerchant","createJobInvoiceForMerchant","getClientProfileForMerchant","getJobInvoiceForMerchant","getOrCreateSubscription","getQuoteDeliveryForMerchant"],
       sideEffects: ["email/SMS: resendTradeInvoiceForMerchant"],
       statuses: [201,400,401,402,403,404,500,503],
       errorTextInResponse: ["parsed.error.errors"],

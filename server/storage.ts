@@ -1,4 +1,4 @@
-import { users, type User, type UserStatus, merchants, merchantTutorialProgress, transactions, uploadedFiles, merchantSettlements, refunds, splitPayments, paymentAttempts, PAYMENT_RETURN_STATE_MAX_AGE_MS, taptStones, stockItems, merchantSubscriptions, subscriptionBillingHistory, pushSubscriptions, pushNotificationDeliveries, normalizePushNotificationPreferences, DEFAULT_PUSH_NOTIFICATION_PREFERENCES, tenantProfiles, activeSchedules, invoicesRentRequests, transactionEvents, clientProfiles, quotes, jobInvoices, jobSchedules, jobEvents, type Merchant, type MerchantTutorialProgress, type Transaction, type SplitPayment, type PaymentAttempt, type InsertMerchant, type InsertTransaction, type CreateMerchant, type Refund, type InsertRefund, type TaptStone, type InsertTaptStone, type StockItem, type InsertStockItem, type MerchantSubscription, type SubscriptionBillingHistory, type PushSubscription, type PushNotificationPreferences, type PushNotificationEventType } from "@shared/schema";
+import { users, type User, type UserStatus, merchants, merchantTutorialProgress, transactions, uploadedFiles, uploadedFileScans, merchantSettlements, refunds, splitPayments, paymentAttempts, PAYMENT_RETURN_STATE_MAX_AGE_MS, taptStones, stockItems, merchantSubscriptions, subscriptionBillingHistory, pushSubscriptions, pushNotificationDeliveries, normalizePushNotificationPreferences, DEFAULT_PUSH_NOTIFICATION_PREFERENCES, tenantProfiles, activeSchedules, invoicesRentRequests, transactionEvents, clientProfiles, quotes, jobInvoices, jobSchedules, jobEvents, type Merchant, type MerchantTutorialProgress, type Transaction, type SplitPayment, type PaymentAttempt, type InsertMerchant, type InsertTransaction, type CreateMerchant, type Refund, type InsertRefund, type TaptStone, type InsertTaptStone, type StockItem, type InsertStockItem, type MerchantSubscription, type SubscriptionBillingHistory, type PushSubscription, type PushNotificationPreferences, type PushNotificationEventType } from "@shared/schema";
 import { DEFAULT_PLAN_ID, isUpgrade, planFor, planForOrDefault, type PlanId } from "@shared/plans";
 import { decideBilling, failedPaymentUpdates, immediatePlanUpdates, MAX_PAYMENT_ATTEMPTS, nextBillingPeriodStart, nextPeriodUpdates, proratedUpgradeCents, queuedPlanUpdates, renewalPlan } from "./subscription-billing";
 import { getDb, isDatabaseConnected } from "./database";
@@ -1150,16 +1150,25 @@ export interface IStorage extends PaymentAttemptRepository {
   // to a different merchant. The owner may overwrite their own path (a logo
   // re-upload relies on this).
   saveUploadedFile(relPath: string, mimeType: string, data: Buffer, merchantId: number): Promise<void>;
-  // UNSCOPED — it ignores the tenant, so its callers carry the authorization.
-  // There are exactly two: the public logo route (authorized by folder,
-  // PUBLIC_UPLOAD_FOLDERS in upload-policy.ts) and the platform-admin branch of
-  // GET /api/invoice-documents/:name (authorized by the validated admin
-  // principal, and audited). Do not use it to serve anything else.
+  // UNSCOPED and unscanned — it ignores the tenant, so its caller carries the
+  // authorization. There is exactly one: the public logo route (authorized by
+  // folder, PUBLIC_UPLOAD_FOLDERS in upload-policy.ts). Do not use it to serve
+  // anything else; a document is read through the three clean readers below.
   getUploadedFile(relPath: string): Promise<{ mimeType: string; data: Buffer } | undefined>;
-  getUploadedFileForMerchant(relPath: string, merchantId: number): Promise<{ mimeType: string; data: Buffer } | undefined>;
-  // Metadata-only existence + ownership check (never reads the blob), for the
-  // attach-time and checkout-resolve validations.
-  uploadedFileOwnedByMerchant(relPath: string, merchantId: number): Promise<boolean>;
+  //
+  // R1-T7 S6a (owner decision 2026-09-29): an invoice document is kept from every
+  // reader until a scan says it is clean. The document and its clean verdict are
+  // written together; each document reader requires the verdict in its own query,
+  // so a file with no verdict, or an infected one, is found by none of them.
+  //
+  /** Stores a scanned document with its clean verdict, in one write. The same ownership rule as saveUploadedFile. */
+  saveScannedUploadedFile(relPath: string, mimeType: string, data: Buffer, merchantId: number, scan: { scanner: string }): Promise<void>;
+  /** The business's own document, only with a clean scan on record. */
+  getCleanUploadedFileForMerchant(relPath: string, merchantId: number): Promise<{ mimeType: string; data: Buffer } | undefined>;
+  /** UNSCOPED: any business's document with a clean scan on record. The validated, audited platform-admin read only. */
+  getCleanUploadedFile(relPath: string): Promise<{ mimeType: string; data: Buffer } | undefined>;
+  /** Whether the business owns that document and its scan says clean (never reads the blob): what an attach and the payment page ask. */
+  cleanUploadedFileOwnedByMerchant(relPath: string, merchantId: number): Promise<boolean>;
   deleteUploadedFile(relPath: string, merchantId: number): Promise<void>;
   recordInvoiceDocumentAdminRead(adminUserId: number, documentName: string): Promise<void>;
   consumeInvoiceDocumentReadLimit(token: string): Promise<boolean>;
@@ -1210,6 +1219,12 @@ export interface IStorage extends PaymentAttemptRepository {
   /** R1-T4 phase E: end every live session of one login, except `keepId`; how many were ended. */
   revokeAuthSessionsForLogin(userId: number, reason: string, now: Date, keepId?: string): Promise<number>;
 }
+
+/**
+ * R1-T7 S6a: the document has a scan on record and it says clean. Part of each document reader's
+ * own WHERE, beside the business: a file with no verdict, or an infected one, matches none of them.
+ */
+const CLEAN_SCAN_ON_RECORD = sql`exists (select 1 from ${uploadedFileScans} where ${uploadedFileScans.fileId} = ${uploadedFiles.id} and ${uploadedFileScans.verdict} = 'clean')`;
 
 // A tenant id that can match a real merchant. 0 is the platform admin's
 // principal id and must never match a tenant; NaN/fractions are never valid.
@@ -1281,7 +1296,7 @@ export class MemStorage implements IStorage {
     claimedAt: Date;
   }>;
   private tutorialProgress: Map<string, MerchantTutorialProgress>;
-  private uploadedFileBlobs: Map<string, { mimeType: string; data: Buffer; merchantId: number }>;
+  private uploadedFileBlobs: Map<string, { mimeType: string; data: Buffer; merchantId: number; scan?: { verdict: "clean" | "infected"; scanner: string; signature?: string; scannedAt: Date } }>;
   private documentReadLimits = new Map<string, { count: number; expiresAt: number }>();
   private authHandoffCodes = new Map<string, { userId: number; newUser: boolean; expiresAt: Date; consumedAt: Date | null }>();
   private authThrottleRows = new Map<string, AuthThrottleRow>();
@@ -2819,15 +2834,28 @@ export class MemStorage implements IStorage {
     return file ? { mimeType: file.mimeType, data: file.data } : undefined;
   }
 
-  async getUploadedFileForMerchant(relPath: string, merchantId: number): Promise<{ mimeType: string; data: Buffer } | undefined> {
-    if (!isTenantId(merchantId)) return undefined;
-    const file = this.uploadedFileBlobs.get(relPath);
-    return file && file.merchantId === merchantId ? { mimeType: file.mimeType, data: file.data } : undefined;
+  async saveScannedUploadedFile(relPath: string, mimeType: string, data: Buffer, merchantId: number, scan: { scanner: string }): Promise<void> {
+    if (!isTenantId(merchantId)) throw new Error("A valid merchantId is required to save an upload");
+    const existing = this.uploadedFileBlobs.get(relPath);
+    if (existing && existing.merchantId !== merchantId) throw new UploadPathOwnershipError();
+    this.uploadedFileBlobs.set(relPath, { mimeType, data, merchantId, scan: { verdict: "clean", scanner: scan.scanner, scannedAt: new Date() } });
   }
 
-  async uploadedFileOwnedByMerchant(relPath: string, merchantId: number): Promise<boolean> {
+  async getCleanUploadedFileForMerchant(relPath: string, merchantId: number): Promise<{ mimeType: string; data: Buffer } | undefined> {
+    if (!isTenantId(merchantId)) return undefined;
+    const file = this.uploadedFileBlobs.get(relPath);
+    return file && file.merchantId === merchantId && file.scan?.verdict === "clean" ? { mimeType: file.mimeType, data: file.data } : undefined;
+  }
+
+  async getCleanUploadedFile(relPath: string): Promise<{ mimeType: string; data: Buffer } | undefined> {
+    const file = this.uploadedFileBlobs.get(relPath);
+    return file && file.scan?.verdict === "clean" ? { mimeType: file.mimeType, data: file.data } : undefined;
+  }
+
+  async cleanUploadedFileOwnedByMerchant(relPath: string, merchantId: number): Promise<boolean> {
     if (!isTenantId(merchantId)) return false;
-    return this.uploadedFileBlobs.get(relPath)?.merchantId === merchantId;
+    const file = this.uploadedFileBlobs.get(relPath);
+    return file?.merchantId === merchantId && file.scan?.verdict === "clean";
   }
 
   async deleteUploadedFile(relPath: string, merchantId: number): Promise<void> {
@@ -8501,7 +8529,7 @@ export class DatabaseStorage implements IStorage {
         const ref = parseInvoiceDocumentRef(input.documentUrl);
         if (!ref) return { kind: "invalid-document" };
         const [document] = await tx.select({ id: uploadedFiles.id }).from(uploadedFiles).where(and(
-          eq(uploadedFiles.path, ref.relPath), eq(uploadedFiles.merchantId, merchantId),
+          eq(uploadedFiles.path, ref.relPath), eq(uploadedFiles.merchantId, merchantId), CLEAN_SCAN_ON_RECORD,
         )).limit(1).for("share");
         if (!document) return { kind: "invalid-document" };
       }
@@ -8750,7 +8778,7 @@ export class DatabaseStorage implements IStorage {
     const ref = parseInvoiceDocumentRef(documentUrl);
     if (!ref) return false;
     const [document] = await tx.select({ id: uploadedFiles.id }).from(uploadedFiles)
-      .where(and(eq(uploadedFiles.path, ref.relPath), eq(uploadedFiles.merchantId, merchantId))).limit(1).for("share");
+      .where(and(eq(uploadedFiles.path, ref.relPath), eq(uploadedFiles.merchantId, merchantId), CLEAN_SCAN_ON_RECORD)).limit(1).for("share");
     return !!document;
   }
   private async insertTradesProspect(tx: any, merchantId: number, prospect: ClientProfileChanges): Promise<any> {
@@ -9211,15 +9239,20 @@ export class DatabaseStorage implements IStorage {
     // row, which `merchant_id = <n>` never matches), ON CONFLICT ... WHERE is
     // false, nothing is written and RETURNING is empty: refuse rather than
     // overwrite or re-stamp another tenant's file.
-    const written = await db.insert(uploadedFiles)
-      .values({ path: relPath, mimeType, data, merchantId })
-      .onConflictDoUpdate({
-        target: uploadedFiles.path,
-        set: { mimeType, data, createdAt: new Date() },
-        setWhere: eq(uploadedFiles.merchantId, merchantId),
-      })
-      .returning({ id: uploadedFiles.id });
-    if (written.length === 0) throw new UploadPathOwnershipError();
+    await db.transaction(async (tx: any) => {
+      const written = await tx.insert(uploadedFiles)
+        .values({ path: relPath, mimeType, data, merchantId })
+        .onConflictDoUpdate({
+          target: uploadedFiles.path,
+          set: { mimeType, data, createdAt: new Date() },
+          setWhere: eq(uploadedFiles.merchantId, merchantId),
+        })
+        .returning({ id: uploadedFiles.id });
+      if (written.length === 0) throw new UploadPathOwnershipError();
+      // A verdict is for the bytes it was given (R1-T7 S6a): bytes stored unscanned have none, so
+      // one left by what they replaced goes with it.
+      await tx.delete(uploadedFileScans).where(eq(uploadedFileScans.fileId, written[0].id));
+    });
   }
 
   async getUploadedFile(relPath: string): Promise<{ mimeType: string; data: Buffer } | undefined> {
@@ -9228,20 +9261,52 @@ export class DatabaseStorage implements IStorage {
     return file ? { mimeType: file.mimeType, data: file.data } : undefined;
   }
 
-  async getUploadedFileForMerchant(relPath: string, merchantId: number): Promise<{ mimeType: string; data: Buffer } | undefined> {
+  // The file and its clean verdict commit together (R1-T7 S6a): a stored document is never readable
+  // unscanned. The ownership rule is saveUploadedFile's: only the row's own business replaces it.
+  async saveScannedUploadedFile(relPath: string, mimeType: string, data: Buffer, merchantId: number, scan: { scanner: string }): Promise<void> {
+    if (!isTenantId(merchantId)) throw new Error("A valid merchantId is required to save an upload");
+    const db = this.db; if (!db) throw new Error("Database not connected");
+    await db.transaction(async (tx: any) => {
+      const written = await tx.insert(uploadedFiles)
+        .values({ path: relPath, mimeType, data, merchantId })
+        .onConflictDoUpdate({
+          target: uploadedFiles.path,
+          set: { mimeType, data, createdAt: new Date() },
+          setWhere: eq(uploadedFiles.merchantId, merchantId),
+        })
+        .returning({ id: uploadedFiles.id });
+      if (written.length === 0) throw new UploadPathOwnershipError();
+      await tx.insert(uploadedFileScans)
+        .values({ fileId: written[0].id, verdict: "clean", scanner: scan.scanner })
+        .onConflictDoUpdate({
+          target: uploadedFileScans.fileId,
+          set: { verdict: "clean", signature: null, scanner: scan.scanner, scannedAt: new Date() },
+        });
+    });
+  }
+
+  async getCleanUploadedFileForMerchant(relPath: string, merchantId: number): Promise<{ mimeType: string; data: Buffer } | undefined> {
     const db = this.db; if (!db || !isTenantId(merchantId)) return undefined;
     const [file] = await db.select({ mimeType: uploadedFiles.mimeType, data: uploadedFiles.data })
       .from(uploadedFiles)
-      .where(and(eq(uploadedFiles.path, relPath), eq(uploadedFiles.merchantId, merchantId)));
+      .where(and(eq(uploadedFiles.path, relPath), eq(uploadedFiles.merchantId, merchantId), CLEAN_SCAN_ON_RECORD));
     return file ? { mimeType: file.mimeType, data: file.data } : undefined;
   }
 
-  async uploadedFileOwnedByMerchant(relPath: string, merchantId: number): Promise<boolean> {
+  async getCleanUploadedFile(relPath: string): Promise<{ mimeType: string; data: Buffer } | undefined> {
+    const db = this.db; if (!db) return undefined;
+    const [file] = await db.select({ mimeType: uploadedFiles.mimeType, data: uploadedFiles.data })
+      .from(uploadedFiles)
+      .where(and(eq(uploadedFiles.path, relPath), CLEAN_SCAN_ON_RECORD));
+    return file ? { mimeType: file.mimeType, data: file.data } : undefined;
+  }
+
+  async cleanUploadedFileOwnedByMerchant(relPath: string, merchantId: number): Promise<boolean> {
     const db = this.db; if (!db || !isTenantId(merchantId)) return false;
     // Selects the id only — the blob is never read for an ownership check.
     const [row] = await db.select({ id: uploadedFiles.id })
       .from(uploadedFiles)
-      .where(and(eq(uploadedFiles.path, relPath), eq(uploadedFiles.merchantId, merchantId)))
+      .where(and(eq(uploadedFiles.path, relPath), eq(uploadedFiles.merchantId, merchantId), CLEAN_SCAN_ON_RECORD))
       .limit(1);
     return !!row;
   }

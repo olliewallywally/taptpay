@@ -174,7 +174,7 @@ const RECIPES: Record<string, ServedRecipe> = {
     check: async (res) => {
       expect(res.body).toEqual({ documentUrl: expect.stringMatching(/^\/uploads\/invoices\/invoice-\d+-[0-9a-f]{16}\.pdf$/), documentName: "bill.pdf" });
       // Kept for the business that uploaded it: the invoice create checks the reference against it.
-      const stored = await storage.getUploadedFileForMerchant(res.body.documentUrl.replace(/^\/uploads\//, ""), ctx.merchantId);
+      const stored = await storage.getCleanUploadedFileForMerchant(res.body.documentUrl.replace(/^\/uploads\//, ""), ctx.merchantId);
       expect(stored).toBeTruthy();
     },
   }),

@@ -35,6 +35,11 @@ process.env.PAYMENT_MODE = "disabled";
 // The built-in simulated email provider (refused in staging/production): no
 // test sends real email or needs a real key, even under ENV_VALIDATION_MODE=enforce.
 process.env.EMAIL_PROVIDER = "simulation";
+// R1-T7 S6a: the stand-in document scanner (refused in staging/production): no test needs a
+// ClamAV daemon. It calls everything clean but the antivirus test file.
+process.env.UPLOAD_SCANNER = "simulation";
+delete process.env.CLAMAV_HOST;
+delete process.env.CLAMAV_PORT;
 
 process.env.JWT_SECRET = "http-harness-jwt-secret-not-a-real-credential-000";
 process.env.PAYMENT_RETURN_STATE_SECRET = "http-harness-return-state-secret-not-real-000";

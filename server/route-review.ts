@@ -948,7 +948,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       {
         principal: "public-bearer",
         tenant: "token",
-        tenantRule: `${CHECKOUT_TENANT_RULE}; the file must be the invoice's own attachment and belong to the invoice's business (getUploadedFileForMerchant)`,
+        tenantRule: `${CHECKOUT_TENANT_RULE}; the file must be the invoice's own attachment, belong to the invoice's business and have a clean scan on record (getCleanUploadedFileForMerchant)`,
       },
     ],
     input: "token: must match /^[A-Za-z0-9_-]{1,200}$/ (404 otherwise), then looked up",
@@ -2993,14 +2993,14 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         roles: ["owner", "member"],
         tenant: "resource",
         tenantRule:
-          "only the business's own upload (getUploadedFileForMerchant): another business's, one no business could be attributed to, a malformed name and a missing one all give the same 404",
+          "only the business's own upload with a clean scan on record (getCleanUploadedFileForMerchant): another business's, one no business could be attributed to, one never scanned or scanned and blocked, a malformed name and a missing one all give the same 404",
       },
       {
         principal: "platform-admin",
         when: "the validated platform admin (isValidatedPlatformAdmin)",
         tenant: "any-merchant",
         tenantRule:
-          "any invoice document by its generated name (owner decision S1, 2026-09-19), each read recorded before any bytes leave (recordInvoiceDocumentAdminRead: 503 when it cannot be)",
+          "any invoice document with a clean scan on record, by its generated name (getCleanUploadedFile; owner decision S1, 2026-09-19), each read recorded before any bytes leave (recordInvoiceDocumentAdminRead: 503 when it cannot be); one never scanned or scanned and blocked is 404 and records nothing",
       },
     ],
     input: "name: must be a generated invoice-document name (isInvoiceDocumentName: 404 otherwise), so no other folder or path can be asked for",
@@ -3192,8 +3192,9 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       "the file 'document': a PDF, PNG, JPEG, WebP or HEIC by its MIME type (400 with the filter's message otherwise), whose first bytes must match that type for all but HEIC (400), up to 20 MB (413 above it), read into memory; the type and size refusals were 500s until 2026-09-27 (receiveUpload, server/routes.ts). Its own name is returned as sent",
     capability: null,
     entitlement: null,
-    idempotency: "none: each upload stores another document under a new random name (invoice-<time>-<16 hex characters>), stamped with the business (saveUploadedFile)",
-    sideEffects: null,
+    idempotency: "none: each upload stores another document under a new random name (invoice-<time>-<16 hex characters>), stamped with the business and written with its clean scan verdict in one transaction (saveScannedUploadedFile)",
+    sideEffects:
+      "the document is scanned before anything is stored (getMalwareScanner; owner decision 2026-09-29: ClamAV): a blocked one is 400 'This file was blocked because it may be harmful.' with a security log line (INVOICE_DOCUMENT_BLOCKED_BY_SCAN: the business, the scanner and the signature's name, never the bytes); no scanner configured, one that cannot be reached, or an answer that is no verdict is 503 'Document scanning is temporarily unavailable. Please try again.'; nothing is stored in either case. The type and size refusals come first, so nothing is scanned that would be refused anyway",
     successDto: "{ documentUrl: an opaque reference the invoice create checks against the business, documentName: the file's own name }",
     errorDisclosure: ["fixed"],
     findings: ["The upload is read into memory up to 20 MB per request (invoiceDocUpload), by any login of the business."],

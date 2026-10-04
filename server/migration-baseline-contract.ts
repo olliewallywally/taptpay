@@ -191,6 +191,10 @@ export const BASELINE_EFFECT_REQUIREMENTS: readonly Requirement[] = [
   r("0031_auth_sessions.sql", "constraint", "auth_sessions", "auth_sessions_user_id_fkey"),
   r("0031_auth_sessions.sql", "index", "auth_sessions", "auth_sessions_user_id_idx"),
   r("0031_auth_sessions.sql", "index", "auth_sessions", "auth_sessions_absolute_expires_at_idx"),
+  r("0032_uploaded_file_scans.sql", "table", "uploaded_file_scans"),
+  r("0032_uploaded_file_scans.sql", "constraint", "uploaded_file_scans", "uploaded_file_scans_verdict_chk"),
+  r("0032_uploaded_file_scans.sql", "constraint", "uploaded_file_scans", "uploaded_file_scans_signature_chk"),
+  r("0032_uploaded_file_scans.sql", "constraint", "uploaded_file_scans", "uploaded_file_scans_file_id_fkey"),
 ];
 
 export const FIND_MISSING_BASELINE_EFFECTS_SQL = `

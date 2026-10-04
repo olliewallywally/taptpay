@@ -43,6 +43,7 @@ import { sendPushToMerchant } from "./push";
 import { isPushServiceEndpoint } from "./push-endpoint";
 import { resendInvoiceEmailForMerchant } from "./property-cron";
 import { INVOICE_DOCUMENT_FOLDER, isInvoiceDocumentName, isPublicUploadFolder, parseInvoiceDocumentRef } from "./upload-policy";
+import { getMalwareScanner, ScannerUnavailableError, type ScanResult } from "./malware-scanner";
 import { INVOICE_DOCUMENT_EXTENSIONS } from "./invoice-document-security";
 import { resendTradeInvoice, resendTradeInvoiceForMerchant, sendTradePaymentInvoice, sendTradePaymentInvoiceForMerchant, sendTradeQuoteForMerchant } from "./trades-delivery";
 import { QUOTE_ACCEPTANCE_UNAVAILABLE, tellBusinessQuoteAcceptanceBlocked } from "./quote-acceptance-notice";
@@ -416,7 +417,8 @@ async function requireOwnedInvoiceDocument(
 ): Promise<boolean> {
   if (!documentUrl) return true;
   const ref = parseInvoiceDocumentRef(documentUrl);
-  if (ref && (await storage.uploadedFileOwnedByMerchant(ref.relPath, merchantId))) return true;
+  // And scanned clean (R1-T7 S6a): a document with no clean scan on record cannot be attached.
+  if (ref && (await storage.cleanUploadedFileOwnedByMerchant(ref.relPath, merchantId))) return true;
   res.status(400).json({ message: "Invalid document attachment" });
   return false;
 }
@@ -7037,7 +7039,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     const ref = parseInvoiceDocumentRef(invoice.documentUrl);
     if (!ref) return false;
     try {
-      return await storage.uploadedFileOwnedByMerchant(ref.relPath, invoice.merchantId);
+      return await storage.cleanUploadedFileOwnedByMerchant(ref.relPath, invoice.merchantId);
     } catch (err) {
       console.error("[CHECKOUT_DOCUMENT_CHECK]", err);
       return false;
@@ -7350,11 +7352,28 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       const ext = INVOICE_DOCUMENT_EXTENSIONS[req.file.mimetype];
       if (!ext) return res.status(400).json({ message: "Unsupported document type" });
+      // R1-T7 S6a (owner decision 2026-09-29): scanned before anything is stored. No scanner, a
+      // scanner that cannot be reached, or an answer that is no verdict refuses the upload; so does
+      // a document the scanner blocks. Nothing is kept in either case.
+      let scan: ScanResult;
+      try {
+        const scanner = getMalwareScanner();
+        if (!scanner) throw new ScannerUnavailableError("not configured");
+        scan = await scanner.scan(req.file.buffer);
+        if (scan?.verdict !== "clean" && scan?.verdict !== "infected") throw new ScannerUnavailableError("an answer that is not a verdict");
+      } catch (error) {
+        console.error("[INVOICE_DOC_SCAN_UNAVAILABLE]", error instanceof ScannerUnavailableError ? error.message : "scanner fault");
+        return res.status(503).json({ message: "Document scanning is temporarily unavailable. Please try again.", code: "DOCUMENT_SCAN_UNAVAILABLE" });
+      }
+      if (scan.verdict !== "clean") {
+        logSecurityEvent("INVOICE_DOCUMENT_BLOCKED_BY_SCAN", { merchantId: req.user.merchantId, scanner: scan.scanner, signature: scan.signature });
+        return res.status(400).json({ message: "This file was blocked because it may be harmful.", code: "DOCUMENT_BLOCKED" });
+      }
       const filename = `invoice-${Date.now()}-${crypto.randomBytes(8).toString('hex')}${ext}`;
-      // Stamped with the uploader's merchant (gap 13). The returned `documentUrl`
-      // is an opaque reference the create routes validate against that owner —
-      // it is no longer a fetchable public URL (see GET /uploads/:folder/:name).
-      await saveUploadedFile(`${INVOICE_DOCUMENT_FOLDER}/${filename}`, req.file.mimetype, req.file.buffer, req.user.merchantId);
+      // Stamped with the uploader's merchant (gap 13) and stored with its clean verdict. The
+      // returned `documentUrl` is an opaque reference the create routes validate against that
+      // owner — it is no longer a fetchable public URL (see GET /uploads/:folder/:name).
+      await storage.saveScannedUploadedFile(`${INVOICE_DOCUMENT_FOLDER}/${filename}`, req.file.mimetype, req.file.buffer, req.user.merchantId, { scanner: scan.scanner });
       const documentUrl = `/uploads/${INVOICE_DOCUMENT_FOLDER}/${filename}`;
       res.json({ documentUrl, documentName: req.file.originalname });
     } catch (err) {
@@ -7386,9 +7405,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const { name } = req.params;
       if (!isInvoiceDocumentName(name)) return res.status(404).json({ message: "Document not found" });
       const relPath = `${INVOICE_DOCUMENT_FOLDER}/${name}`;
+      // Only with a clean scan on record (R1-T7 S6a), for the business and the admin alike.
       const file = isAdmin
-        ? await storage.getUploadedFile(relPath)
-        : await storage.getUploadedFileForMerchant(relPath, merchantId as number);
+        ? await storage.getCleanUploadedFile(relPath)
+        : await storage.getCleanUploadedFileForMerchant(relPath, merchantId as number);
       if (!file) return res.status(404).json({ message: "Document not found" });
       if (isAdmin) {
         try {
@@ -7598,7 +7618,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (invoice.status === "voided") return res.status(410).json({ message: "This payment link has been voided" });
       if (invoice.status === "paid" || invoice.status === "paid_external") return res.status(404).json({ message: "Document not found" });
       const ref = parseInvoiceDocumentRef(invoice.documentUrl);
-      const file = ref ? await storage.getUploadedFileForMerchant(ref.relPath, invoice.merchantId) : undefined;
+      const file = ref ? await storage.getCleanUploadedFileForMerchant(ref.relPath, invoice.merchantId) : undefined;
       if (!file) return res.status(404).json({ message: "Document not found" });
       return sendPrivateDocument(res, file);
     } catch (err) { console.error("[CHECKOUT_DOCUMENT]", err); res.status(500).json({ message: "Failed to load document" }); }

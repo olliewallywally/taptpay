@@ -137,6 +137,11 @@ export interface AppConfig {
     messagingServiceSid?: string;
   }>;
   readonly whatsapp: Readonly<{ apiUrl?: string; apiKey?: string; instance: string }>;
+  /**
+   * R1-T7 S6a: what scans an uploaded invoice document before it is stored. ClamAV with no host
+   * is no scanner, and then no document can be called clean (server/malware-scanner.ts).
+   */
+  readonly uploads: Readonly<{ scanner: "clamav" | "simulation"; clamavHost?: string; clamavPort: number }>;
   readonly wallets: Readonly<{
     googlePayEnvironment: "TEST" | "PRODUCTION";
     applePayMerchantId: string;
@@ -497,6 +502,20 @@ export function loadConfig(env: EnvironmentSource): Readonly<AppConfig> {
     throw new ConfigValidationError("TWILIO_ACCOUNT_SID + TWILIO_AUTH_TOKEN + sender", "sms", "must be configured together");
   }
 
+  // R1-T7 S6a (owner decision 2026-09-29). The stand-in calls nearly everything clean, so, like
+  // the simulated email provider, it can never run where real documents are.
+  const uploadScanner = nonempty(env, "UPLOAD_SCANNER") ?? "clamav";
+  if (uploadScanner !== "clamav" && uploadScanner !== "simulation") {
+    throw new ConfigValidationError("UPLOAD_SCANNER", "uploads");
+  }
+  if (uploadScanner === "simulation" && (appEnv === "staging" || appEnv === "production")) {
+    throw new ConfigValidationError("UPLOAD_SCANNER", "uploads", "cannot simulate in staging or production");
+  }
+  const clamavPortRaw = nonempty(env, "CLAMAV_PORT") ?? "3310";
+  if (!/^\d+$/.test(clamavPortRaw) || Number(clamavPortRaw) < 1 || Number(clamavPortRaw) > 65535) {
+    throw new ConfigValidationError("CLAMAV_PORT", "uploads");
+  }
+
   const whatsappApiUrl = nonempty(env, "EVOLUTION_API_URL");
   const whatsappApiKey = nonempty(env, "EVOLUTION_API_KEY");
   requireCompleteGroup("whatsapp", [
@@ -587,6 +606,11 @@ export function loadConfig(env: EnvironmentSource): Readonly<AppConfig> {
       apiUrl: whatsappApiUrl,
       apiKey: whatsappApiKey,
       instance: nonempty(env, "EVOLUTION_INSTANCE") ?? "default",
+    },
+    uploads: {
+      scanner: uploadScanner,
+      clamavHost: nonempty(env, "CLAMAV_HOST"),
+      clamavPort: Number(clamavPortRaw),
     },
     wallets: {
       googlePayEnvironment: nonempty(env, "GOOGLE_PAY_ENV") === "PRODUCTION" ? "PRODUCTION" : "TEST",

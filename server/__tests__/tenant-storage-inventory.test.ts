@@ -336,7 +336,7 @@ const REVIEWED_UNSCOPED: Record<string, Record<string, string>> = {
     settleAuthThrottle: "the same counter, given back when the email could not be sent",
   },
   "GET /api/invoice-documents/:name": {
-    getUploadedFile: "validated platform-admin branch only; a business's login reads through getUploadedFileForMerchant",
+    getCleanUploadedFile: "validated platform-admin branch only, and only a document scanned clean; a business's login reads through getCleanUploadedFileForMerchant",
     recordInvoiceDocumentAdminRead: "validated platform-admin branch only: the audit line of that read",
   },
 };
@@ -361,5 +361,27 @@ test("every signed-in business route names its business to storage, or is a revi
     const review = ROUTE_REVIEW[key];
     const served = review.branches.some((branch) => branch.principal === principal || (principal === "platform-admin" && (branch as any).platformAdmin));
     expect([key, principal, served]).toEqual([key, principal, true]);
+  }
+});
+
+test("a document is read and attached only through the clean readers; the unscanned reader serves logos alone", () => {
+  const contract = storageContract();
+  // The readers that asked for no scan are retired (R1-T7 S6a).
+  for (const name of ["getUploadedFileForMerchant", "uploadedFileOwnedByMerchant"]) {
+    expect([name, contract.find(method => method.name === name)]).toEqual([name, undefined]);
+  }
+  for (const name of ["getCleanUploadedFileForMerchant", "cleanUploadedFileOwnedByMerchant"]) {
+    expect([name, contract.find(method => method.name === name)?.requiredTenant]).toEqual([name, true]);
+  }
+  const facts = currentRouteFacts();
+  const callers = (name: string) => [...facts].filter(([, fact]) => fact.storageMethods.includes(name)).map(([key]) => key).sort();
+  expect(callers("getUploadedFile")).toEqual(["GET /uploads/:folder/:name"]);
+  expect(callers("saveUploadedFile")).toEqual(["POST /api/merchants/:id/logo"]);
+  expect(callers("saveScannedUploadedFile")).toEqual(["POST /api/property/invoices/document"]);
+  expect(callers("getCleanUploadedFile")).toEqual(["GET /api/invoice-documents/:name"]);
+  expect(callers("getCleanUploadedFileForMerchant")).toEqual(["GET /api/checkout/document/:token", "GET /api/invoice-documents/:name"]);
+  // Every create that can attach a document asks the clean check before it writes.
+  for (const key of ["POST /api/property/invoices", "POST /api/trades/quotes", "POST /api/trades/invoices"]) {
+    expect([key, facts.get(key)?.storageMethods.includes("cleanUploadedFileOwnedByMerchant")]).toEqual([key, true]);
   }
 });

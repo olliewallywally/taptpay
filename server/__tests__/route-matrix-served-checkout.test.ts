@@ -125,7 +125,7 @@ const RECIPES: Record<string, OwnServedRecipe> = {
     fakeRecords(ctx);
     // Named as the upload route names an invoice document (upload-policy.ts).
     const name = `invoice-${Date.now()}-${crypto.randomBytes(8).toString("hex")}.pdf`;
-    await storage.saveUploadedFile(`invoices/${name}`, "application/pdf", PDF, ctx.merchantId);
+    await storage.saveScannedUploadedFile(`invoices/${name}`, "application/pdf", PDF, ctx.merchantId, { scanner: "simulation" });
     Object.assign(rent(), { documentUrl: `/uploads/invoices/${name}`, documentName: "bill.pdf" });
     return {
       req: { ...get(`/api/checkout/document/${rent().token}`), binary: true }, status: 200,

@@ -1542,6 +1542,22 @@ export const uploadedFiles = pgTable("uploaded_files", {
 
 export type UploadedFile = typeof uploadedFiles.$inferSelect;
 
+// R1-T7 S6a (0032; owner decision 2026-09-29): a document is kept from every reader until a scan
+// says it is clean. One row per scanned file, written with the file; a file with no row has no
+// verdict, and no document reader finds it. Logos are not scanned and are not read through this.
+export const uploadedFileScans = pgTable("uploaded_file_scans", {
+  fileId: integer("file_id").primaryKey().references(() => uploadedFiles.id, { onDelete: "cascade" }),
+  verdict: text("verdict").notNull(), // clean | infected
+  signature: text("signature"), // the scanner's name for what it found; null when clean
+  scanner: text("scanner").notNull(),
+  scannedAt: timestamp("scanned_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  verdictCheck: check("uploaded_file_scans_verdict_chk", sql`${t.verdict} in ('clean', 'infected')`),
+  signatureCheck: check("uploaded_file_scans_signature_chk", sql`(${t.verdict} = 'infected') = (${t.signature} is not null)`),
+}));
+
+export type UploadedFileScan = typeof uploadedFileScans.$inferSelect;
+
 // Gap 13: an admin download is served only after this durable append succeeds.
 // No merchant FK: retaining an audit record must not depend on account lifetime.
 export const invoiceDocumentAccessAudit = pgTable("invoice_document_access_audit", {

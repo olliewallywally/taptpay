@@ -108,7 +108,7 @@ describe("gap 13 — GET /api/checkout/resolve/:token hands the page a token-sco
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
     const name = newDocName();
-    await storage.saveUploadedFile(`invoices/${name}`, "application/pdf", PDF_BYTES, owner.merchantId);
+    await storage.saveScannedUploadedFile(`invoices/${name}`, "application/pdf", PDF_BYTES, owner.merchantId, { scanner: "simulation" });
     const token = newToken();
     stubTokenLookups({
       property: propertyInvoice(owner.merchantId, token, {
@@ -130,7 +130,7 @@ describe("gap 13 — GET /api/checkout/resolve/:token hands the page a token-sco
     const owner = await createOwnerPrincipal();
     const other = await createOwnerPrincipal();
     const name = newDocName();
-    await storage.saveUploadedFile(`invoices/${name}`, "application/pdf", PDF_BYTES, other.merchantId);
+    await storage.saveScannedUploadedFile(`invoices/${name}`, "application/pdf", PDF_BYTES, other.merchantId, { scanner: "simulation" });
     const token = newToken();
     stubTokenLookups({
       property: propertyInvoice(owner.merchantId, token, {
@@ -170,12 +170,12 @@ describe("gap 13 — GET /api/checkout/resolve/:token hands the page a token-sco
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
     const name = newDocName();
-    await storage.saveUploadedFile(`invoices/${name}`, "application/pdf", PDF_BYTES, owner.merchantId);
+    await storage.saveScannedUploadedFile(`invoices/${name}`, "application/pdf", PDF_BYTES, owner.merchantId, { scanner: "simulation" });
     const token = newToken();
     stubTokenLookups({
       property: propertyInvoice(owner.merchantId, token, { documentUrl: `/uploads/invoices/${name}`, documentName: "bill.pdf" }),
     });
-    jest.spyOn(storage, "uploadedFileOwnedByMerchant").mockRejectedValue(new Error("column merchant_id does not exist"));
+    jest.spyOn(storage, "cleanUploadedFileOwnedByMerchant").mockRejectedValue(new Error("column merchant_id does not exist"));
     jest.spyOn(console, "error").mockImplementation(() => undefined);
 
     const res = await request(app).get(`/api/checkout/resolve/${token}`);
@@ -205,7 +205,7 @@ describe("gap 13 — GET /api/checkout/document/:token", () => {
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
     const name = newDocName();
-    await storage.saveUploadedFile(`invoices/${name}`, "application/pdf", PDF_BYTES, owner.merchantId);
+    await storage.saveScannedUploadedFile(`invoices/${name}`, "application/pdf", PDF_BYTES, owner.merchantId, { scanner: "simulation" });
     const token = newToken();
     stubTokenLookups({
       property: propertyInvoice(owner.merchantId, token, { documentUrl: `/uploads/invoices/${name}`, documentName: "bill.pdf" }),
@@ -224,7 +224,7 @@ describe("gap 13 — GET /api/checkout/document/:token", () => {
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
     const name = newDocName();
-    await storage.saveUploadedFile(`invoices/${name}`, "application/pdf", PDF_BYTES, owner.merchantId);
+    await storage.saveScannedUploadedFile(`invoices/${name}`, "application/pdf", PDF_BYTES, owner.merchantId, { scanner: "simulation" });
     const token = newToken();
     stubTokenLookups({
       trades: tradesInvoice(owner.merchantId, token, { documentUrl: `/uploads/invoices/${name}`, documentName: "quote.pdf" }),
@@ -249,7 +249,7 @@ describe("gap 13 — GET /api/checkout/document/:token", () => {
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
     const name = newDocName();
-    await storage.saveUploadedFile(`invoices/${name}`, "application/pdf", PDF_BYTES, owner.merchantId);
+    await storage.saveScannedUploadedFile(`invoices/${name}`, "application/pdf", PDF_BYTES, owner.merchantId, { scanner: "simulation" });
     const token = newToken();
     stubTokenLookups({
       property: propertyInvoice(owner.merchantId, token, { status: "voided", documentUrl: `/uploads/invoices/${name}` }),
@@ -264,7 +264,7 @@ describe("gap 13 — GET /api/checkout/document/:token", () => {
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
     const name = newDocName();
-    await storage.saveUploadedFile(`invoices/${name}`, "application/pdf", PDF_BYTES, owner.merchantId);
+    await storage.saveScannedUploadedFile(`invoices/${name}`, "application/pdf", PDF_BYTES, owner.merchantId, { scanner: "simulation" });
     const token = newToken();
     stubTokenLookups({
       property: propertyInvoice(owner.merchantId, token, { status, documentUrl: `/uploads/invoices/${name}` }),
@@ -291,7 +291,7 @@ describe("gap 13 — GET /api/checkout/document/:token", () => {
     const owner = await createOwnerPrincipal();
     const other = await createOwnerPrincipal();
     const name = newDocName();
-    await storage.saveUploadedFile(`invoices/${name}`, "application/pdf", PDF_BYTES, other.merchantId);
+    await storage.saveScannedUploadedFile(`invoices/${name}`, "application/pdf", PDF_BYTES, other.merchantId, { scanner: "simulation" });
     const token = newToken();
     stubTokenLookups({
       property: propertyInvoice(owner.merchantId, token, { documentUrl: `/uploads/invoices/${name}`, documentName: "bill.pdf" }),
@@ -321,7 +321,7 @@ describe("gap 13 — GET /api/checkout/document/:token", () => {
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
     const name = newDocName();
-    await storage.saveUploadedFile(`invoices/${name}`, "application/pdf", PDF_BYTES, owner.merchantId);
+    await storage.saveScannedUploadedFile(`invoices/${name}`, "application/pdf", PDF_BYTES, owner.merchantId, { scanner: "simulation" });
     const token = newToken();
     stubTokenLookups({
       property: propertyInvoice(owner.merchantId, token, { documentUrl: `/uploads/invoices/${name}`, documentName: "bill.pdf" }),
