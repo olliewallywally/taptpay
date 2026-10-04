@@ -1,3 +1,5 @@
+import { createPrivateKey } from "node:crypto";
+
 export type EnvironmentValidationMode = "audit" | "enforce";
 export type AppEnvironment = "development" | "test" | "staging" | "production";
 export type DatabaseTarget = "local" | "ci" | "staging" | "production";
@@ -107,6 +109,12 @@ export interface AppConfig {
     passwordHash?: string;
   }>;
   readonly oauth: Readonly<{ googleClientId?: string; googleClientSecret?: string }>;
+  /**
+   * R1-T5: Sign in with Apple (server/apple-sign-in.ts). The Services ID is the app's name to
+   * Apple; the team id, key id and private key sign the short-lived secret Apple asks for.
+   * All four or none.
+   */
+  readonly apple: Readonly<{ servicesId?: string; teamId?: string; keyId?: string; privateKey?: string }>;
   readonly analytics: Readonly<{ propertyId?: string; serviceAccount?: string }>;
   readonly push: Readonly<{
     vapidPublicKey?: string;
@@ -212,6 +220,16 @@ function validateOrigin(key: string, value: string | undefined): string | undefi
     throw new ConfigValidationError(key, "origin");
   }
   return value;
+}
+
+/** Whether the text is an EC P-256 private key, the kind Apple issues. Says nothing about why not. */
+function isP256PrivateKey(pem: string): boolean {
+  try {
+    const key = createPrivateKey(pem);
+    return key.asymmetricKeyType === "ec" && key.asymmetricKeyDetails?.namedCurve === "prime256v1";
+  } catch {
+    return false;
+  }
 }
 
 function requireCompleteGroup(
@@ -432,6 +450,26 @@ export function loadConfig(env: EnvironmentSource): Readonly<AppConfig> {
     throw new ConfigValidationError("PUBLIC_ORIGIN", "google-oauth");
   }
 
+  // R1-T5 (owner decision 2026-09-29): all four, or Sign in with Apple is not configured.
+  const appleServicesId = nonempty(env, "APPLE_SERVICES_ID");
+  const appleTeamId = nonempty(env, "APPLE_TEAM_ID");
+  const appleKeyId = nonempty(env, "APPLE_KEY_ID");
+  // A key pasted into one line carries its line breaks as the two characters "\n".
+  const applePrivateKey = nonempty(env, "APPLE_PRIVATE_KEY")?.replace(/\\n/g, "\n");
+  requireCompleteGroup("apple-sign-in", [
+    ["APPLE_SERVICES_ID", appleServicesId],
+    ["APPLE_TEAM_ID", appleTeamId],
+    ["APPLE_KEY_ID", appleKeyId],
+    ["APPLE_PRIVATE_KEY", applePrivateKey],
+  ]);
+  if (applePrivateKey && !isP256PrivateKey(applePrivateKey)) {
+    throw new ConfigValidationError("APPLE_PRIVATE_KEY", "apple-sign-in", "must be the EC P-256 private key Apple issued");
+  }
+  // Apple is given one exact redirect address, so the public origin must be known.
+  if (appleServicesId && !publicOrigin && appEnv !== "test") {
+    throw new ConfigValidationError("PUBLIC_ORIGIN", "apple-sign-in");
+  }
+
   const analyticsPropertyId = nonempty(env, "GOOGLE_ANALYTICS_PROPERTY_ID");
   const analyticsServiceAccount = nonempty(env, "GOOGLE_ANALYTICS_SERVICE_ACCOUNT");
   requireCompleteGroup("analytics", [
@@ -573,6 +611,7 @@ export function loadConfig(env: EnvironmentSource): Readonly<AppConfig> {
       passwordHash: nonempty(env, "ADMIN_PASSWORD_HASH"),
     },
     oauth: { googleClientId, googleClientSecret },
+    apple: { servicesId: appleServicesId, teamId: appleTeamId, keyId: appleKeyId, privateKey: applePrivateKey },
     analytics: { propertyId: analyticsPropertyId, serviceAccount: analyticsServiceAccount },
     push: {
       vapidPublicKey,
