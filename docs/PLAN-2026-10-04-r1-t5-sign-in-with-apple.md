@@ -293,3 +293,33 @@ database implementation and can take the identity insert inside it without chang
 what Google's path does. What must not move: Google's three routes, byte for byte;
 the login page's handling of `?error=`; every existing cross-site refusal.
 **Approve the same T5b scope.**
+
+## T5b completion
+
+Code `0a12124a`. 43 of 43 red on `71b4fe18`; then 43 pass (HTTP 29, not configured 3,
+non-https origin 2, storage 9); route suites 25 / 1,709 with the three routes
+registered and served; affected 73 suites / 2,603; actual PostgreSQL 10 of 10 with
+migration 0033 through the runner, and the convergence rehearsal (35 applied) with a
+new recorded fingerprint; 44 of 44 planted defects caught after one weak test was
+tightened; full server 175 suites / 4,307 tests on the commit.
+[Evidence](evidence/remediation-v2-2/r1/R1-T5b-apple-identities-and-sign-in-2026-10-04.md).
+
+## T5c starting facts (read, not yet changed)
+
+- Settings has no connected-accounts row of any kind today (nothing for Google
+  either), so the screen for "connect Apple" is new and is T5d's; T5c is the server.
+- Apple's callback is a cross-site post, so the session cookie is not on it. The link
+  intent has to ride in the starting cookie under the server's signature: the login
+  and the session that started it. The callback must check that session is still
+  live before it links anything.
+- Start the link by a signed-in POST with the page's CSRF token (which answers with
+  Apple's address for the page to go to), not by a plain GET.
+- The plan says "from an already authenticated owner session". Default: the account
+  owner only, connecting an identity to the owner's own login.
+- Outcomes to settle in the preflight: an unknown or pending identity is linked; one
+  already this login's is a no-op; one linked to another login is refused; a login
+  that already has a different Apple identity is refused (one per login, by the
+  table). A pending identity's stored email is not what authorizes the link: the
+  signed-in session is.
+- Storage needs one contract that links under the identity's row lock, and a read of
+  "does this login have an Apple identity" for the Settings row.
