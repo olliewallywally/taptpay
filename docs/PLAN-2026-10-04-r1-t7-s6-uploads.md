@@ -262,3 +262,15 @@ Recurring invoices carry no document. The scheduler runs one pass at a time behi
 its own in-process guard, but two instances can run at once, so both passes must be
 safe run twice: the verdict insert takes no second row for a file, and a second
 deletion finds nothing left. **Approve the same S6b scope.**
+
+## S6b completion
+
+Code `382de840`. On `910c89b1` the 20 storage tests failed, the passes suite could
+not load and the pin failed; then storage 20, passes and scheduler 18; affected 102
+suites / 3,115 tests; actual PostgreSQL 13 of 13; 47 of 47 planted defects caught on
+the final code; full server 170 suites / 4,210 tests on the commit.
+[Evidence](evidence/remediation-v2-2/r1/R1-T7-S6b-upload-passes-2026-10-04.md).
+One rule was widened before commit: because a deletion cannot be undone, a document
+counts as named by an invoice if its path appears anywhere in the stored address.
+With this, S6's engineering scope and R1-T7's (S0–S6) are implemented; independent
+review is owed. The immediate handoff is `docs/HANDOFF-2026-10-04-r1-t7-s6.md`.

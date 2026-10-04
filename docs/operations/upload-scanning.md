@@ -34,7 +34,23 @@ A document with no clean verdict on record is treated as not there: its business
 the person paying the invoice and the platform admin all get "not found", the payment
 page shows no document link, and it cannot be attached to an invoice or quote. That
 includes every document uploaded before scanning existed, until the scheduled pass
-(R1-T7 S6b) has scanned it.
+below has scanned it.
+
+## Documents from before scanning, and old unused uploads
+
+Two things happen at the end of every scheduler run (`POST /api/internal/cron`), and
+its reply reports them as `uploadScans` and `uploadRetention`:
+
+- **Earlier documents get their verdict.** Up to five documents that have no scan on
+  record are scanned per run. Clean ones become readable again. One the scanner
+  blocks stays "not found" for everyone; its bytes are kept, unreadable, and a log
+  line `INVOICE_DOCUMENT_BLOCKED_BY_SCAN` (with `pass: "earlier-documents"`) names
+  the business and what was found. If the scanner is not reachable the pass stops and
+  changes nothing (`scannerAvailable: false`, or `noVerdict: 1`).
+- **Uploads no invoice uses are deleted after 12 months.** Only documents that no
+  property invoice, trades quote or trades invoice names, uploaded more than 12
+  calendar months ago. Never a logo, never an attached document. At most 50 per run;
+  a log line `UNATTACHED_UPLOADS_DELETED` gives the count. Deletion is permanent.
 
 ## The stand-in, for development and tests only
 
