@@ -248,3 +248,14 @@ payload (first name, last name, address); the push stops answer 403 with their t
 messages when the device is not the business's, and 200 `{ success: true }`; the
 print request answers 404 "Payment board not found" for a foreign, missing or removed
 board. **Approve the same S5b scope.**
+
+## S5b completion
+
+Code `587842cb`. Red 46 of 52 and three pins on `c294f007`; 52 pass; affected 87
+suites / 2,874 tests; actual PostgreSQL 14 of 14, and the five earlier verifiers it
+touches rerun; 36 of 36 planted defects caught; full server 165 suites / 4,107 tests
+on the commit.
+[Evidence](evidence/remediation-v2-2/r1/R1-T7-S5b-stragglers-2026-10-04.md).
+The S5 starting query now lists 9 registrations, each a reviewed exception held by a
+test. S5's engineering scope is implemented; S6's starting facts are in
+`docs/HANDOFF-2026-10-04-r1-t7-s5.md`.

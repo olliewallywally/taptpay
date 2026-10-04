@@ -1,5 +1,32 @@
 # Full integration continuation audit — 2026-09-07
 
+Latest continuation **2026-10-04 — S5b the stragglers code-complete `587842cb`; S5
+engineering scope (a, b) implemented**, local, awaiting independent review.
+[Evidence](r1/R1-T7-S5b-stragglers-2026-10-04.md),
+[immediate handoff](../../HANDOFF-2026-10-04-r1-t7-s5.md).
+
+- Stock create takes its business as its own argument (the global create retired);
+  the team resend and remove read the login through the business; a property
+  tenant's create, archive and restore commit their history line in the write's
+  transaction; the two push stops name the business, the address and the active
+  state in one statement; the print request reads its board through the business.
+- Two real defects closed: a failed history insert left a tenant made, archived or
+  restored with no history (a retried create made a second tenant); a device
+  re-registered to another business between the stop's read and write was stopped
+  for that business. A database fault while stopping a device is now 500, not 403.
+- The S5 starting query: **41 → 9**, each of the 9 a reviewed exception held by a
+  test with its reason (account scope, per-login push, validated admin, public board
+  branch, the print limit's counter).
+- Red **46 of 52** and three pins on `c294f007`; affected **87 suites / 2,874
+  pass**; fresh actual PostgreSQL **14 pass**, five earlier verifiers rerun; **36 of
+  36** planted mutations caught; **full server 165 suites / 4,107 pass** on
+  `587842cb`. Typecheck/build/whitespace and **187 routes / 0 gaps; 255 contracts**.
+- No app DB/provider, live migration, client/schema change, push or deploy.
+
+**Active next:** S6 the private upload lifecycle (starting facts and the one thing
+the owner should know before it ships are in the handoff); then Apple and R1-T10.
+Independent/external gates remain below.
+
 Latest continuation **2026-10-04 — S5a the business's own settings row code-complete
 `c294f007`**, local, awaiting independent review.
 [Evidence](r1/R1-T7-S5a-merchant-settings-2026-10-04.md),
