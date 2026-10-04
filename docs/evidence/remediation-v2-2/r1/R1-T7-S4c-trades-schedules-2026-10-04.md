@@ -58,10 +58,9 @@ Verification:
 - Typecheck, production build and unstaged/staged whitespace pass. Inventories:
   **187 registrations / 0 unclassified / 0 gaps; 252 storage contracts** (244
   declared, 8 inherited).
-- **Full server:** started on `df54069e` with a clean tree, but this session reached its usage limit
-  before the result could be read. **Not claimed.** Its log is
-  `.local/claude-scratch/session-2026-10-03/full-server-s4c.log` (last line `server exit <code>`);
-  read it, or rerun `npm run test:server`, before relying on this batch.
+- **Full server: 161 suites / 3,988 tests pass**, exit 0, 695.606 seconds, run on
+  `df54069e`. Only documentation was committed during the run (`19eb6cd7`); no source
+  or generated inventory changed. No new client or browser run is claimed.
 
 Phase handoff record:
 

@@ -33,9 +33,8 @@ Each batch: tests red first on the committed base; focused and affected suites; 
 new empty disposable PostgreSQL through the existing migration runner; a mutation
 check on a scratch copy; regenerated route and storage inventories; typecheck and
 build; a full server run on the code commit (S4a 3,795; S4b1 3,847; S4b2 3,942 tests,
-all passing). **S4c's full server run was started on `df54069e` but not read: the session
-hit its usage limit. Read `.local/claude-scratch/session-2026-10-03/full-server-s4c.log`
-or rerun it first.** Counts are in each evidence file.
+all passing). S4c's, read after its documentation commit, also passed: 3,988 tests on `df54069e`.
+Counts are in each evidence file.
 No application database, provider, live migration, client UI, flag, push or deploy.
 Independent review of S4 (and of S1–S3) remains owed.
 

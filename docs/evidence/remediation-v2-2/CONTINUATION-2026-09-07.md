@@ -11,11 +11,11 @@ independent review. [Evidence](r1/R1-T7-S4c-trades-schedules-2026-10-04.md),
 - Red **43 of 43** on `22628b95`; affected **36 suites / 1,833 pass**; fresh actual
   PostgreSQL **21 pass**; **26 of 26** planted mutations caught after one survivor was
   fixed by a new test. Typecheck/build and **187 routes / 0 gaps; 252 contracts** pass.
-- **Full server on `df54069e` started but NOT read (usage limit): not claimed.** Read
-  `.local/claude-scratch/session-2026-10-03/full-server-s4c.log` or rerun first.
+- **Full server on `df54069e`: 161 suites / 3,988 pass** (read after the documentation
+  commit `19eb6cd7`, which changed no source).
 - No app DB/provider, live migration, client/schema change, push or deploy.
 
-**Active next:** confirm the S4c full server run; then S5 (starting facts in the
+**Active next:** S5 (starting facts in the
 handoff), S6, Apple and R1-T10. Independent/external gates remain below.
 
 Latest continuation **2026-10-04 — S4b2 trades quote, invoice and balance creation and
