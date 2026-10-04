@@ -394,3 +394,14 @@ test("the upload lifecycle's storage is the scheduler's alone: no route lists, r
     expect([name, [...facts].filter(([, fact]) => fact.storageMethods.includes(name)).map(([key]) => key)]).toEqual([name, []]);
   }
 });
+
+test("Apple identities are read and written by Apple's callback alone", () => {
+  // Account-entry scope (R1-T5b): no business's route, and no other sign-in route, touches an identity.
+  const facts = currentRouteFacts();
+  const callers = (name: string) => [...facts].filter(([, fact]) => fact.storageMethods.includes(name)).map(([key]) => key).sort();
+  for (const name of ["getAppleIdentity", "recordPendingAppleIdentity", "createMerchantWithAppleIdentity"]) {
+    expect([name, callers(name)]).toEqual([name, ["POST /api/auth/apple/callback"]]);
+  }
+  // The handoff code is redeemed by the two session routes and no one else.
+  expect(callers("consumeAuthHandoffCode")).toEqual(["POST /api/auth/apple/session", "POST /api/auth/google/session"]);
+});

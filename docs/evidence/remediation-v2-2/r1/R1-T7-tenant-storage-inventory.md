@@ -1,10 +1,10 @@
 # R1-T7 tenant/storage execution inventory
 
-Generated from working-tree sources on base `910c89b1f2b6b2a0f163b12ccca8048fa62b6ea7`; the phase evidence names the final commit.
+Generated from working-tree sources on base `71b4fe18079e1eb81abf39c5322f3fa3b49bbfaf`; the phase evidence names the final commit.
 
-Registrations: **187**; registrations with session/admin authentication: **119**;
+Registrations: **190**; registrations with session/admin authentication: **119**;
 registrations calling checkMerchantOwnership: **25**.
-IStorage: **252** declared methods;
+IStorage: **255** declared methods;
 PaymentAttemptRepository: **8** inherited methods.
 
 Classifications come from the reviewed per-route branches, including mixed public/signed-in routes.
@@ -45,6 +45,7 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | GET /api/admin/payment-method-breakdown | validated admin (platform-admin/any-merchant) | `getAllMerchants`, `getTransactionsByMerchant` |
 | GET /api/admin/request-origin | validated admin (platform-admin/none) | — |
 | GET /api/admin/revenue-over-time | validated admin (platform-admin/any-merchant) | `getAllMerchants`, `getTransactionsByMerchant` |
+| GET /api/auth/apple | public (public/none) | — |
 | GET /api/auth/google | public (public/none) | — |
 | GET /api/auth/google/callback | account entry/recovery (public/credentials) | `createAuthHandoffCode`, `createMerchantWithPassword`, `getMerchantByEmail`, `getUserByEmail`, `settleAuthThrottle`, `takeAuthThrottleSlot`, `updateMerchant` |
 | GET /api/auth/me | account (merchant/session) | `getMerchant`, `getOrCreateSubscription` |
@@ -119,6 +120,8 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | POST /api/admin/merchants/:id/set-active | validated admin (platform-admin/any-merchant) | `getMerchant`, `updateMerchantStatus` |
 | POST /api/admin/merchants/:id/verify | validated admin (platform-admin/any-merchant) | `getMerchant`, `updateMerchantStatus` |
 | POST /api/admin/resend-verification | validated admin (platform-admin/any-merchant) | `getMerchantByEmail` |
+| POST /api/auth/apple/callback | account entry/recovery (public/credentials) | `createAuthHandoffCode`, `createMerchantWithAppleIdentity`, `getAppleIdentity`, `getMerchantByEmail`, `getUserByEmail`, `recordPendingAppleIdentity`, `settleAuthThrottle`, `takeAuthThrottleSlot` |
+| POST /api/auth/apple/session | single-resource bearer (public-bearer/token) | `consumeAuthHandoffCode` |
 | POST /api/auth/confirm-email | single-resource bearer (public-bearer/token) | `confirmMerchantEmail`, `getMerchantByToken`, `settleAuthThrottle`, `takeAuthThrottleSlot` |
 | POST /api/auth/forgot-password | account entry/recovery (public/mailbox) | `takeAuthThrottleSlot` |
 | POST /api/auth/google/session | single-resource bearer (public-bearer/token) | `consumeAuthHandoffCode` |
@@ -220,6 +223,9 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | IStorage | createMerchant | no | `createMerchant(merchant: InsertMerchant): Promise<Merchant>` |
 | IStorage | createMerchantWithPassword | no | `createMerchantWithPassword(merchantData: any, passwordHash: string): Promise<Merchant>` |
 | IStorage | createMerchantWithSignup | no | `createMerchantWithSignup(data: MerchantSignupStorageInput): Promise<Merchant>` |
+| IStorage | getAppleIdentity | no | `getAppleIdentity(key: AppleIdentityKey): Promise<AppleIdentityRecord \| undefined>` |
+| IStorage | recordPendingAppleIdentity | no | `recordPendingAppleIdentity(key: AppleIdentityKey, first: { email?: string; isPrivateEmail: boolean }): Promise<AppleIdentityRecord>` |
+| IStorage | createMerchantWithAppleIdentity | no | `createMerchantWithAppleIdentity( merchantData: { name: string; businessName: string; email: string }, passwordHash: string, key: AppleIdentityKey, first: { isPrivateEmail: boolean }, ): Promise<{ merchant: Merchant; userId: number }>` |
 | IStorage | verifyMerchant | no | `verifyMerchant(token: string, passwordHash: string): Promise<Merchant \| undefined>` |
 | IStorage | confirmMerchantEmail | no | `confirmMerchantEmail(token: string, onboardingCompleted: boolean): Promise<Merchant \| undefined>` |
 | IStorage | updateMerchantStatus | no | `updateMerchantStatus(id: number, status: string): Promise<Merchant \| undefined>` |

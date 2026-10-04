@@ -13,7 +13,9 @@
  */
 import crypto from "node:crypto";
 import jwt from "jsonwebtoken";
-import type { AppConfig } from "./config";
+import type { CookieOptions } from "express";
+import { config, type AppConfig } from "./config";
+import { HANDOFF_CODE_TTL_MS, OAUTH_STATE_TTL_MS } from "./google-sign-in";
 
 export const APPLE_ISSUER = "https://appleid.apple.com";
 export const APPLE_KEYS_URL = "https://appleid.apple.com/auth/keys";
@@ -25,6 +27,8 @@ const CLIENT_SECRET_TTL_SECONDS = 300;
 const ISSUED_AT_SKEW_SECONDS = 60;
 /** An unknown key id may send us back to Apple for its keys at most this often. */
 const KEY_REFETCH_INTERVAL_MS = 60_000;
+
+export const APPLE_AUTHORIZE_URL = "https://appleid.apple.com/auth/authorize";
 
 /** The part of `fetch` this needs. */
 export type AppleTransport = (
@@ -220,4 +224,95 @@ export async function exchangeAppleCode(
   const idToken = (body as { id_token?: unknown } | undefined)?.id_token;
   if (typeof idToken !== "string" || !idToken) throw new AppleSignInError("bad-token", "Apple's answer carried no identity token");
   return idToken;
+}
+
+// ── R1-T5b: this browser's sign-in ──────────────────────────────────────────────────────────────
+
+const RANDOM_TOKEN = /^[A-Za-z0-9_-]{43}$/; // 32 random bytes, base64url
+const randomToken = () => crypto.randomBytes(32).toString("base64url");
+
+/** All four settings, or null: then Sign in with Apple is simply not offered. */
+export function appleSettings(settings: AppConfig["apple"] = config.apple): AppleSettings | null {
+  const { servicesId, teamId, keyId, privateKey } = settings;
+  return servicesId && teamId && keyId && privateKey ? { servicesId, teamId, keyId, privateKey } : null;
+}
+
+/**
+ * Cookie names and flags for the public origin. Apple returns by a cross-site form POST, and only a
+ * `SameSite=None; Secure` cookie comes back with one, so the starting cookie has to be that: the
+ * flow needs an https origin (`secure` false here means it cannot run). The handoff cookie is read
+ * only by our own page's POST, so it is Strict, as Google's is.
+ */
+export function appleSignInCookies(publicOrigin: string) {
+  const secure = new URL(publicOrigin).protocol === "https:";
+  const name = (base: string) => (secure ? `__Host-${base}` : base);
+  const options = (sameSite: "none" | "strict", maxAge: number): CookieOptions => ({ httpOnly: true, secure, sameSite, path: "/", maxAge });
+  return {
+    secure,
+    oauth: { name: name("taptpay-apple-oauth"), options: options("none", OAUTH_STATE_TTL_MS) },
+    handoff: { name: name("taptpay-apple-handoff"), options: options("strict", HANDOFF_CODE_TTL_MS) },
+  };
+}
+
+let appleStateKey: Buffer | undefined;
+/** The starting cookie's signature, under a key for this purpose alone (as Google's state has its own). */
+function appleStateSignature(payload: string): string {
+  appleStateKey ??= Buffer.from(crypto.hkdfSync("sha256", config.jwtSecret, Buffer.alloc(0), "taptpay apple-state v1", 32));
+  return crypto.createHmac("sha256", appleStateKey).update(payload, "utf8").digest("base64url");
+}
+
+/** A fresh state and nonce, and the signed cookie value binding them to this browser and this moment. */
+export function startAppleSignIn(): { state: string; nonce: string; cookieValue: string } {
+  const state = randomToken();
+  const nonce = randomToken();
+  const payload = `${state}.${nonce}.${Date.now()}`;
+  return { state, nonce, cookieValue: `${payload}.${appleStateSignature(payload)}` };
+}
+
+/**
+ * The nonce this browser was given when the returned `state` is its own, else null. The cookie is
+ * believed only under this server's signature and within ten minutes of its start; a malformed
+ * cookie or state is simply refused. Compared in constant time.
+ */
+export function verifyAppleSignInState(cookieValue: string | undefined, returnedState: unknown): string | null {
+  if (typeof cookieValue !== "string" || typeof returnedState !== "string") return null;
+  const [state, nonce, issued, signature, extra] = cookieValue.split(".");
+  if (extra !== undefined || !RANDOM_TOKEN.test(state ?? "") || !RANDOM_TOKEN.test(nonce ?? "") || !RANDOM_TOKEN.test(signature ?? "")) return null;
+  if (!/^\d{13}$/.test(issued ?? "")) return null;
+  if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(appleStateSignature(`${state}.${nonce}.${issued}`)))) return null;
+  const age = Date.now() - Number(issued);
+  if (age < 0 || age >= OAUTH_STATE_TTL_MS) return null;
+  if (!RANDOM_TOKEN.test(returnedState)) return null;
+  return crypto.timingSafeEqual(Buffer.from(state), Buffer.from(returnedState)) ? nonce : null;
+}
+
+/** Where the browser is sent to sign in at Apple. The answer comes back as a form post. */
+export function appleAuthorizeUrl(settings: AppleSettings, redirectUri: string, started: { state: string; nonce: string }): string {
+  const params = new URLSearchParams({
+    client_id: settings.servicesId,
+    redirect_uri: redirectUri,
+    response_type: "code",
+    response_mode: "form_post",
+    scope: "name email",
+    state: started.state,
+    nonce: started.nonce,
+  });
+  return `${APPLE_AUTHORIZE_URL}?${params.toString()}`;
+}
+
+/**
+ * A display name from the form's `user` field, which Apple sends once and does not sign. Only a
+ * name is ever read from it: letters as given, control characters removed, at most 100 characters.
+ */
+export function appleDisplayName(userField: unknown): string | undefined {
+  if (typeof userField !== "string" || userField.length > 4096) return undefined;
+  let parsed: { name?: { firstName?: unknown; lastName?: unknown } } | null;
+  try {
+    parsed = JSON.parse(userField);
+  } catch {
+    return undefined;
+  }
+  const part = (value: unknown) => (typeof value === "string" ? value.replace(/[\u0000-\u001f\u007f]/g, "").trim() : "");
+  const name = `${part(parsed?.name?.firstName)} ${part(parsed?.name?.lastName)}`.trim().slice(0, 100).trim();
+  return name || undefined;
 }

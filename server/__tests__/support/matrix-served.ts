@@ -37,6 +37,8 @@ export interface ServedRequest {
   method: "get" | "post" | "put" | "patch" | "delete";
   path: string;
   body?: Record<string, unknown>;
+  /** A form post (application/x-www-form-urlencoded), as another site's page sends one. */
+  form?: Record<string, string>;
   /** A file sent as multipart form data. */
   attach?: { field: string; bytes: Buffer; filename: string; contentType: string };
   /** A download: its bytes are the body. */
@@ -84,6 +86,7 @@ export async function sendServed(ctx: ServedCtx, who: Principal | null, req: Ser
   if (who) pending = pending.set(signedIn(who));
   for (const [name, value] of Object.entries(req.headers ?? {})) pending = pending.set(name, value);
   if (req.attach) pending = pending.attach(req.attach.field, req.attach.bytes, { filename: req.attach.filename, contentType: req.attach.contentType });
+  else if (req.form) pending = pending.type("form").send(req.form);
   else if (req.body) pending = pending.send(req.body);
   if (req.binary) pending = pending.buffer(true).parse(bytes);
   return pending;

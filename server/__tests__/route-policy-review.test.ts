@@ -33,7 +33,8 @@ const TOKEN_CHECKS = [
 ];
 
 /** Checks that prove a sign-in: a password, or Google's code for a verified email. */
-const CREDENTIAL_CHECKS = ["authenticateUser", "checkPasswordEvenly", "verifyGoogleSignInState"];
+// A password check, Google's returned state, or Apple's verified identity token (R1-T5b).
+const CREDENTIAL_CHECKS = ["authenticateUser", "checkPasswordEvenly", "verifyGoogleSignInState", "verifyAppleIdentityToken"];
 
 const UNAUTHENTICATED: ReadonlyArray<ReviewedBranch["principal"]> = [
   "public",

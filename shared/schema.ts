@@ -1630,6 +1630,29 @@ export const authSessions = pgTable("auth_sessions", {
 }));
 
 export type AuthSession = typeof authSessions.$inferSelect;
+
+// R1-T5b (0033; owner decision 2026-09-29): Sign in with Apple identities. Apple's issuer, this
+// app's client id and Apple's stable subject are unique together. `userId` is the login the
+// identity signs in; none means pending: known, but it signs nobody in (an identity is never joined
+// to a login by email). One Apple identity per login. No Apple token or code is stored.
+export const appleIdentities = pgTable("apple_identities", {
+  id: serial("id").primaryKey(),
+  issuer: text("issuer").notNull(),
+  clientId: text("client_id").notNull(),
+  subject: text("subject").notNull(),
+  userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }),
+  // As Apple gave it on the first authorization; may be a private relay address.
+  email: text("email"),
+  isPrivateEmail: boolean("is_private_email").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  linkedAt: timestamp("linked_at", { withTimezone: true }),
+}, (t) => ({
+  subjectUnique: uniqueIndex("apple_identities_subject_uq").on(t.issuer, t.clientId, t.subject),
+  userIdUnique: uniqueIndex("apple_identities_user_id_uq").on(t.userId).where(sql`${t.userId} is not null`),
+  linkedCheck: check("apple_identities_linked_chk", sql`(${t.userId} is null) = (${t.linkedAt} is null)`),
+}));
+
+export type AppleIdentityRecord = typeof appleIdentities.$inferSelect;
 export type NewAuthSession = typeof authSessions.$inferInsert;
 
 // Each provider session opened for a split rent or trades invoice (0030; owner decision

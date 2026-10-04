@@ -195,6 +195,11 @@ export const BASELINE_EFFECT_REQUIREMENTS: readonly Requirement[] = [
   r("0032_uploaded_file_scans.sql", "constraint", "uploaded_file_scans", "uploaded_file_scans_verdict_chk"),
   r("0032_uploaded_file_scans.sql", "constraint", "uploaded_file_scans", "uploaded_file_scans_signature_chk"),
   r("0032_uploaded_file_scans.sql", "constraint", "uploaded_file_scans", "uploaded_file_scans_file_id_fkey"),
+  r("0033_apple_identities.sql", "table", "apple_identities"),
+  r("0033_apple_identities.sql", "constraint", "apple_identities", "apple_identities_linked_chk"),
+  r("0033_apple_identities.sql", "constraint", "apple_identities", "apple_identities_user_id_fkey"),
+  r("0033_apple_identities.sql", "index", "apple_identities", "apple_identities_subject_uq"),
+  r("0033_apple_identities.sql", "index", "apple_identities", "apple_identities_user_id_uq"),
 ];
 
 export const FIND_MISSING_BASELINE_EFFECTS_SQL = `

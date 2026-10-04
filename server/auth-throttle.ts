@@ -245,6 +245,16 @@ export function googleStateBucket(state: string): AuthThrottleBucket {
   return { key: `google-state:${bucketKeyHmac("google-state", state)}`, policy: GOOGLE_STATE_ONCE_POLICY };
 }
 
+/** Apple callbacks from one visitor address that get as far as asking Apple (R1-T5b): Google's policy. */
+export function appleCallbackAddressBucket(address: string): AuthThrottleBucket {
+  return { key: `apple-address:${bucketKeyHmac("apple-address", address)}`, policy: ADDRESS_GOOGLE_POLICY };
+}
+
+/** One Sign in with Apple start, by its state: the callback takes it up once, as Google's is. */
+export function appleStateBucket(state: string): AuthThrottleBucket {
+  return { key: `apple-state:${bucketKeyHmac("apple-state", state)}`, policy: GOOGLE_STATE_ONCE_POLICY };
+}
+
 /** Password tries on one email-confirmation link (owner decision 2026-09-23). */
 export function confirmEmailBucket(token: string): AuthThrottleBucket {
   return { key: `confirm-email:${bucketKeyHmac("confirm-email", token)}`, policy: SIGN_IN_POLICY };

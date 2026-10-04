@@ -1,4 +1,4 @@
-import { users, type User, type UserStatus, merchants, merchantTutorialProgress, transactions, uploadedFiles, uploadedFileScans, merchantSettlements, refunds, splitPayments, paymentAttempts, PAYMENT_RETURN_STATE_MAX_AGE_MS, taptStones, stockItems, merchantSubscriptions, subscriptionBillingHistory, pushSubscriptions, pushNotificationDeliveries, normalizePushNotificationPreferences, DEFAULT_PUSH_NOTIFICATION_PREFERENCES, tenantProfiles, activeSchedules, invoicesRentRequests, transactionEvents, clientProfiles, quotes, jobInvoices, jobSchedules, jobEvents, type Merchant, type MerchantTutorialProgress, type Transaction, type SplitPayment, type PaymentAttempt, type InsertMerchant, type InsertTransaction, type CreateMerchant, type Refund, type InsertRefund, type TaptStone, type InsertTaptStone, type StockItem, type InsertStockItem, type MerchantSubscription, type SubscriptionBillingHistory, type PushSubscription, type PushNotificationPreferences, type PushNotificationEventType } from "@shared/schema";
+import { users, type User, type UserStatus, merchants, merchantTutorialProgress, transactions, uploadedFiles, uploadedFileScans, appleIdentities, type AppleIdentityRecord, merchantSettlements, refunds, splitPayments, paymentAttempts, PAYMENT_RETURN_STATE_MAX_AGE_MS, taptStones, stockItems, merchantSubscriptions, subscriptionBillingHistory, pushSubscriptions, pushNotificationDeliveries, normalizePushNotificationPreferences, DEFAULT_PUSH_NOTIFICATION_PREFERENCES, tenantProfiles, activeSchedules, invoicesRentRequests, transactionEvents, clientProfiles, quotes, jobInvoices, jobSchedules, jobEvents, type Merchant, type MerchantTutorialProgress, type Transaction, type SplitPayment, type PaymentAttempt, type InsertMerchant, type InsertTransaction, type CreateMerchant, type Refund, type InsertRefund, type TaptStone, type InsertTaptStone, type StockItem, type InsertStockItem, type MerchantSubscription, type SubscriptionBillingHistory, type PushSubscription, type PushNotificationPreferences, type PushNotificationEventType } from "@shared/schema";
 import { DEFAULT_PLAN_ID, isUpgrade, planFor, planForOrDefault, type PlanId } from "@shared/plans";
 import { decideBilling, failedPaymentUpdates, immediatePlanUpdates, MAX_PAYMENT_ATTEMPTS, nextBillingPeriodStart, nextPeriodUpdates, proratedUpgradeCents, queuedPlanUpdates, renewalPlan } from "./subscription-billing";
 import { getDb, isDatabaseConnected } from "./database";
@@ -762,6 +762,27 @@ export interface IStorage extends PaymentAttemptRepository {
   createMerchant(merchant: InsertMerchant): Promise<Merchant>;
   createMerchantWithPassword(merchantData: any, passwordHash: string): Promise<Merchant>;
   createMerchantWithSignup(data: MerchantSignupStorageInput): Promise<Merchant>;
+  //
+  // R1-T5b: Sign in with Apple identities. Account-entry scope: none of these is a business's route.
+  //
+  /** The identity Apple's issuer, this client id and that subject name, if it has been seen. */
+  getAppleIdentity(key: AppleIdentityKey): Promise<AppleIdentityRecord | undefined>;
+  /**
+   * Records an identity that signs nobody in. One that exists is left as it is, linked or pending,
+   * except that a pending one with no email keeps the first email it is given.
+   */
+  recordPendingAppleIdentity(key: AppleIdentityKey, first: { email?: string; isPrivateEmail: boolean }): Promise<AppleIdentityRecord>;
+  /**
+   * A new business, its owner login, its subscription and its Apple identity, together or not at
+   * all. A pending identity for the same person becomes this login's; one already linked is never
+   * moved (AppleIdentityTakenError, and nothing is made).
+   */
+  createMerchantWithAppleIdentity(
+    merchantData: { name: string; businessName: string; email: string },
+    passwordHash: string,
+    key: AppleIdentityKey,
+    first: { isPrivateEmail: boolean },
+  ): Promise<{ merchant: Merchant; userId: number }>;
   verifyMerchant(token: string, passwordHash: string): Promise<Merchant | undefined>;
   confirmMerchantEmail(token: string, onboardingCompleted: boolean): Promise<Merchant | undefined>;
   updateMerchantStatus(id: number, status: string): Promise<Merchant | undefined>;
@@ -1236,6 +1257,21 @@ export interface IStorage extends PaymentAttemptRepository {
  */
 const CLEAN_SCAN_ON_RECORD = sql`exists (select 1 from ${uploadedFileScans} where ${uploadedFileScans.fileId} = ${uploadedFiles.id} and ${uploadedFileScans.verdict} = 'clean')`;
 
+/** R1-T5b: what names an Apple identity. The three are unique together. */
+export type AppleIdentityKey = { issuer: string; clientId: string; subject: string };
+
+/** The identity already signs in another login: it is never moved. */
+export class AppleIdentityTakenError extends Error {
+  constructor() {
+    super("That Apple identity already belongs to a TaptPay login");
+    this.name = "AppleIdentityTakenError";
+  }
+}
+
+const appleIdentityIs = (key: AppleIdentityKey) => and(
+  eq(appleIdentities.issuer, key.issuer), eq(appleIdentities.clientId, key.clientId), eq(appleIdentities.subject, key.subject),
+);
+
 /** A document the scan pass reads: its path, its business, and a token for exactly these bytes. */
 export type UnscannedDocument = { path: string; merchantId: number | null; version: string; data: Buffer };
 
@@ -1333,6 +1369,8 @@ export class MemStorage implements IStorage {
   private tutorialProgress: Map<string, MerchantTutorialProgress>;
   private uploadedFileBlobs: Map<string, { mimeType: string; data: Buffer; merchantId: number; createdAt: Date; version: string; scan?: { verdict: "clean" | "infected"; scanner: string; signature?: string; scannedAt: Date } }>;
   private uploadVersions = 0;
+  private appleIdentities = new Map<string, AppleIdentityRecord>();
+  private currentAppleIdentityId = 1;
   private documentReadLimits = new Map<string, { count: number; expiresAt: number }>();
   private authHandoffCodes = new Map<string, { userId: number; newUser: boolean; expiresAt: Date; consumedAt: Date | null }>();
   private authThrottleRows = new Map<string, AuthThrottleRow>();
@@ -1581,6 +1619,57 @@ export class MemStorage implements IStorage {
     this.merchants.set(id, merchant);
     this.ensureMemSubscription(id);
     return merchant;
+  }
+
+  private appleIdentityMapKey(key: AppleIdentityKey): string {
+    return `${key.issuer}\n${key.clientId}\n${key.subject}`;
+  }
+
+  async getAppleIdentity(key: AppleIdentityKey): Promise<AppleIdentityRecord | undefined> {
+    return this.appleIdentities.get(this.appleIdentityMapKey(key));
+  }
+
+  async recordPendingAppleIdentity(key: AppleIdentityKey, first: { email?: string; isPrivateEmail: boolean }): Promise<AppleIdentityRecord> {
+    const mapKey = this.appleIdentityMapKey(key);
+    const existing = this.appleIdentities.get(mapKey);
+    if (existing) {
+      if (existing.userId === null && existing.email === null && first.email) {
+        existing.email = first.email;
+        existing.isPrivateEmail = first.isPrivateEmail;
+      }
+      return existing;
+    }
+    const made: AppleIdentityRecord = {
+      id: this.currentAppleIdentityId++, issuer: key.issuer, clientId: key.clientId, subject: key.subject, userId: null,
+      email: first.email ?? null, isPrivateEmail: first.isPrivateEmail, createdAt: new Date(), linkedAt: null,
+    };
+    this.appleIdentities.set(mapKey, made);
+    return made;
+  }
+
+  async createMerchantWithAppleIdentity(
+    merchantData: { name: string; businessName: string; email: string },
+    passwordHash: string,
+    key: AppleIdentityKey,
+    first: { isPrivateEmail: boolean },
+  ): Promise<{ merchant: Merchant; userId: number }> {
+    const mapKey = this.appleIdentityMapKey(key);
+    const existing = this.appleIdentities.get(mapKey);
+    // Every check before anything is made: memory has no transaction to roll back.
+    if (existing && existing.userId !== null) throw new AppleIdentityTakenError();
+    const email = merchantData.email.trim().toLowerCase();
+    if ([...this.merchants.values()].some((merchant) => merchant.email.toLowerCase() === email)
+      || [...this.users.values()].some((user) => user.email.toLowerCase() === email)) {
+      throw new Error("That email address already belongs to another login");
+    }
+    const merchant = await this.createMerchantWithPassword({ ...merchantData, email }, passwordHash);
+    const owner = [...this.users.values()].find((user) => user.merchantId === merchant.id && user.role === "owner")!;
+    const now = new Date();
+    this.appleIdentities.set(mapKey, {
+      id: existing?.id ?? this.currentAppleIdentityId++, issuer: key.issuer, clientId: key.clientId, subject: key.subject,
+      userId: owner.id, email, isPrivateEmail: first.isPrivateEmail, createdAt: existing?.createdAt ?? now, linkedAt: now,
+    });
+    return { merchant, userId: owner.id };
   }
 
   async createMerchantWithSignup(data: MerchantSignupStorageInput): Promise<Merchant> {
@@ -2850,6 +2939,7 @@ export class MemStorage implements IStorage {
     this.billSplitLocks.clear();
     this.accountMutationLocks.clear();
     this.uploadedFileBlobs.clear();
+    this.appleIdentities.clear();
     this.documentReadLimits.clear();
     this.authThrottleRows.clear();
     this.invoiceSplitSessionRows.clear();
@@ -4643,7 +4733,63 @@ export class DatabaseStorage implements IStorage {
 
   async createMerchantWithPassword(merchantData: any, passwordHash: string): Promise<Merchant> {
     if (!this.db) throw new Error('Database not available');
-    return await this.db.transaction(async (tx) => {
+    return await this.db.transaction((tx) => this.insertMerchantWithPassword(tx, merchantData, passwordHash));
+  }
+
+  async getAppleIdentity(key: AppleIdentityKey): Promise<AppleIdentityRecord | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const [row] = await this.db.select().from(appleIdentities).where(appleIdentityIs(key)).limit(1);
+    return row;
+  }
+
+  async recordPendingAppleIdentity(key: AppleIdentityKey, first: { email?: string; isPrivateEmail: boolean }): Promise<AppleIdentityRecord> {
+    if (!this.db) throw new Error('Database not available');
+    const [made] = await this.db.insert(appleIdentities)
+      .values({ issuer: key.issuer, clientId: key.clientId, subject: key.subject, userId: null, email: first.email ?? null, isPrivateEmail: first.isPrivateEmail })
+      .onConflictDoNothing({ target: [appleIdentities.issuer, appleIdentities.clientId, appleIdentities.subject] })
+      .returning();
+    if (made) return made;
+    // It exists. A pending one with no email keeps the first it is given; nothing else changes.
+    if (first.email) {
+      await this.db.update(appleIdentities).set({ email: first.email, isPrivateEmail: first.isPrivateEmail })
+        .where(and(appleIdentityIs(key), isNull(appleIdentities.userId), isNull(appleIdentities.email)));
+    }
+    const [row] = await this.db.select().from(appleIdentities).where(appleIdentityIs(key)).limit(1);
+    return row;
+  }
+
+  // One transaction (R1-T5b): a business whose only way in is Apple must never exist without its
+  // identity. A pending row for the person becomes this login's; a linked one is never moved.
+  async createMerchantWithAppleIdentity(
+    merchantData: { name: string; businessName: string; email: string },
+    passwordHash: string,
+    key: AppleIdentityKey,
+    first: { isPrivateEmail: boolean },
+  ): Promise<{ merchant: Merchant; userId: number }> {
+    if (!this.db) throw new Error('Database not available');
+    return await this.db.transaction(async (tx: any) => {
+      const merchant = await this.insertMerchantWithPassword(tx, merchantData, passwordHash);
+      const [owner] = await tx.select({ id: users.id }).from(users)
+        .where(and(eq(users.merchantId, merchant.id), eq(users.role, "owner"))).limit(1);
+      if (!owner) throw new Error("The new business has no owner login");
+      const now = new Date();
+      const linked = await tx.insert(appleIdentities)
+        .values({ issuer: key.issuer, clientId: key.clientId, subject: key.subject, userId: owner.id, email: merchant.email, isPrivateEmail: first.isPrivateEmail, linkedAt: now })
+        .onConflictDoUpdate({
+          target: [appleIdentities.issuer, appleIdentities.clientId, appleIdentities.subject],
+          set: { userId: owner.id, linkedAt: now, email: merchant.email, isPrivateEmail: first.isPrivateEmail },
+          setWhere: isNull(appleIdentities.userId),
+        })
+        .returning({ id: appleIdentities.id });
+      // Thrown, not returned: the business made above must roll back with it.
+      if (linked.length === 0) throw new AppleIdentityTakenError();
+      return { merchant, userId: owner.id as number };
+    });
+  }
+
+  /** The business, its owner login and its subscription, inside the caller's transaction. */
+  private async insertMerchantWithPassword(tx: any, merchantData: any, passwordHash: string): Promise<Merchant> {
+    {
       // R0-T5: never accept a merchant-supplied Windcave credential through this path.
       const { windcaveApiKey: _rejectedWindcaveApiKey, ...safeMerchantData } = merchantData;
       const insertData = {
@@ -4673,7 +4819,7 @@ export class DatabaseStorage implements IStorage {
         .values(newSubscriptionValues(merchant.id))
         .onConflictDoNothing({ target: merchantSubscriptions.merchantId });
       return merchant;
-    });
+    }
   }
 
   async updateMerchant(id: number, updates: Partial<Merchant>): Promise<Merchant | undefined> {

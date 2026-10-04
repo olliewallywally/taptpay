@@ -111,6 +111,7 @@ export const HEADER_ONLY_CALLERS: readonly MatrixCaller[] = ["old-token", "old-a
  */
 export const UNKNOWN_LINK_ANSWER: Record<string, MatrixAnswer> = {
   "POST /api/auth/google/session": 401,
+  "POST /api/auth/apple/session": 401,
   "POST /api/auth/reset-password": 400,
   "GET /api/auth/validate-reset-token/:token": 200,
   "POST /api/auth/confirm-email": 400,

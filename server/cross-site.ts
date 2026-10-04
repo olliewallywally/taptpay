@@ -32,10 +32,18 @@ export interface CrossSiteCallback {
 }
 
 /**
- * Callbacks that legitimately arrive from another site, by exact method and path. Sign in with Apple
- * (R1-T5) will add Apple's form post.
+ * Callbacks that legitimately arrive from another site, by exact method and path.
  */
 export const CROSS_SITE_CALLBACKS: readonly CrossSiteCallback[] = [
+  {
+    method: "POST",
+    path: "/api/auth/apple/callback",
+    origins: ["https://appleid.apple.com"],
+    why:
+      "Sign in with Apple answers by a form post from Apple's own origin (R1-T5b). The route believes nothing in it " +
+      "but a state that matches this browser's signed, ten-minute, once-only starting cookie, and then only what " +
+      "Apple's token endpoint says for the code",
+  },
   {
     method: "POST",
     path: "/api/billing/card/callback",

@@ -72,6 +72,7 @@ const REAL_MIGRATIONS = [
   "0030_invoice_split_sessions.sql",
   "0031_auth_sessions.sql",
   "0032_uploaded_file_scans.sql",
+  "0033_apple_identities.sql",
 ];
 
 /** Migrations that own a `BEGIN;` / `COMMIT;` pair. */

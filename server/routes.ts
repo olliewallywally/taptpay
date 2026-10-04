@@ -21,7 +21,7 @@ import {
   HANDOFF_CODE_TTL_MS, clearSignInCookie, googleVerifiedEmail, handoffCodeHash, newHandoffCode, readCookie,
   signInCookies, startGoogleSignIn, verifyGoogleSignInState,
 } from "./google-sign-in";
-import { type SignInRealm, type TooManyWhat, boardPrintBucket, confirmEmailBucket, confirmationResendBucket, googleCallbackAddressBucket, googleStateBucket, normalizeThrottleEmail, passwordChangeBucket, passwordResetAddressBucket, passwordResetBucket, signInAccountBucket, signInAddressBucket, signInDeviceKeyPrefix, signupNoticeBucket, tooManyAttempts } from "./auth-throttle";
+import { type SignInRealm, type TooManyWhat, boardPrintBucket, confirmEmailBucket, confirmationResendBucket, appleCallbackAddressBucket, appleStateBucket, googleCallbackAddressBucket, googleStateBucket, normalizeThrottleEmail, passwordChangeBucket, passwordResetAddressBucket, passwordResetBucket, signInAccountBucket, signInAddressBucket, signInDeviceKeyPrefix, signupNoticeBucket, tooManyAttempts } from "./auth-throttle";
 import { BOARD_PRINT_JSON_LIMIT, boardPrintRequestSchema, decodeBoardPrintPdf } from "./board-print";
 import { clientAddressForLimits } from "./client-address";
 import { ACCOUNT_EMAIL_REPLY_FLOOR_MS, SIGN_UP_REPLY_FLOOR_MS, replyNoSoonerThan, replyStart } from "./even-reply";
@@ -44,6 +44,10 @@ import { isPushServiceEndpoint } from "./push-endpoint";
 import { resendInvoiceEmailForMerchant } from "./property-cron";
 import { INVOICE_DOCUMENT_FOLDER, isInvoiceDocumentName, isPublicUploadFolder, parseInvoiceDocumentRef } from "./upload-policy";
 import { getMalwareScanner, ScannerUnavailableError, type ScanResult } from "./malware-scanner";
+import {
+  APPLE_ISSUER, AppleSignInError, appleAuthorizeUrl, appleDisplayName, appleSettings, appleSignInCookies, createAppleKeySet,
+  exchangeAppleCode, startAppleSignIn, verifyAppleIdentityToken, verifyAppleSignInState, type AppleTransport,
+} from "./apple-sign-in";
 import { INVOICE_DOCUMENT_EXTENSIONS } from "./invoice-document-security";
 import { resendTradeInvoice, resendTradeInvoiceForMerchant, sendTradePaymentInvoice, sendTradePaymentInvoiceForMerchant, sendTradeQuoteForMerchant } from "./trades-delivery";
 import { QUOTE_ACCEPTANCE_UNAVAILABLE, tellBusinessQuoteAcceptanceBlocked } from "./quote-acceptance-notice";
@@ -795,6 +799,157 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     } catch (err) {
       console.error('[GOOGLE_SESSION]', err);
       return res.status(500).json({ message: 'Google sign in failed. Please try again.' });
+    }
+  });
+
+  // ── Sign in with Apple — R1-T5b (owner decision 2026-09-29, answer 2; built with stand-ins, live
+  // once the owner's Services ID, key and team ID are set). The web flow through the Services ID:
+  // Apple answers by a form post from its own origin (server/cross-site.ts). The same protections as
+  // Google's flow, for Apple's protocol: a state and nonce bound to the starting browser by a signed
+  // HttpOnly cookie, good for ten minutes and taken up once; a one-time code handed to the login page
+  // in a second HttpOnly cookie, never a session in an address. Unlike Google's, an Apple identity is
+  // NEVER joined to a login by its email (server/apple-sign-in.ts; plan R1-T5).
+  const appleCookies = appleSignInCookies(getBaseUrl());
+  const appleTransport: AppleTransport = (url, init) => fetch(url, init);
+  const appleKeys = createAppleKeySet(appleTransport);
+  const appleSignInError = (message: string) => `/login?error=${encodeURIComponent(message)}`;
+  const APPLE_EXPIRED = 'Apple sign in expired. Please try again.';
+  const APPLE_ALREADY_HAS_LOGIN = 'That email already has a TaptPay login. Sign in, then connect Apple in Settings.';
+
+  app.get("/api/auth/apple", (req, res) => {
+    const settings = appleSettings();
+    if (!settings) return res.redirect(appleSignInError('Apple sign in is not configured'));
+    // The starting cookie must be SameSite=None to come back on Apple's post, and that needs https.
+    if (!appleCookies.secure) return res.redirect(appleSignInError('Apple sign in needs a secure (https) address'));
+    const start = startAppleSignIn();
+    res.cookie(appleCookies.oauth.name, start.cookieValue, appleCookies.oauth.options);
+    res.set('Cache-Control', 'no-store');
+    res.redirect(appleAuthorizeUrl(settings, `${getBaseUrl(req)}/api/auth/apple/callback`, start));
+  });
+
+  app.post("/api/auth/apple/callback", async (req, res) => {
+    // After a form post the browser must fetch the next page with GET: 303.
+    const back = (target: string) => res.redirect(303, target);
+    res.set('Cache-Control', 'no-store');
+    const settings = appleSettings();
+    if (!settings) return back(appleSignInError('Apple sign in is not configured'));
+    const form = (req.body ?? {}) as { code?: unknown; state?: unknown; error?: unknown; user?: unknown };
+    // The starting cookie is spent whatever happens next.
+    const nonce = verifyAppleSignInState(readCookie(req.headers.cookie, appleCookies.oauth.name), form.state);
+    clearSignInCookie(res, appleCookies.oauth);
+
+    if (form.error || typeof form.code !== 'string' || !form.code) {
+      return back(appleSignInError('Apple sign in was cancelled'));
+    }
+    // Not this browser's sign-in (or it expired): refuse before asking Apple anything.
+    if (!nonce) return back(appleSignInError(APPLE_EXPIRED));
+
+    try {
+      // Each start is taken up once, before Apple is asked anything: a kept copy of the cookie and
+      // state cannot replay the return. The slot is never given back.
+      const firstUse = await storage.takeAuthThrottleSlot([appleStateBucket(form.state as string)], new Date());
+      if (!firstUse.allowed) return back(appleSignInError(APPLE_EXPIRED));
+      // Returns that get as far as asking Apple are counted per visitor address, once addresses can
+      // be told apart (R1-T4 phase B); a success gives its count back.
+      const address = clientAddressForLimits(req);
+      const addressBuckets = address ? [appleCallbackAddressBucket(address)] : [];
+      if (addressBuckets.length > 0) {
+        const slot = await storage.takeAuthThrottleSlot(addressBuckets, new Date());
+        if (!slot.allowed) return back(appleSignInError(tooManyAttempts(slot.retryAfterMs, "sign-in").body.message));
+      }
+
+      let identity;
+      try {
+        const idToken = await exchangeAppleCode(form.code, `${getBaseUrl(req)}/api/auth/apple/callback`, settings, appleTransport);
+        identity = await verifyAppleIdentityToken(idToken, { clientId: settings.servicesId, nonce }, appleKeys);
+      } catch (error) {
+        if (!(error instanceof AppleSignInError)) throw error;
+        // The reason only: never the code, the token or anything in it.
+        console.error('[APPLE_SIGN_IN]', error.reason);
+        return back(appleSignInError(
+          error.reason === 'grant-refused' ? 'Apple sign in was not completed. Please try again.'
+            : error.reason === 'unreachable' ? 'Apple sign in is unavailable right now. Please try again.'
+              : 'Apple sign in failed. Please try again.',
+        ));
+      }
+
+      const key = { issuer: APPLE_ISSUER, clientId: identity.clientId, subject: identity.subject };
+      const known = await storage.getAppleIdentity(key);
+      let userId = known?.userId ?? null;
+      let isNewUser = false;
+
+      if (userId === null) {
+        // An identity that signs nobody in yet. Its email is the one in Apple's token, or the one
+        // Apple gave the first time (Apple shares it once): never anything from the unsigned form.
+        const offered = identity.email?.trim().toLowerCase() || undefined;
+        if (offered && !identity.emailVerified) {
+          return back(appleSignInError("Apple hasn't verified that email address."));
+        }
+        const email = offered ?? known?.email ?? undefined;
+        if (!email) {
+          return back(appleSignInError(
+            'Apple did not share an email address. In your Apple ID settings, stop using Apple ID with TaptPay, then try again.',
+          ));
+        }
+        const isPrivateEmail = offered ? identity.privateRelay : (known?.isPrivateEmail ?? false);
+        const [existingMerchant, existingLogin] = await Promise.all([
+          storage.getMerchantByEmail(email),
+          storage.getUserByEmail(email),
+        ]);
+        if (existingMerchant || existingLogin) {
+          // Never joined by email (plan R1-T5): the identity is recorded as pending and signs nobody
+          // in. Its owner connects it from a signed-in session (R1-T5c).
+          await storage.recordPendingAppleIdentity(key, { email, isPrivateEmail });
+          return back(appleSignInError(APPLE_ALREADY_HAS_LOGIN));
+        }
+        // A new business, as a first Google sign-in makes: Apple verified the address. The login
+        // never signs in by password, so it is given a random unguessable one.
+        const name = appleDisplayName(form.user) ?? email.split('@')[0];
+        const randomPasswordHash = await bcrypt.hash(crypto.randomBytes(32).toString("hex"), 12);
+        const made = await storage.createMerchantWithAppleIdentity({ name, businessName: name, email }, randomPasswordHash, key, { isPrivateEmail });
+        userId = made.userId;
+        isNewUser = true;
+      }
+
+      const handoff = newHandoffCode();
+      await storage.createAuthHandoffCode({
+        codeHash: handoff.codeHash,
+        userId,
+        newUser: isNewUser,
+        expiresAt: new Date(Date.now() + HANDOFF_CODE_TTL_MS),
+      });
+      res.cookie(appleCookies.handoff.name, handoff.code, appleCookies.handoff.options);
+      await storage.settleAuthThrottle(addressBuckets, "void", new Date())
+        .catch((error) => console.error("[APPLE_ADDRESS_THROTTLE_RETURN]", error));
+      return back('/login?apple=complete');
+    } catch (err) {
+      // Two first sign-ins at once: the second finds the address or the identity taken. Either way
+      // nothing half-made is left, and trying again signs in.
+      console.error('[APPLE_SIGN_IN]', err instanceof Error ? err.name : 'error');
+      return back(appleSignInError('Apple sign in failed. Please try again.'));
+    }
+  });
+
+  // The login page's half of Sign in with Apple: redeem the one-time code, once, for the session
+  // cookie and the page's CSRF token; never cached.
+  app.post("/api/auth/apple/session", async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    const codeHash = handoffCodeHash(readCookie(req.headers.cookie, appleCookies.handoff.name));
+    clearSignInCookie(res, appleCookies.handoff);
+    const expired = () => res.status(401).json({ code: 'APPLE_SIGN_IN_EXPIRED', message: APPLE_EXPIRED });
+    if (!codeHash) return expired();
+    try {
+      const redeemed = await storage.consumeAuthHandoffCode(codeHash, new Date());
+      if (!redeemed) return expired();
+      const issued = await loginForUserId(redeemed.userId);
+      if (!issued) {
+        return res.status(403).json({ code: 'ACCOUNT_UNAVAILABLE', message: 'This account cannot sign in right now.' });
+      }
+      const session = await startBusinessSession(req, res, issued);
+      return res.json({ merchantId: issued.merchantId, newUser: redeemed.newUser, csrfToken: session.csrfToken });
+    } catch (err) {
+      console.error('[APPLE_SESSION]', err);
+      return res.status(500).json({ message: 'Apple sign in failed. Please try again.' });
     }
   });
 

@@ -1217,6 +1217,87 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     },
   },
 
+  "GET /api/auth/apple": {
+    branches: [
+      { principal: "public", tenant: "none", tenantRule: "no merchant data: starts a Sign in with Apple for whoever asks; Apple then says who they are" },
+    ],
+    input:
+      "nothing is read from the request; redirect_uri comes from getBaseUrl(req): the configured public origin, or in development the request's own Host",
+    capability:
+      "Sign in with Apple configured (all four of config.apple, server/config.ts) and an https public origin: without either the browser goes back to /login with an error and no cookie is set",
+    entitlement: null,
+    idempotency: "each call starts a new sign-in: a fresh state and nonce replace this browser's cookie; nothing is stored",
+    sideEffects: null,
+    successDto:
+      "302 to Apple's authorize page with the Services ID, redirect_uri, response_mode=form_post, the name and email scope, state and nonce; sets the HttpOnly state cookie (SameSite=None and Secure, the only kind that comes back on Apple's cross-site post; 10 minutes, __Host-); Cache-Control no-store",
+    errorDisclosure: ["fixed"],
+    controls: {
+      authenticity: "anyone: this only starts a sign-in, which Apple authenticates and the callback checks",
+      replay: "harmless: a new call replaces this browser's pending sign-in",
+      rate: "none — it stores nothing and calls no one",
+    },
+  },
+
+  "POST /api/auth/apple/callback": {
+    branches: [
+      {
+        principal: "public",
+        tenant: "credentials",
+        tenantRule:
+          "the login Apple's verified identity token names by its stable subject (issuer, Services ID and subject together): the login that identity was made with. An identity seen for the first time whose verified email no business or login uses makes a new verified business, its owner login and the linked identity in one transaction (createMerchantWithAppleIdentity). An identity is NEVER joined to an existing business or login by its email: it is recorded as pending (recordPendingAppleIdentity), signs nobody in, and the person is told to sign in and connect Apple from Settings. Refused: an email Apple has not verified, and a first sign-in whose token carries no email",
+      },
+    ],
+    input:
+      "Apple's form post, read raw: code (sent to Apple's token endpoint), state (must equal the state in this browser's cookie, compared in constant time by verifyAppleSignInState; the cookie's state and nonce must each be 43 base64url characters, under this server's signature with a start time no more than ten minutes old), error (only its presence is used) and user (Apple's unsigned first-time details: a display name of at most 100 characters is read from it and nothing else, never its email)",
+    capability:
+      "Sign in with Apple configured (config.apple, server/config.ts): without it the browser goes back to /login with an error, before anything in the post is read",
+    entitlement: null,
+    idempotency:
+      "the state cookie is cleared on every call, and each start is taken up once (appleStateBucket, a row of auth_throttle taken before Apple is asked and never given back: a second return with the same cookie and state, a simultaneous one included, goes back to /login with the expired message); a new Apple identity gets one business (two first sign-ins at once: the second finds the address or the identity taken, nothing half-made is left, and trying again signs in)",
+    sideEffects:
+      "asks Apple to exchange the code (appleid.apple.com/auth/token, with a five-minute client secret signed by the team's key) and, when it does not hold them, for Apple's published keys (appleid.apple.com/auth/keys, cached, refetched for an unknown key id at most once a minute); for a new Apple identity, creates a verified business, its owner login, its subscription and the identity together; for one whose email already has a login, records the identity as pending",
+    successDto:
+      "303 to /login?apple=complete, with the one-time handoff code in a second HttpOnly cookie (SameSite=Strict, 60 seconds): never a token, a code or anything of Apple's in an address. Every refusal is a 303 to /login?error=<a fixed message>",
+    errorDisclosure: ["fixed"],
+    controls: {
+      authenticity:
+        "Apple's authorization code, exchanged at Apple's token endpoint, and the identity token that comes back: RS256 under a key Apple publishes, Apple as issuer, the Services ID as the only audience, unexpired, and carrying the nonce this browser's starting cookie holds (server/apple-sign-in.ts). The returned state must equal the cookie's, which stops login CSRF; the cookie carries its start time under the server's signature (a key of its own, derived from JWT_SECRET). The post itself is admitted only from Apple's exact origin (server/cross-site.ts)",
+      replay:
+        "each start is taken up once, before Apple is asked (appleStateBucket): a replayed cookie and state are refused without asking Apple again; Apple also accepts a code once",
+      rate:
+        "tooManyAttempts after takeAuthThrottleSlot per visitor address (20 free, then waits from 30 s), counted before Apple is asked, only once TRUST_PROXY_HOPS is set (R1-T4 phase B, off by default): until then no limit. A success gives its count back",
+    },
+    findings: [
+      "Until TRUST_PROXY_HOPS is set there is no limit: each sign-in started (GET /api/auth/apple, itself unlimited) can make the server call Apple's token endpoint once with a made-up code, which Apple refuses. Phase B's live check switches the limit on.",
+      "No screen leads here yet: the login page's Apple button is R1-T5d. Built and tested against a stand-in Apple; going live needs the owner's Services ID, key and team ID and a real iPhone (owner decision 2026-09-29).",
+    ],
+  },
+
+  "POST /api/auth/apple/session": {
+    branches: [
+      {
+        principal: "public-bearer",
+        tenant: "token",
+        tenantRule:
+          "the one-time handoff code in this browser's cookie selects the one login the callback signed in: only its SHA-256 is looked up, and storage.consumeAuthHandoffCode spends it in one statement (unknown, spent, or older than 60 seconds: 401 APPLE_SIGN_IN_EXPIRED)",
+      },
+    ],
+    input: "only the handoff cookie, refused unless it is 43 base64url characters (handoffCodeHash); the body is not read",
+    capability: null,
+    entitlement: null,
+    idempotency: "one-time: the first redemption spends the code (of two at once, exactly one succeeds); the cookie is cleared on every call",
+    sideEffects: null,
+    successDto:
+      "{ merchantId, newUser, csrfToken }: no account credential in the body, Cache-Control no-store; starts a session and sets its cookie. 403 ACCOUNT_UNAVAILABLE when the login is no longer active, its merchant neither verified nor active, or a member over the seat limit (loginForUserId, server/auth.ts)",
+    errorDisclosure: ["fixed"],
+    controls: {
+      authenticity:
+        "the one-time code the callback set in this browser's cookie. SameSite=Strict, so another site cannot make the browser redeem it",
+      replay: "refused: the code is spent on first use",
+      rate: "none — a 32-byte code that lives 60 seconds cannot be guessed",
+    },
+  },
+
   "POST /api/auth/login": {
     branches: [
       {

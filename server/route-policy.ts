@@ -1,8 +1,8 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 910c89b1f2b6b2a0f163b12ccca8048fa62b6ea7 on 2026-10-04.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 71b4fe18079e1eb81abf39c5322f3fa3b49bbfaf on 2026-10-04.
  *
- * 187 registrations (78 GET, 77 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
+ * 190 registrations (79 GET, 79 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
  * live count on every run rather than trusting this comment.
  *
@@ -156,6 +156,42 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
   "POST /api/auth/google/session": {
     method: "POST",
     path: "/api/auth/google/session",
+    principal: "public",
+    markers: [],
+    facts: {
+      authChecks: ["storage.consumeAuthHandoffCode"],
+      storageMethods: ["consumeAuthHandoffCode"],
+      statuses: [200,401,403,500],
+      helpers: ["expired"],
+    },
+  },
+  "GET /api/auth/apple": {
+    method: "GET",
+    path: "/api/auth/apple",
+    principal: "public",
+    markers: [],
+    facts: {
+      statuses: [302],
+      helpers: ["appleSignInError"],
+    },
+  },
+  "POST /api/auth/apple/callback": {
+    method: "POST",
+    path: "/api/auth/apple/callback",
+    principal: "public",
+    markers: [],
+    facts: {
+      authChecks: ["verifyAppleIdentityToken","verifyAppleSignInState"],
+      storageMethods: ["createAuthHandoffCode","createMerchantWithAppleIdentity","getAppleIdentity","getMerchantByEmail","getUserByEmail","recordPendingAppleIdentity","settleAuthThrottle","takeAuthThrottleSlot"],
+      sideEffects: ["outbound http: fetch"],
+      statuses: [303],
+      rateLimits: ["tooManyAttempts"],
+      helpers: ["appleSignInError","appleTransport","back"],
+    },
+  },
+  "POST /api/auth/apple/session": {
+    method: "POST",
+    path: "/api/auth/apple/session",
     principal: "public",
     markers: [],
     facts: {

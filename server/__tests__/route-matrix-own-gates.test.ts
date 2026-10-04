@@ -45,6 +45,7 @@ const COMPLETION = { idempotencyKey: ATTEMPT, sessionId: "no-ones-session", shar
 /** How each link route is asked with a token, state or code that is no one's. */
 const UNKNOWN_LINK: Record<string, Request & { message?: RegExp; bodyEquals?: unknown }> = {
   "POST /api/auth/google/session": { method: "post", path: "/api/auth/google/session", body: {} },
+  "POST /api/auth/apple/session": { method: "post", path: "/api/auth/apple/session", body: {} },
   "POST /api/auth/reset-password": {
     method: "post", path: "/api/auth/reset-password",
     body: { token: NO_ONES_TOKEN, password: VALID_PASSWORD, confirmPassword: VALID_PASSWORD },

@@ -95,6 +95,9 @@ const AUTH_CHECK_CALLS = new Set([
   "validateResetToken",
   "resetPassword",
   "verifyGoogleSignInState",
+  // R1-T5b: Sign in with Apple: this browser's state, then Apple's signed identity token.
+  "verifyAppleSignInState",
+  "verifyAppleIdentityToken",
   "storage.getMerchantByToken",
   "storage.getQuoteByToken",
   "storage.getUserByInviteToken",
