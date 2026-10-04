@@ -1,5 +1,23 @@
 # Full integration continuation audit — 2026-09-07
 
+Latest continuation **2026-10-04 — S4c trades recurring invoices code-complete
+`df54069e`; S4 engineering scope (a, b1, b2, c) implemented**, local, awaiting
+independent review. [Evidence](r1/R1-T7-S4c-trades-schedules-2026-10-04.md),
+[immediate handoff](../../HANDOFF-2026-10-04-r1-t7-trades.md).
+
+- Create under the client's lock (an archive beside it can no longer leave it live);
+  edit and cancel under client-then-row locks with history; resume from the locked
+  row. All 25 signed-in trades registrations use merchant-required storage (pinned).
+- Red **43 of 43** on `22628b95`; affected **36 suites / 1,833 pass**; fresh actual
+  PostgreSQL **21 pass**; **26 of 26** planted mutations caught after one survivor was
+  fixed by a new test. Typecheck/build and **187 routes / 0 gaps; 252 contracts** pass.
+- **Full server on `df54069e` started but NOT read (usage limit): not claimed.** Read
+  `.local/claude-scratch/session-2026-10-03/full-server-s4c.log` or rerun first.
+- No app DB/provider, live migration, client/schema change, push or deploy.
+
+**Active next:** confirm the S4c full server run; then S5 (starting facts in the
+handoff), S6, Apple and R1-T10. Independent/external gates remain below.
+
 Latest continuation **2026-10-04 — S4b2 trades quote, invoice and balance creation and
 delivery code-complete `9b124dea`**, local, awaiting independent review.
 [Evidence/handoff](r1/R1-T7-S4b2-trades-create-2026-10-03.md),
