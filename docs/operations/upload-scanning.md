@@ -59,6 +59,12 @@ every file clean except the standard antivirus test file (EICAR), which it block
 the refusal can be seen. Its verdicts are recorded under the name `simulation`. The
 app refuses to start with it in staging or production.
 
+This workspace switches it on for development only, in `.replit` under
+`[userenv.development]` (added 2026-10-04). It is not set for deployments, where
+ClamAV is required. It takes effect when the development server is next started; that
+it does was not checked here, because the development database could not be reached
+to apply migration `0032` first.
+
 ## The database
 
 Verdicts live in `uploaded_file_scans` (migration `0032`), one row per scanned file,
