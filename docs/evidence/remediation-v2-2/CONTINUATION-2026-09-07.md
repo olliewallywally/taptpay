@@ -1,5 +1,39 @@
 # Full integration continuation audit — 2026-09-07
 
+Latest continuation **2026-10-04 — S6a a clean scan on record code-complete
+`34faf453`**, local, awaiting independent review.
+[Evidence](r1/R1-T7-S6a-upload-scans-2026-10-04.md),
+[S6 preflights](../../PLAN-2026-10-04-r1-t7-s6-uploads.md),
+[operations note](../../operations/upload-scanning.md).
+Owner decision 2026-09-29 (answer 3) governs; finish-R1 authorization persists.
+
+- An uploaded invoice document is scanned before anything is stored (ClamAV's
+  INSTREAM; `server/malware-scanner.ts`): clean stores the file and its verdict in
+  one transaction; blocked is 400 and nothing stored; no scanner, a fault, a timeout
+  or a non-verdict is 503 and nothing stored. Every reader and every attach requires
+  a clean verdict in its own query. Documents from before this have none, so they
+  are unreadable until S6b's pass. The stand-in scanner is development and tests
+  only, refused by configuration in staging and production.
+- Migration **0032** (`uploaded_file_scans`, additive) applied to no application
+  database. Convergence rehearsed as CI runs it: 34 applied, 0 pending; recorded
+  fingerprint moved (1 table, 5 columns, 4 constraints, 1 index added).
+- Red on `d1eb5fb4`: two suites could not load, 24 storage and 12 configuration
+  tests and both pins failed. Affected **103 suites / 3,314 pass**; fresh actual
+  PostgreSQL **14 pass** (it found and closed a stale-verdict gap before commit);
+  **47 of 47** planted mutations caught; **full server 168 suites / 4,171 pass** on
+  `34faf453`. Typecheck/build/whitespace and **187 routes / 0 gaps; 257 contracts**.
+- The gap-13 verifier is 12 pass / 2 fail, identical on the base: the two shell out
+  to the `tsx` command, which the sandbox refuses.
+- **Owner actions this creates:** run ClamAV where the app runs and set
+  `CLAMAV_HOST`; apply 0032 with the other pending development migrations; in
+  development without ClamAV, `UPLOAD_SCANNER=simulation`. Until then document
+  upload answers 503 there.
+- ClamAV was not available here: its protocol is tested against a loopback stand-in.
+  No app DB/provider, live migration, client change, push or deploy.
+
+**Active next:** S6b the two scheduler passes (preflight and separate reread approve
+it on `34faf453`); then Apple and R1-T10. Independent/external gates remain below.
+
 Latest continuation **2026-10-04 — S5b the stragglers code-complete `587842cb`; S5
 engineering scope (a, b) implemented**, local, awaiting independent review.
 [Evidence](r1/R1-T7-S5b-stragglers-2026-10-04.md),

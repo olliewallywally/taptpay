@@ -147,3 +147,118 @@ attachment", the payment page hiding its link and never failing), the 429 and 41
 order on the payer's read, the admin read's audit-before-bytes rule, and the upload's
 existing 400s in their existing order before any scan is attempted. **Approve the
 same S6a scope.**
+
+## S6a completion
+
+Code `34faf453`. On `d1eb5fb4` the scanner and HTTP suites could not load, 24 of 24
+storage tests and the 12 new configuration tests failed, and both pins failed; then
+scanner 13, storage 24, HTTP 14, configuration 88; affected 103 suites / 3,314
+tests; actual PostgreSQL 14 of 14 with migration 0032 through the runner, and the
+convergence rehearsal (34 applied) with a new recorded fingerprint; 47 of 47 planted
+defects caught; full server 168 suites / 4,171 tests on the commit.
+[Evidence](evidence/remediation-v2-2/r1/R1-T7-S6a-upload-scans-2026-10-04.md),
+[operations note](operations/upload-scanning.md).
+The PostgreSQL verifier found one gap before commit (an unscanned save kept the
+file's old verdict in the database); it is closed and held three ways.
+
+## S6b preflight — the two scheduler passes
+
+Base `34faf453` (the S6a code).
+
+### Verification of Prior Fixes
+
+S6a was checked at completion in this session (counts in its evidence): red on the
+base, focused and affected suites, actual PostgreSQL with migration 0032 through the
+runner, the convergence rehearsal and new fingerprint, the planted defects, typecheck,
+build and the full server suite on its commit. Reread for this scope: the scheduler
+route and how it isolates and reports its passes, the three tables that name a
+document (`invoices_rent_requests`, `quotes`, `job_invoices`), the two storage attach
+holds and the lock they take (a share lock on the file's row), the scanner boundary,
+and the owner's answer 4 of 2026-09-29 with the 7-year rule of 2026-09-21.
+
+### Blocking Issues
+
+None. Two things are true after S6a and are what S6b is for:
+
+- A document uploaded before S6a has no verdict and is readable by nobody. Nothing
+  will ever give it one.
+- An upload no invoice uses stays forever. The owner's answer is 12 months.
+
+### High-Risk Concerns
+
+- **The scan pass** takes documents with no verdict, oldest first, a few per run
+  (each is read into memory, up to 20 MB), scans each, and records the verdict only
+  if the file still has none. Clean makes it readable again. Infected is recorded and
+  the bytes stay where they are, unreadable (S6a's readers already refuse it): that
+  is the quarantine. A scanner that gives no verdict stops the pass and records
+  nothing: no document becomes readable without a verdict, and none is condemned
+  without one.
+- **The deletion pass** removes a document only when all of these hold in the
+  database at the moment of deletion: it is in the documents folder; it was uploaded
+  more than 12 calendar months ago; no property invoice, trades quote or trades
+  invoice names it. It takes the same row lock an attach takes, so a document being
+  attached at that moment is either attached first (and kept) or deleted first (and
+  the attach is refused as an invalid document). It never touches a logo, and never
+  an attached document, however old: those follow the 7-year rule.
+- Both passes are isolated like every other scheduler pass: a failure is reported
+  and stops nothing else.
+
+### Missing Steps
+
+Tests red first (storage in both implementations and the captured SQL; the two pass
+functions with a stand-in scanner; the scheduler route's report); the storage
+contracts; the passes; the route wiring and its review; actual PostgreSQL for the
+pass's bounded oldest-first selection, the one-verdict rule under two passes at once,
+the deletion's three reference kinds, its 12-month boundary and both orders of the
+attach race; the mutation check; inventories; affected and full runs, typecheck,
+build, evidence, the handoff.
+
+### Unsafe Assumptions
+
+"12 months" is calendar months from the upload's stored time, in UTC. An infected
+document is unattached by construction, so it is deleted with the others at 12
+months; until then its bytes are kept and never served. Deletion is a hard delete of
+the row and its verdict; there is no undo, which is the decision. Nothing here reads
+or deletes a document that an invoice names, so no legal-hold question arises in
+this pass; the wider retention policy stays with A-H3. The memory implementation
+mirrors the rules for the harness; the SQL is proved on PostgreSQL.
+
+### Required Ordering Changes
+
+The storage contracts first, then the two passes, then the scheduler wiring.
+
+### Open Product / Provider / Legal Questions
+
+None. Both behaviours are the owner's recorded answers.
+
+### Compliance and Data-Handling Notes
+
+The deletion logs a count only; the scan pass logs a blocked document's business and
+signature name, never bytes or names of people. Synthetic loopback PostgreSQL and a
+stand-in scanner only; no application database, provider, live migration, client UI,
+push or deployment.
+
+### Test and Rollback Adequacy
+
+A document one day short of 12 months, an attached one of any age and a logo are
+kept; an unattached one a day past is deleted, with its verdict. A document attached
+while the pass waits is kept; one deleted while an attach waits refuses the attach.
+Two scan passes at once record one verdict per file. A scanner outage records
+nothing. Fix forward; a deleted upload cannot be restored, by design.
+
+### Final Recommendation (Approve / Do not approve)
+
+**Approve S6b on the S6a commit**, failing tests first. With it S6's engineering
+scope, and R1-T7's, is implemented; neither is independently closed by it.
+
+### Separate reread
+
+Retraced by reference. A document's address is stored as `/uploads/invoices/<name>`
+on three tables and nowhere else; the storage attach holds resolve it to the file's
+path `invoices/<name>` and lock that row `FOR SHARE` inside the create's transaction.
+A deletion that locks the row `FOR UPDATE` first therefore serializes with every
+attach, and a separate statement after the lock sees any invoice committed before it.
+Recurring invoices carry no document. The scheduler runs one pass at a time behind
+its own in-process guard, but two instances can run at once, so both passes must be
+safe run twice: the verdict insert takes no second row for a file, and a second
+deletion finds nothing left. **Approve the same S6b scope.**
