@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { CheckCircle, XCircle } from "lucide-react";
 import logoImage from "@assets/IMG_6592_1755070818452.png";
+import { apiPath } from "@shared/api-path";
 
 type State = "form" | "success" | "error";
 
@@ -27,7 +28,7 @@ export default function ConfirmEmail() {
     setSubmitting(true);
     setFormError("");
     try {
-      const res = await fetch("/api/auth/confirm-email", {
+      const res = await fetch(apiPath("POST /api/auth/confirm-email"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, password }),

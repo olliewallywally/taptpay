@@ -7,6 +7,7 @@ import { useTokenPagePrivacy } from "@/hooks/use-token-page-privacy";
 import { PASSWORD_RULE, meetsPasswordRule } from "@shared/password-rule";
 import logoImage from "@assets/IMG_6592_1755070818452.png";
 import "./merchant-signup.css";
+import { apiPath } from "@shared/api-path";
 
 /**
  * Invited teammates land here from their email. The token in the URL is the
@@ -58,7 +59,7 @@ export default function AcceptInvite() {
     setError(null);
     setSubmitting(true);
     try {
-      const response = await fetch("/api/team/accept-invite", {
+      const response = await fetch(apiPath("POST /api/team/accept-invite"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, name: name.trim() || undefined, password, confirmPassword }),

@@ -13,6 +13,7 @@ import { forgotPasswordSchema } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { z } from "zod";
+import { apiPath } from "@shared/api-path";
 
 type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>;
 
@@ -30,7 +31,7 @@ export default function ForgotPassword() {
 
   const forgotPasswordMutation = useMutation({
     mutationFn: async (data: ForgotPasswordFormData) => {
-      const response = await fetch("/api/auth/forgot-password", {
+      const response = await fetch(apiPath("POST /api/auth/forgot-password"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { Mail, RefreshCw, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import logoImage from "@assets/IMG_6592_1755070818452.png";
+import { apiPath } from "@shared/api-path";
 
 function maskEmail(email: string) {
   const [local, domain] = email.split("@");
@@ -28,7 +29,7 @@ export default function CheckEmail() {
     if (!email) return;
     setResending(true);
     try {
-      const res = await fetch("/api/auth/resend-confirmation", {
+      const res = await fetch(apiPath("POST /api/auth/resend-confirmation"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),

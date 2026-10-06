@@ -3,6 +3,7 @@
  * (server/apple-sign-in.ts, server/routes.ts): a page only asks whether it is offered, sends the
  * browser to start it, and says how it went. Nothing here is stored.
  */
+import { apiPath } from "@shared/api-path";
 
 /** A login's own Apple connection, as GET /api/auth/apple/connection answers its owner. */
 export interface AppleConnection {
@@ -18,7 +19,7 @@ export interface AppleConnection {
 /** Whether Sign in with Apple is offered here: the server's own answer, and no when it cannot be asked. */
 export async function appleSignInOffered(signal?: AbortSignal): Promise<boolean> {
   try {
-    const response = await fetch("/api/auth/apple/available", { credentials: "same-origin", cache: "no-store", signal });
+    const response = await fetch(apiPath("GET /api/auth/apple/available"), { credentials: "same-origin", cache: "no-store", signal });
     if (!response.ok) return false;
     const body = await response.json().catch(() => null);
     return body?.available === true;
@@ -44,7 +45,7 @@ export function leaveForApple(url: string): void {
 }
 
 /** Where a sign-in starts: the server sets its starting cookie there and sends the browser on to Apple. */
-export const APPLE_SIGN_IN_START = "/api/auth/apple";
+export const APPLE_SIGN_IN_START = apiPath("GET /api/auth/apple");
 
 /** Starts Sign in with Apple from the login page. (A test replaces it, as above.) */
 export function leaveToSignInWithApple(): void {

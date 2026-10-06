@@ -10,6 +10,7 @@ import { clearSignOutPending } from "@/lib/session";
 import { apiErrorMessage } from "@/lib/api-error";
 import { trackEvent } from "@/lib/analytics";
 import { appleSignInOffered, leaveToSignInWithApple } from "@/lib/apple-sign-in";
+import { apiPath, apiTo } from "@shared/api-path";
 import { SEOHead } from "@/components/SEOHead";
 import { ChevronDown, ArrowLeft } from "lucide-react";
 import taptLogoPath from "@assets/IMG_6592_1755070818452.png";
@@ -28,8 +29,8 @@ const GOOGLE_SIGN_IN_PARAMS = ['google', 'apple', 'error', 'token', 'merchantId'
 // The two sign-ins a provider hands back here (R1-T4 phase A; Apple's is R1-T5d): where the page
 // redeems the one-time code, and the words it uses.
 const HANDOFFS = {
-  google: { name: 'Google', session: '/api/auth/google/session' },
-  apple: { name: 'Apple', session: '/api/auth/apple/session' },
+  google: { name: 'Google', session: apiPath("POST /api/auth/google/session") },
+  apple: { name: 'Apple', session: apiPath("POST /api/auth/apple/session") },
 } as const;
 
 export default function Login() {
@@ -125,8 +126,8 @@ export default function Login() {
 
   const loginMutation = useMutation({
     mutationFn: async (data: LoginFormData) => {
-      const endpoint = loginType === 'merchant' ? "/api/auth/login" : "/api/admin/auth/login";
-      const response = await apiRequest("POST", endpoint, data);
+      const signIn = loginType === 'merchant' ? apiTo("POST /api/auth/login") : apiTo("POST /api/admin/auth/login");
+      const response = await apiRequest(...signIn, data);
       return response.json();
     },
     onSuccess: () => {
@@ -201,7 +202,7 @@ export default function Login() {
 
   const handleGoogleLogin = () => {
     trackEvent("login_attempted", { auth_method: "google", login_type: "merchant" });
-    window.location.href = '/api/auth/google';
+    window.location.href = apiPath("GET /api/auth/google");
   };
 
   const handleAppleLogin = () => {

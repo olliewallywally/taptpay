@@ -13,6 +13,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { Shield, ArrowLeft } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import taptLogoPath from "@assets/tapt logo v2_1751682549877.png";
+import { apiTo } from "@shared/api-path";
 
 const adminLoginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -36,7 +37,7 @@ export default function AdminLogin() {
 
   const loginMutation = useMutation({
     mutationFn: async (data: AdminLoginFormData) => {
-      const response = await apiRequest("POST", "/api/admin/auth/login", data);
+      const response = await apiRequest(...apiTo("POST /api/admin/auth/login"), data);
       return response.json();
     },
     // R1-T4 phase E: the sign-in is the admin's session cookie; the admin area reads it at start.

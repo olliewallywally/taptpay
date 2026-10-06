@@ -13,6 +13,7 @@ import { resetPasswordSchema } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { z } from "zod";
+import { apiPath } from "@shared/api-path";
 
 type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;
 
@@ -40,10 +41,10 @@ export default function ResetPassword() {
     isFetching: checkingToken,
     refetch: checkTokenAgain,
   } = useQuery({
-    queryKey: ["/api/auth/validate-reset-token", token],
+    queryKey: ["GET /api/auth/validate-reset-token/:token", token],
     queryFn: async () => {
       if (!token) throw new Error("No reset token provided");
-      const response = await fetch(`/api/auth/validate-reset-token/${token}`);
+      const response = await fetch(apiPath("GET /api/auth/validate-reset-token/:token", { token }));
       if (!response.ok) throw new Error("Failed to validate token");
       return response.json();
     },
@@ -52,7 +53,7 @@ export default function ResetPassword() {
 
   const resetPasswordMutation = useMutation({
     mutationFn: async (data: ResetPasswordFormData) => {
-      const response = await fetch("/api/auth/reset-password", {
+      const response = await fetch(apiPath("POST /api/auth/reset-password"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

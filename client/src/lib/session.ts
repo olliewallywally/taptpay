@@ -13,6 +13,8 @@
  * every other request the business's, as the server reads them.
  */
 
+import { ADMIN_API_PREFIX, apiPath } from "@shared/api-path";
+
 export type SessionRealm = "business" | "admin";
 
 /** The signed-in login, as the start-up check reads it. */
@@ -70,7 +72,7 @@ export function realmOf(url: string): SessionRealm {
   } catch {
     // A relative path as given.
   }
-  return path === "/api/admin" || path.startsWith("/api/admin/") ? "admin" : "business";
+  return path === ADMIN_API_PREFIX || path.startsWith(`${ADMIN_API_PREFIX}/`) ? "admin" : "business";
 }
 
 /** Whether a request goes to this site's own origin (a path, or an address on the same origin). */
@@ -167,7 +169,7 @@ function sessionUser(value: unknown): SessionUser | null {
  * when signed in and released when not. Throws only when the request itself failed (offline, aborted).
  */
 export async function readBusinessSession(signal?: AbortSignal): Promise<SessionCheck> {
-  const response = await fetch("/api/auth/session", { credentials: "same-origin", cache: "no-store", signal });
+  const response = await fetch(apiPath("GET /api/auth/session"), { credentials: "same-origin", cache: "no-store", signal });
   if (response.status === 401 || response.status === 403) {
     releaseSession("business");
     return { kind: "signed-out" };
@@ -188,7 +190,7 @@ export async function readBusinessSession(signal?: AbortSignal): Promise<Session
 
 /** The admin area's start-up check (GET /api/admin/auth/me), held and released as the business's. */
 export async function readAdminSession(signal?: AbortSignal): Promise<SessionCheck> {
-  const response = await fetch("/api/admin/auth/me", { credentials: "same-origin", cache: "no-store", signal });
+  const response = await fetch(apiPath("GET /api/admin/auth/me"), { credentials: "same-origin", cache: "no-store", signal });
   if (response.status === 401 || response.status === 403) {
     releaseSession("admin");
     return { kind: "signed-out" };
@@ -255,14 +257,14 @@ export function clearSignOutPending(): void {
  */
 export async function finishPendingSignOut(): Promise<void> {
   try {
-    const check = await fetch("/api/auth/session", { credentials: "same-origin", cache: "no-store" });
+    const check = await fetch(apiPath("GET /api/auth/session"), { credentials: "same-origin", cache: "no-store" });
     if (!check.ok) return;
     const body = await check.json();
     if (body?.signedIn !== true || typeof body.csrfToken !== "string") {
       if (body?.signedIn === false) markSignOutPending(false); // Nothing to end.
       return;
     }
-    const ended = await fetch("/api/auth/logout", {
+    const ended = await fetch(apiPath("POST /api/auth/logout"), {
       method: "POST",
       credentials: "same-origin",
       headers: { [CSRF_HEADER]: body.csrfToken },
@@ -288,7 +290,7 @@ export async function logOutThisDevice(): Promise<void> {
       await finishPendingSignOut();
       return;
     }
-    const response = await sessionFetch("/api/auth/logout", { method: "POST" });
+    const response = await sessionFetch(apiPath("POST /api/auth/logout"), { method: "POST" });
     // Ended now, or had already ended.
     if (response.ok || response.status === 401) markSignOutPending(false);
   } catch {
@@ -302,7 +304,7 @@ export async function logOutThisDevice(): Promise<void> {
 /** The admin area's Log Out, as the business's. */
 export async function logOutAdmin(): Promise<void> {
   try {
-    if (held.admin) await sessionFetch("/api/admin/auth/logout", { method: "POST" });
+    if (held.admin) await sessionFetch(apiPath("POST /api/admin/auth/logout"), { method: "POST" });
   } catch {
     // Unreachable: the admin session ends on its own, after 30 minutes unused.
   } finally {

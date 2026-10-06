@@ -15,6 +15,7 @@ import { trackEvent } from "@/lib/analytics";
 import { useToast } from "@/hooks/use-toast";
 import logoImage from "@assets/IMG_6592_1755070818452.png";
 import "./merchant-signup.css";
+import { apiTo } from "@shared/api-path";
 
 type SignupForm = {
   name: string;
@@ -193,7 +194,7 @@ export default function MerchantSignup() {
 
   const signupMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/merchants/signup", form);
+      const response = await apiRequest(...apiTo("POST /api/merchants/signup"), form);
       return response.json();
     },
     onSuccess: () => {

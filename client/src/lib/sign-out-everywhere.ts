@@ -1,3 +1,4 @@
+import { apiPath } from "@shared/api-path";
 import { heldSession, sessionFetch } from "./session";
 
 /**
@@ -22,7 +23,7 @@ export async function signOutEverywhere(): Promise<SignOutEverywhereOutcome> {
 
   let response: Response;
   try {
-    response = await sessionFetch("/api/auth/sign-out-everywhere", { method: "POST" });
+    response = await sessionFetch(apiPath("POST /api/auth/sign-out-everywhere"), { method: "POST" });
   } catch {
     throw new Error(FAILED);
   }

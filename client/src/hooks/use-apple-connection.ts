@@ -4,8 +4,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { appleConnectOutcome, isAppleAuthorizeUrl, leaveForApple, type AppleConnection } from "@/lib/apple-sign-in";
 import { apiRequest } from "@/lib/queryClient";
+import { apiPath, apiTo } from "@shared/api-path";
 
-export const APPLE_CONNECTION_KEY = ["/api/auth/apple/connection"] as const;
+export const APPLE_CONNECTION_KEY = [apiPath("GET /api/auth/apple/connection")] as const;
 
 const COULD_NOT_START = "Could not start connecting Apple. Please try again.";
 const COULD_NOT_DISCONNECT = "Could not disconnect Apple. Please try again.";
@@ -55,7 +56,7 @@ export function useAppleConnection(isOwner: boolean) {
   const query = useQuery<AppleConnection>({
     queryKey: APPLE_CONNECTION_KEY,
     enabled: isOwner,
-    queryFn: async () => (await apiRequest("GET", "/api/auth/apple/connection")).json(),
+    queryFn: async () => (await apiRequest(...apiTo("GET /api/auth/apple/connection"))).json(),
   });
 
   // How the return went is said once, to the owner only. A refusal is said as soon as the page knows
@@ -80,7 +81,7 @@ export function useAppleConnection(isOwner: boolean) {
 
   const connect = useMutation({
     mutationFn: async (currentPassword: string) => {
-      const response = await apiRequest("POST", "/api/auth/apple/connect", { currentPassword });
+      const response = await apiRequest(...apiTo("POST /api/auth/apple/connect"), { currentPassword });
       const body = await response.json().catch(() => ({}));
       // The page leaves only for Apple's own sign-in page.
       if (!isAppleAuthorizeUrl(body?.url)) throw new Error(COULD_NOT_START);
@@ -92,7 +93,7 @@ export function useAppleConnection(isOwner: boolean) {
 
   const disconnect = useMutation({
     mutationFn: async (currentPassword: string) => {
-      await apiRequest("POST", "/api/auth/apple/disconnect", { currentPassword });
+      await apiRequest(...apiTo("POST /api/auth/apple/disconnect"), { currentPassword });
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: APPLE_CONNECTION_KEY });

@@ -2,7 +2,8 @@
  * R1-T2 — regenerates server/route-policy.ts and the documentation table from
  * the current server/routes.ts source. Run this whenever routes.ts's
  * registrations change; server/__tests__/route-policy-inventory.test.ts fails
- * loudly if the two drift apart.
+ * loudly if the two drift apart. R1-T10a: it also writes shared/api-routes.ts, the
+ * client's typed list of the routes a browser calls (server/api-route-list.ts).
  *
  *   npx tsx scripts/generate-route-policy.ts
  */
@@ -25,6 +26,7 @@ import {
 import { compactFacts, currentRouteFacts, type RecordedRouteFacts } from "../server/route-facts";
 import { MATRIX_CALLER_MEANING, describeMatrixRow, matrixRowFor } from "../server/route-matrix";
 import { REVIEW_PENDING, ROUTE_REVIEW, type RouteReview } from "../server/route-review";
+import { API_ROUTES_FILE, browserApiRoutes, renderApiRoutes } from "../server/api-route-list";
 
 const POLICY_FILE = path.join(process.cwd(), "server", "route-policy.ts");
 const TABLE_FILE = path.join(
@@ -380,7 +382,12 @@ ${rows.map(renderFactsSection).join("\n")}`;
 
   fs.writeFileSync(TABLE_FILE, table);
 
-  console.log(`Wrote ${POLICY_FILE} and ${TABLE_FILE}`);
+  // R1-T10a: the client's typed list of the routes a browser calls (types only), from the
+  // registrations just read. server/__tests__/api-route-contract.test.ts holds it to them.
+  const apiRoutes = browserApiRoutes(rows, ROUTE_REVIEW);
+  fs.writeFileSync(path.join(process.cwd(), API_ROUTES_FILE), renderApiRoutes(apiRoutes));
+
+  console.log(`Wrote ${POLICY_FILE}, ${TABLE_FILE} and ${API_ROUTES_FILE} (${apiRoutes.length} routes a browser calls)`);
   console.log(`${rows.length} registrations, ${unclassified.length} unclassified, ${suspectedGaps.length} suspected gap(s).`);
 }
 
