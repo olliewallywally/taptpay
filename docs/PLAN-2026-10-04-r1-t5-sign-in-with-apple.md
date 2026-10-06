@@ -113,6 +113,20 @@ on them.
 8. **No email is sent when Apple is connected or disconnected.** The app sends none
    when a password changes either; both are written to the security log. A notice
    email for both is a small later addition.
+9. **The Settings row** (added with T5d). Default: in the Account section on the phone
+   and on the tablet and desktop screens, for the owner only: "Sign in with Apple", whether
+   it is connected and with which address, a field for the current password and one
+   button (Connect Apple, or Disconnect). Plain ink, no new colours. It is new on screen
+   and the owner will want to look at it. The row is not drawn at all until Apple is set
+   up, unless an identity is already connected.
+10. **"Forgot password?" on the login page** (found with T5c). It answers "coming soon",
+    though the page exists at `/forgot-password`. An owner who has only ever signed in
+    with Google has no password they know and needs that page before connecting Apple.
+    Default: the Settings row links to it; the login page is left exactly as it is.
+11. **Apple's mark on the button** (added with T5d). Default: the standard Apple logo
+    shape, drawn in the page as Google's "G" is. Apple's own guidance asks for the
+    artwork from its design resources: swapping that file in before submission is a
+    one-line change, and his to choose.
 
 ## T5a preflight — Apple's token boundary
 
@@ -477,3 +491,110 @@ tightened; full server 179 suites / 4,432 tests on the commit.
 Settled while building, by the plan's protected order (a capability before the role):
 the start says Apple is not available (503) before it asks who is calling. Changed from
 the draft: the connect cookie's reader takes a login id of at most ten digits.
+
+## T5d preflight — the screens
+
+Base `9a531b3e` (T5c code `3520df77`; the commit above it is documentation).
+
+### Verification of Prior Fixes
+
+T5c was verified in this session: 179 suites / 4,432 tests on `3520df77`. Reread for this
+scope: the login page (the Google button, its handoff, how it cleans the address); both
+Settings screens (the phone's `client/src/pages/settings.tsx`, whose Account section
+holds only the account's status; the tablet and desktop's
+`client/src/desktop/DesktopSettingsPage.tsx`, whose Account section has the password
+row); how a page sends a change (`apiRequest` to `sessionFetch`, which adds the page's
+CSRF token); `apiErrorMessage`; the client tests' set-up (jsdom, `fetch` replaced, any
+React warning fails the test); the public capability reads and their reviews; R1-T4
+phase E's in-process browser check; and the plan's baseline rule (R1-H1: "intentional R1
+differences such as Sign in with Apple are reviewed explicitly rather than absorbed").
+
+### Blocking Issues
+
+None for building. What only the owner can settle is recorded, not asked: how the
+button and the Settings row look (defaults 1 and 9 at the top of this plan).
+
+### High-Risk Concerns
+
+- **The button must not appear where it does nothing.** The owner's answer: it goes live
+  once Apple is set up. The login page asks the server whether Sign in with Apple is
+  offered and shows the button only on a yes. That needs one small public read
+  (`GET /api/auth/apple/available`): a boolean from configuration and the origin's
+  scheme, nothing else. Until the owner's setup the login page is exactly as it is now.
+- **The same weight as Google's** (guideline 4.8; Apple's interface guidelines): the
+  same width, height and shape, directly under Google's, Apple's mark, black, the
+  approved wording "Continue with Apple".
+- **The handoff takes nothing from the address** but the fixed word `complete`. The
+  page redeems the one-time code by a same-origin POST and stores nothing, as Google's
+  does. `apple` joins the sign-in results the page removes from its address.
+- **The password is typed, used once and forgotten**: component state, cleared when the
+  request ends, never stored, never in an address.
+- **The page leaves only for Apple.** The start's answer is believed only when its
+  address is Apple's own authorize page (`https://appleid.apple.com/`).
+- **The return word is one of eight.** Each maps to a fixed message; anything else says
+  nothing; the word is removed from the address either way.
+- **Owners only.** The row is not drawn for a teammate (the server refuses them too),
+  and not drawn at all when Apple is not offered and nothing is connected.
+- **No new status colours** (the owner's rule): the row is neutral ink.
+
+### Missing Steps
+
+Tests red first (the read, in its three configurations; the button's presence, absence
+and click; Apple's handoff; the row on the phone and on the desktop screen: its states,
+connecting, disconnecting, each refusal, each return word, the address cleaned); the
+read with its review, public-path entry and served case; the shared client piece; the
+login page; the two Settings screens; a real browser on phone, tablet and desktop
+against the real routes, over https, with a stand-in Apple; typecheck, build, affected
+and full runs for server and client, the mutation check, evidence.
+
+### Unsafe Assumptions
+
+The iPhone app shows the live site, so these pages are what it shows; Sign in with Apple
+inside that app, and Safari itself, are the owner's real-device check. The browser check
+here is Chromium: it proves the pages and this server's cookies together (the starting
+cookie returning on Apple's cross-site post, the session cookie staying behind and being
+there again on the way back), not Safari's own rules. A stand-in page plays Apple's
+sign-in screen and posts the form back the way Apple does.
+
+### Required Ordering Changes
+
+The read first; then the shared client piece; the login page; the two Settings screens;
+the browser check last, on the built app.
+
+### Open Product / Provider / Legal Questions
+
+Defaults 1 and 5 to 8 stand. Added with T5d, recorded for the owner: (9) what the
+Settings row says and where it sits; (10) the login page's "Forgot password?" answers
+"coming soon" although the page exists at `/forgot-password` — the row links to that
+page for an owner who has no password they know, and the login page is left as it is.
+
+### Compliance and Data-Handling Notes
+
+The pages store nothing new. Analytics gets `auth_method: "apple"` on the same three
+sign-in events Google's has, with no identifier. The row shows the address Apple gave,
+to its owner only.
+
+### Test and Rollback Adequacy
+
+Each screen's states are driven with the server's real answers as fixtures; the browser
+check drives the real routes end to end at three sizes. A refusal leaves the page as it
+was. Fix forward; nothing here changes a stored row's shape.
+
+### Final Recommendation (Approve / Do not approve)
+
+**Approve T5d on `9a531b3e`**, failing tests first. It does not close R1-T5: the
+runbooks (T5e) and the owner's setup and iPhone check remain.
+
+### Separate reread
+
+Retraced by call site. The login page's effect already handles `?error=` for any
+provider, so Apple's refusals are shown today; only `apple=complete` and the button are
+new. `/settings` draws the phone screen for the phone and `DesktopSettingsPage` for
+tablet and desktop, in three verticals from one component: two places take the row, not
+six. Both screens already know whether the login is the owner (`/api/auth/me`). The
+desktop Account section ends with the password row, which stays; the Apple row follows
+it. A fresh query client in a test has no default fetcher, so the shared piece must
+bring its own. `window.location.assign` is what jsdom cannot do: the shared piece
+leaves through one small function the tests replace. What must not move: Google's
+button, handoff and tests; the password row; every existing Settings test.
+**Approve the same T5d scope.**
