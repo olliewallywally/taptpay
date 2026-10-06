@@ -15,6 +15,7 @@ import { apiErrorMessage } from "@/lib/api-error";
 import { apiRequest } from "@/lib/queryClient";
 import { isNativeApp } from "@/lib/native";
 import { usePushNotifications } from "@/hooks/use-push-notifications";
+import { useAppleConnection } from "@/hooks/use-apple-connection";
 import {
   BILLING_CARD_SESSION_KEY,
   useBillingCardReturn,
@@ -205,9 +206,13 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
      Windcave hosted-card return still lands on /settings?section=billing&card=…
      (server/routes.ts:7014, not changed here) — landing straight on the billing
      page instead of an inline scroll target is the same behavior, new shape. */
-  const [activeSection, setActiveSection] = useState<SectionKey | null>(() =>
-    new URLSearchParams(window.location.search).get("section") === "billing" ? "billing" : null,
-  );
+  const [activeSection, setActiveSection] = useState<SectionKey | null>(() => {
+    const params = new URLSearchParams(window.location.search);
+    // Apple's return to a connect lands on /settings?apple=<word> (R1-T5d): back on the Account
+    // page the owner left from, as the card return lands on Billing.
+    if (params.has("apple")) return "account";
+    return params.get("section") === "billing" ? "billing" : null;
+  });
   /* Slide-out is a real CSS animation, not an instant unmount — `leaving` keeps
      the section rendered (with the exit class applied) for the animation's
      duration, then the state actually clears. 260ms matches SETTINGS_LEAVE_MS
@@ -309,6 +314,8 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
     },
   });
   const isOwner = authData?.user?.role === "owner" || authData?.user?.role === "admin";
+  // R1-T5d: the owner's own "Sign in with Apple" row (Account). The server refuses everyone else.
+  const apple = useAppleConnection(authData?.user?.role === "owner");
 
   const { data: billingCardStatus } = useQuery<{
     ready: boolean;
@@ -1412,6 +1419,51 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
                 <AlertCircle className="text-amber-500 shrink-0" size={24} />
               )}
             </div>
+
+            {/* R1-T5d: Sign in with Apple for this login. Drawn for the owner, where Apple can be
+                connected or already is; connecting and disconnecting ask for the current password. */}
+            {apple.visible && (
+              <div className="p-4 rounded-xl" style={{ background: APPLE_FILL }} data-testid="apple-connection">
+                <p className="text-gray-700 font-medium">Sign in with Apple</p>
+                <p className="text-sm break-words" style={{ color: APPLE_MUTED }}>
+                  {apple.connected
+                    ? `Connected${apple.email ? ` · ${apple.email}` : ''}${apple.isPrivateEmail ? ' (Hide My Email)' : ''}`
+                    : 'Not connected'}
+                </p>
+                <Input
+                  type="password"
+                  autoComplete="current-password"
+                  value={apple.password}
+                  onChange={(e) => apple.setPassword(e.target.value)}
+                  placeholder="Current password"
+                  aria-label="Current password for Apple"
+                  className="mt-3 !border !border-gray-200 focus:!border-[#040D6D] focus:!ring-[#040D6D]"
+                  style={{ minHeight: 44 }}
+                />
+                <WireframeLiquidButton
+                  onClick={apple.submit}
+                  busy={apple.busy}
+                  disabled={!apple.password}
+                  accent="#040D6D"
+                  filledTextColor="#58ABFF"
+                  style={{ width: '100%', marginTop: 12, padding: '12px 27px', fontSize: 14 }}
+                  data-testid="button-apple-connection"
+                >
+                  {apple.connected ? 'Disconnect Apple' : 'Connect Apple'}
+                </WireframeLiquidButton>
+                {!apple.connected && (
+                  <button
+                    type="button"
+                    onClick={() => setLocation('/forgot-password')}
+                    className="w-full mt-1 text-sm font-semibold"
+                    style={{ color: APPLE_MUTED, background: 'transparent', border: 'none', minHeight: 44 }}
+                    data-testid="link-apple-set-password"
+                  >
+                    No password yet? Set one first
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
         )}

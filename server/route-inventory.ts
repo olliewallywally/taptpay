@@ -461,6 +461,8 @@ export const PUBLIC_PATH_ALLOWLIST: Record<string, string> = {
   "POST /api/auth/google/session":
     "redeems the one-time handoff code its HttpOnly cookie carries, once, for the account token (R1-T4 phase A); the code is the credential, so necessarily pre-session",
   "GET /api/auth/apple": "Sign in with Apple redirect initiation (R1-T5b); necessarily pre-session",
+  "GET /api/auth/apple/available":
+    "whether Sign in with Apple is offered on this server (R1-T5d): one boolean from configuration and the origin's scheme, no secret; the login page asks before it shows the button",
   "POST /api/auth/apple/callback":
     "Apple's form-post callback that issues the one-time sign-in handoff code (R1-T5b); necessarily pre-session, and admitted cross-site only from Apple's exact origin",
   "POST /api/auth/apple/session":

@@ -54,8 +54,9 @@ describe("a password sign-in on the login page", () => {
     }));
     await signIn();
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    // One sign-in; the page's only other request asks whether Sign in with Apple is offered (R1-T5d).
+    expect(fetchMock.mock.calls.map(([asked]) => asked).sort()).toEqual(["/api/auth/apple/available", "/api/auth/login"]);
+    const [url, init] = fetchMock.mock.calls.find(([asked]) => asked === "/api/auth/login") as [string, RequestInit];
     expect({ url, method: init.method, credentials: init.credentials }).toEqual({ url: "/api/auth/login", method: "POST", credentials: "same-origin" });
     expect(new Headers(init.headers).get("Authorization")).toBeNull();
     expect(Object.keys(localStorage)).toEqual([]);

@@ -180,6 +180,14 @@ const RECIPES: Record<string, OwnServedRecipe> = {
       },
     };
   },
+  // Whether Sign in with Apple is offered here (R1-T5d): the login page asks before it shows the button.
+  "GET /api/auth/apple/available": () => ({
+    req: get("/api/auth/apple/available"), status: 200,
+    check: (res) => {
+      expect(res.body).toEqual({ available: true });
+      expect(res.headers["cache-control"]).toBe("no-store");
+    },
+  }),
   // Sign in with Apple (R1-T5b): the start, Apple's form post back, and the browser redeeming its one-time code.
   "GET /api/auth/apple": () => ({
     req: get("/api/auth/apple"), status: 302,
@@ -396,6 +404,7 @@ const SERVED_BY: Record<string, OwnServedCaller[]> = {
   "GET /api/auth/google/callback": ["signed-out"],
   "POST /api/auth/google/session": ["link-holder"],
   "GET /api/auth/apple": ["signed-out"],
+  "GET /api/auth/apple/available": ["signed-out"],
   "POST /api/auth/apple/callback": ["signed-out"],
   "POST /api/auth/apple/session": ["link-holder"],
   "POST /api/auth/login": ["signed-out"],

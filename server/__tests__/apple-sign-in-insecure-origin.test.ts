@@ -53,3 +53,10 @@ test("on an http origin an owner cannot start a connect, and the connection says
   const read = await request(app).get("/api/auth/apple/connection").set({ Cookie: owner.cookie, ...host });
   expect(read.body).toEqual({ available: false, connected: false, email: null, isPrivateEmail: false, connectedAt: null });
 });
+
+// R1-T5d: set up, but the origin is not https, so the flow cannot run: not offered.
+test("on an http origin the server says Sign in with Apple is not offered", async () => {
+  const { app } = await createTestApp();
+  const res = await request(app).get("/api/auth/apple/available");
+  expect({ status: res.status, body: res.body }).toEqual({ status: 200, body: { available: false } });
+});

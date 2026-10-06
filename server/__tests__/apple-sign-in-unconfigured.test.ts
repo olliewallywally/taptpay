@@ -105,3 +105,12 @@ test("a connect begun while Apple was set up returns to an app where it no longe
   expect(fetchSpy).not.toHaveBeenCalled();
   expect(await (storage as any).getAppleIdentityForLogin(owner.user.userId)).toBeUndefined();
 });
+
+// R1-T5d: the login page asks before it shows the button.
+test("the server says Sign in with Apple is not offered", async () => {
+  const { app } = await createTestApp();
+  const res = await request(app).get("/api/auth/apple/available");
+  expect({ status: res.status, body: res.body }).toEqual({ status: 200, body: { available: false } });
+  expect(res.headers["cache-control"]).toMatch(/no-store/);
+  expect(fetchSpy).not.toHaveBeenCalled();
+});

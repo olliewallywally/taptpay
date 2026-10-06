@@ -1241,6 +1241,19 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     },
   },
 
+  "GET /api/auth/apple/available": {
+    branches: [{ principal: "public", tenant: "none", tenantRule: "none: the platform's own settings" }],
+    input: "nothing",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto:
+      "{ available }: whether Sign in with Apple can run on this server (all four Apple settings and an https public origin), never cached. The login page shows its Apple button only on true (R1-T5d). The same for every caller, signed in or not; nothing of the settings themselves",
+    errorDisclosure: ["fixed"],
+    controls: CONFIGURATION_CONTROLS,
+  },
+
   "POST /api/auth/apple/callback": {
     branches: [
       {

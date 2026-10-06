@@ -1,8 +1,8 @@
 # R1-T7 tenant/storage execution inventory
 
-Generated from working-tree sources on base `3cf92efa341736cd720ee1b9867e0d6debe03713`; the phase evidence names the final commit.
+Generated from working-tree sources on base `d86d6f114ae6806820f74a99248698d17cd556b1`; the phase evidence names the final commit.
 
-Registrations: **193**; registrations with session/admin authentication: **122**;
+Registrations: **194**; registrations with session/admin authentication: **122**;
 registrations calling checkMerchantOwnership: **25**.
 IStorage: **258** declared methods;
 PaymentAttemptRepository: **8** inherited methods.
@@ -46,6 +46,7 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | GET /api/admin/request-origin | validated admin (platform-admin/none) | — |
 | GET /api/admin/revenue-over-time | validated admin (platform-admin/any-merchant) | `getAllMerchants`, `getTransactionsByMerchant` |
 | GET /api/auth/apple | public (public/none) | — |
+| GET /api/auth/apple/available | public (public/none) | — |
 | GET /api/auth/apple/connection | account (merchant/session) | `getAppleIdentityForLogin` |
 | GET /api/auth/google | public (public/none) | — |
 | GET /api/auth/google/callback | account entry/recovery (public/credentials) | `createAuthHandoffCode`, `createMerchantWithPassword`, `getMerchantByEmail`, `getUserByEmail`, `settleAuthThrottle`, `takeAuthThrottleSlot`, `updateMerchant` |

@@ -1,8 +1,8 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 3cf92efa341736cd720ee1b9867e0d6debe03713 on 2026-10-06.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ d86d6f114ae6806820f74a99248698d17cd556b1 on 2026-10-06.
  *
- * 193 registrations (80 GET, 81 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
+ * 194 registrations (81 GET, 81 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
  * live count on every run rather than trusting this comment.
  *
@@ -175,6 +175,16 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       helpers: ["appleSignInError"],
     },
   },
+  "GET /api/auth/apple/available": {
+    method: "GET",
+    path: "/api/auth/apple/available",
+    principal: "public",
+    markers: [],
+    facts: {
+      statuses: [200],
+      helpers: ["appleOffered"],
+    },
+  },
   "POST /api/auth/apple/callback": {
     method: "POST",
     path: "/api/auth/apple/callback",
@@ -212,7 +222,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       storageMethods: ["getAppleIdentityForLogin"],
       statuses: [200,401,403,500,503],
       dtos: ["appleConnectionDto"],
-      helpers: ["ownerLoginOf"],
+      helpers: ["appleOffered","ownerLoginOf"],
     },
   },
   "POST /api/auth/apple/connect": {

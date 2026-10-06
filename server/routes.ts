@@ -815,6 +815,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   const appleTransport: AppleTransport = (url, init) => fetch(url, init);
   const appleKeys = createAppleKeySet(appleTransport);
   const appleSignInError = (message: string) => `/login?error=${encodeURIComponent(message)}`;
+  /** Sign in with Apple can run here: all four settings, on an https origin (the starting cookie needs it). */
+  const appleOffered = () => appleSettings() !== null && appleCookies.secure;
   const APPLE_EXPIRED = 'Apple sign in expired. Please try again.';
   const APPLE_ALREADY_HAS_LOGIN = 'That email already has a TaptPay login. Sign in, then connect Apple in Settings.';
 
@@ -827,6 +829,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     res.cookie(appleCookies.oauth.name, start.cookieValue, appleCookies.oauth.options);
     res.set('Cache-Control', 'no-store');
     res.redirect(appleAuthorizeUrl(settings, `${getBaseUrl(req)}/api/auth/apple/callback`, start));
+  });
+
+  // R1-T5d: the login page's question before it shows "Continue with Apple" (owner decision
+  // 2026-09-29: it goes live once Apple is set up). One boolean about this server, and nothing else.
+  app.get("/api/auth/apple/available", (_req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.json({ available: appleOffered() });
   });
 
   app.post("/api/auth/apple/callback", async (req, res) => {
@@ -977,7 +986,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     if (!login) return res.status(403).json(OWNER_ONLY);
     try {
       const identity = await storage.getAppleIdentityForLogin(login.userId);
-      return res.json(appleConnectionDto(identity, appleSettings() !== null && appleCookies.secure));
+      return res.json(appleConnectionDto(identity, appleOffered()));
     } catch (err) {
       console.error('[APPLE_CONNECTION]', err);
       return res.status(500).json({ message: 'Could not read the Apple connection. Please try again.' });

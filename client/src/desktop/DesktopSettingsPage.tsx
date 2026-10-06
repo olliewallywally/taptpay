@@ -10,6 +10,7 @@ import { apiErrorMessage } from "@/lib/api-error";
 import { apiRequest } from "@/lib/queryClient";
 import { useTutorial } from "@/features/tutorial/tutorial";
 import { useToast } from "@/hooks/use-toast";
+import { useAppleConnection } from "@/hooks/use-apple-connection";
 import { SIGN_OUT_EVERYWHERE_CONFIRMATION, signOutEverywhere } from "@/lib/sign-out-everywhere";
 import { resyncThisDevicePush } from "@/lib/push-device";
 import { forgetThisDeviceSignIn, logOut } from "@/lib/log-out";
@@ -174,7 +175,10 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
     canRestart: tutorialReady,
   } = useTutorial();
 
-  const [openSec, setOpenSec] = useState<SectionKey | null>("business");
+  // Apple's return to a connect lands on /settings?apple=<word> (R1-T5d): back on Account, where the
+  // owner left from.
+  const [openSec, setOpenSec] = useState<SectionKey | null>(() =>
+    new URLSearchParams(window.location.search).has("apple") ? "account" : "business");
   const [details, setDetails] = useState({ businessName: "", gstNumber: "", email: "" });
   const [detailsDirty, setDetailsDirty] = useState(false);
   const [dailyGoal, setDailyGoal] = useState("");
@@ -220,6 +224,8 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
     enabled: !!merchantId,
   });
   const isOwner = authQuery.data?.user?.role === "owner" || authQuery.data?.user?.role === "admin";
+  // R1-T5d: the owner's own "Sign in with Apple" row (Account). The server refuses everyone else.
+  const apple = useAppleConnection(authQuery.data?.user?.role === "owner");
 
   const cardQuery = useQuery<{ ready: boolean; card: { last4: string; brand: string | null; expiry: string | null } | null }>({
     queryKey: ["/api/billing/card"],
@@ -1144,7 +1150,7 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
                             : `${status} — contact support if you need help`}
                       </span>
                     </div>
-                    <div className="ds-row ds-row-last ds-row-tall">
+                    <div className={`ds-row${apple.visible ? "" : " ds-row-last"} ds-row-tall`}>
                       <span className="ds-row-label">Password</span>
                       <span className="ds-card-form">
                         <input
@@ -1181,6 +1187,51 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
                         </button>
                       </span>
                     </div>
+                    {/* R1-T5d: Sign in with Apple for this login. Drawn for the owner, where Apple can be
+                        connected or already is; connecting and disconnecting ask for the current password. */}
+                    {apple.visible && (
+                      <div className="ds-row ds-row-last ds-row-tall" data-testid="apple-connection">
+                        <span className="ds-row-text">
+                          <span className="ds-row-label">Sign in with Apple</span>
+                          <span className="ds-row-sub">
+                            {apple.connected
+                              ? `Connected${apple.email ? ` · ${apple.email}` : ""}${apple.isPrivateEmail ? " (Hide My Email)" : ""}`
+                              : "Not connected"}
+                          </span>
+                        </span>
+                        <span className="ds-card-form">
+                          <input
+                            className="ds-inline-input"
+                            type="password"
+                            autoComplete="current-password"
+                            value={apple.password}
+                            onChange={(e) => apple.setPassword(e.target.value)}
+                            placeholder="current password"
+                            aria-label="Current password for Apple"
+                            style={{ width: 150 }}
+                          />
+                          <button
+                            type="button"
+                            className="ds-primary ds-primary-sm"
+                            disabled={apple.busy || !apple.password}
+                            onClick={apple.submit}
+                            data-testid="button-apple-connection"
+                          >
+                            {apple.connected ? "Disconnect Apple" : "Connect Apple"}
+                          </button>
+                          {!apple.connected && (
+                            <button
+                              type="button"
+                              className="ds-ghost"
+                              onClick={() => setLocation("/forgot-password")}
+                              data-testid="link-apple-set-password"
+                            >
+                              No password yet?
+                            </button>
+                          )}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
 

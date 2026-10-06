@@ -406,3 +406,18 @@ describe("R1-T5b — redeeming the one-time code", () => {
     expect(setCookies(session).has("__Host-taptpay-session")).toBe(false);
   });
 });
+
+describe("R1-T5d — whether Sign in with Apple is offered", () => {
+  test("says yes when Apple is set up on an https origin, and nothing else", async () => {
+    const { app } = await createTestApp();
+    const res = await request(app).get("/api/auth/apple/available");
+    expect({ status: res.status, body: res.body }).toEqual({ status: 200, body: { available: true } });
+    expect(res.headers["cache-control"]).toMatch(/no-store/);
+    // It starts nothing: no cookie, and Apple is not asked.
+    expect(res.headers["set-cookie"]).toBeUndefined();
+    expect(appleRequests).toEqual([]);
+    // Signed in or not, the answer is the same: it is about the server, not the caller.
+    const owner = await createOwnerPrincipal();
+    expect((await request(app).get("/api/auth/apple/available").set("Cookie", owner.cookie)).body).toEqual({ available: true });
+  });
+});

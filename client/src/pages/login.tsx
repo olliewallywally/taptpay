@@ -9,6 +9,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { clearSignOutPending } from "@/lib/session";
 import { apiErrorMessage } from "@/lib/api-error";
 import { trackEvent } from "@/lib/analytics";
+import { appleSignInOffered, leaveToSignInWithApple } from "@/lib/apple-sign-in";
 import { SEOHead } from "@/components/SEOHead";
 import { ChevronDown, ArrowLeft } from "lucide-react";
 import taptLogoPath from "@assets/IMG_6592_1755070818452.png";
@@ -20,9 +21,16 @@ const loginSchema = z.object({
 
 type LoginFormData = z.infer<typeof loginSchema>;
 
-// Google sign-in's results, removed from the address on arrival. Everything else
+// Google's and Apple's sign-in results, removed from the address on arrival. Everything else
 // (returnTo) stays for the password form.
-const GOOGLE_SIGN_IN_PARAMS = ['google', 'error', 'token', 'merchantId', 'newUser'];
+const GOOGLE_SIGN_IN_PARAMS = ['google', 'apple', 'error', 'token', 'merchantId', 'newUser'];
+
+// The two sign-ins a provider hands back here (R1-T4 phase A; Apple's is R1-T5d): where the page
+// redeems the one-time code, and the words it uses.
+const HANDOFFS = {
+  google: { name: 'Google', session: '/api/auth/google/session' },
+  apple: { name: 'Apple', session: '/api/auth/apple/session' },
+} as const;
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -36,7 +44,8 @@ export default function Login() {
   // address (the old hand-back, or a crafted link) is dropped unused.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const googleComplete = params.get('google') === 'complete';
+    // Only the fixed word redeems, and Google's is read first, as it always was.
+    const provider = params.get('google') === 'complete' ? 'google' : params.get('apple') === 'complete' ? 'apple' : null;
     const error = params.get('error');
 
     if (GOOGLE_SIGN_IN_PARAMS.some((name) => params.has(name))) {
@@ -45,28 +54,29 @@ export default function Login() {
       window.history.replaceState({}, '', `/login${rest ? `?${rest}` : ''}${window.location.hash}`);
     }
 
-    const signInFailed = (description: string) => {
-      trackEvent("login_failed", { auth_method: "google", login_type: "merchant" });
+    const signInFailed = (description: string, method: 'google' | 'apple') => {
+      trackEvent("login_failed", { auth_method: method, login_type: "merchant" });
       toast({ title: 'Sign in failed', description, variant: 'destructive' });
     };
 
-    if (googleComplete) {
+    if (provider) {
+      const handoff = HANDOFFS[provider];
       void (async () => {
         let result: { csrfToken?: unknown; merchantId?: unknown; newUser?: unknown; message?: unknown } = {};
         let ok = false;
         try {
-          const response = await fetch('/api/auth/google/session', { method: 'POST', credentials: 'same-origin' });
+          const response = await fetch(handoff.session, { method: 'POST', credentials: 'same-origin' });
           ok = response.ok;
           result = await response.json().catch(() => ({}));
         } catch {
           // Network failure: fall through to the generic message.
         }
         if (!ok || typeof result.csrfToken !== 'string') {
-          signInFailed(typeof result.message === 'string' ? result.message : 'Google sign in failed. Please try again.');
+          signInFailed(typeof result.message === 'string' ? result.message : `${handoff.name} sign in failed. Please try again.`, provider);
           return;
         }
         const newUser = result.newUser === true;
-        trackEvent("login_succeeded", { auth_method: "google", login_type: "merchant", new_user: newUser });
+        trackEvent("login_succeeded", { auth_method: provider, login_type: "merchant", new_user: newUser });
         // R1-T4 phase E: the sign-in is the session cookie the server just set, which no script can
         // read; nothing is stored here. The next page load's start-up check reads the session.
         clearSignOutPending();
@@ -76,15 +86,29 @@ export default function Login() {
             description: 'Your account has been created. Please complete your profile in Settings.',
           });
         } else {
-          toast({ title: 'Welcome back!', description: 'Signed in with Google.' });
+          toast({ title: 'Welcome back!', description: `Signed in with ${handoff.name}.` });
         }
         // Match password login: force the app-wide AuthProvider to re-mount and
         // read the new session instead of keeping stale state.
         window.location.href = '/dashboard';
       })();
     } else if (error) {
-      signInFailed(error);
+      // Both providers come back to ?error= with the server's own fixed words; Apple's all name Apple.
+      // Only the count in analytics depends on telling them apart.
+      signInFailed(error, /apple/i.test(error) ? 'apple' : 'google');
     }
+  }, []);
+
+  // R1-T5d (owner decision 2026-09-29: Sign in with Apple goes live once Apple is set up). The page
+  // asks the server whether it is offered and shows the button only on a yes: until then, and whenever
+  // the server cannot say, the page is exactly as it was.
+  const [appleOffered, setAppleOffered] = useState(false);
+  useEffect(() => {
+    const asking = new AbortController();
+    void appleSignInOffered(asking.signal).then((offered) => {
+      if (!asking.signal.aborted) setAppleOffered(offered);
+    });
+    return () => asking.abort();
   }, []);
 
   const [showMore, setShowMore] = useState(false);
@@ -178,6 +202,11 @@ export default function Login() {
   const handleGoogleLogin = () => {
     trackEvent("login_attempted", { auth_method: "google", login_type: "merchant" });
     window.location.href = '/api/auth/google';
+  };
+
+  const handleAppleLogin = () => {
+    trackEvent("login_attempted", { auth_method: "apple", login_type: "merchant" });
+    leaveToSignInWithApple();
   };
 
   return (
@@ -349,6 +378,22 @@ export default function Login() {
                 </svg>
                 Google
               </button>
+
+              {/* R1-T5d: the same shape and size as Google's (App Store guideline 4.8), in Apple's black
+                  with its mark. The mark's path is Font Awesome Free's Apple brand icon (CC BY 4.0). */}
+              {appleOffered && (
+                <button
+                  type="button"
+                  onClick={handleAppleLogin}
+                  className="w-full bg-black text-white rounded-full py-3 md:py-4 hover:bg-neutral-800 transition-colors text-center flex items-center justify-center gap-2 font-medium"
+                  data-testid="button-apple-login"
+                >
+                  <svg className="w-5 h-5" viewBox="0 0 384 512" aria-hidden="true">
+                    <path fill="currentColor" d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/>
+                  </svg>
+                  Continue with Apple
+                </button>
+              )}
 
               <button
                 onClick={() => setLocation('/signup')}
