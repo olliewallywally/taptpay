@@ -1,8 +1,8 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 71b4fe18079e1eb81abf39c5322f3fa3b49bbfaf on 2026-10-04.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 3cf92efa341736cd720ee1b9867e0d6debe03713 on 2026-10-06.
  *
- * 190 registrations (79 GET, 79 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
+ * 193 registrations (80 GET, 81 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
  * live count on every run rather than trusting this comment.
  *
@@ -181,12 +181,12 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     principal: "public",
     markers: [],
     facts: {
-      authChecks: ["verifyAppleIdentityToken","verifyAppleSignInState"],
-      storageMethods: ["createAuthHandoffCode","createMerchantWithAppleIdentity","getAppleIdentity","getMerchantByEmail","getUserByEmail","recordPendingAppleIdentity","settleAuthThrottle","takeAuthThrottleSlot"],
-      sideEffects: ["outbound http: fetch"],
+      authChecks: ["appleStateMatches","compares user.role === 'owner'","compares user.userId === start.userId","liveBusinessSessionLogin","readAppleConnectStart","verifyAppleIdentityToken","verifyAppleSignInState"],
+      storageMethods: ["connectAppleIdentity","createAuthHandoffCode","createMerchantWithAppleIdentity","getAppleIdentity","getMerchantByEmail","getUserByEmail","recordPendingAppleIdentity","settleAuthThrottle","takeAuthThrottleSlot"],
+      sideEffects: ["audit log: logSecurityEvent","outbound http: fetch"],
       statuses: [303],
       rateLimits: ["tooManyAttempts"],
-      helpers: ["appleSignInError","appleTransport","back"],
+      helpers: ["appleSignInError","appleTransport","back","done","finishAppleConnect","stillTheOwner"],
     },
   },
   "POST /api/auth/apple/session": {
@@ -199,6 +199,52 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       storageMethods: ["consumeAuthHandoffCode"],
       statuses: [200,401,403,500],
       helpers: ["expired"],
+    },
+  },
+  "GET /api/auth/apple/connection": {
+    method: "GET",
+    path: "/api/auth/apple/connection",
+    principal: "merchant-user",
+    markers: ["authenticateToken"],
+    facts: {
+      middleware: ["authenticateToken"],
+      authChecks: ["compares user.role !== 'owner'","isAccountOwner"],
+      storageMethods: ["getAppleIdentityForLogin"],
+      statuses: [200,401,403,500,503],
+      dtos: ["appleConnectionDto"],
+      helpers: ["ownerLoginOf"],
+    },
+  },
+  "POST /api/auth/apple/connect": {
+    method: "POST",
+    path: "/api/auth/apple/connect",
+    principal: "merchant-user",
+    markers: ["authenticateToken"],
+    facts: {
+      middleware: ["authenticateToken"],
+      body: ["schema: currentPasswordBody"],
+      authChecks: ["compares user.role !== 'owner'","isAccountOwner"],
+      storageMethods: ["getAppleIdentityForLogin","getUserById","settleAuthThrottle","takeAuthThrottleSlot"],
+      sideEffects: ["audit log: logSecurityEvent"],
+      statuses: [200,400,401,403,404,409,429,500,503],
+      rateLimits: ["refuseTooManyAttempts","tooManyAttempts"],
+      helpers: ["ownerLoginOf","provesCurrentPassword","refuseTooManyAttempts"],
+    },
+  },
+  "POST /api/auth/apple/disconnect": {
+    method: "POST",
+    path: "/api/auth/apple/disconnect",
+    principal: "merchant-user",
+    markers: ["authenticateToken","isAccountOwner"],
+    facts: {
+      middleware: ["authenticateToken"],
+      body: ["schema: currentPasswordBody"],
+      authChecks: ["compares user.role !== 'owner'","isAccountOwner"],
+      storageMethods: ["disconnectAppleIdentity","getUserById","settleAuthThrottle","takeAuthThrottleSlot"],
+      sideEffects: ["audit log: logSecurityEvent"],
+      statuses: [200,400,401,403,404,429,500,503],
+      rateLimits: ["refuseTooManyAttempts","tooManyAttempts"],
+      helpers: ["ownerLoginOf","provesCurrentPassword","refuseTooManyAttempts"],
     },
   },
   "POST /api/auth/sign-out-everywhere": {

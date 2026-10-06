@@ -196,6 +196,9 @@ const sessionBusiness = (refusal: string) =>
 /** P2.2's answer to a principal without the tenant; it was 400 "Merchant ID required" or 401 "Authentication required", route by route. */
 const ADMIN_403 = '403 "Merchant access required", since 2026-09-27 (R1-T3)';
 const CREATES_SUBSCRIPTION = "apart from getOrCreateSubscription, which makes the business's subscription row if it has none";
+/** R1-T5c: the three signed-in Apple routes act on the caller's own login and on nothing a request names. */
+const APPLE_OWN_LOGIN =
+  "the session's own login, by its users-row id, and no business's data: nothing in the request names a login or a business. Only an owner's login behind a business session (ownerLoginOf: isAccountOwner, then the role must be the owner's own and the session a business one): a teammate, and the platform admin (which isAccountOwner alone would let through, and which has no login row), are refused 403 'Only the account owner can do this.'";
 const TUTORIAL_SHARED =
   "The tutorial is the business's, not the login's: a teammate's progress, dismissal or restart applies to every login of the business, the owner's included (shown in the harness: a teammate's restart moved the business to generation 2). A product choice, recorded.";
 const PUSH_SWITCHES_FAULT_AS_DEFAULTS =
@@ -1242,34 +1245,43 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     branches: [
       {
         principal: "public",
+        when: "the starting cookie is a sign-in's, or there is none",
         tenant: "credentials",
         tenantRule:
           "the login Apple's verified identity token names by its stable subject (issuer, Services ID and subject together): the login that identity was made with. An identity seen for the first time whose verified email no business or login uses makes a new verified business, its owner login and the linked identity in one transaction (createMerchantWithAppleIdentity). An identity is NEVER joined to an existing business or login by its email: it is recorded as pending (recordPendingAppleIdentity), signs nobody in, and the person is told to sign in and connect Apple from Settings. Refused: an email Apple has not verified, and a first sign-in whose token carries no email",
       },
+      {
+        principal: "public",
+        when: "the starting cookie is a connect's (readAppleConnectStart: six parts in the shapes this server writes, under a signature key used for nothing else; R1-T5c)",
+        tenant: "credentials",
+        tenantRule:
+          "the login and the session the starting cookie names under the server's signature, and nothing in Apple's post: that cookie is set only by POST /api/auth/apple/connect, for a signed-in owner who proved the current password. The session must still stand and still be that owner's (liveBusinessSessionLogin: not ended, not run out, its login active with the session's version, its business verified or active; then the same login id and the owner role), checked before Apple is asked and again before the write, which re-reads the login under its row lock and takes nothing but an active owner's (connectAppleIdentity). Apple's verified token says which identity; an identity never seen, or pending, becomes that login's whatever email it holds. Never moved: an identity that is another login's (taken), and a login that has a different one (has-another). No business, login or session is made",
+      },
     ],
     input:
-      "Apple's form post, read raw: code (sent to Apple's token endpoint), state (must equal the state in this browser's cookie, compared in constant time by verifyAppleSignInState; the cookie's state and nonce must each be 43 base64url characters, under this server's signature with a start time no more than ten minutes old), error (only its presence is used) and user (Apple's unsigned first-time details: a display name of at most 100 characters is read from it and nothing else, never its email)",
+      "Apple's form post, read raw: code (sent to Apple's token endpoint), state (must equal the state in this browser's cookie, compared in constant time by verifyAppleSignInState; the cookie's state and nonce must each be 43 base64url characters, under this server's signature with a start time no more than ten minutes old), error (only its presence is used) and user (Apple's unsigned first-time details: a display name of at most 100 characters is read from it and nothing else, never its email). A connect's return reads code, state (appleStateMatches: whole, in this server's shape, in constant time, against its own cookie's) and error's presence; user is not read",
     capability:
-      "Sign in with Apple configured (config.apple, server/config.ts): without it the browser goes back to /login with an error, before anything in the post is read",
+      "Sign in with Apple configured (config.apple, server/config.ts): without it the browser goes back to /login with an error, before anything in the post is read (a connect's return goes to /settings?apple=unavailable)",
     entitlement: null,
     idempotency:
-      "the state cookie is cleared on every call, and each start is taken up once (appleStateBucket, a row of auth_throttle taken before Apple is asked and never given back: a second return with the same cookie and state, a simultaneous one included, goes back to /login with the expired message); a new Apple identity gets one business (two first sign-ins at once: the second finds the address or the identity taken, nothing half-made is left, and trying again signs in)",
+      "the state cookie is cleared on every call, and each start is taken up once (appleStateBucket, a row of auth_throttle taken before Apple is asked and never given back: a second return with the same cookie and state, a simultaneous one included, goes back to /login with the expired message); a new Apple identity gets one business (two first sign-ins at once: the second finds the address or the identity taken, nothing half-made is left, and trying again signs in). A connect's start is taken up once the same way (a second return answers expired); connecting the identity a login already has changes nothing, and of two connects at once for one login, or of one identity by two logins, one wins (the login's row lock and the table's two unique rules)",
     sideEffects:
-      "asks Apple to exchange the code (appleid.apple.com/auth/token, with a five-minute client secret signed by the team's key) and, when it does not hold them, for Apple's published keys (appleid.apple.com/auth/keys, cached, refetched for an unknown key id at most once a minute); for a new Apple identity, creates a verified business, its owner login, its subscription and the identity together; for one whose email already has a login, records the identity as pending",
+      "asks Apple to exchange the code (appleid.apple.com/auth/token, with a five-minute client secret signed by the team's key) and, when it does not hold them, for Apple's published keys (appleid.apple.com/auth/keys, cached, refetched for an unknown key id at most once a minute); for a new Apple identity, creates a verified business, its owner login, its subscription and the identity together; for one whose email already has a login, records the identity as pending; for a connect, links the identity to the owner's login and writes APPLE_CONNECTED to the security log (logSecurityEvent) by login id, with no Apple subject, token or email",
     successDto:
-      "303 to /login?apple=complete, with the one-time handoff code in a second HttpOnly cookie (SameSite=Strict, 60 seconds): never a token, a code or anything of Apple's in an address. Every refusal is a 303 to /login?error=<a fixed message>",
+      "303 to /login?apple=complete, with the one-time handoff code in a second HttpOnly cookie (SameSite=Strict, 60 seconds): never a token, a code or anything of Apple's in an address. Every refusal is a 303 to /login?error=<a fixed message>. A connect's return is always a 303 to /settings?apple=<one fixed word: connected, cancelled, expired, taken, has-another, unavailable, failed or try-later>, with no handoff code and no session cookie (the owner has a session)",
     errorDisclosure: ["fixed"],
     controls: {
       authenticity:
-        "Apple's authorization code, exchanged at Apple's token endpoint, and the identity token that comes back: RS256 under a key Apple publishes, Apple as issuer, the Services ID as the only audience, unexpired, and carrying the nonce this browser's starting cookie holds (server/apple-sign-in.ts). The returned state must equal the cookie's, which stops login CSRF; the cookie carries its start time under the server's signature (a key of its own, derived from JWT_SECRET). The post itself is admitted only from Apple's exact origin (server/cross-site.ts)",
+        "Apple's authorization code, exchanged at Apple's token endpoint, and the identity token that comes back: RS256 under a key Apple publishes, Apple as issuer, the Services ID as the only audience, unexpired, and carrying the nonce this browser's starting cookie holds (server/apple-sign-in.ts). The returned state must equal the cookie's, which stops login CSRF; the cookie carries its start time under the server's signature (a key of its own, derived from JWT_SECRET). The post itself is admitted only from Apple's exact origin (server/cross-site.ts). A connect is believed on three things together: its starting cookie's signature under the connect key (a sign-in's cookie is never a connect's, nor the reverse), the session it names still standing for the owner it names, and Apple's token for the nonce that cookie holds",
       replay:
         "each start is taken up once, before Apple is asked (appleStateBucket): a replayed cookie and state are refused without asking Apple again; Apple also accepts a code once",
       rate:
-        "tooManyAttempts after takeAuthThrottleSlot per visitor address (20 free, then waits from 30 s), counted before Apple is asked, only once TRUST_PROXY_HOPS is set (R1-T4 phase B, off by default): until then no limit. A success gives its count back",
+        "tooManyAttempts after takeAuthThrottleSlot per visitor address (20 free, then waits from 30 s), counted before Apple is asked, only once TRUST_PROXY_HOPS is set (R1-T4 phase B, off by default): until then no limit. A success gives its count back. A connect's return is counted in the same bucket (over it: /settings?apple=try-later) and gives its count back when it connects",
     },
     findings: [
-      "Until TRUST_PROXY_HOPS is set there is no limit: each sign-in started (GET /api/auth/apple, itself unlimited) can make the server call Apple's token endpoint once with a made-up code, which Apple refuses. Phase B's live check switches the limit on.",
-      "No screen leads here yet: the login page's Apple button is R1-T5d. Built and tested against a stand-in Apple; going live needs the owner's Services ID, key and team ID and a real iPhone (owner decision 2026-09-29).",
+      "Until TRUST_PROXY_HOPS is set there is no limit: each sign-in started (GET /api/auth/apple, itself unlimited) can make the server call Apple's token endpoint once with a made-up code, which Apple refuses. Phase B's live check switches the limit on. (A connect's start needs the owner's password, counted per login.)",
+      "No screen leads here yet: the login page's Apple button and the Settings row are R1-T5d. Built and tested against a stand-in Apple; going live needs the owner's Services ID, key and team ID and a real iPhone (owner decision 2026-09-29).",
+      "Sign-in and a connect share one starting cookie name, so starting one replaces a pending other in the same browser: the replaced one's return is then refused as expired (on the login page for a sign-in's cookie, in Settings for a connect's). Safe, and the person starts again.",
     ],
   },
 
@@ -1296,6 +1308,46 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       replay: "refused: the code is spent on first use",
       rate: "none — a 32-byte code that lives 60 seconds cannot be guessed",
     },
+  },
+
+  "GET /api/auth/apple/connection": {
+    branches: [{ principal: "merchant", roles: ["owner"], tenant: "session", tenantRule: APPLE_OWN_LOGIN }],
+    input: "nothing",
+    capability: null,
+    entitlement: null,
+    idempotency: "read-only",
+    sideEffects: null,
+    successDto:
+      "appleConnectionDto: { available, connected, email, isPrivateEmail, connectedAt }, never cached: whether Apple signs this login in, the address Apple gave (possibly a relay address) and since when; never Apple's subject, issuer or client id. available says whether a connect can start here (Apple configured, an https origin); a connection made earlier is still shown when it cannot",
+    errorDisclosure: ["fixed"],
+  },
+
+  "POST /api/auth/apple/connect": {
+    branches: [{ principal: "merchant", roles: ["owner"], tenant: "session", tenantRule: APPLE_OWN_LOGIN }],
+    input:
+      "body: currentPasswordBody (currentPassword, a string that is not empty; anything else is 400 'Current password is required', with no issue list); redirect_uri comes from getBaseUrl(req): the configured public origin, or in development the request's own Host",
+    capability:
+      "Sign in with Apple configured (all four of config.apple, server/config.ts) and an https public origin (the starting cookie must be SameSite=None and Secure to come back on Apple's post): without either, 503 APPLE_NOT_AVAILABLE, answered before the caller's role is looked at (the plan's order) and before any password is checked",
+    entitlement: null,
+    idempotency:
+      "a login that already has an Apple identity is refused first (409 APPLE_ALREADY_CONNECTED, before the password is checked, so it costs no attempt). Otherwise the current password is checked, counted per login in changing the password's own bucket (passwordChangeBucket: five wrong between the two routes and disconnecting, then 429 TOO_MANY_ATTEMPTS with Retry-After; the right password clears the count), and each call that proves it starts a new connect: a fresh state and nonce replace this browser's starting cookie. Nothing is stored and Apple is asked nothing",
+    sideEffects: "logs a slowed password check (logSecurityEvent: PASSWORD_CHECK_SLOWED, by login id)",
+    successDto:
+      "{ url }, never cached: Apple's authorize address for the page to go to (the Services ID, redirect_uri, response_mode=form_post, the name and email scope, state and nonce). Sets the HttpOnly starting cookie (SameSite=None and Secure; 10 minutes, __Host-), which carries the state, the nonce, the start time, this login's id and this session's id under the server's signature, with a key used for nothing else. No session is begun",
+    errorDisclosure: ["fixed"],
+  },
+
+  "POST /api/auth/apple/disconnect": {
+    branches: [{ principal: "merchant", roles: ["owner"], tenant: "session", tenantRule: APPLE_OWN_LOGIN }],
+    input: "body: currentPasswordBody (currentPassword, a string that is not empty; anything else is 400 'Current password is required', with no issue list)",
+    capability: null,
+    entitlement: null,
+    idempotency:
+      "checks the current password, counted in the same bucket as changing it and connecting (429 TOO_MANY_ATTEMPTS), then deletes this login's Apple identity row (disconnectAppleIdentity, by the session's login id alone): nothing about that Apple account is kept, and it can be connected again. With nothing connected the answer is the same and nothing is removed. A login made by Apple has no password anyone knows, so it cannot remove its only way in",
+    sideEffects:
+      "writes APPLE_DISCONNECTED to the security log (logSecurityEvent) by login id, with whether a row was removed and no Apple subject or email; logs a slowed password check (PASSWORD_CHECK_SLOWED). It ends no session: those Apple began stay until they end or the owner signs out everywhere",
+    successDto: "{ connected: false }, never cached",
+    errorDisclosure: ["fixed"],
   },
 
   "POST /api/auth/login": {

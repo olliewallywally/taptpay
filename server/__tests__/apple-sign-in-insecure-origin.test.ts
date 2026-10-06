@@ -10,7 +10,7 @@ delete process.env.REPLIT_DOMAINS;
 delete process.env.REPLIT_DEV_DOMAIN;
 
 import request from "supertest";
-import { createTestApp, resetTestStorage } from "./support/http-harness";
+import { VALID_PASSWORD, createOwnerPrincipal, createTestApp, resetTestStorage, signedIn } from "./support/http-harness";
 import { appleSignInCookies } from "../apple-sign-in";
 
 /**
@@ -36,4 +36,20 @@ test("the cookies are __Host- and Secure only on https; the starting one is Same
   const http = appleSignInCookies("http://localhost:5000");
   expect(http.secure).toBe(false);
   expect([http.oauth.name, http.handoff.name]).toEqual(["taptpay-apple-oauth", "taptpay-apple-handoff"]);
+});
+
+// R1-T5c: a connect starts with the same cookie, so it is refused on an http origin too.
+test("on an http origin an owner cannot start a connect, and the connection says Apple is not available", async () => {
+  const { app } = await createTestApp();
+  const owner = await createOwnerPrincipal();
+  // With no public origin the page's CSRF token is bound to the address the request came to: ask for
+  // it the way the page does, at one fixed address.
+  const host = { Host: "harness.local" };
+  const page = await request(app).get("/api/auth/session").set({ Cookie: owner.cookie, ...host });
+  const res = await request(app).post("/api/auth/apple/connect").set({ ...signedIn({ cookie: owner.cookie, csrf: page.body.csrfToken }), ...host })
+    .send({ currentPassword: VALID_PASSWORD });
+  expect({ status: res.status, body: res.body }).toEqual({ status: 503, body: { code: "APPLE_NOT_AVAILABLE", message: "Sign in with Apple is not available." } });
+  expect(([] as string[]).concat(res.headers["set-cookie"] ?? []).some((line) => line.includes("apple-oauth"))).toBe(false);
+  const read = await request(app).get("/api/auth/apple/connection").set({ Cookie: owner.cookie, ...host });
+  expect(read.body).toEqual({ available: false, connected: false, email: null, isPrivateEmail: false, connectedAt: null });
 });

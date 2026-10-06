@@ -16,7 +16,7 @@ import {
 import { TUTORIAL_PAGE_KEYS, isTutorialPageKey } from "@shared/tutorial";
 import { inviteTeamMemberSchema, acceptInviteSchema, retailTransactionCreateRequestSchema, cashSaleRequestSchema, updateMerchantDetailsSchema, updateThemeSchema, updateDailyGoalSchema, forgotPasswordSchema, resetPasswordSchema, changePasswordSchema, newPasswordSchema, createRefundSchema, insertRefundSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, merchantOnboardingSchema, pushNotificationPreferencesSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createClientProfileSchema, updateClientProfileSchema, createQuoteSchema, acceptQuoteSchema, createJobInvoiceSchema, markJobPaidExternalSchema, sendJobBalanceSchema, createJobScheduleSchema, updateJobScheduleSchema, updateTradeReminderSettingsSchema, updateTradeGstSettingsSchema } from "@shared/schema";
 import { isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, getWindcaveEnv, submitGooglePayToken, createAttendedSession, submitTapToPayToken, createCardStorageSession, queryStoredCardSession, chargeStoredCard } from "./windcave";
-import { authenticateUser, checkPasswordEvenly, passwordCheckBudget, authenticateToken, createUser, loginForUserId, sessionLoginForUserRow, isAccountOwner, requestPasswordReset, resetPassword, validateResetToken, type AuthenticatedRequest, logSecurityEvent, syncVerifiedMerchants, startBusinessSession, startAdminSession, endAuthSession, endLoginSessions, csrfTokenForRequest, clearSessionCookie, hasSessionCookie, readBusinessSession, respondAuthBackendUnavailable, isStreamSessionActive } from "./auth";
+import { authenticateUser, checkPasswordEvenly, passwordCheckBudget, authenticateToken, createUser, loginForUserId, sessionLoginForUserRow, isAccountOwner, requestPasswordReset, resetPassword, validateResetToken, type AuthenticatedRequest, logSecurityEvent, syncVerifiedMerchants, startBusinessSession, startAdminSession, endAuthSession, endLoginSessions, csrfTokenForRequest, clearSessionCookie, hasSessionCookie, readBusinessSession, respondAuthBackendUnavailable, isStreamSessionActive, liveBusinessSessionLogin } from "./auth";
 import {
   HANDOFF_CODE_TTL_MS, clearSignInCookie, googleVerifiedEmail, handoffCodeHash, newHandoffCode, readCookie,
   signInCookies, startGoogleSignIn, verifyGoogleSignInState,
@@ -45,8 +45,9 @@ import { resendInvoiceEmailForMerchant } from "./property-cron";
 import { INVOICE_DOCUMENT_FOLDER, isInvoiceDocumentName, isPublicUploadFolder, parseInvoiceDocumentRef } from "./upload-policy";
 import { getMalwareScanner, ScannerUnavailableError, type ScanResult } from "./malware-scanner";
 import {
-  APPLE_ISSUER, AppleSignInError, appleAuthorizeUrl, appleDisplayName, appleSettings, appleSignInCookies, createAppleKeySet,
-  exchangeAppleCode, startAppleSignIn, verifyAppleIdentityToken, verifyAppleSignInState, type AppleTransport,
+  APPLE_ISSUER, AppleSignInError, appleAuthorizeUrl, appleDisplayName, appleSettings, appleSignInCookies, appleStateMatches, createAppleKeySet,
+  exchangeAppleCode, readAppleConnectStart, startAppleConnect, startAppleSignIn, verifyAppleIdentityToken, verifyAppleSignInState,
+  type AppleConnectResult, type AppleConnectStart, type AppleTransport,
 } from "./apple-sign-in";
 import { INVOICE_DOCUMENT_EXTENSIONS } from "./invoice-document-security";
 import { resendTradeInvoice, resendTradeInvoiceForMerchant, sendTradePaymentInvoice, sendTradePaymentInvoiceForMerchant, sendTradeQuoteForMerchant } from "./trades-delivery";
@@ -61,6 +62,7 @@ import {
 } from "./billing-card";
 import {
   adminMerchantDto,
+  appleConnectionDto,
   billingHistoryDto,
   adminMerchantSummaryDto,
   adminTransactionDto,
@@ -831,6 +833,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     // After a form post the browser must fetch the next page with GET: 303.
     const back = (target: string) => res.redirect(303, target);
     res.set('Cache-Control', 'no-store');
+    // R1-T5c: a signed-in owner's connect returns here too (Apple takes one return address). It is told
+    // by its starting cookie alone, which only a connect's start is given; everything else is a sign-in.
+    const connectStart = readAppleConnectStart(readCookie(req.headers.cookie, appleCookies.oauth.name));
+    if (connectStart) return finishAppleConnect(req, res, connectStart);
     const settings = appleSettings();
     if (!settings) return back(appleSignInError('Apple sign in is not configured'));
     const form = (req.body ?? {}) as { code?: unknown; state?: unknown; error?: unknown; user?: unknown };
@@ -952,6 +958,198 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       return res.status(500).json({ message: 'Apple sign in failed. Please try again.' });
     }
   });
+
+  // ── Connecting Apple to a login that already exists — R1-T5c (plan R1-T5: an identity is linked
+  // "only from an already authenticated owner session", never by its email). The signed-in owner proves
+  // the current password, as changing it asks, and is given Apple's address to go to. Apple's return is
+  // a cross-site post with no session cookie on it, so the login and the session that asked ride in the
+  // starting cookie under the server's signature (a key used for nothing else, server/apple-sign-in.ts),
+  // and that session must still stand, and still be the owner's, when Apple returns.
+  const OWNER_ONLY = { message: "Only the account owner can do this." } as const;
+  const APPLE_NOT_AVAILABLE = { code: 'APPLE_NOT_AVAILABLE', message: 'Sign in with Apple is not available.' } as const;
+  const currentPasswordBody = z.object({ currentPassword: z.string().min(1) });
+
+  // The owner's Settings row: whether Apple signs this login in. Read without Apple being set up, so a
+  // connection made earlier can still be seen (and removed).
+  app.get("/api/auth/apple/connection", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    res.set('Cache-Control', 'no-store');
+    const login = ownerLoginOf(req);
+    if (!login) return res.status(403).json(OWNER_ONLY);
+    try {
+      const identity = await storage.getAppleIdentityForLogin(login.userId);
+      return res.json(appleConnectionDto(identity, appleSettings() !== null && appleCookies.secure));
+    } catch (err) {
+      console.error('[APPLE_CONNECTION]', err);
+      return res.status(500).json({ message: 'Could not read the Apple connection. Please try again.' });
+    }
+  });
+
+  // The start is a POST with the page's CSRF token, never a link: another site's link would carry the
+  // session cookie (it is SameSite=Lax). It answers with Apple's address for the page to go to.
+  app.post("/api/auth/apple/connect", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    res.set('Cache-Control', 'no-store');
+    // The capability before the role (P2.2's order). The starting cookie must be SameSite=None to come
+    // back on Apple's post, and that needs https.
+    const settings = appleSettings();
+    if (!settings || !appleCookies.secure) return res.status(503).json(APPLE_NOT_AVAILABLE);
+    const login = ownerLoginOf(req);
+    if (!login) return res.status(403).json(OWNER_ONLY);
+    const body = currentPasswordBody.safeParse(req.body);
+    if (!body.success) return res.status(400).json({ message: "Current password is required" });
+    try {
+      // A login has one Apple identity: said before the password is checked, so it costs no attempt.
+      if (await storage.getAppleIdentityForLogin(login.userId)) {
+        return res.status(409).json({ code: 'APPLE_ALREADY_CONNECTED', message: 'Apple is already connected to this login.' });
+      }
+      if (!(await provesCurrentPassword(res, login.userId, body.data.currentPassword))) return;
+      const start = startAppleConnect(login);
+      res.cookie(appleCookies.oauth.name, start.cookieValue, appleCookies.oauth.options);
+      return res.json({ url: appleAuthorizeUrl(settings, `${getBaseUrl(req)}/api/auth/apple/callback`, start) });
+    } catch (err) {
+      console.error('[APPLE_CONNECT_START]', err);
+      return res.status(500).json({ message: 'Could not start connecting Apple. Please try again.' });
+    }
+  });
+
+  // Removes the login's Apple identity, behind the same password. Needs nothing of Apple, so it works
+  // while Apple is not set up. It signs nobody out: "sign out everywhere" does that.
+  app.post("/api/auth/apple/disconnect", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    res.set('Cache-Control', 'no-store');
+    const login = ownerLoginOf(req);
+    if (!login) return res.status(403).json(OWNER_ONLY);
+    const body = currentPasswordBody.safeParse(req.body);
+    if (!body.success) return res.status(400).json({ message: "Current password is required" });
+    try {
+      if (!(await provesCurrentPassword(res, login.userId, body.data.currentPassword))) return;
+      const removed = await storage.disconnectAppleIdentity(login.userId);
+      // By login id only: no Apple subject, token or email.
+      logSecurityEvent('APPLE_DISCONNECTED', { userId: login.userId, removed });
+      return res.json({ connected: false });
+    } catch (err) {
+      console.error('[APPLE_DISCONNECT]', err);
+      return res.status(500).json({ message: 'Could not disconnect Apple. Please try again.' });
+    }
+  });
+
+  /**
+   * The signed-in owner's own login and the session that signed the request in: an owner's users row
+   * behind a business session. isAccountOwner also answers yes for the platform admin, who has no
+   * login row, and for the role's retired spelling: neither is a login Apple could sign in.
+   */
+  function ownerLoginOf(req: AuthenticatedRequest): { userId: number; sessionId: string } | null {
+    const user = req.user;
+    const session = req.authSession;
+    if (!user || !isAccountOwner(user) || user.role !== 'owner' || !user.userId || session?.realm !== 'business') return null;
+    return { userId: user.userId, sessionId: session.id };
+  }
+
+  /**
+   * The signed-in login proves its current password: the check changing the password makes, counted
+   * in the same bucket (passwordChangeBucket), so connecting, disconnecting and changing the password
+   * cannot be used to multiply the guesses. A refusal is answered here; true means it was proved.
+   */
+  async function provesCurrentPassword(res: express.Response, userId: number, currentPassword: string): Promise<boolean> {
+    const userRow = await storage.getUserById(userId);
+    if (!userRow) {
+      res.status(404).json({ message: "Login not found" });
+      return false;
+    }
+    const throttleBucket = passwordChangeBucket(userId);
+    const slot = await storage.takeAuthThrottleSlot([throttleBucket], new Date());
+    if (!slot.allowed) {
+      logSecurityEvent('PASSWORD_CHECK_SLOWED', { userId });
+      refuseTooManyAttempts(res, slot.retryAfterMs, "sign-in");
+      return false;
+    }
+    let currentPasswordValid: boolean;
+    try {
+      currentPasswordValid = await bcrypt.compare(currentPassword, userRow.password);
+    } catch (error) {
+      await storage.settleAuthThrottle([throttleBucket], "void", new Date()).catch(() => undefined);
+      throw error;
+    }
+    if (!currentPasswordValid) {
+      res.status(400).json({ message: "Current password is incorrect" });
+      return false;
+    }
+    await storage.settleAuthThrottle([throttleBucket], "success", new Date())
+      .catch((error) => console.error("[PASSWORD_CHECK_THROTTLE_CLEAR]", error));
+    return true;
+  }
+
+  /**
+   * Apple's return to a connect (POST /api/auth/apple/callback with a connect's starting cookie). Who
+   * is being connected is never taken from the post: it is the login and session the cookie names
+   * under the server's signature. Every outcome sends the browser to Settings with one fixed word;
+   * no session is made (the owner has one) and nothing of Apple's goes into an address.
+   */
+  async function finishAppleConnect(req: express.Request, res: express.Response, start: AppleConnectStart) {
+    const done = (result: AppleConnectResult) => res.redirect(303, `/settings?apple=${result}`);
+    // The starting cookie is spent whatever happens next.
+    clearSignInCookie(res, appleCookies.oauth);
+    const settings = appleSettings();
+    if (!settings) return done("unavailable");
+    const form = (req.body ?? {}) as { code?: unknown; state?: unknown; error?: unknown };
+    if (form.error || typeof form.code !== 'string' || !form.code) return done("cancelled");
+    // Not this start's return, or begun more than ten minutes ago: refused before Apple is asked anything.
+    if (start.expired || !appleStateMatches(start.state, form.state)) return done("expired");
+    // The session that asked, read by its id: not ended, not run out, its login and business still in
+    // good standing, and that login still the owner the cookie names.
+    const stillTheOwner = async () => {
+      const user = await liveBusinessSessionLogin(start.sessionId);
+      return user !== null && user.userId === start.userId && user.role === 'owner';
+    };
+
+    try {
+      // Each start is taken up once, before Apple is asked anything, as a sign-in's is: a kept copy of
+      // the cookie and state cannot replay the return. The slot is never given back.
+      const firstUse = await storage.takeAuthThrottleSlot([appleStateBucket(start.state)], new Date());
+      if (!firstUse.allowed) return done("expired");
+      if (!(await stillTheOwner())) return done("expired");
+      // Returns that get as far as asking Apple are counted per visitor address with sign-in's, once
+      // addresses can be told apart (R1-T4 phase B); a connect that succeeds gives its count back.
+      const address = clientAddressForLimits(req);
+      const addressBuckets = address ? [appleCallbackAddressBucket(address)] : [];
+      if (addressBuckets.length > 0) {
+        const slot = await storage.takeAuthThrottleSlot(addressBuckets, new Date());
+        if (!slot.allowed) return done("try-later");
+      }
+
+      let identity;
+      try {
+        const idToken = await exchangeAppleCode(form.code, `${getBaseUrl(req)}/api/auth/apple/callback`, settings, appleTransport);
+        identity = await verifyAppleIdentityToken(idToken, { clientId: settings.servicesId, nonce: start.nonce }, appleKeys);
+      } catch (error) {
+        if (!(error instanceof AppleSignInError)) throw error;
+        // The reason only: never the code, the token or anything in it.
+        console.error('[APPLE_CONNECT]', error.reason);
+        return done(error.reason === 'unreachable' ? "unavailable" : "failed");
+      }
+
+      // Asking Apple took a moment: the session must still stand now. The write then re-reads the
+      // login under its row lock and takes nothing but an active owner's.
+      if (!(await stillTheOwner())) return done("expired");
+      // Only an address Apple verified is kept. It is shown to the owner and decides nothing.
+      const email = identity.emailVerified ? identity.email?.trim().toLowerCase() || undefined : undefined;
+      const outcome = await storage.connectAppleIdentity(
+        start.userId,
+        { issuer: APPLE_ISSUER, clientId: identity.clientId, subject: identity.subject },
+        { email, isPrivateEmail: email ? identity.privateRelay : false },
+      );
+      if (outcome === "identity-taken") return done("taken");
+      if (outcome === "login-has-another") return done("has-another");
+      if (outcome === "no-login") return done("expired");
+      // By login id only: no Apple subject, token or email. The same identity again changed nothing.
+      if (outcome === "connected") logSecurityEvent('APPLE_CONNECTED', { userId: start.userId });
+      await storage.settleAuthThrottle(addressBuckets, "void", new Date())
+        .catch((error) => console.error("[APPLE_ADDRESS_THROTTLE_RETURN]", error));
+      return done("connected");
+    } catch (err) {
+      // The name only: a storage error's text can carry the row it refused, Apple's subject included.
+      console.error('[APPLE_CONNECT]', err instanceof Error ? err.name : 'error');
+      return done("failed");
+    }
+  }
 
   // R1-T4 phase D: end every session of the signed-in login, this one included.
   // Advancing the login's session version ends every session begun before it.

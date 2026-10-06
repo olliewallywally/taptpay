@@ -310,6 +310,21 @@ const REVIEWED_UNSCOPED: Record<string, Record<string, string>> = {
   "POST /api/auth/sign-out-everywhere": {
     advanceUserSessionVersion: "account scope: the signed-in login's own sessions, by the session's login id",
   },
+  "GET /api/auth/apple/connection": {
+    getAppleIdentityForLogin: "account scope (R1-T5c): the signed-in owner's own Apple identity, by the session's login id",
+  },
+  "POST /api/auth/apple/connect": {
+    getAppleIdentityForLogin: "account scope: whether the signed-in owner's own login already has an Apple identity",
+    getUserById: "account scope: the signed-in login itself, by the session's login id, for its password check",
+    takeAuthThrottleSlot: "account scope: the password check's counter, keyed by the signed-in login (change-password's own)",
+    settleAuthThrottle: "account scope: the same counter",
+  },
+  "POST /api/auth/apple/disconnect": {
+    getUserById: "account scope: the signed-in login itself, by the session's login id, for its password check",
+    takeAuthThrottleSlot: "account scope: the password check's counter, keyed by the signed-in login (change-password's own)",
+    settleAuthThrottle: "account scope: the same counter",
+    disconnectAppleIdentity: "account scope: the signed-in owner's own Apple identity, removed by the session's login id",
+  },
   "PUT /api/merchants/:id/change-password": {
     getUserById: "account scope: the signed-in login itself, by the session's login id (the path is only a precondition)",
     takeAuthThrottleSlot: "account scope: the password check's counter, keyed by the signed-in login",
@@ -395,12 +410,20 @@ test("the upload lifecycle's storage is the scheduler's alone: no route lists, r
   }
 });
 
-test("Apple identities are read and written by Apple's callback alone", () => {
-  // Account-entry scope (R1-T5b): no business's route, and no other sign-in route, touches an identity.
+test("Apple identities are found and linked by Apple's callback alone; a signed-in owner reads and removes only their own", () => {
+  // Account-entry scope (R1-T5b): no business's route, and no other sign-in route, touches an identity
+  // by Apple's key. A connect (R1-T5c) is linked by the callback too, never by a signed-in route.
   const facts = currentRouteFacts();
   const callers = (name: string) => [...facts].filter(([, fact]) => fact.storageMethods.includes(name)).map(([key]) => key).sort();
-  for (const name of ["getAppleIdentity", "recordPendingAppleIdentity", "createMerchantWithAppleIdentity"]) {
+  for (const name of ["getAppleIdentity", "recordPendingAppleIdentity", "createMerchantWithAppleIdentity", "connectAppleIdentity"]) {
     expect([name, callers(name)]).toEqual([name, ["POST /api/auth/apple/callback"]]);
+  }
+  // Login-scoped (R1-T5c): each takes a login id and no Apple key, and only the three owner routes call them.
+  expect(callers("getAppleIdentityForLogin")).toEqual(["GET /api/auth/apple/connection", "POST /api/auth/apple/connect"]);
+  expect(callers("disconnectAppleIdentity")).toEqual(["POST /api/auth/apple/disconnect"]);
+  const contract = storageContract();
+  for (const name of ["getAppleIdentityForLogin", "connectAppleIdentity", "disconnectAppleIdentity"]) {
+    expect([name, contract.find((method) => method.name === name)?.signature.startsWith(`${name}(userId: number`)]).toEqual([name, true]);
   }
   // The handoff code is redeemed by the two session routes and no one else.
   expect(callers("consumeAuthHandoffCode")).toEqual(["POST /api/auth/apple/session", "POST /api/auth/google/session"]);

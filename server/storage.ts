@@ -783,6 +783,20 @@ export interface IStorage extends PaymentAttemptRepository {
     key: AppleIdentityKey,
     first: { isPrivateEmail: boolean },
   ): Promise<{ merchant: Merchant; userId: number }>;
+  //
+  // R1-T5c: a signed-in owner's own Apple identity. Login-scoped: each names the caller's own login.
+  //
+  /** The Apple identity that signs this login in, if it has one. */
+  getAppleIdentityForLogin(userId: number): Promise<AppleIdentityRecord | undefined>;
+  /**
+   * Connects an Apple identity to an active owner's login, under that login's row lock. An identity
+   * never seen, or pending, becomes the login's (the email is replaced only by one given now). The
+   * same identity again changes nothing; an identity that is another login's is never moved; a login
+   * that has an identity takes no second one; anything but an active owner's login takes none.
+   */
+  connectAppleIdentity(userId: number, key: AppleIdentityKey, first: { email?: string; isPrivateEmail: boolean }): Promise<AppleConnectOutcome>;
+  /** Removes this login's Apple identity: nothing about that Apple account is kept. True when one was removed. */
+  disconnectAppleIdentity(userId: number): Promise<boolean>;
   verifyMerchant(token: string, passwordHash: string): Promise<Merchant | undefined>;
   confirmMerchantEmail(token: string, onboardingCompleted: boolean): Promise<Merchant | undefined>;
   updateMerchantStatus(id: number, status: string): Promise<Merchant | undefined>;
@@ -1268,6 +1282,12 @@ export class AppleIdentityTakenError extends Error {
   }
 }
 
+/** What connecting an Apple identity to a login came to (R1-T5c). */
+export type AppleConnectOutcome = "connected" | "already-connected" | "identity-taken" | "login-has-another" | "no-login";
+
+/** A users-row id: nothing else is ever looked up as a login. */
+const isLoginId = (userId: unknown): userId is number => typeof userId === "number" && Number.isSafeInteger(userId) && userId > 0;
+
 const appleIdentityIs = (key: AppleIdentityKey) => and(
   eq(appleIdentities.issuer, key.issuer), eq(appleIdentities.clientId, key.clientId), eq(appleIdentities.subject, key.subject),
 );
@@ -1670,6 +1690,37 @@ export class MemStorage implements IStorage {
       userId: owner.id, email, isPrivateEmail: first.isPrivateEmail, createdAt: existing?.createdAt ?? now, linkedAt: now,
     });
     return { merchant, userId: owner.id };
+  }
+
+  async getAppleIdentityForLogin(userId: number): Promise<AppleIdentityRecord | undefined> {
+    if (!isLoginId(userId)) return undefined;
+    return [...this.appleIdentities.values()].find((identity) => identity.userId === userId);
+  }
+
+  async connectAppleIdentity(userId: number, key: AppleIdentityKey, first: { email?: string; isPrivateEmail: boolean }): Promise<AppleConnectOutcome> {
+    if (!isLoginId(userId)) return "no-login";
+    const login = this.users.get(userId);
+    if (!login || login.role !== "owner" || login.status !== "active") return "no-login";
+    const mapKey = this.appleIdentityMapKey(key);
+    const mine = await this.getAppleIdentityForLogin(userId);
+    if (mine) return this.appleIdentityMapKey(mine) === mapKey ? "already-connected" : "login-has-another";
+    const existing = this.appleIdentities.get(mapKey);
+    if (existing && existing.userId !== null) return "identity-taken";
+    const now = new Date();
+    // The row's email is replaced only by one given now, as the SQL's coalesce does.
+    const email = first.email || null;
+    this.appleIdentities.set(mapKey, {
+      id: existing?.id ?? this.currentAppleIdentityId++, issuer: key.issuer, clientId: key.clientId, subject: key.subject, userId,
+      email: email ?? existing?.email ?? null,
+      isPrivateEmail: email ? first.isPrivateEmail : (existing?.isPrivateEmail ?? first.isPrivateEmail),
+      createdAt: existing?.createdAt ?? now, linkedAt: now,
+    });
+    return "connected";
+  }
+
+  async disconnectAppleIdentity(userId: number): Promise<boolean> {
+    const mine = await this.getAppleIdentityForLogin(userId);
+    return mine ? this.appleIdentities.delete(this.appleIdentityMapKey(mine)) : false;
   }
 
   async createMerchantWithSignup(data: MerchantSignupStorageInput): Promise<Merchant> {
@@ -4785,6 +4836,52 @@ export class DatabaseStorage implements IStorage {
       if (linked.length === 0) throw new AppleIdentityTakenError();
       return { merchant, userId: owner.id as number };
     });
+  }
+
+  async getAppleIdentityForLogin(userId: number): Promise<AppleIdentityRecord | undefined> {
+    if (!isLoginId(userId)) return undefined;
+    if (!this.db) throw new Error('Database not available');
+    const [row] = await this.db.select().from(appleIdentities).where(eq(appleIdentities.userId, userId)).limit(1);
+    return row;
+  }
+
+  // One transaction (R1-T5c). The login's row is locked first, so two connects for one login queue
+  // and the second sees the first's identity. The link itself takes a row over only while it has no
+  // login: of two logins connecting one identity at once, the second finds it taken.
+  async connectAppleIdentity(userId: number, key: AppleIdentityKey, first: { email?: string; isPrivateEmail: boolean }): Promise<AppleConnectOutcome> {
+    if (!isLoginId(userId)) return "no-login";
+    if (!this.db) throw new Error('Database not available');
+    return await this.db.transaction(async (tx: any) => {
+      const [login] = await tx.select({ id: users.id }).from(users)
+        .where(and(eq(users.id, userId), eq(users.role, "owner"), eq(users.status, "active"))).for("update");
+      if (!login) return "no-login";
+      const [mine] = await tx.select().from(appleIdentities).where(eq(appleIdentities.userId, userId)).limit(1);
+      if (mine) {
+        return mine.issuer === key.issuer && mine.clientId === key.clientId && mine.subject === key.subject ? "already-connected" : "login-has-another";
+      }
+      const now = new Date();
+      const linked = await tx.insert(appleIdentities)
+        .values({ issuer: key.issuer, clientId: key.clientId, subject: key.subject, userId, email: first.email || null, isPrivateEmail: first.isPrivateEmail, linkedAt: now })
+        .onConflictDoUpdate({
+          target: [appleIdentities.issuer, appleIdentities.clientId, appleIdentities.subject],
+          set: {
+            userId,
+            linkedAt: now,
+            email: sql`coalesce(excluded.email, ${appleIdentities.email})`,
+            isPrivateEmail: sql`case when excluded.email is null then ${appleIdentities.isPrivateEmail} else excluded.is_private_email end`,
+          },
+          setWhere: isNull(appleIdentities.userId),
+        })
+        .returning({ id: appleIdentities.id });
+      return linked.length === 0 ? "identity-taken" : "connected";
+    });
+  }
+
+  async disconnectAppleIdentity(userId: number): Promise<boolean> {
+    if (!isLoginId(userId)) return false;
+    if (!this.db) throw new Error('Database not available');
+    const removed = await this.db.delete(appleIdentities).where(eq(appleIdentities.userId, userId)).returning({ id: appleIdentities.id });
+    return removed.length > 0;
   }
 
   /** The business, its owner login and its subscription, inside the caller's transaction. */

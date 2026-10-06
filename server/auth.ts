@@ -449,6 +449,17 @@ export async function isStreamSessionActive(
   return merchantId === undefined || user.role === 'admin' || user.merchantId === merchantId;
 }
 
+/**
+ * The login a business session stands for now, when that session has not been ended or run out and
+ * its login could still be signed in by it; else null (a storage fault included). For a request that
+ * arrives without the session's cookie but names the session under the server's own signature:
+ * Apple's return to a connect (R1-T5c). Like the stream check, it presents no secret, writes nothing
+ * and is not a use of the session.
+ */
+export function liveBusinessSessionLogin(sessionId: string): Promise<User | null> {
+  return userOfLiveSession({ id: sessionId, realm: 'business' });
+}
+
 /** The principal a session stands for now, when it has not been ended or run out; else null. */
 async function userOfLiveSession(signIn: { id: string; realm: SessionRealm }): Promise<User | null> {
   const storageModule = await readForAuth('load the storage module', () => import('./storage'));

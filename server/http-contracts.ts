@@ -4,6 +4,7 @@ import {
   type Transaction,
   type User,
   type SubscriptionBillingHistory,
+  type AppleIdentityRecord,
 } from "@shared/schema";
 import { planForOrDefault } from "@shared/plans";
 import { config } from "./config";
@@ -85,6 +86,21 @@ export function teamMemberDto(user: User) {
     status: user.status,
     lastLoginAt: user.lastLoginAt,
     createdAt: user.createdAt,
+  };
+}
+
+/**
+ * A login's own Apple connection, for its owner's Settings (R1-T5c): whether Apple signs this login
+ * in, the address Apple gave (which may be a relay address) and since when. Never Apple's subject,
+ * issuer or client id: nothing here identifies the Apple account to anyone who reads the answer.
+ */
+export function appleConnectionDto(identity: AppleIdentityRecord | undefined, available: boolean) {
+  return {
+    available,
+    connected: identity !== undefined,
+    email: identity?.email ?? null,
+    isPrivateEmail: identity?.isPrivateEmail ?? false,
+    connectedAt: identity?.linkedAt ? new Date(identity.linkedAt).toISOString() : null,
   };
 }
 

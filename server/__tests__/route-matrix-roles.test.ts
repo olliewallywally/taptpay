@@ -4,6 +4,8 @@ import "./support/test-env";
 // teammate's refusal is the one observed. A capability flag needs enforce mode (config.ts).
 process.env.FEATURE_REFUND_INITIATION = "true";
 process.env.ENV_VALIDATION_MODE = "enforce";
+// A connect's start checks that Sign in with Apple is set up before the owner, likewise (R1-T5c).
+import "./support/apple-sign-in-test-env";
 
 import crypto from "crypto";
 import { observeRefusalEffects } from "./support/refusal-effects";
@@ -84,6 +86,10 @@ const RECIPES: Record<string, (ctx: Ctx) => Promise<Req> | Req> = {
   "POST /api/subscription/cancel": () => ({ method: "post", path: "/api/subscription/cancel", body: { reason: "Too dear" } }),
   "POST /api/subscription/resume": () => ({ method: "post", path: "/api/subscription/resume", body: {} }),
   "GET /api/team": () => ({ method: "get", path: "/api/team" }),
+  // The caller's own login, owner-only: connecting Apple (R1-T5c).
+  "GET /api/auth/apple/connection": () => ({ method: "get", path: "/api/auth/apple/connection" }),
+  "POST /api/auth/apple/connect": () => ({ method: "post", path: "/api/auth/apple/connect", body: { currentPassword: VALID_PASSWORD } }),
+  "POST /api/auth/apple/disconnect": () => ({ method: "post", path: "/api/auth/apple/disconnect", body: { currentPassword: VALID_PASSWORD } }),
   "POST /api/team/invite": () => ({ method: "post", path: "/api/team/invite", body: { email: email("invitee") } }),
   "GET /api/subscription/billing-history": () => ({ method: "get", path: "/api/subscription/billing-history" }),
   "GET /api/billing/card": () => ({ method: "get", path: "/api/billing/card" }),

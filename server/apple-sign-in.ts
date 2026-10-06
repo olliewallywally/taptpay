@@ -286,6 +286,65 @@ export function verifyAppleSignInState(cookieValue: string | undefined, returned
   return crypto.timingSafeEqual(Buffer.from(state), Buffer.from(returnedState)) ? nonce : null;
 }
 
+// ── R1-T5c: a signed-in owner connecting Apple ─────────────────────────────────────────────────
+
+const SESSION_ID = /^[A-Za-z0-9_-]{22}$/; // as server/auth-sessions.ts makes one
+const LOGIN_ID = /^[1-9]\d{0,9}$/; // a users-row id: at most ten digits, so always an exact number
+
+/** What a connect's return answers with: `/settings?apple=<one of these>` and nothing else. */
+export type AppleConnectResult = "connected" | "cancelled" | "expired" | "taken" | "has-another" | "unavailable" | "failed" | "try-later";
+
+let appleConnectKey: Buffer | undefined;
+/** A connect's starting cookie is signed under its own key: it is never a sign-in's, nor a sign-in's a connect's. */
+function appleConnectSignature(payload: string): string {
+  appleConnectKey ??= Buffer.from(crypto.hkdfSync("sha256", config.jwtSecret, Buffer.alloc(0), "taptpay apple-connect v1", 32));
+  return crypto.createHmac("sha256", appleConnectKey).update(payload, "utf8").digest("base64url");
+}
+
+/**
+ * Starts a connect for a signed-in login. Apple's return is a cross-site post with no session cookie
+ * on it, so the login and the session that asked are carried in the starting cookie, under this
+ * server's signature, beside a fresh state and nonce.
+ */
+export function startAppleConnect(login: { userId: number; sessionId: string }): { state: string; nonce: string; cookieValue: string } {
+  const state = randomToken();
+  const nonce = randomToken();
+  const payload = `${state}.${nonce}.${Date.now()}.${login.userId}.${login.sessionId}`;
+  return { state, nonce, cookieValue: `${payload}.${appleConnectSignature(payload)}` };
+}
+
+export interface AppleConnectStart {
+  state: string;
+  nonce: string;
+  userId: number;
+  sessionId: string;
+  /** Ours, but begun more than ten minutes ago (or in the future): it connects nothing. */
+  expired: boolean;
+}
+
+/**
+ * The connect this browser started, when its starting cookie is one: six parts in the shapes this
+ * server writes, under the connect signature. Null for anything else, a sign-in's cookie included.
+ * It says nothing about the state Apple returned (appleStateMatches) or whether the session that
+ * asked still stands (the caller checks both).
+ */
+export function readAppleConnectStart(cookieValue: string | undefined): AppleConnectStart | null {
+  if (typeof cookieValue !== "string") return null;
+  const [state, nonce, issued, userId, sessionId, signature, extra] = cookieValue.split(".");
+  if (extra !== undefined || !RANDOM_TOKEN.test(state ?? "") || !RANDOM_TOKEN.test(nonce ?? "") || !RANDOM_TOKEN.test(signature ?? "")) return null;
+  if (!/^\d{13}$/.test(issued ?? "") || !LOGIN_ID.test(userId ?? "") || !SESSION_ID.test(sessionId ?? "")) return null;
+  const expected = appleConnectSignature(`${state}.${nonce}.${issued}.${userId}.${sessionId}`);
+  if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return null;
+  const age = Date.now() - Number(issued);
+  return { state, nonce, userId: Number(userId), sessionId, expired: age < 0 || age >= OAUTH_STATE_TTL_MS };
+}
+
+/** Whether the state Apple returned is the one this start was given: whole, in this server's shape, in constant time. */
+export function appleStateMatches(state: string, returnedState: unknown): boolean {
+  if (typeof returnedState !== "string" || !RANDOM_TOKEN.test(returnedState) || !RANDOM_TOKEN.test(state)) return false;
+  return crypto.timingSafeEqual(Buffer.from(state), Buffer.from(returnedState));
+}
+
 /** Where the browser is sent to sign in at Apple. The answer comes back as a form post. */
 export function appleAuthorizeUrl(settings: AppleSettings, redirectUri: string, started: { state: string; nonce: string }): string {
   const params = new URLSearchParams({

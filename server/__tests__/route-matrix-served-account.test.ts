@@ -1,5 +1,6 @@
 import "./support/test-env";
 import "./support/push-test-env";
+import { APPLE_TEST_SERVICES_ID } from "./support/apple-sign-in-test-env";
 
 import crypto from "crypto";
 import request from "supertest";
@@ -16,7 +17,7 @@ import * as emailService from "../email-service-multi";
 import { subscriptionCardSessionState } from "../storage";
 import * as windcave from "../windcave";
 import { TUTORIAL_PAGE_KEYS } from "@shared/tutorial";
-import { signedIn, resetTestStorage, storage, type Principal } from "./support/http-harness";
+import { VALID_PASSWORD, signedIn, resetTestStorage, storage, type Principal } from "./support/http-harness";
 import {
   CARD,
   as,
@@ -32,7 +33,7 @@ import {
 
 /**
  * R1-T3 (plan C10): the allowed callers succeed — the account family (the session, the tutorials,
- * notifications, the plan, the team, the payment card, Send to Print, invoice documents). For every
+ * notifications, connecting Apple, the plan, the team, the payment card, Send to Print, invoice documents). For every
  * route of the family and every caller the matrix answers "allowed" (the owner; a teammate where the
  * route's review admits one; the platform admin where it is admitted), a real request is served: the
  * route's success status, and what the success did or returned (its review's success DTO, the record
@@ -50,6 +51,14 @@ const web = (name: string) => ({
   keys: { p256dh: `p256dh-${name}`, auth: `auth-${name}` },
 });
 const DEVICE = "matrix-device-0001";
+const APPLE_OAUTH_COOKIE = "__Host-taptpay-apple-oauth";
+/** An Apple identity connected to a login, as Apple's return leaves it (R1-T5c). */
+async function appleConnected(who: Principal) {
+  const key = { issuer: "https://appleid.apple.com", clientId: APPLE_TEST_SERVICES_ID, subject: `001234.${crypto.randomBytes(16).toString("hex")}.0123` };
+  const outcome = await storage.connectAppleIdentity(who.user.userId!, key, { email: "owner.apple@example.test", isPrivateEmail: false });
+  if (outcome !== "connected") throw new Error(`fixture: connect answered ${outcome}`);
+  return key;
+}
 const SWITCHES = { paymentReceived: false, dailyPayoutSummary: true, failedPaymentAlerts: false };
 
 async function invited(ctx: Ctx): Promise<number> {
@@ -108,6 +117,44 @@ const RECIPES: Record<string, Recipe> = {
       expect(await meStatus(ctx, who === ctx.owner ? ctx.member : ctx.owner)).toBe(200);
     },
   }),
+  // Connecting Apple to the owner's own login (R1-T5c). Apple is never reached: a start only answers
+  // with Apple's address, and the connection is made here as Apple's return would leave it.
+  "GET /api/auth/apple/connection": async (_ctx, who) => {
+    const key = await appleConnected(who);
+    return {
+      req: get("/api/auth/apple/connection"), status: 200,
+      check: (res) => {
+        expect(res.headers["cache-control"]).toBe("no-store");
+        expect(res.body).toEqual({ available: true, connected: true, email: "owner.apple@example.test", isPrivateEmail: false, connectedAt: expect.any(String) });
+        // Nothing that identifies the Apple account.
+        expect(JSON.stringify(res.body)).not.toContain(key.subject);
+      },
+    };
+  },
+  "POST /api/auth/apple/connect": (_ctx, who) => ({
+    req: { method: "post", path: "/api/auth/apple/connect", body: { currentPassword: VALID_PASSWORD } }, status: 200,
+    check: async (res) => {
+      const target = new URL(res.body.url);
+      expect(target.origin + target.pathname).toBe("https://appleid.apple.com/auth/authorize");
+      expect(target.searchParams.get("client_id")).toBe(APPLE_TEST_SERVICES_ID);
+      // The starting cookie names this login and this session; nothing is connected until Apple returns.
+      const cookie = ([] as string[]).concat(res.headers["set-cookie"] ?? []).find((line) => line.startsWith(`${APPLE_OAUTH_COOKIE}=`)) ?? "";
+      expect(cookie.split(";")[0].split("=")[1].split(".").slice(3, 5)).toEqual([String(who.user.userId), who.sessionId]);
+      expect(await storage.getAppleIdentityForLogin(who.user.userId!)).toBeUndefined();
+    },
+  }),
+  "POST /api/auth/apple/disconnect": async (ctx, who) => {
+    const key = await appleConnected(who);
+    return {
+      req: { method: "post", path: "/api/auth/apple/disconnect", body: { currentPassword: VALID_PASSWORD } }, status: 200,
+      check: async (res) => {
+        expect(res.body).toEqual({ connected: false });
+        expect(await storage.getAppleIdentity(key)).toBeUndefined();
+        // It ends no session: the owner carries on.
+        expect(await meStatus(ctx, who)).toBe(200);
+      },
+    };
+  },
   // The tutorials.
   "GET /api/tutorial/state": () => ({
     req: get("/api/tutorial/state"), status: 200,

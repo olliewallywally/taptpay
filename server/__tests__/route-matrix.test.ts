@@ -2,6 +2,8 @@ import "./support/test-env";
 // Push subscription checks its keys (503) before the caller, as P2.2 orders a capability before the
 // role or tenant: with keys set, the caller's answer is the one observed.
 import "./support/push-test-env";
+// A connect's start checks that Sign in with Apple is set up (503) before the caller, likewise (R1-T5c).
+import "./support/apple-sign-in-test-env";
 
 import { observeRefusalEffects } from "./support/refusal-effects";
 import request from "supertest";

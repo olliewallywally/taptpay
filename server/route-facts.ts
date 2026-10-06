@@ -98,6 +98,11 @@ const AUTH_CHECK_CALLS = new Set([
   // R1-T5b: Sign in with Apple: this browser's state, then Apple's signed identity token.
   "verifyAppleSignInState",
   "verifyAppleIdentityToken",
+  // R1-T5c: a connect's return: its starting cookie under the connect key, the state Apple returned,
+  // and the session that asked, read by its id.
+  "readAppleConnectStart",
+  "appleStateMatches",
+  "liveBusinessSessionLogin",
   "storage.getMerchantByToken",
   "storage.getQuoteByToken",
   "storage.getUserByInviteToken",
