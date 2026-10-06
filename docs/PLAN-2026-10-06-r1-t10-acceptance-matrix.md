@@ -212,3 +212,183 @@ only when a route does; a refusal names the route and the parameter and never th
 value; the builder must be handed a name written out where it is used, so the contract
 test can read every name from the source; a method spelled beside the builder must be
 the route's own.
+
+## T10b preflight — the other screens onto the builder
+
+Base `510ddceb` (T10a's code is `9f9182e5`; the commit above it is documentation).
+
+### What was measured first (on `9f9182e5`, read from the syntax tree, tests aside)
+
+- **581 API addresses are still spelled by hand, in 66 files.**
+- **118 of them are in 14 files the app never loads**: 11 that nothing imports
+  (`components/digital-wallet-buttons`, `components/native-payment-buttons`,
+  `pages/admin-api`, `pages/admin-dashboard`, `pages/admin-merchant`,
+  `pages/admin-merchant-broken`, `pages/admin-revenue`, `pages/admin/WebsiteAnalytics`,
+  `pages/exports`, `pages/merchant-terminal-mobile`, `pages/settings-simple`) and three
+  pages that `App.tsx` declares for lazy loading and never renders
+  (`pages/merchant-terminal`, `pages/demo-terminal`, `pages/create-merchant`).
+  **Every call to a route the server no longer has is in one of these 14.** They are
+  out of T10b's scope and are listed for the owner below.
+- **463 are in the 52 files the app renders. None calls a route the server does not
+  have.** Of them: 258 are requests; 125 are cache keys that are the whole path of a GET
+  route with no parameter; 79 are cache labels (`"/api/merchants"` 70 times,
+  `"/api/transactions"` 6, and three used once); one is a cache key built from an id.
+  Six more in the two admin dashboards are not API addresses at all: the admin area has
+  a page of its own at the address `/api`.
+
+### Method
+
+The move is mechanical, so it is done and checked mechanically, with the hand kept for
+what a tool cannot place:
+
+1. **A rewrite** (scratch, `t10b/codemod.ts`) matches each spelled address to exactly one
+   listed route by its shape and by the method its call says, and writes the builder in
+   its place. What it cannot place with certainty it leaves alone and lists. A dry run
+   places 410 of the 463 and lists 53 (17 of them in `lib/payment-addressing.ts`).
+2. **A proof written apart from the rewrite** (`t10b/proof.ts`) reads the file before and
+   after: every address must pair one for one with a built one, with the same text
+   pieces, the same values between them, the same query tail, and the same method
+   wherever the old call said one; and with those expressions cut out of both, and the
+   builder's import removed, **the rest of the file must be the same text**. A file the
+   hand changed anywhere else fails and is read.
+3. **The type check** then holds every name to the list and every parameter to its type;
+   **the contract test** reads every name and every method from the source.
+4. **Every existing test stays as it is** and must pass.
+
+### What the builder gains (first batch, tests red first)
+
+- **A value the page may not have yet.** 42 of the placed calls hand over an id typed
+  `number | null` or `string | undefined` (the page asks only once it is signed in, which
+  the type system cannot see). The builder already refuses a missing value when it runs;
+  its type now says so, instead of forty-two `!`. A parameter left out, an extra one, a
+  route the server does not have, or text for a whole number still does not typecheck.
+- **`apiPathOrNull`**, for the two places an address with a parameter is worked out
+  while the page is being drawn (a cache key, an image's address): the same address, or
+  null while a value is not usable; it never throws. The contract test forbids the
+  throwing builder with a parameter inside a query key.
+- **`wholeNumber`**, for the six places a whole-number id reaches the page as text (the
+  admin's business page, from its own address; one refund): the number when the text is
+  written exactly as the server's own parser reads one, otherwise null. Tested against
+  that parser.
+- **Five cache labels** as named constants (`MERCHANTS_KEY` and four others). A label is
+  the first word of a cached entry's name where that word is not itself an address.
+  **Every cache key keeps its value**, so moved and unmoved files, and the tests that
+  put data in the cache, go on sharing entries exactly as before. The contract test
+  pins each label, ties it to the routes it is the start of, checks none is a GET
+  route's whole path, and checks a label is only ever the first word of a key.
+
+### Batches (each its own commit; the guard's list grows with each)
+
+1. Settings: `pages/settings`, `desktop/DesktopSettingsPage`,
+   `hooks/use-billing-card-return`, `lib/merchant` (76), with the builder's additions.
+2. Retail: the phone and desktop terminals, home, analytics, stock, transactions, the
+   payment stack, the board builder, the QR display, the retail reports (110).
+3. Property: both terminals, the tenant pages, `lib/property-data`, the desktop
+   directory profile (65).
+4. Trades: both terminals, clients, schedules, dashboards, analytics, reports,
+   `desktop/data/trades-data` (101).
+5. The public pay, split, checkout and receipt pages and `lib/payment-addressing` (48).
+6. The shell: `App`, the tutorial, onboarding, push, live updates (33).
+7. The admin area (30), and then **the guard turned round**: no file under `client/src`
+   may spell an API address, except the listed files the app never loads (held to their
+   present counts, and checked by the test to be unreachable from the app's entry) and
+   the admin area's page address `/api`.
+
+### Verification of Prior Fixes
+
+T10a was verified in this session: full client 117 suites / 1,420 tests and full server
+180 suites / 4,464 tests on `9f9182e5`. Reread for this scope: the default query
+function (it asks for the first word of a key, so a key with no function of its own *is*
+an address: 11 such keys in rendered files, every one a real GET route); the request
+wrappers (`tradesFetch`, `propFetch`, the three local `authFetch`: all `(address,
+options)` like `fetch`); the server's strict whole-number parser; where each id comes
+from; the 20 tutorial page keys.
+
+### Blocking Issues
+
+None.
+
+### High-Risk Concerns
+
+- **An address or a method changing.** The proof compares each one, from the commit.
+- **A cache key changing**, which would silently stop one screen refreshing another.
+  Keys keep their values; the proof compares them like any address.
+- **A refusal by the builder where a request used to be sent**: an exception while the
+  page is drawn would be a blank screen. Measured: all 118 placed calls that carry a
+  parameter are inside an async function or the function react-query calls, where a
+  refusal is a failed request like any other (`t10b/sync-sites.ts`). The hand-placed
+  ones are checked the same way; the two worked out while drawing use `apiPathOrNull`.
+- **Text ids.** 33 placed calls wrote a text id into the path as it was; the builder
+  writes it into one path segment. Every value the server issues (UUIDs, hexadecimal and
+  URL-safe tokens, the 20 tutorial page keys) is unchanged by that. A value holding `/`,
+  `?` or `#` used to become another path; it now reaches the server as one id, which it
+  refuses.
+- **Double encoding** where the old code already encoded: the rewrite removes
+  `encodeURIComponent()` and `opaquePart()` around a text value, and the proof fails if
+  one is left around a value or removed from a whole number.
+
+### Missing Steps
+
+The builder's additions with their tests red first; then, per batch: the files added to
+the guard's list (red), the rewrite, the hand-placed ones, the proof, the refusal
+check, the type check, the contract test, the batch's own page tests and the full client
+suite. At the end: the guard turned round, the mutation check of what is new, the
+production build, the full server suite, evidence.
+
+### Unsafe Assumptions
+
+"Never loaded" is read from static imports and `import()`; the client has no
+`import.meta.glob`. The last batch puts that reading into the test itself, so a file
+that becomes loaded and still spells an address fails. A wrapper's method is read from
+the options written at the call; where they are not written out there, the call is done
+by hand. A text id is trusted to be what the server issued only in the sense above: it
+is always written into one segment.
+
+### Required Ordering Changes
+
+The builder's additions first, since every later batch uses them. The admin area last,
+with the guard turned round after it.
+
+### Open Product / Provider / Legal Questions
+
+None blocks T10b. Recorded for the owner:
+
+4. **The 14 files the app never loads.** They cost nothing when the app runs. They are
+   where every out-of-date call lives (the admin sign-up, edit and delete he removed on
+   2026-09-26; `nfc-pay`; `split-enabled`; the old wallet-button routes; the admin
+   API-key and revenue pages; the old exports), and they make a search for an address
+   return answers that are not true of the app. Deleting them is his call; nothing is
+   deleted here.
+5. **The admin area's page at `/api`.** A page address, not an API address; it is left
+   as it is and named as the one exception in the guard.
+
+### Compliance and Data-Handling Notes
+
+No data is touched and no request changes. A refusal by the builder names a route and a
+parameter, never a value.
+
+### Test and Rollback Adequacy
+
+The existing tests assert literal addresses and stay unchanged; the proof covers every
+moved expression, tested or not. Each batch is one commit and can be reverted alone:
+keys keep their values, so a reverted batch still shares its cache with the others.
+
+### Final Recommendation (Approve / Do not approve)
+
+**Approve T10b on `510ddceb`**, the builder's additions red first, in the seven batches
+above. It does not close R1-T10.
+
+### Separate reread
+
+Retraced with the tools rather than by eye. The rewrite's dry run over the 52 files: 410
+placed, 53 listed. Applied to a scratch copy and type-checked: 48 errors, in six kinds,
+all of them a value's type (36 `number | null`, 2 `number | undefined`, 3 `string |
+undefined`, 1 `string | null`, 5 text for a whole number, 1 `string | number`), none a
+wrong name or a wrong parameter. The proof over that copy: the 33 files with nothing
+listed all pass (same addresses, same values, same rest); the 19 with something listed
+fail only at what is still spelled. The refusal check: 118 of 118 inside an async
+function or a query's own function. Read by hand: the one request whose last segment is
+chosen when it runs (`send-balance` or `complete`; both are routes), the one templated
+key, the image address in the QR display, the two places a method is not written at the
+call. What must not move: any address, method or cache key; any existing test; the
+never-loaded files. **Approve the same T10b scope.**
