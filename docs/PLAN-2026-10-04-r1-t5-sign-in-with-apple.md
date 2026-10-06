@@ -616,3 +616,37 @@ Settled while building: "connected" is said on a return only when the server's o
 answer agrees (the word alone is anyone's to put in a link); a refusal shows the
 server's words or one fixed sentence, never a raw body; the password field's name for
 assistive technology is "Current password for Apple" on both screens.
+
+## T5e — runbooks and the owner's list (documentation only)
+
+Base `f3126e9d` (T5d code `3e5db51d`). No code, no test, no schema.
+
+### Preflight
+
+Read against the code as it stands, so the runbook says only what the app does: the four
+settings and what a partial set or a wrong key does (`server/config.ts`: the app does not
+start); every message the Apple routes and the Settings row show (`server/routes.ts`,
+`client/src/lib/apple-sign-in.ts`); what is stored (`apple_identities`) and what is
+logged; that no Apple token is kept; the client secret's five-minute life; how Apple's
+own keys are fetched again. **What it cannot claim**: nothing in it was done against a
+real Apple account. The steps in Apple's console are written from Apple's published
+flow for a Services ID; the owner confirms them as he does them. No open question
+blocks it. **Approve as documentation.**
+
+### Completion
+
+`docs/operations/sign-in-with-apple.md`: what the owner sets up at Apple (the App ID, the
+Services ID with its domain and the one return URL, the key, the team ID, the sender
+addresses for Hide My Email); the four settings and the public origin; **the eight checks
+to make on a real iPhone, in Safari and in the app, before it is called live**; every
+message and what it means; rotating the key (a swap of two settings, since the app signs
+a fresh five-minute secret per exchange) and what a leak means; why the Services ID must
+never change; the design for revoking Apple's grant when an account is closed (A-T6: a
+fresh authorization at that moment, so no token is stored); and what is not done
+(Apple's server notifications, the native sheet, notice emails). The route inventory was
+regenerated with T5c and T5d (194 routes).
+
+**R1-T5's engineering scope (T5a to T5e) is implemented. It is not closed.** Owed:
+independent review of every part; the owner's Apple setup; the iPhone checks in the
+runbook, recorded as evidence; and his look at the button and the Settings row
+(defaults 1, 9 and 11).
