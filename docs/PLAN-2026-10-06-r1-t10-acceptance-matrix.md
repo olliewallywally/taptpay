@@ -194,3 +194,21 @@ the rest. `shared/` is compiled into both projects, and the server project alrea
 tests `shared/` code (`password-rule.test.ts`). The sign-in surface is small and I have
 its tests fresh: 12 files, 29 literals. What must not move: every address; every
 existing test; the eager pages' imports. **Approve the same T10a scope.**
+
+## T10a completion
+
+Code `9f9182e5` on base `8d6ba483`. Red on the base: the contract suite cannot load.
+Then: the contract test 28; the generated list 178 of the 194 registrations (16 left
+out, none a page's to call); the twelve sign-in and account-entry files moved, **29
+spelled addresses becoming 26 uses of 22 route names**, two uses of the shared admin
+prefix and one renamed cache key, shown from the commit itself to be the same addresses;
+no client test file changed; the built client holding exactly the 22 names in use; 37 of
+37 planted defects caught, none surviving; the route suites, the contract test and the
+two source guards 28 / 1,811; full client 117 suites / 1,420 tests and full server 180 suites / 4,464 tests
+on the commit. [Evidence](evidence/remediation-v2-2/r1/R1-T10a-route-contract-2026-10-06.md).
+
+Settled while building: the generated file carries no date and no commit, so it changes
+only when a route does; a refusal names the route and the parameter and never the
+value; the builder must be handed a name written out where it is used, so the contract
+test can read every name from the source; a method spelled beside the builder must be
+the route's own.
