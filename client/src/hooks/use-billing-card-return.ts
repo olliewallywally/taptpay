@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiErrorMessage, apiErrorStatus } from "@/lib/api-error";
 import { apiRequest } from "@/lib/queryClient";
+import { apiPath, apiTo } from "@shared/api-path";
 
 export const BILLING_CARD_SESSION_KEY = "taptpay.cardSession";
 
@@ -35,7 +36,7 @@ export async function confirmBillingCardSession(
   const delayMs = Math.max(0, options.delayMs ?? 750);
   const wait = options.wait ?? waitFor;
   const request = options.request ?? ((id: string) =>
-    apiRequest("POST", "/api/billing/card/confirm", { sessionId: id }));
+    apiRequest(...apiTo("POST /api/billing/card/confirm"), { sessionId: id }));
 
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     let response: Response;
@@ -128,10 +129,10 @@ export function useBillingCardReturn(): { confirmingCard: boolean } {
       if (result.status === "saved") {
         sessionStorage.removeItem(BILLING_CARD_SESSION_KEY);
         await Promise.all([
-          queryClient.invalidateQueries({ queryKey: ["/api/billing/card"] }),
-          queryClient.invalidateQueries({ queryKey: ["/api/subscription"] }),
-          queryClient.invalidateQueries({ queryKey: ["/api/subscription/billing-history"] }),
-          queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] }),
+          queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/billing/card")] }),
+          queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/subscription")] }),
+          queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/subscription/billing-history")] }),
+          queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/auth/me")] }),
         ]);
         toast({ title: "Payment method saved" });
       } else if (result.status === "pending") {

@@ -1,14 +1,20 @@
 import fs from "node:fs";
 import path from "node:path";
+import ts from "typescript";
 import { expandFacts } from "../route-facts";
+import { strictPositiveIntegerParam, strictUuidParam } from "../http-params";
 import { ROUTE_MATRIX } from "../route-matrix";
 import { ROUTE_POLICY } from "../route-policy";
 import { ROUTE_REVIEW } from "../route-review";
 import { API_ROUTES_FILE, browserApiRoutes, renderApiRoutes } from "../api-route-list";
-import { ADMIN_API_PREFIX, apiMethod, apiPath, apiTo } from "../../shared/api-path";
+import {
+  ADMIN_API_PREFIX, CHECKOUT_RESOLVE_KEY, MERCHANTS_KEY, QUOTE_TOKEN_KEY, SPLIT_PAYMENTS_KEY, TRANSACTIONS_KEY,
+  apiMethod, apiPath, apiTo, wholeNumber,
+} from "../../shared/api-path";
+import { isTutorialPageKey } from "../../shared/tutorial";
 
 /**
- * R1-T10a: one spelling for every API address. The pages name a route by its registration
+ * R1-T10: one spelling for every API address. The pages name a route by its registration
  * ("PUT /api/merchants/:id/theme") and a small builder fills its path; the list of names is
  * generated from the server's own registrations (shared/api-routes.ts, types only). So a page and
  * the server cannot disagree about a path or the shape of an id without this file, or the type
@@ -21,10 +27,6 @@ const ROOT = process.cwd();
 const read = (file: string) => fs.readFileSync(path.join(ROOT, file), "utf8");
 const listed = browserApiRoutes();
 const keys = listed.map((route) => route.key);
-/** A route's name passed to the builder, wherever the client's source does so. */
-const NAMED = /\bapi(?:Path|To|Method)\(\s*(["'`])([^"'`]*)\1/g;
-/** Any other first argument: a name the type check cannot be relied on to have seen. */
-const CALLED = /\bapi(?:Path|To|Method)\(\s*([^\s)])/g;
 
 /** Every source file of the client, tests aside. */
 function clientSources(dir = "client/src"): string[] {
@@ -53,11 +55,104 @@ const MIGRATED = [
   "client/src/lib/sign-out-everywhere.ts",
   "client/src/lib/apple-sign-in.ts",
   "client/src/hooks/use-apple-connection.ts",
+  // T10b, batch 1: Settings, on the phone and on tablet and desktop, and what they share.
+  "client/src/pages/settings.tsx",
+  "client/src/desktop/DesktopSettingsPage.tsx",
+  "client/src/hooks/use-billing-card-return.ts",
+  "client/src/lib/merchant.ts",
 ];
-/** A string that starts with /api: in quotes of any kind, a template included. */
-const SPELLED_ADDRESS = /["'`]\/api(?:[/"'`?#]|$)/m;
+/** Text that is an API address or the start of one: /api itself, or /api followed by a path, a query or a fragment. */
+const ADDRESS_START = /^\/api(?:[/?#]|$)/;
 
-describe("R1-T10a — the list of API routes a browser calls", () => {
+/** The cache labels (shared/api-path.ts): the first word of a cached entry's name that is not an address. */
+const LABELS: Record<string, string> = { MERCHANTS_KEY, TRANSACTIONS_KEY, SPLIT_PAYMENTS_KEY, CHECKOUT_RESOLVE_KEY, QUOTE_TOKEN_KEY };
+
+/** Calls that take an address first and, like fetch, say their method in the options after it. */
+const FETCH_LIKE = new Set(["fetch", "sessionFetch", "tradesFetch", "propFetch", "authFetch"]);
+const BUILDERS = new Set(["apiPath", "apiTo", "apiMethod"]);
+
+const parsed = new Map<string, ts.SourceFile>();
+/** A client source file's syntax tree: the checks below read calls from it, not from the text. */
+function tree(file: string): ts.SourceFile {
+  if (!parsed.has(file)) parsed.set(file, ts.createSourceFile(file, read(file), ts.ScriptTarget.Latest, true, file.endsWith("x") ? ts.ScriptKind.TSX : ts.ScriptKind.TS));
+  return parsed.get(file)!;
+}
+const at = (file: string, node: ts.Node) => `${file}:${tree(file).getLineAndCharacterOfPosition(node.getStart(tree(file))).line + 1}`;
+const written = (node: ts.Node | undefined): string | null =>
+  node && (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) ? node.text : null;
+const calleeOf = (call: ts.CallExpression | ts.NewExpression): string =>
+  ts.isIdentifier(call.expression) ? call.expression.text : ts.isPropertyAccessExpression(call.expression) ? call.expression.name.text : "";
+
+/**
+ * The API addresses a file spells itself: every string, in quotes of any kind or a template, that
+ * starts with /api. Read from the syntax tree, so a comment that mentions an address is not one.
+ */
+function spelledAddresses(file: string): string[] {
+  const spelled: string[] = [];
+  const visit = (node: ts.Node): void => {
+    const text = ts.isTemplateExpression(node) ? node.head.text : written(node);
+    if (text !== null && ADDRESS_START.test(text)) spelled.push(`${at(file, node)}: ${node.getText(tree(file)).slice(0, 60)}`);
+    ts.forEachChild(node, visit);
+  };
+  visit(tree(file));
+  return spelled;
+}
+
+interface BuilderUse { file: string; node: ts.CallExpression; builder: string; key: string | null }
+/** Every call of the builder in a file, with the route's name where it is written out. */
+function builderUses(file: string): BuilderUse[] {
+  const uses: BuilderUse[] = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && BUILDERS.has(node.expression.text)) {
+      uses.push({ file, node, builder: node.expression.text, key: written(node.arguments[0]) });
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(tree(file));
+  return uses;
+}
+
+/**
+ * The method a call says beside a built address, where the address is handed straight to a request:
+ * fetch(apiPath(...), { method }), a wrapper of the same shape, apiRequest("METHOD", apiPath(...)), or
+ * new EventSource(apiPath(...)). Also through `${apiPath(...)}?tail`, `apiPath(...) + tail` and
+ * `a ? apiPath(...) : apiPath(...)`. Null where the address goes anywhere else: nothing is said there.
+ */
+function saidBeside(use: BuilderUse): { method: string } | { unreadable: string } | null {
+  let node: ts.Node = use.node;
+  for (;;) {
+    const parent: ts.Node = node.parent;
+    if (ts.isTemplateSpan(parent) && ts.isTemplateExpression(parent.parent) && parent.parent.head.text === "" && parent.parent.templateSpans[0] === parent) node = parent.parent;
+    else if (ts.isParenthesizedExpression(parent) || ts.isAsExpression(parent) || ts.isNonNullExpression(parent)) node = parent;
+    else if (ts.isBinaryExpression(parent) && parent.operatorToken.kind === ts.SyntaxKind.PlusToken && parent.left === node) node = parent;
+    else if (ts.isConditionalExpression(parent) && (parent.whenTrue === node || parent.whenFalse === node)) node = parent;
+    else break;
+  }
+  const parent = node.parent;
+  if (ts.isNewExpression(parent) && calleeOf(parent) === "EventSource" && parent.arguments?.[0] === node) return { method: "GET" };
+  if (!ts.isCallExpression(parent)) return null;
+  const name = calleeOf(parent);
+  if (name === "apiRequest" && parent.arguments[1] === node) {
+    const said = written(parent.arguments[0]);
+    return said === null ? { unreadable: "apiRequest's method is not written out" } : { method: said.toUpperCase() };
+  }
+  if (!FETCH_LIKE.has(name) || parent.arguments[0] !== node) return null;
+  const options = parent.arguments[1];
+  if (!options) return { method: "GET" };
+  if (!ts.isObjectLiteralExpression(options)) return { unreadable: `${name}'s options are not written at the call` };
+  let method = "GET";
+  for (const property of options.properties) {
+    if (ts.isSpreadAssignment(property)) return { unreadable: `${name}'s options are spread from elsewhere` };
+    if ((ts.isPropertyAssignment(property) || ts.isShorthandPropertyAssignment(property)) && property.name.getText(tree(use.file)) === "method") {
+      const said = ts.isPropertyAssignment(property) ? written(property.initializer) : null;
+      if (said === null) return { unreadable: `${name}'s method is not written out` };
+      method = said.toUpperCase();
+    }
+  }
+  return { method };
+}
+
+describe("R1-T10 — the list of API routes a browser calls", () => {
   it("is the server's own registrations: the checked-in file is what the generator writes now", () => {
     // Regenerate with: node --import tsx scripts/generate-route-policy.ts
     expect(read(API_ROUTES_FILE)).toBe(renderApiRoutes(listed));
@@ -137,9 +232,15 @@ describe("R1-T10a — the list of API routes a browser calls", () => {
   });
 });
 
-describe("R1-T10a — building an address", () => {
+describe("R1-T10 — building an address", () => {
   const sample = (type: "number" | "string") => (type === "number" ? 7 : "abc-123_x");
-  const build = apiPath as unknown as (key: string, params?: Record<string, unknown>) => string;
+  const build = apiPath as unknown as (key: string, params?: unknown) => string;
+  /** What a page can hold where an id should be, and the server could not read as one. */
+  const UNUSABLE: Array<[string, unknown]> = [
+    ["zero", 0], ["a negative number", -3], ["a fraction", 1.5], ["not a number", Number.NaN], ["infinity", Number.POSITIVE_INFINITY],
+    ["a number too large to be exact", Number.MAX_SAFE_INTEGER + 2], ["nothing", undefined], ["null", null], ["empty text", ""],
+    ["a list", [22]], ["an object", { id: 22 }], ["true", true],
+  ];
 
   it("fills every listed route's path with its parameters, and says its method", () => {
     for (const route of listed) {
@@ -156,6 +257,7 @@ describe("R1-T10a — building an address", () => {
     expect(apiPath("GET /api/merchants/:id/profile", { id: 22 })).toBe("/api/merchants/22/profile");
     expect(apiPath("PUT /api/merchants/:merchantId/stock-items/:itemId", { merchantId: 22, itemId: 5 })).toBe("/api/merchants/22/stock-items/5");
     expect(apiPath("GET /api/pay/t/:token", { token: "AbC_-123" })).toBe("/api/pay/t/AbC_-123");
+    expect(apiPath("GET /api/merchants/:id/profile", { id: Number.MAX_SAFE_INTEGER })).toBe("/api/merchants/9007199254740991/profile");
     expect(apiTo("PUT /api/merchants/:id/theme", { id: 22 })).toEqual(["PUT", "/api/merchants/22/theme"]);
     expect(apiTo("POST /api/auth/logout")).toEqual(["POST", "/api/auth/logout"]);
   });
@@ -163,37 +265,139 @@ describe("R1-T10a — building an address", () => {
   it("writes a text parameter into one path segment, whatever it holds", () => {
     expect(apiPath("GET /api/pay/t/:token", { token: "a/b c?d#e%" })).toBe("/api/pay/t/a%2Fb%20c%3Fd%23e%25");
     expect(apiPath("GET /api/pay/t/:token", { token: "../admin" })).toBe("/api/pay/t/..%2Fadmin");
+    // The ids and tokens the server issues are written as they are.
+    for (const issued of ["3f2b8c1e-9a4d-4e6f-8b7a-1c2d3e4f5a6b", "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08", "AbC_-123xyz", "retail-terminal"]) {
+      expect(apiPath("GET /api/pay/t/:token", { token: issued })).toBe(`/api/pay/t/${issued}`);
+    }
   });
 
-  it.each([
-    ["zero", 0], ["a negative number", -3], ["a fraction", 1.5], ["not a number", Number.NaN], ["infinity", Number.POSITIVE_INFINITY],
-    ["a number too large to be exact", Number.MAX_SAFE_INTEGER + 2], ["nothing", undefined], ["null", null], ["empty text", ""],
-    ["a list", [22]], ["an object", { id: 22 }], ["true", true],
-  ])("refuses %s as a parameter instead of building a wrong address", (_what, value) => {
-    expect(() => build("GET /api/merchants/:id/profile", { id: value })).toThrow(/GET \/api\/merchants\/:id\/profile/);
-    expect(() => build("GET /api/pay/t/:token", { token: value })).toThrow(/GET \/api\/pay\/t\/:token/);
+  it.each(UNUSABLE)("leaves the parameter's own name where %s was given, never an address for something else", (_what, value) => {
+    expect(build("GET /api/merchants/:id/profile", { id: value })).toBe("/api/merchants/:id/profile");
+    expect(build("GET /api/pay/t/:token", { token: value })).toBe("/api/pay/t/:token");
+    // Each parameter on its own: a good one beside it is still written.
+    expect(build("PUT /api/merchants/:merchantId/stock-items/:itemId", { merchantId: 22, itemId: value })).toBe("/api/merchants/22/stock-items/:itemId");
+    expect(build("PUT /api/merchants/:merchantId/stock-items/:itemId", { merchantId: value, itemId: 5 })).toBe("/api/merchants/:merchantId/stock-items/5");
   });
 
-  it("refuses a missing parameter and one the path does not have, and never repeats what it was given", () => {
-    expect(() => build("PUT /api/merchants/:merchantId/stock-items/:itemId", { merchantId: 22 })).toThrow(/itemId/);
-    expect(() => build("GET /api/merchants/:id/profile")).toThrow(/"id"/);
-    expect(() => build("GET /api/merchants/:id/profile", { id: 22, merchantId: 23 })).toThrow(/"merchantId"/);
-    expect(() => build("GET /api/auth/session", { id: 22 })).toThrow(/"id"/);
-    // A parameter can be a secret (a link's token): each refusal names the route and the parameter only.
-    const told = (params: Record<string, unknown>) => {
-      try { build("GET /api/merchants/:id/profile", params); } catch (error) { return String((error as Error).message); }
-      return "(built)";
-    };
-    expect(told({ id: -987654321 })).toMatch(/"id"/);
-    expect(told({ id: -987654321 })).not.toContain("987654321");
-    expect(told({ id: { toString: () => "s3cr3t-value" } })).toMatch(/"id"/);
-    expect(told({ id: { toString: () => "s3cr3t-value" } })).not.toContain("s3cr3t-value");
-    expect(told({ id: 22, note: "s3cr3t-value" })).toMatch(/"note"/);
-    expect(told({ id: 22, note: "s3cr3t-value" })).not.toContain("s3cr3t-value");
+  it("never throws, whatever it is handed: an address may be worked out while a page is being drawn", () => {
+    for (const route of listed) {
+      for (const [, value] of UNUSABLE) {
+        const params = Object.fromEntries(route.params.map((param) => [param.name, value]));
+        // Nothing usable for any parameter: the path as the server registers it.
+        expect([route.key, build(route.key, params)]).toEqual([route.key, route.path]);
+      }
+      expect([route.key, build(route.key)]).toEqual([route.key, route.path]);
+    }
+    // A parameter left out, one the path does not have, and things that are not parameters at all.
+    expect(build("PUT /api/merchants/:merchantId/stock-items/:itemId", { merchantId: 22 })).toBe("/api/merchants/22/stock-items/:itemId");
+    expect(build("GET /api/merchants/:id/profile", { id: 22, merchantId: 23 })).toBe("/api/merchants/22/profile");
+    expect(build("GET /api/auth/session", { id: 22 })).toBe("/api/auth/session");
+    for (const odd of [null, 7, "text", true, [22], () => 22]) expect(build("GET /api/merchants/:id/profile", odd)).toBe("/api/merchants/:id/profile");
+    // Only what the page itself handed over is a parameter: nothing inherited.
+    expect(build("GET /api/merchants/:id/profile", Object.create({ id: 22 }))).toBe("/api/merchants/:id/profile");
+  });
+
+  it("what it leaves in the path is refused by the server's own parsers, and repeats nothing it was given", () => {
+    for (const route of listed) {
+      for (const param of route.params) {
+        const left = `:${param.name}`;
+        expect([route.key, strictPositiveIntegerParam(left)]).toEqual([route.key, null]);
+        expect([route.key, strictUuidParam(left)]).toEqual([route.key, null]);
+        expect([route.key, isTutorialPageKey(left)]).toEqual([route.key, false]);
+      }
+    }
+    // A parameter can be a secret (a link's token) or a mistake: neither is echoed into the address.
+    expect(build("GET /api/merchants/:id/profile", { id: -987654321 })).not.toContain("987654321");
+    expect(build("GET /api/merchants/:id/profile", { id: { toString: () => "s3cr3t-value" } })).not.toContain("s3cr3t");
+    expect(build("GET /api/merchants/:id/profile", { id: 22, note: "s3cr3t-value" })).not.toContain("s3cr3t");
   });
 });
 
-describe("R1-T10a — the admin area's prefix", () => {
+describe("R1-T10b — a whole number that reached the page as text", () => {
+  const read = wholeNumber as unknown as (value: unknown) => number | null;
+
+  it("is read exactly as the server's own parser reads a path parameter", () => {
+    const texts = [
+      "1", "22", "9007199254740991", "9007199254740992", "99999999999999999999", "0", "00", "022", "-3", "+3", "1.0", "1.5", "1e3", "0x10",
+      " 22", "22 ", "2 2", "22\n", "", " ", "abc", "22abc", "NaN", "Infinity", "undefined", "null", ":id", "\u0662\u0662", "\uff12\uff12",
+    ];
+    for (const text of texts) expect([text, wholeNumber(text)]).toEqual([text, strictPositiveIntegerParam(text)]);
+    expect(wholeNumber("22")).toBe(22);
+    expect(wholeNumber("9007199254740991")).toBe(9007199254740991);
+    expect(texts.filter((text) => wholeNumber(text) !== null)).toEqual(["1", "22", "9007199254740991"]);
+  });
+
+  it("hands a number on for the builder to judge, and reads nothing else as one", () => {
+    expect(wholeNumber(22)).toBe(22);
+    expect(wholeNumber(-3)).toBe(-3);
+    expect(wholeNumber(1.5)).toBe(1.5);
+    expect(Number.isNaN(wholeNumber(Number.NaN))).toBe(true);
+    for (const other of [null, undefined, true, false, [22], ["22"], { id: 22 }, { toString: () => "22" }, () => 22]) expect(read(other)).toBeNull();
+  });
+
+  it("with the builder: the address the text names, or the parameter's own name", () => {
+    expect(apiPath("GET /api/admin/merchants/:id", { id: wholeNumber("22") })).toBe("/api/admin/merchants/22");
+    expect(apiPath("GET /api/admin/merchants/:id", { id: wholeNumber(22) })).toBe("/api/admin/merchants/22");
+    for (const text of ["abc", "022", "22.0", "", "-1", " 22"]) {
+      expect([text, apiPath("GET /api/admin/merchants/:id", { id: wholeNumber(text) })]).toEqual([text, "/api/admin/merchants/:id"]);
+    }
+    expect(apiPath("GET /api/admin/merchants/:id", { id: wholeNumber(-3) })).toBe("/api/admin/merchants/:id");
+  });
+});
+
+describe("R1-T10b — cache labels", () => {
+  it("are these five, with the values every cached entry already has", () => {
+    expect(LABELS).toEqual({
+      MERCHANTS_KEY: "/api/merchants",
+      TRANSACTIONS_KEY: "/api/transactions",
+      SPLIT_PAYMENTS_KEY: "/api/split-payments",
+      CHECKOUT_RESOLVE_KEY: "/api/checkout/resolve",
+      QUOTE_TOKEN_KEY: "/api/trades/quotes/token",
+    });
+    // And the builder's file holds no other address-like word: the labels and the admin prefix are all of them.
+    const constants = [...read("shared/api-path.ts").matchAll(/^export const (\w+) = "(\/api[^"]*)";$/gm)].map((match) => [match[1], match[2]]);
+    expect(Object.fromEntries(constants)).toEqual({ ...LABELS, ADMIN_API_PREFIX: "/api/admin" });
+    const strings: string[] = [];
+    const visit = (node: ts.Node): void => {
+      const text = ts.isTemplateExpression(node) ? node.head.text : written(node);
+      if (text !== null && text.startsWith("/api")) strings.push(text);
+      ts.forEachChild(node, visit);
+    };
+    visit(ts.createSourceFile("shared/api-path.ts", read("shared/api-path.ts"), ts.ScriptTarget.Latest, true));
+    expect([...strings].sort()).toEqual(constants.map(([, value]) => value).sort());
+  });
+
+  it("each is the start of a listed route's path, up to its parameter, and none can be fetched as it stands", () => {
+    for (const [name, label] of Object.entries(LABELS)) {
+      const starts = listed.filter((route) => route.path.startsWith(`${label}/:`));
+      expect([name, starts.length > 0]).toEqual([name, true]);
+      // The default query function asks the server for a key's first word: a label must not be one it could get.
+      expect([name, keys.includes(`GET ${label}`)]).toEqual([name, false]);
+    }
+  });
+
+  it("a label is only ever the first word of a cached entry's name, never part of an address", () => {
+    const elsewhere: string[] = [];
+    let uses = 0;
+    for (const file of clientSources()) {
+      const visit = (node: ts.Node): void => {
+        if (ts.isIdentifier(node) && Object.prototype.hasOwnProperty.call(LABELS, node.text) && !ts.isImportSpecifier(node.parent)) {
+          uses += 1;
+          let holder: ts.Node = node.parent;
+          let inner: ts.Node = node;
+          while (ts.isParenthesizedExpression(holder) || ts.isAsExpression(holder)) { inner = holder; holder = holder.parent; }
+          if (!ts.isArrayLiteralExpression(holder) || holder.elements[0] !== inner) elsewhere.push(at(file, node));
+        }
+        ts.forEachChild(node, visit);
+      };
+      visit(tree(file));
+    }
+    expect(elsewhere).toEqual([]);
+    expect(uses).toBeGreaterThanOrEqual(8);
+  });
+});
+
+describe("R1-T10 — the admin area's prefix", () => {
   it("is the one the server reads the admin's own session by, and where every admin-gated route lives", () => {
     // The page sends the admin's CSRF token to an address under this prefix, the business's to any other
     // (client/src/lib/session.ts); the server picks the session to read by the same prefix.
@@ -209,10 +413,9 @@ describe("R1-T10a — the admin area's prefix", () => {
   });
 });
 
-describe("R1-T10a — the pages moved onto the builder", () => {
+describe("R1-T10 — the pages moved onto the builder", () => {
   it("spell no API address themselves", () => {
-    const spelled = MIGRATED.filter((file) => SPELLED_ADDRESS.test(read(file)));
-    expect(spelled).toEqual([]);
+    expect(MIGRATED.flatMap(spelledAddresses)).toEqual([]);
   });
 
   it("are real files, each listed once, and each uses the builder", () => {
@@ -221,61 +424,94 @@ describe("R1-T10a — the pages moved onto the builder", () => {
       expect([file, fs.existsSync(path.join(ROOT, file))]).toEqual([file, true]);
       expect([file, /\bapi(?:Path|To)\(/.test(read(file))]).toEqual([file, true]);
     }
-    expect(MIGRATED.length).toBeGreaterThanOrEqual(12);
+    expect(MIGRATED.length).toBeGreaterThanOrEqual(16);
   });
 
   it("the guard itself tells an address from a route's name", () => {
-    for (const address of ['fetch("/api/auth/login")', "fetch('/api/auth/login')", "fetch(`/api/merchants/${id}/profile`)", 'const base = "/api";', 'x = "/api?y=1"']) {
-      expect([address, SPELLED_ADDRESS.test(address)]).toEqual([address, true]);
+    const spelledIn = (code: string) => {
+      const file = "client/src/__probe__.tsx";
+      parsed.set(file, ts.createSourceFile(file, code, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX));
+      try {
+        return spelledAddresses(file).length;
+      } finally {
+        parsed.delete(file);
+      }
+    };
+    for (const address of [
+      'fetch("/api/auth/login")', "fetch('/api/auth/login')", "fetch(`/api/auth/login`)", "fetch(`/api/merchants/${id}/profile`)",
+      'const base = "/api";', 'x = "/api?y=1"', 'x = "/api#y"', 'const key = ["/api/merchants", id];', 'const image = <img src="/api/x" />;',
+      'const image = <img src={`/api/x/${id}`} />;', "fetch(`${apiPath(\"GET /api/x\")}${'/api/y'}`)",
+    ]) {
+      expect([address, spelledIn(address)]).toEqual([address, 1]);
     }
-    for (const fine of ['apiPath("POST /api/auth/login")', "apiTo('PUT /api/merchants/:id/theme', { id })", "// sends the browser to /api/auth/apple", 'href="/apiary"']) {
-      expect([fine, SPELLED_ADDRESS.test(fine)]).toEqual([fine, false]);
+    for (const fine of [
+      'apiPath("POST /api/auth/login")', "apiTo('PUT /api/merchants/:id/theme', { id })", 'fetch(`${apiPath("GET /api/x")}?limit=5`)',
+      '// was fetch("/api/auth/login")\nconst x = 1;', '/* ["/api/merchants", id, "profile"] */ const y = 2;', 'const link = <a href="/apiary">bees</a>;',
+      'const page = "/settings/api";', 'const words = <p>/api/x</p>;',
+    ]) {
+      expect([fine, spelledIn(fine)]).toEqual([fine, 0]);
     }
   });
 });
 
-describe("R1-T10a — every route the client names", () => {
-  const sources = clientSources();
-
-  it("is a listed one, read from the source so a cast past the types is still caught", () => {
-    const unknown: string[] = [];
-    let named = 0;
-    for (const file of sources) {
-      for (const match of read(file).matchAll(NAMED)) {
-        named += 1;
-        if (!keys.includes(match[2])) unknown.push(`${file}: ${match[2]}`);
-      }
-    }
-    expect(unknown).toEqual([]);
-    expect(named).toBeGreaterThanOrEqual(26);
-  });
-
-  it("is called by its own method wherever a call spells one beside the builder", () => {
-    // fetch(apiPath("POST …"), { method: "POST", … }): the method is spelled twice there, and must be the route's.
-    // (apiTo carries the method itself.) A call that spells none is a GET.
-    const CALL = /\b(?:fetch|sessionFetch)\(\s*apiPath\(\s*"([A-Z]+) [^"]*"/g;
-    const disagree: string[] = [];
-    let calls = 0;
-    for (const file of sources) {
-      const text = read(file);
-      for (const match of text.matchAll(CALL)) {
-        calls += 1;
-        const call = text.slice(match.index!, match.index! + 600).split(");")[0];
-        const spelled = /\bmethod:\s*["'`]([A-Za-z]+)["'`]/.exec(call)?.[1] ?? "GET";
-        if (spelled.toUpperCase() !== match[1]) disagree.push(`${file}: ${match[0].split("(").pop()} is called with ${spelled}`);
-      }
-    }
-    expect(disagree).toEqual([]);
-    expect(calls).toBeGreaterThanOrEqual(12);
-  });
+describe("R1-T10 — every route the client names", () => {
+  const uses = clientSources().flatMap(builderUses);
 
   it("is written out where it is used: the builder is never handed a name from a variable", () => {
-    const indirect: string[] = [];
-    for (const file of sources) {
-      for (const match of read(file).matchAll(CALLED)) {
-        if (!/["'`]/.test(match[1])) indirect.push(`${file}: ${read(file).slice(match.index!, match.index! + 40).split("\n")[0]}`);
-      }
+    expect(uses.filter((use) => use.key === null).map((use) => `${at(use.file, use.node)}: ${use.node.getText(tree(use.file)).slice(0, 60)}`)).toEqual([]);
+  });
+
+  it("is a listed one, read from the source so a cast past the types is still caught", () => {
+    expect(uses.filter((use) => use.key !== null && !keys.includes(use.key)).map((use) => `${at(use.file, use.node)}: ${use.key}`)).toEqual([]);
+    expect(uses.length).toBeGreaterThanOrEqual(90);
+  });
+
+  it("is called by its own method wherever the call says one beside it", () => {
+    // fetch(apiPath("POST …"), { method: "POST", … }): the method is spelled twice there, and must be the route's.
+    // (apiTo carries the method itself.) A call that says none is a GET. A call whose method cannot be read
+    // where it is made is refused too: write it out there, or take both from apiTo.
+    const disagree: string[] = [];
+    const unreadable: string[] = [];
+    let checked = 0;
+    for (const use of uses) {
+      if (use.builder !== "apiPath" || use.key === null) continue;
+      const said = saidBeside(use);
+      if (said === null) continue;
+      checked += 1;
+      if ("unreadable" in said) unreadable.push(`${at(use.file, use.node)}: ${use.key}: ${said.unreadable}`);
+      else if (said.method !== use.key.split(" ")[0]) disagree.push(`${at(use.file, use.node)}: ${use.key} is called with ${said.method}`);
     }
-    expect(indirect).toEqual([]);
+    expect(disagree).toEqual([]);
+    expect(unreadable).toEqual([]);
+    expect(checked).toBeGreaterThanOrEqual(25);
+  });
+
+  it("the reading of a call's method is itself right", () => {
+    const said = (code: string) => {
+      const file = "client/src/__probe__.tsx";
+      parsed.set(file, ts.createSourceFile(file, code, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX));
+      try {
+        return builderUses(file).map((use) => saidBeside(use));
+      } finally {
+        parsed.delete(file);
+      }
+    };
+    expect(said('fetch(apiPath("GET /api/x"))')).toEqual([{ method: "GET" }]);
+    expect(said('sessionFetch(apiPath("POST /api/x"), { method: "post", body })')).toEqual([{ method: "POST" }]);
+    expect(said('tradesFetch(`${apiPath("GET /api/x")}?limit=5`, { headers })')).toEqual([{ method: "GET" }]);
+    expect(said('propFetch(apiPath("GET /api/x") + query, { method: "DELETE" })')).toEqual([{ method: "DELETE" }]);
+    expect(said('fetch(on ? apiPath("PUT /api/x") : apiPath("PUT /api/y"), { method: "PUT" })')).toEqual([{ method: "PUT" }, { method: "PUT" }]);
+    expect(said('apiRequest("PATCH", apiPath("PATCH /api/x"), body)')).toEqual([{ method: "PATCH" }]);
+    expect(said('new EventSource(apiPath("GET /api/x"))')).toEqual([{ method: "GET" }]);
+    expect(said('fetch(apiPath("POST /api/x"), options)')).toEqual([{ unreadable: "fetch\'s options are not written at the call" }]);
+    expect(said('fetch(apiPath("POST /api/x"), { ...options })')).toEqual([{ unreadable: "fetch\'s options are spread from elsewhere" }]);
+    expect(said('fetch(apiPath("POST /api/x"), { method })')).toEqual([{ unreadable: "fetch\'s method is not written out" }]);
+    expect(said('fetch(apiPath("POST /api/x"), { method: verb })')).toEqual([{ unreadable: "fetch\'s method is not written out" }]);
+    expect(said('apiRequest(verb, apiPath("POST /api/x"))')).toEqual([{ unreadable: "apiRequest\'s method is not written out" }]);
+    // Handed to anything else, or kept for later: nothing is said beside it.
+    expect(said('const address = apiPath("GET /api/x"); load(apiPath("GET /api/y")); const key = [apiPath("GET /api/z")];')).toEqual([null, null, null]);
+    expect(said('apiRequest(...apiTo("POST /api/x"), body)')).toEqual([null]);
+    // The address inside a later template slot is not the address the call is made to.
+    expect(said('fetch(`${base}${apiPath("POST /api/x")}`)')).toEqual([null]);
   });
 });

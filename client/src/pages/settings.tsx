@@ -81,6 +81,7 @@ import {
   Upload, CheckCircle, XCircle, LogOut, AlertCircle, Bell, BellOff, Printer, ArrowRight, ArrowLeft, CreditCard, Building2, Wrench, BookOpen, RotateCcw, SlidersHorizontal, UserCircle
 } from "lucide-react";
 import { sessionFetch } from "@/lib/session";
+import { MERCHANTS_KEY, apiPath, apiTo } from "@shared/api-path";
 
 type SectionKey = "business" | "prefs" | "billing" | "account" | "notifs" | "tutorial";
 
@@ -265,7 +266,7 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
   const [tradeGstMode, setTradeGstMode] = useState<"inclusive" | "exclusive">("inclusive");
 
   useEffect(() => {
-    apiRequest("GET", "/api/trades/gst-settings")
+    apiRequest(...apiTo("GET /api/trades/gst-settings"))
       .then(r => r.json())
       .then(data => {
         setGstRegistered(!!data.gstRegistered);
@@ -277,15 +278,15 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
   const saveGst = (patch: { gstRegistered?: boolean; tradeGstMode?: "inclusive" | "exclusive" }) => {
     if (patch.gstRegistered !== undefined) setGstRegistered(patch.gstRegistered);
     if (patch.tradeGstMode) setTradeGstMode(patch.tradeGstMode);
-    apiRequest("PUT", "/api/trades/gst-settings", patch).catch(() => {
+    apiRequest(...apiTo("PUT /api/trades/gst-settings"), patch).catch(() => {
       toast({ title: "Could not save GST setting", variant: "destructive" });
     });
   };
 
   const { data: merchant, isLoading } = useQuery({
-    queryKey: ["/api/merchants", merchantId, "profile"],
+    queryKey: [MERCHANTS_KEY, merchantId, "profile"],
     queryFn: async () => {
-      const response = await sessionFetch(`/api/merchants/${merchantId}/profile`);
+      const response = await sessionFetch(apiPath("GET /api/merchants/:id/profile", { id: merchantId }));
       if (!response.ok) throw new Error("Failed to fetch merchant");
       const data = await response.json();
       setBusinessDetails({
@@ -306,9 +307,9 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
   });
 
   const { data: authData } = useQuery<AuthMeResponse>({
-    queryKey: ["/api/auth/me"],
+    queryKey: [apiPath("GET /api/auth/me")],
     queryFn: async () => {
-      const response = await apiRequest("GET", "/api/auth/me");
+      const response = await apiRequest(...apiTo("GET /api/auth/me"));
       if (!response.ok) throw new Error("Failed to load account access");
       return response.json();
     },
@@ -321,13 +322,13 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
     ready: boolean;
     card: { last4: string; brand: string | null; expiry: string | null } | null;
   }>({
-    queryKey: ["/api/billing/card"],
+    queryKey: [apiPath("GET /api/billing/card")],
     enabled: isOwner,
   });
 
   const updateMerchantMutation = useMutation({
     mutationFn: async (details: MerchantDetails) => {
-      const response = await sessionFetch(`/api/merchants/${merchantId}`, {
+      const response = await sessionFetch(apiPath("PUT /api/merchants/:id", { id: merchantId }), {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -338,7 +339,7 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "profile"] });
+      queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "profile"] });
       toast({ title: "Business details saved successfully" });
     },
     onError: () => {
@@ -348,7 +349,7 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
 
   const updateDailyGoalMutation = useMutation({
     mutationFn: async (goalAmount: string) => {
-      const response = await sessionFetch(`/api/merchants/${merchantId}/daily-goal`, {
+      const response = await sessionFetch(apiPath("PUT /api/merchants/:id/daily-goal", { id: merchantId }), {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -359,7 +360,7 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "profile"] });
+      queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "profile"] });
       toast({ title: "Daily goal updated successfully" });
     },
     onError: () => {
@@ -372,7 +373,7 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
       const formData = new FormData();
       formData.append('logo', file);
       
-      const response = await sessionFetch(`/api/merchants/${merchantId}/logo`, {
+      const response = await sessionFetch(apiPath("POST /api/merchants/:id/logo", { id: merchantId }), {
         method: "POST",
         headers: {
         },
@@ -382,7 +383,7 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "profile"] });
+      queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "profile"] });
       setLogoFile(null);
       setLogoPreview(null);
       toast({ title: "Logo uploaded successfully" });
@@ -394,7 +395,7 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
 
   const deleteLogoMutation = useMutation({
     mutationFn: async () => {
-      const response = await sessionFetch(`/api/merchants/${merchantId}/logo`, {
+      const response = await sessionFetch(apiPath("DELETE /api/merchants/:id/logo", { id: merchantId }), {
         method: "DELETE",
         headers: {
         },
@@ -403,7 +404,7 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "profile"] });
+      queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "profile"] });
       setLogoPreview(null);
       toast({ title: "Logo deleted successfully" });
     },
@@ -414,9 +415,9 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
 
   // Fetch subscription data
   const { data: subscriptionData } = useQuery({
-    queryKey: ["/api/subscription"],
+    queryKey: [apiPath("GET /api/subscription")],
     queryFn: async () => {
-      const response = await apiRequest('GET', '/api/subscription');
+      const response = await apiRequest(...apiTo("GET /api/subscription"));
       if (!response.ok) throw new Error("Failed to fetch subscription");
       return response.json();
     },
@@ -430,9 +431,9 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
     isLoading: teamLoading,
     error: teamError,
   } = useQuery<{ members: TeamMember[]; seatLimit: number; seatsInUse: number }>({
-    queryKey: ["/api/team"],
+    queryKey: [apiPath("GET /api/team")],
     queryFn: async () => {
-      const response = await apiRequest('GET', '/api/team');
+      const response = await apiRequest(...apiTo("GET /api/team"));
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body?.message || "Failed to fetch team");
       return body;
@@ -445,9 +446,9 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
     isLoading: billingHistoryLoading,
     error: billingHistoryError,
   } = useQuery<{ history: BillingHistoryEntry[] }>({
-    queryKey: ["/api/subscription/billing-history"],
+    queryKey: [apiPath("GET /api/subscription/billing-history")],
     queryFn: async () => {
-      const response = await apiRequest("GET", "/api/subscription/billing-history?limit=12");
+      const response = await apiRequest("GET", `${apiPath("GET /api/subscription/billing-history")}?limit=12`);
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body?.message || "Failed to load billing history");
       return body;
@@ -456,17 +457,17 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
   });
 
   const refreshBilling = () => {
-    queryClient.invalidateQueries({ queryKey: ["/api/subscription"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/subscription/billing-history"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/team"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/billing/card"] });
+    queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/subscription")] });
+    queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/subscription/billing-history")] });
+    queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/team")] });
+    queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/billing/card")] });
   };
 
   // Reads the server's message so a refused downgrade explains itself ("Crew ->
   // Solo needs 1 login; you have 4") instead of showing a generic failure.
   const changePlanMutation = useMutation({
     mutationFn: async (planId: PlanId) => {
-      const response = await apiRequest('PUT', '/api/subscription/plan', { planId });
+      const response = await apiRequest(...apiTo("PUT /api/subscription/plan"), { planId });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body?.message || "Failed to change plan");
       return body;
@@ -482,7 +483,7 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
 
   const cancelSubscriptionMutation = useMutation({
     mutationFn: async (reason: string) => {
-      const response = await apiRequest('POST', '/api/subscription/cancel', { reason });
+      const response = await apiRequest(...apiTo("POST /api/subscription/cancel"), { reason });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body?.message || "Failed to cancel subscription");
       return body;
@@ -500,7 +501,7 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
 
   const resumeSubscriptionMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest('POST', '/api/subscription/resume', {});
+      const response = await apiRequest(...apiTo("POST /api/subscription/resume"), {});
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body?.message || "Failed to resume subscription");
       return body;
@@ -514,7 +515,7 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
 
   const inviteMutation = useMutation({
     mutationFn: async (payload: { email: string; name: string }) => {
-      const response = await apiRequest('POST', '/api/team/invite', payload);
+      const response = await apiRequest(...apiTo("POST /api/team/invite"), payload);
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body?.message || "Failed to send invite");
       return body;
@@ -532,7 +533,7 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
 
   const memberStatusMutation = useMutation({
     mutationFn: async (payload: { userId: number; status: 'active' | 'disabled' }) => {
-      const response = await apiRequest('PUT', `/api/team/${payload.userId}/status`, { status: payload.status });
+      const response = await apiRequest(...apiTo("PUT /api/team/:userId/status", { userId: payload.userId }), { status: payload.status });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body?.message || "Failed to update login");
       return body;
@@ -546,7 +547,7 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
 
   const removeMemberMutation = useMutation({
     mutationFn: async (userId: number) => {
-      const response = await apiRequest('DELETE', `/api/team/${userId}`, undefined);
+      const response = await apiRequest(...apiTo("DELETE /api/team/:userId", { userId }), undefined);
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body?.message || "Failed to remove login");
       return body;
@@ -560,7 +561,7 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
 
   const resendInviteMutation = useMutation({
     mutationFn: async (userId: number) => {
-      const response = await apiRequest("POST", `/api/team/${userId}/resend`, {});
+      const response = await apiRequest(...apiTo("POST /api/team/:userId/resend", { userId }), {});
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body?.message || "Failed to resend invite");
       return body;
@@ -574,7 +575,7 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
 
   const revokeInviteMutation = useMutation({
     mutationFn: async (userId: number) => {
-      const response = await apiRequest("DELETE", `/api/team/${userId}/invite`, undefined);
+      const response = await apiRequest(...apiTo("DELETE /api/team/:userId/invite", { userId }), undefined);
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body?.message || "Failed to revoke invite");
       return body;
@@ -692,7 +693,7 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
   const handleStartCardSetup = async () => {
     setCardSaving(true);
     try {
-      const resp = await apiRequest('POST', '/api/billing/card/session', {});
+      const resp = await apiRequest(...apiTo("POST /api/billing/card/session"), {});
       const body = await resp.json().catch(() => ({}));
       if (!resp.ok || !body?.redirectUrl) {
         throw new Error(body?.message || 'Could not start card setup');
@@ -709,14 +710,14 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
   const handleRemoveCard = async () => {
     setCardRemoving(true);
     try {
-      const resp = await sessionFetch('/api/billing/card', {
+      const resp = await sessionFetch(apiPath("DELETE /api/billing/card"), {
         method: 'DELETE',
       });
       const body = await resp.json().catch(() => ({}));
       if (!resp.ok) throw new Error(body?.message || 'Failed to remove card');
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['/api/billing/card'] }),
-        queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] }),
+        queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/billing/card")] }),
+        queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/auth/me")] }),
       ]);
       toast({ title: "Card removed" });
     } catch (error: unknown) {
