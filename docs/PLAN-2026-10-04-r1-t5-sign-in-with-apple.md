@@ -459,3 +459,21 @@ on a sign-in cookie, byte for byte (their 43 tests are the net); change-password
   signed-in session is.
 - Storage needs one contract that links under the identity's row lock, and a read of
   "does this login have an Apple identity" for the Settings row.
+
+## T5c completion
+
+Code `3520df77`. The session before stopped mid-step; what it left uncommitted (the
+tests, the storage contracts, the connect cookie) was treated as an unverified draft and
+re-proved. 93 of 95 new tests red on `3cf92efa` (the other two are the first tests of
+sign-in's own per-address limit from T5b, which pass there by design); then 100 pass
+across six suites (the flow over HTTP 50, the connect cookie 19, storage 15, the
+per-address limit 6, not configured 7, a non-https origin 3); route suites 25 / 1,740
+with the three routes reviewed, registered and served and the callback's review in two
+branches; affected 86 suites / 2,891; actual PostgreSQL 13 of 13, the races included,
+and T5b's 10 of 10 again; 117 of 117 planted defects caught after one weak test was
+tightened; full server 179 suites / 4,432 tests on the commit.
+[Evidence](evidence/remediation-v2-2/r1/R1-T5c-apple-connect-2026-10-06.md).
+
+Settled while building, by the plan's protected order (a capability before the role):
+the start says Apple is not available (503) before it asks who is calling. Changed from
+the draft: the connect cookie's reader takes a login id of at most ten digits.
