@@ -598,3 +598,21 @@ bring its own. `window.location.assign` is what jsdom cannot do: the shared piec
 leaves through one small function the tests replace. What must not move: Google's
 button, handoff and tests; the password row; every existing Settings test.
 **Approve the same T5d scope.**
+
+## T5d completion
+
+Code `3e5db51d`. Red on `d86d6f11`: five server assertions, the five new client suites
+unable to load, and the one changed test. Then: server 60 focused; client 117 new tests
+(the shared rules 33, the shared row 41, the login page 15, the phone screen 10, the
+tablet and desktop screen 18); route suites and their neighbours 32 / 1,881 with the
+read registered and served; **a real browser on the real routes with a stand-in Apple,
+83 of 83 checks at phone, tablet and desktop**, the server seeing Apple's post back as a
+cross-site form post from Apple's origin with the starting cookie and, on a connect,
+without the session cookie; 81 of 81 planted defects caught (74 in the pages, 7 on the
+server), none surviving; full client 117 suites / 1,420 tests and full server 179 suites / 4,436 tests on the
+commit. [Evidence](evidence/remediation-v2-2/r1/R1-T5d-apple-screens-2026-10-06.md).
+
+Settled while building: "connected" is said on a return only when the server's own
+answer agrees (the word alone is anyone's to put in a link); a refusal shows the
+server's words or one fixed sentence, never a raw body; the password field's name for
+assistive technology is "Current password for Apple" on both screens.
