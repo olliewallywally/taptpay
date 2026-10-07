@@ -640,8 +640,9 @@ client 118 suites / 1,422 tests and full server 180 suites / 4,479 tests on `8a4
    not see a wrong address. The gate's own self-test showed this.
 3. **One business serves all three verticals.** The vertical is the address (or
    `localStorage.taptMode` for Settings), not something a business is.
-4. **One answer is expected and named**: `GET /api/auth/session` saying 401 where nobody
-   is signed in. A plant shows it excuses no other 401.
+4. **No answer is excused.** The gate's first version allowed a 401 from the session
+   check where nobody is signed in. The server never sends one there (it answers 200 and
+   says so), so the allowance was removed.
 5. **A fallback mark is taken and listed**, never a bare element such as `main`. One
    cell needs it (below).
 

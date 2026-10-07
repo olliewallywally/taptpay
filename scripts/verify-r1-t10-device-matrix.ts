@@ -28,8 +28,8 @@
 //   on a tablet; a centred, rounded frame holding the 1180x880 canvas on a desktop, short or not;
 //   and no merchant frame at any size on a page outside it, which is known by a mark of its own
 //   (a control or the words only that page has);
-// - no page error, no console error, no failed request to this app. One answer is not a failure:
-//   where nobody is signed in, GET /api/auth/session says 401, which is how the page learns it;
+// - no page error, no console error, no failed request to this app, with no allowance: where
+//   nobody is signed in, GET /api/auth/session answers 200 and says so, and nothing else is asked;
 // - every /api address it asks for is one the server registers. The server answers an address it
 //   does not have with the app's own page and a 200 (the fallback in server/vite.ts serveStatic), so
 //   a wrong address would not show as a failed request: each one is held to the route policy instead;
@@ -181,7 +181,8 @@ for (const [itemName, price, status, paymentMethod] of [
   ["toastie", "9.00", "failed", "qr_code"], ["flat white", "5.50", "completed", "qr_code"], ["big brunch", "24.00", "completed", "qr_code"],
   ["latte", "6.00", "completed", "qr_code"],
 ] as const) {
-  const sale = await storage.createTransactionForMerchant(merchantId, { merchantId, itemName, price, paymentMethod, taptStoneId: counter.id } as any);
+  // A sale is made pending, said outright: the in-memory storage has no default for it, as the database has.
+  const sale = await storage.createTransactionForMerchant(merchantId, { merchantId, itemName, price, paymentMethod, status: "pending", taptStoneId: counter.id } as any);
   if (status !== "pending") await storage.updateTransactionStatusForMerchant(sale.id, merchantId, status);
 }
 
@@ -520,14 +521,9 @@ async function visit(context: BrowserContext, size: Size, surface: Surface | Out
     } else {
       faults.push(...shellFaults(facts, judgedSize));
     }
-    // Where nobody is signed in, the session check's 401 is the answer, not a failure; so is the console's line for it.
-    const expected = outside?.who === "nobody" ? "401 GET /api/auth/session" : null;
     for (const error of watch.pageErrors) faults.push(`page error: ${error}`);
-    for (const error of watch.consoleErrors) {
-      if (expected && error.from === `${base}/api/auth/session` && /status of 401/.test(error.text)) continue;
-      faults.push(`console error: ${error.text}`);
-    }
-    for (const failure of watch.failed) if (failure !== expected) faults.push(`failed request: ${failure}`);
+    for (const error of watch.consoleErrors) faults.push(`console error: ${error.text}`);
+    for (const failure of watch.failed) faults.push(`failed request: ${failure}`);
     if (MEASURE) {
       measured = await page.evaluate(`(function (selector) { var el = document.querySelector(selector); if (!el) return null; var r = el.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; })(${JSON.stringify(MEASURE)})`);
     }
@@ -574,7 +570,7 @@ try {
     plants.push(
       ["onboarding opened with nobody signed in", /ended at \/login|no mark of the \/onboarding page/, () => visit(signedOut, phone, onboarding, { shot: false })],
       ["the wrong page is up (the terms, judged by the privacy page's words)", /no mark of the \/terms page/, () => visit(signedOut, phone, { ...terms, mark: privacy.mark }, { shot: false })],
-      ["a signed-out page asking for a business's data (the session's own 401 does not excuse it)", /failed request: 401 GET \/api\/merchants\/1\/profile/, () => visit(signedOut, phone, login, { plant: (page) => page.evaluate("fetch('/api/merchants/1/profile').then(function () {})") as Promise<void>, shot: false })],
+      ["a signed-out page asking for a business's data", /failed request: 401 GET \/api\/merchants\/1\/profile/, () => visit(signedOut, phone, login, { plant: (page) => page.evaluate("fetch('/api/merchants/1/profile').then(function () {})") as Promise<void>, shot: false })],
       ["a page outside the frame judged as a merchant's desktop screen", /no tablet\/desktop frame/, () => visit(onDesktop, desktop, login, { as: { size: desktop }, shot: false })],
     );
     const control = [await visit(signedIn, phone, terminal, { shot: false }), await visit(onDesktop, desktop, terminal, { shot: false }), await visit(signedOut, phone, login, { shot: false })];

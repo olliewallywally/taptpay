@@ -50,9 +50,7 @@ real login page**, and opens every screen at the four sizes the plan names:
   an error screen (the preflight);
 - the shell: for a merchant screen, the one in the table, measured (the arithmetic is
   the containment gate's); for a page outside the frame, no merchant frame at any size;
-- no page error, no console error, no failed request to this app. One answer is not a
-  failure, and only that one: where nobody is signed in, `GET /api/auth/session` says
-  401, which is how the page learns it;
+- no page error, no console error, no failed request to this app, with no allowance;
 - **every `/api` address it asked for is one the server registers** (finding 2);
 - no error screen ("couldn't check your session", "Something went wrong", "Connection
   Lost"), and nothing still animating when it is read.
@@ -105,11 +103,18 @@ phase E; a copy of one passes 4 of 20 scenarios, on an error screen.
   error; a request this app refuses; a request to an address the server does not have; a
   phone judged as a tablet; a desktop judged as a tablet; a desktop frame pushed 40
   pixels off centre. On a page outside the frame: onboarding opened with nobody signed
-  in; the wrong page up; a signed-out page asking for a business's data (so the
-  session's own 401 excuses nothing else); and that page judged as a merchant screen.
+  in; the wrong page up; a signed-out page asking for a business's data; and that page
+  judged as a merchant screen.
   **All thirteen are caught, and the three unplanted controls pass.** The first run of
   it, with nine, caught eight: the request to an address the server does not have came
   back 200, which is finding 2 and why the route check exists.
+- **A correction to the gate, found by reading the server, not by a failure.** Its first
+  version excused one answer: a 401 from the session check on a page where nobody is
+  signed in. The server never sends that. `GET /api/auth/session` answers 200 and says
+  nobody is signed in. So the allowance excused nothing that happened, and could have
+  hidden something that did; it is removed, and nothing is excused now. The seeded open
+  sale is also now said to be pending outright (the in-memory storage has no default for
+  a sale's status, as the database has). 128 of 128 pass, and 13 of 13, after both.
 - **On this tree: 128 of 128 cells pass.** 584 requests to this app's API, to 31 of the
   server's routes (all of them reads), none to an address it does not have. Each of the
   20 merchant screens is known by a different mark on the phone, and by a different
