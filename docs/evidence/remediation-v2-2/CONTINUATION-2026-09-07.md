@@ -34,9 +34,8 @@ and what only the owner can close (T10f) remain.**
   Typecheck/build/whitespace and **194 routes / 0 gaps; 266 contracts; 178 browser
   routes** after every batch; the app's source names 160 of the 178.
 - **Full client 117 suites / 1,420 tests and full server 180 suites pass** on an
-  archived copy of each of `997c28ad`, `a07c5072`, `cda1988b`, `2c796135`, `ffa4a544`
-  (the server's tests went from 4,472 to 4,476 as the contract test grew). **Owed:**
-  the same two runs on `633eebb1` and `7f62a6b0`.
+  archived copy of each of the seven commits (the server's tests went from 4,472 to
+  4,479 as the contract test grew).
 - **One existing test changed, on purpose**: `split-payment-view-boundary.test.tsx`, two
   lines. It read the split page's source for two addresses as they were spelled.
 - No browser was driven (that is T10c). No route, schema, request or behaviour changed.

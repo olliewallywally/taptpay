@@ -374,8 +374,9 @@ Verification:
   address made longer (2); a name the server does not have, or from a variable (2).
 - Full client 117 suites / 1,420 tests on the tree; the server tests that read client
   source 5 / 114; typecheck, production build and whitespace pass; generators unchanged.
-- The full client and server suites on an archived copy of `633eebb1`: **not finished when
-  this was written**.
+- **Full client: 117 suites / 1,420 tests pass** (46.688 seconds) and **full server:
+  180 suites / 4,476 tests pass** (800.318 seconds), both exit 0, on an archived copy of
+  `633eebb1`.
 
 ## Batch 7 — The admin area, and the guard turned round (`7f62a6b0`)
 
@@ -437,8 +438,12 @@ Verification:
 - **The built client** holds 158 route names and nothing of the list itself. The source
   names 160: the other two are in a receipt helper no page calls, which the build
   leaves out.
-- The full client and server suites on an archived copy of `7f62a6b0`: **not finished when
-  this was written**.
+- **Full client: 117 suites / 1,420 tests pass** (55.714 seconds) and **full server:
+  180 suites / 4,479 tests pass** (825.415 seconds), both exit 0, on an archived copy of
+  `7f62a6b0`. The server's count is 4,476 plus the contract suite's 3 new tests.
+  That client run printed one warning, a test worker slow to exit, while a browser check
+  was running beside it. Run again on the same code with nothing beside it: 117 suites /
+  1,420 tests pass (43.263 seconds) and no warning.
 
 ## For the owner: the files the app never loads
 
