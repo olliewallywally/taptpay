@@ -468,3 +468,145 @@ loads, and the admin's page address.
   no method beside it for the test to read.
 - **The 14 files the app never loads** still spell 118 addresses, some of routes the
   server no longer has. They are held, not fixed.
+
+## T10c preflight — the device matrix as one gate
+
+Base `e8cbf688` (T10b's last code is `7f62a6b0`; the commit above it is documentation).
+
+### What was read and run first
+
+- **The existing device gates cannot see a signed-in app any more.** Each one signs its
+  page in by putting a token in `localStorage` and answering `/api/auth/me` itself
+  (`scripts/desktop-shots/retail-fixtures.mjs`; 18 other scripts set the same token).
+  Since R1-T4 phase E (`2611e80e`, `8d5bad38`, 2026-10-01 and 02) the app reads no
+  token: it asks `GET /api/auth/session` with its cookie. Nothing in those fixtures
+  answers that address.
+- **Run today to be sure.** A copy of `scripts/verify-r0-device-containment.mjs`
+  (differing only in where it writes), against this tree's built client: **4 of 20
+  scenarios pass and 16 fail** (12 "desktop/tablet shell absent", 4 on the retired NFC
+  page). The four that pass are the phone's, and its picture of `/terminal` is the
+  screen "We couldn't check your session": the gate asked only for no page error, some
+  text, and no desktop frame. So a pass there is not a terminal.
+  (`.local/claude-scratch/session-2026-10-07/t10c/r0-containment-on-this-tree.log`,
+  `r0-out/phone-_terminal.png`.)
+- Nobody could have seen this: those gates need a dev server on :5000, which the
+  sandbox cannot start or reach. It does not say the app is broken. Phase E's own
+  browser checks signed in for real, through the routes
+  (`scripts/verify-r1-t4-sessions-browser.ts`), and T5's did the same.
+- **The in-memory storage has no property or trades rows.** Its methods for them return
+  empty lists; the server's tests put doubles in their place with the test runner.
+  Eleven storage reads stand behind the lists and profiles those screens ask for (read
+  from the generated route facts): `getTenantProfilesByMerchant`,
+  `getTenantProfileForMerchant`, `getInvoiceRentRequestsByMerchant`,
+  `getActiveSchedulesByMerchant`, `getTransactionEventsByTenantForMerchant`,
+  `getClientProfilesByMerchant`, `getClientProfileForMerchant`,
+  `getJobInvoicesByMerchant`, `getQuotesByMerchant`, `getJobSchedulesByMerchant`,
+  `getJobEventsByClientForMerchant`.
+- What each shell must be is already written down as assertions, in the containment
+  gate: on a phone, no desktop frame at all; on a tablet, the frame fills the window
+  with square corners; on a desktop, a centred frame `min(1000, 94% of the width, 94% of
+  the height × 59/44)` wide and 44/59 as tall, rounded, holding a 1180×880 canvas
+  scaled to fit. At 1440×900 that is 1000×746; at 1440×650 it is 819×611, the same
+  desktop frame, as decision D10 says (a short window with a mouse is never the phone).
+- The surfaces: the tablet and desktop app is 3 verticals × 5 screens (home, clients or
+  stock, terminal, analytics, settings); the phone has those and its own pages; then the
+  public, sign-in and onboarding pages, and what a customer opens.
+
+### The split
+
+- **T10c-1, the harness and the first gate.** This tree's app in-process on a loopback
+  port over https (as the T4 and T5 browser checks do it), the built client, no
+  database, no dev server; three seeded businesses, one per vertical, the property and
+  trades ones with rows behind the eleven reads above; **signed in through the real
+  login route**; the four contexts; every surface. Each cell must show: it is on its own
+  screen (a mark only that screen has), the expected shell, zero page errors, zero
+  console errors, zero failed requests to this app, and what it asked of any other
+  machine (which the sandbox refuses, and which is listed, not hidden).
+- **T10c-2, the measurements** on the same cells, taken from the existing gates' own
+  in-page code rather than written again: nothing wider than the window, no clipped
+  critical text, the centre of each visible control reaching that control, a terminal
+  with rows in view.
+- **T10c-3, the old gates.** Give their shared fixture the sign-in the app now asks for,
+  and run each against the in-process app where it can run at all; record which are
+  tied to the dev server (the ones that read `/src/...` modules) and stay unrun.
+
+### Verification of Prior Fixes
+
+T10b is verified in this session: full client 117 suites / 1,420 tests and full server
+180 suites on an archived copy of each of its seven commits. No browser was driven in
+T10b; T10c-1 is where a browser first asks the real routes for every address T10b
+moved. Reread for this scope: the app's routes (`App.tsx`), the device classes
+(`use-device-class.ts`, D10), the tablet and desktop route table, the two in-process
+browser checks, the existing gates and their fixtures, the R1-H1 acceptance.
+
+### Blocking Issues
+
+None for T10c-1. The finding above is the reason for it, not a blocker of it.
+
+### High-Risk Concerns
+
+- **A gate that passes on the wrong screen**, as the old one does. Every cell names a
+  mark of its own screen and fails without it; a cell on the login page, an error
+  screen or a loading screen is a failure whatever else is clean.
+- **Calling the sandbox's limits the app's faults, or hiding the app's faults as the
+  sandbox's.** Requests to other machines are refused here and are listed apart; a
+  request to this app that fails is a failure, with no allowance.
+- **Doubles that flatter.** The property and trades rows are put in at the storage
+  layer, so the real routes, their checks and their replies still run; but storage
+  itself is not exercised for those two, and the evidence says so. Retail runs on the
+  in-memory storage as it is.
+- **Timing.** A cell is read after its requests have settled and its animations have
+  ended, with a bound; a cell that never settles fails.
+
+### Missing Steps
+
+The seeds; the doubles; sign-in per context; the list of surfaces with each one's mark;
+the shell assertions; the error, request and off-machine collectors; a run that fails on
+purpose for each check (a cell sent to the wrong screen, a planted console error, a
+planted failed request, a planted wrong frame) before it is trusted; evidence. Then
+T10c-2 and T10c-3, each with its own short preflight here.
+
+### Unsafe Assumptions
+
+Chromium on Linux is not Safari on an iPhone or an iPad: this gate is the automated
+part; real devices are the owner's (T10f). A production build is what is served, not
+the dev server. "iPhone orientations chosen by product" (the supplied plan) are not
+chosen: landscape is not in this gate until he says which.
+
+### Required Ordering Changes
+
+The old gates' repair (T10c-3) comes after the new gate, not before: the new one does
+not depend on them, and a repaired old gate is then checked against it.
+
+### Open Product / Provider / Legal Questions
+
+None blocks T10c. Recorded for the owner:
+
+6. **Which iPhone orientations** the matrix should cover. The supplied plan leaves it to
+   him. Until then the gate covers portrait only.
+
+### Compliance and Data-Handling Notes
+
+All data is made up in the run and held in memory; nothing leaves the machine; no
+database, provider or real account is contacted.
+
+### Test and Rollback Adequacy
+
+The gate is a script and its evidence; it changes no application code. Each check is
+shown to fail on a planted fault before its passes are counted.
+
+### Final Recommendation (Approve / Do not approve)
+
+**Approve T10c-1 on `e8cbf688`.** It does not close R1-T10.
+
+### Separate reread
+
+Retraced against the tree. The containment gate's run is on disk with its pictures: the
+phone "passes" are the session-error screen. `App.tsx` asks `GET /api/auth/session`
+and nothing else to learn who is signed in; `lib/session.ts` lists the old storage keys
+only to remove them. The in-memory storage's property and trades methods return `[]`
+on one line each. The route facts name the eleven reads. The frame arithmetic gives
+1000×746 and 819×611. What must not happen: a pass without the screen's own mark; an
+allowance for a failed request to this app; a change to any page to make a cell pass
+(a real fault found is recorded and fixed as its own step, tests first).
+**Approve the same T10c-1 scope.**
