@@ -230,10 +230,10 @@ Base `510ddceb` (T10a's code is `9f9182e5`; the commit above it is documentation
   **Every call to a route the server no longer has is in one of these 14.** They are
   out of T10b's scope and are listed for the owner below.
 - **463 are in the 52 files the app renders. None calls a route the server does not
-  have.** Of them: 258 are requests; 125 are cache keys that are the whole path of a GET
+  have.** Of them: 252 are requests; 125 are cache keys that are the whole path of a GET
   route with no parameter; 79 are cache labels (`"/api/merchants"` 70 times,
-  `"/api/transactions"` 6, and three used once); one is a cache key built from an id.
-  Six more in the two admin dashboards are not API addresses at all: the admin area has
+  `"/api/transactions"` 6, and three used once); one is a cache key built from an id;
+  and six, in the two admin dashboards, are not API addresses at all: the admin area has
   a page of its own at the address `/api`.
 
 ### Method
@@ -392,3 +392,79 @@ chosen when it runs (`send-balance` or `complete`; both are routes), the one tem
 key, the image address in the QR display, the two places a method is not written at the
 call. What must not move: any address, method or cache key; any existing test; the
 never-loaded files. **Approve the same T10b scope.**
+
+## T10b completion
+
+[Evidence, with each batch's verification](evidence/remediation-v2-2/r1/R1-T10b-screens-on-the-builder-2026-10-07.md).
+All seven batches are code-complete and await independent review.
+
+| Batch | Code | Moved |
+|---|---|---|
+| 1. Settings, and the builder's additions | `997c28ad` | 4 files, 76 addresses |
+| 2. Retail | `a07c5072` | 12 files, 110 |
+| 3. Property | `cda1988b` | 7 files, 65 |
+| 4. Trades | `2c796135` | 10 files, 101 |
+| 5. What a customer opens | `ffa4a544` | 8 files, 48 |
+| 6. The shell | `633eebb1` | 6 files, 33 |
+| 7. The admin area, and the guard turned round | `7f62a6b0` | 4 files, 24 |
+
+**No file the app loads spells an API address.** 457 addresses are moved: the 463 the
+audit counted, less the six that are the admin area's own page address `/api`. 448 are
+paired by the proof with the address that replaced them. The other 9 are in places
+changed by hand (five in batch 4, three in batch 5, one in batch 6), each read and run
+side by side with what it replaced. The contract test went from 28 tests to 43 and holds
+every source file of the client, with two named exceptions: the 14 files the app never
+loads, and the admin's page address.
+
+### Settled while building (where this departs from the preflight above)
+
+1. **One builder, and it never throws.** The preflight kept T10a's throwing builder and
+   planned `apiPathOrNull` beside it. An address worked out while a page is drawn is
+   ordinary, a throw there is a blank screen, and a page shows a failed request's own
+   words. So `apiPath` writes into the path only what the server could read as that
+   parameter and otherwise leaves the parameter's own name, which the server refuses as
+   it refused `undefined`. `apiPathOrNull` was not built, and the preflight's refusal
+   check (`sync-sites.ts`) is no longer needed: there is nothing to throw.
+2. **Two checks the preflight did not plan**, each found by a real file:
+   - *Nothing is added to a built address but a query or a fragment* (batch 3). The
+     desktop profile panel kept a list's address in a variable and added
+     `/<id>/events` to it: with the list's address built, the file spelled nothing and
+     still made two addresses no check had read.
+   - *The first word of a cache key is a GET route's* (batch 4). Nothing says a method
+     beside a key, and a key named for the POST route of the same path is the same text.
+3. **The proof fails where it cannot tell.** Where a call does not say a method and
+   more than one route has that path, the proof needs the method read from the helper by
+   hand, instead of passing either (batch 4, after it missed a planted mistake).
+4. **A place changed by hand is named to the proof** by its exact text on both sides and
+   cut out, so the rest of its file is held like any other; the place itself is read and
+   run side by side with the old expression. Ten such places: two in batch 3 (requests
+   built onto a variable, which were not spelled addresses), six in batch 4 (five
+   addresses), one function in batch 5 (three addresses) and one in batch 6. The seven
+   ids read through `wholeNumber()` (two in batch 2, five in batch 7) are judged by the
+   proof itself.
+5. **One existing test changed** (batch 5). `split-payment-view-boundary.test.tsx` reads
+   the split page's source and expected two addresses as they were spelled; it expects
+   them as they are named. "Every existing test stays as it is" holds for every other.
+6. **The floors move with each batch.** The contract test's lower bounds (files on the
+   builder, uses of it read from the source, methods checked, labels, keys, files read
+   and files loaded) are raised to just under what the tree holds, so a reader that
+   stopped reading would fail.
+7. **The guard reads plain JavaScript too** (batch 7). It read only `.ts` and `.tsx`;
+   the client has two `.jsx` files, one of them the retail terminal's own view. Neither
+   spells an address.
+8. **A fifteenth file the app never loads** (batch 7): `pages/admin-login.tsx`, moved
+   with the sign-in pages in T10a, is a page nothing imports. The admin signs in through
+   the login page. It joins question 4 for the owner.
+
+### What T10b does not show
+
+- **No browser was driven.** That a page still asks for the same address rests on the
+  proof, on the side-by-side runs, and on the pages' existing tests where they have
+  them. The device matrix is T10c.
+- **A wrong name that is still a listed route, with the right method, in a page with no
+  test of its own** is beyond the contract test. The proof held every such name once,
+  when it was written; nothing holds it afterwards.
+- **An address handed to a helper** (a list loader, the payment helpers' callers) has
+  no method beside it for the test to read.
+- **The 14 files the app never loads** still spell 118 addresses, some of routes the
+  server no longer has. They are held, not fixed.
