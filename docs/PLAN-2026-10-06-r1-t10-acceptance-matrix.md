@@ -610,3 +610,64 @@ on one line each. The route facts name the eleven reads. The frame arithmetic gi
 allowance for a failed request to this app; a change to any page to make a cell pass
 (a real fault found is recorded and fixed as its own step, tests first).
 **Approve the same T10c-1 scope.**
+
+## T10c-1 completion
+
+The gate `86d5785d`; the fault it found, fixed, `8a4a13e2`; the pages outside the
+merchant frame added in `6c553579` (a commit the Replit agent made of this session's
+working tree during a pause; it holds the gate's script as verified, and nothing else of
+substance). [Evidence](evidence/remediation-v2-2/r1/R1-T10c-1-device-matrix-2026-10-07.md).
+
+`scripts/verify-r1-t10-device-matrix.ts`: this tree's app in one process, signed in
+through the real login page, **128 cells**: the 22 merchant screens and ten pages
+outside the merchant frame, at phone, tablet, desktop and the short desktop. **128 of
+128 pass.** Thirteen planted faults caught, three controls pass. 584 requests to 31 of
+the server's routes, none to an address it does not have.
+
+Red first: on the gate's own commit 87 of its 88 cells passed, and the one that failed
+was a real console error on the phone's transactions page, fixed as its own commit with
+its own test (6 of 6 planted mistakes caught; the chart's measured box unchanged). Full
+client 118 suites / 1,422 tests and full server 180 suites / 4,479 tests on `8a4a13e2`.
+
+### Settled while building
+
+1. **The mark of a merchant screen is its own tutorial's target** for that device class
+   (`tutorialStepsForDevice`): each route already names its tutorial page in `App.tsx`,
+   so nothing new had to be invented or kept in step. A page outside the frame has no
+   tutorial; its mark is a control or the words only that page has.
+2. **An address is held to the route policy, not to its answer.** The server answers an
+   address it does not have with the app's page and a 200, so "no failed request" could
+   not see a wrong address. The gate's own self-test showed this.
+3. **One business serves all three verticals.** The vertical is the address (or
+   `localStorage.taptMode` for Settings), not something a business is.
+4. **One answer is expected and named**: `GET /api/auth/session` saying 401 where nobody
+   is signed in. A plant shows it excuses no other 401.
+5. **A fallback mark is taken and listed**, never a bare element such as `main`. One
+   cell needs it (below).
+
+### Found, and where each goes
+
+- The phone's transactions chart wrote a console error on every draw: **fixed**.
+- The server's answer to an API address it does not have: **question 7, the owner's**.
+- The phone's trades home has none of its tutorial's own targets (its phone steps name
+  marks that exist only on the desktop page): **T10d**.
+- Every page asks three other sites for a file, Replit's dev-banner script among them:
+  **question 8, the owner's**.
+- Once in about twenty-five sign-ins the phone's login button could not be tapped, and it is
+  not explained: **T10c-2**.
+
+### What T10c-1 does not show
+
+Only each screen's first load; nothing is tapped or saved. Property and trades run on
+rows put behind eleven storage reads. What a customer opens, the admin area, and the
+pages reached only from an emailed link are not in the gate yet. Chromium on Linux, in
+portrait.
+
+### Open for the owner (added to the list above)
+
+7. **What the server should say to an API address it does not have.** Today it is the
+   app's page with a 200. A "not found" in the API's own form would let a page, a test
+   and a log tell a wrong address from a right one. It changes what an integrator
+   calling a wrong address gets back.
+8. **Replit's dev-banner script in the live page** (`client/index.html`): every
+   visitor's browser asks replit.com for a script on every page, payment pages included.
