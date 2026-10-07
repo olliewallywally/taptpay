@@ -11,6 +11,7 @@ import {
   paymentTokenForReturnState,
   type PaymentReturnOutcome,
 } from "@/lib/payment-addressing";
+import { apiPath } from "@shared/api-path";
 
 function SafeReturnMessage({ loading = false }: { loading?: boolean }) {
   return (
@@ -46,7 +47,7 @@ export default function PaymentReturn() {
   const { data, error } = useQuery<PaymentReturnOutcome>({
     queryKey: ["payment-return", state],
     queryFn: async () => {
-      const response = await fetch(`/api/pay/return/${encodeURIComponent(state)}`, {
+      const response = await fetch(apiPath("GET /api/pay/return/:state", { state }), {
         headers: { "Cache-Control": "no-cache" },
       });
       if (!response.ok) throw new Error("return-unavailable");

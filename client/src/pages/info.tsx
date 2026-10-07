@@ -3,6 +3,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { Download, Share2, FileText, ArrowRight, CheckCircle, Loader2, Phone, Mail, User } from "lucide-react";
 import logoImage from "@assets/IMG_6592_1755070818452.png";
 import { PLANS, formatPlanPrice } from "@shared/plans";
+import { apiPath } from "@shared/api-path";
 
 const LS_KEY = "infoPackUnlocked";
 
@@ -62,7 +63,7 @@ export default function InfoPage() {
     if (!email.trim() || !/\S+@\S+\.\S+/.test(email)) { setError("Please enter a valid email address."); return; }
     setSubmitting(true);
     try {
-      const res = await fetch("/api/info-pack-leads", {
+      const res = await fetch(apiPath("POST /api/info-pack-leads"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: name.trim(), email: email.trim() }),

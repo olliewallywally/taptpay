@@ -1,3 +1,4 @@
+import { apiPath } from "@shared/api-path";
 export type CheckoutSource =
   | { kind: "retail-legacy"; transactionId: number }
   | { kind: "retail-token"; token: string }
@@ -64,24 +65,24 @@ export function checkoutSourceForRoute(
 export function checkoutResolveEndpoint(source: CheckoutSource): string {
   switch (source.kind) {
     case "retail-legacy":
-      return `/api/transactions/${source.transactionId}`;
+      return apiPath("GET /api/transactions/:id", { id: source.transactionId });
     case "retail-token":
-      return `/api/pay/t/${opaquePart(source.token)}`;
+      return apiPath("GET /api/pay/t/:token", { token: source.token });
     case "invoice-token":
-      return `/api/checkout/resolve/${opaquePart(source.token)}`;
+      return apiPath("GET /api/checkout/resolve/:token", { token: source.token });
     case "quote-token":
-      return `/api/trades/quotes/token/${opaquePart(source.token)}`;
+      return apiPath("GET /api/trades/quotes/token/:token", { token: source.token });
   }
 }
 
 export function checkoutSessionEndpoint(source: PaymentCheckoutSource): string {
   switch (source.kind) {
     case "retail-legacy":
-      return `/api/transactions/${source.transactionId}/pay`;
+      return apiPath("POST /api/transactions/:id/pay", { id: source.transactionId });
     case "retail-token":
-      return `/api/pay/t/${opaquePart(source.token)}/session`;
+      return apiPath("POST /api/pay/t/:token/session", { token: source.token });
     case "invoice-token":
-      return `/api/checkout/${opaquePart(source.token)}/session`;
+      return apiPath("POST /api/checkout/:token/session", { token: source.token });
   }
 }
 
@@ -89,22 +90,26 @@ export function checkoutCompletionEndpoint(
   source: PaymentCheckoutSource,
   method: "hosted-fields" | "googlepay",
 ): string {
-  const suffix = method === "hosted-fields"
-    ? "hosted-fields-complete"
-    : "googlepay-complete";
+  const hostedFields = method === "hosted-fields";
 
   switch (source.kind) {
     case "retail-legacy":
-      return `/api/transactions/${source.transactionId}/${suffix}`;
+      return hostedFields
+        ? apiPath("POST /api/transactions/:id/hosted-fields-complete", { id: source.transactionId })
+        : apiPath("POST /api/transactions/:id/googlepay-complete", { id: source.transactionId });
     case "retail-token":
-      return `/api/pay/t/${opaquePart(source.token)}/${suffix}`;
+      return hostedFields
+        ? apiPath("POST /api/pay/t/:token/hosted-fields-complete", { token: source.token })
+        : apiPath("POST /api/pay/t/:token/googlepay-complete", { token: source.token });
     case "invoice-token":
-      return `/api/checkout/${opaquePart(source.token)}/${suffix}`;
+      return hostedFields
+        ? apiPath("POST /api/checkout/:token/hosted-fields-complete", { token: source.token })
+        : apiPath("POST /api/checkout/:token/googlepay-complete", { token: source.token });
   }
 }
 
 export function tokenSplitEndpoint(token: string): string {
-  return `/api/pay/t/${opaquePart(token)}/split`;
+  return apiPath("POST /api/pay/t/:token/split", { token });
 }
 
 export function tokenSessionRequest(idempotencyKey: string, amount?: string): {
@@ -174,27 +179,27 @@ export function currentTokenPaymentAmount(payment: TokenPaymentSummary): string 
 
 export function receiptDataEndpoint(source: ReceiptSource): string {
   if (source.kind === "retail-legacy") {
-    return `/api/transactions/${source.transactionId}`;
+    return apiPath("GET /api/transactions/:id", { id: source.transactionId });
   }
-  const base = `/api/pay/t/${opaquePart(source.token)}/receipt`;
+  const base = apiPath("GET /api/pay/t/:token/receipt", { token: source.token });
   return source.share == null ? base : `${base}?share=${source.share}`;
 }
 
 export function receiptPdfEndpoint(source: ReceiptSource): string {
   if (source.kind === "retail-legacy") {
-    const base = `/api/transactions/${source.transactionId}/receipt-pdf`;
+    const base = apiPath("POST /api/transactions/:id/receipt-pdf", { id: source.transactionId });
     return source.splitPaymentId ? `${base}?splitId=${source.splitPaymentId}` : base;
   }
-  const base = `/api/pay/t/${opaquePart(source.token)}/receipt-pdf`;
+  const base = apiPath("POST /api/pay/t/:token/receipt-pdf", { token: source.token });
   return source.share == null ? base : `${base}?share=${source.share}`;
 }
 
 export function receiptQrEndpoint(source: ReceiptSource): string {
   if (source.kind === "retail-legacy") {
-    const base = `/api/transactions/${source.transactionId}/receipt-qr`;
+    const base = apiPath("GET /api/transactions/:id/receipt-qr", { id: source.transactionId });
     return source.splitPaymentId ? `${base}?splitId=${source.splitPaymentId}` : base;
   }
-  const base = `/api/pay/t/${opaquePart(source.token)}/receipt-qr`;
+  const base = apiPath("GET /api/pay/t/:token/receipt-qr", { token: source.token });
   return source.share == null ? base : `${base}?share=${source.share}`;
 }
 

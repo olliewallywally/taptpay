@@ -92,6 +92,15 @@ const MIGRATED = [
   "client/src/components/reports/TradesReportsButton.tsx",
   "client/src/desktop/data/trades-data.ts",
   "client/src/desktop/pages/trades-clients.tsx",
+  // T10b, batch 5: what a customer opens. Pay, split, checkout, the receipt, the return from the bank, and their addresses.
+  "client/src/lib/payment-addressing.ts",
+  "client/src/pages/checkout.tsx",
+  "client/src/pages/customer-payment.tsx",
+  "client/src/pages/split-payment.tsx",
+  "client/src/pages/receipt.tsx",
+  "client/src/pages/payment-result.tsx",
+  "client/src/pages/payment-return.tsx",
+  "client/src/pages/info.tsx",
 ];
 /** Text that is an API address or the start of one: /api itself, or /api followed by a path, a query or a fragment. */
 const ADDRESS_START = /^\/api(?:[/?#]|$)/;
@@ -477,7 +486,7 @@ describe("R1-T10b — cache labels", () => {
       visit(tree(file));
     }
     expect(elsewhere).toEqual([]);
-    expect(uses).toBeGreaterThanOrEqual(60);
+    expect(uses).toBeGreaterThanOrEqual(75);
   });
 });
 
@@ -508,7 +517,7 @@ describe("R1-T10 — the pages moved onto the builder", () => {
       expect([file, fs.existsSync(path.join(ROOT, file))]).toEqual([file, true]);
       expect([file, /\bapi(?:Path|To)\(/.test(read(file))]).toEqual([file, true]);
     }
-    expect(MIGRATED.length).toBeGreaterThanOrEqual(45);
+    expect(MIGRATED.length).toBeGreaterThanOrEqual(53);
   });
 
   it("the guard itself tells an address from a route's name", () => {
@@ -547,7 +556,7 @@ describe("R1-T10 — every route the client names", () => {
 
   it("is a listed one, read from the source so a cast past the types is still caught", () => {
     expect(uses.filter((use) => use.key !== null && !keys.includes(use.key)).map((use) => `${at(use.file, use.node)}: ${use.key}`)).toEqual([]);
-    expect(uses.length).toBeGreaterThanOrEqual(305);
+    expect(uses.length).toBeGreaterThanOrEqual(345);
   });
 
   it("is called by its own method wherever the call says one beside it", () => {
@@ -567,7 +576,7 @@ describe("R1-T10 — every route the client names", () => {
     }
     expect(disagree).toEqual([]);
     expect(unreadable).toEqual([]);
-    expect(checked).toBeGreaterThanOrEqual(135);
+    expect(checked).toBeGreaterThanOrEqual(150);
   });
 
   it("the reading of a call's method is itself right", () => {

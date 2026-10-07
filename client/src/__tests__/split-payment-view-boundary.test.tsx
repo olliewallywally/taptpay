@@ -63,8 +63,8 @@ describe('SplitPaymentView extraction boundary', () => {
     expect(controller).toContain('checkoutResolveEndpoint');
     expect(controller).toContain('tokenSplitEndpoint(token)');
     expect(controller).toMatch(/tokenPaymentPath\(token,\s*['"]checkout['"]\)/);
-    expect(controller).toContain('`/api/transactions/${txnId}/split`');
-    expect(controller).toContain('`/api/transactions/${txnId}/pay`');
+    expect(controller).toContain('apiPath("POST /api/transactions/:id/split", { id: txnId })');
+    expect(controller).toContain('apiPath("POST /api/transactions/:id/pay", { id: txnId })');
     expect(controller).toContain('window.location.href = payData.hppUrl');
   });
 

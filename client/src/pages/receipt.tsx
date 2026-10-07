@@ -13,6 +13,7 @@ import {
   receiptPdfEndpoint,
   type ReceiptSource,
 } from "@/lib/payment-addressing";
+import { SPLIT_PAYMENTS_KEY, TRANSACTIONS_KEY, apiPath } from "@shared/api-path";
 
 function formatPaymentMethod(method?: string): string {
   switch (method) {
@@ -48,10 +49,10 @@ export default function Receipt({ sourceKind = "retail-legacy" }: {
     : (id ? { kind: "retail-legacy", transactionId: id, splitPaymentId: splitId } : null);
 
   const { data: legacyTransaction, isLoading: transactionLoading } = useQuery({
-    queryKey: ["/api/transactions", id],
+    queryKey: [TRANSACTIONS_KEY, id],
     queryFn: async () => {
       if (!id) return null;
-      const response = await fetch(`/api/transactions/${id}`);
+      const response = await fetch(apiPath("GET /api/transactions/:id", { id }));
       if (!response.ok) throw new Error("Failed to fetch transaction");
       return response.json();
     },
@@ -80,10 +81,10 @@ export default function Receipt({ sourceKind = "retail-legacy" }: {
   const legacyMerchant = legacyTransaction?.merchant;
 
   const { data: legacySplitPayment, isLoading: splitLoading } = useQuery({
-    queryKey: ["/api/split-payments", splitId],
+    queryKey: [SPLIT_PAYMENTS_KEY, splitId],
     queryFn: async () => {
       if (!splitId) return null;
-      const response = await fetch(`/api/split-payments/${splitId}`);
+      const response = await fetch(apiPath("GET /api/split-payments/:id", { id: splitId }));
       if (!response.ok) throw new Error("Failed to fetch split payment");
       return response.json();
     },

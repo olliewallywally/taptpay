@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { CheckCircle, XCircle, AlertCircle, ArrowLeft, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import taptLogo from "@assets/IMG_6592_1755070818452.png";
+import { TRANSACTIONS_KEY, apiPath } from "@shared/api-path";
 
 export default function PaymentResult() {
   const { transactionId } = useParams<{ transactionId: string }>();
@@ -15,9 +16,9 @@ export default function PaymentResult() {
   const txnId = parseInt(transactionId);
 
   const { data: transaction } = useQuery({
-    queryKey: ["/api/transactions", txnId],
+    queryKey: [TRANSACTIONS_KEY, txnId],
     queryFn: async () => {
-      const response = await fetch(`/api/transactions/${txnId}`);
+      const response = await fetch(apiPath("GET /api/transactions/:id", { id: txnId }));
       if (!response.ok) throw new Error("Transaction not found");
       return response.json();
     },

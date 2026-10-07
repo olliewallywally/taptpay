@@ -29,6 +29,7 @@ import {
   type PaymentCheckoutSource,
 } from "@/lib/payment-addressing";
 import { checkoutBusiness } from "@/lib/checkout-business";
+import { CHECKOUT_RESOLVE_KEY, QUOTE_TOKEN_KEY, TRANSACTIONS_KEY, apiPath } from "@shared/api-path";
 // Window augmentations are declared centrally in client/src/global.d.ts.
 
 // ── Error boundary — catches any render crash and shows a safe fallback ──
@@ -179,9 +180,9 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
   const [googlePreSessionTrigger, setGooglePreSessionTrigger] = useState(0);
 
   const { data: rawTransaction, isLoading: rawTxLoading } = useQuery({
-    queryKey: ["/api/transactions", txId],
+    queryKey: [TRANSACTIONS_KEY, txId],
     queryFn: async () => {
-      const res = await fetch(`/api/transactions/${txId}`);
+      const res = await fetch(apiPath("GET /api/transactions/:id", { id: txId }));
       if (!res.ok) throw new Error("Not found");
       return res.json();
     },
@@ -212,9 +213,9 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
 
   // Invoice resolve — amount, merchant, label, and split state for /r/:token.
   const { data: invoiceData, isLoading: invoiceLoading, error: invoiceError, refetch: refetchInvoice } = useQuery({
-    queryKey: ["/api/checkout/resolve", token],
+    queryKey: [CHECKOUT_RESOLVE_KEY, token],
     queryFn: async () => {
-      const res = await fetch(`/api/checkout/resolve/${token}`);
+      const res = await fetch(apiPath("GET /api/checkout/resolve/:token", { token }));
       if (res.status === 404) throw new Error("not-found");
       if (res.status === 410) throw new Error("voided");
       if (!res.ok) throw new Error("error");
@@ -229,9 +230,9 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
   // quote "viewed" server-side; if it was already accepted it also returns the
   // minted invoice so a revisit jumps straight to the payment step.
   const { data: quoteData, isLoading: quoteLoading, error: quoteError } = useQuery<any>({
-    queryKey: ["/api/trades/quotes/token", quoteToken],
+    queryKey: [QUOTE_TOKEN_KEY, quoteToken],
     queryFn: async () => {
-      const res = await fetch(`/api/trades/quotes/token/${quoteToken}`);
+      const res = await fetch(apiPath("GET /api/trades/quotes/token/:token", { token: quoteToken }));
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || "Quote not found");
       return res.json();
     },
@@ -266,14 +267,14 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
   }, [quoteMode, quoteData?.invoice?.token, acceptedInvoiceToken]);
 
   const openQuotePdf = () => {
-    if (quoteToken) window.open(`/api/trades/quotes/token/${quoteToken}/pdf`, "_blank", "noopener,noreferrer");
+    if (quoteToken) window.open(apiPath("GET /api/trades/quotes/token/:token/pdf", { token: quoteToken }), "_blank", "noopener,noreferrer");
   };
   const respondToQuote = async (accept: boolean) => {
     if (!quoteToken || quoteResponding) return;
     setQuoteResponding(true);
     setQuoteRespondError("");
     try {
-      const res = await fetch(`/api/trades/quotes/token/${quoteToken}/respond`, {
+      const res = await fetch(apiPath("POST /api/trades/quotes/token/:token/respond", { token: quoteToken }), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ accept }),
@@ -405,8 +406,8 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
   };
 
   const { data: envData } = useQuery({
-    queryKey: ["/api/windcave/env"],
-    queryFn: async () => (await fetch("/api/windcave/env")).json(),
+    queryKey: [apiPath("GET /api/windcave/env")],
+    queryFn: async () => (await fetch(apiPath("GET /api/windcave/env"))).json(),
   });
 
   // The business's name and logo come with what the page holds (owner decision 2026-09-26).
@@ -1230,7 +1231,7 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
     if (!isInvoice || splitBusy) return;
     setSplitBusy(true);
     try {
-      const res = await fetch(`/api/checkout/${token}/split`, {
+      const res = await fetch(apiPath("POST /api/checkout/:token/split", { token }), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ count }),
