@@ -2,13 +2,14 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
 import { Search, AlertCircle, CheckCircle } from 'lucide-react';
+import { apiPath } from "@shared/api-path";
 
 export function MerchantsPage() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
 
   const { data: merchants, isLoading } = useQuery<any[]>({
-    queryKey: ['/api/admin/merchants'],
+    queryKey: [apiPath("GET /api/admin/merchants")],
   });
 
   const filteredMerchants = (merchants || [])

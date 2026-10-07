@@ -28,87 +28,50 @@ const read = (file: string) => fs.readFileSync(path.join(ROOT, file), "utf8");
 const listed = browserApiRoutes();
 const keys = listed.map((route) => route.key);
 
-/** Every source file of the client, tests aside. */
+/** Every source file of the client, tests aside: TypeScript and the few plain JavaScript ones alike. */
+const SOURCE = /\.(ts|tsx|js|jsx|mjs)$/;
 function clientSources(dir = "client/src"): string[] {
   return fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true }).flatMap((entry) => {
     const file = `${dir}/${entry.name}`;
     if (entry.isDirectory()) return entry.name === "__tests__" ? [] : clientSources(file);
-    return /\.(ts|tsx)$/.test(entry.name) && !/\.(test|spec)\.(ts|tsx)$/.test(entry.name) ? [file] : [];
+    return SOURCE.test(entry.name) && !/\.(test|spec)\.(ts|tsx|js|jsx|mjs)$/.test(entry.name) ? [file] : [];
   });
 }
 
 /**
- * The surfaces moved onto the builder. Each may no longer spell an API address itself. The list only
- * grows: a later batch (R1-T10b) appends its files; none is ever taken off.
+ * The files the app never loads. Nothing imports eleven of them; App declares three for lazy loading
+ * and never renders them. Every call to a route the server no longer has is in one of these, so they
+ * are left as they are, held to the number of addresses each spells today, and must stay unloaded.
+ * Deleting them is the owner's decision (docs/PLAN-2026-10-06-r1-t10-acceptance-matrix.md, question 4).
+ * A file is taken off this list by deleting it or by moving it onto the builder, never added to it.
  */
-const MIGRATED = [
-  // T10a: signing in, signing up, and getting back into an account.
-  "client/src/pages/login.tsx",
-  "client/src/pages/admin-login.tsx",
-  "client/src/pages/merchant-signup.tsx",
-  "client/src/pages/forgot-password.tsx",
-  "client/src/pages/reset-password.tsx",
-  "client/src/pages/confirm-email.tsx",
-  "client/src/pages/check-email.tsx",
-  "client/src/pages/accept-invite.tsx",
-  "client/src/lib/session.ts",
-  "client/src/lib/sign-out-everywhere.ts",
-  "client/src/lib/apple-sign-in.ts",
-  "client/src/hooks/use-apple-connection.ts",
-  // T10b, batch 1: Settings, on the phone and on tablet and desktop, and what they share.
-  "client/src/pages/settings.tsx",
-  "client/src/desktop/DesktopSettingsPage.tsx",
-  "client/src/hooks/use-billing-card-return.ts",
-  "client/src/lib/merchant.ts",
-  // T10b, batch 2: retail. The terminals, home, analytics, stock, transactions, the payment stack, boards.
-  "client/src/pages/merchant-terminal-mobile-v2.tsx",
-  "client/src/desktop/pages/retail-terminal.tsx",
-  "client/src/desktop/pages/retail-analytics.tsx",
-  "client/src/desktop/pages/retail-home.tsx",
-  "client/src/desktop/pages/retail-stock.tsx",
-  "client/src/pages/stock-management.tsx",
-  "client/src/pages/transactions.tsx",
-  "client/src/pages/dashboard.tsx",
-  "client/src/components/reports/RetailReportsButton.tsx",
-  "client/src/pages/board-builder.tsx",
-  "client/src/components/qr-code-display.tsx",
-  "client/src/pages/payment-stack.tsx",
-  // T10b, batch 3: property. Both terminals, the tenant pages, the lists they share, the desktop profile panel.
-  "client/src/pages/property/property-terminal.tsx",
-  "client/src/desktop/pages/property-terminal.tsx",
-  "client/src/pages/property/tenant-directory.tsx",
-  "client/src/pages/property/tenant-profile.tsx",
-  "client/src/lib/property-data.ts",
-  "client/src/desktop/DesktopDirectoryProfile.tsx",
-  "client/src/desktop/pages/property-clients.tsx",
-  // T10b, batch 4: trades. Both terminals, clients, schedules, the dashboard and analytics, reports, the desktop lists.
-  "client/src/pages/trades/trades-terminal.tsx",
-  "client/src/desktop/pages/trades-terminal.tsx",
-  "client/src/pages/trades/client-directory.tsx",
-  "client/src/pages/trades/client-profile.tsx",
-  "client/src/pages/trades/recurring-schedules.tsx",
-  "client/src/pages/trades/trades-analytics.tsx",
-  "client/src/pages/trades/trades-dashboard.tsx",
-  "client/src/components/reports/TradesReportsButton.tsx",
-  "client/src/desktop/data/trades-data.ts",
-  "client/src/desktop/pages/trades-clients.tsx",
-  // T10b, batch 5: what a customer opens. Pay, split, checkout, the receipt, the return from the bank, and their addresses.
-  "client/src/lib/payment-addressing.ts",
-  "client/src/pages/checkout.tsx",
-  "client/src/pages/customer-payment.tsx",
-  "client/src/pages/split-payment.tsx",
-  "client/src/pages/receipt.tsx",
-  "client/src/pages/payment-result.tsx",
-  "client/src/pages/payment-return.tsx",
-  "client/src/pages/info.tsx",
-  // T10b, batch 6: the shell. Who is signed in, the tutorial, onboarding, push, live updates.
-  "client/src/App.tsx",
-  "client/src/features/tutorial/tutorial.tsx",
-  "client/src/hooks/use-push-notifications.ts",
-  "client/src/lib/push-device.ts",
-  "client/src/lib/sse-client.ts",
-  "client/src/pages/merchant-onboarding.tsx",
-];
+const NEVER_LOADED: Record<string, number> = {
+  "client/src/components/digital-wallet-buttons.tsx": 3,
+  "client/src/components/native-payment-buttons.tsx": 4,
+  "client/src/pages/admin-api.tsx": 7,
+  "client/src/pages/admin-dashboard.tsx": 6,
+  "client/src/pages/admin-merchant-broken.tsx": 9,
+  "client/src/pages/admin-merchant.tsx": 9,
+  "client/src/pages/admin-revenue.tsx": 1,
+  "client/src/pages/admin/WebsiteAnalytics.tsx": 2,
+  "client/src/pages/create-merchant.tsx": 3,
+  "client/src/pages/demo-terminal.tsx": 28,
+  "client/src/pages/exports.tsx": 4,
+  "client/src/pages/merchant-terminal-mobile.tsx": 17,
+  "client/src/pages/merchant-terminal.tsx": 22,
+  "client/src/pages/settings-simple.tsx": 3,
+};
+/**
+ * The admin area has a page of its own at the address /api, as it has one at /merchants: a page's
+ * address, not the API's. It is the one such text a loaded file may spell, in the two files that go there.
+ */
+const ADMIN_PAGE = "/api";
+const ADMIN_PAGE_USES: Record<string, number> = {
+  "client/src/pages/admin/AdminDashboard.tsx": 5,
+  "client/src/pages/admin/GridDashboard.tsx": 1,
+};
+/** Moved onto the builder with the sign-in pages (T10a), and found later to be a page nothing imports. */
+const MOVED_AND_NEVER_LOADED = ["client/src/pages/admin-login.tsx"];
 /** Text that is an API address or the start of one: /api itself, or /api followed by a path, a query or a fragment. */
 const ADDRESS_START = /^\/api(?:[/?#]|$)/;
 
@@ -125,7 +88,7 @@ const BUILDERS = new Set(["apiPath", "apiTo", "apiMethod"]);
 const parsed = new Map<string, ts.SourceFile>();
 /** A client source file's syntax tree: the checks below read calls from it, not from the text. */
 function tree(file: string): ts.SourceFile {
-  if (!parsed.has(file)) parsed.set(file, ts.createSourceFile(file, read(file), ts.ScriptTarget.Latest, true, file.endsWith("x") ? ts.ScriptKind.TSX : ts.ScriptKind.TS));
+  if (!parsed.has(file)) parsed.set(file, ts.createSourceFile(file, read(file), ts.ScriptTarget.Latest, true, file.endsWith(".tsx") ? ts.ScriptKind.TSX : file.endsWith(".ts") ? ts.ScriptKind.TS : ts.ScriptKind.JSX));
   return parsed.get(file)!;
 }
 const at = (file: string, node: ts.Node) => `${file}:${tree(file).getLineAndCharacterOfPosition(node.getStart(tree(file))).line + 1}`;
@@ -138,15 +101,78 @@ const calleeOf = (call: ts.CallExpression | ts.NewExpression): string =>
  * The API addresses a file spells itself: every string, in quotes of any kind or a template, that
  * starts with /api. Read from the syntax tree, so a comment that mentions an address is not one.
  */
-function spelledAddresses(file: string): string[] {
-  const spelled: string[] = [];
+function spelled(file: string): Array<{ where: string; text: string; whole: boolean }> {
+  const found: Array<{ where: string; text: string; whole: boolean }> = [];
   const visit = (node: ts.Node): void => {
     const text = ts.isTemplateExpression(node) ? node.head.text : written(node);
-    if (text !== null && ADDRESS_START.test(text)) spelled.push(`${at(file, node)}: ${node.getText(tree(file)).slice(0, 60)}`);
+    // `whole`: the text is all there is (not the start of a template that goes on).
+    if (text !== null && ADDRESS_START.test(text)) found.push({ where: `${at(file, node)}: ${node.getText(tree(file)).slice(0, 60)}`, text, whole: !ts.isTemplateExpression(node) });
     ts.forEachChild(node, visit);
   };
   visit(tree(file));
-  return spelled;
+  return found;
+}
+const spelledAddresses = (file: string): string[] => spelled(file).map((address) => address.where);
+
+/**
+ * What a file loads: its imports and re-exports that are not types only, and its import() calls.
+ * A page declared for lazy loading and never used is never asked for: `const Page = lazy(() => import("…"))`
+ * with no other mention of Page. Any other mention counts as a use, so a doubt reads as loaded.
+ */
+function importsOf(file: string): string[] {
+  const source = tree(file);
+  const mentions = new Map<string, number>();
+  const count = (node: ts.Node): void => {
+    if (ts.isIdentifier(node)) mentions.set(node.text, (mentions.get(node.text) ?? 0) + 1);
+    ts.forEachChild(node, count);
+  };
+  count(source);
+  const specs: string[] = [];
+  const visit = (node: ts.Node): void => {
+    if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) {
+      const typesOnly = ts.isImportDeclaration(node) ? node.importClause?.isTypeOnly === true : node.isTypeOnly;
+      if (!typesOnly) specs.push(node.moduleSpecifier.text);
+      return;
+    }
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && mentions.get(node.name.text) === 1
+      && node.initializer && ts.isCallExpression(node.initializer) && /^(lazy|lazyWithRetry)$/.test(calleeOf(node.initializer))) return;
+    if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
+      const spec = written(node.arguments[0]);
+      if (spec !== null) specs.push(spec);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return specs;
+}
+
+/** The client file an import names, where it is one of the client's own source files. */
+function clientFile(from: string, spec: string): string | null {
+  const base = spec.startsWith("@/") ? `client/src/${spec.slice(2)}`
+    : spec.startsWith(".") ? path.posix.normalize(path.posix.join(path.posix.dirname(from), spec))
+    : null;
+  if (base === null) return null;
+  for (const candidate of [base, `${base}.ts`, `${base}.tsx`, `${base}.js`, `${base}.jsx`, `${base}/index.ts`, `${base}/index.tsx`]) {
+    const full = path.join(ROOT, candidate);
+    if (SOURCE.test(candidate) && fs.existsSync(full) && fs.statSync(full).isFile()) return candidate;
+  }
+  return null;
+}
+
+/** Every client source file the app can load, starting from its entry and following importsOf. */
+function loadedFiles(entry = "client/src/main.tsx"): Set<string> {
+  const loaded = new Set<string>();
+  const queue = [entry];
+  while (queue.length) {
+    const file = queue.pop()!;
+    if (loaded.has(file)) continue;
+    loaded.add(file);
+    for (const spec of importsOf(file)) {
+      const target = clientFile(file, spec);
+      if (target !== null) queue.push(target);
+    }
+  }
+  return loaded;
 }
 
 interface BuilderUse { file: string; node: ts.CallExpression; builder: string; key: string | null }
@@ -516,18 +542,87 @@ describe("R1-T10 — the admin area's prefix", () => {
   });
 });
 
-describe("R1-T10 — the pages moved onto the builder", () => {
-  it("spell no API address themselves", () => {
-    expect(MIGRATED.flatMap(spelledAddresses)).toEqual([]);
+describe("R1-T10 — where an API address may still be spelled", () => {
+  const sources = clientSources();
+  const loaded = loadedFiles();
+
+  it("nowhere but in the listed files the app never loads: no other client file spells one", () => {
+    // Every file is held, loaded or not; a new file that spells an address fails here, whoever imports it.
+    const spelt = sources
+      .filter((file) => !(file in NEVER_LOADED))
+      .flatMap((file) => spelled(file).filter((address) => !(file in ADMIN_PAGE_USES && address.whole && address.text === ADMIN_PAGE)))
+      .map((address) => address.where);
+    expect(spelt).toEqual([]);
+    expect(sources.length).toBeGreaterThanOrEqual(245);
+    // Plain JavaScript files are read too.
+    expect(sources.filter((file) => /\.(js|jsx|mjs)$/.test(file)).length).toBeGreaterThanOrEqual(2);
   });
 
-  it("are real files, each listed once, and each uses the builder", () => {
-    expect(new Set(MIGRATED).size).toBe(MIGRATED.length);
-    for (const file of MIGRATED) {
-      expect([file, fs.existsSync(path.join(ROOT, file))]).toEqual([file, true]);
-      expect([file, /\bapi(?:Path|To)\(/.test(read(file))]).toEqual([file, true]);
+  it("the admin area's own page address is the one exception, in the two files that go to it", () => {
+    for (const [file, times] of Object.entries(ADMIN_PAGE_USES)) {
+      expect([file, spelled(file).filter((address) => address.whole && address.text === ADMIN_PAGE).length]).toEqual([file, times]);
+      expect([file, loaded.has(file)]).toEqual([file, true]);
     }
-    expect(MIGRATED.length).toBeGreaterThanOrEqual(59);
+    // It is a page: the admin area's own router has a route at it, and the server has no route there.
+    expect(read("client/src/pages/admin/AdminDashboard.tsx")).toContain('<Route path="/api" component={APIManagement} />');
+    expect(Object.keys(ROUTE_POLICY).filter((key) => key.split(" ")[1] === ADMIN_PAGE)).toEqual([]);
+  });
+
+  it("the files the app never loads spell what they spelled when they were listed, and are still never loaded", () => {
+    for (const [file, times] of Object.entries(NEVER_LOADED)) {
+      expect([file, fs.existsSync(path.join(ROOT, file))]).toEqual([file, true]);
+      expect([file, spelled(file).length]).toEqual([file, times]);
+      expect([file, loaded.has(file)]).toEqual([file, false]);
+    }
+    expect(Object.keys(NEVER_LOADED)).toHaveLength(14);
+    expect(Object.values(NEVER_LOADED).reduce((sum, times) => sum + times, 0)).toBe(118);
+  });
+
+  it("the reading of what the app loads reaches every file that names a route", () => {
+    // If the reading missed a way of importing, files the app plainly loads would read as never loaded.
+    // Every file on the builder is a loaded one, but for the one found to be a page nothing imports.
+    const onTheBuilder = sources.filter((file) => builderUses(file).length > 0);
+    expect(onTheBuilder.filter((file) => !loaded.has(file))).toEqual(MOVED_AND_NEVER_LOADED);
+    expect(onTheBuilder.length).toBeGreaterThanOrEqual(63);
+    for (const file of [
+      "client/src/main.tsx", "client/src/App.tsx", "client/src/pages/login.tsx", "client/src/lib/session.ts",
+      // Reached only through import(), through a re-export, and through a plain JavaScript file.
+      "client/src/pages/checkout.tsx", "client/src/pages/admin/MerchantDetail.tsx", "client/src/features/terminal/retail/RetailTerminalViewCore.jsx",
+      "client/src/features/terminal/SegmentedBar.tsx", "client/src/components/Stepper.jsx",
+    ]) {
+      expect([file, loaded.has(file)]).toEqual([file, true]);
+    }
+    expect(loaded.size).toBeGreaterThanOrEqual(180);
+    expect(loaded.size).toBeLessThan(sources.length);
+  });
+
+  it("the reading of what a file loads is itself right", () => {
+    const loads = (code: string) => {
+      const file = "client/src/__probe__.tsx";
+      parsed.set(file, ts.createSourceFile(file, code, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX));
+      try {
+        return importsOf(file);
+      } finally {
+        parsed.delete(file);
+      }
+    };
+    expect(loads('import App from "./App"; import "./index.css"; import { a, type B } from "@/lib/a";')).toEqual(["./App", "./index.css", "@/lib/a"]);
+    expect(loads('export { x } from "./x"; export * from "./y"; export type { T } from "./types";')).toEqual(["./x", "./y"]);
+    expect(loads('import type { T } from "./types"; const x: T = 1;')).toEqual([]);
+    expect(loads('const load = () => import("@/lib/heavy"); const again = async () => { await import(`./chunk`); };')).toEqual(["@/lib/heavy", "./chunk"]);
+    // Declared for lazy loading and rendered: loaded. Declared and never mentioned again: never asked for.
+    expect(loads('const Page = lazyWithRetry(() => import("@/pages/page")); const el = <Page />;')).toEqual(["@/pages/page"]);
+    expect(loads('const Page = lazy(() => import("@/pages/page")); const routes = [Page];')).toEqual(["@/pages/page"]);
+    expect(loads('const Page = lazyWithRetry(() => import("@/pages/page")); const Other = lazy(() => import("@/pages/other")); use(Other);')).toEqual(["@/pages/other"]);
+    // Anything but a lazy declaration is followed, used or not.
+    expect(loads('const unused = preload(() => import("@/pages/page"));')).toEqual(["@/pages/page"]);
+    expect(clientFile("client/src/App.tsx", "@/pages/login")).toBe("client/src/pages/login.tsx");
+    expect(clientFile("client/src/features/terminal/retail/RetailTerminalView.tsx", "./RetailTerminalViewCore.jsx")).toBe("client/src/features/terminal/retail/RetailTerminalViewCore.jsx");
+    expect(clientFile("client/src/features/terminal/retail/RetailTerminalViewCore.jsx", "../SegmentedBar")).toBe("client/src/features/terminal/SegmentedBar.tsx");
+    expect(clientFile("client/src/pages/merchant-signup.tsx", "@/components/Stepper")).toBe("client/src/components/Stepper.jsx");
+    expect(clientFile("client/src/main.tsx", "./index.css")).toBeNull();
+    expect(clientFile("client/src/main.tsx", "react")).toBeNull();
+    expect(clientFile("client/src/pages/login.tsx", "@shared/api-path")).toBeNull();
   });
 
   it("the guard itself tells an address from a route's name", () => {
@@ -566,7 +661,7 @@ describe("R1-T10 — every route the client names", () => {
 
   it("is a listed one, read from the source so a cast past the types is still caught", () => {
     expect(uses.filter((use) => use.key !== null && !keys.includes(use.key)).map((use) => `${at(use.file, use.node)}: ${use.key}`)).toEqual([]);
-    expect(uses.length).toBeGreaterThanOrEqual(380);
+    expect(uses.length).toBeGreaterThanOrEqual(405);
   });
 
   it("is called by its own method wherever the call says one beside it", () => {
@@ -586,7 +681,7 @@ describe("R1-T10 — every route the client names", () => {
     }
     expect(disagree).toEqual([]);
     expect(unreadable).toEqual([]);
-    expect(checked).toBeGreaterThanOrEqual(165);
+    expect(checked).toBeGreaterThanOrEqual(175);
   });
 
   it("the reading of a call's method is itself right", () => {
@@ -627,7 +722,7 @@ describe("R1-T10 — every route the client names", () => {
     // address nothing gets. Nothing is said beside a key, so the method check above does not reach it.
     const words = clientSources().flatMap(keyWords);
     expect(words.filter((use) => use.key !== null && !use.key.startsWith("GET ")).map((use) => `${at(use.file, use.node)}: ${use.key}`)).toEqual([]);
-    expect(words.length).toBeGreaterThanOrEqual(105);
+    expect(words.length).toBeGreaterThanOrEqual(120);
   });
 
   it("the reading of a key's first word is itself right", () => {

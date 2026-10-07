@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { DollarSign, Activity, Users, AlertCircle, TrendingUp } from 'lucide-react';
 import { useLocation } from 'wouter';
+import { apiPath } from "@shared/api-path";
 
 /* The platform's totals, as the admin's own figures give them (GET /api/admin/analytics). */
 interface PlatformTotals {
@@ -44,11 +45,11 @@ export function GridDashboard() {
   const [, setLocation] = useLocation();
 
   const businessesQuery = useQuery<unknown, Error, AdminBusiness[]>({
-    queryKey: ['/api/admin/merchants'],
+    queryKey: [apiPath("GET /api/admin/merchants")],
     select: readBusinesses,
   });
   const totalsQuery = useQuery<unknown, Error, PlatformTotals>({
-    queryKey: ['/api/admin/analytics'],
+    queryKey: [apiPath("GET /api/admin/analytics")],
     select: readTotals,
   });
 

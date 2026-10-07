@@ -11,6 +11,7 @@ import {
 // @ts-ignore - react-simple-maps ships no type declarations and has no @types package
 import { ComposableMap, Geographies, Geography, ZoomableGroup } from 'react-simple-maps';
 import { adminCsrfHeader } from "@/lib/session";
+import { apiPath } from "@shared/api-path";
 
 const GEO_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
 
@@ -169,9 +170,9 @@ export function Analytics() {
   const headers = adminCsrfHeader();
 
   const { data: summary, isLoading: summaryLoading } = useQuery<GA4Summary>({
-    queryKey: ['/api/admin/ga4-metrics'],
+    queryKey: [apiPath("GET /api/admin/ga4-metrics")],
     queryFn: async () => {
-      const res = await fetch('/api/admin/ga4-metrics', { headers });
+      const res = await fetch(apiPath("GET /api/admin/ga4-metrics"), { headers });
       return res.json();
     },
     staleTime: 60000,
@@ -179,24 +180,24 @@ export function Analytics() {
   });
 
   const { data: detailed, isLoading: detailedLoading } = useQuery<GA4Detailed>({
-    queryKey: ['/api/admin/ga4-detailed', range],
+    queryKey: [apiPath("GET /api/admin/ga4-detailed"), range],
     queryFn: async () => {
-      const res = await fetch(`/api/admin/ga4-detailed?range=${range}`, { headers });
+      const res = await fetch(`${apiPath("GET /api/admin/ga4-detailed")}?range=${range}`, { headers });
       return res.json();
     },
     staleTime: 120000,
   });
 
   const { data: revenueData } = useQuery<RevenuePoint[]>({
-    queryKey: ['/api/admin/revenue-over-time'],
+    queryKey: [apiPath("GET /api/admin/revenue-over-time")],
   });
 
   const { data: paymentMethods } = useQuery<PaymentMethod[]>({
-    queryKey: ['/api/admin/payment-method-breakdown'],
+    queryKey: [apiPath("GET /api/admin/payment-method-breakdown")],
   });
 
   const { data: platformStats } = useQuery<AnalyticsData>({
-    queryKey: ['/api/admin/analytics'],
+    queryKey: [apiPath("GET /api/admin/analytics")],
   });
 
   const ga4Ok = summary?.configured && !summary?.error;

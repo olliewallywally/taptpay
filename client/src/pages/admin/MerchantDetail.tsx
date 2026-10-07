@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { adminCsrfHeader } from "@/lib/session";
+import { apiPath, wholeNumber } from "@shared/api-path";
 
 // R1-T4 phase E: the sign-in is the admin's session cookie; this is the page's CSRF token.
 const ADMIN_HEADERS = () => adminCsrfHeader();
@@ -33,18 +34,18 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
 
   // ── Queries ────────────────────────────────────────────────────────────────
   const { data: merchant, isLoading } = useQuery({
-    queryKey: ['/api/admin/merchants', merchantId],
+    queryKey: [apiPath("GET /api/admin/merchants"), merchantId],
     queryFn: async () => {
-      const res = await fetch(`/api/admin/merchants/${merchantId}`, { headers: ADMIN_HEADERS() });
+      const res = await fetch(apiPath("GET /api/admin/merchants/:id", { id: wholeNumber(merchantId) }), { headers: ADMIN_HEADERS() });
       if (!res.ok) throw new Error('Failed to fetch merchant');
       return res.json();
     },
   });
 
   const { data: transactions = [] } = useQuery<any[]>({
-    queryKey: ['/api/admin/merchants', merchantId, 'transactions'],
+    queryKey: [apiPath("GET /api/admin/merchants"), merchantId, 'transactions'],
     queryFn: async () => {
-      const res = await fetch(`/api/admin/merchants/${merchantId}/transactions`, { headers: ADMIN_HEADERS() });
+      const res = await fetch(apiPath("GET /api/admin/merchants/:id/transactions", { id: wholeNumber(merchantId) }), { headers: ADMIN_HEADERS() });
       if (!res.ok) return [];
       return res.json();
     },
@@ -92,7 +93,7 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
   // ── Mutations ──────────────────────────────────────────────────────────────
   const verifyMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/admin/merchants/${merchantId}/verify`, {
+      const res = await fetch(apiPath("POST /api/admin/merchants/:id/verify", { id: wholeNumber(merchantId) }), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...ADMIN_HEADERS() },
       });
@@ -101,8 +102,8 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
     },
     onSuccess: () => {
       toast({ title: 'Merchant Verified', description: 'Account verified successfully.' });
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/merchants'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/merchants', merchantId] });
+      queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/admin/merchants")] });
+      queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/admin/merchants"), merchantId] });
       setShowConfirm(false);
     },
     onError: (e: any) => toast({ title: 'Verification Failed', description: e.message, variant: 'destructive' }),
@@ -110,7 +111,7 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
 
   const resendEmailMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch('/api/admin/resend-verification', {
+      const res = await fetch(apiPath("POST /api/admin/resend-verification"), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...ADMIN_HEADERS() },
         body: JSON.stringify({ email: merchant.email }),
@@ -124,7 +125,7 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
 
   const saveWindcaveIdMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/admin/merchants/${merchantId}/windcave-merchant-id`, {
+      const res = await fetch(apiPath("PATCH /api/admin/merchants/:id/windcave-merchant-id", { id: wholeNumber(merchantId) }), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', ...ADMIN_HEADERS() },
         body: JSON.stringify({ windcaveMerchantId: windcaveIdValue }),
@@ -134,7 +135,7 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
     },
     onSuccess: () => {
       toast({ title: 'Saved', description: 'Windcave Merchant ID updated.' });
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/merchants', merchantId] });
+      queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/admin/merchants"), merchantId] });
       setEditingWindcaveId(false);
     },
     onError: (e: any) => toast({ title: 'Save Failed', description: e.message, variant: 'destructive' }),
@@ -142,7 +143,7 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
 
   const activateMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/admin/merchants/${merchantId}/set-active`, {
+      const res = await fetch(apiPath("POST /api/admin/merchants/:id/set-active", { id: wholeNumber(merchantId) }), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...ADMIN_HEADERS() },
       });
@@ -151,15 +152,15 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
     },
     onSuccess: () => {
       toast({ title: 'Merchant Activated', description: 'Account is now fully active.' });
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/merchants'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/merchants', merchantId] });
+      queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/admin/merchants")] });
+      queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/admin/merchants"), merchantId] });
     },
     onError: (e: any) => toast({ title: 'Activation Failed', description: e.message, variant: 'destructive' }),
   });
 
   // ── Receipt helpers ────────────────────────────────────────────────────────
   const fetchPdfBlob = async (txId: number) => {
-    const r = await fetch(`/api/transactions/${txId}/receipt-pdf`, { method: 'POST' });
+    const r = await fetch(apiPath("POST /api/transactions/:id/receipt-pdf", { id: txId }), { method: 'POST' });
     if (!r.ok) throw new Error('Failed to generate PDF');
     return r.blob();
   };
