@@ -16,6 +16,9 @@
 //   of its own). The routes, their checks and their replies are the real ones; for property and
 //   trades the storage underneath is not exercised.
 //
+// It opens the merchant's screens (22 at each size) and the pages outside the merchant frame (the
+// landing page, sign-in, sign-up, the password pages, the info and legal pages, onboarding).
+//
 // What each cell (a screen at a size) must show:
 // - the address it was sent to, still (not the login page);
 // - a mark of its own screen: a target of that screen's own tutorial, for that device class. Where
@@ -23,7 +26,10 @@
 //   element such as "main"), and the cell is listed apart: that is a finding about the tutorial;
 // - the shell the plan expects: none of the desktop frame on a phone; the frame filling the window
 //   on a tablet; a centred, rounded frame holding the 1180x880 canvas on a desktop, short or not;
-// - no page error, no console error, no failed request to this app;
+//   and no merchant frame at any size on a page outside it, which is known by a mark of its own
+//   (a control or the words only that page has);
+// - no page error, no console error, no failed request to this app. One answer is not a failure:
+//   where nobody is signed in, GET /api/auth/session says 401, which is how the page learns it;
 // - every /api address it asks for is one the server registers. The server answers an address it
 //   does not have with the app's own page and a 200 (the fallback in server/vite.ts serveStatic), so
 //   a wrong address would not show as a failed request: each one is held to the route policy instead;
@@ -36,9 +42,9 @@
 // --measure records the box of the first element a selector finds in each cell (results.json), to
 // compare a screen before and after a change.
 //
-// --self-test plants one fault at a time (signed out, the wrong screen, a console error, a page
-// error, a failed request, the wrong shell) and exits 0 only when every one is caught and the
-// unplanted control passes. Exits 1 when a cell fails. Chromium on Linux is not Safari on an iPhone:
+// --self-test plants one fault at a time (signed out, the wrong screen or page, a console error, a
+// page error, a failed request, an address the server does not have, the wrong shell) and exits 0
+// only when every one is caught and the unplanted controls pass. Exits 1 when a cell fails. Chromium on Linux is not Safari on an iPhone:
 // real devices are the owner's check.
 import express from "express";
 import https from "node:https";
@@ -151,6 +157,15 @@ const paid = await storage.completeSubscriptionCardSetup(
   async () => ({ success: true as const, approved: true, windcaveTransactionId: "matrix-first-month" }),
 );
 if (!paid.ok) throw new Error(`seed: the paid month failed: ${paid.reason}`);
+
+// A second business that has signed up and not finished onboarding: the one page it is sent to.
+const NEW_EMAIL = "new@matrix.test";
+const newcomer = await storage.createMerchant({
+  name: "Matrix Newcomer", businessName: "Matrix New Business", businessType: "sole-trader",
+  email: NEW_EMAIL, phone: "021 555 0101", address: "2 Matrix Street, Auckland",
+} as any);
+await storage.updateMerchantStatus(newcomer.id as number, "active");
+await createUser(NEW_EMAIL, OWNER_PASSWORD, newcomer.id as number, "merchant");
 
 // Retail: in the in-memory storage itself.
 for (const [name, cost, description, emoji] of [
@@ -274,6 +289,22 @@ const SURFACES: Surface[] = [
   { path: "/settings", pageKey: "settings", mode: "trades" },
 ];
 
+/** A page outside the merchant frame: who opens it, and a control or the words only that page has. */
+interface Outside { path: string; who: "nobody" | "a new business"; mark: { selector?: string; text?: string } }
+const OUTSIDE: Outside[] = [
+  { path: "/", who: "nobody", mark: { selector: "#tp-nav" } },
+  { path: "/login", who: "nobody", mark: { selector: '[data-testid="button-login"]' } },
+  { path: "/signup", who: "nobody", mark: { text: "start with you" } },
+  { path: "/forgot-password", who: "nobody", mark: { selector: 'input[placeholder="Enter your email"]' } },
+  // With no token in its address it is its own screen, and says so.
+  { path: "/reset-password", who: "nobody", mark: { text: "Invalid Reset Link" } },
+  { path: "/check-email", who: "nobody", mark: { text: "Check your email" } },
+  { path: "/info", who: "nobody", mark: { text: "info pack" } },
+  { path: "/terms", who: "nobody", mark: { text: "1. Service Description" } },
+  { path: "/privacy", who: "nobody", mark: { text: "Office of the Privacy Commissioner" } },
+  { path: "/onboarding", who: "a new business", mark: { text: "Complete Your Business Profile" } },
+];
+
 // ── What is read from a page (a string, not a function: tsx wraps nested functions in a helper the page lacks) ──
 const FACTS = `(function (selectors) {
   function box(el) { var r = el.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; }
@@ -357,7 +388,7 @@ const browser = await chromium.launch({
   args: ["--host-resolver-rules=MAP localhost 127.0.0.1"],
 });
 
-interface Watch { pageErrors: string[]; consoleErrors: string[]; failed: string[]; elsewhere: string[]; sent: string[]; routes: Set<string> }
+interface Watch { pageErrors: string[]; consoleErrors: Array<{ text: string; from: string }>; failed: string[]; elsewhere: string[]; sent: string[]; routes: Set<string> }
 async function openContext(size: Size): Promise<BrowserContext> {
   const context = await browser.newContext({
     viewport: { width: size.width, height: size.height }, hasTouch: size.touch, isMobile: size.touch,
@@ -382,7 +413,7 @@ async function openPage(context: BrowserContext, mode: Mode | null): Promise<{ p
     return route.fulfill({ status: 200, contentType: kind === "stylesheet" ? "text/css" : kind === "script" ? "text/javascript" : "text/plain", body: "" });
   });
   page.on("pageerror", (error) => watch.pageErrors.push(String(error).slice(0, 300)));
-  page.on("console", (message) => { if (message.type() === "error") watch.consoleErrors.push(message.text().slice(0, 300)); });
+  page.on("console", (message) => { if (message.type() === "error") watch.consoleErrors.push({ text: message.text().slice(0, 300), from: message.location().url ?? "" }); });
   page.on("request", (request) => {
     const url = new URL(request.url());
     if (url.origin !== base || !url.pathname.startsWith("/api/")) return;
@@ -404,10 +435,10 @@ async function openPage(context: BrowserContext, mode: Mode | null): Promise<{ p
   return { page, watch };
 }
 
-async function signIn(context: BrowserContext): Promise<void> {
+async function signIn(context: BrowserContext, email = OWNER_EMAIL): Promise<void> {
   const { page } = await openPage(context, null);
   await page.goto(`${base}/login`, { waitUntil: "domcontentloaded", timeout: 120_000 });
-  await page.fill('[data-testid="input-email"]', OWNER_EMAIL, { timeout: 60_000 });
+  await page.fill('[data-testid="input-email"]', email, { timeout: 60_000 });
   await page.fill('[data-testid="input-password"]', OWNER_PASSWORD);
   try {
     await page.click('[data-testid="button-login"]', { timeout: 8_000 });
@@ -430,7 +461,7 @@ async function signIn(context: BrowserContext): Promise<void> {
   await page.close();
 }
 
-interface Cell { size: string; path: string; mode: Mode; pageKey: string; faults: string[]; mark: string | null; byFallback: boolean; elsewhere: string[]; sent: number; routes: string[]; measured?: unknown }
+interface Cell { size: string; path: string; mode: Mode | "outside"; pageKey: string; faults: string[]; mark: string | null; byFallback: boolean; elsewhere: string[]; sent: number; routes: string[]; measured?: unknown }
 /** A fallback that names something of the screen's own (a class, an attribute), not any page's furniture. */
 const ownFallback = (selector: string | undefined | null): boolean => !!selector && /[.#\[]/.test(selector);
 const ERROR_SCREENS = /Something went wrong|couldn't check your session|taking longer than expected|Connection Lost/i;
@@ -439,11 +470,16 @@ const ERROR_SCREENS = /Something went wrong|couldn't check your session|taking l
  * One screen at one size. `as` lets the self-test judge a cell by another screen's mark or another size's
  * shell; `plant` lets it break the page after it has settled.
  */
-async function visit(context: BrowserContext, size: Size, surface: Surface, options: { as?: { pageKey?: TutorialPageKey; size?: Size }; plant?: (page: Page) => Promise<void>; shot?: boolean } = {}): Promise<Cell> {
-  const { page, watch } = await openPage(context, surface.mode);
-  const judgedKey = options.as?.pageKey ?? surface.pageKey;
+async function visit(context: BrowserContext, size: Size, surface: Surface | Outside, options: { as?: { pageKey?: TutorialPageKey; size?: Size }; plant?: (page: Page) => Promise<void>; shot?: boolean } = {}): Promise<Cell> {
+  const outside = "who" in surface ? surface : null;
+  const mode: Mode = outside ? "retail" : (surface as Surface).mode;
+  const { page, watch } = await openPage(context, outside ? null : mode);
+  const judgedKey = options.as?.pageKey ?? (outside ? null : (surface as Surface).pageKey);
   const judgedSize = options.as?.size ?? size;
-  const steps = tutorialStepsForDevice(judgedKey, judgedSize.deviceClass);
+  const steps: Array<{ target: string; fallbackTarget?: string }> = judgedKey
+    ? tutorialStepsForDevice(judgedKey, judgedSize.deviceClass)
+    : outside?.mark.selector ? [{ target: outside.mark.selector }] : [];
+  const words = judgedKey ? null : outside?.mark.text ?? null;
   const faults: string[] = [];
   let mark: string | null = null;
   let byFallback = false;
@@ -458,7 +494,8 @@ async function visit(context: BrowserContext, size: Size, surface: Surface, opti
       await page.waitForTimeout(250);
       facts = await readFacts(page, steps);
       if (watch.sent.length !== lastSent) { lastSent = watch.sent.length; quietSince = Date.now(); }
-      const marked = facts.marks.some((step, index) => step.shown || (step.fallbackShown && ownFallback(steps[index].fallbackTarget)));
+      const marked = facts.marks.some((step, index) => step.shown || (step.fallbackShown && ownFallback(steps[index].fallbackTarget)))
+        || (words !== null && facts.text.includes(words));
       if (marked && facts.running === 0 && Date.now() - quietSince >= 1000) break;
       if (Date.now() > deadline) break;
     }
@@ -469,18 +506,33 @@ async function visit(context: BrowserContext, size: Size, surface: Surface, opti
     const fallback = found ? -1 : facts.marks.findIndex((step, index) => step.fallbackShown && ownFallback(steps[index].fallbackTarget));
     mark = found?.target ?? (fallback >= 0 ? steps[fallback].fallbackTarget ?? null : null);
     byFallback = !found && fallback >= 0;
-    if (!mark) faults.push(`no mark of the ${judgedKey} screen is shown (looked for ${facts.marks.length} tutorial targets)`);
+    if (!mark && words !== null && facts.text.includes(words)) mark = `"${words}"`;
+    if (!mark) faults.push(judgedKey
+      ? `no mark of the ${judgedKey} screen is shown (looked for ${facts.marks.length} tutorial targets)`
+      : `no mark of the ${surface.path} page is shown (${outside?.mark.selector ?? `the words "${words}"`})`);
     if (ERROR_SCREENS.test(facts.text)) faults.push(`an error screen: "${(facts.text.match(ERROR_SCREENS) ?? [""])[0]}"`);
     if (facts.running > 0) faults.push(`${facts.running} animation(s) still running when the wait ran out`);
-    faults.push(...shellFaults(facts, judgedSize));
+    if (outside && !options.as?.size) {
+      // Outside the merchant frame at every size: only the window and the pointer are held.
+      if (facts.frame || facts.deviceClass) faults.push("a page outside the merchant frame is shown inside it");
+      if (facts.window.width !== size.width || facts.window.height !== size.height) faults.push(`the window is ${facts.window.width}x${facts.window.height}, not ${size.width}x${size.height}`);
+      if (facts.coarse !== size.touch) faults.push(`the pointer reads ${facts.coarse ? "coarse" : "fine"}`);
+    } else {
+      faults.push(...shellFaults(facts, judgedSize));
+    }
+    // Where nobody is signed in, the session check's 401 is the answer, not a failure; so is the console's line for it.
+    const expected = outside?.who === "nobody" ? "401 GET /api/auth/session" : null;
     for (const error of watch.pageErrors) faults.push(`page error: ${error}`);
-    for (const error of watch.consoleErrors) faults.push(`console error: ${error}`);
-    for (const failure of watch.failed) faults.push(`failed request: ${failure}`);
+    for (const error of watch.consoleErrors) {
+      if (expected && error.from === `${base}/api/auth/session` && /status of 401/.test(error.text)) continue;
+      faults.push(`console error: ${error.text}`);
+    }
+    for (const failure of watch.failed) if (failure !== expected) faults.push(`failed request: ${failure}`);
     if (MEASURE) {
       measured = await page.evaluate(`(function (selector) { var el = document.querySelector(selector); if (!el) return null; var r = el.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; })(${JSON.stringify(MEASURE)})`);
     }
     if (options.shot !== false) {
-      const slug = `${size.name}-${surface.mode}-${surface.path.replace(/[^a-z0-9]+/gi, "_").replace(/^_|_$/g, "").slice(0, 60) || "root"}`;
+      const slug = `${size.name}-${outside ? "outside" : mode}-${surface.path.replace(/[^a-z0-9]+/gi, "_").replace(/^_|_$/g, "").slice(0, 60) || "root"}`;
       await page.screenshot({ path: path.join(out, `${slug}.png`) });
     }
   } catch (error) {
@@ -488,7 +540,7 @@ async function visit(context: BrowserContext, size: Size, surface: Surface, opti
   } finally {
     await page.close().catch(() => undefined);
   }
-  return { size: size.name, path: surface.path, mode: surface.mode, pageKey: surface.pageKey, faults, mark, byFallback, elsewhere: [...new Set(watch.elsewhere)], sent: watch.sent.length, routes: [...watch.routes].sort(), ...(MEASURE ? { measured } : {}) };
+  return { size: size.name, path: surface.path, mode: outside ? "outside" : mode, pageKey: outside ? outside.who : (surface as Surface).pageKey, faults, mark, byFallback, elsewhere: [...new Set(watch.elsewhere)], sent: watch.sent.length, routes: [...watch.routes].sort(), ...(MEASURE ? { measured } : {}) };
 }
 
 let exitCode = 0;
@@ -514,7 +566,18 @@ try {
       ["a desktop judged by the tablet's shell", /tablet frame width|the pointer reads|the frame says/, () => visit(onDesktop, desktop, terminal, { as: { size: { ...tablet, width: desktop.width, height: desktop.height } }, shot: false })],
       ["a desktop frame pushed off centre", /desktop frame centre/, () => visit(onDesktop, desktop, terminal, { plant: (page) => page.evaluate(`document.querySelector('[data-testid="desktop-frame"] > .tapt-desktop-frame').style.transform = 'translateX(40px)'`) as Promise<void>, shot: false })],
     ];
-    const control = [await visit(signedIn, phone, terminal, { shot: false }), await visit(onDesktop, desktop, terminal, { shot: false })];
+    // And on the pages outside the merchant frame.
+    const login = OUTSIDE.find((page) => page.path === "/login")!;
+    const terms = OUTSIDE.find((page) => page.path === "/terms")!;
+    const privacy = OUTSIDE.find((page) => page.path === "/privacy")!;
+    const onboarding = OUTSIDE.find((page) => page.path === "/onboarding")!;
+    plants.push(
+      ["onboarding opened with nobody signed in", /ended at \/login|no mark of the \/onboarding page/, () => visit(signedOut, phone, onboarding, { shot: false })],
+      ["the wrong page is up (the terms, judged by the privacy page's words)", /no mark of the \/terms page/, () => visit(signedOut, phone, { ...terms, mark: privacy.mark }, { shot: false })],
+      ["a signed-out page asking for a business's data (the session's own 401 does not excuse it)", /failed request: 401 GET \/api\/merchants\/1\/profile/, () => visit(signedOut, phone, login, { plant: (page) => page.evaluate("fetch('/api/merchants/1/profile').then(function () {})") as Promise<void>, shot: false })],
+      ["a page outside the frame judged as a merchant's desktop screen", /no tablet\/desktop frame/, () => visit(onDesktop, desktop, login, { as: { size: desktop }, shot: false })],
+    );
+    const control = [await visit(signedIn, phone, terminal, { shot: false }), await visit(onDesktop, desktop, terminal, { shot: false }), await visit(signedOut, phone, login, { shot: false })];
     for (const cell of control) {
       const ok = cell.faults.length === 0;
       if (!ok) exitCode = 1;
@@ -532,12 +595,25 @@ try {
     for (const size of sizes) {
       const context = await openContext(size);
       await signIn(context);
+      const say = (cell: Cell) => console.log(`${cell.faults.length ? "FAIL" : "PASS"} ${size.name.padEnd(13)} ${cell.mode.padEnd(8)} ${cell.path}${cell.faults.length ? ` — ${cell.faults.join("; ")}` : `  [${cell.mark}]${cell.byFallback ? " (a fallback: none of this screen's tutorial targets is on the page)" : ""}`}`);
       for (const surface of surfaces) {
         const cell = await visit(context, size, surface);
-        cells.push(cell);
-        console.log(`${cell.faults.length ? "FAIL" : "PASS"} ${size.name.padEnd(13)} ${surface.mode.padEnd(8)} ${surface.path}${cell.faults.length ? ` — ${cell.faults.join("; ")}` : `  [${cell.mark}]${cell.byFallback ? " (a fallback: none of this screen's tutorial targets is on the page)" : ""}`}`);
+        cells.push(cell); say(cell);
       }
       await context.close();
+      // The pages outside the merchant frame: with nobody signed in, and onboarding as a business that has just signed up.
+      const pages = OUTSIDE.filter((page) => !ONLY_SURFACE || page.path === ONLY_SURFACE);
+      if (pages.some((page) => page.who === "nobody")) {
+        const nobody = await openContext(size);
+        for (const page of pages.filter((each) => each.who === "nobody")) { const cell = await visit(nobody, size, page); cells.push(cell); say(cell); }
+        await nobody.close();
+      }
+      if (pages.some((page) => page.who === "a new business")) {
+        const fresh = await openContext(size);
+        await signIn(fresh, NEW_EMAIL);
+        for (const page of pages.filter((each) => each.who === "a new business")) { const cell = await visit(fresh, size, page); cells.push(cell); say(cell); }
+        await fresh.close();
+      }
     }
     const failed = cells.filter((cell) => cell.faults.length);
     const elsewhere = [...new Set(cells.flatMap((cell) => cell.elsewhere))].sort();
