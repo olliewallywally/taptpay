@@ -9,6 +9,7 @@ import { tradesFetch } from "@/lib/trades-api";
 import { useMerchantProfile } from "@/lib/merchant";
 import { TRADES_REPORT_OPTIONS } from "@/lib/report-pdf/reports/trades-options";
 import type { TradesReportData } from "@/lib/report-pdf/reports/trades";
+import { apiPath } from "@shared/api-path";
 
 const load = (path: string) => () => tradesFetch(path).then((r) => (r.ok ? r.json() : []));
 
@@ -37,9 +38,9 @@ export function TradesReportsButton({
 }) {
   const [open, setOpen] = useState(false);
   const { data: merchant } = useMerchantProfile();
-  const { data: clients = [] } = useQuery<any[]>({ queryKey: ["/api/trades/clients"], queryFn: load("/api/trades/clients"), staleTime: 30000 });
-  const { data: invoices = [] } = useQuery<any[]>({ queryKey: ["/api/trades/invoices"], queryFn: load("/api/trades/invoices"), staleTime: 30000 });
-  const { data: quotes = [] } = useQuery<any[]>({ queryKey: ["/api/trades/quotes"], queryFn: load("/api/trades/quotes"), staleTime: 30000 });
+  const { data: clients = [] } = useQuery<any[]>({ queryKey: [apiPath("GET /api/trades/clients")], queryFn: load(apiPath("GET /api/trades/clients")), staleTime: 30000 });
+  const { data: invoices = [] } = useQuery<any[]>({ queryKey: [apiPath("GET /api/trades/invoices")], queryFn: load(apiPath("GET /api/trades/invoices")), staleTime: 30000 });
+  const { data: quotes = [] } = useQuery<any[]>({ queryKey: [apiPath("GET /api/trades/quotes")], queryFn: load(apiPath("GET /api/trades/quotes")), staleTime: 30000 });
 
   const { invoices: fInvoices, clients: fClients } = filterBySite(invoices, clients, siteFilter);
   const clientIds = new Set(fClients.map((c: any) => c.id));

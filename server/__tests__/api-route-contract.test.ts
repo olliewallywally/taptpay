@@ -81,6 +81,17 @@ const MIGRATED = [
   "client/src/lib/property-data.ts",
   "client/src/desktop/DesktopDirectoryProfile.tsx",
   "client/src/desktop/pages/property-clients.tsx",
+  // T10b, batch 4: trades. Both terminals, clients, schedules, the dashboard and analytics, reports, the desktop lists.
+  "client/src/pages/trades/trades-terminal.tsx",
+  "client/src/desktop/pages/trades-terminal.tsx",
+  "client/src/pages/trades/client-directory.tsx",
+  "client/src/pages/trades/client-profile.tsx",
+  "client/src/pages/trades/recurring-schedules.tsx",
+  "client/src/pages/trades/trades-analytics.tsx",
+  "client/src/pages/trades/trades-dashboard.tsx",
+  "client/src/components/reports/TradesReportsButton.tsx",
+  "client/src/desktop/data/trades-data.ts",
+  "client/src/desktop/pages/trades-clients.tsx",
 ];
 /** Text that is an API address or the start of one: /api itself, or /api followed by a path, a query or a fragment. */
 const ADDRESS_START = /^\/api(?:[/?#]|$)/;
@@ -171,6 +182,16 @@ function saidBeside(use: BuilderUse): { method: string } | { unreadable: string 
     }
   }
   return { method };
+}
+
+/** The built addresses that are the first word of a list: a cached entry's name. */
+function keyWords(file: string): BuilderUse[] {
+  return builderUses(file).filter((use) => {
+    if (use.builder !== "apiPath") return false;
+    let node: ts.Node = use.node;
+    while (ts.isParenthesizedExpression(node.parent) || ts.isAsExpression(node.parent)) node = node.parent;
+    return ts.isArrayLiteralExpression(node.parent) && node.parent.elements[0] === node;
+  });
 }
 
 /**
@@ -487,7 +508,7 @@ describe("R1-T10 — the pages moved onto the builder", () => {
       expect([file, fs.existsSync(path.join(ROOT, file))]).toEqual([file, true]);
       expect([file, /\bapi(?:Path|To)\(/.test(read(file))]).toEqual([file, true]);
     }
-    expect(MIGRATED.length).toBeGreaterThanOrEqual(35);
+    expect(MIGRATED.length).toBeGreaterThanOrEqual(45);
   });
 
   it("the guard itself tells an address from a route's name", () => {
@@ -526,7 +547,7 @@ describe("R1-T10 — every route the client names", () => {
 
   it("is a listed one, read from the source so a cast past the types is still caught", () => {
     expect(uses.filter((use) => use.key !== null && !keys.includes(use.key)).map((use) => `${at(use.file, use.node)}: ${use.key}`)).toEqual([]);
-    expect(uses.length).toBeGreaterThanOrEqual(205);
+    expect(uses.length).toBeGreaterThanOrEqual(305);
   });
 
   it("is called by its own method wherever the call says one beside it", () => {
@@ -546,7 +567,7 @@ describe("R1-T10 — every route the client names", () => {
     }
     expect(disagree).toEqual([]);
     expect(unreadable).toEqual([]);
-    expect(checked).toBeGreaterThanOrEqual(95);
+    expect(checked).toBeGreaterThanOrEqual(135);
   });
 
   it("the reading of a call's method is itself right", () => {
@@ -576,6 +597,39 @@ describe("R1-T10 — every route the client names", () => {
     expect(said('apiRequest(...apiTo("POST /api/x"), body)')).toEqual([null]);
     // The address inside a later template slot is not the address the call is made to.
     expect(said('fetch(`${base}${apiPath("POST /api/x")}`)')).toEqual([null]);
+  });
+
+  it("is a GET route wherever it is the first word of a cached entry's name", () => {
+    // A cached entry is named for the address that is asked for it (the default query function gets its
+    // first word), and one screen refreshes another's by that word. Named for a POST, it would be an
+    // address nothing gets. Nothing is said beside a key, so the method check above does not reach it.
+    const words = clientSources().flatMap(keyWords);
+    expect(words.filter((use) => use.key !== null && !use.key.startsWith("GET ")).map((use) => `${at(use.file, use.node)}: ${use.key}`)).toEqual([]);
+    expect(words.length).toBeGreaterThanOrEqual(95);
+  });
+
+  it("the reading of a key's first word is itself right", () => {
+    const firstWords = (code: string) => {
+      const file = "client/src/__probe__.tsx";
+      parsed.set(file, ts.createSourceFile(file, code, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX));
+      try {
+        return keyWords(file).map((use) => use.key);
+      } finally {
+        parsed.delete(file);
+      }
+    };
+    expect(firstWords('useQuery({ queryKey: [apiPath("GET /api/x")] })')).toEqual(["GET /api/x"]);
+    expect(firstWords('queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/x"), id, "events"] })')).toEqual(["GET /api/x"]);
+    expect(firstWords('queryClient.setQueryData([apiPath("POST /api/x")], data)')).toEqual(["POST /api/x"]);
+    expect(firstWords('export const KEY = [apiPath("PUT /api/x")] as const;')).toEqual(["PUT /api/x"]);
+    expect(firstWords('const key = [(apiPath("DELETE /api/x/:id", { id }) as string), "y"];')).toEqual(["DELETE /api/x/:id"]);
+    // Not a key's first word: a later word, an address handed to a request, a request inside a list.
+    expect(firstWords('const key = [MERCHANTS_KEY, apiPath("POST /api/x")];')).toEqual([]);
+    expect(firstWords('fetch(apiPath("POST /api/x"), { method: "POST" })')).toEqual([]);
+    expect(firstWords('await Promise.all([fetch(apiPath("POST /api/x"), { method: "POST" })]);')).toEqual([]);
+    expect(firstWords('apiRequest(...apiTo("POST /api/x"), body)')).toEqual([]);
+    // A route's method at the head of a list is not an address, so it is nobody's key.
+    expect(firstWords('const said = [apiMethod("POST /api/x"), "is how it is called"];')).toEqual([]);
   });
 
   it("is never made longer: only a query or a fragment may follow a built address", () => {

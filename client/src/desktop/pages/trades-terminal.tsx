@@ -45,6 +45,7 @@ import {
   formatDesktopKeypadMoney,
   type DesktopKeypadKey,
 } from "../desktop-keypad";
+import { MERCHANTS_KEY, apiPath, apiTo } from "@shared/api-path";
 
 /* ── palette ── */
 const ACCENT = "#5E9EFF";
@@ -167,17 +168,17 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
   const quotesQuery = useTradesQuotesQuery();
   /* A failed answer is a failure, not "no schedules" (R1-T9). */
   const schedulesQuery = useQuery<TradesSchedule[]>({
-    queryKey: ["/api/trades/schedules"],
+    queryKey: [apiPath("GET /api/trades/schedules")],
     queryFn: async () => {
-      const response = await tradesFetch("/api/trades/schedules");
+      const response = await tradesFetch(apiPath("GET /api/trades/schedules"));
       if (!response.ok) throw new Error("Could not load recurring invoices");
       return responseRows(await response.json()) as TradesSchedule[];
     },
   });
   const reminderSettingsQuery = useQuery<{ tradeRemindersEnabled: boolean }>({
-    queryKey: ["/api/trades/reminder-settings"],
+    queryKey: [apiPath("GET /api/trades/reminder-settings")],
     queryFn: async () => {
-      const response = await tradesFetch("/api/trades/reminder-settings");
+      const response = await tradesFetch(apiPath("GET /api/trades/reminder-settings"));
       if (!response.ok) throw new Error("Could not load reminder settings");
       const body = requireResponseRecord(await response.json());
       return { tradeRemindersEnabled: body?.tradeRemindersEnabled !== false };
@@ -188,9 +189,9 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
      quotes without GST, and the null was cached under the key every page shares
      for the business details, where exports would read it as loaded (R1-T9). */
   const merchantQuery = useQuery<any>({
-    queryKey: ["/api/merchants", merchantId, "profile"],
+    queryKey: [MERCHANTS_KEY, merchantId, "profile"],
     queryFn: async () => {
-      const response = await tradesFetch(`/api/merchants/${merchantId}/profile`);
+      const response = await tradesFetch(apiPath("GET /api/merchants/:id/profile", { id: merchantId }));
       if (!response.ok) throw new Error("Could not load the business details");
       return response.json();
     },
@@ -418,7 +419,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
       if (invType === "balance") {
         if (!balanceDeposit) throw new Error("No paid deposit to bill the balance for");
         const res = await tradesFetch(
-          `/api/trades/invoices/${balanceDeposit.id}/send-balance`,
+          apiPath("POST /api/trades/invoices/:id/send-balance", { id: balanceDeposit.id }),
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -432,7 +433,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
       if (amountCents <= 0) throw new Error("Enter an amount first");
       const due = new Date();
       due.setDate(due.getDate() + 7);
-      const res = await tradesFetch("/api/trades/invoices", {
+      const res = await tradesFetch(apiPath("POST /api/trades/invoices"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -479,7 +480,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
   const promoteClient = useMutation({
     mutationFn: async () => {
       if (!sentInvoice?.clientProfileId) throw new Error("No client to save");
-      const res = await tradesFetch(`/api/trades/clients/${sentInvoice.clientProfileId}/promote`, { method: "POST" });
+      const res = await tradesFetch(apiPath("POST /api/trades/clients/:id/promote", { id: sentInvoice.clientProfileId }), { method: "POST" });
       if (!res.ok) throw await failure(res, "Could not save the client");
       return res.json();
     },
@@ -520,7 +521,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
       }
       const validUntil = new Date();
       validUntil.setDate(validUntil.getDate() + 30);
-      const res = await tradesFetch("/api/trades/quotes", {
+      const res = await tradesFetch(apiPath("POST /api/trades/quotes"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -555,7 +556,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
     mutationFn: async () => {
       const amountCents = Math.round(Number(recurring.amount) * 100);
       if (!recurring.clientProfileId || amountCents <= 0) throw new Error("Choose a client and enter an amount");
-      const response = await tradesFetch("/api/trades/schedules", {
+      const response = await tradesFetch(apiPath("POST /api/trades/schedules"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...recurring, amountCents, startDate: new Date(`${recurring.startDate}T09:00:00Z`).toISOString(), amount: undefined }),
@@ -563,7 +564,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
       if (!response.ok) throw new Error(await response.json().then((d) => d.message).catch(() => "Could not create recurring invoice"));
       return response.json();
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/trades/schedules"] }); setRecurringError(""); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/trades/schedules")] }); setRecurringError(""); },
     onError: (error) =>
       setRecurringError(
         isBillingCardRequired(error)
@@ -574,7 +575,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
 
   const toggleReminders = useMutation({
     mutationFn: async (tradeRemindersEnabled: boolean) => {
-      const response = await tradesFetch("/api/trades/reminder-settings", {
+      const response = await tradesFetch(apiPath("PUT /api/trades/reminder-settings"), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tradeRemindersEnabled }),
@@ -583,7 +584,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
       return response.json();
     },
     onSuccess: (body) => {
-      queryClient.setQueryData(["/api/trades/reminder-settings"], {
+      queryClient.setQueryData([apiPath("GET /api/trades/reminder-settings")], {
         tradeRemindersEnabled: body?.tradeRemindersEnabled !== false,
       });
       toast({ title: "Reminder settings saved" });
@@ -601,8 +602,11 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
       action: "update" | "cancel";
       status?: "active" | "paused";
     }) => {
-      const response = await tradesFetch(`/api/trades/schedules/${scheduleId}`, {
-        method: action === "cancel" ? "DELETE" : "PUT",
+      const [method, address] = action === "cancel"
+        ? apiTo("DELETE /api/trades/schedules/:id", { id: scheduleId })
+        : apiTo("PUT /api/trades/schedules/:id", { id: scheduleId });
+      const response = await tradesFetch(address, {
+        method,
         headers: action === "cancel" ? undefined : { "Content-Type": "application/json" },
         body: action === "cancel" ? undefined : JSON.stringify({ status }),
       });
@@ -610,7 +614,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/trades/schedules"] });
+      queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/trades/schedules")] });
       toast({ title: "Recurring schedule updated" });
     },
     onError: (error: unknown) => toast({
@@ -621,7 +625,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
 
   const markReceived = useMutation({
     mutationFn: async (invoiceId: string) => {
-      const res = await tradesFetch(`/api/trades/invoices/${invoiceId}/mark-paid-external`, {
+      const res = await tradesFetch(apiPath("POST /api/trades/invoices/:id/mark-paid-external", { id: invoiceId }), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ externalPaymentReference: null }),

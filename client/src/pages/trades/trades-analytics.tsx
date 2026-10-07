@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { tradesFetch } from "@/lib/trades-api";
 import { TRADES_THEME } from "@/lib/trades-theme";
 import { TradesReportsButton } from "@/components/reports/TradesReportsButton";
+import { apiPath } from "@shared/api-path";
 
 /* ── Design tokens (trades palette; mirrors property-analytics) ──
    The trades accent is near-black, so property's bright sky-blue accent role
@@ -166,8 +167,8 @@ export default function TradesAnalytics() {
   const [totVis, setTotVis] = useState(true);
 
   const { data: invoices = [] } = useQuery<any[]>({
-    queryKey: ['/api/trades/invoices'],
-    queryFn: () => tradesFetch('/api/trades/invoices').then(r => r.ok ? r.json() : []),
+    queryKey: [apiPath("GET /api/trades/invoices")],
+    queryFn: () => tradesFetch(apiPath("GET /api/trades/invoices")).then(r => r.ok ? r.json() : []),
     staleTime: 30000,
     retry: false,
   });

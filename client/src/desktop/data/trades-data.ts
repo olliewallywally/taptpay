@@ -5,6 +5,7 @@ import {
   tradesInvoiceRemainingCents,
   tradesOutstandingCents,
 } from "@/lib/trades-money";
+import { apiPath } from "@shared/api-path";
 
 /* The list endpoints return raw Drizzle rows as JSON. Timestamps therefore
    arrive in the browser as ISO strings (or null for nullable columns). */
@@ -101,9 +102,9 @@ export interface TradesInvoice {
 
 /* Keep these keys byte-for-byte compatible with the existing mobile Trades
    caches. A mutation from either surface then invalidates both surfaces. */
-export const TRADES_CLIENTS_QUERY_KEY = ["/api/trades/clients"] as const;
-export const TRADES_INVOICES_QUERY_KEY = ["/api/trades/invoices"] as const;
-export const TRADES_QUOTES_QUERY_KEY = ["/api/trades/quotes"] as const;
+export const TRADES_CLIENTS_QUERY_KEY = [apiPath("GET /api/trades/clients")] as const;
+export const TRADES_INVOICES_QUERY_KEY = [apiPath("GET /api/trades/invoices")] as const;
+export const TRADES_QUOTES_QUERY_KEY = [apiPath("GET /api/trades/quotes")] as const;
 
 async function loadTradesRows<T>(path: string): Promise<T[]> {
   const response = await tradesFetch(path);
@@ -121,7 +122,7 @@ async function loadTradesRows<T>(path: string): Promise<T[]> {
 export function useTradesClientsQuery() {
   return useQuery<TradesClient[]>({
     queryKey: TRADES_CLIENTS_QUERY_KEY,
-    queryFn: () => loadTradesRows<TradesClient>("/api/trades/clients"),
+    queryFn: () => loadTradesRows<TradesClient>(apiPath("GET /api/trades/clients")),
     staleTime: 60_000,
     retry: false,
   });
@@ -130,7 +131,7 @@ export function useTradesClientsQuery() {
 export function useTradesInvoicesQuery() {
   return useQuery<TradesInvoice[]>({
     queryKey: TRADES_INVOICES_QUERY_KEY,
-    queryFn: () => loadTradesRows<TradesInvoice>("/api/trades/invoices"),
+    queryFn: () => loadTradesRows<TradesInvoice>(apiPath("GET /api/trades/invoices")),
     staleTime: 30_000,
     retry: false,
   });
@@ -139,7 +140,7 @@ export function useTradesInvoicesQuery() {
 export function useTradesQuotesQuery() {
   return useQuery<TradesQuote[]>({
     queryKey: TRADES_QUOTES_QUERY_KEY,
-    queryFn: () => loadTradesRows<TradesQuote>("/api/trades/quotes"),
+    queryFn: () => loadTradesRows<TradesQuote>(apiPath("GET /api/trades/quotes")),
     staleTime: 30_000,
     retry: false,
   });

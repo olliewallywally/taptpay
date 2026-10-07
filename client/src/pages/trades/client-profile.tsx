@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { tradesFetch, tradesHeaders } from "@/lib/trades-api";
 import { TRADES_THEME } from "@/lib/trades-theme";
+import { apiPath } from "@shared/api-path";
 
 const C = {
   ink: TRADES_THEME.INK,
@@ -361,39 +362,39 @@ export default function ClientProfile({ clientId: clientIdProp, embedded = false
   const [editError, setEditError] = useState<string | null>(null);
 
   const { data: client, isLoading } = useQuery<any>({
-    queryKey: ["/api/trades/clients", clientId],
-    queryFn: () => tradesFetch(`/api/trades/clients/${clientId}`).then((response) => response.ok ? response.json() : null),
+    queryKey: [apiPath("GET /api/trades/clients"), clientId],
+    queryFn: () => tradesFetch(apiPath("GET /api/trades/clients/:id", { id: clientId })).then((response) => response.ok ? response.json() : null),
     enabled: !!clientId,
     retry: false,
   });
 
   const { data: events = [] } = useQuery<any[]>({
-    queryKey: ["/api/trades/clients", clientId, "events"],
-    queryFn: () => tradesFetch(`/api/trades/clients/${clientId}/events`).then((response) => response.ok ? response.json() : []),
+    queryKey: [apiPath("GET /api/trades/clients"), clientId, "events"],
+    queryFn: () => tradesFetch(apiPath("GET /api/trades/clients/:id/events", { id: clientId })).then((response) => response.ok ? response.json() : []),
     enabled: !!clientId,
     staleTime: 30000,
     retry: false,
   });
 
   const { data: invoices = [] } = useQuery<any[]>({
-    queryKey: ["/api/trades/invoices", { clientProfileId: clientId }],
-    queryFn: () => tradesFetch(`/api/trades/invoices?clientProfileId=${clientId}`).then((response) => response.ok ? response.json() : []),
+    queryKey: [apiPath("GET /api/trades/invoices"), { clientProfileId: clientId }],
+    queryFn: () => tradesFetch(`${apiPath("GET /api/trades/invoices")}?clientProfileId=${clientId}`).then((response) => response.ok ? response.json() : []),
     enabled: !!clientId,
     staleTime: 30000,
     retry: false,
   });
 
   const { data: allQuotes = [] } = useQuery<any[]>({
-    queryKey: ["/api/trades/quotes"],
-    queryFn: () => tradesFetch("/api/trades/quotes").then((response) => response.ok ? response.json() : []),
+    queryKey: [apiPath("GET /api/trades/quotes")],
+    queryFn: () => tradesFetch(apiPath("GET /api/trades/quotes")).then((response) => response.ok ? response.json() : []),
     enabled: !!clientId,
     staleTime: 30000,
     retry: false,
   });
 
   const { data: allSchedules = [] } = useQuery<any[]>({
-    queryKey: ["/api/trades/schedules"],
-    queryFn: () => tradesFetch("/api/trades/schedules").then((response) => response.ok ? response.json() : []),
+    queryKey: [apiPath("GET /api/trades/schedules")],
+    queryFn: () => tradesFetch(apiPath("GET /api/trades/schedules")).then((response) => response.ok ? response.json() : []),
     enabled: !!clientId,
     staleTime: 30000,
     retry: false,
@@ -401,7 +402,7 @@ export default function ClientProfile({ clientId: clientIdProp, embedded = false
 
   const updateMutation = useMutation({
     mutationFn: async (data: ClientForm) => {
-      const response = await fetch(`/api/trades/clients/${clientId}`, {
+      const response = await fetch(apiPath("PUT /api/trades/clients/:id", { id: clientId }), {
         method: "PUT",
         headers: { "Content-Type": "application/json", ...tradesHeaders() },
         body: JSON.stringify(data),
@@ -413,8 +414,8 @@ export default function ClientProfile({ clientId: clientIdProp, embedded = false
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/trades/clients", clientId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/trades/clients"] });
+      queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/trades/clients"), clientId] });
+      queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/trades/clients")] });
       setEditError(null);
       setEditing(false);
       setEditForm(null);
@@ -426,12 +427,12 @@ export default function ClientProfile({ clientId: clientIdProp, embedded = false
 
   const archiveMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch(`/api/trades/clients/${clientId}/archive`, { method: "POST", headers: tradesHeaders() });
+      const response = await fetch(apiPath("POST /api/trades/clients/:id/archive", { id: clientId }), { method: "POST", headers: tradesHeaders() });
       if (!response.ok) throw new Error("Failed to archive");
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/trades/clients"] });
+      queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/trades/clients")] });
       setEditing(false);
       setEditForm(null);
       goBack();

@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { X } from "lucide-react";
 import { tradesFetch, tradesHeaders } from "@/lib/trades-api";
 import { TRADES_THEME } from "@/lib/trades-theme";
+import { apiPath } from "@shared/api-path";
 
 /* ── Design tokens — mirrors the tenant directory (property) page ── */
 const C = {
@@ -271,23 +272,23 @@ export default function ClientDirectory() {
   const queryClient = useQueryClient();
 
   const { data: clients = [], isLoading } = useQuery<any[]>({
-    queryKey: ["/api/trades/clients"],
-    queryFn: () => tradesFetch("/api/trades/clients").then((response) => response.ok ? response.json() : []),
+    queryKey: [apiPath("GET /api/trades/clients")],
+    queryFn: () => tradesFetch(apiPath("GET /api/trades/clients")).then((response) => response.ok ? response.json() : []),
     staleTime: 60000,
     retry: false,
   });
 
   const { data: invoices = [] } = useQuery<any[]>({
-    queryKey: ["/api/trades/invoices"],
-    queryFn: () => tradesFetch("/api/trades/invoices").then((response) => response.ok ? response.json() : []),
+    queryKey: [apiPath("GET /api/trades/invoices")],
+    queryFn: () => tradesFetch(apiPath("GET /api/trades/invoices")).then((response) => response.ok ? response.json() : []),
     staleTime: 30000,
     retry: false,
   });
 
   // Archived clients — fetched lazily only when the merchant expands the section.
   const { data: archivedClients = [] } = useQuery<any[]>({
-    queryKey: ["/api/trades/clients", "archived"],
-    queryFn: () => tradesFetch("/api/trades/clients?includeArchived=true").then((response) => response.ok ? response.json() : []),
+    queryKey: [apiPath("GET /api/trades/clients"), "archived"],
+    queryFn: () => tradesFetch(`${apiPath("GET /api/trades/clients")}?includeArchived=true`).then((response) => response.ok ? response.json() : []),
     select: (list: any[]) => list.filter((client: any) => client.status === "archived"),
     enabled: showArchived,
     staleTime: 30000,
@@ -296,7 +297,7 @@ export default function ClientDirectory() {
 
   const createMutation = useMutation({
     mutationFn: async (data: ClientForm) => {
-      const response = await fetch("/api/trades/clients", {
+      const response = await fetch(apiPath("POST /api/trades/clients"), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...tradesHeaders() },
         body: JSON.stringify(data),
@@ -308,7 +309,7 @@ export default function ClientDirectory() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/trades/clients"] });
+      queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/trades/clients")] });
       setSaveError(null);
       setShowAdd(false);
     },
@@ -319,12 +320,12 @@ export default function ClientDirectory() {
 
   const restoreMutation = useMutation({
     mutationFn: async (id: string) => {
-      const response = await fetch(`/api/trades/clients/${id}/unarchive`, { method: "POST", headers: tradesHeaders() });
+      const response = await fetch(apiPath("POST /api/trades/clients/:id/unarchive", { id }), { method: "POST", headers: tradesHeaders() });
       if (!response.ok) throw new Error("Failed to restore");
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/trades/clients"] });
+      queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/trades/clients")] });
     },
   });
 

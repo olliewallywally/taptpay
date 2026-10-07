@@ -17,6 +17,7 @@ import {
 } from "../DesktopPageScaffold";
 import { entranceProps, useListEntrance } from "../list-entrance";
 import { DesktopDirectoryProfile } from "../DesktopDirectoryProfile";
+import { apiPath } from "@shared/api-path";
 
 /* ── palette ── */
 const ACCENT = "#5E9EFF";
@@ -112,7 +113,7 @@ export default function DesktopTradesClients(props: DesktopRoutePageProps) {
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof EMPTY_FORM) => {
-      const res = await tradesFetch("/api/trades/clients", {
+      const res = await tradesFetch(apiPath("POST /api/trades/clients"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),

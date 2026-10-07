@@ -4,14 +4,15 @@ import { useLocation } from "wouter";
 import { TradesReportsButton } from "@/components/reports/TradesReportsButton";
 import { TradesDashboardView } from "@/features/dashboard/TradesDashboardView";
 import { tradesFetch } from "@/lib/trades-api";
+import { apiPath } from "@shared/api-path";
 
 export default function TradesDashboard() {
   const [, setLocation] = useLocation();
   const [siteFilter, setSiteFilter] = useState<string | null>(null);
   const { data: clients = [] } = useQuery<any[]>({
-    queryKey: ["/api/trades/clients"],
+    queryKey: [apiPath("GET /api/trades/clients")],
     queryFn: () =>
-      tradesFetch("/api/trades/clients").then((response) => {
+      tradesFetch(apiPath("GET /api/trades/clients")).then((response) => {
         if (!response.ok) throw new Error("load failed");
         return response.json();
       }),
@@ -24,9 +25,9 @@ export default function TradesDashboard() {
     isError: invoiceError,
     refetch: refetchInvoices,
   } = useQuery<any[]>({
-    queryKey: ["/api/trades/invoices"],
+    queryKey: [apiPath("GET /api/trades/invoices")],
     queryFn: () =>
-      tradesFetch("/api/trades/invoices").then((response) => {
+      tradesFetch(apiPath("GET /api/trades/invoices")).then((response) => {
         if (!response.ok) throw new Error("load failed");
         return response.json();
       }),
