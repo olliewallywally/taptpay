@@ -9,6 +9,7 @@ import {
 } from "../DesktopPageScaffold";
 import { AnimatedListRow, AnimatedScrollList } from "@/components/AnimatedScrollList";
 import { DesktopDirectoryProfile } from "../DesktopDirectoryProfile";
+import { apiPath } from "@shared/api-path";
 
 /* ── palette ── */
 const ACCENT = "#5E9EFF";
@@ -127,7 +128,7 @@ export default function DesktopPropertyClients(props: DesktopRoutePageProps) {
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof EMPTY_FORM) => {
-      const res = await fetch("/api/property/tenants", {
+      const res = await fetch(apiPath("POST /api/property/tenants"), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...propHeaders() },
         body: JSON.stringify(data),

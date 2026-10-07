@@ -6,6 +6,7 @@ import { propFetch } from "@/lib/property-api";
 import { usePropertyTenants, usePropertyInvoices } from "@/lib/property-data";
 import { AnimatedListRow } from "@/components/AnimatedScrollList";
 import { businessCsrfHeader } from "@/lib/session";
+import { apiPath } from "@shared/api-path";
 
 /* ── Design tokens ── */
 const C = {
@@ -300,8 +301,8 @@ export default function TenantDirectory() {
 
   // Archived tenants — fetched lazily only when the merchant expands the section.
   const { data: archivedTenants = [] } = useQuery<any[]>({
-    queryKey: ['/api/property/tenants', 'archived'],
-    queryFn: () => propFetch('/api/property/tenants?includeArchived=true').then(r => r.ok ? r.json() : []),
+    queryKey: [apiPath("GET /api/property/tenants"), 'archived'],
+    queryFn: () => propFetch(`${apiPath("GET /api/property/tenants")}?includeArchived=true`).then(r => r.ok ? r.json() : []),
     select: (list: any[]) => list.filter((t: any) => t.status === 'archived'),
     enabled: showArchived,
     staleTime: 30000,
@@ -310,16 +311,16 @@ export default function TenantDirectory() {
 
   const restoreMutation = useMutation({
     mutationFn: async (id: string) => {
-      const r = await fetch(`/api/property/tenants/${id}/unarchive`, { method: 'POST', headers: propHeaders() });
+      const r = await fetch(apiPath("POST /api/property/tenants/:id/unarchive", { id }), { method: 'POST', headers: propHeaders() });
       if (!r.ok) throw new Error('Failed to restore');
       return r.json();
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['/api/property/tenants'] }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/property/tenants")] }); },
   });
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
-      const r = await fetch('/api/property/tenants', {
+      const r = await fetch(apiPath("POST /api/property/tenants"), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...propHeaders() },
         body: JSON.stringify(data),
@@ -331,7 +332,7 @@ export default function TenantDirectory() {
       return r.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/property/tenants'] });
+      queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/property/tenants")] });
       setSaveError(null);
       setShowAdd(false);
     },

@@ -4,6 +4,7 @@ import { useRoute, useLocation } from "wouter";
 import { consumeSnap, startPropertyBack, signalPropertyReady } from "@/lib/property-transition";
 import { propFetch } from "@/lib/property-api";
 import { businessCsrfHeader } from "@/lib/session";
+import { apiPath } from "@shared/api-path";
 
 /* ── Design tokens ── */
 const C = {
@@ -112,23 +113,23 @@ export default function TenantProfile() {
   useLayoutEffect(() => { signalPropertyReady(); }, []);
 
   const { data: tenant, isLoading } = useQuery<any>({
-    queryKey: ['/api/property/tenants', tenantId],
-    queryFn: () => propFetch(`/api/property/tenants/${tenantId}`).then(r => r.ok ? r.json() : null),
+    queryKey: [apiPath("GET /api/property/tenants"), tenantId],
+    queryFn: () => propFetch(apiPath("GET /api/property/tenants/:id", { id: tenantId })).then(r => r.ok ? r.json() : null),
     enabled: !!tenantId,
     retry: false,
   });
 
   const { data: events = [] } = useQuery<any[]>({
-    queryKey: ['/api/property/tenants', tenantId, 'events'],
-    queryFn: () => propFetch(`/api/property/tenants/${tenantId}/events`).then(r => r.ok ? r.json() : []),
+    queryKey: [apiPath("GET /api/property/tenants"), tenantId, 'events'],
+    queryFn: () => propFetch(apiPath("GET /api/property/tenants/:id/events", { id: tenantId })).then(r => r.ok ? r.json() : []),
     enabled: !!tenantId,
     staleTime: 30000,
     retry: false,
   });
 
   const { data: invoices = [] } = useQuery<any[]>({
-    queryKey: ['/api/property/invoices', { tenantProfileId: tenantId }],
-    queryFn: () => propFetch(`/api/property/invoices?tenantProfileId=${tenantId}`).then(r => r.ok ? r.json() : []),
+    queryKey: [apiPath("GET /api/property/invoices"), { tenantProfileId: tenantId }],
+    queryFn: () => propFetch(`${apiPath("GET /api/property/invoices")}?tenantProfileId=${tenantId}`).then(r => r.ok ? r.json() : []),
     enabled: !!tenantId,
     staleTime: 30000,
     retry: false,
@@ -136,7 +137,7 @@ export default function TenantProfile() {
 
   const updateMutation = useMutation({
     mutationFn: async (data: any) => {
-      const r = await fetch(`/api/property/tenants/${tenantId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', ...propHeaders() }, body: JSON.stringify(data) });
+      const r = await fetch(apiPath("PUT /api/property/tenants/:id", { id: tenantId }), { method: 'PUT', headers: { 'Content-Type': 'application/json', ...propHeaders() }, body: JSON.stringify(data) });
       if (!r.ok) {
         const msg = await r.json().then((d: any) => d.message).catch(() => `Error ${r.status}`);
         throw new Error(msg);
@@ -144,7 +145,7 @@ export default function TenantProfile() {
       return r.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/property/tenants', tenantId] });
+      queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/property/tenants"), tenantId] });
       setEditError(null);
       setEditing(false);
     },
@@ -153,12 +154,12 @@ export default function TenantProfile() {
 
   const archiveMutation = useMutation({
     mutationFn: async () => {
-      const r = await fetch(`/api/property/tenants/${tenantId}/archive`, { method: 'POST', headers: propHeaders() });
+      const r = await fetch(apiPath("POST /api/property/tenants/:id/archive", { id: tenantId }), { method: 'POST', headers: propHeaders() });
       if (!r.ok) throw new Error('Failed to archive');
       return r.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/property/tenants'] });
+      queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/property/tenants")] });
       startPropertyBack(() => setLocation('/property/tenants'));
     },
   });

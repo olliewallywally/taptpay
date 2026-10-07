@@ -35,6 +35,7 @@ import {
 } from "../data/property-terminal-model";
 import { filterByProperty } from "@/lib/property-dashboard-data";
 import { AnimatedListRow, AnimatedScrollList } from "@/components/AnimatedScrollList";
+import { apiPath } from "@shared/api-path";
 
 /* ── palette ── */
 const ACCENT = "#5E9EFF";
@@ -66,7 +67,7 @@ const REMINDER_DEFAULTS = {
   rentReminderMaxCount: 3,
 };
 
-const REMINDER_KEY = ["/api/property/reminder-settings"] as const;
+const REMINDER_KEY = [apiPath("GET /api/property/reminder-settings")] as const;
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
@@ -209,7 +210,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
     /* A failed answer is a failure, not "no settings": read as null, it showed the
        defaults as the merchant's own and let them be changed from there (R1-T9). */
     queryFn: () =>
-      propFetch("/api/property/reminder-settings").then((r) => {
+      propFetch(apiPath("GET /api/property/reminder-settings")).then((r) => {
         if (!r.ok) throw new Error("load failed");
         return r.json().then(requireResponseRecord);
       }),
@@ -313,7 +314,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
       const now = new Date();
       const due = new Date(now);
       due.setDate(due.getDate() + 7);
-      const res = await fetch("/api/property/invoices", {
+      const res = await fetch(apiPath("POST /api/property/invoices"), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...propHeaders() },
         body: JSON.stringify({
@@ -336,7 +337,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
       /* Recurring: first request goes now, automation starts one interval on. */
       if (frequency !== "once") {
         const startDate = addInterval(now, frequency);
-        const sr = await fetch(`/api/property/tenants/${tenantId}/schedules`, {
+        const sr = await fetch(apiPath("POST /api/property/tenants/:tenantId/schedules", { tenantId }), {
           method: "POST",
           headers: { "Content-Type": "application/json", ...propHeaders() },
           body: JSON.stringify({
@@ -379,7 +380,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
     mutationFn: async () => {
       const due = new Date();
       due.setDate(due.getDate() + dueDays);
-      const res = await fetch("/api/property/invoices", {
+      const res = await fetch(apiPath("POST /api/property/invoices"), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...propHeaders() },
         body: JSON.stringify({
@@ -429,7 +430,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
       invoiceId: string;
       reference?: string;
     }) => {
-      const res = await fetch(`/api/property/invoices/${invoiceId}/mark-paid-external`, {
+      const res = await fetch(apiPath("POST /api/property/invoices/:id/mark-paid-external", { id: invoiceId }), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...propHeaders() },
         /* The column exists and the phone captures it; the desktop used to
@@ -451,7 +452,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
      otherwise. The phone omits this; the desktop send paths already do it. */
   const resendOne = useMutation({
     mutationFn: async (invoiceId: string) => {
-      const res = await fetch(`/api/property/invoices/${invoiceId}/resend`, {
+      const res = await fetch(apiPath("POST /api/property/invoices/:id/resend", { id: invoiceId }), {
         method: "POST",
         headers: propHeaders(),
       });
@@ -473,7 +474,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
 
   const voidInvoice = useMutation({
     mutationFn: async (invoiceId: string) => {
-      const res = await fetch(`/api/property/invoices/${invoiceId}/void`, {
+      const res = await fetch(apiPath("POST /api/property/invoices/:id/void", { id: invoiceId }), {
         method: "POST",
         headers: propHeaders(),
       });
@@ -572,7 +573,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
      a cadence chip that waits for the server feels broken. */
   const updateReminders = useMutation({
     mutationFn: async (patch: Record<string, unknown>) => {
-      const res = await fetch("/api/property/reminder-settings", {
+      const res = await fetch(apiPath("PUT /api/property/reminder-settings"), {
         method: "PUT",
         headers: { "Content-Type": "application/json", ...propHeaders() },
         body: JSON.stringify(patch),
@@ -598,7 +599,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
 
   const setScheduleStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: "active" | "paused" }) => {
-      const res = await fetch(`/api/property/schedules/${id}`, {
+      const res = await fetch(apiPath("PUT /api/property/schedules/:id", { id }), {
         method: "PUT",
         headers: { "Content-Type": "application/json", ...propHeaders() },
         body: JSON.stringify({ status }),
@@ -613,7 +614,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
 
   const cancelSchedule = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/property/schedules/${id}`, {
+      const res = await fetch(apiPath("DELETE /api/property/schedules/:id", { id }), {
         method: "DELETE",
         headers: propHeaders(),
       });
@@ -663,7 +664,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
     try {
       const body = new FormData();
       body.append("document", file);
-      const res = await fetch("/api/property/invoices/document", {
+      const res = await fetch(apiPath("POST /api/property/invoices/document"), {
         method: "POST",
         headers: propHeaders(),
         body,

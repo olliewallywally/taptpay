@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { propFetch } from "@/lib/property-api";
 import { tradesFetch } from "@/lib/trades-api";
+import { apiPath } from "@shared/api-path";
 
 type Vertical = "trades" | "property";
 
@@ -16,13 +17,13 @@ export function DesktopDirectoryProfile({
   const address = vertical === "trades" ? profile?.siteAddress : profile?.propertyAddress;
   const name = `${profile?.firstName ?? ""} ${profile?.lastName ?? ""}`.trim() || noun;
   const initials = `${profile?.firstName?.[0] ?? ""}${profile?.lastName?.[0] ?? ""}`.toUpperCase() || "?";
-  const base = vertical === "trades" ? "/api/trades/clients" : "/api/property/tenants";
+  const base = vertical === "trades" ? apiPath("GET /api/trades/clients") : apiPath("GET /api/property/tenants");
   const eventsQuery = useQuery<any[]>({
     queryKey: [base, id, "events"],
     queryFn: async () => {
       const response = vertical === "trades"
-        ? await tradesFetch(`${base}/${id}/events`)
-        : await propFetch(`${base}/${id}/events`);
+        ? await tradesFetch(apiPath("GET /api/trades/clients/:id/events", { id }))
+        : await propFetch(apiPath("GET /api/property/tenants/:id/events", { id }));
       return response.ok ? response.json() : [];
     },
     enabled: !!id,

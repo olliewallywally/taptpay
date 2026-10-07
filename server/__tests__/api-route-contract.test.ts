@@ -73,6 +73,14 @@ const MIGRATED = [
   "client/src/pages/board-builder.tsx",
   "client/src/components/qr-code-display.tsx",
   "client/src/pages/payment-stack.tsx",
+  // T10b, batch 3: property. Both terminals, the tenant pages, the lists they share, the desktop profile panel.
+  "client/src/pages/property/property-terminal.tsx",
+  "client/src/desktop/pages/property-terminal.tsx",
+  "client/src/pages/property/tenant-directory.tsx",
+  "client/src/pages/property/tenant-profile.tsx",
+  "client/src/lib/property-data.ts",
+  "client/src/desktop/DesktopDirectoryProfile.tsx",
+  "client/src/desktop/pages/property-clients.tsx",
 ];
 /** Text that is an API address or the start of one: /api itself, or /api followed by a path, a query or a fragment. */
 const ADDRESS_START = /^\/api(?:[/?#]|$)/;
@@ -163,6 +171,48 @@ function saidBeside(use: BuilderUse): { method: string } | { unreadable: string 
     }
   }
   return { method };
+}
+
+/**
+ * Where a file makes a built address longer: `${apiPath(...)}/more`, apiPath(...) + "/more", or the same
+ * through a name the file gave it (const base = on ? apiPath(...) : apiPath(...); `${base}/${id}/more`).
+ * Only a query or a fragment may follow a built address. A longer address is another route, with a name
+ * of its own; made this way it would be one the list has never seen, in a file that spells nothing.
+ * A name is followed where it is a plain constant in the same file: not an object's member, and not
+ * another file's export.
+ */
+function extendedAddresses(file: string): string[] {
+  const source = tree(file);
+  const named = new Set<string>();
+  const built = (node: ts.Expression): boolean => {
+    while (ts.isParenthesizedExpression(node) || ts.isAsExpression(node) || ts.isNonNullExpression(node)) node = node.expression;
+    if (ts.isCallExpression(node)) return ts.isIdentifier(node.expression) && node.expression.text === "apiPath";
+    if (ts.isConditionalExpression(node)) return built(node.whenTrue) || built(node.whenFalse);
+    if (ts.isBinaryExpression(node) && [ts.SyntaxKind.BarBarToken, ts.SyntaxKind.QuestionQuestionToken, ts.SyntaxKind.AmpersandAmpersandToken].includes(node.operatorToken.kind)) {
+      return built(node.left) || built(node.right);
+    }
+    return ts.isIdentifier(node) && named.has(node.text);
+  };
+  // The names this file gives a built address, in the order it declares them.
+  const name = (node: ts.Node): void => {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer && built(node.initializer)) named.add(node.name.text);
+    ts.forEachChild(node, name);
+  };
+  name(source);
+  const morePath = (text: string | null) => text !== null && text.startsWith("/");
+  const found: string[] = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isTemplateExpression(node)) {
+      for (const span of node.templateSpans) {
+        if (built(span.expression) && morePath(span.literal.text)) found.push(`${at(file, span)}: ${node.getText(source).slice(0, 70)}`);
+      }
+    } else if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.PlusToken && built(node.left)) {
+      if (morePath(ts.isTemplateExpression(node.right) ? node.right.head.text : written(node.right))) found.push(`${at(file, node)}: ${node.getText(source).slice(0, 70)}`);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return found;
 }
 
 describe("R1-T10 — the list of API routes a browser calls", () => {
@@ -437,7 +487,7 @@ describe("R1-T10 — the pages moved onto the builder", () => {
       expect([file, fs.existsSync(path.join(ROOT, file))]).toEqual([file, true]);
       expect([file, /\bapi(?:Path|To)\(/.test(read(file))]).toEqual([file, true]);
     }
-    expect(MIGRATED.length).toBeGreaterThanOrEqual(28);
+    expect(MIGRATED.length).toBeGreaterThanOrEqual(35);
   });
 
   it("the guard itself tells an address from a route's name", () => {
@@ -476,7 +526,7 @@ describe("R1-T10 — every route the client names", () => {
 
   it("is a listed one, read from the source so a cast past the types is still caught", () => {
     expect(uses.filter((use) => use.key !== null && !keys.includes(use.key)).map((use) => `${at(use.file, use.node)}: ${use.key}`)).toEqual([]);
-    expect(uses.length).toBeGreaterThanOrEqual(140);
+    expect(uses.length).toBeGreaterThanOrEqual(205);
   });
 
   it("is called by its own method wherever the call says one beside it", () => {
@@ -496,7 +546,7 @@ describe("R1-T10 — every route the client names", () => {
     }
     expect(disagree).toEqual([]);
     expect(unreadable).toEqual([]);
-    expect(checked).toBeGreaterThanOrEqual(60);
+    expect(checked).toBeGreaterThanOrEqual(95);
   });
 
   it("the reading of a call's method is itself right", () => {
@@ -526,5 +576,49 @@ describe("R1-T10 — every route the client names", () => {
     expect(said('apiRequest(...apiTo("POST /api/x"), body)')).toEqual([null]);
     // The address inside a later template slot is not the address the call is made to.
     expect(said('fetch(`${base}${apiPath("POST /api/x")}`)')).toEqual([null]);
+  });
+
+  it("is never made longer: only a query or a fragment may follow a built address", () => {
+    // A longer address is another route's, and has its own name. Made by adding to a built one, it would be
+    // an address the list has never seen, in a file that spells none.
+    expect(clientSources().flatMap(extendedAddresses)).toEqual([]);
+  });
+
+  it("the reading of what follows a built address is itself right", () => {
+    const longer = (code: string) => {
+      const file = "client/src/__probe__.tsx";
+      parsed.set(file, ts.createSourceFile(file, code, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX));
+      try {
+        return extendedAddresses(file).length;
+      } finally {
+        parsed.delete(file);
+      }
+    };
+    for (const [code, times] of [
+      ['fetch(`${apiPath("GET /api/x")}/more`)', 1],
+      ['fetch(apiPath("GET /api/x") + "/more")', 1],
+      ['fetch(apiPath("GET /api/x") + `/${id}/more`)', 1],
+      ['const key = [`${apiPath("GET /api/x")}/${id}`];', 1],
+      ['fetch(`${origin}${apiPath("GET /api/x")}/more`)', 1],
+      ['fetch(`${(apiPath("GET /api/x") as string)}/more`)', 1],
+      // Through a name the file gave it, a choice of two, a fallback, or a second name.
+      ['const base = apiPath("GET /api/x"); fetch(`${base}/${id}/events`);', 1],
+      ['const base = on ? apiPath("GET /api/x") : apiPath("GET /api/y"); const a = fetch(`${base}/${id}/events`); const b = fetch(base + "/more");', 2],
+      ['const base = given || apiPath("GET /api/x"); load(`${base}/more`);', 1],
+      ['const base = apiPath("GET /api/x"); const again = base; fetch(again + "/more");', 1],
+    ] as Array<[string, number]>) {
+      expect([code, longer(code)]).toEqual([code, times]);
+    }
+    for (const fine of [
+      'fetch(`${apiPath("GET /api/x")}?limit=5`)', 'fetch(`${apiPath("GET /api/x")}#top`)', 'fetch(`${apiPath("GET /api/x")}${query}`)',
+      'fetch(apiPath("GET /api/x") + query)', 'fetch(apiPath("GET /api/x") + "?a=1")', 'fetch(apiPath("GET /api/x"))',
+      'const base = apiPath("GET /api/x"); say(`could not load ${base} today`); fetch(`${base}?page=2`);',
+      'const shown = `${window.location.origin}${apiPath("GET /api/x")}`;',
+      // A name never given a built address may be followed by anything: it is a page's address, or someone else's.
+      'const home = "/settings"; go(`${home}/team`); const cdn = provider.base; load(`${cdn}/js/lib.js`);',
+      'const base = apiTo("POST /api/x"); apiRequest(...base, body);',
+    ]) {
+      expect([fine, longer(fine)]).toEqual([fine, 0]);
+    }
   });
 });
