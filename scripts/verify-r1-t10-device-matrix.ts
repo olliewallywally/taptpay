@@ -16,8 +16,11 @@
 //   of its own). The routes, their checks and their replies are the real ones; for property and
 //   trades the storage underneath is not exercised.
 //
-// It opens the merchant's screens (22 at each size) and the pages outside the merchant frame (the
-// landing page, sign-in, sign-up, the password pages, the info and legal pages, onboarding).
+// It opens the merchant's screens (22 at each size) and the pages outside the merchant frame: the
+// landing page, sign-in, sign-up, the password pages, the info and legal pages, onboarding; and what a
+// customer opens: a sale's own link at checkout, at the split page and at its receipt, a payment
+// board with no sale, with an open sale (which moves on to checkout) and with one just paid, a board
+// sale's checkout, split page and receipt by its number, and the two notices.
 //
 // What each cell (a screen at a size) must show:
 // - the address it was sent to, still (not the login page);
@@ -91,6 +94,12 @@ execFileSync("openssl", [
   "-addext", "subjectAltName=DNS:localhost", "-keyout", path.join(certDir, "key.pem"), "-out", path.join(certDir, "cert.pem"),
 ], { stdio: "ignore" });
 const tls = { key: readFileSync(path.join(certDir, "key.pem")), cert: readFileSync(path.join(certDir, "cert.pem")) };
+// The browser is told to trust this run's certificate, by its key and no other. Telling it instead to
+// overlook certificate errors made the first page of a fresh browser lose its stylesheet about one run
+// in ten (net::ERR_TOO_MANY_RETRIES while the exception was still being made), and come up unstyled.
+const certKeyHash = execFileSync("sh", ["-c",
+  `openssl x509 -pubkey -noout -in "${path.join(certDir, "cert.pem")}" | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | openssl enc -base64`,
+], { encoding: "utf8" }).trim();
 
 // A clean environment before the app reads its configuration.
 for (const key of Object.keys(process.env)) {
@@ -185,6 +194,28 @@ for (const [itemName, price, status, paymentMethod] of [
   const sale = await storage.createTransactionForMerchant(merchantId, { merchantId, itemName, price, paymentMethod, status: "pending", taptStoneId: counter.id } as any);
   if (status !== "pending") await storage.updateTransactionStatusForMerchant(sale.id, merchantId, status);
 }
+
+// What a customer opens: sales with a link of their own, and sales on boards kept for this.
+const { createPaymentCredential } = await import("../server/payment-credential");
+async function sale(itemName: string, price: string, status: string, where: { board?: number; link?: true; shared?: true }) {
+  const credential = where.link ? createPaymentCredential() : null;
+  const made = await storage.createTransactionForMerchant(merchantId, {
+    merchantId, itemName, price, paymentMethod: "qr_code", status: "pending",
+    ...(where.board ? { taptStoneId: where.board } : {}), ...(credential ? { paymentTokenHash: credential.hash } : {}), ...(where.shared ? { splitEnabled: true } : {}),
+  } as any);
+  if (status !== "pending") await storage.updateTransactionStatusForMerchant(made.id, merchantId, status);
+  return { id: made.id as number, token: credential?.rawToken ?? "" };
+}
+const linkOpen = await sale("flat white", "5.50", "pending", { link: true });
+const linkShared = await sale("table of four", "120.00", "pending", { link: true, shared: true });
+const linkPaid = await sale("big brunch", "24.00", "completed", { link: true });
+const quiet = await storage.createTaptStone({ merchantId, name: "Window", stoneNumber: 3 } as any);
+const busy = await storage.createTaptStone({ merchantId, name: "Patio", stoneNumber: 4 } as any);
+const sharing = await storage.createTaptStone({ merchantId, name: "Bar", stoneNumber: 5 } as any);
+const justPaid = await storage.createTaptStone({ merchantId, name: "Garden", stoneNumber: 6 } as any);
+const boardOpen = await sale("long black", "5.00", "pending", { board: busy.id });
+const boardShared = await sale("sharing platter", "60.00", "pending", { board: sharing.id, shared: true });
+const boardPaid = await sale("scone", "7.00", "completed", { board: justPaid.id });
 
 // Property and trades: rows behind the storage reads their screens' lists come from.
 const TENANTS = [
@@ -290,8 +321,12 @@ const SURFACES: Surface[] = [
   { path: "/settings", pageKey: "settings", mode: "trades" },
 ];
 
-/** A page outside the merchant frame: who opens it, and a control or the words only that page has. */
-interface Outside { path: string; who: "nobody" | "a new business"; mark: { selector?: string; text?: string } }
+/**
+ * A page outside the merchant frame: who opens it, and a control or the words only that page has.
+ * `name` is what it is called in the output where its address holds a sale's link; `movesTo` is where
+ * it is meant to end up when it is not meant to stay.
+ */
+interface Outside { path: string; who: "nobody" | "a new business"; mark: { selector?: string; text?: string }; name?: string; movesTo?: string }
 const OUTSIDE: Outside[] = [
   { path: "/", who: "nobody", mark: { selector: "#tp-nav" } },
   { path: "/login", who: "nobody", mark: { selector: '[data-testid="button-login"]' } },
@@ -304,6 +339,22 @@ const OUTSIDE: Outside[] = [
   { path: "/terms", who: "nobody", mark: { text: "1. Service Description" } },
   { path: "/privacy", who: "nobody", mark: { text: "Office of the Privacy Commissioner" } },
   { path: "/onboarding", who: "a new business", mark: { text: "Complete Your Business Profile" } },
+  // What a customer opens. A sale with a link of its own:
+  { path: `/checkout/t/${linkOpen.token}`, name: "/checkout/t/:token", who: "nobody", mark: { text: "enter credit card" } },
+  { path: `/split/t/${linkShared.token}`, name: "/split/t/:token", who: "nobody", mark: { text: "each pays" } },
+  { path: `/receipt/t/${linkPaid.token}`, name: "/receipt/t/:token", who: "nobody", mark: { text: "Payment Accepted!" } },
+  // A payment board: with no sale; with an open one, which moves on to its checkout; and with one just
+  // paid, which the server still hands the page for three minutes and which is not a fault.
+  { path: `/pay/${merchantId}/stone/${quiet.id}`, name: "/pay/:id/stone/:stone (no sale)", who: "nobody", mark: { text: "Waiting for Payment" } },
+  { path: `/pay/${merchantId}/stone/${busy.id}`, name: "/pay/:id/stone/:stone (an open sale)", who: "nobody", mark: { text: "enter credit card" }, movesTo: `/checkout/${boardOpen.id}` },
+  { path: `/pay/${merchantId}/stone/${justPaid.id}`, name: "/pay/:id/stone/:stone (a sale just paid)", who: "nobody", mark: { text: "Waiting for Payment" } },
+  // A board's sale by its number:
+  { path: `/checkout/${boardOpen.id}`, name: "/checkout/:number", who: "nobody", mark: { text: "enter credit card" } },
+  { path: `/split/${boardShared.id}`, name: "/split/:number", who: "nobody", mark: { text: "each pays" } },
+  { path: `/receipt/${boardPaid.id}`, name: "/receipt/:number", who: "nobody", mark: { text: "Payment Accepted!" } },
+  // The two notices: no board and no link; and a return from the bank this browser did not start.
+  { path: `/pay/${merchantId}`, name: "/pay/:id", who: "nobody", mark: { text: "Ask for your payment link" } },
+  { path: "/pay/return/not-a-state-this-browser-holds", name: "/pay/return/:state", who: "nobody", mark: { text: "Reopen the original payment link" } },
 ];
 
 // ── What is read from a page (a string, not a function: tsx wraps nested functions in a helper the page lacks) ──
@@ -385,15 +436,15 @@ function shellFaults(facts: Facts, size: Size): string[] {
 // ── The browser ──────────────────────────────────────────────────────────────────────────────────
 const browser = await chromium.launch({
   executablePath: CHROMIUM_PATH, headless: true,
-  // For this browser only: localhost is this machine.
-  args: ["--host-resolver-rules=MAP localhost 127.0.0.1"],
+  // For this browser only: localhost is this machine, and this run's certificate is trusted by its key.
+  args: ["--host-resolver-rules=MAP localhost 127.0.0.1", `--ignore-certificate-errors-spki-list=${certKeyHash}`],
 });
 
 interface Watch { pageErrors: string[]; consoleErrors: Array<{ text: string; from: string }>; failed: string[]; elsewhere: string[]; sent: string[]; routes: Set<string> }
 async function openContext(size: Size): Promise<BrowserContext> {
   const context = await browser.newContext({
     viewport: { width: size.width, height: size.height }, hasTouch: size.touch, isMobile: size.touch,
-    deviceScaleFactor: 1, ignoreHTTPSErrors: true, serviceWorkers: "block", timezoneId: "Pacific/Auckland",
+    deviceScaleFactor: 1, serviceWorkers: "block", timezoneId: "Pacific/Auckland",
   });
   // Sandboxed Chromium has only loopback and reports itself offline; the app would cover itself with "Connection Lost".
   await context.addInitScript('Object.defineProperty(Navigator.prototype, "onLine", { get: function () { return true; } });');
@@ -437,7 +488,7 @@ async function openPage(context: BrowserContext, mode: Mode | null): Promise<{ p
 }
 
 async function signIn(context: BrowserContext, email = OWNER_EMAIL): Promise<void> {
-  const { page } = await openPage(context, null);
+  const { page, watch } = await openPage(context, null);
   await page.goto(`${base}/login`, { waitUntil: "domcontentloaded", timeout: 120_000 });
   await page.fill('[data-testid="input-email"]', email, { timeout: 60_000 });
   await page.fill('[data-testid="input-password"]', OWNER_PASSWORD);
@@ -454,11 +505,13 @@ async function signIn(context: BrowserContext, email = OWNER_EMAIL): Promise<voi
         active: document.activeElement ? document.activeElement.tagName : null, kbOpen: document.documentElement.hasAttribute("data-kb-open") };
     })()`);
     await page.screenshot({ path: path.join(out, `sign-in-tap-missed-${Date.now()}.png`) });
-    throw new Error(`the login button could not be tapped: ${JSON.stringify(state)} — ${String(error).split("\n")[0]}`);
+    throw new Error(`the login button could not be tapped: ${JSON.stringify(state)}; failed requests: ${JSON.stringify(watch.failed)} — ${String(error).split("\n")[0]}`);
   }
   await page.waitForFunction(() => !location.pathname.startsWith("/login"), undefined, { timeout: 60_000 });
   const session = await page.evaluate("fetch('/api/auth/session', { credentials: 'same-origin', cache: 'no-store' }).then(function (r) { return r.status; })");
   if (session !== 200) throw new Error(`sign-in did not leave a session (GET /api/auth/session answered ${session})`);
+  // The sign-in pages are held like any cell: a request of theirs that failed is not passed over.
+  if (watch.failed.length || watch.pageErrors.length) throw new Error(`signing in: ${[...watch.failed.map((line) => `failed request: ${line}`), ...watch.pageErrors.map((line) => `page error: ${line}`)].join("; ")}`);
   await page.close();
 }
 
@@ -481,6 +534,7 @@ async function visit(context: BrowserContext, size: Size, surface: Surface | Out
     ? tutorialStepsForDevice(judgedKey, judgedSize.deviceClass)
     : outside?.mark.selector ? [{ target: outside.mark.selector }] : [];
   const words = judgedKey ? null : outside?.mark.text ?? null;
+  const called = outside?.name ?? surface.path;
   const faults: string[] = [];
   let mark: string | null = null;
   let byFallback = false;
@@ -502,7 +556,8 @@ async function visit(context: BrowserContext, size: Size, surface: Surface | Out
     }
     if (options.plant) { await options.plant(page); await page.waitForTimeout(600); facts = await readFacts(page, steps); }
 
-    if (facts.path !== surface.path) faults.push(`sent to ${surface.path}, ended at ${facts.path}`);
+    const meantFor = outside?.movesTo ?? surface.path;
+    if (facts.path !== meantFor) faults.push(`sent to ${called}, ${outside?.movesTo ? `meant to move to ${outside.movesTo}, ` : ""}ended at ${facts.path}`);
     const found = facts.marks.find((step) => step.shown);
     const fallback = found ? -1 : facts.marks.findIndex((step, index) => step.fallbackShown && ownFallback(steps[index].fallbackTarget));
     mark = found?.target ?? (fallback >= 0 ? steps[fallback].fallbackTarget ?? null : null);
@@ -510,7 +565,7 @@ async function visit(context: BrowserContext, size: Size, surface: Surface | Out
     if (!mark && words !== null && facts.text.includes(words)) mark = `"${words}"`;
     if (!mark) faults.push(judgedKey
       ? `no mark of the ${judgedKey} screen is shown (looked for ${facts.marks.length} tutorial targets)`
-      : `no mark of the ${surface.path} page is shown (${outside?.mark.selector ?? `the words "${words}"`})`);
+      : `no mark of the ${called} page is shown (${outside?.mark.selector ?? `the words "${words}"`})`);
     if (ERROR_SCREENS.test(facts.text)) faults.push(`an error screen: "${(facts.text.match(ERROR_SCREENS) ?? [""])[0]}"`);
     if (facts.running > 0) faults.push(`${facts.running} animation(s) still running when the wait ran out`);
     if (outside && !options.as?.size) {
@@ -528,7 +583,7 @@ async function visit(context: BrowserContext, size: Size, surface: Surface | Out
       measured = await page.evaluate(`(function (selector) { var el = document.querySelector(selector); if (!el) return null; var r = el.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; })(${JSON.stringify(MEASURE)})`);
     }
     if (options.shot !== false) {
-      const slug = `${size.name}-${outside ? "outside" : mode}-${surface.path.replace(/[^a-z0-9]+/gi, "_").replace(/^_|_$/g, "").slice(0, 60) || "root"}`;
+      const slug = `${size.name}-${outside ? "outside" : mode}-${called.replace(/[^a-z0-9]+/gi, "_").replace(/^_|_$/g, "").slice(0, 60) || "root"}`;
       await page.screenshot({ path: path.join(out, `${slug}.png`) });
     }
   } catch (error) {
@@ -536,7 +591,7 @@ async function visit(context: BrowserContext, size: Size, surface: Surface | Out
   } finally {
     await page.close().catch(() => undefined);
   }
-  return { size: size.name, path: surface.path, mode: outside ? "outside" : mode, pageKey: outside ? outside.who : (surface as Surface).pageKey, faults, mark, byFallback, elsewhere: [...new Set(watch.elsewhere)], sent: watch.sent.length, routes: [...watch.routes].sort(), ...(MEASURE ? { measured } : {}) };
+  return { size: size.name, path: called, mode: outside ? "outside" : mode, pageKey: outside ? outside.who : (surface as Surface).pageKey, faults, mark, byFallback, elsewhere: [...new Set(watch.elsewhere)], sent: watch.sent.length, routes: [...watch.routes].sort(), ...(MEASURE ? { measured } : {}) };
 }
 
 let exitCode = 0;
@@ -573,7 +628,18 @@ try {
       ["a signed-out page asking for a business's data", /failed request: 401 GET \/api\/merchants\/1\/profile/, () => visit(signedOut, phone, login, { plant: (page) => page.evaluate("fetch('/api/merchants/1/profile').then(function () {})") as Promise<void>, shot: false })],
       ["a page outside the frame judged as a merchant's desktop screen", /no tablet\/desktop frame/, () => visit(onDesktop, desktop, login, { as: { size: desktop }, shot: false })],
     );
-    const control = [await visit(signedIn, phone, terminal, { shot: false }), await visit(onDesktop, desktop, terminal, { shot: false }), await visit(signedOut, phone, login, { shot: false })];
+    // And on what a customer opens.
+    const receipt = OUTSIDE.find((page) => page.name === "/receipt/t/:token")!;
+    const checkout = OUTSIDE.find((page) => page.name === "/checkout/t/:token")!;
+    const emptyBoard = OUTSIDE.find((page) => page.name === "/pay/:id/stone/:stone (no sale)")!;
+    const openBoard = OUTSIDE.find((page) => page.name === "/pay/:id/stone/:stone (an open sale)")!;
+    plants.push(
+      ["the wrong customer page is up (the receipt, judged by the checkout's words)", /no mark of the \/receipt\/t\/:token page/, () => visit(signedOut, phone, { ...receipt, mark: checkout.mark }, { shot: false })],
+      ["a board that was meant to move on to checkout and did not", /meant to move to \/checkout\/\d+, ended at \/pay\//, () => visit(signedOut, phone, { ...emptyBoard, movesTo: openBoard.movesTo }, { shot: false })],
+      ["a board that moved on when it was meant to stay", /ended at \/checkout\//, () => visit(signedOut, phone, { ...openBoard, movesTo: undefined }, { shot: false })],
+      ["a sale's link that is not one (the server's 404 is a failure here)", /failed request: 404 GET \/api\/pay\/t\/not-a-real-link/, () => visit(signedOut, phone, { ...checkout, path: "/checkout/t/not-a-real-link" }, { shot: false })],
+    );
+    const control = [await visit(signedIn, phone, terminal, { shot: false }), await visit(onDesktop, desktop, terminal, { shot: false }), await visit(signedOut, phone, login, { shot: false }), await visit(signedOut, phone, openBoard, { shot: false })];
     for (const cell of control) {
       const ok = cell.faults.length === 0;
       if (!ok) exitCode = 1;
@@ -598,7 +664,7 @@ try {
       }
       await context.close();
       // The pages outside the merchant frame: with nobody signed in, and onboarding as a business that has just signed up.
-      const pages = OUTSIDE.filter((page) => !ONLY_SURFACE || page.path === ONLY_SURFACE);
+      const pages = OUTSIDE.filter((page) => !ONLY_SURFACE || page.path === ONLY_SURFACE || page.name === ONLY_SURFACE);
       if (pages.some((page) => page.who === "nobody")) {
         const nobody = await openContext(size);
         for (const page of pages.filter((each) => each.who === "nobody")) { const cell = await visit(nobody, size, page); cells.push(cell); say(cell); }
