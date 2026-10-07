@@ -456,7 +456,7 @@ function TransactionsPage({ merchantId }: { merchantId: number }) {
             const tipPt = pCoords[7] ?? { x: W - pad, y: H / 2 };
             return (
               <div style={{ position: 'relative', margin: '8px 0 4px', padding: '0 4px' }}>
-                <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="auto" style={{ display: 'block', overflow: 'visible' }}>
+                <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block', height: 'auto', overflow: 'visible' }}>
                   <defs>
                     <linearGradient id="ra1" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor={C.sky} stopOpacity="0.22" />
