@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import jsPDF from "jspdf";
 import { sessionFetch } from "@/lib/session";
+import { MERCHANTS_KEY, apiPath, apiTo, wholeNumber } from "@shared/api-path";
 
 type LayoutKey = "taptpay-a5-portrait" | "taptpay-a5-landscape";
 
@@ -315,9 +316,9 @@ export default function BoardBuilder() {
   }, [merchantId, setLocation]);
 
   const merchantQuery = useQuery<MerchantData>({
-    queryKey: ["/api/merchants", merchantId, "profile"],
+    queryKey: [MERCHANTS_KEY, merchantId, "profile"],
     queryFn: async () => {
-      const res = await sessionFetch(`/api/merchants/${merchantId}/profile`);
+      const res = await sessionFetch(apiPath("GET /api/merchants/:id/profile", { id: merchantId }));
       if (!res.ok) throw new Error("Failed to fetch merchant");
       return res.json() as Promise<MerchantData>;
     },
@@ -325,9 +326,9 @@ export default function BoardBuilder() {
   });
 
   const stonesQuery = useQuery<TaptStoneData[]>({
-    queryKey: ["/api/merchants", merchantId, "tapt-stones"],
+    queryKey: [MERCHANTS_KEY, merchantId, "tapt-stones"],
     queryFn: async () => {
-      const res = await sessionFetch(`/api/merchants/${merchantId}/tapt-stones`);
+      const res = await sessionFetch(apiPath("GET /api/merchants/:id/tapt-stones", { id: merchantId }));
       if (!res.ok) throw new Error("Failed to fetch stones");
       return res.json() as Promise<TaptStoneData[]>;
     },
@@ -414,7 +415,7 @@ export default function BoardBuilder() {
       return;
     }
     setFetchingQr(true);
-    const url = `/api/merchants/${merchantId}/stone/${selectedStoneId}/qr?size=600`;
+    const url = `${apiPath("GET /api/merchants/:id/stone/:stoneId/qr", { id: merchantId, stoneId: wholeNumber(selectedStoneId) })}?size=600`;
     fetchAsDataUrl(url)
       .then(setQrDataUrl)
       .catch(() => setQrDataUrl(""))
@@ -543,7 +544,7 @@ export default function BoardBuilder() {
       if (!pdfBase64) throw new Error("This board is too detailed to send. Try a smaller background image.");
 
       // The business comes from the sign-in; the board is one of its own (server/board-print.ts).
-      await apiRequest("POST", "/api/board-builder/submit", {
+      await apiRequest(...apiTo("POST /api/board-builder/submit"), {
         pdf: pdfBase64,
         stoneId: Number(selectedStoneId),
         layout: dim.label,

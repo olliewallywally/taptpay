@@ -48,6 +48,7 @@ import { entranceProps, useListEntrance } from "../list-entrance";
 import { DesktopLoadFailure } from "../DesktopLoadFailure";
 import { sessionFetch } from "@/lib/session";
 import { retailResponse } from "@/lib/response-data";
+import { MERCHANTS_KEY, apiPath, apiTo } from "@shared/api-path";
 
 /* ── palette ── */
 const ACCENT = "#5E9EFF";
@@ -156,27 +157,27 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
   };
 
   const merchantQuery = useQuery<any>({
-    queryKey: ["/api/merchants", merchantId, "profile"],
-    queryFn: () => authFetch(`/api/merchants/${merchantId}/profile`),
+    queryKey: [MERCHANTS_KEY, merchantId, "profile"],
+    queryFn: () => authFetch(apiPath("GET /api/merchants/:id/profile", { id: merchantId })),
     enabled: !!merchantId,
   });
 
   const txQuery = useQuery<Tx[]>({
-    queryKey: ["/api/merchants", merchantId, "transactions"],
-    queryFn: () => authFetch(`/api/merchants/${merchantId}/transactions`),
+    queryKey: [MERCHANTS_KEY, merchantId, "transactions"],
+    queryFn: () => authFetch(apiPath("GET /api/merchants/:id/transactions", { id: merchantId })),
     refetchInterval: 15000,
     enabled: !!merchantId,
   });
 
   const stockQuery = useQuery<{ id: number; name: string; cost: string }[]>({
-    queryKey: ["/api/merchants", merchantId, "stock-items"],
-    queryFn: () => authFetch(`/api/merchants/${merchantId}/stock-items`),
+    queryKey: [MERCHANTS_KEY, merchantId, "stock-items"],
+    queryFn: () => authFetch(apiPath("GET /api/merchants/:merchantId/stock-items", { merchantId })),
     enabled: !!merchantId,
   });
 
   const boardsQuery = useQuery<RetailBoard[]>({
-    queryKey: ["/api/merchants", merchantId, "tapt-stones"],
-    queryFn: () => authFetch(`/api/merchants/${merchantId}/tapt-stones`),
+    queryKey: [MERCHANTS_KEY, merchantId, "tapt-stones"],
+    queryFn: () => authFetch(apiPath("GET /api/merchants/:id/tapt-stones", { id: merchantId })),
     enabled: !!merchantId,
   });
 
@@ -357,7 +358,7 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
   /* ── mutations ── */
   const refundMutation = useMutation({
     mutationFn: async (v: { txId: number; amount: string; reason: string }) => {
-      const res = await apiRequest("POST", `/api/transactions/${v.txId}/refunds`, {
+      const res = await apiRequest(...apiTo("POST /api/transactions/:transactionId/refunds", { transactionId: v.txId }), {
         refundAmount: v.amount,
         refundReason: v.reason,
         refundMethod: "original_payment_method",
@@ -365,7 +366,7 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
       return res.json();
     },
     onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "transactions"] });
+      queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "transactions"] });
       toast({ title: "Refund successful", description: data?.message || "The refund has been processed." });
       setRefundFor(null);
       setRefundAmount("");
@@ -382,7 +383,7 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
   const downloadReceipt = async (tx: Tx) => {
     setBusyTx(tx.id);
     try {
-      const res = await sessionFetch(`/api/transactions/${tx.id}/receipt-pdf`, {
+      const res = await sessionFetch(apiPath("POST /api/transactions/:id/receipt-pdf", { id: tx.id }), {
         method: "POST",
       });
       if (!res.ok) throw new Error("receipt");

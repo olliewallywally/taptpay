@@ -12,6 +12,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { csvCell } from "@/lib/report-utils";
 import QRCode from "qrcode";
 import { sessionFetch } from "@/lib/session";
+import { MERCHANTS_KEY, apiPath, apiTo } from "@shared/api-path";
 
 interface Transaction {
   id: number;
@@ -115,18 +116,18 @@ function TransactionsPage({ merchantId }: { merchantId: number }) {
   const { toast } = useToast();
 
   const { data: transactions = [], isLoading } = useQuery({
-    queryKey: ["/api/merchants", merchantId, "transactions"],
+    queryKey: [MERCHANTS_KEY, merchantId, "transactions"],
     queryFn: async () => {
-      const response = await sessionFetch(`/api/merchants/${merchantId}/transactions`);
+      const response = await sessionFetch(apiPath("GET /api/merchants/:id/transactions", { id: merchantId }));
       if (!response.ok) throw new Error("Failed to fetch transactions");
       return response.json();
     },
   });
 
   const { data: merchant } = useQuery({
-    queryKey: ["/api/merchants", merchantId, "profile"],
+    queryKey: [MERCHANTS_KEY, merchantId, "profile"],
     queryFn: async () => {
-      const response = await sessionFetch(`/api/merchants/${merchantId}/profile`);
+      const response = await sessionFetch(apiPath("GET /api/merchants/:id/profile", { id: merchantId }));
       if (!response.ok) throw new Error("Failed to fetch merchant");
       return response.json();
     },
@@ -135,7 +136,7 @@ function TransactionsPage({ merchantId }: { merchantId: number }) {
 
   const refundMutation = useMutation({
     mutationFn: async ({ txId, amount, reason }: { txId: number; amount: string; reason: string }) => {
-      const res = await apiRequest("POST", `/api/transactions/${txId}/refunds`, {
+      const res = await apiRequest(...apiTo("POST /api/transactions/:transactionId/refunds", { transactionId: txId }), {
         refundAmount: amount,
         refundReason: reason,
         refundMethod: "original_payment_method",
@@ -150,7 +151,7 @@ function TransactionsPage({ merchantId }: { merchantId: number }) {
       if (data.transaction) {
         setSelectedTx((prev) => prev ? { ...prev, ...data.transaction } : null);
       }
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "transactions"] });
+      queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "transactions"] });
     },
     onError: (err: any) => {
       toast({ title: "Refund failed", description: err.message || "Could not process refund.", variant: "destructive" });
@@ -177,7 +178,7 @@ function TransactionsPage({ merchantId }: { merchantId: number }) {
   };
 
   const fetchPdfBlob = async (txId: number): Promise<Blob> => {
-    const response = await sessionFetch(`/api/transactions/${txId}/receipt-pdf`, {
+    const response = await sessionFetch(apiPath("POST /api/transactions/:id/receipt-pdf", { id: txId }), {
       method: "POST",
     });
     if (!response.ok) throw new Error("Failed to generate PDF");
@@ -371,7 +372,7 @@ function TransactionsPage({ merchantId }: { merchantId: number }) {
 
   const handleDownloadPDF = async () => {
     try {
-      const response = await sessionFetch(`/api/merchants/${merchantId}/export/pdf`);
+      const response = await sessionFetch(apiPath("GET /api/merchants/:id/export/pdf", { id: merchantId }));
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);

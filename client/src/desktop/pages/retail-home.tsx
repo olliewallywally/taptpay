@@ -17,6 +17,7 @@ import {
 import { useBucketMorph } from "../bucket-morph";
 import { SlidingIndicator, useSlidingIndicator } from "../sliding-indicator";
 import { sessionFetch } from "@/lib/session";
+import { MERCHANTS_KEY, apiPath } from "@shared/api-path";
 
 /* ── Retail palette (from the desktop design tokens) ── */
 const ACCENT = "#5E9EFF";
@@ -111,9 +112,9 @@ function useRetailHomeModel(tf: Timeframe, selBar: number) {
   const merchantId = getCurrentMerchantId();
 
   const merchantQuery = useQuery<any>({
-    queryKey: ["/api/merchants", merchantId, "profile"],
+    queryKey: [MERCHANTS_KEY, merchantId, "profile"],
     queryFn: async () => {
-      const res = await sessionFetch(`/api/merchants/${merchantId}/profile`);
+      const res = await sessionFetch(apiPath("GET /api/merchants/:id/profile", { id: merchantId }));
       if (!res.ok) throw new Error("Failed to fetch merchant");
       return res.json();
     },
@@ -121,9 +122,9 @@ function useRetailHomeModel(tf: Timeframe, selBar: number) {
   });
 
   const txQuery = useQuery<Tx[]>({
-    queryKey: ["/api/merchants", merchantId, "transactions"],
+    queryKey: [MERCHANTS_KEY, merchantId, "transactions"],
     queryFn: async () => {
-      const res = await sessionFetch(`/api/merchants/${merchantId}/transactions`);
+      const res = await sessionFetch(apiPath("GET /api/merchants/:id/transactions", { id: merchantId }));
       if (!res.ok) throw new Error("Failed to fetch transactions");
       return res.json();
     },

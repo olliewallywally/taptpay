@@ -60,6 +60,19 @@ const MIGRATED = [
   "client/src/desktop/DesktopSettingsPage.tsx",
   "client/src/hooks/use-billing-card-return.ts",
   "client/src/lib/merchant.ts",
+  // T10b, batch 2: retail. The terminals, home, analytics, stock, transactions, the payment stack, boards.
+  "client/src/pages/merchant-terminal-mobile-v2.tsx",
+  "client/src/desktop/pages/retail-terminal.tsx",
+  "client/src/desktop/pages/retail-analytics.tsx",
+  "client/src/desktop/pages/retail-home.tsx",
+  "client/src/desktop/pages/retail-stock.tsx",
+  "client/src/pages/stock-management.tsx",
+  "client/src/pages/transactions.tsx",
+  "client/src/pages/dashboard.tsx",
+  "client/src/components/reports/RetailReportsButton.tsx",
+  "client/src/pages/board-builder.tsx",
+  "client/src/components/qr-code-display.tsx",
+  "client/src/pages/payment-stack.tsx",
 ];
 /** Text that is an API address or the start of one: /api itself, or /api followed by a path, a query or a fragment. */
 const ADDRESS_START = /^\/api(?:[/?#]|$)/;
@@ -393,7 +406,7 @@ describe("R1-T10b — cache labels", () => {
       visit(tree(file));
     }
     expect(elsewhere).toEqual([]);
-    expect(uses).toBeGreaterThanOrEqual(8);
+    expect(uses).toBeGreaterThanOrEqual(60);
   });
 });
 
@@ -424,7 +437,7 @@ describe("R1-T10 — the pages moved onto the builder", () => {
       expect([file, fs.existsSync(path.join(ROOT, file))]).toEqual([file, true]);
       expect([file, /\bapi(?:Path|To)\(/.test(read(file))]).toEqual([file, true]);
     }
-    expect(MIGRATED.length).toBeGreaterThanOrEqual(16);
+    expect(MIGRATED.length).toBeGreaterThanOrEqual(28);
   });
 
   it("the guard itself tells an address from a route's name", () => {
@@ -463,7 +476,7 @@ describe("R1-T10 — every route the client names", () => {
 
   it("is a listed one, read from the source so a cast past the types is still caught", () => {
     expect(uses.filter((use) => use.key !== null && !keys.includes(use.key)).map((use) => `${at(use.file, use.node)}: ${use.key}`)).toEqual([]);
-    expect(uses.length).toBeGreaterThanOrEqual(90);
+    expect(uses.length).toBeGreaterThanOrEqual(140);
   });
 
   it("is called by its own method wherever the call says one beside it", () => {
@@ -483,7 +496,7 @@ describe("R1-T10 — every route the client names", () => {
     }
     expect(disagree).toEqual([]);
     expect(unreadable).toEqual([]);
-    expect(checked).toBeGreaterThanOrEqual(25);
+    expect(checked).toBeGreaterThanOrEqual(60);
   });
 
   it("the reading of a call's method is itself right", () => {

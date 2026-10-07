@@ -1,4 +1,5 @@
 import { QrCode } from "lucide-react";
+import { apiPath } from "@shared/api-path";
 
 interface QRCodeDisplayProps {
   paymentUrl?: string;
@@ -14,7 +15,7 @@ interface QRCodeDisplayProps {
  */
 export function QRCodeDisplay({ qrCodeUrl, merchantId, stoneId }: QRCodeDisplayProps) {
   const actualQrCodeUrl = qrCodeUrl || (merchantId && stoneId
-    ? `/api/merchants/${merchantId}/stone/${stoneId}/qr`
+    ? apiPath("GET /api/merchants/:id/stone/:stoneId/qr", { id: merchantId, stoneId })
     : undefined);
   return (
     <div className="w-full h-full bg-[#0A1628] rounded-xl flex items-center justify-center p-2">

@@ -11,17 +11,18 @@ import { dollarsToCents } from "@/lib/report-utils";
 import { RETAIL_REPORT_OPTIONS } from "@/lib/report-pdf/reports/retail-options";
 import type { RetailReportData } from "@/lib/report-pdf/reports/retail";
 import { sessionFetch } from "@/lib/session";
+import { MERCHANTS_KEY, apiPath } from "@shared/api-path";
 
 export function RetailReportsButton({ tone = "onDark", color = "#00E5CC", style }: { tone?: "onLight" | "onDark"; color?: string; style?: React.CSSProperties }) {
   const [open, setOpen] = useState(false);
   const merchantId = getCurrentMerchantId();
   const { data: merchant } = useMerchantProfile();
   const { data: transactions = [] } = useQuery<any[]>({
-    queryKey: ["/api/merchants", merchantId, "transactions"],
+    queryKey: [MERCHANTS_KEY, merchantId, "transactions"],
     enabled: !!merchantId,
     staleTime: 30000,
     queryFn: async () => {
-      const r = await sessionFetch(`/api/merchants/${merchantId}/transactions`);
+      const r = await sessionFetch(apiPath("GET /api/merchants/:id/transactions", { id: merchantId }));
       if (!r.ok) throw new Error("Failed to load transactions");
       return r.json();
     },

@@ -18,6 +18,7 @@ import {
 import { DesktopLoadFailure } from "../DesktopLoadFailure";
 import { sessionFetch } from "@/lib/session";
 import { retailResponse } from "@/lib/response-data";
+import { MERCHANTS_KEY, apiPath, apiTo } from "@shared/api-path";
 
 /* ── palette ── */
 const ACCENT = "#5E9EFF";
@@ -198,27 +199,27 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
   };
 
   const merchantQuery = useQuery<any>({
-    queryKey: ["/api/merchants", merchantId, "profile"],
-    queryFn: () => authFetch(`/api/merchants/${merchantId}/profile`),
+    queryKey: [MERCHANTS_KEY, merchantId, "profile"],
+    queryFn: () => authFetch(apiPath("GET /api/merchants/:id/profile", { id: merchantId })),
     enabled: !!merchantId,
   });
 
   const txQuery = useQuery<Tx[]>({
-    queryKey: ["/api/merchants", merchantId, "transactions"],
-    queryFn: () => authFetch(`/api/merchants/${merchantId}/transactions`),
+    queryKey: [MERCHANTS_KEY, merchantId, "transactions"],
+    queryFn: () => authFetch(apiPath("GET /api/merchants/:id/transactions", { id: merchantId })),
     refetchInterval: 5000,
     enabled: !!merchantId,
   });
 
   const stockQuery = useQuery<StockItem[]>({
-    queryKey: ["/api/merchants", merchantId, "stock-items"],
-    queryFn: () => authFetch(`/api/merchants/${merchantId}/stock-items`),
+    queryKey: [MERCHANTS_KEY, merchantId, "stock-items"],
+    queryFn: () => authFetch(apiPath("GET /api/merchants/:merchantId/stock-items", { merchantId })),
     enabled: !!merchantId,
   });
 
   const stonesQuery = useQuery<Stone[]>({
-    queryKey: ["/api/merchants", merchantId, "tapt-stones"],
-    queryFn: () => authFetch(`/api/merchants/${merchantId}/tapt-stones`),
+    queryKey: [MERCHANTS_KEY, merchantId, "tapt-stones"],
+    queryFn: () => authFetch(apiPath("GET /api/merchants/:id/tapt-stones", { id: merchantId })),
     enabled: !!merchantId,
   });
 
@@ -239,7 +240,7 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
 
   const createMutation = useMutation<CreatedSaleResponse, Error, CreateSaleInput>({
     mutationFn: async (sale) => {
-      const res = await apiRequest("POST", "/api/transactions", {
+      const res = await apiRequest(...apiTo("POST /api/transactions"), {
         merchantId,
         itemName: sale.item,
         price: sale.price,
@@ -259,8 +260,8 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
       setCopiedKey(null);
     },
     onSuccess: (created, sale) => {
-      void queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "transactions"] });
-      void queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "active-transaction"] });
+      void queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "transactions"] });
+      void queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "active-transaction"] });
 
       const paymentUrl = typeof created?.paymentUrl === "string" ? created.paymentUrl.trim() : "";
       const qrCodeUrl = typeof created?.qrCodeUrl === "string" ? created.qrCodeUrl.trim() : "";
@@ -298,8 +299,7 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
     mutationFn: async (name) => {
       const trimmed = name?.trim();
       const res = await apiRequest(
-        "POST",
-        `/api/merchants/${merchantId}/tapt-stones`,
+        ...apiTo("POST /api/merchants/:id/tapt-stones", { id: merchantId }),
         trimmed ? { name: trimmed } : {},
       );
       return res.json();
@@ -317,7 +317,7 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
       setBoardsOn(true);
       setPickerOpen(false);
       queryClient.setQueryData<Stone[]>(
-        ["/api/merchants", merchantId, "tapt-stones"],
+        [MERCHANTS_KEY, merchantId, "tapt-stones"],
         (current = []) =>
           [...current.filter((stone) => stone.id !== created.id), created].sort(
             (a, b) => a.stoneNumber - b.stoneNumber,
@@ -326,7 +326,7 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
       setDestination({ kind: "board", boardId: created.id });
       setBoardError(null);
       void queryClient.invalidateQueries({
-        queryKey: ["/api/merchants", merchantId, "tapt-stones"],
+        queryKey: [MERCHANTS_KEY, merchantId, "tapt-stones"],
       });
       toast({ title: "New board created", description: `${created.name} selected` });
     },
@@ -346,8 +346,7 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
   const renameBoardMutation = useMutation<Stone, Error, { id: number; name: string }>({
     mutationFn: async ({ id, name }) => {
       const res = await apiRequest(
-        "PUT",
-        `/api/merchants/${merchantId}/tapt-stones/${id}`,
+        ...apiTo("PUT /api/merchants/:merchantId/tapt-stones/:stoneId", { merchantId, stoneId: id }),
         { name: name.trim() },
       );
       return res.json();
@@ -357,7 +356,7 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
       /* The server echoes the row back, but fall back to the local name so the
          list still updates if the response shape ever changes. */
       queryClient.setQueryData<Stone[]>(
-        ["/api/merchants", merchantId, "tapt-stones"],
+        [MERCHANTS_KEY, merchantId, "tapt-stones"],
         (current = []) =>
           current.map((stone) =>
             stone.id === id ? { ...stone, ...updated, name: updated?.name ?? name.trim() } : stone,
@@ -366,7 +365,7 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
       setEditingId(null);
       setDraftName("");
       void queryClient.invalidateQueries({
-        queryKey: ["/api/merchants", merchantId, "tapt-stones"],
+        queryKey: [MERCHANTS_KEY, merchantId, "tapt-stones"],
       });
     },
     onError: (error) => {
@@ -378,12 +377,12 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
 
   const cancelMutation = useMutation({
     mutationFn: async (transactionId: number) => {
-      const res = await apiRequest("POST", `/api/transactions/${transactionId}/cancel`, {});
+      const res = await apiRequest(...apiTo("POST /api/transactions/:id/cancel", { id: transactionId }), {});
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "active-transaction"] });
+      queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "transactions"] });
+      queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "active-transaction"] });
       toast({ title: "Transaction cancelled" });
       setExpandedId(null);
     },

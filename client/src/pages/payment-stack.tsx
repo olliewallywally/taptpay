@@ -8,6 +8,7 @@ import { Clock, Loader2, Plus, Copy, X, ChevronRight, Layers, ArrowLeft } from "
 import { Link } from "wouter";
 import type { Transaction } from "@shared/schema";
 import { businessCsrfHeader } from "@/lib/session";
+import { MERCHANTS_KEY, apiPath, apiTo } from "@shared/api-path";
 
 const BRAND = "#00DFC8";
 const SURFACE = "rgba(26, 86, 255, 0.08)";
@@ -44,10 +45,10 @@ function PaymentStackPage({ merchantId }: { merchantId: number }) {
   const [copiedId, setCopiedId] = useState<number | null>(null);
 
   const { data: allTransactions = [], isLoading } = useQuery<Transaction[]>({
-    queryKey: ["/api/merchants", merchantId, "transactions"],
+    queryKey: [MERCHANTS_KEY, merchantId, "transactions"],
     queryFn: async () => {
       // Both reads are signed in (authenticateToken reads only this header).
-      const r = await fetch(`/api/merchants/${merchantId}/transactions`, { headers: authHeaders() });
+      const r = await fetch(apiPath("GET /api/merchants/:id/transactions", { id: merchantId }), { headers: authHeaders() });
       if (!r.ok) throw new Error("Failed to fetch transactions");
       return r.json();
     },
@@ -55,9 +56,9 @@ function PaymentStackPage({ merchantId }: { merchantId: number }) {
   });
 
   const { data: taptStones = [] } = useQuery({
-    queryKey: ["/api/merchants", merchantId, "tapt-stones"],
+    queryKey: [MERCHANTS_KEY, merchantId, "tapt-stones"],
     queryFn: async () => {
-      const r = await fetch(`/api/merchants/${merchantId}/tapt-stones`, { headers: authHeaders() });
+      const r = await fetch(apiPath("GET /api/merchants/:id/tapt-stones", { id: merchantId }), { headers: authHeaders() });
       if (!r.ok) throw new Error();
       return r.json();
     },
@@ -65,12 +66,12 @@ function PaymentStackPage({ merchantId }: { merchantId: number }) {
 
   const cancelMutation = useMutation({
     mutationFn: async (transactionId: number) => {
-      const r = await apiRequest("POST", `/api/transactions/${transactionId}/cancel`, {});
+      const r = await apiRequest(...apiTo("POST /api/transactions/:id/cancel", { id: transactionId }), {});
       return r.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "active-transaction"] });
+      queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "transactions"] });
+      queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "active-transaction"] });
       toast({ title: "Transaction cancelled" });
       setExpandedId(null);
     },

@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { sessionFetch } from "@/lib/session";
+import { MERCHANTS_KEY, apiPath } from "@shared/api-path";
 
 interface VariationOption {
   label: string;
@@ -363,18 +364,18 @@ function StockManagementPage({ merchantId }: { merchantId: number }) {
   const queryClient = useQueryClient();
 
   const { data: merchant } = useQuery({
-    queryKey: ["/api/merchants", merchantId, "profile"],
+    queryKey: [MERCHANTS_KEY, merchantId, "profile"],
     queryFn: async () => {
-      const response = await sessionFetch(`/api/merchants/${merchantId}/profile`);
+      const response = await sessionFetch(apiPath("GET /api/merchants/:id/profile", { id: merchantId }));
       if (!response.ok) throw new Error("Failed to fetch merchant");
       return response.json();
     },
   });
 
   const { data: stockItems = [], isLoading } = useQuery({
-    queryKey: ["/api/merchants", merchantId, "stock-items"],
+    queryKey: [MERCHANTS_KEY, merchantId, "stock-items"],
     queryFn: async () => {
-      const response = await sessionFetch(`/api/merchants/${merchantId}/stock-items`);
+      const response = await sessionFetch(apiPath("GET /api/merchants/:merchantId/stock-items", { merchantId }));
       if (!response.ok) throw new Error("Failed to fetch stock items");
       return response.json();
     },
@@ -382,7 +383,7 @@ function StockManagementPage({ merchantId }: { merchantId: number }) {
 
   const addItemMutation = useMutation({
     mutationFn: async (item: typeof sheetItem) => {
-      const response = await sessionFetch(`/api/merchants/${merchantId}/stock-items`, {
+      const response = await sessionFetch(apiPath("POST /api/merchants/:merchantId/stock-items", { merchantId }), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(item),
@@ -391,7 +392,7 @@ function StockManagementPage({ merchantId }: { merchantId: number }) {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "stock-items"] });
+      queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "stock-items"] });
       setSheetItem(null);
       toast({ title: "Product added" });
     },
@@ -400,7 +401,7 @@ function StockManagementPage({ merchantId }: { merchantId: number }) {
 
   const updateItemMutation = useMutation({
     mutationFn: async (item: StockItem & { variations: VariationGroup[] }) => {
-      const response = await sessionFetch(`/api/merchants/${merchantId}/stock-items/${item.id}`, {
+      const response = await sessionFetch(apiPath("PUT /api/merchants/:merchantId/stock-items/:itemId", { merchantId, itemId: item.id }), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -415,7 +416,7 @@ function StockManagementPage({ merchantId }: { merchantId: number }) {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "stock-items"] });
+      queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "stock-items"] });
       setSheetItem(null);
       toast({ title: "Product updated" });
     },
@@ -424,14 +425,14 @@ function StockManagementPage({ merchantId }: { merchantId: number }) {
 
   const deleteItemMutation = useMutation({
     mutationFn: async (itemId: number) => {
-      const response = await sessionFetch(`/api/merchants/${merchantId}/stock-items/${itemId}`, {
+      const response = await sessionFetch(apiPath("DELETE /api/merchants/:merchantId/stock-items/:itemId", { merchantId, itemId }), {
         method: "DELETE",
       });
       if (!response.ok) throw new Error("Failed to delete stock item");
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "stock-items"] });
+      queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "stock-items"] });
       setSheetItem(null);
       toast({ title: "Product deleted" });
     },
