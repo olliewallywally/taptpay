@@ -202,8 +202,11 @@ function BoardPayment({ merchantId: id, stoneNumber }: { merchantId: number; sto
 
   const logo = <MerchantLogo customLogoUrl={merchant?.customLogoUrl} />;
 
-  // Waiting for a transaction to be created by the merchant
-  if (isLoading || (!currentTransaction && paymentStatus === "loading")) {
+  // Waiting: for the business to open a sale; for a sale someone else is paying, or has just paid, to
+  // give way to the next; or for this page's own move to checkout. The fault screen below is for a
+  // fault: a sale that failed while this page was open. The server hands a board's page its newest
+  // open sale, or one paid in the last three minutes, and neither of those is one.
+  if (isLoading || (paymentStatus !== "success" && paymentStatus !== "error")) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="w-full max-w-sm md:max-w-md">
