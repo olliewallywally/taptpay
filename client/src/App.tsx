@@ -44,6 +44,7 @@ import { LandingPage } from "@/pages/landing-page";
 import Login from "@/pages/login";
 import AppLogin from "@/pages/app-login";
 import MerchantSignup from "@/pages/merchant-signup";
+import { apiPath } from "@shared/api-path";
 
 const NotFound              = lazyWithRetry(() => import("@/pages/not-found"));
 const MerchantTerminalMobile = lazyWithRetry(() => import("@/pages/merchant-terminal-mobile-v2"));
@@ -595,7 +596,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     return startBoundedSessionCheck(
-      (signal) => probeSession("/api/auth/session", signal, readBusinessSessionReply),
+      (signal) => probeSession(apiPath("GET /api/auth/session"), signal, readBusinessSessionReply),
       (result) => {
         setIsRetrying(false);
         if (result.kind === "ok") {
@@ -705,7 +706,7 @@ export function AdminProtectedRoute({ children }: { children: React.ReactNode })
   useEffect(() => {
     // R1-T4 phase E: the admin's sign-in is a session cookie of its own; the page always asks.
     return startBoundedSessionCheck(
-      (signal) => probeSession("/api/admin/auth/me", signal, readAdminSessionReply),
+      (signal) => probeSession(apiPath("GET /api/admin/auth/me"), signal, readAdminSessionReply),
       (result) => {
         setIsRetrying(false);
         if (result.kind === "ok") {

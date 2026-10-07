@@ -1,3 +1,4 @@
+import { apiPath } from "@shared/api-path";
 export interface SSEMessage {
   type: string;
   transaction?: any;
@@ -36,7 +37,7 @@ export class SSEClient {
     if (stoneId !== undefined && stoneId !== null) params.set("stoneId", String(stoneId));
     const query = params.toString();
     this.eventSource = new EventSource(
-      `/api/merchants/${merchantId}/events${query ? `?${query}` : ""}`,
+      `${apiPath("GET /api/merchants/:id/events", { id: merchantId })}${query ? `?${query}` : ""}`,
     );
     this.eventSource.onmessage = (event) => this.dispatch(event.data);
     this.eventSource.onerror = (error) => {
@@ -66,7 +67,7 @@ export class SSEClient {
     const decoder = new TextDecoder();
     while (!signal.aborted) {
       try {
-        const response = await fetch(`/api/merchants/${merchantId}/events`, {
+        const response = await fetch(apiPath("GET /api/merchants/:id/events", { id: merchantId }), {
           headers: { Accept: "text/event-stream" },
           credentials: "same-origin",
           cache: "no-store",

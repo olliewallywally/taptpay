@@ -21,6 +21,7 @@ import {
   type TutorialStep,
 } from "./tutorial-registry";
 import "./tutorial.css";
+import { apiPath, apiTo } from "@shared/api-path";
 
 interface TutorialProgressEntry {
   status: TutorialPageStatus;
@@ -77,7 +78,7 @@ export function TutorialProvider({ enabled, children }: { enabled: boolean; chil
   const startAttempt = useRef<string | null>(null);
 
   const stateQuery = useQuery<TutorialState>({
-    queryKey: ["/api/tutorial/state"],
+    queryKey: [apiPath("GET /api/tutorial/state")],
     enabled,
     staleTime: 30_000,
   });
@@ -91,7 +92,7 @@ export function TutorialProvider({ enabled, children }: { enabled: boolean; chil
   }, []);
 
   const setCachedProgress = useCallback((pageKey: TutorialPageKey, entry: TutorialProgressEntry) => {
-    queryClient.setQueryData<TutorialState>(["/api/tutorial/state"], old => old ? ({
+    queryClient.setQueryData<TutorialState>([apiPath("GET /api/tutorial/state")], old => old ? ({
       ...old,
       progress: { ...old.progress, [pageKey]: entry },
     }) : old);
@@ -102,15 +103,15 @@ export function TutorialProvider({ enabled, children }: { enabled: boolean; chil
     status: TutorialPageStatus,
     lastStep: number,
   ) => {
-    const state = queryClient.getQueryData<TutorialState>(["/api/tutorial/state"]);
+    const state = queryClient.getQueryData<TutorialState>([apiPath("GET /api/tutorial/state")]);
     if (!state) throw new Error("Tutorial state is unavailable");
-    const response = await apiRequest("PATCH", `/api/tutorial/pages/${pageKey}`, {
+    const response = await apiRequest(...apiTo("PATCH /api/tutorial/pages/:pageKey", { pageKey }), {
       generation: state.generation,
       status,
       lastStep,
     });
     const saved = await response.json();
-    const currentState = queryClient.getQueryData<TutorialState>(["/api/tutorial/state"]);
+    const currentState = queryClient.getQueryData<TutorialState>([apiPath("GET /api/tutorial/state")]);
     // A restart can finish while an older request is still in flight. Never
     // copy progress from the previous generation into the newly-reset run.
     if (currentState?.generation !== state.generation) return;
@@ -160,7 +161,7 @@ export function TutorialProvider({ enabled, children }: { enabled: boolean; chil
     setActive(null);
     void saveProgress(closing.pageKey, status, closing.stepIndex).catch(() => {
       // The already-saved "started" row still prevents an unwanted repeat.
-      void queryClient.invalidateQueries({ queryKey: ["/api/tutorial/state"] });
+      void queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/tutorial/state")] });
     });
   }, [active, queryClient, saveProgress, setCachedProgress]);
 
@@ -187,11 +188,11 @@ export function TutorialProvider({ enabled, children }: { enabled: boolean; chil
   const restartTutorials = useCallback(async () => {
     setIsRestarting(true);
     try {
-      const response = await apiRequest("POST", "/api/tutorial/restart");
+      const response = await apiRequest(...apiTo("POST /api/tutorial/restart"));
       const fresh = await response.json() as TutorialState;
       setActive(null);
       startAttempt.current = null;
-      queryClient.setQueryData(["/api/tutorial/state"], fresh);
+      queryClient.setQueryData([apiPath("GET /api/tutorial/state")], fresh);
     } finally {
       setIsRestarting(false);
     }

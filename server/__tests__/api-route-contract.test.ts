@@ -101,6 +101,13 @@ const MIGRATED = [
   "client/src/pages/payment-result.tsx",
   "client/src/pages/payment-return.tsx",
   "client/src/pages/info.tsx",
+  // T10b, batch 6: the shell. Who is signed in, the tutorial, onboarding, push, live updates.
+  "client/src/App.tsx",
+  "client/src/features/tutorial/tutorial.tsx",
+  "client/src/hooks/use-push-notifications.ts",
+  "client/src/lib/push-device.ts",
+  "client/src/lib/sse-client.ts",
+  "client/src/pages/merchant-onboarding.tsx",
 ];
 /** Text that is an API address or the start of one: /api itself, or /api followed by a path, a query or a fragment. */
 const ADDRESS_START = /^\/api(?:[/?#]|$)/;
@@ -108,8 +115,11 @@ const ADDRESS_START = /^\/api(?:[/?#]|$)/;
 /** The cache labels (shared/api-path.ts): the first word of a cached entry's name that is not an address. */
 const LABELS: Record<string, string> = { MERCHANTS_KEY, TRANSACTIONS_KEY, SPLIT_PAYMENTS_KEY, CHECKOUT_RESOLVE_KEY, QUOTE_TOKEN_KEY };
 
-/** Calls that take an address first and, like fetch, say their method in the options after it. */
-const FETCH_LIKE = new Set(["fetch", "sessionFetch", "tradesFetch", "propFetch", "authFetch"]);
+/**
+ * Calls that take an address first and, like fetch, say their method in the options after it.
+ * `request` is a fetch handed in to be called (hooks/use-push-notifications).
+ */
+const FETCH_LIKE = new Set(["fetch", "sessionFetch", "tradesFetch", "propFetch", "authFetch", "request"]);
 const BUILDERS = new Set(["apiPath", "apiTo", "apiMethod"]);
 
 const parsed = new Map<string, ts.SourceFile>();
@@ -517,7 +527,7 @@ describe("R1-T10 — the pages moved onto the builder", () => {
       expect([file, fs.existsSync(path.join(ROOT, file))]).toEqual([file, true]);
       expect([file, /\bapi(?:Path|To)\(/.test(read(file))]).toEqual([file, true]);
     }
-    expect(MIGRATED.length).toBeGreaterThanOrEqual(53);
+    expect(MIGRATED.length).toBeGreaterThanOrEqual(59);
   });
 
   it("the guard itself tells an address from a route's name", () => {
@@ -556,7 +566,7 @@ describe("R1-T10 — every route the client names", () => {
 
   it("is a listed one, read from the source so a cast past the types is still caught", () => {
     expect(uses.filter((use) => use.key !== null && !keys.includes(use.key)).map((use) => `${at(use.file, use.node)}: ${use.key}`)).toEqual([]);
-    expect(uses.length).toBeGreaterThanOrEqual(345);
+    expect(uses.length).toBeGreaterThanOrEqual(380);
   });
 
   it("is called by its own method wherever the call says one beside it", () => {
@@ -576,7 +586,7 @@ describe("R1-T10 — every route the client names", () => {
     }
     expect(disagree).toEqual([]);
     expect(unreadable).toEqual([]);
-    expect(checked).toBeGreaterThanOrEqual(150);
+    expect(checked).toBeGreaterThanOrEqual(165);
   });
 
   it("the reading of a call's method is itself right", () => {
@@ -596,6 +606,9 @@ describe("R1-T10 — every route the client names", () => {
     expect(said('fetch(on ? apiPath("PUT /api/x") : apiPath("PUT /api/y"), { method: "PUT" })')).toEqual([{ method: "PUT" }, { method: "PUT" }]);
     expect(said('apiRequest("PATCH", apiPath("PATCH /api/x"), body)')).toEqual([{ method: "PATCH" }]);
     expect(said('new EventSource(apiPath("GET /api/x"))')).toEqual([{ method: "GET" }]);
+    // A fetch handed in under the name `request` is read like fetch.
+    expect(said('request(apiPath("POST /api/x"), { method: "POST", body })')).toEqual([{ method: "POST" }]);
+    expect(said('request(apiPath("POST /api/x"))')).toEqual([{ method: "GET" }]);
     expect(said('fetch(apiPath("POST /api/x"), options)')).toEqual([{ unreadable: "fetch\'s options are not written at the call" }]);
     expect(said('fetch(apiPath("POST /api/x"), { ...options })')).toEqual([{ unreadable: "fetch\'s options are spread from elsewhere" }]);
     expect(said('fetch(apiPath("POST /api/x"), { method })')).toEqual([{ unreadable: "fetch\'s method is not written out" }]);
@@ -614,7 +627,7 @@ describe("R1-T10 — every route the client names", () => {
     // address nothing gets. Nothing is said beside a key, so the method check above does not reach it.
     const words = clientSources().flatMap(keyWords);
     expect(words.filter((use) => use.key !== null && !use.key.startsWith("GET ")).map((use) => `${at(use.file, use.node)}: ${use.key}`)).toEqual([]);
-    expect(words.length).toBeGreaterThanOrEqual(95);
+    expect(words.length).toBeGreaterThanOrEqual(105);
   });
 
   it("the reading of a key's first word is itself right", () => {

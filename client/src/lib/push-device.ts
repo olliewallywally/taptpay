@@ -20,6 +20,7 @@
  */
 import { isNativeIOS } from "@/lib/native";
 import { csrfHeaders, heldSession } from "./session";
+import { apiPath } from "@shared/api-path";
 
 export const PUSH_REQUEST_TIMEOUT_MS = 5_000;
 
@@ -107,7 +108,7 @@ export async function stopThisDevicePush(): Promise<void> {
       const deviceToken = readNativeDeviceToken();
       forgetNativeDeviceToken();
       // Without a remembered token the server stops this login's iPhones.
-      if (signedIn()) await post("/api/push/native-unsubscribe", deviceToken ? { deviceToken } : {});
+      if (signedIn()) await post(apiPath("POST /api/push/native-unsubscribe"), deviceToken ? { deviceToken } : {});
       return;
     }
     const subscription = await currentWebSubscription();
@@ -116,7 +117,7 @@ export async function stopThisDevicePush(): Promise<void> {
     // Local first: it retires the endpoint at the push service, so this device
     // stops even if the request below never lands.
     await subscription.unsubscribe().catch(() => false);
-    if (signedIn()) await post("/api/push/unsubscribe", { endpoint });
+    if (signedIn()) await post(apiPath("POST /api/push/unsubscribe"), { endpoint });
   } catch {
     // Signing out never fails because of notifications.
   }
@@ -128,12 +129,12 @@ export async function resyncThisDevicePush(): Promise<void> {
     if (!signedIn()) return;
     if (isNativeIOS()) {
       const deviceToken = readNativeDeviceToken();
-      if (deviceToken) await post("/api/push/native-subscribe", { deviceToken });
+      if (deviceToken) await post(apiPath("POST /api/push/native-subscribe"), { deviceToken });
       return;
     }
     if (!("Notification" in window) || Notification.permission !== "granted") return;
     const subscription = await currentWebSubscription();
-    if (subscription) await post("/api/push/subscribe", { subscription: subscription.toJSON() });
+    if (subscription) await post(apiPath("POST /api/push/subscribe"), { subscription: subscription.toJSON() });
   } catch {
     // Opening the app never fails because of notifications.
   }
