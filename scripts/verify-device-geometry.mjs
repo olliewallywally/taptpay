@@ -72,7 +72,7 @@ try {
   await fixture("readable visible text overflow is not clipped text",
     '<div style="width:40px;white-space:nowrap;overflow:visible">Long text remains fully painted</div>', clean);
   await fixture("direct text cropped beyond the negative viewport edge is a fault",
-    '<div class="negative-glyphs" style="width:40px;text-align:right;white-space:nowrap;overflow:visible">A long directly painted label</div>',
+    '<div class="negative-glyphs" style="width:40px;text-indent:-100px;white-space:nowrap;overflow:visible">A long directly painted label</div>',
     (g) => { assert.equal(g.docOverflow, 0); assert.equal(g.edgeCrosserCount, 0); assert.ok(g.clippedText.some((x) => x.label === "div.negative-glyphs")); });
   await fixture("positive text overflow remains reachable by actual document horizontal scroll",
     '<div style="width:40px;white-space:nowrap;overflow:visible">' + 'Readable by horizontal page scrolling. '.repeat(5) + '</div>',
