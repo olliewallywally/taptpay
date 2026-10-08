@@ -526,7 +526,7 @@ export function Analytics() {
                     {m.icon}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[#dbdfea]/50 text-xs truncate">{m.label}</p>
+                    <p className="text-[#dbdfea]/50 text-xs whitespace-normal break-words">{m.label}</p>
                     <p className="text-[#dbdfea] text-lg font-semibold leading-tight">{m.value}</p>
                   </div>
                 </div>

@@ -301,7 +301,7 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
               <Icon className={`size-5 ${color.includes('from') ? 'text-white' : text}`} />
             </div>
             <div className="min-w-0">
-              <p className="text-[#dbdfea]/50 text-xs truncate">{label}</p>
+              <p className="text-[#dbdfea]/50 text-xs whitespace-normal break-words">{label}</p>
               <p className="text-[#dbdfea] text-lg font-semibold leading-tight">{value}</p>
             </div>
           </div>

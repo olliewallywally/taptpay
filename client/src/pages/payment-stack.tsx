@@ -179,7 +179,7 @@ function PaymentStackPage({ merchantId }: { merchantId: number }) {
                   <div className="text-white font-bold tabular-nums" style={{ fontSize: "28px", lineHeight: 1.1, letterSpacing: "-0.5px" }}>
                     ${amount.toFixed(2)}
                   </div>
-                  <p className="text-white/50 text-sm mt-0.5 truncate">{tx.itemName}</p>
+                  <p className="text-white/50 text-sm mt-0.5 whitespace-normal break-words">{tx.itemName}</p>
                 </div>
 
                 <div className="flex flex-col items-end gap-1 flex-shrink-0">

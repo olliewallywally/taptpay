@@ -2,6 +2,8 @@
  * Keep the browser evaluator in plain JS: tsx can inject helpers into functions
  * passed to Playwright, which do not exist in the browser's execution context.
  */
+import { createHash } from "node:crypto";
+
 function browserGeometry(rowSelector) {
   const slack = 2;
   const round = (n) => Math.round(n * 10) / 10;
@@ -20,12 +22,37 @@ function browserGeometry(rowSelector) {
       .split(/\s+/).filter(Boolean).slice(0, 3).join(".").slice(0, 100);
     return el.tagName.toLowerCase() + (cls ? "." + cls : "");
   };
+  const zeroPaintClip = (el, s) => {
+    // Native visually-hidden styles crop text to no painted area while its
+    // layout/range boxes remain nonzero. This is geometry, not a class list.
+    const legacy = s.clip.match(/^rect\(([^)]+)\)$/);
+    if (legacy && /^(absolute|fixed)$/.test(s.position)) {
+      const values = legacy[1].split(/[,\s]+/).filter(Boolean);
+      if (values.length === 4) {
+        const [top, right, bottom, left] = values.map((v, i) => v === "auto"
+          ? (i === 1 ? el.offsetWidth : i === 2 ? el.offsetHeight : 0) : Number.parseFloat(v));
+        if (right <= left || bottom <= top) return true;
+      }
+    }
+    const inset = s.clipPath.match(/^inset\(([^)]+)\)$/);
+    if (inset) {
+      const values = inset[1].split(/\s+round\s+/)[0].trim().split(/\s+/);
+      if (values.length >= 1 && values.length <= 4 && values.every((v) => /^-?[\d.]+(?:px|%)?$/.test(v))) {
+        const [a, b = a, c = a, d = b] = values;
+        const offset = (v, length) => Number.parseFloat(v) * (v.endsWith("%") ? length / 100 : 1);
+        if (offset(a, el.offsetHeight) + offset(c, el.offsetHeight) >= el.offsetHeight ||
+            offset(b, el.offsetWidth) + offset(d, el.offsetWidth) >= el.offsetWidth) return true;
+      }
+    }
+    return false;
+  };
   const mounted = (el) => {
+    // Visibility is inherited but descendants may explicitly restore it.
+    if (style(el).visibility === "hidden" || style(el).visibility === "collapse") return false;
     for (let n = el; n; n = n.parentElement) {
       const s = style(n);
-      if (s.display === "none" || s.visibility === "hidden" ||
-          s.visibility === "collapse" || Number(s.opacity) === 0 ||
-          s.contentVisibility === "hidden") return false;
+      if (s.display === "none" || Number(s.opacity) === 0 ||
+          s.contentVisibility === "hidden" || zeroPaintClip(n, s)) return false;
     }
     const r = el.getBoundingClientRect();
     return r.width > 0 && r.height > 0;
@@ -63,28 +90,52 @@ function browserGeometry(rowSelector) {
   const pointInside = (x, y, c) => x >= c.left && x < c.right && y >= c.top && y < c.bottom;
   const hardTextClip = (el) => {
     const c = { left: -Infinity, right: Infinity, top: -Infinity, bottom: Infinity };
-    let reachableX = false;
-    let reachableY = false;
+    let moveLeft = 0;
+    let moveRight = 0;
+    let moveUp = 0;
+    let moveDown = 0;
     for (let n = el; n; n = n.parentElement) {
       const s = style(n);
       const paint = /(^|\s)(paint|strict|content)(\s|$)/.test(s.contain);
       const hardX = paint || /^(hidden|clip)$/.test(s.overflowX);
       const hardY = paint || /^(hidden|clip)$/.test(s.overflowY);
       const b = (hardX || hardY) ? clipBox(n) : null;
-      if (hardX && !reachableX) {
-        c.left = Math.max(c.left, b.left);
-        c.right = Math.min(c.right, b.right);
+      if (hardX) {
+        c.left = Math.max(c.left, b.left - moveRight);
+        c.right = Math.min(c.right, b.right + moveLeft);
       }
-      if (hardY && !reachableY) {
-        c.top = Math.max(c.top, b.top);
-        c.bottom = Math.min(c.bottom, b.bottom);
+      if (hardY) {
+        c.top = Math.max(c.top, b.top - moveDown);
+        c.bottom = Math.min(c.bottom, b.bottom + moveUp);
       }
       // A line partly entering a scrollport remains readable by scrolling.
-      // Outer clipping of that scrollport does not permanently truncate its
-      // text, but a hard clip already encountered inside it still does.
-      if (/^(auto|scroll)$/.test(s.overflowX) && n.scrollWidth > n.clientWidth) reachableX = true;
-      if (/^(auto|scroll)$/.test(s.overflowY) && n.scrollHeight > n.clientHeight) reachableY = true;
+      // Only the measured available scroll delta can recover text from an
+      // outer hard clip. An oversized inner viewport may still hide its tail.
+      const r = n.getBoundingClientRect();
+      const sx = n.offsetWidth ? r.width / n.offsetWidth : 1;
+      const sy = n.offsetHeight ? r.height / n.offsetHeight : 1;
+      const viewportOverflowX = s.overflowX === "visible" ? style(document.body).overflowX : s.overflowX;
+      const pageScrollX = n === document.scrollingElement && !/^(hidden|clip)$/.test(viewportOverflowX);
+      if (/^(auto|scroll)$/.test(s.overflowX) || pageScrollX) {
+        const maximum = Math.max(0, n.scrollWidth - n.clientWidth);
+        if (s.direction === "rtl") {
+          moveLeft += Math.max(0, -n.scrollLeft) * sx;
+          moveRight += Math.max(0, maximum + n.scrollLeft) * sx;
+        } else {
+          moveLeft += Math.max(0, maximum - n.scrollLeft) * sx;
+          moveRight += Math.max(0, n.scrollLeft) * sx;
+        }
+      }
+      if (/^(auto|scroll)$/.test(s.overflowY)) {
+        moveUp += Math.max(0, n.scrollHeight - n.clientHeight - n.scrollTop) * sy;
+        moveDown += Math.max(0, n.scrollTop) * sy;
+      }
     }
+    // Negative glyph overflow can be cropped by the viewport while its
+    // element box and document scrollWidth remain inside the window. Account
+    // for the actual horizontal scroll range before treating that as loss.
+    c.left = Math.max(c.left, -moveRight);
+    c.right = Math.min(c.right, vw + moveLeft);
     return c;
   };
 
@@ -114,18 +165,20 @@ function browserGeometry(rowSelector) {
       range.detach();
       return boxes;
     });
-    // Do not inspect text that is wholly outside the current scroll window.
-    if (!rects.some((r) => intersects(r, effectiveClip(el, true)))) continue;
+    // Ignore elements outside the scroll window. A visible control can have
+    // its entire label cropped (e.g. text-indent), so its glyphs need not
+    // intersect the clip before their permanent clipping is measured.
+    if (!intersects(el.getBoundingClientRect(), effectiveClip(el, true))) continue;
     const s = style(el);
     const c = hardTextClip(el);
-    // Inline clientWidth is zero in Chromium: only rendered ranges can prove
-    // those leaves clipped. Block scrollWidth also catches text overrunning an
-    // authored width even when overflow is visible rather than hidden.
+    // Inline clientWidth is zero in Chromium. Block scrollWidth is useful
+    // diagnostic evidence, but also includes decorative pseudo-elements and
+    // visible overflow, so only rendered text against a hard clip proves loss.
     const blockOverflow = s.display !== "inline" && el.clientWidth > 0 &&
       !/^(auto|scroll)$/.test(s.overflowX) && el.scrollWidth > el.clientWidth + slack;
     const clippedRange = rects.some((r) => r.left < c.left - slack || r.right > c.right + slack ||
       r.top < c.top - slack || r.bottom > c.bottom + slack);
-    if (blockOverflow || clippedRange) {
+    if (clippedRange) {
       clippedText.push({ label: label(el), scrollW: el.scrollWidth, clientW: el.clientWidth,
         blockOverflow, clippedRange });
     }
@@ -173,6 +226,7 @@ function browserGeometry(rowSelector) {
 }
 
 export const GEOMETRY_SOURCE = `(${browserGeometry.toString()})`;
+export const GEOMETRY_SOURCE_SHA256 = createHash("sha256").update(GEOMETRY_SOURCE).digest("hex");
 
 export async function measureGeometry(page, rowSelector = null) {
   if (rowSelector !== null && (typeof rowSelector !== "string" || !rowSelector.trim())) {

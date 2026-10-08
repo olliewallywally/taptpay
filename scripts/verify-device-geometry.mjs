@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
 import { CHROMIUM_PATH } from "./desktop-shots/retail-fixtures.mjs";
-import { measureGeometry } from "./device-geometry.mjs";
+import { GEOMETRY_SOURCE_SHA256, measureGeometry } from "./device-geometry.mjs";
 
 const browser = await chromium.launch({ executablePath: CHROMIUM_PATH, headless: true });
 const page = await browser.newPage({ viewport: { width: 320, height: 240 } });
@@ -58,6 +58,28 @@ try {
   await fixture("hidden ancestors suppress descendant faults",
     '<div style="opacity:0;overflow:hidden"><div style="width:400px;overflow:hidden">Long text</div><button>Pay</button></div><div style="visibility:hidden"><button>Pay</button></div><div style="display:none"><button>Pay</button></div>',
     (g) => { clean(g); assert.equal(g.tapCentresChecked, 0); });
+  await fixture("legacy zero-paint accessible text and controls are clean",
+    '<span style="position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap">Accessible hidden label</span><button style="position:absolute;clip:rect(0,0,0,0)">Hidden control</button>',
+    (g) => { clean(g); assert.equal(g.tapCentresChecked, 0); });
+  await fixture("zero-paint inset accessible text is clean",
+    '<span style="position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap">Accessible hidden label</span>', clean);
+  await fixture("a descendant may restore inherited hidden visibility",
+    '<div style="visibility:hidden"><button style="visibility:visible">Pay</button></div><div style="position:absolute;left:0;top:0;width:80px;height:36px;background:red"></div>',
+    (g) => { assert.equal(g.tapCentresChecked, 1); assert.equal(g.tapCentreMiss, 1); });
+  await fixture("legacy clip does not hide a statically positioned control",
+    '<button style="clip:rect(0,0,0,0)">Pay</button><div style="position:absolute;left:0;top:0;width:80px;height:36px;background:red"></div>',
+    (g) => { assert.equal(g.tapCentresChecked, 1); assert.equal(g.tapCentreMiss, 1); });
+  await fixture("readable visible text overflow is not clipped text",
+    '<div style="width:40px;white-space:nowrap;overflow:visible">Long text remains fully painted</div>', clean);
+  await fixture("direct text cropped beyond the negative viewport edge is a fault",
+    '<div class="negative-glyphs" style="width:40px;text-align:right;white-space:nowrap;overflow:visible">A long directly painted label</div>',
+    (g) => { assert.equal(g.docOverflow, 0); assert.equal(g.edgeCrosserCount, 0); assert.ok(g.clippedText.some((x) => x.label === "div.negative-glyphs")); });
+  await fixture("positive text overflow remains reachable by actual document horizontal scroll",
+    '<div style="width:40px;white-space:nowrap;overflow:visible">' + 'Readable by horizontal page scrolling. '.repeat(5) + '</div>',
+    (g) => { assert.ok(g.docOverflow > 0); assert.equal(g.clippedTextCount, 0); });
+  await fixture("compact button pseudo-element hit expansion does not clip its text",
+    '<style>.expanded{position:relative;width:33px;padding:0;border:0;font:12px Arial;overflow:visible}.expanded::after{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:max(100%,44px);height:44px}</style><button class="expanded">Sign in</button>',
+    (g) => { clean(g); assert.equal(g.tapCentresChecked, 1); });
   await fixture("clipped decorative children do not cross viewport edges",
     '<div style="width:100px;height:40px;overflow:hidden"><div style="width:500px;height:20px;background:red"></div></div>', clean);
   await fixture("below-scroll text and controls are clean",
@@ -69,11 +91,17 @@ try {
     '<div style="width:200px;height:30px;overflow:auto"><p style="margin:0;line-height:20px">Some text wrapped into multiple lines of the scrollable region</p></div>', clean);
   await fixture("scrollable text remains reachable inside an outer hard clip",
     '<div style="width:200px;height:30px;overflow:hidden"><div style="height:30px;overflow:auto"><p style="margin:0;line-height:20px">Some text wrapped into multiple lines of the scrollable region</p></div></div>', clean);
+  await fixture("insufficient inner scroll cannot recover outer hard-clipped text",
+    '<div style="width:200px;height:30px;overflow:hidden"><div style="height:100px;overflow:auto"><p class="unreachable" style="margin:0;line-height:20px">' + 'Some text wrapped into multiple lines of the scrollable region '.repeat(5) + '</p></div></div>',
+    (g) => assert.ok(g.clippedText.some((x) => x.label === "p.unreachable" && x.clippedRange)));
   await fixture("horizontal auto scrolling does not truncate a text leaf",
     '<div style="width:100px;overflow:auto;white-space:nowrap">Long text readable by horizontal scrolling</div>', clean);
   await fixture("mixed direct button text and SVG still detect clipping",
     '<button class="mixed" style="width:60px;overflow:hidden;white-space:nowrap">Long clipped payment label <svg width="10" height="10"></svg></button>',
     (g) => assert.ok(g.clippedText.some((x) => x.label === "button.mixed")));
+  await fixture("a wholly cropped mixed button label is a fault",
+    '<button class="wholly-cropped" style="width:60px;overflow:hidden;white-space:nowrap;text-indent:100px">Pay <svg width="10" height="10"></svg></button>',
+    (g) => assert.ok(g.clippedText.some((x) => x.label === "button.wholly-cropped" && x.clippedRange)));
   await fixture("hard vertical line-clamp clipping is a fault",
     '<div class="clamped" style="width:120px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:1;overflow:hidden">A long paragraph that wraps over several lines and is permanently clamped</div>',
     (g) => assert.ok(g.clippedText.some((x) => x.label === "div.clamped" && x.clippedRange)));
@@ -102,7 +130,7 @@ try {
     '<div class="tp-stack-row" style="height:40px;width:200px">Payment row</div><div style="position:absolute;inset:0;background:red"></div>',
     (g) => { clean(g); assert.deepEqual(g.terminalRows, { total: 1, visible: 0 }); }, ".tp-stack-row");
   await assert.rejects(() => measureGeometry(page, ""), /nonempty selector/);
-  console.log(`PASS ${passed} geometry fixtures; empty row selector rejected`);
+  console.log(`PASS ${passed} geometry fixtures; empty row selector rejected; source sha256 ${GEOMETRY_SOURCE_SHA256}`);
 } finally {
   await browser.close();
 }

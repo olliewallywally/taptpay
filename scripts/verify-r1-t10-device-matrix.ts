@@ -62,7 +62,7 @@ import { chromium, type BrowserContext, type Page, type Request as BrowserReques
 import { CHROMIUM_PATH } from "./desktop-shots/retail-fixtures.mjs";
 import { tutorialStepsForDevice } from "../client/src/features/tutorial/tutorial-registry";
 import type { TutorialPageKey } from "../shared/tutorial";
-import { measureGeometry } from "./device-geometry.mjs";
+import { measureGeometry, GEOMETRY_SOURCE_SHA256 } from "./device-geometry.mjs";
 
 const argv = process.argv.slice(2);
 const flag = (name: string) => {
@@ -772,7 +772,7 @@ try {
     const failed = cells.filter((cell) => cell.faults.length);
     const elsewhere = [...new Set(cells.flatMap((cell) => cell.elsewhere))].sort();
     const routes = [...new Set(cells.flatMap((cell) => cell.routes))].sort();
-    writeFileSync(path.join(out, "results.json"), JSON.stringify({ base: "in-process", cells, elsewhere, routes }, null, 1));
+    writeFileSync(path.join(out, "results.json"), JSON.stringify({ base: "in-process", geometrySourceSha256: GEOMETRY_SOURCE_SHA256, cells, elsewhere, routes }, null, 1));
     console.log(`\n${cells.length} cells: ${cells.length - failed.length} pass, ${failed.length} fail`);
     console.log(`${cells.reduce((sum, cell) => sum + cell.sent, 0)} requests to this app's API, to ${routes.length} of the server's routes; none to an address it does not have${failed.some((cell) => cell.faults.some((fault) => fault.includes("no such route"))) ? " — NOT TRUE, see the failures" : ""}`);
     console.log(`asked of other machines (refused here, answered empty): ${elsewhere.length ? elsewhere.join(", ") : "nothing"}`);
