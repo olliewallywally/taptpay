@@ -50,6 +50,7 @@
 // only when every one is caught and the unplanted controls pass. Exits 1 when a cell fails. Chromium on Linux is not Safari on an iPhone:
 // real devices are the owner's check.
 import express from "express";
+import bcrypt from "bcrypt";
 import https from "node:https";
 import net from "node:net";
 import { execFileSync } from "node:child_process";
@@ -57,26 +58,40 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import os from "node:os";
 import path from "node:path";
 import type { AddressInfo } from "node:net";
-import { chromium, type BrowserContext, type Page } from "playwright";
+import { chromium, type BrowserContext, type Page, type Request as BrowserRequest } from "playwright";
 import { CHROMIUM_PATH } from "./desktop-shots/retail-fixtures.mjs";
 import { tutorialStepsForDevice } from "../client/src/features/tutorial/tutorial-registry";
 import type { TutorialPageKey } from "../shared/tutorial";
+import { measureGeometry } from "./device-geometry.mjs";
 
 const argv = process.argv.slice(2);
-const flag = (name: string) => { const at = argv.indexOf(name); return at >= 0 ? argv.splice(at, 2)[1] : null; };
+const flag = (name: string) => {
+  const at = argv.indexOf(name);
+  if (at < 0) return null;
+  const value = argv[at + 1];
+  if (!value || value.startsWith("--")) throw new Error(`${name} needs a value`);
+  argv.splice(at, 2);
+  return value;
+};
 const ONLY_CONTEXT = flag("--context");
 const ONLY_SURFACE = flag("--surface");
 const MEASURE = flag("--measure");
 const SELF_TEST = argv.includes("--self-test") ? (argv.splice(argv.indexOf("--self-test"), 1), true) : false;
 const out = argv[0];
 const builtClient = argv[1];
-if (!out || !builtClient || !existsSync(path.join(builtClient, "index.html"))) {
+if (argv.length !== 2 || !out || !builtClient || !existsSync(path.join(builtClient, "index.html"))) {
   throw new Error("usage: verify-r1-t10-device-matrix.ts <evidence dir> <absolute built client dir>   (npx vite build --outDir <that dir> first)");
 }
+if (ONLY_CONTEXT && !["phone", "tablet", "desktop", "desktop-short"].includes(ONLY_CONTEXT)) {
+  throw new Error(`unknown --context: ${ONLY_CONTEXT}`);
+}
+if (SELF_TEST && (ONLY_CONTEXT || ONLY_SURFACE)) throw new Error("--self-test cannot be combined with matrix filters");
 mkdirSync(out, { recursive: true });
 
 const OWNER_PASSWORD = "Matrix-password-1";
 const OWNER_EMAIL = "owner@matrix.test";
+const ADMIN_EMAIL = "admin@matrix.test";
+const ADMIN_PASSWORD = "Matrix-admin-password-1";
 
 // ── The app, in this process ─────────────────────────────────────────────────────────────────────
 const freePort = () => new Promise<number>((resolve) => {
@@ -113,6 +128,8 @@ Object.assign(process.env, {
   EMAIL_PROVIDER: "simulation",
   JWT_SECRET: "device-matrix-not-a-real-secret-0001",
   PUBLIC_ORIGIN: base,
+  ADMIN_EMAIL,
+  ADMIN_PASSWORD_HASH: bcrypt.hashSync(ADMIN_PASSWORD, 4),
 });
 
 const { createApp } = await import("../server/app");
@@ -326,7 +343,7 @@ const SURFACES: Surface[] = [
  * `name` is what it is called in the output where its address holds a sale's link; `movesTo` is where
  * it is meant to end up when it is not meant to stay.
  */
-interface Outside { path: string; who: "nobody" | "a new business"; mark: { selector?: string; text?: string }; name?: string; movesTo?: string }
+interface Outside { path: string; who: "nobody" | "a new business" | "admin"; mark: { selector?: string; text?: string }; name?: string; movesTo?: string }
 const OUTSIDE: Outside[] = [
   { path: "/", who: "nobody", mark: { selector: "#tp-nav" } },
   { path: "/login", who: "nobody", mark: { selector: '[data-testid="button-login"]' } },
@@ -340,6 +357,7 @@ const OUTSIDE: Outside[] = [
   { path: "/privacy", who: "nobody", mark: { text: "Office of the Privacy Commissioner" } },
   { path: "/onboarding", who: "a new business", mark: { text: "Complete Your Business Profile" } },
   // What a customer opens. A sale with a link of its own:
+  { path: `/pay/t/${linkOpen.token}`, name: "/pay/t/:token", who: "nobody", mark: { text: "enter credit card" }, movesTo: `/checkout/t/${linkOpen.token}` },
   { path: `/checkout/t/${linkOpen.token}`, name: "/checkout/t/:token", who: "nobody", mark: { text: "enter credit card" } },
   { path: `/split/t/${linkShared.token}`, name: "/split/t/:token", who: "nobody", mark: { text: "each pays" } },
   { path: `/receipt/t/${linkPaid.token}`, name: "/receipt/t/:token", who: "nobody", mark: { text: "Payment Accepted!" } },
@@ -355,6 +373,14 @@ const OUTSIDE: Outside[] = [
   // The two notices: no board and no link; and a return from the bank this browser did not start.
   { path: `/pay/${merchantId}`, name: "/pay/:id", who: "nobody", mark: { text: "Ask for your payment link" } },
   { path: "/pay/return/not-a-state-this-browser-holds", name: "/pay/return/:state", who: "nobody", mark: { text: "Reopen the original payment link" } },
+  // The admin opens these with its own cookie; these pages never use the merchant frame.
+  { path: "/admin", who: "admin", mark: { selector: '[data-testid="stat-total-revenue"]' } },
+  { path: "/admin/merchants", who: "admin", mark: { selector: '[data-testid="input-search-merchants"]' } },
+  { path: `/admin/merchants/${merchantId}`, name: "/admin/merchants/:id", who: "admin", mark: { text: "Account Information" } },
+  { path: "/admin/api", who: "admin", mark: { selector: '[data-testid="api-management-unavailable"]' } },
+  { path: "/admin/analytics", who: "admin", mark: { text: "Revenue & Platform" } },
+  { path: "/admin/web-analytics", who: "admin", mark: { text: "Revenue & Platform" } },
+  { path: "/admin/settings", who: "admin", mark: { text: "Settings page coming soon" } },
 ];
 
 // ── What is read from a page (a string, not a function: tsx wraps nested functions in a helper the page lacks) ──
@@ -440,7 +466,7 @@ const browser = await chromium.launch({
   args: ["--host-resolver-rules=MAP localhost 127.0.0.1", `--ignore-certificate-errors-spki-list=${certKeyHash}`],
 });
 
-interface Watch { pageErrors: string[]; consoleErrors: Array<{ text: string; from: string }>; failed: string[]; elsewhere: string[]; sent: string[]; routes: Set<string> }
+interface Watch { pageErrors: string[]; consoleErrors: Array<{ text: string; from: string }>; failed: string[]; elsewhere: string[]; sent: string[]; routes: Set<string>; pending: Set<BrowserRequest> }
 async function openContext(size: Size): Promise<BrowserContext> {
   const context = await browser.newContext({
     viewport: { width: size.width, height: size.height }, hasTouch: size.touch, isMobile: size.touch,
@@ -454,7 +480,7 @@ async function openContext(size: Size): Promise<BrowserContext> {
 /** A page of the context that records what it does. Nothing leaves this machine: another machine's reply is empty. */
 async function openPage(context: BrowserContext, mode: Mode | null): Promise<{ page: Page; watch: Watch }> {
   const page = await context.newPage();
-  const watch: Watch = { pageErrors: [], consoleErrors: [], failed: [], elsewhere: [], sent: [], routes: new Set() };
+  const watch: Watch = { pageErrors: [], consoleErrors: [], failed: [], elsewhere: [], sent: [], routes: new Set(), pending: new Set() };
   if (mode) await page.addInitScript(`try { localStorage.setItem("taptMode", ${JSON.stringify(mode)}); } catch (e) {}`);
   await page.route("**/*", async (route) => {
     const url = new URL(route.request().url());
@@ -468,7 +494,9 @@ async function openPage(context: BrowserContext, mode: Mode | null): Promise<{ p
   page.on("console", (message) => { if (message.type() === "error") watch.consoleErrors.push({ text: message.text().slice(0, 300), from: message.location().url ?? "" }); });
   page.on("request", (request) => {
     const url = new URL(request.url());
-    if (url.origin !== base || !url.pathname.startsWith("/api/")) return;
+    if (url.origin !== base) return;
+    watch.pending.add(request);
+    if (!url.pathname.startsWith("/api/")) return;
     watch.sent.push(`${request.method()} ${url.pathname}`);
     const route = routeFor(request.method(), url.pathname);
     if (route) watch.routes.add(route);
@@ -477,8 +505,12 @@ async function openPage(context: BrowserContext, mode: Mode | null): Promise<{ p
   page.on("response", (response) => {
     const url = new URL(response.url());
     if (url.origin === base && response.status() >= 400) watch.failed.push(`${response.status()} ${response.request().method()} ${url.pathname}${url.search}`);
+    // A stream need not finish, but must answer with its own content type before it is considered open.
+    if (response.headers()["content-type"]?.startsWith("text/event-stream")) watch.pending.delete(response.request());
   });
+  page.on("requestfinished", (request) => watch.pending.delete(request));
   page.on("requestfailed", (request) => {
+    watch.pending.delete(request);
     const url = new URL(request.url());
     const why = request.failure()?.errorText ?? "failed";
     // A request the page itself gave up (it moved on, or closed a stream) is not a failure of this app.
@@ -487,11 +519,12 @@ async function openPage(context: BrowserContext, mode: Mode | null): Promise<{ p
   return { page, watch };
 }
 
-async function signIn(context: BrowserContext, email = OWNER_EMAIL): Promise<void> {
+async function signIn(context: BrowserContext, email = OWNER_EMAIL, realm: "business" | "admin" = "business", beforeProbe?: (page: Page) => Promise<void>): Promise<void> {
   const { page, watch } = await openPage(context, null);
   await page.goto(`${base}/login`, { waitUntil: "domcontentloaded", timeout: 120_000 });
+  if (realm === "admin") await page.getByRole("button", { name: "Admin", exact: true }).click();
   await page.fill('[data-testid="input-email"]', email, { timeout: 60_000 });
-  await page.fill('[data-testid="input-password"]', OWNER_PASSWORD);
+  await page.fill('[data-testid="input-password"]', realm === "admin" ? ADMIN_PASSWORD : OWNER_PASSWORD);
   try {
     await page.click('[data-testid="button-login"]', { timeout: 8_000 });
   } catch (error) {
@@ -508,14 +541,25 @@ async function signIn(context: BrowserContext, email = OWNER_EMAIL): Promise<voi
     throw new Error(`the login button could not be tapped: ${JSON.stringify(state)}; failed requests: ${JSON.stringify(watch.failed)} — ${String(error).split("\n")[0]}`);
   }
   await page.waitForFunction(() => !location.pathname.startsWith("/login"), undefined, { timeout: 60_000 });
-  const session = await page.evaluate("fetch('/api/auth/session', { credentials: 'same-origin', cache: 'no-store' }).then(function (r) { return r.status; })");
-  if (session !== 200) throw new Error(`sign-in did not leave a session (GET /api/auth/session answered ${session})`);
+  if (beforeProbe) await beforeProbe(page);
+  const endpoint = realm === "admin" ? "/api/admin/auth/me" : "/api/auth/session";
+  const session = await page.evaluate(async (endpoint) => {
+    const reply = await fetch(endpoint, { credentials: "same-origin", cache: "no-store" });
+    return { status: reply.status, body: await reply.json() };
+  }, endpoint);
+  const expectedMerchant = email === NEW_EMAIL ? newcomer.id : merchantId;
+  const identityMatches = realm === "admin"
+    ? session.body?.user?.role === "admin" && session.body?.user?.email === ADMIN_EMAIL
+    : session.body?.signedIn === true && session.body?.user?.email === email && session.body?.user?.merchantId === expectedMerchant;
+  if (session.status !== 200 || !identityMatches || typeof session.body?.csrfToken !== "string") {
+    throw new Error(`sign-in did not leave the expected ${realm} session (GET ${endpoint} answered ${session.status})`);
+  }
   // The sign-in pages are held like any cell: a request of theirs that failed is not passed over.
-  if (watch.failed.length || watch.pageErrors.length) throw new Error(`signing in: ${[...watch.failed.map((line) => `failed request: ${line}`), ...watch.pageErrors.map((line) => `page error: ${line}`)].join("; ")}`);
+  if (watch.failed.length || watch.pageErrors.length || watch.consoleErrors.length) throw new Error(`signing in: ${[...watch.failed.map((line) => `failed request: ${line}`), ...watch.pageErrors.map((line) => `page error: ${line}`), ...watch.consoleErrors.map((error) => `console error: ${error.text}`)].join("; ")}`);
   await page.close();
 }
 
-interface Cell { size: string; path: string; mode: Mode | "outside"; pageKey: string; faults: string[]; mark: string | null; byFallback: boolean; elsewhere: string[]; sent: number; routes: string[]; measured?: unknown }
+interface Cell { size: string; path: string; mode: Mode | "outside"; pageKey: string; faults: string[]; mark: string | null; byFallback: boolean; elsewhere: string[]; sent: number; routes: string[]; measured?: unknown; geometry?: Awaited<ReturnType<typeof measureGeometry>> }
 /** A fallback that names something of the screen's own (a class, an attribute), not any page's furniture. */
 const ownFallback = (selector: string | undefined | null): boolean => !!selector && /[.#\[]/.test(selector);
 const ERROR_SCREENS = /Something went wrong|couldn't check your session|taking longer than expected|Connection Lost/i;
@@ -539,6 +583,7 @@ async function visit(context: BrowserContext, size: Size, surface: Surface | Out
   let mark: string | null = null;
   let byFallback = false;
   let measured: unknown;
+  let geometry: Cell["geometry"];
   try {
     await page.goto(`${base}${surface.path}`, { waitUntil: "domcontentloaded", timeout: 120_000 });
     // Settled: a mark is up (or the wait runs out), nothing is being fetched, and no finite animation is running.
@@ -551,7 +596,7 @@ async function visit(context: BrowserContext, size: Size, surface: Surface | Out
       if (watch.sent.length !== lastSent) { lastSent = watch.sent.length; quietSince = Date.now(); }
       const marked = facts.marks.some((step, index) => step.shown || (step.fallbackShown && ownFallback(steps[index].fallbackTarget)))
         || (words !== null && facts.text.includes(words));
-      if (marked && facts.running === 0 && Date.now() - quietSince >= 1000) break;
+      if (marked && facts.running === 0 && watch.pending.size === 0 && Date.now() - quietSince >= 1000) break;
       if (Date.now() > deadline) break;
     }
     if (options.plant) { await options.plant(page); await page.waitForTimeout(600); facts = await readFacts(page, steps); }
@@ -579,6 +624,17 @@ async function visit(context: BrowserContext, size: Size, surface: Surface | Out
     for (const error of watch.pageErrors) faults.push(`page error: ${error}`);
     for (const error of watch.consoleErrors) faults.push(`console error: ${error.text}`);
     for (const failure of watch.failed) faults.push(`failed request: ${failure}`);
+    for (const request of watch.pending) faults.push(`request did not settle: ${request.method()} ${new URL(request.url()).pathname}`);
+    const terminalRows = !outside && ["/terminal", "/property/terminal", "/trades/terminal"].includes(surface.path)
+      ? size.deviceClass === "mobile" ? ".tp-stack-row"
+        : mode === "retail" ? ".rt-rows .rt-row" : mode === "property" ? ".pt-rows .pt-row" : ".tt-rows .tt-row"
+      : null;
+    geometry = await measureGeometry(page, terminalRows);
+    if (geometry.docOverflow > 1) faults.push(`document overflow: ${geometry.docOverflow}px`);
+    if (geometry.edgeCrosserCount) faults.push(`window edge crossing: ${geometry.edgeCrosserCount} rendered elements`);
+    if (geometry.clippedTextCount) faults.push(`clipped text: ${geometry.clippedTextCount} elements`);
+    if (geometry.tapCentreMiss) faults.push(`tap centre miss: ${geometry.tapCentreMiss} controls`);
+    if (geometry.terminalRows && geometry.terminalRows.visible === 0) faults.push(`terminal has zero visible rows (${geometry.terminalRows.total} mounted)`);
     if (MEASURE) {
       measured = await page.evaluate(`(function (selector) { var el = document.querySelector(selector); if (!el) return null; var r = el.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; })(${JSON.stringify(MEASURE)})`);
     }
@@ -591,13 +647,15 @@ async function visit(context: BrowserContext, size: Size, surface: Surface | Out
   } finally {
     await page.close().catch(() => undefined);
   }
-  return { size: size.name, path: called, mode: outside ? "outside" : mode, pageKey: outside ? outside.who : (surface as Surface).pageKey, faults, mark, byFallback, elsewhere: [...new Set(watch.elsewhere)], sent: watch.sent.length, routes: [...watch.routes].sort(), ...(MEASURE ? { measured } : {}) };
+  return { size: size.name, path: called, mode: outside ? "outside" : mode, pageKey: outside ? outside.who : (surface as Surface).pageKey, faults, mark, byFallback, elsewhere: [...new Set(watch.elsewhere)], sent: watch.sent.length, routes: [...watch.routes].sort(), geometry, ...(MEASURE ? { measured } : {}) };
 }
 
 let exitCode = 0;
 try {
   const sizes = SIZES.filter((size) => !ONLY_CONTEXT || size.name === ONLY_CONTEXT);
   const surfaces = SURFACES.filter((surface) => !ONLY_SURFACE || surface.path === ONLY_SURFACE);
+  const pages = OUTSIDE.filter((page) => !ONLY_SURFACE || page.path === ONLY_SURFACE || page.name === ONLY_SURFACE);
+  if (!sizes.length || (!surfaces.length && !pages.length)) throw new Error("matrix filters selected zero cells");
   if (SELF_TEST) {
     // One fault at a time, on the phone's terminal and the desktop's; every one must be caught.
     const phone = SIZES[0]; const desktop = SIZES[2]; const tablet = SIZES[1];
@@ -638,6 +696,34 @@ try {
       ["a board that was meant to move on to checkout and did not", /meant to move to \/checkout\/\d+, ended at \/pay\//, () => visit(signedOut, phone, { ...emptyBoard, movesTo: openBoard.movesTo }, { shot: false })],
       ["a board that moved on when it was meant to stay", /ended at \/checkout\//, () => visit(signedOut, phone, { ...openBoard, movesTo: undefined }, { shot: false })],
       ["a sale's link that is not one (the server's 404 is a failure here)", /failed request: 404 GET \/api\/pay\/t\/not-a-real-link/, () => visit(signedOut, phone, { ...checkout, path: "/checkout/t/not-a-real-link" }, { shot: false })],
+      ["a required request that never answers", /request did not settle: GET \/api\/auth\/session/, () => visit(signedIn, phone, terminal, { plant: async (page) => {
+        await page.route("**/api/auth/session", () => {});
+        await page.evaluate("void fetch('/api/auth/session')");
+      }, shot: false })],
+    );
+    // Session status alone is not proof of sign-in, and console errors during sign-in cannot disappear.
+    const signInPlants: Array<[string, RegExp, (page: Page) => Promise<void>]> = [
+      ["a signed-out session reply with HTTP 200", /did not leave the expected business session/, (page) => page.route("**/api/auth/session", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ signedIn: false }) }))],
+      ["another business's session reply with HTTP 200", /did not leave the expected business session/, (page) => page.route("**/api/auth/session", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ signedIn: true, csrfToken: "fixture", user: { email: OWNER_EMAIL, merchantId: newcomer.id } }) }))],
+      ["a console error during sign-in", /console error: planted sign-in fault/, (page) => page.evaluate("console.error('planted sign-in fault')") as Promise<void>],
+    ];
+    for (const [name, expected, plant] of signInPlants) {
+      const context = await openContext(phone);
+      let reason = "";
+      try { await signIn(context, OWNER_EMAIL, "business", plant); }
+      catch (error) { reason = String(error); }
+      finally { await context.close(); }
+      const caught = expected.test(reason);
+      if (!caught) exitCode = 1;
+      console.log(`${caught ? "caught" : "MISSED"} ${name}`);
+    }
+    const adminContext = await openContext(desktop);
+    await signIn(adminContext, ADMIN_EMAIL, "admin");
+    const adminHome = OUTSIDE.find((page) => page.path === "/admin")!;
+    const adminApi = OUTSIDE.find((page) => page.path === "/admin/api")!;
+    plants.push(
+      ["the admin's page opened with nobody signed in", /ended at \/login|no mark of the \/admin page/, () => visit(signedOut, phone, adminHome, { shot: false })],
+      ["the wrong admin page (home judged by the API page's mark)", /no mark of the \/admin page/, () => visit(adminContext, desktop, { ...adminHome, mark: adminApi.mark }, { shot: false })],
     );
     const control = [await visit(signedIn, phone, terminal, { shot: false }), await visit(onDesktop, desktop, terminal, { shot: false }), await visit(signedOut, phone, login, { shot: false }), await visit(signedOut, phone, openBoard, { shot: false })];
     for (const cell of control) {
@@ -651,7 +737,8 @@ try {
       if (!caught) exitCode = 1;
       console.log(`${caught ? "caught" : "MISSED"} ${name} — ${cell.faults.find((fault) => expected.test(fault)) ?? cell.faults.join("; ") ?? "no fault reported"}`);
     }
-    console.log(`${plants.length} planted, ${exitCode ? "NOT all caught" : "all caught"}`);
+    await adminContext.close();
+    console.log(`${plants.length + signInPlants.length} planted, ${exitCode ? "checks failed (see controls and plants)" : "all caught"}`);
   } else {
     const cells: Cell[] = [];
     for (const size of sizes) {
@@ -664,7 +751,6 @@ try {
       }
       await context.close();
       // The pages outside the merchant frame: with nobody signed in, and onboarding as a business that has just signed up.
-      const pages = OUTSIDE.filter((page) => !ONLY_SURFACE || page.path === ONLY_SURFACE || page.name === ONLY_SURFACE);
       if (pages.some((page) => page.who === "nobody")) {
         const nobody = await openContext(size);
         for (const page of pages.filter((each) => each.who === "nobody")) { const cell = await visit(nobody, size, page); cells.push(cell); say(cell); }
@@ -675,6 +761,12 @@ try {
         await signIn(fresh, NEW_EMAIL);
         for (const page of pages.filter((each) => each.who === "a new business")) { const cell = await visit(fresh, size, page); cells.push(cell); say(cell); }
         await fresh.close();
+      }
+      if (pages.some((page) => page.who === "admin")) {
+        const admin = await openContext(size);
+        await signIn(admin, ADMIN_EMAIL, "admin");
+        for (const page of pages.filter((each) => each.who === "admin")) { const cell = await visit(admin, size, page); cells.push(cell); say(cell); }
+        await admin.close();
       }
     }
     const failed = cells.filter((cell) => cell.faults.length);
