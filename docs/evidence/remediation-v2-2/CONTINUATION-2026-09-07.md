@@ -1,5 +1,28 @@
 # Full integration continuation audit — 2026-09-07
 
+Latest continuation **2026-10-10 — interrupted T10c-2/T10c-3 work recovered,
+completed changes committed for the owner's requested push.** Immediate detailed
+handover: [HANDOFF-2026-10-10-r1-t10-commit-and-push](../../HANDOFF-2026-10-10-r1-t10-commit-and-push.md).
+This supersedes the older T10c-2/T10c-3 "not started" descriptions below.
+
+- `ebcba947`: preserve Oliver's phone Transactions swipe layout; covered graph
+  controls become inert/aria-hidden when expanded and restore on collapse. Real
+  drag/focus/geometry checks pass; the dated owner decision is committed.
+- `e0e69b4d`: historical layout fixtures use observed HttpOnly cookie-session
+  startup, strict public optout and tutorial precedence. Protocol/screen probes
+  and a loopback fixture runner are included.
+- Fresh typecheck/build, **118 client suites / 1,427 tests**, **33 fixture checks**,
+  **8 representative screens**, mobile **21 cells** and desktop P0 pass. Fresh
+  real-route device matrix: **204/204 cells**, 840 API requests to 45 registered routes.
+- Full dock rerun has one invalid-flick harness finding (0.15px/ms instead of
+  >0.4px/ms); retain the failure and read the handover for the isolated rerun.
+  Isolated gesture rerun exits 0 at 0.88px/ms; a fresh full A–F green run remains owed.
+  Existing cartographer/browser-data warnings remain visible. No baseline update.
+- No fresh full server suite, PostgreSQL check, migration, production provider,
+  deployment or real-device check. Review remains owed. **R1-T10 stays open:**
+  durable T10c-2 evidence/review, T10d tutorials, T10e accessibility and T10f
+  owner/manual acceptance remain. Push state and resume commands are in the handover.
+
 Latest continuation **2026-10-07 — R1-T10c-1 the device matrix as one gate,
 code-complete `86d5785d`, `8a4a13e2`, `6c553579`**, local, awaiting independent review.
 [Evidence](r1/R1-T10c-1-device-matrix-2026-10-07.md),
