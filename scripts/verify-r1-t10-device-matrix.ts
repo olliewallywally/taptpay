@@ -392,7 +392,7 @@ const FACTS = `(function (selectors) {
     if (r.width <= 0 || r.height <= 0) return false;
     for (var n = el; n && n !== document.documentElement; n = n.parentElement) {
       var s = getComputedStyle(n);
-      if (s.display === "none" || s.visibility === "hidden") return false;
+      if (s.display === "none" || s.visibility === "hidden" || s.opacity === "0" || n.getAttribute("aria-hidden") === "true") return false;
     }
     return true;
   }
@@ -559,10 +559,30 @@ async function signIn(context: BrowserContext, email = OWNER_EMAIL, realm: "busi
   await page.close();
 }
 
-interface Cell { size: string; path: string; mode: Mode | "outside"; pageKey: string; faults: string[]; mark: string | null; byFallback: boolean; elsewhere: string[]; sent: number; routes: string[]; measured?: unknown; geometry?: Awaited<ReturnType<typeof measureGeometry>> }
+interface Cell { size: string; path: string; mode: Mode | "outside"; pageKey: string; faults: string[]; mark: string | null; byFallback: boolean; elsewhere: string[]; sent: number; routes: string[]; measured?: unknown; geometry?: Awaited<ReturnType<typeof measureGeometry>>; initialGeometry?: Awaited<ReturnType<typeof measureGeometry>>; interaction?: { name: string; coveredControlsCannotFocus: boolean; restoredControlsCanFocus: boolean; geometryRestored: boolean } }
 /** A fallback that names something of the screen's own (a class, an attribute), not any page's furniture. */
 const ownFallback = (selector: string | undefined | null): boolean => !!selector && /[.#\[]/.test(selector);
 const ERROR_SCREENS = /Something went wrong|couldn't check your session|taking longer than expected|Connection Lost/i;
+
+async function dragTransactionsSheet(page: Page, expand: boolean): Promise<void> {
+  const sheet = page.locator('[data-tutorial-id="tx-history"]').locator("..").locator("..").locator("..");
+  const box = await sheet.locator(":scope > div").first().boundingBox();
+  if (!box) throw new Error("transactions sheet has no drag handle");
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2, expand ? 20 : (page.viewportSize()!.height - 20), { steps: 16 });
+  await page.mouse.up();
+  await page.waitForTimeout(600);
+}
+
+async function focusPeriod(page: Page): Promise<boolean> {
+  return page.evaluate(() => {
+    const button = document.querySelector<HTMLButtonElement>('[data-tutorial-id="tx-period"] button');
+    if (!button) throw new Error("transactions has no period button");
+    button.focus();
+    return document.activeElement === button;
+  });
+}
 
 /**
  * One screen at one size. `as` lets the self-test judge a cell by another screen's mark or another size's
@@ -584,6 +604,8 @@ async function visit(context: BrowserContext, size: Size, surface: Surface | Out
   let byFallback = false;
   let measured: unknown;
   let geometry: Cell["geometry"];
+  let initialGeometry: Cell["initialGeometry"];
+  let interaction: Cell["interaction"];
   try {
     await page.goto(`${base}${surface.path}`, { waitUntil: "domcontentloaded", timeout: 120_000 });
     // Settled: a mark is up (or the wait runs out), nothing is being fetched, and no finite animation is running.
@@ -598,6 +620,38 @@ async function visit(context: BrowserContext, size: Size, surface: Surface | Out
         || (words !== null && facts.text.includes(words));
       if (marked && facts.running === 0 && watch.pending.size === 0 && Date.now() - quietSince >= 1000) break;
       if (Date.now() > deadline) break;
+    }
+    // Owner decision 2026-10-08: preserve this phone's swipe layout; verify text after expansion.
+    // Preserve the initial measurement and exercise restoration, rather than adding a clipping allowance.
+    if (!outside && size.deviceClass === "mobile" && surface.path === "/transactions") {
+      initialGeometry = await measureGeometry(page, null);
+      const period = page.locator('[data-tutorial-id="tx-period"]');
+      const before = await period.boundingBox();
+      await dragTransactionsSheet(page, true);
+      const coveredControlsCannotFocus = !(await focusPeriod(page));
+      await dragTransactionsSheet(page, false);
+      const restoredControlsCanFocus = await focusPeriod(page);
+      const after = await period.boundingBox();
+      const geometryRestored = !!before && !!after && ["x", "y", "width", "height"].every((key) => Math.abs(before[key as keyof typeof before] - after[key as keyof typeof after]) < 1.25);
+      if (!coveredControlsCannotFocus) faults.push("the covered period button can receive focus");
+      if (!restoredControlsCanFocus) faults.push("the revealed period button cannot receive focus");
+      if (!geometryRestored) faults.push("the period controls did not return to their original geometry");
+      await dragTransactionsSheet(page, true);
+      interaction = { name: "expanded Transactions sheet by its drag handle", coveredControlsCannotFocus, restoredControlsCanFocus, geometryRestored };
+      // A drag/focus change can start new finite animations. Settle those as for the first render,
+      // with a fresh bound; a fixed delay can finish while the browser is still drawing them.
+      const interactionDeadline = Date.now() + 10_000;
+      let interactionQuietSince = Date.now();
+      let interactionLastSent = watch.sent.length;
+      do {
+        await page.waitForTimeout(250);
+        facts = await readFacts(page, steps);
+        if (watch.sent.length !== interactionLastSent) {
+          interactionLastSent = watch.sent.length;
+          interactionQuietSince = Date.now();
+        }
+        if (facts.running === 0 && watch.pending.size === 0 && Date.now() - interactionQuietSince >= 1000) break;
+      } while (Date.now() < interactionDeadline);
     }
     if (options.plant) { await options.plant(page); await page.waitForTimeout(600); facts = await readFacts(page, steps); }
 
@@ -647,7 +701,7 @@ async function visit(context: BrowserContext, size: Size, surface: Surface | Out
   } finally {
     await page.close().catch(() => undefined);
   }
-  return { size: size.name, path: called, mode: outside ? "outside" : mode, pageKey: outside ? outside.who : (surface as Surface).pageKey, faults, mark, byFallback, elsewhere: [...new Set(watch.elsewhere)], sent: watch.sent.length, routes: [...watch.routes].sort(), geometry, ...(MEASURE ? { measured } : {}) };
+  return { size: size.name, path: called, mode: outside ? "outside" : mode, pageKey: outside ? outside.who : (surface as Surface).pageKey, faults, mark, byFallback, elsewhere: [...new Set(watch.elsewhere)], sent: watch.sent.length, routes: [...watch.routes].sort(), geometry, ...(initialGeometry ? { initialGeometry, interaction } : {}), ...(MEASURE ? { measured } : {}) };
 }
 
 let exitCode = 0;
@@ -725,11 +779,14 @@ try {
       ["the admin's page opened with nobody signed in", /ended at \/login|no mark of the \/admin page/, () => visit(signedOut, phone, adminHome, { shot: false })],
       ["the wrong admin page (home judged by the API page's mark)", /no mark of the \/admin page/, () => visit(adminContext, desktop, { ...adminHome, mark: adminApi.mark }, { shot: false })],
     );
-    const control = [await visit(signedIn, phone, terminal, { shot: false }), await visit(onDesktop, desktop, terminal, { shot: false }), await visit(signedOut, phone, login, { shot: false }), await visit(signedOut, phone, openBoard, { shot: false })];
+    const transactions = SURFACES.find((surface) => surface.path === "/transactions")!;
+    const control = [await visit(signedIn, phone, terminal, { shot: false }), await visit(onDesktop, desktop, terminal, { shot: false }), await visit(signedOut, phone, login, { shot: false }), await visit(signedOut, phone, openBoard, { shot: false }),
+      await visit(signedIn, phone, transactions, { shot: false }),
+    ];
     for (const cell of control) {
       const ok = cell.faults.length === 0;
       if (!ok) exitCode = 1;
-      console.log(`${ok ? "PASS" : "FAIL"} control: ${cell.size} ${cell.path} with nothing planted${ok ? "" : ` — ${cell.faults.join("; ")}`}`);
+      console.log(`${ok ? "PASS" : "FAIL"} control: ${cell.size} ${cell.path}${cell.interaction ? ` (${cell.interaction.name})` : " with nothing planted"}${ok ? "" : ` — ${cell.faults.join("; ")}`}`);
     }
     for (const [name, expected, run] of plants) {
       const cell = await run();

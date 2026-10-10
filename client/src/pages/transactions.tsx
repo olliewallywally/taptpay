@@ -258,6 +258,12 @@ function TransactionsPage({ merchantId }: { merchantId: number }) {
   const defaultOffset = measuredTop ?? 340;
   const currentOffset = sheetOffset ?? defaultOffset;
 
+  // The expanded sheet covers this region. Keep its controls out of focus and hit testing
+  // until the graph is revealed again, using the sheet's existing expanded-state threshold.
+  useEffect(() => {
+    if (topRef.current) topRef.current.inert = currentOffset < 40;
+  }, [currentOffset]);
+
   const onDragStart = useCallback((e: React.PointerEvent) => {
     e.currentTarget.setPointerCapture(e.pointerId);
     dragStartY.current   = e.clientY;
@@ -423,7 +429,7 @@ function TransactionsPage({ merchantId }: { merchantId: number }) {
     <div style={{ width: '100%', maxWidth: 'var(--phone-shell-max)', height: '100svh', fontFamily: "'Outfit', system-ui, sans-serif", background: C.navy, position: 'relative', overflow: 'hidden' }}>
 
       {/* ── Dark top ── */}
-      <div ref={topRef} style={{ padding: '52px 24px 0' }}>
+      <div ref={topRef} aria-hidden={currentOffset < 40 || undefined} style={{ padding: '52px 24px 0' }}>
         <div style={{ marginBottom: 20 }}>
           <span style={{ fontSize: 14, fontWeight: 600, color: C.white }}>analytics</span>
         </div>
