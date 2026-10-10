@@ -36,6 +36,7 @@
  * and still exit 0; §4.1 forbids that here.
  */
 import { chromium } from "playwright";
+import { assertBusinessSessionFixture } from "./browser-session-fixture.mjs";
 import {
   BASE_URL,
   CHROMIUM_PATH,
@@ -281,11 +282,13 @@ async function checkDockContract(page, label) {
  */
 async function checkDockAbsent(page) {
   await page.goto(`${BASE_URL}/login`, { waitUntil: "domcontentloaded" });
+  await assertBusinessSessionFixture(page);
+  await page.getByTestId("button-login").waitFor({ state: "visible" });
   await page.waitForTimeout(900);
+  if (new URL(page.url()).pathname !== "/login") fail("absent dock: public fixture left /login");
   const nav = await navRect(page);
   if (nav) {
-    notes.push("/login unexpectedly rendered a dock; skipped the absent-dock clause");
-    return null;
+    fail("/login unexpectedly rendered a dock (§4.3 clause 8)");
   }
   const { raw, px } = await readDockH(page);
   const zero = raw === "" || px === 0;
@@ -856,6 +859,7 @@ async function verticalRun(browser, phone, { route, vertical, slots }) {
   try {
     await installVerticalMocks(page);
     await page.goto(`${BASE_URL}${route}`, { waitUntil: "domcontentloaded" });
+    await assertBusinessSessionFixture(page);
     await page.locator(".tp-viewport").waitFor({ state: "visible", timeout: 20_000 });
     await page.waitForTimeout(1_100);
     return await walkSubbarScreens(page, vertical, slots, phone);
@@ -950,6 +954,7 @@ async function checkCollapseChannel(browser) {
   });
   try {
     await page.goto(`${BASE_URL}/terminal`, { waitUntil: "domcontentloaded" });
+    await assertBusinessSessionFixture(page);
     await page.locator(".tp-viewport").waitFor({ state: "visible" });
     await page.waitForTimeout(700);
 
@@ -1019,6 +1024,7 @@ async function checkGesture(browser) {
   const out = {};
   try {
     await page.goto(`${BASE_URL}/terminal`, { waitUntil: "domcontentloaded" });
+    await assertBusinessSessionFixture(page);
     await page.locator(".tp-viewport").waitFor({ state: "visible" });
     await waitForCollapsed(page);
 
@@ -1221,6 +1227,7 @@ async function checkGesture(browser) {
        by keyboard and by switch control, and `event.detail === 0` is exactly
        the kind of discrimination a later refactor deletes as redundant. */
     await page.goto(`${BASE_URL}/terminal`, { waitUntil: "domcontentloaded" });
+    await assertBusinessSessionFixture(page);
     await page.locator(".tp-viewport").waitFor({ state: "visible" });
     await waitForCollapsed(page);
     const named = await page.evaluate(() => {
@@ -1271,6 +1278,7 @@ async function checkMorph(browser, { goo = true, reducedMotion = false } = {}) {
   try {
     if (!goo) await page.addInitScript(() => { window.__TAPT_DOCK_GOO__ = false; });
     await page.goto(`${BASE_URL}/terminal`, { waitUntil: "domcontentloaded" });
+    await assertBusinessSessionFixture(page);
     await page.locator(".tp-viewport").waitFor({ state: "visible" });
     await page.waitForTimeout(700);
 
@@ -1489,6 +1497,7 @@ async function main() {
       });
       try {
         await page.goto(`${BASE_URL}/terminal`, { waitUntil: "domcontentloaded" });
+        await assertBusinessSessionFixture(page);
         await page.locator(".tp-viewport").waitFor({ state: "visible" });
         await page.waitForTimeout(900);
 
@@ -1527,6 +1536,7 @@ async function main() {
     });
     try {
       await contract.page.goto(`${BASE_URL}/terminal`, { waitUntil: "domcontentloaded" });
+      await assertBusinessSessionFixture(contract.page);
       await contract.page.locator(".tp-viewport").waitFor({ state: "visible" });
       report.dock = await checkDockContract(contract.page, "dock @ 390x844");
     } finally {
@@ -1538,7 +1548,7 @@ async function main() {
       viewport: { width: 390, height: 844 },
       hasTouch: true,
       isMobile: true,
-    });
+    }, { signedIn: false });
     try {
       report.dockAbsent = await checkDockAbsent(page);
     } finally {
@@ -1571,6 +1581,7 @@ async function main() {
     });
     try {
       await sweep.page.goto(`${BASE_URL}/terminal`, { waitUntil: "domcontentloaded" });
+      await assertBusinessSessionFixture(sweep.page);
       await sweep.page.locator(".tp-viewport").waitFor({ state: "visible" });
       await sweep.page.waitForTimeout(900);
       await sweep.page.getByRole("button", { name: "add item", exact: true }).click();

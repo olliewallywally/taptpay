@@ -43,6 +43,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { chromium } from "playwright";
 import { BASE_URL, CHROMIUM_PATH, VERTICALS, newMobilePage } from "./mobile-fixtures.mjs";
+import { assertBusinessSessionFixture } from "./browser-session-fixture.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BASELINE = join(HERE, "verify-mobile-responsive.baseline.json");
@@ -445,6 +446,7 @@ async function runCell(browser, vertical, vp, safeArea) {
     await page.goto(`${BASE_URL}${VERTICALS[vertical].route}`, {
       waitUntil: "domcontentloaded", timeout: 30_000,
     });
+    await assertBusinessSessionFixture(page);
     /* The terminal mounts its stylesheet and measures its indicator after
        paint; a networkidle wait is not enough on its own. */
     await page.waitForSelector(".tp-viewport", { timeout: 15_000 });
