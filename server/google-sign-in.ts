@@ -64,7 +64,10 @@ export function readCookie(header: string | undefined, name: string): string | u
   return undefined;
 }
 
-/** A fresh state and PKCE pair, and the signed cookie value binding them to this browser and this moment. */
+/**
+ * A fresh state and PKCE pair, signed with its creation time and bound to this browser.
+ * The dot delimiter cannot occur in the base64url tokens or signature, or the integer timestamp.
+ */
 export function startGoogleSignIn(): { state: string; codeChallenge: string; cookieValue: string } {
   const state = randomToken();
   const verifier = randomToken();

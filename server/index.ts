@@ -23,7 +23,7 @@ const app = createApp({ writeRequestLog: log });
 
 (async () => {
   for (const diagnostic of config.diagnostics) {
-    console.warn(`[CONFIG] ${diagnostic.group}: ${diagnostic.key}`);
+    console.warn(`[CONFIG] ${diagnostic.group}: ${diagnostic.message}`);
   }
 
   // ── Database connectivity verification ───────────────────────────────────

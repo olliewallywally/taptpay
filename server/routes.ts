@@ -23,7 +23,8 @@ import {
 } from "./google-sign-in";
 import { type SignInRealm, type TooManyWhat, boardPrintBucket, confirmEmailBucket, confirmationResendBucket, appleCallbackAddressBucket, appleStateBucket, googleCallbackAddressBucket, googleStateBucket, normalizeThrottleEmail, passwordChangeBucket, passwordResetAddressBucket, passwordResetBucket, signInAccountBucket, signInAddressBucket, signInDeviceKeyPrefix, signupNoticeBucket, tooManyAttempts } from "./auth-throttle";
 import { BOARD_PRINT_JSON_LIMIT, boardPrintRequestSchema, decodeBoardPrintPdf } from "./board-print";
-import { clientAddressForLimits } from "./client-address";
+import { clientAddressForLimits, limitAddress } from "./client-address";
+import { tapToPayAmountSchema, tapToPayRequestSchema } from "./tap-to-pay-request";
 import { ACCOUNT_EMAIL_REPLY_FLOOR_MS, SIGN_UP_REPLY_FLOOR_MS, replyNoSoonerThan, replyStart } from "./even-reply";
 import { deviceKnowsEmail, markSignInDevice, readSignInDevice, signInBucketFor, signInDeviceCookie, type SignInDevice } from "./sign-in-device";
 import { generateReceiptPdf } from "./pdf-generator";
@@ -276,11 +277,12 @@ function checkResendRateLimit(key: string): boolean {
 }
 
 function checkRateLimit(ip: string): boolean {
+  const key = limitAddress(ip) ?? 'unknown';
   const now = Date.now();
-  const record = rateLimitMap.get(ip);
+  const record = rateLimitMap.get(key);
   
   if (!record || now > record.resetTime) {
-    rateLimitMap.set(ip, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
+    rateLimitMap.set(key, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
     return true;
   }
   
@@ -2774,15 +2776,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       const transaction = await storage.getActiveTransactionByMerchant(merchantId, { kind: "board", stoneId });
 
-      if (!transaction) {
+      if (!transaction || transaction.merchantId !== merchantId) {
         return res.json(null);
-      }
-      
-      // SECURITY: Verify transaction belongs to the correct merchant
-      if (transaction.merchantId !== merchantId) {
-        return res.status(403).json({ 
-          message: "Transaction access denied" 
-        });
       }
       
       // SECURITY: verify the transaction is for that board
@@ -2924,7 +2919,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         platformFeeAmount: "0.00",
         merchantNet: price,
         splitEnabled: false,
-      } as any);
+      });
 
       // Broadcast completion to SSE clients
       broadcastToStone(transaction.merchantId!, transaction.taptStoneId, {
@@ -2956,12 +2951,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   //   Windcave's attended Tap to Pay on iPhone (WCPaymentSDK + server-side session flow).
   app.post("/api/transactions/tap-to-pay", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
-      const { merchantId, transactionId, amount, windcaveToken } = req.body;
-
-      if (!merchantId || !amount) {
-        return res.status(400).json({ message: "merchantId and amount are required" });
+      const validation = tapToPayRequestSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ message: "Invalid Tap to Pay request" });
       }
-      const mid = parseInt(merchantId);
+      const { merchantId: mid, transactionId, amount: requestedAmount, windcaveToken } = validation.data;
       if (!checkMerchantOwnership(req, mid)) {
         return res.status(403).json({ message: "Access denied" });
       }
@@ -2970,16 +2964,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
       if (!(await requireBillingCard(mid, res))) return;
 
-      const requestedAmount = parseFloat(amount);
-      if (isNaN(requestedAmount) || requestedAmount <= 0) {
-        return res.status(400).json({ message: "Invalid amount" });
-      }
-
       // Resolve the pending transaction to finalize.
       // Prefer the explicitly supplied transactionId, otherwise use the merchant's active pending one.
       let pendingTransaction: Awaited<ReturnType<typeof storage.getTransaction>> | undefined;
       if (transactionId) {
-        pendingTransaction = await storage.getTransactionForMerchant(parseInt(transactionId), mid);
+        pendingTransaction = await storage.getTransactionForMerchant(transactionId, mid);
         if (!pendingTransaction || pendingTransaction.merchantId !== mid) {
           return res.status(404).json({ message: "Transaction not found" });
         }
@@ -2996,13 +2985,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // The amount to charge Windcave is always the pending transaction's stored price.
       // If no pending transaction, fall back to request body amount.
       // This prevents any divergence between charged amount and recorded ledger amount.
-      const chargeAmount = pendingTransaction
-        ? parseFloat(pendingTransaction.price)
-        : requestedAmount;
-
-      if (isNaN(chargeAmount) || chargeAmount <= 0) {
+      const chargeValidation = tapToPayAmountSchema.safeParse(pendingTransaction ? pendingTransaction.price : requestedAmount);
+      if (!chargeValidation.success) {
         return res.status(400).json({ message: "Invalid charge amount" });
       }
+      const chargeAmount = chargeValidation.data;
 
       const merchantRef = `TAPTP-${pendingTransaction?.id ?? Date.now()}`;
       let paymentResult;
@@ -3015,7 +3002,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         }
 
         // Step 1: Create an attended session on Windcave using the pending transaction price
-        const sessionResult = await createAttendedSession(chargeAmount.toFixed(2), merchantRef);
+        const sessionResult = await createAttendedSession(chargeAmount, merchantRef);
         if (!sessionResult.success || !sessionResult.sessionId) {
           return res.status(502).json({ message: `Failed to create attended session: ${sessionResult.error}` });
         }
@@ -3053,7 +3040,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         transaction = await storage.createTransactionForMerchant(mid, {
           merchantId: mid,
           itemName: "Tap to Pay Sale",
-          price: chargeAmount.toFixed(2),
+          price: chargeAmount,
           status: finalStatus,
           paymentMethod: "tap_to_pay",
           splitEnabled: false,

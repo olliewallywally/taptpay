@@ -1,12 +1,22 @@
-import { Request, Response, NextFunction } from 'express';
+import type { Request, Response, NextFunction } from 'express';
+import type { Merchant, Transaction } from '@shared/schema';
 import { storage } from '../storage';
 import { strictPositiveIntegerParam } from '../http-params';
 
+export interface MerchantRequest extends Request {
+  merchant?: Merchant;
+}
+
+export interface MerchantTransactionRequest extends Request {
+  transaction?: Transaction;
+}
+
 /**
- * Middleware to validate that a merchant exists and is active
+ * Validate that a merchant exists and is verified. This does not authenticate
+ * callers or authorize access; any future private route must do that separately.
  * Usage: app.get('/api/merchants/:merchantId/..., validateMerchant, handler)
  */
-export async function validateMerchant(req: Request, res: Response, next: NextFunction) {
+export async function validateMerchant(req: MerchantRequest, res: Response, next: NextFunction) {
   try {
     const merchantId = strictPositiveIntegerParam(req.params.merchantId);
 
@@ -18,20 +28,12 @@ export async function validateMerchant(req: Request, res: Response, next: NextFu
 
     const merchant = await storage.getMerchant(merchantId);
     
-    if (!merchant) {
-      return res.status(404).json({ 
-        message: `Merchant #${merchantId} not found. Please check the merchant ID.` 
-      });
-    }
-
-    if (merchant.status !== 'verified') {
-      return res.status(403).json({ 
-        message: `Merchant #${merchantId} is not verified and cannot process payments.` 
-      });
+    if (!merchant || merchant.status !== 'verified') {
+      return res.status(404).json({ message: "Not found" });
     }
 
     // Add merchant to request for use in route handlers
-    (req as any).merchant = merchant;
+    req.merchant = merchant;
     next();
   } catch (error) {
     console.error('Merchant validation error:', error);
@@ -42,9 +44,9 @@ export async function validateMerchant(req: Request, res: Response, next: NextFu
 }
 
 /**
- * Middleware to validate that a transaction belongs to the specified merchant
+ * Validate a transaction's merchant association, without authenticating callers.
  */
-export async function validateMerchantTransaction(req: Request, res: Response, next: NextFunction) {
+export async function validateMerchantTransaction(req: MerchantTransactionRequest, res: Response, next: NextFunction) {
   try {
     const merchantId = strictPositiveIntegerParam(req.params.merchantId);
     const transactionId = strictPositiveIntegerParam(req.params.transactionId);
@@ -57,20 +59,12 @@ export async function validateMerchantTransaction(req: Request, res: Response, n
 
     const transaction = await storage.getTransaction(transactionId);
     
-    if (!transaction) {
-      return res.status(404).json({ 
-        message: `Transaction #${transactionId} not found.` 
-      });
-    }
-
-    if (transaction.merchantId !== merchantId) {
-      return res.status(403).json({ 
-        message: `Transaction #${transactionId} does not belong to merchant #${merchantId}.` 
-      });
+    if (!transaction || transaction.merchantId !== merchantId) {
+      return res.status(404).json({ message: "Not found" });
     }
 
     // Add transaction to request for use in route handlers
-    (req as any).transaction = transaction;
+    req.transaction = transaction;
     next();
   } catch (error) {
     console.error('Transaction validation error:', error);

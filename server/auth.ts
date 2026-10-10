@@ -3,8 +3,6 @@ import { config } from './config';
 import { isDemoAccountLoginBlocked } from './demo-safety';
 import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
-import fs from 'fs';
-import path from 'path';
 import { sendPasswordResetEmail } from './email-service';
 import {
   CSRF_HEADER,
@@ -26,15 +24,7 @@ import {
 import { getBaseUrl } from './url-utils';
 import type { AuthSession } from '@shared/schema';
 import type { IStorage } from './storage';
-
-// Security Audit Log File
-const SECURITY_LOG_DIR = path.join(process.cwd(), 'logs');
-const SECURITY_LOG_FILE = path.join(SECURITY_LOG_DIR, 'security-audit.log');
-
-// Ensure logs directory exists
-if (!fs.existsSync(SECURITY_LOG_DIR)) {
-  fs.mkdirSync(SECURITY_LOG_DIR, { recursive: true });
-}
+import { writeSecurityAuditEvent } from './security-audit-log';
 
 export interface User {
   id: number;
@@ -78,36 +68,10 @@ function isPositiveInteger(value: unknown): value is number {
 // Sign-in and password-reset attempts are throttled in shared storage — slowed
 // down, never locked (R1-T4 phase C): server/auth-throttle.ts, server/sign-in-device.ts.
 
-// Security audit logging - writes to dedicated file with PII redaction
+// Bounded asynchronous audit logging; see security-audit-log.ts for redaction
+// scope and the explicit diagnostics on failed or dropped events.
 export function logSecurityEvent(event: string, details: Record<string, any>) {
-  const timestamp = new Date().toISOString();
-  
-  // Redact sensitive PII for audit log
-  const redactedDetails = { ...details };
-  if (redactedDetails.email) {
-    // Mask email: keep first 2 chars and domain
-    const email = redactedDetails.email;
-    const atIndex = email.indexOf('@');
-    if (atIndex > 2) {
-      redactedDetails.email = email.substring(0, 2) + '***' + email.substring(atIndex);
-    }
-  }
-  
-  const logEntry = {
-    timestamp,
-    event,
-    ...redactedDetails,
-  };
-  
-  const logLine = JSON.stringify(logEntry) + '\n';
-  
-  // Write to dedicated security audit log file
-  try {
-    fs.appendFileSync(SECURITY_LOG_FILE, logLine);
-  } catch (error) {
-    // Fallback to console if file write fails, but don't expose full details
-    console.error(`[SECURITY_LOG_ERROR] Failed to write audit log for event: ${event}`);
-  }
+  writeSecurityAuditEvent(event, details);
 }
 
 export interface AuthenticatedRequest extends Request {

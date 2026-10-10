@@ -1,4 +1,4 @@
-import { createPrivateKey } from "node:crypto";
+import { createPrivateKey, randomBytes } from "node:crypto";
 
 export type EnvironmentValidationMode = "audit" | "enforce";
 export type AppEnvironment = "development" | "test" | "staging" | "production";
@@ -168,6 +168,10 @@ const PAYMENT_MODES = new Set<PaymentMode>(["disabled", "simulation", "uat", "pr
 const EMAIL_PROVIDERS = new Set<AppConfig["email"]["provider"]>([
   "resend", "smtp", "gmail", "outlook", "simulation",
 ]);
+
+// Only development/test may reach this fallback. Repeated configuration loads
+// reuse it; a restart changes derived CSRF, OAuth-state and admin/device keys.
+let localJwtSecret: string | undefined;
 
 function nonempty(env: EnvironmentSource, key: string): string | undefined {
   const value = env[key];
@@ -580,16 +584,25 @@ export function loadConfig(env: EnvironmentSource): Readonly<AppConfig> {
     crypto: false as const,
   };
 
+  const trustProxyHops = parseTrustProxyHops(nonempty(env, "TRUST_PROXY_HOPS"));
+  if (trustProxyHops === null) {
+    diagnostics.push({
+      key: "TRUST_PROXY_HOPS",
+      group: "network",
+      message: "TRUST_PROXY_HOPS is unset: IP-based authentication limits are disabled until the proxy topology is verified. Account and device limits remain active.",
+    });
+  }
+
   return deepFreeze({
     envValidationMode,
     appEnv,
     isProduction,
     publicOrigin,
     publicApiOrigin,
-    trustProxyHops: parseTrustProxyHops(nonempty(env, "TRUST_PROXY_HOPS")),
+    trustProxyHops,
     databaseTarget,
     databaseUrl,
-    jwtSecret: jwtSecret ?? "dev-only-jwt-secret-not-for-production",
+    jwtSecret: jwtSecret ?? (localJwtSecret ??= randomBytes(32).toString("hex")),
     paymentReturnStateSecret,
     cronSecret,
     seedDemoData: rawBooleans.SEED_DEMO_DATA,

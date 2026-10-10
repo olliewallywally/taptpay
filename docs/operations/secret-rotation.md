@@ -14,6 +14,24 @@ Use `APP_ENV=development`, `DATABASE_TARGET=local`, `PAYMENT_MODE=disabled` and
 `ENV_VALIDATION_MODE=audit` for isolated development, with an independently chosen
 local JWT secret. Never use production database/provider inputs locally.
 
+If `JWT_SECRET` is omitted in development or tests, the server generates a random
+key once per process. Account bearer tokens have been retired, but this key still
+derives CSRF tokens, signed Google/Apple state, admin-session tags, remembered
+devices and authentication-throttle keys. Restarting changes those values:
+in-flight OAuth state and existing admin sessions become invalid; a stored
+business session needs a freshly fetched CSRF token. Configure an independent
+local `JWT_SECRET` privately for consistent behavior across restarts or multiple
+processes. Staging and production still require a configured secret of at least
+32 characters; neither uses this fallback.
+
+When `TRUST_PROXY_HOPS` is unset, startup warns that IP-based authentication limits
+are disabled; account and device limits remain active. Leave it unset until the
+deployment's proxy topology has been verified, in line with the existing
+[owner decision](../decisions/2026-09-21-r1-t4-t9-owner-answers.md). The existing
+admin-only `/api/admin/request-origin` endpoint supports that verification. An
+unknown topology does not block startup; do not guess a hop count to silence the
+warning.
+
 Node 22 can load this file explicitly before application imports:
 
 ```bash

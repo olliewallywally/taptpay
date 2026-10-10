@@ -30,7 +30,10 @@ export const boardPrintRequestSchema = z
       .string()
       .min(1, "The board's PDF is missing")
       .max(BOARD_PRINT_PDF_MAX_BASE64, "The board's PDF must be at most 2 MB")
-      .regex(/^[A-Za-z0-9+/]+={0,2}$/, "The board's PDF must be base64"),
+      .regex(/^[A-Za-z0-9+/]+={0,2}$/, "The board's PDF must be base64")
+      // Flat alphabet/padding check plus quartets: avoid a repeated-group regex
+      // whose backtracking stack can overflow on an otherwise valid 2 MB PDF.
+      .refine((value) => value.length % 4 === 0, "The board's PDF must have valid base64 padding"),
     stoneId: z.number().int().positive(),
     layout: z.enum(BOARD_PRINT_LAYOUTS),
     submitterName: z.string().trim().min(1, "Enter your name").max(100),

@@ -127,6 +127,16 @@ function securityLogLinesAbout(sessionId: string): Array<Record<string, unknown>
     .map((line) => JSON.parse(line));
 }
 
+async function waitForSecurityLogEvent(sessionId: string, event: string) {
+  const deadline = performance.now() + 2000;
+  let lines = securityLogLinesAbout(sessionId);
+  while (!lines.some((line) => line.event === event) && performance.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    lines = securityLogLinesAbout(sessionId);
+  }
+  return lines;
+}
+
 describe("signing in starts a session the server keeps", () => {
   it("a password sign-in sets an HttpOnly, Secure, SameSite=Lax, host-only cookie that lasts 7 days", async () => {
     const { app } = await createTestApp();
@@ -564,7 +574,7 @@ describe("the daily swap of the secret", () => {
       expect(copy.body.code).toBe("SESSION_ENDED");
       expect((await me(app, browser)).status).toBe(401);
       expect(await storage.getAuthSession(idOf(first))).toMatchObject({ revokedReason: "reuse_detected" });
-      const logged = securityLogLinesAbout(idOf(first));
+      const logged = await waitForSecurityLogEvent(idOf(first), "SESSION_REUSE_DETECTED");
       expect(logged.map((line) => line.event)).toContain("SESSION_REUSE_DETECTED");
       expect(JSON.stringify(logged)).not.toContain(secretOf(first));
     } finally {
@@ -596,7 +606,7 @@ describe("every way a session ends", () => {
     expect((await request(app).get("/api/auth/me").set("Cookie", `${BUSINESS}=${phoneCookie}`)).status).toBe(401);
     expect((await me(app, laptop)).status).toBe(200);
     expect(await storage.getAuthSession(idOf(phoneCookie))).toMatchObject({ revokedReason: "logout" });
-    const logged = securityLogLinesAbout(idOf(phoneCookie));
+    const logged = await waitForSecurityLogEvent(idOf(phoneCookie), "SESSION_REVOKED");
     expect(logged.map((line) => line.event)).toContain("SESSION_REVOKED");
     expect(JSON.stringify(logged)).not.toContain(secretOf(phoneCookie));
   });

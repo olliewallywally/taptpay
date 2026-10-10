@@ -115,7 +115,7 @@ const NUMBER_AUTHENTICITY =
 const NUMBERED_SALE_FINDING =
   "Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.";
 const CHECK_RATE_LIMIT =
-  "checkRateLimit (100 a minute per visitor address, counted in this server process only; until TRUST_PROXY_HOPS is set every visitor shares one address — R1-T4 phase B)";
+  "checkRateLimit (100 a minute per normalized IPv4 address or IPv6 /64, counted in this server process only; until TRUST_PROXY_HOPS is set visitors behind a proxy share its address — R1-T4 phase B)";
 const SPLIT_SHARE_FINDING =
   "A split share is marked paid without comparing what the provider charged with the share. Until 2026-09-26 the pay route let the customer choose the amount, so every share of a $100 sale could be paid with $0.01 and the sale showed fully paid (shown in the harness); the owner chose exact shares only, and the pay route now opens every session for exactly what is owed. What remains is one session settling twice (gap 11's replay; the read-then-write settlement, R3/C20); the amount check itself is R2/R3 (plan lines 870, 1511).";
 const GAP11_REPLAY_FINDING =
@@ -1770,7 +1770,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         principal: "public",
         when: "a stoneId, regardless of cookies or Authorization headers: a board's page reads its board as any customer does (with neither a sign-in nor a stoneId: 410 NO_BOARD_ADDRESS_RETIRED)",
         tenant: "board",
-        tenantRule: `${BOARD_PAGE_RULE}; a board that is not the business's, or does not exist, is 404, the same answer (since 2026-09-29, R1-T3; it was 403), and so is a board the business has removed (owner decision 2026-09-29: its page no longer shows the sale left open on it)`,
+        tenantRule: `${BOARD_PAGE_RULE}; a board that is not the business's, or does not exist, is 404, the same answer (since 2026-09-29, R1-T3; it was 403), and so is a board the business has removed (owner decision 2026-09-29: its page no longer shows the sale left open on it); absent or mismatched transactions return null`,
       },
     ],
     input: "id: strictPositiveIntegerParam; stoneId: strictPositiveIntegerQueryParam when present (400 otherwise)",
@@ -3008,7 +3008,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       },
     ],
     input:
-      "body read without a schema: merchantId and transactionId with parseInt, amount with parseFloat (400 if not above zero), windcaveToken required once the provider is configured",
+      "strict tapToPayRequestSchema: positive safe-integer merchantId and optional transactionId; amount is a JSON number or decimal string from 0.01 to 99999999.99 with at most two decimals, canonicalized to a two-decimal string; optional nonblank string windcaveToken, required once the provider is configured. The stored charge amount is validated by the same money schema before any provider call",
     capability: "Tap to Pay must be on (config.features.tapToPay: 503 TAP_TO_PAY_DISABLED otherwise), and the provider configured (isWindcaveConfigured: 503 otherwise)",
     entitlement: "paid access (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise)",
     idempotency:
@@ -3019,7 +3019,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     errorDisclosure: ["provider-text"],
     findings: [
       "A provider failure answers with the provider's own error text (`Failed to create attended session: …`, `Payment processor error: …`, from sessionResult.error and paymentResult.error), to a signed-in login of the business (R2's provider boundary).",
-      "merchantId, transactionId and amount are read with parseInt and parseFloat (§8.4). It stays off (TAP_TO_PAY_DISABLED) until the iPhone hardware work (R7).",
+      "Strict input and stored-price validation are in place. It stays off (TAP_TO_PAY_DISABLED) until the iPhone hardware work (R7).",
       "No idempotency: without a transactionId, a repeat finishes whatever is pending next, or charges a new sale for the amount sent (R3's payment attempts).",
       ADMIN_MONEY,
     ],

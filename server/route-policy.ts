@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ d86d6f114ae6806820f74a99248698d17cd556b1 on 2026-10-06.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ bd5d120498503e0e0607c0bc814a88c81a80e1e9 on 2026-10-10.
  *
  * 194 registrations (81 GET, 81 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -766,7 +766,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     markers: ["authenticateToken","checkMerchantOwnership"],
     facts: {
       middleware: ["authenticateToken"],
-      body: ["fields: amount, merchantId, transactionId, windcaveToken"],
+      body: ["schema: tapToPayRequestSchema"],
       authChecks: ["checkMerchantOwnership","compares pendingTransaction.merchantId !== mid"],
       storageMethods: ["createTransactionForMerchant","getActiveTransactionByMerchant","getOrCreateSubscription","getTransactionForMerchant","updateTransactionPaymentMethodForMerchant","updateTransactionStatusForMerchant"],
       sideEffects: ["live update: sseBroker.broadcast","provider: createAttendedSession","provider: submitTapToPayToken","push: sendPushToMerchant"],

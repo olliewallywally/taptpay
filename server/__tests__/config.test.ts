@@ -1,3 +1,7 @@
+import { spawnSync } from "node:child_process";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+import jwt from "jsonwebtoken";
 import {
   BOOLEAN_ENV_KEYS,
   loadConfig,
@@ -256,6 +260,64 @@ describe("fail-closed runtime configuration", () => {
   });
 });
 
+describe("local JWT signing secret", () => {
+  test.each(["development", "test"])("%s without a configured secret uses a random key", (appEnv) => {
+    const loaded = loadConfig({
+      ...BASE_ENV,
+      APP_ENV: appEnv,
+      DATABASE_TARGET: appEnv === "development" ? "local" : "ci",
+      JWT_SECRET: undefined,
+    });
+    expect(loaded.jwtSecret).toMatch(/^[a-f0-9]{64}$/);
+    const forged = jwt.sign({ userId: 1 }, "dev-only-jwt-secret-not-for-production");
+    expect(() => jwt.verify(forged, loaded.jwtSecret)).toThrow();
+  });
+
+  test("reloading local configuration preserves this process's fallback key", () => {
+    const local = { ...BASE_ENV, JWT_SECRET: undefined };
+    const first = loadConfig(local);
+    const second = loadConfig(local);
+    const token = jwt.sign({ userId: 1 }, first.jwtSecret);
+    expect(jwt.verify(token, second.jwtSecret)).toEqual(expect.objectContaining({ userId: 1 }));
+  });
+
+  test("separate processes generate independent fallback keys", () => {
+    // Hashes let this check compare keys without exposing any signing key in output.
+    const configUrl = pathToFileURL(path.resolve(__dirname, "../config.ts")).href;
+    const script = `
+      import { createHash } from 'node:crypto';
+      import { config } from ${JSON.stringify(configUrl)};
+      process.stdout.write(createHash('sha256').update(config.jwtSecret).digest('hex'));
+    `;
+    const launch = () => {
+      const result = spawnSync(process.execPath, ["--import=tsx", "--input-type=module", "-e", script], {
+        cwd: path.resolve(__dirname, "../.."),
+        env: { APP_ENV: "test", ENV_VALIDATION_MODE: "audit" },
+        encoding: "utf8",
+        timeout: 10_000,
+      });
+      expect(result.status).toBe(0);
+      expect(result.stdout).toMatch(/^[a-f0-9]{64}$/);
+      return result.stdout;
+    };
+    expect(launch()).not.toBe(launch());
+  });
+
+  test("an explicitly configured local secret remains unchanged", () => {
+    expect(loadConfig(BASE_ENV).jwtSecret).toBe(BASE_ENV.JWT_SECRET);
+  });
+
+  test.each(["staging", "production"].flatMap((appEnv) =>
+    ["audit", "enforce"].map((mode) => [appEnv, mode] as const),
+  ))("%s in %s mode still requires a configured strong key", (appEnv, mode) => {
+    const source = { ...BASE_ENV, APP_ENV: appEnv, DATABASE_TARGET: appEnv, ENV_VALIDATION_MODE: mode };
+    for (const secret of [undefined, "", "short-local-key"]) {
+      expect(() => loadConfig({ ...source, JWT_SECRET: secret })).toThrow("JWT_SECRET");
+    }
+    expect(loadConfig(source).jwtSecret).toBe(BASE_ENV.JWT_SECRET);
+  });
+});
+
 // R1-T4 phase B (owner decision 2026-09-21, Q4: off until checked on the live deployment).
 describe("TRUST_PROXY_HOPS", () => {
   test("unset means unknown: no proxy is trusted and address limits stay off", () => {
@@ -264,7 +326,28 @@ describe("TRUST_PROXY_HOPS", () => {
   });
 
   test.each([["0", 0], ["1", 1], ["2", 2], ["9", 9]])("%p is %p hops", (raw, hops) => {
-    expect(loadConfig({ ...BASE_ENV, TRUST_PROXY_HOPS: raw }).trustProxyHops).toBe(hops);
+    const loaded = loadConfig({ ...BASE_ENV, TRUST_PROXY_HOPS: raw });
+    expect(loaded.trustProxyHops).toBe(hops);
+    expect(loaded.diagnostics.some(({ key }) => key === "TRUST_PROXY_HOPS")).toBe(false);
+  });
+
+  test.each(["development", "test", "staging", "production"].flatMap((appEnv) =>
+    ["audit", "enforce"].map((mode) => [appEnv, mode] as const),
+  ))("unknown proxy topology warns without blocking %s in %s mode", (appEnv, mode) => {
+    const loaded = loadConfig({
+      ...BASE_ENV,
+      APP_ENV: appEnv,
+      DATABASE_TARGET: appEnv === "development" ? "local" : appEnv === "test" ? "ci" : appEnv,
+      ENV_VALIDATION_MODE: mode,
+    });
+    expect(loaded.trustProxyHops).toBeNull();
+    const diagnostic = loaded.diagnostics.find(({ key }) => key === "TRUST_PROXY_HOPS");
+    expect(diagnostic).toEqual({
+      key: "TRUST_PROXY_HOPS",
+      group: "network",
+      message: "TRUST_PROXY_HOPS is unset: IP-based authentication limits are disabled until the proxy topology is verified. Account and device limits remain active.",
+    });
+    expect(JSON.stringify(loaded.diagnostics)).not.toContain(BASE_ENV.JWT_SECRET);
   });
 
   test.each(["-1", "10", "1.5", "01", " 1", "one", "true"])("refuses %p", (raw) => {
