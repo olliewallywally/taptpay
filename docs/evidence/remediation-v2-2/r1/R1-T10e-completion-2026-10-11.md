@@ -1,5 +1,8 @@
 # R1-T10e accessibility implementation — 2026-10-11
 
+Publication checkpoint: implementation `2e96a318d277856f292d3d93fd848e30eba32a5d` was pushed to `origin/fix/qwen-aligned-20261010` on 2026-10-11. A fresh `git ls-remote` returned that exact SHA. This documentation checkpoint follows the implementation; deployment and the listed manual acceptance gates remain pending.
+
+
 Bounded engineering checkpoint on `fix/qwen-aligned-20261010`, exact base
 `10f12c8d9e6a6317b1416fd1a71f4c769e03aa0d`. The implementation is the commit containing this record;
 publication verification is recorded by the subsequent handover checkpoint.
