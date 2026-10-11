@@ -226,10 +226,6 @@ const invoiceAjaxUrlCache = new Map<string, {
 }>();
 
 // Validate that a URL belongs to a known Windcave domain before using it with auth headers.
-function assertWindcaveUrl(url: string): void {
-  const allowed = /^https:\/\/(?:uat|sec)\.windcave\.com\//;
-  if (!allowed.test(url)) throw new Error(`Blocked non-Windcave URL: ${url}`);
-}
 
 // Rate limiting: Track requests per IP
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
@@ -2537,7 +2533,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           ? cached?.ajaxSubmitGooglePayUrl
           : undefined;
         if (ajaxUrl && validation.data.googlePayToken) {
-          assertWindcaveUrl(ajaxUrl);
           const submitted = await submitGooglePayToken(ajaxUrl, validation.data.googlePayToken);
           if (submitted.error !== "3DS_REQUIRED") {
             queryResult = {
@@ -3582,7 +3577,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
         if (ajaxUrl && googlePayToken) {
           // Validate it's a Windcave domain before forwarding credentials
-          assertWindcaveUrl(ajaxUrl);
           const gpayResult = await submitGooglePayToken(ajaxUrl, googlePayToken);
           if (gpayResult.error === "3DS_REQUIRED") {
             // 3DS required — fall back to session query to determine outcome
@@ -8146,7 +8140,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       } else {
         const ajaxUrl = invoiceAjaxUrlCache.get(token)?.ajaxSubmitGooglePayUrl;
         if (ajaxUrl && googlePayToken) {
-          assertWindcaveUrl(ajaxUrl);
           const gpayResult = await submitGooglePayToken(ajaxUrl, googlePayToken);
           if (gpayResult.error === "3DS_REQUIRED") {
             const queryResult = await queryWindcaveSession(sessionId);

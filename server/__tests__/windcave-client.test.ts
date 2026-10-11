@@ -16,6 +16,7 @@ const UAT: WindcaveClientConfig = {
   endpoint: "https://uat.windcave.com/api/v1",
   username: "SyntheticUser",
   apiKey: "synthetic-api-key-value",
+  publicOrigin: "https://app.example.test",
 };
 
 const SESSION_ID = "0000120000000000a1b2c3d4e5f60718";
@@ -102,22 +103,39 @@ describe("createSession", () => {
     });
   });
 
-  it("answers a 202 with the session ID and the links as received", async () => {
+  it("answers a 202 with the session ID and only the validated links the pages use (R2-T2)", async () => {
     const { client } = harness([reply(202, created)]);
     await expect(client.createSession(createRequest)).resolves.toEqual({
       kind: "created",
       sessionId: SESSION_ID,
-      links: created.links,
+      links: { hpp: "https://uat.windcave.com/pxmi3/F0SYNTHETIC", ajaxSubmitCard: "https://uat.windcave.com/mh/F1SYNTHETIC" },
+      rejectedLinks: 0,
     });
   });
 
-  it("keeps only well-formed link entries", async () => {
-    const { client } = harness([reply(202, { id: SESSION_ID, links: [created.links[1], { rel: "hpp" }, "x", null, { rel: 3, href: "y" }] })]);
+  it("drops malformed entries and links that fail validation, counting the failures", async () => {
+    const { client, audit } = harness([reply(202, { id: SESSION_ID, links: [
+      created.links[1], { rel: "hpp" }, "x", null, { rel: 3, href: "y" },
+      { rel: "ajaxSubmitCard", href: "https://evil.test/mh/F1", method: "AJAX_POST" },
+    ] })]);
     await expect(client.createSession(createRequest)).resolves.toEqual({
       kind: "created",
       sessionId: SESSION_ID,
-      links: [created.links[1]],
+      links: { hpp: "https://uat.windcave.com/pxmi3/F0SYNTHETIC" },
+      rejectedLinks: 1,
     });
+    expect(JSON.stringify(audit)).not.toContain("evil.test");
+  });
+
+  it.each([
+    ["a callback on another origin", { callbackBase: "https://evil.test/api/windcave/callback?transactionId=7" }],
+    ["a callback with no query to append the result to", { callbackBase: "https://app.example.test/api/windcave/callback" }],
+    ["a notification address on another origin", { notificationUrl: "https://evil.test/api/windcave/notification" }],
+    ["plain http", { notificationUrl: "http://app.example.test/api/windcave/notification" }],
+  ])("refuses %s without calling the provider", async (_label, change) => {
+    const { client, calls } = harness([]);
+    await expect(client.createSession({ ...createRequest, ...change })).resolves.toEqual({ kind: "invalid_request" });
+    expect(calls).toHaveLength(0);
   });
 
   it.each([
@@ -249,6 +267,11 @@ describe("configuration", () => {
     ["no endpoint", { ...UAT, endpoint: "" }],
     ["no username", { ...UAT, username: "" }],
     ["no API key", { ...UAT, apiKey: "" }],
+    ["no public origin", { ...UAT, publicOrigin: undefined }],
+    ["the production endpoint in UAT mode", { ...UAT, endpoint: "https://sec.windcave.com/api/v1" }],
+    ["the UAT endpoint in production mode", { ...UAT, mode: "production" as const }],
+    ["an endpoint with a trailing slash", { ...UAT, endpoint: "https://uat.windcave.com/api/v1/" }],
+    ["an endpoint on another host", { ...UAT, endpoint: "https://uat.windcave.com.evil.test/api/v1" }],
   ])("with %s answers disabled and never calls the transport", async (_label, config) => {
     const { client, calls } = harness([], config);
     await expect(client.createSession(createRequest)).resolves.toEqual({ kind: "disabled" });

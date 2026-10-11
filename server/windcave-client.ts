@@ -7,7 +7,8 @@
 // a malformed reply, a session still processing or an unexpected status is never
 // approved or declined. The X-ID is the caller's persisted attempt identity, reused
 // on every retry so the provider can recognise a repeat; the client generates none.
-import type { PaymentMode } from "./config";
+import { PRODUCTION_WINDCAVE_ENDPOINT, UAT_WINDCAVE_ENDPOINT, type PaymentMode } from "./config";
+import { selectSessionLinks, validateCallbackAddress, type SessionLinks } from "./windcave-links";
 
 export type WindcaveTransport = (url: string, init: RequestInit) => Promise<Response>;
 
@@ -16,6 +17,8 @@ export interface WindcaveClientConfig {
   endpoint: string;
   username: string;
   apiKey: string;
+  /** Callback and notification addresses must be on exactly this origin (R2-T2). */
+  publicOrigin: string | undefined;
 }
 
 export interface WindcaveClientDeps {
@@ -49,13 +52,16 @@ export interface CreateSessionRequest {
 export type UnknownReason = "timeout" | "network" | "server_error" | "unexpected_status";
 
 export type CreateSessionOutcome =
-  | { kind: "created"; sessionId: string; links: WindcaveLink[] }
+  /** Only links valid for their relation and mode (R2-T2); `rejectedLinks` counts the rest. */
+  | { kind: "created"; sessionId: string; links: SessionLinks; rejectedLinks: number }
   /** The X-ID was already used: confirm the session by querying it, never from this body. */
   | { kind: "duplicate"; body: unknown }
   | { kind: "rejected"; status: number }
   /** The provider may have accepted the session. */
   | { kind: "unknown"; reason: UnknownReason }
   | { kind: "malformed" }
+  /** A callback or notification address is not on PUBLIC_ORIGIN; nothing was sent. */
+  | { kind: "invalid_request" }
   | { kind: "disabled" };
 
 export type QuerySessionOutcome =
@@ -79,9 +85,17 @@ type Exchange =
   | { kind: "response"; status: number; text: string }
   | { kind: "failed"; reason: "timeout" | "network" };
 
+const PINNED_ENDPOINT: Readonly<Partial<Record<PaymentMode, string>>> = Object.freeze({
+  uat: UAT_WINDCAVE_ENDPOINT,
+  production: PRODUCTION_WINDCAVE_ENDPOINT,
+});
+
+// Configuration already pins the endpoint per mode; the client holds to it again so
+// it can never be built against another host, port or path.
 function isConfigured(config: WindcaveClientConfig): boolean {
-  return (config.mode === "uat" || config.mode === "production") &&
-    !!config.endpoint && !!config.username && !!config.apiKey;
+  const pinned = PINNED_ENDPOINT[config.mode];
+  return !!pinned && config.endpoint === pinned &&
+    !!config.username && !!config.apiKey && !!config.publicOrigin;
 }
 
 function parseJson(text: string): { ok: true; value: unknown } | { ok: false } {
@@ -131,6 +145,11 @@ export function createWindcaveClient(deps: WindcaveClientDeps): WindcaveClient {
   return {
     async createSession(request) {
       if (!configured) return { kind: "disabled" };
+      if (!validateCallbackAddress(request.callbackBase, config.publicOrigin, { needsQuery: true }) ||
+          !validateCallbackAddress(request.notificationUrl, config.publicOrigin, { needsQuery: false })) {
+        record("CREATE_SESSION_INVALID_REQUEST", { reason: "callback_origin" });
+        return { kind: "invalid_request" };
+      }
       const init: RequestInit = {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: authorization, "X-ID": request.xId },
@@ -190,8 +209,9 @@ export function createWindcaveClient(deps: WindcaveClientDeps): WindcaveClient {
           record("CREATE_SESSION_MALFORMED", { status });
           return { kind: "malformed" };
         }
-        record("CREATE_SESSION_CREATED", { links: links.length });
-        return { kind: "created", sessionId, links };
+        const selected = selectSessionLinks(links, config.mode);
+        record("CREATE_SESSION_CREATED", { links: links.length, rejectedLinks: selected.rejected });
+        return { kind: "created", sessionId, links: selected.links, rejectedLinks: selected.rejected };
       }
     },
 

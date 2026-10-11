@@ -3,6 +3,7 @@ import crypto from "crypto";
 import { redactSensitive } from "./request-log";
 import { config } from "./config";
 import { createWindcaveClient, type UnknownReason, type WindcaveClient } from "./windcave-client";
+import { validateWindcaveLink, windcaveScriptEnv } from "./windcave-links";
 
 const WINDCAVE_ENDPOINT = config.windcave.endpoint || "";
 const SESSION_URL = `${WINDCAVE_ENDPOINT}/sessions`;
@@ -11,8 +12,7 @@ const REQUEST_TIMEOUT = 15000;
 const RETRY_LIMIT = 5;
 
 export function getWindcaveEnv(): "uat" | "sec" {
-  const endpoint = config.windcave.endpoint || "";
-  return endpoint.includes("sec.windcave.com") ? "sec" : "uat";
+  return windcaveScriptEnv(config.paymentMode);
 }
 
 const PROCESSOR_AUDIT_VALUE_KEY = /(?:session|x[-_]?id|transactionId|txId|refundTxId|merchantReference|url|href|body)/i;
@@ -89,6 +89,7 @@ function defaultSessionClient(): WindcaveClient {
       endpoint: config.windcave.endpoint || "",
       username: config.windcave.username || "",
       apiKey: config.windcave.apiKey || "",
+      publicOrigin: config.publicOrigin,
     },
     // Resolved per call, so the no-network test guard and fetch spies still apply.
     transport: (url, init) => fetch(url, init),
@@ -98,7 +99,7 @@ function defaultSessionClient(): WindcaveClient {
   });
 }
 
-function legacyFailure(outcome: { kind: "rejected"; status: number } | { kind: "unknown"; reason: UnknownReason } | { kind: "malformed" } | { kind: "disabled" }): string {
+function legacyFailure(outcome: { kind: "rejected"; status: number } | { kind: "unknown"; reason: UnknownReason } | { kind: "malformed" } | { kind: "invalid_request" } | { kind: "disabled" }): string {
   switch (outcome.kind) {
     // Provider text is not carried: it can echo request details (RF-6).
     case "rejected": return `Windcave ${outcome.status}`;
@@ -108,6 +109,7 @@ function legacyFailure(outcome: { kind: "rejected"; status: number } | { kind: "
         : outcome.reason === "server_error" ? "Windcave server error"
         : "Unexpected Windcave status";
     case "malformed": return "Unreadable provider response body";
+    case "invalid_request": return "Callback address is not on the public origin";
     case "disabled": return "Payment provider is not configured";
   }
 }
@@ -137,14 +139,14 @@ export async function createWindcaveSession(
   });
 
   if (outcome.kind === "created") {
-    const findHref = (rel: string) => outcome.links.find((l) => l.rel === rel)?.href;
+    // Validated per relation (R2-T2); no other REDIRECT link stands in for the hosted page.
     return {
       success: true,
       sessionId: outcome.sessionId,
-      hppUrl: findHref("hpp") || outcome.links.find((l) => l.method === "REDIRECT")?.href,
-      ajaxSubmitCardUrl: findHref("ajaxSubmitCard"),
-      ajaxSubmitApplePayUrl: findHref("ajaxSubmitApplePay"),
-      ajaxSubmitGooglePayUrl: findHref("ajaxSubmitGooglePay"),
+      hppUrl: outcome.links.hpp,
+      ajaxSubmitCardUrl: outcome.links.ajaxSubmitCard,
+      ajaxSubmitApplePayUrl: outcome.links.ajaxSubmitApplePay,
+      ajaxSubmitGooglePayUrl: outcome.links.ajaxSubmitGooglePay,
       alreadyComplete: false,
     };
   }
@@ -618,6 +620,11 @@ export async function submitGooglePayToken(
   ajaxSubmitGooglePayUrl: string,
   googlePayToken: object
 ): Promise<{ success: boolean; approved?: boolean; windcaveTransactionId?: string; error?: string }> {
+  // R2-T2: the wallet token goes only to this mode's documented Google Pay link.
+  // Thrown, as the route-level check it replaces did; the address is not logged.
+  if (!validateWindcaveLink(ajaxSubmitGooglePayUrl, "ajaxSubmitGooglePay", config.paymentMode).ok) {
+    throw new Error("Blocked a Google Pay link that is not this mode's Windcave address");
+  }
   logAudit("GOOGLEPAY_SUBMIT", { url: ajaxSubmitGooglePayUrl });
   try {
     // Body format confirmed from Windcave's official SDK source:

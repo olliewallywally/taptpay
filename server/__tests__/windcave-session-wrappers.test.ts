@@ -5,12 +5,13 @@ jest.mock("../config", () => {
     config: {
       ...actual.config,
       paymentMode: "uat",
+      publicOrigin: "https://app.example.test",
       windcave: { ...actual.config.windcave, endpoint: actual.UAT_WINDCAVE_ENDPOINT, username: "SyntheticUser", apiKey: "synthetic-key" },
     },
   };
 });
 
-import { createWindcaveSession, queryWindcaveSession } from "../windcave";
+import { createWindcaveSession, getWindcaveEnv, queryWindcaveSession, submitGooglePayToken } from "../windcave";
 
 /**
  * R2-T1: createWindcaveSession / queryWindcaveSession now run through the injectable
@@ -92,6 +93,24 @@ describe("createWindcaveSession", () => {
     expect(body.notificationUrl).toBe("https://app.example.test/api/windcave/rent-notification");
   });
 
+  it("takes the hosted page only from its own relation, never another REDIRECT link (R2-T2)", async () => {
+    jest.spyOn(global, "fetch").mockResolvedValue(reply(202, { id: SESSION_ID, links: [
+      { href: "https://uat.windcave.com/pxmi3/F4SYNTHETIC", rel: "paymentMethod:paypal", method: "REDIRECT" },
+      { href: "https://evil.test/mh/F1", rel: "ajaxSubmitCard", method: "AJAX_POST" },
+    ] }));
+    const result = await createWindcaveSession("x-id", "1.00", "r", "", "https://app.example.test", 1);
+    expect(result).toMatchObject({ success: true, sessionId: SESSION_ID });
+    expect(result.hppUrl).toBeUndefined();
+    expect(result.ajaxSubmitCardUrl).toBeUndefined();
+  });
+
+  it("refuses a callback that is not on the public origin without calling the provider", async () => {
+    const fetchSpy = jest.spyOn(global, "fetch");
+    await expect(createWindcaveSession("x-id", "1.00", "r", "", "https://evil.test", 1))
+      .resolves.toEqual({ success: false, error: "Callback address is not on the public origin" });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   it("keeps the legacy reading of a duplicate X-ID until R2-T5", async () => {
     jest.spyOn(global, "fetch").mockResolvedValue(reply(200, { id: SESSION_ID, transactions: [{ id: "0000000c00000003", authorised: true }] }));
     await expect(createWindcaveSession("x-id", "1.00", "r", "", "https://app.example.test", 1)).resolves.toEqual({
@@ -106,5 +125,30 @@ describe("createWindcaveSession", () => {
   it("drops the provider's text from a 4xx error", async () => {
     jest.spyOn(global, "fetch").mockResolvedValue(reply(400, undefined, "PROVIDER-DETAIL"));
     await expect(createWindcaveSession("x-id", "1.00", "r", "", "https://app.example.test", 1)).resolves.toEqual({ success: false, error: "Windcave 400" });
+  });
+});
+
+describe("submitGooglePayToken (R2-T2)", () => {
+  it.each([
+    ["the production host in UAT", "https://sec.windcave.com/mh/F3SYNTHETIC"],
+    ["another host", "https://evil.test/mh/F3SYNTHETIC"],
+    ["an undocumented path", "https://uat.windcave.com/api/v1/sessions/x/googlepay"],
+  ])("refuses %s before sending the wallet token", async (_label, href) => {
+    const fetchSpy = jest.spyOn(global, "fetch");
+    await expect(submitGooglePayToken(href, { signature: "synthetic" })).rejects.toThrow("not this mode's Windcave address");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("sends the wallet token to this mode's documented link", async () => {
+    const fetchSpy = jest.spyOn(global, "fetch").mockResolvedValue(reply(200, { links: [] }));
+    await submitGooglePayToken("https://uat.windcave.com/mh/F3SYNTHETIC", { signature: "synthetic" });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(String(fetchSpy.mock.calls[0][0])).toBe("https://uat.windcave.com/mh/F3SYNTHETIC");
+  });
+});
+
+describe("getWindcaveEnv (R2-T2)", () => {
+  it("names the script host from the payment mode, not by matching the endpoint", () => {
+    expect(getWindcaveEnv()).toBe("uat");
   });
 });

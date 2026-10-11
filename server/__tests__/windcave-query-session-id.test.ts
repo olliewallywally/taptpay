@@ -7,6 +7,7 @@ jest.mock("../config", () => {
     config: {
       ...actual.config,
       paymentMode: "uat",
+      publicOrigin: "https://app.example.test",
       windcave: { ...actual.config.windcave, endpoint: actual.UAT_WINDCAVE_ENDPOINT, username: "SyntheticUser", apiKey: "synthetic-key" },
     },
   };
