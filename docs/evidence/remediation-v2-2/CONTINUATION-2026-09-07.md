@@ -1,5 +1,39 @@
 # Full integration continuation audit — 2026-09-07
 
+Latest continuation **2026-10-11 — R1-T10 tutorial continuation on the reviewed
+security-fix branch.** [Immediate handover](../../HANDOFF-2026-10-11-r1-t10-tutorial-continuation.md),
+[tutorial evidence](r1/R1-T10d-tutorials-2026-10-11.md),
+[bounded preflight/correction rereads](r1/R1-T10d-preflight-2026-10-10.md),
+[durable c2 geometry evidence](r1/R1-T10c-2-geometry-2026-10-11.md).
+
+- Added a real-route tutorial mode: all 20 tutorials / 22 surfaces at four device
+  sizes; completion/reload persistence, actual Settings restart/generation reset,
+  targets/spotlights, independent fallback recovery, resize, SPA departure and Back.
+- Corrected observed phone Trades anchors, active/pending responsive startup,
+  device step limits, hidden/stale target geometry, phone quote fallback, phone
+  Settings restart surface, and merchant-stream page departure/restoration.
+- Typecheck and isolated production client/server builds pass. Full quiet client:
+  **121 suites / 1,440 tests**; focused **29 regressions**, tutorial geometry
+  **18 fixtures**, invalid tutorial options/selections **four checks**.
+- Reverified **35 device geometry fixtures**, **23 planted device faults / five
+  controls**, **33 session fixtures**, and a fresh isolated full **dock A–F pass**
+  at unchanged thresholds. The older dock failures remain in history.
+- Final browser runs: **88/88 tutorial cells**, all 20 page keys / 22 surfaces at
+  four contexts; **176 completed/persisted rounds**, **55 fallback recovery pairs**,
+  **176 responsive measurements**, **88 route-exit/Back checks**; **204/204 screen
+  cells**, **840 API requests / 45 registered routes**. Every process exited 0.
+  [Durable per-cell/hash summary](r1/R1-T10d-browser-summary-2026-10-11.json).
+- Implementation committed as `07ccd385a9bf72241a9835e8016d738a1c889df0`.
+  Normal push is authorized; use the new handover's exact Git checks to verify
+  publication after committing its evidence checkpoint. Original 55/88, expanded
+  73/88 and wrapper-probe 86/88 failures, interrupted candidates and first
+  client-suite failures remain retained, including
+  [sanitized original outputs](r1/R1-T10d-regression-history-2026-10-11.md).
+- No migration, production provider, native/real-device check or deployment.
+  **R1-T10 remains open:** final independent implementation review, T10e
+  accessibility and T10f owner/manual acceptance remain. Broader R1 reviews and
+  Apple/provider/native gates remain; R2 is not authorized by this continuation.
+
 Latest continuation **2026-10-10 — interrupted T10c-2/T10c-3 work recovered,
 completed changes committed for the owner's requested push.** Immediate detailed
 handover: [HANDOFF-2026-10-10-r1-t10-commit-and-push](../../HANDOFF-2026-10-10-r1-t10-commit-and-push.md).
