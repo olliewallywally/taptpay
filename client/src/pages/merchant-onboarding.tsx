@@ -137,7 +137,7 @@ export default function MerchantOnboarding() {
             <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center">
               <span className="text-xs font-bold text-white">3</span>
             </div>
-            <span className="text-sm font-semibold text-blue-700">Business Details</span>
+            <span className="text-sm font-semibold text-blue-900">Business Details</span>
           </div>
         </div>
 

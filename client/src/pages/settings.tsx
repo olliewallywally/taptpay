@@ -91,7 +91,7 @@ type SectionKey = "business" | "prefs" | "billing" | "account" | "notifs" | "tut
    was: inside the untouched sub-page body content and the untouched bottom
    cluster (payment button, mode buttons, log out). */
 const APPLE_INK = '#1C1C1E';
-const APPLE_MUTED = '#8E8E93';
+const APPLE_MUTED = '#586079';
 const APPLE_FILL = '#F2F2F7';
 
 /* iOS-style push/pop: the entering page slides in from the right over
@@ -157,7 +157,7 @@ function SettingsItem({ icon, title, value, onClick, delay = 0, testId, tutorial
         <span style={{ fontWeight: 600, fontSize: 16, color: APPLE_INK, lineHeight: 1.2 }}>{title}</span>
       </span>
       <span className="flex items-center gap-2 flex-shrink-0 ml-3">
-        {value && <span className="text-sm text-gray-400">{value}</span>}
+        {value && <span className="text-sm text-gray-600">{value}</span>}
         <ArrowRight className="w-5 h-5" style={{ color: APPLE_MUTED }} />
       </span>
     </button>
@@ -1387,7 +1387,7 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
                   <Button
                     onClick={handleCancelSubscription}
                     disabled={cancelSubscriptionMutation.isPending || !cancellationReason.trim()}
-                    className="flex-1 bg-red-500 hover:bg-red-600 text-white"
+                    className="flex-1 bg-red-600 hover:bg-red-700 text-white"
                     data-testid="button-confirm-cancel"
                   >
                     {cancelSubscriptionMutation.isPending ? "Processing..." : "Confirm cancellation"}
@@ -1567,7 +1567,7 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
                   <div style={{ fontWeight: 700, fontSize: 16, color: APPLE_INK, letterSpacing: '-0.2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {businessName}
                   </div>
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 4, fontWeight: 600, fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase', color: statusActive ? '#13C29A' : '#FFB02E' }}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 4, fontWeight: 600, fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase', color: statusActive ? '#087F5B' : '#92400E' }}>
                     <span style={{ width: 6, height: 6, borderRadius: 999, background: statusActive ? '#13C29A' : '#FFB02E', flexShrink: 0 }} />
                     {statusActive ? 'active' : 'pending'}
                   </div>
@@ -1659,8 +1659,8 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
               <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#00E5CC" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M4 12h10M4 17h7"/><rect x="14" y="13" width="7" height="7" rx="1.5"/></svg>
             </div>
             <div style={{ textAlign: 'left', minWidth: 0 }}>
-              <div style={{ fontWeight: 700, fontSize: 13, color: '#00E5CC', letterSpacing: '-0.2px' }}>Retail</div>
-              <div style={{ fontWeight: 400, fontSize: 10, color: 'rgba(0,229,204,0.65)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>terminal · sales</div>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#FFFFFF', letterSpacing: '-0.2px' }}>Retail</div>
+              <div style={{ fontWeight: 400, fontSize: 10, color: '#FFFFFF', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>terminal · sales</div>
             </div>
           </button>
           <button
@@ -1672,7 +1672,7 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
             </div>
             <div style={{ textAlign: 'left', minWidth: 0 }}>
               <div style={{ fontWeight: 700, fontSize: 13, color: '#FFFFFF', letterSpacing: '-0.2px' }}>Property</div>
-              <div style={{ fontWeight: 400, fontSize: 10, color: 'rgba(88,171,255,0.65)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>tenants · rent</div>
+              <div style={{ fontWeight: 400, fontSize: 10, color: '#93BAFF', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>tenants · rent</div>
             </div>
           </button>
           <button
@@ -1693,7 +1693,8 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
         <div className="pt-bounce mb-8" style={{ '--pt-d': '445ms' } as any}>
           <Button
             onClick={handleLogout}
-            className="w-full bg-red-500 hover:bg-red-600 text-white py-6 rounded-2xl text-lg flex items-center justify-center gap-2"
+            className="w-full bg-red-600 hover:bg-red-700 text-white py-6 rounded-2xl text-lg flex items-center justify-center gap-2"
+            style={{ scrollMarginBottom: 'calc(var(--dock-h-max, 76px) + 24px)' }}
             data-testid="button-logout"
           >
             <LogOut size={20} />
@@ -1703,7 +1704,7 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
             type="button"
             onClick={handleSignOutAllDevices}
             className="w-full mt-2 py-3 text-sm font-semibold"
-            style={{ color: APPLE_MUTED, background: 'transparent', border: 'none', minHeight: 44 }}
+            style={{ color: APPLE_MUTED, background: 'transparent', border: 'none', minHeight: 44, scrollMarginBottom: 'calc(var(--dock-h-max, 76px) + 24px)' }}
             data-testid="button-sign-out-everywhere"
           >
             Sign out of all devices

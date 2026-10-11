@@ -4,6 +4,14 @@ export type DeviceClass = "mobile" | "tablet" | "desktop";
 
 const COARSE_POINTER_QUERY = "(pointer: coarse)";
 
+// Native browser zoom reduces innerWidth while preserving outerWidth. Embedded
+// previews use their own viewport; screen density and pinch zoom are unrelated.
+export function browserZoomFactor(): number {
+  if (typeof window === 'undefined' || window.self !== window.top || !window.innerWidth) return 1;
+  const ratio = window.outerWidth / window.innerWidth;
+  return Number.isFinite(ratio) && ratio > 1.2 && (window.visualViewport?.scale ?? 1) === 1 ? ratio : 1;
+}
+
 export function classifyDevice(
   width: number,
   height: number,
@@ -31,9 +39,10 @@ function readDeviceClass(): DeviceClass {
     return "mobile";
   }
 
+  const zoom = browserZoomFactor();
   return classifyDevice(
-    window.innerWidth,
-    window.innerHeight,
+    window.innerWidth * zoom,
+    window.innerHeight * zoom,
     window.matchMedia(COARSE_POINTER_QUERY).matches,
   );
 }
@@ -44,13 +53,7 @@ export function useDeviceClass(): DeviceClass {
   useEffect(() => {
     const coarsePointer = window.matchMedia(COARSE_POINTER_QUERY);
     const update = () => {
-      setDeviceClass(
-        classifyDevice(
-          window.innerWidth,
-          window.innerHeight,
-          coarsePointer.matches,
-        ),
-      );
+      setDeviceClass(readDeviceClass());
     };
 
     window.addEventListener("resize", update);

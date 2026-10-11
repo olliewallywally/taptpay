@@ -29,3 +29,12 @@ test('named container focus preserves arrow navigation between list controls', (
   expect(first.scrollIntoView).toHaveBeenCalled();
   expect(second.scrollIntoView).toHaveBeenCalled();
 });
+
+test('list navigation leaves editable cursor keys alone', () => {
+  render(<AnimatedScrollList showGradients={false}><input aria-label="Search"/><button data-scroll-nav-item>Row</button></AnimatedScrollList>);
+  const input = screen.getByRole('textbox'); input.focus();
+  const event = new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true });
+  input.dispatchEvent(event);
+  expect(event.defaultPrevented).toBe(false);
+  expect(input).toHaveFocus();
+});

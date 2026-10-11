@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useAccessibleModal } from '@/hooks/use-accessible-modal';
+import { useState, useId } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { X } from "lucide-react";
@@ -60,12 +61,14 @@ function Field({ label, value, onChange, placeholder, required, type = "text" }:
   required?: boolean;
   type?: string;
 }) {
+  const id = useId();
   return (
     <div style={{ marginBottom: 14 }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: C.sky, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>
+      <label htmlFor={id} style={{ display: 'block', fontSize: 11, fontWeight: 600, color: C.ink, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>
         {label}{required ? " *" : ""}
-      </div>
+      </label>
       <input
+        id={id}
         type={type}
         value={value}
         onChange={(event) => onChange(event.target.value)}
@@ -82,12 +85,14 @@ function TextAreaField({ label, value, onChange, placeholder }: {
   onChange: (value: string) => void;
   placeholder?: string;
 }) {
+  const id = useId();
   return (
     <div style={{ marginBottom: 14 }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: C.sky, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>
+      <label htmlFor={id} style={{ display: 'block', fontSize: 11, fontWeight: 600, color: C.ink, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>
         {label}
-      </div>
+      </label>
       <textarea
+        id={id}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
@@ -118,6 +123,8 @@ function AddClientSheet({ onClose, onSave, saving, saveError }: {
     setClosing(true);
     setTimeout(onClose, 320);
   };
+
+  const modalRef = useAccessibleModal(true, () => { if (!saving) handleClose(); });
 
   const handleSave = () => {
     if (!valid || saving) return;
@@ -151,7 +158,7 @@ function AddClientSheet({ onClose, onSave, saving, saveError }: {
       />
 
       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, display: "flex", justifyContent: "center" }}>
-        <div style={{ width: "100%", maxWidth: "var(--phone-shell-max)", background: C.sheet, borderRadius: "28px 28px 0 0", maxHeight: "92vh", overflowY: "auto", animation: closing ? animOut : animIn }}>
+        <div ref={modalRef} role="dialog" aria-modal="true" aria-label="Add client" tabIndex={-1} style={{ width: "100%", maxWidth: "var(--phone-shell-max)", background: C.sheet, borderRadius: "28px 28px 0 0", maxHeight: "92vh", overflowY: "auto", animation: closing ? animOut : animIn }}>
           <div style={{ display: "flex", justifyContent: "center", padding: "14px 0 2px" }}>
             <div style={{ width: 36, height: 4, borderRadius: 2, background: "rgba(0,0,0,0.1)" }} />
           </div>
@@ -182,6 +189,7 @@ function AddClientSheet({ onClose, onSave, saving, saveError }: {
                 {(["email", "whatsapp", "sms"] as const).map((channel) => (
                   <button
                     key={channel}
+                    aria-pressed={form.preferredChannel === channel}
                     onClick={() => setForm((current) => ({ ...current, preferredChannel: channel }))}
                     style={{ flex: 1, padding: "13px 0", borderRadius: 14, border: "none", background: form.preferredChannel === channel ? C.ink : C.gray, color: form.preferredChannel === channel ? C.white : C.ink, fontWeight: 600, fontSize: 12.5, cursor: "pointer", textTransform: "uppercase", letterSpacing: "0.04em", transition: "background 0.18s, color 0.18s" }}
                   >
@@ -200,7 +208,7 @@ function AddClientSheet({ onClose, onSave, saving, saveError }: {
 
             {saveError && (
               <div style={{ marginBottom: 16, padding: "12px 16px", borderRadius: 14, background: "rgba(255,59,78,0.07)", border: "1px solid rgba(255,59,78,0.18)" }}>
-                <p style={{ color: C.red, fontSize: 13, fontWeight: 500, margin: 0 }}>{saveError}</p>
+                <p role="alert" style={{ color: C.red, fontSize: 13, fontWeight: 500, margin: 0 }}>{saveError}</p>
               </div>
             )}
 
@@ -357,7 +365,7 @@ export default function ClientDirectory() {
 
   return (
     <div style={{ background: C.white, minHeight: "100svh", display: "flex", justifyContent: "center" }}>
-    <div style={{ width: "100%", maxWidth: "var(--phone-shell-max)", minHeight: "100svh", background: C.sheet, paddingBottom: 128, fontFamily: "'Outfit', system-ui, sans-serif", overflow: "hidden" }}>
+    <div className="directory-page" style={{ width: "100%", maxWidth: "var(--phone-shell-max)", minHeight: "100svh", background: C.sheet, paddingBottom: 128, fontFamily: "'Outfit', system-ui, sans-serif", overflow: "hidden" }}>
       <style>{DIRECTORY_CSS}</style>
 
       {/* Hero — big count over ink, same metrics as the tenant directory hero */}
@@ -366,7 +374,7 @@ export default function ClientDirectory() {
         <div className="pt-bounce cdir-hero-label" style={{ "--pt-d": "60ms" } as any}>{clientCountLabel}</div>
       </section>
 
-      <main className="cdir-body">
+      <main className="cdir-body" tabIndex={0} aria-label="Client directory">
         <button type="button" className="cdir-add" onPointerDown={pulse} onClick={() => setShowAdd(true)} aria-label="Add client">
           <svg width={26} height={26} viewBox="0 0 24 24" fill="none" stroke={C.ink} strokeWidth="2.6" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
         </button>
@@ -679,7 +687,7 @@ const DIRECTORY_CSS = `
 .cdir-archived > button {
   border: none;
   background: transparent;
-  color: rgba(4,13,109,0.48);
+  color: rgba(4,13,109,0.7);
   font-family: inherit;
   font-size: 11px;
   font-weight: 850;
@@ -690,7 +698,7 @@ const DIRECTORY_CSS = `
 }
 .cdir-archived-empty {
   padding: 14px 0;
-  color: rgba(4,13,109,0.48);
+  color: rgba(4,13,109,0.7);
   font-size: 13px;
   font-weight: 650;
 }

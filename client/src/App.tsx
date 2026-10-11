@@ -45,6 +45,7 @@ import Login from "@/pages/login";
 import AppLogin from "@/pages/app-login";
 import MerchantSignup from "@/pages/merchant-signup";
 import { apiPath } from "@shared/api-path";
+import { MotionConfig } from 'framer-motion';
 
 const NotFound              = lazyWithRetry(() => import("@/pages/not-found"));
 const MerchantTerminalMobile = lazyWithRetry(() => import("@/pages/merchant-terminal-mobile-v2"));
@@ -1057,7 +1058,7 @@ function App() {
      than in AppRoutes so the listeners survive every navigation. */
   useKeyboardInset();
   return (
-    <QueryClientProvider client={queryClient}>
+    <MotionConfig reducedMotion="user"><QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <NotificationProvider>
           <AuthProvider>
@@ -1066,7 +1067,7 @@ function App() {
           </AuthProvider>
         </NotificationProvider>
       </TooltipProvider>
-    </QueryClientProvider>
+    </QueryClientProvider></MotionConfig>
   );
 }
 

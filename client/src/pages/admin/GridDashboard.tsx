@@ -118,7 +118,7 @@ export function GridDashboard() {
             </div>
             <div className="flex items-center justify-between mb-2 relative z-10">
               <p className="text-[#dbdfea] text-xs opacity-70">Total Transactions</p>
-              <Activity className="size-4 text-[#0055FF]" />
+              <Activity className="size-4 text-[#93BAFF]" />
             </div>
             <div className="relative z-10">
               {figure(totalsFailed, totals && totals.totalTransactions.toLocaleString(), <p className="text-[#4ade80] text-xs">All time</p>)}
@@ -163,7 +163,7 @@ export function GridDashboard() {
             className="bg-[#24263a] hover:bg-[#2a2c3e] rounded-2xl p-6 text-left transition-all group"
             data-testid="quick-action-merchants"
           >
-            <Users className="size-8 text-[#0055FF] mb-3 group-hover:scale-110 transition-transform" />
+            <Users className="size-8 text-[#93BAFF] mb-3 group-hover:scale-110 transition-transform" />
             <h3 className="text-[#dbdfea] text-lg font-medium mb-1">Manage Merchants</h3>
             <p className="text-[#dbdfea]/60 text-sm">View and manage merchant accounts</p>
           </button>
@@ -183,7 +183,7 @@ export function GridDashboard() {
             className="bg-[#24263a] hover:bg-[#2a2c3e] rounded-2xl p-6 text-left transition-all group"
             data-testid="quick-action-analytics"
           >
-            <Activity className="size-8 text-[#0055FF] mb-3 group-hover:scale-110 transition-transform" />
+            <Activity className="size-8 text-[#93BAFF] mb-3 group-hover:scale-110 transition-transform" />
             <h3 className="text-[#dbdfea] text-lg font-medium mb-1">View Analytics</h3>
             <p className="text-[#dbdfea]/60 text-sm">Platform performance and insights</p>
           </button>
@@ -196,7 +196,7 @@ export function GridDashboard() {
               <h2 className="text-[#dbdfea] text-lg font-medium">Recent Merchants</h2>
               <button
                 onClick={() => setLocation('/merchants')}
-                className="text-[#0055FF] text-sm hover:text-[#00E5CC] transition-colors"
+                className="text-[#93BAFF] text-sm hover:text-[#00E5CC] transition-colors"
                 data-testid="link-view-all-merchants"
               >
                 View All →

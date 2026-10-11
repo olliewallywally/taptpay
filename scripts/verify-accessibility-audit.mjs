@@ -39,5 +39,11 @@ try {
     assert.ok(result.violations.every(x => x.nodes.every(n => Object.keys(n).every(k => ['target', 'checkIds'].includes(k)))));
     console.log(`PASS ${name}`); checks++;
   }
+  await page.setContent(clean);
+  await page.evaluate(() => document.querySelector('main').insertAdjacentHTML('beforeend', '<p aria-label="PRIVATE-NAME" data-customer="PRIVATE-ATTRIBUTE" style="color:#aaa;background:#fff;font:12px Arial">PRIVATE-TEXT</p>'));
+  const diagnostic = await auditAccessibility(page, { diagnostics: true });
+  assert.ok(diagnostic.violations.find(x => x.id === 'color-contrast').nodes.some(n => n.diagnostic?.resolved && n.diagnostic.rect.height > 0 && n.diagnostic.contrast.length));
+  assert.ok(!JSON.stringify(diagnostic).includes('PRIVATE-'), 'diagnostics must omit text, accessible names and attribute values');
+  console.log('PASS optional diagnostics resolve numeric colors/geometry without private text or attribute values'); checks++;
   console.log(`${checks} accessibility evaluator checks pass`);
 } finally { await browser.close(); }

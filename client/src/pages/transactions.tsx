@@ -35,7 +35,7 @@ const C = {
   sheet:  '#F4F4F4',
   handle: 'rgba(0,0,0,0.08)',
   dark:   '#1a1a1a',
-  muted:  'rgba(0,0,0,0.35)',
+  muted:  '#586079',
 };
 
 type Timeframe = 'day' | 'week' | 'month' | 'year';
@@ -437,7 +437,7 @@ function TransactionsPage({ merchantId }: { merchantId: number }) {
         {/* Period pills */}
         <div data-tutorial-id="tx-period" style={{ display: 'flex', gap: 0, background: 'rgba(255,255,255,0.06)', borderRadius: 999, padding: 3, marginBottom: 20 }}>
           {(['day', 'week', 'month', 'year'] as Timeframe[]).map(p => (
-            <button className="tap-target" key={p} onClick={() => switchTf(p)} style={{ flex: 1, padding: '8px 0', borderRadius: 999, border: 'none', fontSize: 13, fontWeight: tf === p ? 600 : 500, textTransform: 'capitalize', background: tf === p ? C.sky : 'transparent', color: tf === p ? C.navy : 'rgba(255,255,255,0.4)', transition: 'all 0.3s cubic-bezier(0.34,1.56,0.64,1)', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
+            <button className="tap-target" key={p} onClick={() => switchTf(p)} style={{ flex: 1, padding: '8px 0', borderRadius: 999, border: 'none', fontSize: 13, fontWeight: tf === p ? 600 : 500, textTransform: 'capitalize', background: tf === p ? C.sky : 'transparent', color: tf === p ? C.navy : 'rgba(255,255,255,0.7)', transition: 'all 0.3s cubic-bezier(0.34,1.56,0.64,1)', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
               {p}
             </button>
           ))}
@@ -445,7 +445,7 @@ function TransactionsPage({ merchantId }: { merchantId: number }) {
 
         {/* Total */}
         <div style={{ textAlign: 'center', marginBottom: 4 }}>
-          <p style={{ fontSize: 13, fontWeight: 400, color: 'rgba(255,255,255,0.4)', margin: 0, letterSpacing: '0.04em' }}>Revenue · {totalTransactions} transactions</p>
+          <p style={{ fontSize: 13, fontWeight: 400, color: 'rgba(255,255,255,0.7)', margin: 0, letterSpacing: '0.04em' }}>Revenue · {totalTransactions} transactions</p>
           <p style={{ fontSize: 46, fontWeight: 700, color: C.white, margin: 0, letterSpacing: '-2px', marginTop: 6, fontVariantNumeric: 'tabular-nums', opacity: totVis ? 1 : 0, transform: totVis ? 'translateY(0)' : 'translateY(6px)', transition: 'all 0.45s cubic-bezier(0.34,1.56,0.64,1)' as any }}>
             ${totalRevenue.toLocaleString('en-NZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
@@ -519,7 +519,7 @@ function TransactionsPage({ merchantId }: { merchantId: number }) {
             <button className="tap-target"
               data-tutorial-id="tx-export"
               onClick={() => setShowDownloads(v => !v)}
-              style={{ fontSize: 12, fontWeight: 600, color: C.sky, background: 'none', border: 'none', cursor: 'pointer' }}
+              style={{ fontSize: 12, fontWeight: 600, color: C.navy, background: 'none', border: 'none', cursor: 'pointer' }}
             >
               {showDownloads ? 'hide exports' : 'export →'}
             </button>

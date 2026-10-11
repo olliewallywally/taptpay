@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { MerchantGate } from "@/components/merchant-gate";
@@ -7,7 +7,7 @@ import {
   Search, Plus, Package, Trash2, X, ChevronDown, ChevronUp,
   ArrowUpAZ, ArrowDownAZ, ArrowUp01, ArrowDown01,
 } from "lucide-react";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -47,6 +47,7 @@ function EmojiPicker({ value, onChange }: { value: string; onChange: (e: string)
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
         className="flex items-center gap-2 text-sm text-gray-700 font-medium hover:text-[#0055FF] transition-colors"
       >
         <span className="text-xl leading-none">{value || "🏷️"}</span>
@@ -72,7 +73,7 @@ function EmojiPicker({ value, onChange }: { value: string; onChange: (e: string)
             <button
               type="button"
               onClick={() => { onChange(""); setOpen(false); }}
-              className="text-xs text-gray-400 hover:text-gray-600"
+              className="text-xs text-gray-600 hover:text-gray-700"
             >
               Clear icon
             </button>
@@ -123,7 +124,7 @@ function VariationsBuilder({
       </div>
 
       {variations.length === 0 && (
-        <p className="text-xs text-gray-400 italic">
+        <p className="text-xs text-gray-600 italic">
           No variations yet — e.g. Size, Colour, Material
         </p>
       )}
@@ -132,6 +133,7 @@ function VariationsBuilder({
         <div key={gi} className="border border-gray-200 rounded-xl p-3 space-y-2 bg-gray-50">
           <div className="flex items-center gap-2">
             <input
+              aria-label={`Variation group ${gi + 1} name`}
               value={group.name}
               onChange={(e) => updateGroup(gi, { name: e.target.value })}
               placeholder="e.g. Size, Colour"
@@ -140,7 +142,8 @@ function VariationsBuilder({
             <button
               type="button"
               onClick={() => removeGroup(gi)}
-              className="text-red-400 hover:text-red-600"
+              aria-label={`Remove variation group ${gi + 1}`}
+              className="text-red-600 hover:text-red-700 min-h-11 min-w-11 flex items-center justify-center shrink-0"
             >
               <X size={15} />
             </button>
@@ -150,14 +153,16 @@ function VariationsBuilder({
             {group.options.map((opt, oi) => (
               <div key={oi} className="flex items-center gap-2">
                 <input
+                  aria-label={`Group ${gi + 1} option ${oi + 1} name`}
                   value={opt.label}
                   onChange={(e) => updateOption(gi, oi, { label: e.target.value })}
                   placeholder="e.g. Large, Red"
                   className="flex-1 text-base md:text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#0055FF] bg-white"
                 />
                 <div className="relative flex items-center">
-                  <span className="absolute left-2.5 text-gray-400 text-xs">+$</span>
+                  <span className="absolute left-2.5 text-gray-600 text-xs">+$</span>
                   <input
+                    aria-label={`Group ${gi + 1} option ${oi + 1} price adjustment`}
                     type="number"
                     min="0"
                     step="0.01"
@@ -172,7 +177,8 @@ function VariationsBuilder({
                 <button
                   type="button"
                   onClick={() => removeOption(gi, oi)}
-                  className="text-gray-400 hover:text-red-500"
+                  aria-label={`Remove group ${gi + 1} option ${oi + 1}`}
+                  className="text-gray-600 hover:text-red-600 min-h-11 min-w-11 flex items-center justify-center shrink-0"
                 >
                   <X size={13} />
                 </button>
@@ -224,7 +230,7 @@ function ProductSheet({
         <h2 className="text-[#0055FF] text-lg font-semibold">
           {isAdd ? "New product" : "Edit product"}
         </h2>
-        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1">
+        <button aria-label="Close product editor" onClick={onClose} className="text-gray-600 hover:text-gray-700 p-1">
           <X size={20} />
         </button>
       </div>
@@ -238,6 +244,7 @@ function ProductSheet({
         <div>
           <Label className="text-gray-700 font-medium text-sm">Product name *</Label>
           <Input
+            aria-label="Product name"
             value={form.name}
             onChange={(e) => set({ name: e.target.value })}
             placeholder="e.g. Flat White"
@@ -250,6 +257,7 @@ function ProductSheet({
         <div>
           <Label className="text-gray-700 font-medium text-sm">Base price ($) *</Label>
           <Input
+            aria-label="Base price"
             type="number"
             min="0"
             step="0.01"
@@ -265,6 +273,7 @@ function ProductSheet({
         <div>
           <Label className="text-gray-700 font-medium text-sm">Description</Label>
           <Input
+            aria-label="Description"
             value={form.description || ""}
             onChange={(e) => set({ description: e.target.value })}
             placeholder="Optional short description"
@@ -277,6 +286,7 @@ function ProductSheet({
         <button
           type="button"
           onClick={() => setShowVariations((v) => !v)}
+          aria-expanded={showVariations}
           className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-[#0055FF] transition-colors"
         >
           {showVariations ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -356,6 +366,7 @@ export default function StockManagement() {
 
 function StockManagementPage({ merchantId }: { merchantId: number }) {
   const [sheetItem, setSheetItem] = useState<(Partial<StockItem> & { name: string; cost: string; variations: VariationGroup[] }) | null>(null);
+  const sheetOrigin = useRef<HTMLElement | null>(null);
   const [isAdd, setIsAdd] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("az");
@@ -440,11 +451,13 @@ function StockManagementPage({ merchantId }: { merchantId: number }) {
   });
 
   const openAdd = () => {
+    sheetOrigin.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setIsAdd(true);
     setSheetItem(blankItem());
   };
 
   const openEdit = (item: StockItem) => {
+    sheetOrigin.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setIsAdd(false);
     setSheetItem({
       ...item,
@@ -503,14 +516,14 @@ function StockManagementPage({ merchantId }: { merchantId: number }) {
 
   return (
     <div style={{ background: '#FFFFFF', minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
-    <div className="min-h-screen pb-32 w-full" style={{ maxWidth: 'var(--phone-shell-max)', background: '#F4F4F4', fontFamily: "'Outfit', system-ui, sans-serif" }}>
+    <div className="accessibility-scroll-page min-h-screen pb-32 w-full" role="region" tabIndex={0} aria-label="Stock management" style={{ maxWidth: 'var(--phone-shell-max)', background: '#F4F4F4', fontFamily: "'Outfit', system-ui, sans-serif" }}>
       {/* Safe-area spacer */}
       <div style={{ height: 54 }} />
 
       {/* Tenant-profile-style navy header */}
       <div style={{ padding: '0 18px' }}>
         <div style={{ background: '#040D6D', borderRadius: 24, padding: '24px 26px 26px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div className="stock-header-row" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             {/* Avatar */}
             <div style={{ width: 56, height: 56, borderRadius: 999, background: '#58ABFF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <span style={{ fontWeight: 700, fontSize: 20, color: '#040D6D' }}>{initials}</span>
@@ -656,8 +669,12 @@ function StockManagementPage({ merchantId }: { merchantId: number }) {
       <Sheet open={!!sheetItem} onOpenChange={(open) => !open && setSheetItem(null)}>
         <SheetContent
           side="bottom"
-          className="bg-white rounded-t-3xl p-0 h-[92dvh] flex flex-col overflow-hidden [&>button]:hidden"
+          aria-modal="true"
+          onCloseAutoFocus={(event) => { event.preventDefault(); if (sheetOrigin.current?.isConnected) sheetOrigin.current.focus(); }}
+          aria-describedby={undefined}
+          className="z-[80] bg-white rounded-t-3xl p-0 h-[92dvh] flex flex-col overflow-hidden [&>button]:hidden"
         >
+          <SheetTitle className="sr-only">{isAdd ? 'Add product' : 'Edit product'}</SheetTitle>
           {sheetItem && (
             <ProductSheet
               item={sheetItem}

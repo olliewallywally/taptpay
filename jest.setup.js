@@ -102,6 +102,12 @@ beforeEach(() => {
   reactProblems = [];
 });
 
+// JSDOM has no scrolling implementation. Calls remain observable in unit
+// tests; native focus/scroll reachability is checked by the browser matrix.
+if (!HTMLElement.prototype.scrollIntoView) {
+  HTMLElement.prototype.scrollIntoView = jest.fn();
+}
+
 afterEach(() => {
   const problems = reactProblems;
   reactProblems = [];

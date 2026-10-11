@@ -449,7 +449,7 @@ export default function DesktopRetailHome(props: DesktopRoutePageProps) {
                     data-seg-id={k}
                     aria-pressed={active}
                     style={{
-                      color: active ? NAVY : "#6B7BB8",
+                      color: active ? NAVY : "#93BAFF",
                       fontWeight: active ? 700 : 600,
                     }}
                     onClick={() => {
@@ -563,6 +563,7 @@ export default function DesktopRetailHome(props: DesktopRoutePageProps) {
           <button
             type="button"
             className="rh-notif-prev"
+            aria-hidden={notifOpen} tabIndex={notifOpen ? -1 : 0} aria-expanded={notifOpen}
             style={{ opacity: notifOpen ? 0 : 1, pointerEvents: notifOpen ? "none" : "auto" }}
             onClick={() => setNotifOpen(true)}
           >
@@ -586,6 +587,7 @@ export default function DesktopRetailHome(props: DesktopRoutePageProps) {
           {/* expanded list */}
           <div
             className="rh-notif-list"
+            aria-hidden={!notifOpen} {...{ inert: notifOpen ? undefined : "" }}
             style={{ opacity: notifOpen ? 1 : 0, pointerEvents: notifOpen ? "auto" : "none" }}
           >
             <button type="button" className="rh-notif-listhead" onClick={() => setNotifOpen(false)}>
@@ -705,13 +707,13 @@ const RH_CSS = `
 .rh-breakdown { margin-top:24px; height:138px; border-radius:12px; border:1.5px solid rgba(94,158,255,0.5); padding:18px 22px; display:flex; flex-direction:column; justify-content:space-between; }
 .rh-bd-head { display:flex; align-items:center; justify-content:space-between; }
 .rh-bd-title { font-weight:300; font-size:11px; letter-spacing:0.22em; color:${ACCENT_SOFT}; }
-.rh-bd-hint { font-weight:300; font-size:11px; color:rgba(244,246,255,0.4); }
+.rh-bd-hint { font-weight:300; font-size:11px; color:rgba(244,246,255,0.65); }
 .rh-bd-body { display:flex; align-items:flex-end; gap:26px; }
 .rh-bd-col { display:flex; flex-direction:column; gap:3px; }
 .rh-bd-amt { font-family:'Outfit',sans-serif; font-weight:800; font-size:30px; line-height:1; color:${TEXT_SOFT}; }
 .rh-bd-label { font-weight:300; font-size:12px; color:${ACCENT_SOFT}; text-transform:capitalize; }
 .rh-bd-avg { font-family:'Outfit',sans-serif; font-weight:800; font-size:20px; line-height:1; color:rgba(244,246,255,0.75); }
-.rh-bd-muted { font-weight:300; font-size:11px; color:rgba(244,246,255,0.45); }
+.rh-bd-muted { font-weight:300; font-size:11px; color:rgba(244,246,255,0.65); }
 .rh-bd-share { flex:1; display:flex; flex-direction:column; gap:7px; }
 .rh-bd-share-top { display:flex; align-items:baseline; justify-content:space-between; }
 .rh-bd-pct { font-weight:800; font-size:13px; color:${ACCENT}; }

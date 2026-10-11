@@ -13,7 +13,7 @@ import type { RetailReportData } from "@/lib/report-pdf/reports/retail";
 import { sessionFetch } from "@/lib/session";
 import { MERCHANTS_KEY, apiPath } from "@shared/api-path";
 
-export function RetailReportsButton({ tone = "onDark", color = "#00E5CC", style }: { tone?: "onLight" | "onDark"; color?: string; style?: React.CSSProperties }) {
+export function RetailReportsButton({ tone = "onDark", color = "#FFFFFF", style }: { tone?: "onLight" | "onDark"; color?: string; style?: React.CSSProperties }) {
   const [open, setOpen] = useState(false);
   const merchantId = getCurrentMerchantId();
   const { data: merchant } = useMerchantProfile();

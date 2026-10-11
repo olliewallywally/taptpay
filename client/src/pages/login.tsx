@@ -157,7 +157,7 @@ export default function Login() {
           title: "Admin Access Granted",
           description: "Welcome to the Tapt Admin Dashboard",
         });
-        
+
         window.location.href = "/admin";
       }
     },
@@ -224,7 +224,7 @@ export default function Login() {
       <div className="w-full max-w-xs md:max-w-sm lg:max-w-md mb-3 flex items-center">
         <button
           onClick={() => setLocation("/")}
-          className="tap-target flex items-center gap-1.5 text-gray-500 hover:text-[#0055FF] transition-colors group"
+          className="tap-target flex items-center gap-1.5 text-gray-500 hover:text-[#040D6D] transition-colors group"
           data-testid="button-back-to-landing"
         >
           <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
@@ -244,14 +244,14 @@ export default function Login() {
 
             {/* Success message */}
             {successMessage && (
-              <div className="mb-4 p-3 md:p-4 bg-[#00E5CC] text-[#0055FF] rounded-full text-center font-medium">
+              <div className="mb-4 p-3 md:p-4 bg-[#00E5CC] text-[#040D6D] rounded-full text-center font-medium">
                 {successMessage}
               </div>
             )}
 
             {/* General error message */}
             {errors.general && (
-              <div className="mb-4 p-3 md:p-4 bg-red-500 text-white rounded-full text-center font-medium">
+              <div role="alert" className="mb-4 p-3 md:p-4 bg-red-600 text-white rounded-full text-center font-medium">
                 {errors.general}
               </div>
             )}
@@ -264,8 +264,8 @@ export default function Login() {
                   onClick={() => setLoginType('merchant')}
                   className={`tap-target px-4 py-1 rounded-full text-xs transition-all ${
                     loginType === 'merchant'
-                      ? 'bg-[#00E5CC] text-[#0055FF] font-medium'
-                      : 'text-[#00E5CC] hover:text-white'
+                      ? 'bg-[#00E5CC] text-[#040D6D] font-medium'
+                      : 'text-white hover:text-white'
                   }`}
                 >
                   Merchant
@@ -275,8 +275,8 @@ export default function Login() {
                   onClick={() => setLoginType('admin')}
                   className={`tap-target px-4 py-1 rounded-full text-xs transition-all ${
                     loginType === 'admin'
-                      ? 'bg-[#00E5CC] text-[#0055FF] font-medium'
-                      : 'text-[#00E5CC] hover:text-white'
+                      ? 'bg-[#00E5CC] text-[#040D6D] font-medium'
+                      : 'text-white hover:text-white'
                   }`}
                 >
                   Admin
@@ -289,7 +289,7 @@ export default function Login() {
               {/* Name field (signup only) */}
               {isSignup && (
                 <div>
-                  <label htmlFor="name" className="block text-[#00E5CC] mb-2 ml-3 md:ml-4 text-sm md:text-base">
+                  <label htmlFor="name" className="block text-white mb-2 ml-3 md:ml-4 text-sm md:text-base">
                     name
                   </label>
                   <input
@@ -305,12 +305,14 @@ export default function Login() {
 
               {/* Email field */}
               <div>
-                <label htmlFor="email" className="block text-[#00E5CC] mb-2 ml-3 md:ml-4 text-sm md:text-base">
+                <label htmlFor="email" className="block text-white mb-2 ml-3 md:ml-4 text-sm md:text-base">
                   email
                 </label>
                 <input
                   type="email"
                   id="email"
+                  aria-invalid={!!errors.email}
+                  aria-describedby={errors.email ? 'email-error' : undefined}
                   value={formData.email}
                   onChange={(e) => {
                     setFormData({ ...formData, email: e.target.value });
@@ -323,18 +325,20 @@ export default function Login() {
                   data-testid="input-email"
                 />
                 {errors.email && (
-                  <p className="text-red-400 mt-2 ml-3 md:ml-4 text-sm">{errors.email}</p>
+                  <p id="email-error" role="alert" className="text-white mt-2 ml-3 md:ml-4 text-sm">{errors.email}</p>
                 )}
               </div>
 
               {/* Password field */}
               <div>
-                <label htmlFor="password" className="block text-[#00E5CC] mb-2 ml-3 md:ml-4 text-sm md:text-base">
+                <label htmlFor="password" className="block text-white mb-2 ml-3 md:ml-4 text-sm md:text-base">
                   password
                 </label>
                 <input
                   type="password"
                   id="password"
+                  aria-invalid={!!errors.password}
+                  aria-describedby={errors.password ? 'password-error' : undefined}
                   value={formData.password}
                   onChange={(e) => {
                     setFormData({ ...formData, password: e.target.value });
@@ -347,7 +351,7 @@ export default function Login() {
                   data-testid="input-password"
                 />
                 {errors.password && (
-                  <p className="text-red-400 mt-2 ml-3 md:ml-4 text-sm">{errors.password}</p>
+                  <p id="password-error" role="alert" className="text-white mt-2 ml-3 md:ml-4 text-sm">{errors.password}</p>
                 )}
               </div>
 
@@ -355,7 +359,7 @@ export default function Login() {
               <button
                 type="submit"
                 disabled={loginMutation.isPending}
-                className="w-full bg-[#00E5CC] text-[#0055FF] rounded-full py-4 mt-6 hover:bg-[#00FFE5] transition-colors text-center font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full bg-[#00E5CC] text-[#040D6D] rounded-full py-4 mt-6 hover:bg-[#00FFE5] transition-colors text-center font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 data-testid="button-login"
               >
                 {loginMutation.isPending ? 'loading...' : isSignup ? 'sign up' : 'login'}
@@ -364,11 +368,11 @@ export default function Login() {
 
             {/* Social login buttons */}
             <div className="mt-5 space-y-3">
-              <div className="text-center text-[#00E5CC] mb-3 md:mb-4 text-sm md:text-base">or continue with</div>
-              
+              <div className="text-center text-white mb-3 md:mb-4 text-sm md:text-base">or continue with</div>
+
               <button
                 onClick={handleGoogleLogin}
-                className="w-full bg-white text-[#0055FF] rounded-full py-3 md:py-4 hover:bg-gray-100 transition-colors text-center flex items-center justify-center gap-2 font-medium"
+                className="w-full bg-white text-[#040D6D] rounded-full py-3 md:py-4 hover:bg-gray-100 transition-colors text-center flex items-center justify-center gap-2 font-medium"
                 data-testid="button-google-login"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -398,7 +402,7 @@ export default function Login() {
 
               <button
                 onClick={() => setLocation('/signup')}
-                className="w-full bg-[#00E5CC] text-[#0055FF] rounded-full py-3 md:py-4 hover:opacity-90 transition-opacity text-center flex items-center justify-center gap-2 font-medium"
+                className="w-full bg-[#00E5CC] text-[#040D6D] rounded-full py-3 md:py-4 hover:opacity-90 transition-opacity text-center flex items-center justify-center gap-2 font-medium"
                 data-testid="button-signup"
               >
                 Create account
@@ -407,14 +411,14 @@ export default function Login() {
           </div>
 
           {/* Cyan bottom section — pulled up under the blue rounded bottom */}
-          <div 
+          <div
             className="bg-[#00E5CC] -mt-8 pt-10 pb-4 px-6 flex items-center justify-center cursor-pointer hover:bg-[#00FFE5] transition-colors"
             onClick={() => setShowMore(!showMore)}
             data-testid="button-show-more"
           >
-            <span className="text-[#0055FF] text-center font-medium">more</span>
-            <ChevronDown 
-              className="text-[#0055FF] transition-transform duration-300 ml-2" 
+            <span className="text-[#040D6D] text-center font-medium">more</span>
+            <ChevronDown
+              className="text-[#040D6D] transition-transform duration-300 ml-2"
               style={{ transform: showMore ? 'rotate(180deg)' : 'rotate(0deg)' }}
             />
           </div>
@@ -422,36 +426,36 @@ export default function Login() {
           {/* Expandable more section */}
           {showMore && (
             <div className="bg-[#00E5CC] px-8 md:px-12 pb-6 md:pb-8 space-y-3 md:space-y-4">
-              <button 
+              <button
                 onClick={() => {
                   toast({
                     title: "Password Reset",
                     description: "Password reset functionality coming soon!",
                   });
                 }}
-                className="w-full text-left text-[#0055FF] hover:underline font-medium"
+                className="w-full text-left text-[#040D6D] hover:underline font-medium"
               >
                 Forgot password?
               </button>
-              <button 
+              <button
                 onClick={() => {
                   setIsSignup(!isSignup);
                   setErrors({});
                   setSuccessMessage('');
                 }}
-                className="w-full text-left text-[#0055FF] hover:underline font-medium"
+                className="w-full text-left text-[#040D6D] hover:underline font-medium"
                 data-testid="button-toggle-signup"
               >
                 {isSignup ? 'Already have an account? Login' : 'Create account'}
               </button>
-              <button 
+              <button
                 onClick={() => {
                   toast({
                     title: "Help & Support",
                     description: "Contact support@tapt.co.nz for assistance",
                   });
                 }}
-                className="w-full text-left text-[#0055FF] hover:underline font-medium"
+                className="w-full text-left text-[#040D6D] hover:underline font-medium"
               >
                 Help & Support
               </button>

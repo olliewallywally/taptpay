@@ -1,4 +1,5 @@
 import { useMemo, useState, type CSSProperties } from "react";
+import { useAccessibleModal } from '@/hooks/use-accessible-modal';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getCurrentMerchantId } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
@@ -250,6 +251,7 @@ export default function DesktopRetailStock(props: DesktopRoutePageProps) {
 
   const busy =
     addMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
+  const modalRef = useAccessibleModal(!!draft, () => { if (!busy) setDraft(null); });
 
   return (
     <DesktopPageScaffold {...props} vertical="retail" page="directory" showScope={false}>
@@ -384,7 +386,7 @@ export default function DesktopRetailStock(props: DesktopRoutePageProps) {
       {/* ── add/edit modal ── */}
       {draft && (
         <div className="rs-modal-scrim" onClick={() => !busy && setDraft(null)}>
-          <div className="rs-modal" onClick={(e) => e.stopPropagation()}>
+          <div ref={modalRef} className="rs-modal" role="dialog" aria-modal="true" aria-label={isAdd ? 'Add product' : 'Edit product'} tabIndex={-1} onClick={(e) => e.stopPropagation()}>
             <div className="rs-modal-head">
               <span className="rs-modal-title">{isAdd ? "add product" : "edit product"}</span>
               <button type="button" className="rs-modal-x" aria-label="close" onClick={() => setDraft(null)}>
@@ -421,7 +423,6 @@ export default function DesktopRetailStock(props: DesktopRoutePageProps) {
               <input
                 className="rs-input"
                 value={draft.name}
-                autoFocus
                 onChange={(e) => setDraft((d) => (d ? { ...d, name: e.target.value } : d))}
                 placeholder="flat white"
               />
@@ -517,7 +518,7 @@ const RS_CSS = `
 .rs-card-ico { width:36px; height:36px; border-radius:11px; background:#EEF1F8; display:flex; align-items:center; justify-content:center; }
 .rs-emoji { font-size:19px; line-height:1; }
 .rs-card-name { margin-top:auto; font-weight:700; font-size:14.5px; color:${INK}; text-transform:lowercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.rs-card-sub { margin-top:2px; font-weight:500; font-size:11px; color:#8A90A4; }
+.rs-card-sub { margin-top:2px; font-weight:500; font-size:11px; color:#586079; }
 .rs-card-price { position:absolute; top:16px; right:16px; font-family:'Outfit',sans-serif; font-weight:800; font-size:15px; color:${DEEP_BLUE}; }
 
 .rs-modal-scrim { position:absolute; inset:0; z-index:40; display:flex; align-items:center; justify-content:center; background:rgba(0,6,26,0.62); backdrop-filter:blur(3px); animation:reportIn var(--m-dur-ui) var(--m-ease-out) both; }
@@ -533,7 +534,7 @@ const RS_CSS = `
 .rs-emoji-opt { height:26px; border-radius:7px; font-size:16px; cursor:pointer; transition:background .12s ease; }
 .rs-emoji-opt:hover { background:rgba(94,158,255,0.18); }
 .rs-label { display:flex; flex-direction:column; gap:6px; margin-bottom:14px; font-weight:600; font-size:11px; letter-spacing:0.16em; text-transform:uppercase; color:${ACCENT_SOFT}; }
-.rs-optional { text-transform:none; letter-spacing:normal; font-weight:400; font-size:11px; color:rgba(191,209,255,0.5); }
+.rs-optional { text-transform:none; letter-spacing:normal; font-weight:400; font-size:11px; color:rgba(191,209,255,0.7); }
 .rs-input { display:flex; align-items:center; gap:6px; height:44px; padding:0 15px; border-radius:12px; background:rgba(255,255,255,0.05); border:1px solid rgba(94,158,255,0.28); color:#fff; font-family:'Outfit',sans-serif; font-weight:500; font-size:14px; letter-spacing:normal; text-transform:none; }
 .rs-input:focus-within { border-color:${ACCENT}; }
 .rs-input input, .rs-label > input.rs-input { flex:1; width:100%; border:none; background:transparent; outline:none; color:#fff; font-family:'Outfit',sans-serif; font-weight:500; font-size:14px; }

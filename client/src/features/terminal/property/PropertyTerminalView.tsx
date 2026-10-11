@@ -281,7 +281,9 @@ function RequestsHome({ invoices, tenants, outstanding, outstandingExpenses = 0,
                     return (
                       <>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div className="tp-stack-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inv.tenantName || '—'}</div>
+                          <button type="button" className="tp-stack-name" data-scroll-nav-item
+                            onClick={(event) => { event.stopPropagation(); onRowTap?.(inv); }}
+                            style={{ display: 'block', width: '100%', padding: 0, border: 0, background: 'transparent', textAlign: 'left', fontFamily: 'inherit', lineHeight: 'inherit', cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inv.tenantName || 'View request'}</button>
                           <div className="tp-stack-meta">
                             <span className={`tp-dot ${dotCls}`} />
                             <span className="tp-stack-status">{st}</span>
@@ -1391,7 +1393,7 @@ export function PropertyTerminalView(props: PropertyTerminalViewProps) {
   useFitTerminalAmounts(viewportRef);
 
   return (
-    <div className="property-terminal-view tp-viewport" ref={viewportRef} data-demo-id="property-terminal">
+    <div className="property-terminal-view tp-viewport" ref={viewportRef} data-demo-id="property-terminal" tabIndex={0} role="region" aria-label="Property terminal">
       {props.conveyor && <div
         key={'leave-' + props.conveyor.prevId}
         className={`tp-layer leaving ${conveyorDirection}`}

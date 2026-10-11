@@ -73,7 +73,7 @@ export function WebsiteAnalytics() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setLocation('/analytics')}
-              className="flex items-center gap-2 text-[#0055FF] hover:text-[#00E5CC] transition-colors"
+              className="flex items-center gap-2 text-[#93BAFF] hover:text-[#00E5CC] transition-colors"
               data-testid="button-switch-to-revenue"
             >
               <ArrowLeft className="size-4" />
@@ -88,7 +88,7 @@ export function WebsiteAnalytics() {
             <div className="bg-[#24263a] border border-[#0055FF]/30 rounded-xl p-6">
               <div className="flex items-start gap-4">
                 <div className="size-10 rounded-full bg-[#0055FF]/20 flex items-center justify-center flex-shrink-0">
-                  <AlertCircle className="size-5 text-[#0055FF]" />
+                  <AlertCircle className="size-5 text-[#93BAFF]" />
                 </div>
                 <div>
                   <h3 className="text-[#dbdfea] font-semibold mb-2">Connect Google Analytics Data API</h3>
@@ -125,7 +125,7 @@ export function WebsiteAnalytics() {
                         </div>
                         <div>
                           <p className="text-[#dbdfea] text-sm font-medium">{title}</p>
-                          <p className="text-[#dbdfea]/50 text-xs mt-0.5">{desc}</p>
+                          <p className="text-[#dbdfea]/70 text-xs mt-0.5">{desc}</p>
                         </div>
                       </div>
                     ))}
@@ -175,9 +175,9 @@ export function WebsiteAnalytics() {
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               {[
                 { icon: <Users className="size-5 text-white" />, label: 'Users (7d)', value: formatNumber(data.metrics.totalUsers), sub: 'Unique visitors', gradient: true },
-                { icon: <Eye className="size-5 text-[#0055FF]" />, label: 'Page Views (7d)', value: formatNumber(data.metrics.pageViews), sub: 'Total screen views' },
+                { icon: <Eye className="size-5 text-[#93BAFF]" />, label: 'Page Views (7d)', value: formatNumber(data.metrics.pageViews), sub: 'Total screen views' },
                 { icon: <Activity className="size-5 text-[#00E5CC]" />, label: 'Sessions (7d)', value: formatNumber(data.metrics.sessions), sub: 'Browsing sessions' },
-                { icon: <Clock className="size-5 text-[#0055FF]" />, label: 'Avg Session', value: formatDuration(data.metrics.avgSessionDuration), sub: `${(data.metrics.bounceRate * 100).toFixed(1)}% bounce rate` },
+                { icon: <Clock className="size-5 text-[#93BAFF]" />, label: 'Avg Session', value: formatDuration(data.metrics.avgSessionDuration), sub: `${(data.metrics.bounceRate * 100).toFixed(1)}% bounce rate` },
               ].map((m, i) => (
                 <div key={i} className="bg-[#24263a] rounded-xl p-5">
                   <div className="flex items-center gap-3 mb-3">
@@ -189,7 +189,7 @@ export function WebsiteAnalytics() {
                       <p className="text-[#dbdfea] text-xl font-semibold">{m.value}</p>
                     </div>
                   </div>
-                  <p className="text-[#dbdfea]/40 text-xs">{m.sub}</p>
+                  <p className="text-[#dbdfea]/70 text-xs">{m.sub}</p>
                 </div>
               ))}
             </div>
@@ -198,12 +198,12 @@ export function WebsiteAnalytics() {
               {/* Top pages table */}
               <div className="bg-[#24263a] rounded-xl p-6">
                 <div className="flex items-center gap-2 mb-5">
-                  <TrendingUp className="size-4 text-[#0055FF]" />
+                  <TrendingUp className="size-4 text-[#93BAFF]" />
                   <h3 className="text-[#dbdfea] font-semibold">Top Pages</h3>
-                  <span className="text-[#dbdfea]/40 text-xs ml-1">last 7 days</span>
+                  <span className="text-[#dbdfea]/70 text-xs ml-1">last 7 days</span>
                 </div>
                 {(data.topPages || []).length === 0 ? (
-                  <p className="text-[#dbdfea]/40 text-sm">No page data yet</p>
+                  <p className="text-[#dbdfea]/70 text-sm">No page data yet</p>
                 ) : (
                   <div className="space-y-3">
                     {(data.topPages || []).map((page, i) => {
@@ -230,10 +230,10 @@ export function WebsiteAnalytics() {
                 <div className="flex items-center gap-2 mb-5">
                   <Monitor className="size-4 text-[#00E5CC]" />
                   <h3 className="text-[#dbdfea] font-semibold">Devices</h3>
-                  <span className="text-[#dbdfea]/40 text-xs ml-1">sessions by device</span>
+                  <span className="text-[#dbdfea]/70 text-xs ml-1">sessions by device</span>
                 </div>
                 {(data.devices || []).length === 0 ? (
-                  <p className="text-[#dbdfea]/40 text-sm">No device data yet</p>
+                  <p className="text-[#dbdfea]/70 text-sm">No device data yet</p>
                 ) : (
                   <>
                     <div className="h-40 mb-4">
@@ -256,7 +256,7 @@ export function WebsiteAnalytics() {
                         <div key={i} className="flex items-center gap-1.5 text-xs text-[#dbdfea]/60">
                           <div className="size-2.5 rounded-full" style={{ background: DEVICE_COLORS[i % DEVICE_COLORS.length] }} />
                           <span className="capitalize">{d.name}</span>
-                          <span className="text-[#dbdfea]/40">({formatNumber(d.sessions)})</span>
+                          <span className="text-[#dbdfea]/70">({formatNumber(d.sessions)})</span>
                         </div>
                       ))}
                     </div>

@@ -15,7 +15,7 @@ const SURFACE = "rgba(26, 86, 255, 0.08)";
 const BORDER = "rgba(26, 86, 255, 0.18)";
 
 const statusConfig: Record<string, { color: string; label: string }> = {
-  pending:    { color: "#3B82F6", label: "Awaiting Payment" },
+  pending:    { color: "#93BAFF", label: "Awaiting Payment" },
   processing: { color: "#F59E0B", label: "Processing"       },
   completed:  { color: BRAND,    label: "Complete"          },
   failed:     { color: "#EF4444", label: "Failed"           },
@@ -118,13 +118,13 @@ function PaymentStackPage({ merchantId }: { merchantId: number }) {
             </span>
           )}
         </div>
-        <p className="text-white/30 text-sm pl-12">Active &amp; pending transactions</p>
+        <p className="text-white/70 text-sm pl-12">Active &amp; pending transactions</p>
       </div>
 
       <div className="px-5 space-y-3 pb-36">
         {isLoading && (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="h-8 w-8 animate-spin text-white/30" />
+            <Loader2 className="h-8 w-8 animate-spin text-white/70" />
           </div>
         )}
 
@@ -185,11 +185,11 @@ function PaymentStackPage({ merchantId }: { merchantId: number }) {
                     style={{ backgroundColor: `${sc.color}22`, color: sc.color }}>
                     {sc.label}
                   </span>
-                  <span className="text-white/30 text-xs">{timeAgo(tx.createdAt as any)}</span>
+                  <span className="text-white/70 text-xs">{timeAgo(tx.createdAt as any)}</span>
                 </div>
 
                 <motion.div animate={{ rotate: isExpanded ? 90 : 0 }} transition={{ type: "spring", stiffness: 400, damping: 25 }}>
-                  <ChevronRight size={16} className="text-white/30 flex-shrink-0" />
+                  <ChevronRight size={16} className="text-white/70 flex-shrink-0" />
                 </motion.div>
               </motion.button>
 

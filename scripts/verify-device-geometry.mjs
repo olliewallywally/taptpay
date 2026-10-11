@@ -108,6 +108,9 @@ try {
   await fixture("offscreen controls are clean",
     '<div style="position:absolute;top:400px"><button>Pay</button><span>Below viewport</span></div>',
     (g) => { clean(g); assert.equal(g.tapCentresChecked, 0); });
+  await fixture("a centre rounded onto the viewport edge is outside the hit-test surface",
+    '<button style="position:absolute;top:238.75px;height:2.25px;padding:0;border:0"></button>',
+    (g) => { clean(g); assert.equal(g.tapCentresChecked, 0); });
   await fixture("disabled and inert controls are clean despite obstruction",
     '<button disabled>Pay</button><button aria-disabled="true">Pay</button><fieldset disabled><button>Pay</button></fieldset><div inert><button>Pay</button></div><div style="position:absolute;inset:0;background:red"></div>',
     (g) => { clean(g); assert.equal(g.tapCentresChecked, 0); });

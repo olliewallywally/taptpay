@@ -142,7 +142,7 @@
 .retail-terminal-view .tp-stack-row.holdable:active { background: rgba(255,159,67,0.1); }
 .retail-terminal-view .tp-stack-name { font-weight: 600; font-size: 14px; color: #040D6D; margin-bottom: 1px; }
 .retail-terminal-view .tp-stack-meta { display: flex; align-items: center; gap: 5px; }
-.retail-terminal-view .tp-stack-status { font-weight: 500; font-size: 11px; color: rgba(4,13,109,0.35); }
+.retail-terminal-view .tp-stack-status { font-weight: 500; font-size: 11px; color: #586079; }
 .retail-terminal-view .tp-stack-price { font-weight: 700; font-size: 15px; color: #040D6D; letter-spacing: -0.3px; }
 .retail-terminal-view .tp-stack-empty { padding: 14px 16px; font-size: 13px; color: rgba(4,13,109,0.4); text-align: center; }
 .retail-terminal-view .tp-hold-hint { font-size: 10px; font-weight: 600; color: #FF9F43; }
@@ -153,7 +153,7 @@
 .retail-terminal-view .tp-dot.declined { background: #FF5B5B; animation: none; opacity: 1; }
 .retail-terminal-view .tp-dot.hold { background: #FF9F43; }
 .retail-terminal-view .tp-stack-split { display: flex; flex-direction: column; gap: 5px; margin-top: 5px; padding: 6px 8px; background: rgba(4,13,109,0.04); border-radius: 8px; border-left: 3px solid #58ABFF; }
-.retail-terminal-view .tp-stack-split-label { font-size: 9px; font-weight: 800; color: #58ABFF; letter-spacing: 0.6px; text-transform: uppercase; }
+.retail-terminal-view .tp-stack-split-label { font-size: 9px; font-weight: 800; color: #040D6D; letter-spacing: 0.6px; text-transform: uppercase; }
 .retail-terminal-view .tp-stack-split-bars { display: flex; gap: 4px; align-items: center; }
 .retail-terminal-view .tp-split-bar { height: 7px; flex: 1; border-radius: 4px; background: rgba(4,13,109,0.1); }
 .retail-terminal-view .tp-split-bar.filled { background: #1BBF85; }
@@ -184,7 +184,7 @@
   font-family: 'Outfit', system-ui; font-weight: 500; font-size: 17px;
   letter-spacing: -0.01em; outline: none; box-sizing: border-box;
 }
-.retail-terminal-view .tp-field::placeholder { color: rgba(4,13,109,0.35); }
+.retail-terminal-view .tp-field::placeholder { color: #586079; }
 
 /* ── CTA ── */
 .retail-terminal-view .tp-cta {

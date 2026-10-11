@@ -41,14 +41,14 @@
 
 .signup-brand-row p {
   margin: 0;
-  color: #687087;
+  color: #586079;
   font-size: 0.86rem;
 }
 
 .signup-brand-row button {
   border: 0;
   background: transparent;
-  color: #176fd8;
+  color: #0055FF;
   font-weight: 600;
   cursor: pointer;
 }

@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useId, useRef, useState } from "react";
 import { TRADES_THEME } from "@/lib/trades-theme";
 import type { DockCollapse } from "./dock-collapse-store";
 import { gooEnabled } from "./dock-morph";
@@ -119,6 +119,11 @@ export function TerminalDockView({ mode, activeId, onPick, placement = "fixed", 
   const [animating, setAnimating] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const collapsedRef = useRef(collapsed);
+  useLayoutEffect(() => {
+    if (collapsed && dockRef.current?.contains(document.activeElement)) handleRef.current?.focus();
+    if (dockRef.current) dockRef.current.inert = collapsed;
+    if (!collapsed && document.activeElement === handleRef.current) btnRefs.current[Math.max(0, activeIdx)]?.focus();
+  }, [collapsed, activeIdx]);
   const [navWidth, setNavWidth] = useState(initialNavWidth);
 
   /* Phase F: the blob layer's per-slot travel distance, measured from the
@@ -488,6 +493,8 @@ export function TerminalDockView({ mode, activeId, onPick, placement = "fixed", 
           ref={handleRef}
           type="button"
           aria-expanded={!collapsed}
+          aria-hidden={!collapsed}
+          tabIndex={collapsed ? 0 : -1}
           aria-label="show navigation"
           data-demo-id="dock-handle"
           onPointerDown={onHandlePointerDown}
@@ -505,6 +512,7 @@ export function TerminalDockView({ mode, activeId, onPick, placement = "fixed", 
         </button>
         <div
           ref={dockRef}
+          aria-hidden={collapsed}
           data-demo-id="dock-terminal"
           onPointerDown={onBodyPointerDown}
           onClickCapture={onBodyClickCapture}

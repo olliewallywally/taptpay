@@ -747,6 +747,7 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
 
             <div
               className="rt-rows"
+              tabIndex={0} role="region" aria-label="Sales"
               ref={rowsRef}
               onScroll={(e) => {
                 filterScroll.current[filter] = e.currentTarget.scrollTop;
@@ -1326,10 +1327,10 @@ const RT_CSS = `
 .rt-stack-head { flex:0 0 44px; height:44px; display:flex; align-items:center; justify-content:space-between; }
 .rt-stack-title { display:inline-flex; align-items:center; gap:6px; font-weight:300; font-size:12px; color:${ACCENT_SOFT}; }
 .rt-stack-search { flex:0 0 32px; display:flex; align-items:center; gap:8px; width:180px; height:32px; padding:0 14px; box-sizing:border-box; border-radius:9999px; border:1px solid rgba(94,158,255,0.55); }
-.rt-stack-search input { flex:1; min-width:0; border:none; background:transparent; outline:none; color:#fff; font-family:'Outfit',sans-serif; font-weight:500; font-size:11px; }
+.rt-stack-search input { flex:1; min-width:0; border:none; background:transparent; outline:none; color:#fff; font-family:'Outfit',sans-serif; font-weight:500; font-size:11px; min-height:36px; }
 /* 44 + 32 + 2 = 78px below the shell top → canvas y566 collapsed, y171 expanded. */
 .rt-chips { flex:0 0 auto; margin-top:2px; display:flex; gap:8px; }
-.rt-chip { padding:6px 13px; border-radius:9999px; font-size:11px; cursor:pointer; transition:background .15s ease, color .15s ease; white-space:nowrap; }
+.rt-chip { padding:6px 13px; min-height:36px; border-radius:9999px; font-size:11px; cursor:pointer; transition:background .15s ease, color .15s ease; white-space:nowrap; }
 /* The only part of the shell that resizes. */
 .rt-rows { flex:1; min-height:0; margin-top:8px; display:flex; flex-direction:column; overflow-y:auto; scrollbar-width:none; }
 .rt-rows::-webkit-scrollbar { display:none; }
@@ -1375,7 +1376,7 @@ const RT_CSS = `
 .rt-amt-row { display:flex; align-items:baseline; gap:12px; }
 .rt-amt { font-family:'Outfit',sans-serif; font-weight:700; font-size:66px; line-height:0.95; color:${KP_INK}; font-variant-numeric:tabular-nums; }
 .rt-edit { font-weight:300; font-size:12px; color:${ACCENT_SOFT}; cursor:pointer; background:transparent; }
-.rt-destination-label { margin-top:18px; font-weight:700; font-size:9px; letter-spacing:0.16em; color:rgba(244,246,255,0.45); }
+.rt-destination-label { margin-top:18px; font-weight:700; font-size:9px; letter-spacing:0.16em; color:rgba(244,246,255,0.65); }
 /* ── payment board picker ──────────────────────────────────────────────────
    Progressive disclosure, all in the wireframe idiom: an outlined pill that
    goes solid when engaged, a second pill that pops in beside it, and an
@@ -1462,11 +1463,11 @@ const RT_CSS = `
 .rt-item-name { margin-top:16px; font-weight:300; font-size:16px; color:${TEXT_SOFT}; text-transform:lowercase; }
 .rt-item-hint { margin-top:4px; font-weight:500; font-size:13px; color:rgba(244,246,255,0.5); }
 .rt-field { display:flex; flex-direction:column; gap:8px; }
-.rt-field-label { font-weight:700; font-size:10px; letter-spacing:0.18em; color:rgba(244,246,255,0.45); }
+.rt-field-label { font-weight:700; font-size:10px; letter-spacing:0.18em; color:rgba(244,246,255,0.65); }
 .rt-name-input { height:50px; border-radius:9999px; border:none; outline:none; background:#fff; padding:0 22px; box-sizing:border-box; color:${INK}; font-family:'Outfit',sans-serif; font-weight:600; font-size:13.5px; }
 .rt-split-toggle { display:flex; align-items:center; justify-content:space-between; height:54px; padding:0 20px; box-sizing:border-box; border-radius:12px; border:1.5px solid rgba(94,158,255,0.55); }
 .rt-split-text { display:flex; flex-direction:column; gap:1px; }
-.rt-split-cap { font-weight:600; font-size:8.5px; letter-spacing:0.08em; color:rgba(244,246,255,0.45); }
+.rt-split-cap { font-weight:600; font-size:8.5px; letter-spacing:0.08em; color:rgba(244,246,255,0.65); }
 .rt-split-desc { font-weight:600; font-size:13px; color:${TEXT_SOFT}; }
 .rt-switch { position:relative; width:48px; height:29px; border-radius:9999px; cursor:pointer; transition:background .18s ease; flex:0 0 auto; }
 .rt-knob { position:absolute; top:4px; left:4px; width:21px; height:21px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(10,17,40,0.25); transition:transform .18s ease; }
@@ -1516,7 +1517,7 @@ const RT_CSS = `
 /* share */
 
 .rt-share-head { font-weight:300; font-size:15px; color:${KP_INK}; }
-.rt-share-sub { margin-top:4px; font-weight:500; font-size:12px; color:rgba(244,246,255,0.45); }
+.rt-share-sub { margin-top:4px; font-weight:500; font-size:12px; color:rgba(244,246,255,0.65); }
 .rt-share-body { margin-top:28px; display:flex; flex-direction:column; gap:14px; }
 .rt-share-link { display:flex; align-items:center; gap:12px; height:54px; padding:0 20px; box-sizing:border-box; border-radius:12px; border:1.5px solid rgba(94,158,255,0.55); }
 .rt-share-url { flex:1; min-width:0; font-weight:600; font-size:13px; color:${TEXT_SOFT}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }

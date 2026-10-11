@@ -1,4 +1,5 @@
-import { useState, useRef, useLayoutEffect } from "react";
+import { useState, useRef, useLayoutEffect, useId } from "react";
+import { useAccessibleModal } from '@/hooks/use-accessible-modal';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { startPropertyNavigation, startPropertyBack, signalPropertyReady } from "@/lib/property-transition";
@@ -35,12 +36,14 @@ function pulse(e: any) {
 
 /* ── Shared field input ── */
 function Field({ label, value, onChange, placeholder, required, type = 'text' }: any) {
+  const id = useId();
   return (
     <div style={{ marginBottom: 14 }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: C.sky, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 6 }}>
+      <label htmlFor={id} style={{ display: 'block', fontSize: 11, fontWeight: 600, color: C.navy, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 6 }}>
         {label}{required ? ' *' : ''}
-      </div>
+      </label>
       <input
+        id={id}
         type={type}
         value={value}
         onChange={e => onChange(e.target.value)}
@@ -79,6 +82,7 @@ function AddTenantSheet({ onClose, onSave, saving, saveError }: {
     setClosing(true);
     setTimeout(onClose, 320);
   };
+  const modalRef = useAccessibleModal(true, () => { if (!saving) handleClose(); });
 
   const confirmSubtenant = () => {
     if (!subForm.name.trim()) return;
@@ -127,7 +131,7 @@ function AddTenantSheet({ onClose, onSave, saving, saveError }: {
       {/* Centering wrapper — keeps sheet at 390px on desktop */}
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, display: 'flex', justifyContent: 'center' }}>
       {/* Sheet — slides up from bottom */}
-      <div style={{
+      <div ref={modalRef} role="dialog" aria-modal="true" aria-label="Add tenant" tabIndex={-1} style={{
         width: '100%', maxWidth: 'var(--phone-shell-max)',
         background: '#F4F4F4',
         borderRadius: '28px 28px 0 0',
@@ -144,7 +148,7 @@ function AddTenantSheet({ onClose, onSave, saving, saveError }: {
           {/* Header */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
             <span style={{ fontWeight: 700, fontSize: 20, color: C.navy, letterSpacing: '-0.3px' }}>add tenant</span>
-            <button onClick={handleClose} style={{ width: 32, height: 32, borderRadius: 999, background: C.gray, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <button aria-label="Close add tenant" onClick={handleClose} style={{ width: 32, height: 32, borderRadius: 999, background: C.gray, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={C.navy} strokeWidth="2.4" strokeLinecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg>
             </button>
           </div>
@@ -163,7 +167,7 @@ function AddTenantSheet({ onClose, onSave, saving, saveError }: {
             <div style={{ fontSize: 11, fontWeight: 600, color: C.sky, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>send rent link via</div>
             <div style={{ display: 'flex', gap: 8 }}>
               {(['email', 'whatsapp', 'sms'] as const).map(ch => (
-                <button key={ch} onClick={() => setForm(f => ({ ...f, preferredChannel: ch }))}
+                <button key={ch} aria-pressed={form.preferredChannel === ch} onClick={() => setForm(f => ({ ...f, preferredChannel: ch }))}
                   style={{ flex: 1, padding: '13px 0', borderRadius: 14, border: 'none', background: form.preferredChannel === ch ? C.navy : C.gray, color: form.preferredChannel === ch ? C.white : C.navy, fontWeight: 600, fontSize: 12.5, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.04em', transition: 'background 0.18s, color 0.18s' }}>
                   {ch}
                 </button>
@@ -204,13 +208,14 @@ function AddTenantSheet({ onClose, onSave, saving, saveError }: {
             {/* Add subtenant toggle button */}
             <button
               onClick={() => setSubOpen(o => !o)}
+              aria-expanded={subOpen}
               style={{ width: '100%', padding: '13px 0', borderRadius: 14, border: `1.5px dashed ${subOpen ? C.sky : 'rgba(4,13,109,0.18)'}`, background: subOpen ? 'rgba(88,171,255,0.06)' : 'transparent', color: C.navy, fontWeight: 600, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'all 0.22s ease' }}>
               <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={C.sky} strokeWidth="2.4" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
               <span style={{ color: C.navy }}>add subtenant</span>
             </button>
 
             {/* Expandable subtenant form — smooth slide */}
-            <div style={{
+            <div {...{ inert: subOpen ? undefined : '' }} aria-hidden={!subOpen} style={{
               overflow: 'hidden',
               maxHeight: subOpen ? '320px' : '0px',
               transition: 'max-height 0.38s cubic-bezier(0.16,1,0.3,1)',
@@ -232,7 +237,7 @@ function AddTenantSheet({ onClose, onSave, saving, saveError }: {
           {/* Error */}
           {saveError && (
             <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 14, background: 'rgba(255,59,78,0.07)', border: '1px solid rgba(255,59,78,0.18)' }}>
-              <p style={{ color: '#C71A2A', fontSize: 13, fontWeight: 500, margin: 0 }}>{saveError}</p>
+              <p role="alert" style={{ color: '#C71A2A', fontSize: 13, fontWeight: 500, margin: 0 }}>{saveError}</p>
             </div>
           )}
 
@@ -363,7 +368,7 @@ export default function TenantDirectory() {
 
   return (
     <div style={{ background: C.white, minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
-    <div style={{ width: '100%', maxWidth: 'var(--phone-shell-max)', minHeight: '100svh', background: C.sheet, paddingBottom: 128, fontFamily: "'Outfit', system-ui, sans-serif", overflow: 'hidden' }}>
+    <div className="directory-page" style={{ width: '100%', maxWidth: 'var(--phone-shell-max)', minHeight: '100svh', background: C.sheet, paddingBottom: 128, fontFamily: "'Outfit', system-ui, sans-serif", overflow: 'hidden' }}>
       <style>{DIRECTORY_CSS}</style>
 
       {/* Hero — carries view-transition-name so it morphs into the profile hero */}
@@ -373,7 +378,7 @@ export default function TenantDirectory() {
         <div className="pt-bounce tdir-hero-label" style={{ '--pt-d': '60ms' } as any}>{tenantCountLabel}</div>
       </section>
 
-      <main className="tdir-body">
+      <main className="tdir-body" tabIndex={0} aria-label="Tenant directory">
         <button type="button" className="tdir-add" onPointerDown={pulse} onClick={() => setShowAdd(true)} aria-label="Add tenant">
           <svg width={26} height={26} viewBox="0 0 24 24" fill="none" stroke={C.navy} strokeWidth="2.6" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
         </button>
@@ -700,7 +705,7 @@ const DIRECTORY_CSS = `
 .tdir-archived > button {
   border: none;
   background: transparent;
-  color: rgba(4,13,109,0.48);
+  color: rgba(4,13,109,0.7);
   font-family: inherit;
   font-size: 11px;
   font-weight: 850;
@@ -711,7 +716,7 @@ const DIRECTORY_CSS = `
 }
 .tdir-archived-empty {
   padding: 14px 0;
-  color: rgba(4,13,109,0.48);
+  color: rgba(4,13,109,0.7);
   font-size: 13px;
   font-weight: 650;
 }

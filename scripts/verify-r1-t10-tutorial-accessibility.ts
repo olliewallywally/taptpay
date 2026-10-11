@@ -76,6 +76,7 @@ export async function runTutorialAccessibilityMatrix(harness: Harness) {
           await card.getByRole('heading', { name: steps[0].title, exact: true }).waitFor({ timeout: 10000 });
           assert.ok(originSet, 'real page focus origin was not established');
           trial.originKind = await page.evaluate(() => (window as any).__tutorialFocusOrigin === document.body ? 'document' : 'control');
+          trial.environment = await page.evaluate(() => ({ devicePixelRatio, innerWidth, innerHeight, outerWidth, visualScale: visualViewport?.scale, reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches }));
           // Wait through the real entry animation before exercising key events.
           await page.waitForTimeout(350);
           await page.waitForFunction(() => document.activeElement?.classList.contains('tutorial-next'));
@@ -114,6 +115,10 @@ export async function runTutorialAccessibilityMatrix(harness: Harness) {
           });
           if (!trial.focusReturned) trial.faults.push('tutorial did not return focus to its original connected page control');
           const status = await page.evaluate(async key => (await (await fetch('/api/tutorial/state')).json()).progress[key]?.status, surface.pageKey);
+          if (trial.environment.reducedMotion) {
+            trial.motion = await (await import('./motion-audit.mjs')).auditMotion(page);
+            trial.faults.push(...trial.motion.faults);
+          }
           assert.equal(status, action === 'escape' ? 'dismissed' : 'completed');
           await page.unroute('**/api/tutorial/pages/**');
         }

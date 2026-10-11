@@ -75,7 +75,7 @@ function SplitWordmark({
   }
   return (
     <span
-      aria-label="taptpay"
+      role="img" aria-label="taptpay"
       style={{
         fontFamily: FONT_WORDMARK,
         fontWeight: 900,
@@ -619,7 +619,7 @@ export function SplitPaymentView({
             marginTop: 14,
             textAlign: 'center',
             fontSize: 11,
-            color: '#9aa0b5',
+            color: '#586079',
             letterSpacing: '0.03em',
           }}
         >

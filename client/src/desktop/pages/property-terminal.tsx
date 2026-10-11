@@ -1122,6 +1122,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
 
             <AnimatedScrollList
               className="pt-rows"
+              tabIndex={0} role="region" aria-label="Rent requests"
               scrollRef={rowsRef}
               wrapperRef={stackRowsWrapRef}
             >
@@ -1785,7 +1786,7 @@ const PT_CSS = `
 .pt-panel { flex:1; min-width:0; padding-left:36px; box-sizing:border-box; position:relative; --dt-i:7; }
 .pt-mode { animation:tileIn var(--m-dur-ui) var(--m-ease-out) both; }
 .pt-mode-head { font-weight:300; font-size:15px; color:${KP_INK}; }
-.pt-mode-sub { margin-top:4px; font-weight:500; font-size:12px; color:rgba(244,246,255,0.45); max-width:430px; }
+.pt-mode-sub { margin-top:4px; font-weight:500; font-size:12px; color:rgba(244,246,255,0.65); max-width:430px; }
 
 /* request */
 .pt-req-top { position:absolute; top:62px; width:445px; }
@@ -1802,7 +1803,7 @@ const PT_CSS = `
 .pt-edit { margin-left:auto; font-weight:300; font-size:12px; color:${ACCENT_SOFT}; background:transparent; cursor:pointer; }
 .pt-edit-inline { margin-left:0; }
 .pt-send-via { display:flex; flex-direction:column; gap:1px; min-width:0; }
-.pt-send-cap { font-weight:600; font-size:8.5px; letter-spacing:0.08em; color:rgba(244,246,255,0.45); }
+.pt-send-cap { font-weight:600; font-size:8.5px; letter-spacing:0.08em; color:rgba(244,246,255,0.65); }
 .pt-send-to { font-weight:600; font-size:13px; color:${TEXT_SOFT}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .pt-switch { margin-left:auto; flex:0 0 auto; width:42px; height:25px; border-radius:9999px; padding:3px; box-sizing:border-box; display:flex; align-items:center; cursor:pointer; transition:background .18s ease; }
 .pt-switch-knob { width:19px; height:19px; border-radius:50%; background:#fff; transition:transform .18s ease; }
@@ -1846,7 +1847,7 @@ const PT_CSS = `
 .pt-bill-amt { font-family:'Outfit',sans-serif; font-weight:700; font-size:54px; line-height:0.95; color:${KP_INK}; font-variant-numeric:tabular-nums; }
 .pt-bill-name { margin-top:12px; font-weight:300; font-size:15px; color:${TEXT_SOFT}; }
 .pt-bill-sub { margin-top:3px; font-weight:500; font-size:12.5px; color:rgba(244,246,255,0.5); }
-.pt-bill-label { margin-top:24px; font-weight:700; font-size:10px; letter-spacing:0.18em; color:rgba(244,246,255,0.45); }
+.pt-bill-label { margin-top:24px; font-weight:700; font-size:10px; letter-spacing:0.18em; color:rgba(244,246,255,0.65); }
 .pt-bill-chips { margin-top:12px; display:flex; flex-wrap:wrap; gap:10px; max-width:430px; }
 .pt-bill-chip { padding:11px 20px; border-radius:9999px; font-size:12.5px; cursor:pointer; transition:background .15s ease, color .15s ease; }
 .pt-bill-input { margin-top:12px; width:430px; height:50px; box-sizing:border-box; border-radius:9999px; border:none; outline:none; background:#fff; padding:0 22px; color:${INK}; font-family:'Outfit',sans-serif; font-weight:600; font-size:14px; }
@@ -1878,10 +1879,10 @@ const PT_CSS = `
 .pt-auto-head-mid { display:flex; flex-direction:column; gap:1px; flex:1; min-width:0; }
 .pt-auto-title { font-weight:700; font-size:13.5px; color:${TEXT_SOFT}; }
 .pt-auto-cap { font-weight:500; font-size:11px; color:rgba(244,246,255,0.5); }
-.pt-auto-label { margin-top:12px; font-weight:700; font-size:10px; letter-spacing:0.18em; color:rgba(244,246,255,0.45); }
+.pt-auto-label { margin-top:12px; font-weight:700; font-size:10px; letter-spacing:0.18em; color:rgba(244,246,255,0.65); }
 .pt-auto-chips { margin-top:7px; display:flex; gap:8px; }
 .pt-auto-chip { flex:1; height:36px; border-radius:9999px; font-size:12.5px; cursor:pointer; transition:background .15s ease, color .15s ease; }
-.pt-auto-summary { margin-top:12px; font-weight:500; font-size:11.5px; line-height:1.5; color:rgba(244,246,255,0.45); }
+.pt-auto-summary { margin-top:12px; font-weight:500; font-size:11.5px; line-height:1.5; color:rgba(244,246,255,0.65); }
 .pt-auto-list { margin-top:10px; display:flex; flex-direction:column; }
 /* Running vs paused reads from weight and opacity in the one blue palette. */
 .pt-state-pill { flex:0 0 auto; padding:3px 9px; border-radius:9999px; font-weight:700; font-size:9.5px; letter-spacing:0.06em; text-transform:uppercase; background:rgba(94,158,255,0.18); color:${ACCENT_SOFT}; }

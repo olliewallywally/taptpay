@@ -179,7 +179,9 @@ function browserGeometry(rowSelector) {
     const clippedRange = rects.some((r) => r.left < c.left - slack || r.right > c.right + slack ||
       r.top < c.top - slack || r.bottom > c.bottom + slack);
     if (clippedRange) {
-      clippedText.push({ label: label(el), scrollW: el.scrollWidth, clientW: el.clientWidth,
+      const ancestry = [];
+      for (let p = el; p && ancestry.length < 8; p = p.parentElement) ancestry.push(label(p));
+      clippedText.push({ label: label(el), ancestry, scrollW: el.scrollWidth, clientW: el.clientWidth,
         blockOverflow, clippedRange });
     }
   }
@@ -191,13 +193,18 @@ function browserGeometry(rowSelector) {
     if (!mounted(el) || el.matches(":disabled") || el.getAttribute("aria-disabled") === "true" ||
         el.closest("[inert]") || style(el).pointerEvents === "none") continue;
     const r = el.getBoundingClientRect();
-    const x = r.left + r.width / 2;
-    const y = r.top + r.height / 2;
+    // Chromium hit testing rounds fractional CSS coordinates. A centre just
+    // inside the last pixel can otherwise query beyond the viewport and return
+    // null. Judge the actual rounded sample against the unchanged clip bounds.
+    const x = Math.round(r.left + r.width / 2);
+    const y = Math.round(r.top + r.height / 2);
     if (!pointInside(x, y, effectiveClip(el))) continue;
     tapCentresChecked++;
     const hit = document.elementFromPoint(x, y);
     if (!hit || (hit !== el && !el.contains(hit))) {
-      tapCentreMissSamples.push({ control: label(el), hit: label(hit) });
+      tapCentreMissSamples.push({ control: label(el), hit: label(hit),
+        rect: { x: round(r.x), y: round(r.y), width: round(r.width), height: round(r.height) },
+        viewport: { innerWidth, innerHeight, clientWidth: vw, clientHeight: vh } });
     }
   }
 

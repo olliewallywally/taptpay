@@ -84,6 +84,11 @@ const MEASURE = flag("--measure");
 const SELF_TEST = argv.includes("--self-test") ? (argv.splice(argv.indexOf("--self-test"), 1), true) : false;
 const TUTORIALS = argv.includes("--tutorials") ? (argv.splice(argv.indexOf("--tutorials"), 1), true) : false;
 const ACCESSIBILITY = argv.includes("--accessibility") ? (argv.splice(argv.indexOf("--accessibility"), 1), true) : false;
+const DIAGNOSTICS = argv.includes("--diagnostics") ? (argv.splice(argv.indexOf("--diagnostics"), 1), true) : false;
+const KEYBOARD = argv.includes("--keyboard") ? (argv.splice(argv.indexOf("--keyboard"), 1), true) : false;
+const DIALOGS = argv.includes("--dialogs") ? (argv.splice(argv.indexOf("--dialogs"), 1), true) : false;
+const ZOOM = argv.includes("--zoom") ? (argv.splice(argv.indexOf("--zoom"), 1), true) : false;
+const REDUCED_MOTION = argv.includes("--reduced-motion") ? (argv.splice(argv.indexOf("--reduced-motion"), 1), true) : false;
 const TUTORIAL_ACCESSIBILITY = argv.includes("--tutorial-accessibility") ? (argv.splice(argv.indexOf("--tutorial-accessibility"), 1), true) : false;
 const out = argv[0];
 const builtClient = argv[1];
@@ -98,6 +103,11 @@ if (SELF_TEST && TUTORIALS) throw new Error("--self-test and --tutorials are sep
 if (TUTORIALS && MEASURE) throw new Error("--tutorials records its own geometry; --measure belongs to the device gate");
 if (ACCESSIBILITY && (SELF_TEST || TUTORIALS || MEASURE)) throw new Error("--accessibility is a separate normal-surface audit");
 if (TUTORIAL_ACCESSIBILITY && (SELF_TEST || TUTORIALS || ACCESSIBILITY || MEASURE)) throw new Error("--tutorial-accessibility is a separate active-tutorial audit");
+if (DIAGNOSTICS && !ACCESSIBILITY) throw new Error("--diagnostics requires --accessibility");
+if (KEYBOARD && !ACCESSIBILITY) throw new Error("--keyboard requires --accessibility");
+if (DIALOGS && !ACCESSIBILITY) throw new Error("--dialogs requires --accessibility");
+if ((ZOOM || REDUCED_MOTION) && !ACCESSIBILITY && !TUTORIAL_ACCESSIBILITY) throw new Error("--zoom/--reduced-motion require --accessibility or --tutorial-accessibility");
+if (ZOOM && REDUCED_MOTION) throw new Error("zoom and reduced motion are separate matrix gates");
 const accessibilityAuditor = ACCESSIBILITY ? (await import('./accessibility-audit.mjs')).auditAccessibility : null;
 mkdirSync(out, { recursive: true });
 
@@ -473,20 +483,53 @@ function shellFaults(facts: Facts, size: Size): string[] {
 }
 
 // ── The browser ──────────────────────────────────────────────────────────────────────────────────
-const browser = await chromium.launch({
+const launchOptions = {
   executablePath: CHROMIUM_PATH, headless: true,
   // For this browser only: localhost is this machine, and this run's certificate is trusted by its key.
   args: ["--host-resolver-rules=MAP localhost 127.0.0.1", `--ignore-certificate-errors-spki-list=${certKeyHash}`],
-});
+};
+let nativeZoom = 1;
+async function launchMatrixBrowser() {
+  let context: BrowserContext | null = null;
+  let instance: Awaited<ReturnType<typeof chromium.launch>> | undefined;
+  try {
+    context = ZOOM ? await chromium.launchPersistentContext(path.join(certDir, 'zoom-profile'), { ...launchOptions, viewport: null }) : null;
+    instance = context?.browser() ?? await chromium.launch(launchOptions);
+    if (context) {
+      const settings = await context.newPage();
+      await settings.goto('chrome://settings/appearance');
+      // Chromium's own protected settings API sets browser zoom, unlike CDP
+      // pageScale/pinch emulation, CSS zoom or changing the emulated viewport.
+      await settings.evaluate('new Promise(resolve => chrome.settingsPrivate.setDefaultZoom(2, resolve))');
+      nativeZoom = await settings.evaluate('new Promise(resolve => chrome.settingsPrivate.getDefaultZoom(resolve))');
+      if (nativeZoom !== 2) throw new Error('native browser zoom did not become 200%');
+      await settings.close();
+    }
+    return instance;
+  } catch (error) {
+    await instance?.close().catch(() => undefined);
+    await context?.close().catch(() => undefined);
+    await new Promise<void>(resolve => server.close(() => resolve()));
+    rmSync(certDir, { recursive: true, force: true });
+    throw error;
+  }
+}
+const browser = await launchMatrixBrowser();
 
 interface Watch { pageErrors: string[]; consoleErrors: Array<{ text: string; from: string }>; failed: string[]; elsewhere: string[]; sent: string[]; routes: Set<string>; pending: Set<BrowserRequest> }
 async function openContext(size: Size): Promise<BrowserContext> {
   const context = await browser.newContext({
-    viewport: { width: size.width, height: size.height }, hasTouch: size.touch, isMobile: size.touch,
+    // Chromium's mobile emulation ignores native browser zoom and misroutes
+    // pointer coordinates (confirmed by the isolated control). Native zoom is
+    // exercised in desktop-browser rendering with the original size/pointer.
+    // Real Safari/mobile text enlargement remains a manual acceptance gate.
+    viewport: { width: size.width, height: size.height }, hasTouch: size.touch, isMobile: ZOOM ? false : size.touch,
     deviceScaleFactor: 1, serviceWorkers: "block", timezoneId: "Pacific/Auckland",
+    reducedMotion: REDUCED_MOTION ? 'reduce' : 'no-preference',
   });
   // Sandboxed Chromium has only loopback and reports itself offline; the app would cover itself with "Connection Lost".
   await context.addInitScript('Object.defineProperty(Navigator.prototype, "onLine", { get: function () { return true; } });');
+  if (REDUCED_MOTION) await context.addInitScript((await import('./motion-audit.mjs')).installMotionProbe);
   return context;
 }
 
@@ -583,7 +626,8 @@ async function dragTransactionsSheet(page: Page, expand: boolean): Promise<void>
   if (!box) throw new Error("transactions sheet has no drag handle");
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
-  await page.mouse.move(box.x + box.width / 2, expand ? 20 : (page.viewportSize()!.height - 20), { steps: 16 });
+  const layoutHeight = await page.evaluate(() => innerHeight);
+  await page.mouse.move(box.x + box.width / 2, expand ? 20 : layoutHeight - 20, { steps: 16 });
   await page.mouse.up();
   await page.waitForTimeout(600);
 }
@@ -620,6 +664,11 @@ async function visit(context: BrowserContext, size: Size, surface: Surface | Out
   let initialGeometry: Cell["initialGeometry"];
   let interaction: Cell["interaction"];
   let accessibility: Cell["accessibility"];
+  let keyboard: unknown;
+  let dialog: unknown;
+  let alerts: unknown;
+  let environment: unknown;
+  let fontSamples: unknown;
   try {
     await page.goto(`${base}${surface.path}`, { waitUntil: "domcontentloaded", timeout: 120_000 });
     // Settled: a mark is up (or the wait runs out), nothing is being fetched, and no finite animation is running.
@@ -681,7 +730,13 @@ async function visit(context: BrowserContext, size: Size, surface: Surface | Out
       : `no mark of the ${called} page is shown (${outside?.mark.selector ?? `the words "${words}"`})`);
     if (ERROR_SCREENS.test(facts.text)) faults.push(`an error screen: "${(facts.text.match(ERROR_SCREENS) ?? [""])[0]}"`);
     if (facts.running > 0) faults.push(`${facts.running} animation(s) still running when the wait ran out`);
-    if (outside && !options.as?.size) {
+    if (ZOOM) {
+      environment = await page.evaluate(`({ nativeZoom: ${nativeZoom}, mobileEmulation: false, innerWidth, innerHeight, outerWidth, devicePixelRatio, visualScale: visualViewport.scale, reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches })`);
+      const env = environment as any;
+      if (env.nativeZoom !== 2 || env.devicePixelRatio !== 2 || env.visualScale !== 1) faults.push('200% native browser zoom was not applied');
+      if (Math.abs(env.innerWidth - size.width / 2) > 1 || Math.abs(env.innerHeight - size.height / 2) > 1) faults.push('native zoom did not halve the original layout viewport');
+      if (!outside && size.deviceClass !== 'mobile' && facts.deviceClass !== size.deviceClass) faults.push(`zoom changed ${size.deviceClass} device class to ${facts.deviceClass ?? 'mobile'}`);
+    } else if (outside && !options.as?.size) {
       // Outside the merchant frame at every size: only the window and the pointer are held.
       if (facts.frame || facts.deviceClass) faults.push("a page outside the merchant frame is shown inside it");
       if (facts.window.width !== size.width || facts.window.height !== size.height) faults.push(`the window is ${facts.window.width}x${facts.window.height}, not ${size.width}x${size.height}`);
@@ -692,7 +747,6 @@ async function visit(context: BrowserContext, size: Size, surface: Surface | Out
     for (const error of watch.pageErrors) faults.push(`page error: ${error}`);
     for (const error of watch.consoleErrors) faults.push(`console error: ${error.text}`);
     for (const failure of watch.failed) faults.push(`failed request: ${failure}`);
-    for (const request of watch.pending) faults.push(`request did not settle: ${request.method()} ${new URL(request.url()).pathname}`);
     const terminalRows = !outside && ["/terminal", "/property/terminal", "/trades/terminal"].includes(surface.path)
       ? size.deviceClass === "mobile" ? ".tp-stack-row"
         : mode === "retail" ? ".rt-rows .rt-row" : mode === "property" ? ".pt-rows .pt-row" : ".tt-rows .tt-row"
@@ -702,9 +756,15 @@ async function visit(context: BrowserContext, size: Size, surface: Surface | Out
     if (geometry.edgeCrosserCount) faults.push(`window edge crossing: ${geometry.edgeCrosserCount} rendered elements`);
     if (geometry.clippedTextCount) faults.push(`clipped text: ${geometry.clippedTextCount} elements`);
     if (geometry.tapCentreMiss) faults.push(`tap centre miss: ${geometry.tapCentreMiss} controls`);
-    if (geometry.terminalRows && geometry.terminalRows.visible === 0) faults.push(`terminal has zero visible rows (${geometry.terminalRows.total} mounted)`);
+    if (REDUCED_MOTION) {
+      environment = await (await import('./motion-audit.mjs')).settledMotionEnvironment(page);
+      const env = environment as any;
+      if (!env.reducedMotion) faults.push('reduced-motion preference was not applied');
+      if (env.running) faults.push(`reduced motion: ${env.running} animations still running`);
+    }
+    if (geometry.terminalRows && geometry.terminalRows.visible === 0 && !(ZOOM && KEYBOARD)) faults.push(`terminal has zero visible rows (${geometry.terminalRows.total} mounted)`);
     if (accessibilityAuditor) {
-      const report = await accessibilityAuditor(page);
+      const report = await accessibilityAuditor(page, { diagnostics: DIAGNOSTICS });
       accessibility = report;
       for (const rule of report.violations) faults.push(`accessibility: ${rule.id} (${rule.impact}), ${rule.nodes.length} element(s)`);
       // Capture errors caused during the audit as well as during page startup.
@@ -715,16 +775,74 @@ async function visit(context: BrowserContext, size: Size, surface: Surface | Out
     if (MEASURE) {
       measured = await page.evaluate(`(function (selector) { var el = document.querySelector(selector); if (!el) return null; var r = el.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; })(${JSON.stringify(MEASURE)})`);
     }
+    if (ACCESSIBILITY) fontSamples = await page.evaluate(() => [...document.querySelectorAll<HTMLElement>('h1,h2,h3,p,label,button,input,select,textarea,.tp-amount,[data-demo-id="retail-dashboard-revenue"]')].map((el, index) => {
+      const style = getComputedStyle(el), rect = el.getBoundingClientRect();
+      let scale = 1;
+      for (let p: HTMLElement | null = el; p; p = p.parentElement) {
+        const transform = getComputedStyle(p).transform;
+        if (transform !== 'none') { const m = new DOMMatrixReadOnly(transform); scale *= Math.hypot(m.a, m.b); }
+      }
+      return { index, tag: el.tagName.toLowerCase(), classes: [...el.classList], fontSize: parseFloat(style.fontSize), physicalFontSize: parseFloat(style.fontSize) * scale * devicePixelRatio, visible: rect.width > 0 && rect.height > 0 && style.visibility === 'visible' && Number(style.opacity) > 0 };
+    }).filter(fact => fact.visible).slice(0, 80));
+    if (KEYBOARD) {
+      const { auditKeyboard, auditTabLists } = await import('./keyboard-audit.mjs');
+      const before = watch.sent.length;
+      const report = await auditKeyboard(page);
+      const tabLists = await auditTabLists(page);
+      keyboard = { ...report, tabLists };
+      for (const fault of report.faults) faults.push(`keyboard: ${fault}`);
+      if (ZOOM && terminalRows && geometry.terminalRows?.total) {
+        const rows = await (await import('./scroll-audit.mjs')).auditScrollRows(page, terminalRows);
+        environment = { ...(environment as object), terminalRowReachability: { initialVisible: geometry.terminalRows.visible, ...rows } };
+        for (const fault of rows.faults) faults.push(`zoom terminal rows: ${fault}`);
+      }
+      for (const fault of tabLists.faults) faults.push(`keyboard: ${fault}`);
+      for (const call of watch.sent.slice(before)) if (!call.startsWith('GET ')) faults.push(`keyboard performed a mutation: ${call}`);
+    }
+    if (DIALOGS && !outside) {
+      const { dialogCase, auditDialog } = await import('./dialog-audit.mjs');
+      const spec = dialogCase(surface.path, size.deviceClass === 'mobile');
+      if (spec) {
+        const before = watch.sent.length;
+        const report = await auditDialog(page, spec);
+        dialog = report;
+        for (const fault of report.faults) faults.push(`dialog: ${fault}`);
+        for (const rule of report.audit.violations) faults.push(`dialog accessibility: ${rule.id}, ${rule.nodes.length} element(s)`);
+        for (const expanded of report.expandedAudits) for (const rule of expanded.violations) faults.push(`expanded dialog accessibility: ${rule.id}, ${rule.nodes.length} element(s)`);
+        for (const call of watch.sent.slice(before)) if (!call.startsWith('GET ')) faults.push(`dialog performed a mutation: ${call}`);
+      }
+    }
+    if (DIALOGS && outside?.path === '/login') {
+      const before = watch.sent.length;
+      const report = await (await import('./alert-audit.mjs')).auditLoginAlerts(page);
+      alerts = report;
+      for (const fault of report.faults) faults.push(`alerts: ${fault}`);
+      for (const rule of report.audit.violations) faults.push(`alert accessibility: ${rule.id}, ${rule.nodes.length} element(s)`);
+      for (const call of watch.sent.slice(before)) if (!call.startsWith('GET ')) faults.push(`local validation performed a mutation: ${call}`);
+    }
     if (options.shot !== false) {
       const slug = `${size.name}-${outside ? "outside" : mode}-${called.replace(/[^a-z0-9]+/gi, "_").replace(/^_|_$/g, "").slice(0, 60) || "root"}`;
       await page.screenshot({ path: path.join(out, `${slug}.png`) });
     }
+    if (REDUCED_MOTION) {
+      const motion = await (await import('./motion-audit.mjs')).auditMotion(page);
+      environment = { ...(environment as object), motion };
+      for (const fault of motion.faults) faults.push(`reduced motion: ${fault}`);
+    }
+    // Focus/hover of ordinary controls can start lazy prefetches. Give those
+    // actual requests a bounded opportunity to settle; never clear the watch.
+    const tailDeadline = Date.now() + 10000;
+    while (watch.pending.size && Date.now() < tailDeadline) await page.waitForTimeout(100);
+    for (const error of watch.pageErrors) if (!faults.includes(`page error: ${error}`)) faults.push(`page error: ${error}`);
+    for (const error of watch.consoleErrors) if (!faults.includes(`console error: ${error.text}`)) faults.push(`console error: ${error.text}`);
+    for (const failure of watch.failed) if (!faults.includes(`failed request: ${failure}`)) faults.push(`failed request: ${failure}`);
+    for (const request of watch.pending) faults.push(`request did not settle: ${request.method()} ${new URL(request.url()).pathname}`);
   } catch (error) {
     faults.push(`the visit itself failed: ${String(error).slice(0, 200)}`);
   } finally {
     await page.close().catch(() => undefined);
   }
-  return { size: size.name, path: called, mode: outside ? "outside" : mode, pageKey: outside ? outside.who : (surface as Surface).pageKey, faults, mark, byFallback, elsewhere: [...new Set(watch.elsewhere)], sent: watch.sent.length, routes: [...watch.routes].sort(), geometry, ...(initialGeometry ? { initialGeometry, interaction } : {}), ...(MEASURE ? { measured } : {}), ...(ACCESSIBILITY ? { accessibility } : {}) };
+  return { size: size.name, path: called, mode: outside ? "outside" : mode, pageKey: outside ? outside.who : (surface as Surface).pageKey, faults, mark, byFallback, elsewhere: [...new Set(watch.elsewhere)], sent: watch.sent.length, routes: [...watch.routes].sort(), geometry, ...(initialGeometry ? { initialGeometry, interaction } : {}), ...(MEASURE ? { measured } : {}), ...(ACCESSIBILITY ? { accessibility, fontSamples } : {}), ...(KEYBOARD ? { keyboard } : {}), ...(dialog ? { dialog } : {}), ...(alerts ? { alerts } : {}), ...(environment ? { environment } : {}) };
 }
 
 let exitCode = 0;

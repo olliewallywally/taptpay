@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import userEvent from '@testing-library/user-event';
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -109,6 +110,16 @@ function demoControl(container: HTMLElement, id: string): HTMLElement {
 }
 
 describe("PropertyTerminalView extraction boundary", () => {
+  test('a rent row exposes its existing action to the keyboard without invoking it twice', async () => {
+    const onRowTap = jest.fn();
+    const invoice = { id: 'rent-keyboard', tenantName: 'Mia', tenantProfileId: tenant.id, status: 'sent', kind: 'rent', amountCents: 25000, createdAt: new Date().toISOString(), dueAt: '2099-01-01' };
+    render(<PropertyTerminalView {...viewProps({ invoices: [invoice], onRowTap })} />);
+    const action = screen.getByRole('button', { name: 'Mia' });
+    act(() => action.focus()); await userEvent.keyboard('{Enter}');
+    expect(onRowTap).toHaveBeenCalledTimes(1); expect(onRowTap).toHaveBeenCalledWith(invoice);
+    fireEvent.click(action);
+    expect(onRowTap).toHaveBeenCalledTimes(2);
+  });
   test("contains no controller, network, auth, storage, provider, navigation, or external-font effect", () => {
     for (const { file, source } of viewSources) {
       for (const rule of forbidden) {

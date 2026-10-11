@@ -20,7 +20,7 @@ export function APIManagement() {
         </div>
 
         <div className="bg-[#24263a] rounded-lg p-12 text-center" data-testid="api-management-unavailable">
-          <Key className="size-12 text-[#dbdfea]/30 mx-auto mb-4" aria-hidden="true" />
+          <Key className="size-12 text-[#dbdfea]/70 mx-auto mb-4" aria-hidden="true" />
           <p className="text-[#dbdfea] text-lg mb-2">The e-commerce API is not available</p>
           <p className="text-[#dbdfea]/60 text-sm max-w-md mx-auto">
             API key issuing, usage reporting and revocation are turned off. This screen will

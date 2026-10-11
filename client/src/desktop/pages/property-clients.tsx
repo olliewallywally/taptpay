@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { usePropertyInvoices, usePropertyTenants, PROPERTY_KEYS } from "@/lib/property-data";
 import { propHeaders } from "@/lib/property-api";
 import { fmtNZD } from "@/lib/report-utils";
+import { useAccessibleModal } from '@/hooks/use-accessible-modal';
 import {
   DesktopPageScaffold,
   type DesktopRoutePageProps,
@@ -57,6 +58,7 @@ export default function DesktopPropertyClients(props: DesktopRoutePageProps) {
   const [addOpen, setAddOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const modalRef = useAccessibleModal(addOpen, () => { if (!createMutation.isPending) setAddOpen(false); });
 
   const tenantsQuery = usePropertyTenants();
   const invoicesQuery = usePropertyInvoices();
@@ -303,7 +305,7 @@ export default function DesktopPropertyClients(props: DesktopRoutePageProps) {
             aria-label="close"
             onClick={() => setAddOpen(false)}
           />
-          <div className="pc-modal" role="dialog" aria-modal="true" aria-label="add tenant">
+          <div ref={modalRef} className="pc-modal" role="dialog" aria-modal="true" aria-label="add tenant" tabIndex={-1}>
             <div className="pc-modal-head">
               <span className="pc-modal-title">Add tenant</span>
               <button type="button" className="pc-modal-x" aria-label="close" onClick={() => setAddOpen(false)}>
@@ -366,7 +368,7 @@ export default function DesktopPropertyClients(props: DesktopRoutePageProps) {
               )}
             </div>
 
-            {saveError && <div className="pc-error">{saveError}</div>}
+            {saveError && <div className="pc-error" role="alert">{saveError}</div>}
 
             <div className="pc-modal-actions">
               <button type="button" className="pc-ghost" onClick={() => setAddOpen(false)}>Cancel</button>
@@ -435,7 +437,7 @@ const PC_CSS = `
 .pc-grid { margin-top:20px; display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 .pc-field { display:flex; flex-direction:column; gap:7px; }
 .pc-field-wide { grid-column:1 / -1; }
-.pc-field > span, .pc-field-label { font-weight:700; font-size:10px; letter-spacing:0.16em; color:rgba(244,246,255,0.45); }
+.pc-field > span, .pc-field-label { font-weight:700; font-size:10px; letter-spacing:0.16em; color:rgba(244,246,255,0.65); }
 .pc-field input { height:46px; box-sizing:border-box; border-radius:12px; border:1px solid rgba(94,158,255,0.35); background:rgba(94,158,255,0.08); padding:0 16px; font-family:'Outfit',sans-serif; font-weight:600; font-size:13.5px; color:#fff; outline:none; transition:border-color .15s ease; }
 .pc-field input:focus { border-color:${ACTIVE}; }
 

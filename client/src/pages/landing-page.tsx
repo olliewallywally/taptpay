@@ -1,6 +1,7 @@
 // @ts-nocheck — ported verbatim from the July 2026 prototype export; inline
 // styles use string values (fontWeight:"500", rows:"3", …) for 1:1 fidelity.
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { useAccessibleModal } from '@/hooks/use-accessible-modal';
 import './landing.css';
 
 export interface LandingPageProps {
@@ -19,6 +20,14 @@ export interface LandingPageProps {
  * Mount once as a full page (e.g. a wouter route).
  */
 export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', reducedMotion = false }: LandingPageProps) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useAccessibleModal(menuOpen, () => setMenuOpen(false));
+  useEffect(() => {
+    if (!menuOpen) return;
+    const prior = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prior; };
+  }, [menuOpen]);
   useEffect(() => {
     // The runtime pulls in three.js (~1.2 MB min), so it's loaded on demand:
     // the static markup paints immediately and the scroll/3D rig attaches a
@@ -27,7 +36,7 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
     let cancelled = false;
     import('./landingRuntime').then(({ LandingRuntime }) => {
       if (cancelled) return;
-      const rt = new LandingRuntime({ coinDensity, defaultIndustry, reducedMotion });
+      const rt = new LandingRuntime({ coinDensity, defaultIndustry, reducedMotion, onMenuChange: setMenuOpen });
       rt.init();
     });
     // Prototype parity: the runtime registers window-level listeners and rAF
@@ -75,7 +84,7 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
           {' '}
         </div>
         {' '}
-        <button id="tp-burger" aria-label="menu" style={{ display: "none", background: "transparent", border: "none", cursor: "pointer", padding: "10px" }}>
+        <button id="tp-burger" aria-label="menu" aria-expanded={menuOpen} aria-controls="tp-menu" style={{ display: "none", background: "transparent", border: "none", cursor: "pointer", padding: "10px" }}>
           {' '}
           <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#F4F1E8" strokeWidth="1.8" strokeLinecap="round">
             <path d="M4 7h16M4 12h16M4 17h16" />
@@ -87,7 +96,7 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
       {' '}
       {/* mobile menu overlay */}
       {' '}
-      <div id="tp-menu" style={{ position: "fixed", inset: "0", zIndex: "115", background: "rgba(3,9,74,0.97)", backdropFilter: "blur(14px)", display: "flex", flexDirection: "column", alignItems: "flex-start", justifyContent: "center", gap: "6px", padding: "0 10vw", opacity: "0", pointerEvents: "none", transition: "opacity .35s ease" }}>
+      <div id="tp-menu" ref={menuRef} role="dialog" aria-label="Navigation menu" aria-modal={menuOpen ? 'true' : undefined} aria-hidden={!menuOpen} {...{ inert: menuOpen ? undefined : '' }} tabIndex={-1} style={{ position: "fixed", inset: "0", zIndex: "115", background: "rgba(3,9,74,0.97)", backdropFilter: "blur(14px)", display: "flex", flexDirection: "column", alignItems: "flex-start", justifyContent: "center", gap: "6px", padding: "0 10vw", opacity: menuOpen ? "1" : "0", pointerEvents: menuOpen ? "auto" : "none", transition: "opacity .35s ease" }}>
         {' '}
         <button id="tp-menu-close" aria-label="close menu" style={{ position: "absolute", top: "20px", right: "20px", background: "transparent", border: "none", cursor: "pointer", padding: "12px" }}>
           {' '}
@@ -161,7 +170,7 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
             {' '}
           </div>
           {' '}
-          <div style={{ marginTop: "56px", display: "flex", flexWrap: "wrap", alignItems: "center", gap: "10px 22px", fontFamily: "'Outfit'", fontWeight: "500", fontSize: "12px", letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(244,241,232,0.4)", maxWidth: "921px" }}>
+          <div style={{ marginTop: "56px", display: "flex", flexWrap: "wrap", alignItems: "center", gap: "10px 22px", fontFamily: "'Outfit'", fontWeight: "500", fontSize: "12px", letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(244,241,232,0.65)", maxWidth: "921px" }}>
             {' '}
             <span>{"apple pay"}</span>
             <span style={{ opacity: ".4" }}>{"·"}</span>
@@ -177,7 +186,7 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
           {' '}
         </div>
         {' '}
-        <div style={{ position: "absolute", bottom: "34px", left: "clamp(20px,7vw,9vw)", zIndex: "4", display: "flex", alignItems: "center", gap: "10px", fontFamily: "'Outfit'", fontWeight: "500", fontSize: "12px", letterSpacing: "0.24em", textTransform: "uppercase", color: "rgba(244,241,232,0.45)" }}>
+        <div style={{ position: "absolute", bottom: "34px", left: "clamp(20px,7vw,9vw)", zIndex: "4", display: "flex", alignItems: "center", gap: "10px", fontFamily: "'Outfit'", fontWeight: "500", fontSize: "12px", letterSpacing: "0.24em", textTransform: "uppercase", color: "rgba(244,241,232,0.65)" }}>
           {' '}
           <span>{"scroll"}</span>
           {' '}
@@ -231,7 +240,7 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
                           {' '}
                           <div className="tp-phone-scale" style={{ position: "absolute", left: "4.4%", right: "4.2%", top: "1.75%", bottom: "1.75%", borderRadius: "11%/5.2%", overflow: "hidden", background: "#fff" }}>
                             {' '}
-                            <iframe id="tp-cine-frame" className="tp-app-frame" data-late-src="app/embed.html?mode=property&route=/property" title="taptpay live app" style={{ width: "390px", height: "844px", border: "none", transformOrigin: "top left", pointerEvents: "none", display: "block", background: "#fff" }} />
+                            <iframe tabIndex={-1} aria-hidden="true" id="tp-cine-frame" className="tp-app-frame" data-late-src="app/embed.html?mode=property&route=/property" title="taptpay property app overview" style={{ width: "390px", height: "844px", border: "none", transformOrigin: "top left", pointerEvents: "none", display: "block", background: "#fff" }} />
                             {' '}
                           </div>
                           {' '}
@@ -269,7 +278,7 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
             {' '}
             <div id="tp-s-head-a" style={{ willChange: "transform,opacity" }}>
               {' '}
-              <div style={{ fontFamily: "'Outfit'", fontWeight: "500", fontSize: "13px", letterSpacing: "0.32em", textTransform: "uppercase", color: "rgba(244,241,232,0.45)", marginBottom: "16px" }}>{"the tech"}</div>
+              <div style={{ fontFamily: "'Outfit'", fontWeight: "500", fontSize: "13px", letterSpacing: "0.32em", textTransform: "uppercase", color: "rgba(244,241,232,0.65)", marginBottom: "16px" }}>{"the tech"}</div>
               {' '}
               <h2 style={{ margin: "0", fontFamily: "'Outfit'", fontWeight: "300", fontSize: "clamp(30px,4.4vw,68px)", lineHeight: "1.05", letterSpacing: "-0.02em", color: "#F4F1E8" }}>
                 {"every other payment tool"}
@@ -303,7 +312,7 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
           {' '}
           <div id="tp-cine-dots" style={{ position: "absolute", bottom: "5vh", left: "50%", transform: "translateX(-50%)", display: "flex", gap: "8px", zIndex: "20" }} />
           {' '}
-          <div id="tp-cine-cap" style={{ position: "absolute", top: "7vh", left: "0", width: "100%", textAlign: "center", fontFamily: "'Outfit'", fontWeight: "500", fontSize: "12px", letterSpacing: "0.3em", textTransform: "uppercase", color: "rgba(244,241,232,0.4)", opacity: "0", transition: "opacity .5s ease", zIndex: "20" }}>{"this is the real app — live in the phone"}</div>
+          <div id="tp-cine-cap" style={{ position: "absolute", top: "7vh", left: "0", width: "100%", textAlign: "center", fontFamily: "'Outfit'", fontWeight: "500", fontSize: "12px", letterSpacing: "0.3em", textTransform: "uppercase", color: "rgba(244,241,232,0.65)", opacity: "0", transition: "opacity .5s ease", zIndex: "20" }}>{"this is the real app — live in the phone"}</div>
           {' '}
         </div>
         {' '}
@@ -346,7 +355,7 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
             {' '}
             <span style={{ display: "inline-block", fontFamily: "'Outfit'", fontWeight: "400", fontSize: "clamp(56px,12vw,190px)", lineHeight: "1", letterSpacing: "-0.04em", color: "#5E9DFF" }}>{"just your phone."}</span>
             {' '}
-            <div style={{ marginTop: "26px", fontFamily: "'Outfit'", fontWeight: "400", fontSize: "clamp(14px,1.3vw,18px)", letterSpacing: "0.04em", color: "rgba(244,241,232,0.5)" }}>{"one app. the whole payment stack."}</div>
+            <div style={{ marginTop: "26px", fontFamily: "'Outfit'", fontWeight: "400", fontSize: "clamp(14px,1.3vw,18px)", letterSpacing: "0.04em", color: "rgba(244,241,232,0.65)" }}>{"one app. the whole payment stack."}</div>
             {' '}
           </div>
           {' '}
@@ -392,7 +401,7 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
           {' '}
           <div style={{ flex: "1 1 420px", minWidth: "300px" }}>
             {' '}
-            <div id="tp-ind-tag" style={{ fontFamily: "'Outfit'", fontWeight: "500", fontSize: "13px", letterSpacing: "0.24em", textTransform: "uppercase", color: "rgba(244,241,232,0.45)" }}>{"property management"}</div>
+            <div id="tp-ind-tag" style={{ fontFamily: "'Outfit'", fontWeight: "500", fontSize: "13px", letterSpacing: "0.24em", textTransform: "uppercase", color: "rgba(244,241,232,0.65)" }}>{"property management"}</div>
             {' '}
             <h3 id="tp-ind-h" style={{ margin: "14px 0 0", fontFamily: "'Outfit'", fontWeight: "300", fontSize: "clamp(28px,3.4vw,52px)", lineHeight: "1.06", letterSpacing: "-0.02em", color: "#F4F1E8" }}>{"rent that collects itself."}</h3>
             {' '}
@@ -402,17 +411,17 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
               {' '}
               <div>
                 <div id="tp-ind-s1v" style={{ fontFamily: "'Outfit'", fontWeight: "700", fontSize: "clamp(26px,2.6vw,38px)", color: "#5E9DFF" }}>{"0.3%"}</div>
-                <div id="tp-ind-s1l" style={{ marginTop: "4px", fontFamily: "'Outfit'", fontWeight: "400", fontSize: "13px", color: "rgba(244,241,232,0.5)" }}>{"platform fee"}</div>
+                <div id="tp-ind-s1l" style={{ marginTop: "4px", fontFamily: "'Outfit'", fontWeight: "400", fontSize: "13px", color: "rgba(244,241,232,0.65)" }}>{"platform fee"}</div>
               </div>
               {' '}
               <div>
                 <div id="tp-ind-s2v" style={{ fontFamily: "'Outfit'", fontWeight: "700", fontSize: "clamp(26px,2.6vw,38px)", color: "#5E9DFF" }}>{"2–10"}</div>
-                <div id="tp-ind-s2l" style={{ marginTop: "4px", fontFamily: "'Outfit'", fontWeight: "400", fontSize: "13px", color: "rgba(244,241,232,0.5)" }}>{"way rent splits"}</div>
+                <div id="tp-ind-s2l" style={{ marginTop: "4px", fontFamily: "'Outfit'", fontWeight: "400", fontSize: "13px", color: "rgba(244,241,232,0.65)" }}>{"way rent splits"}</div>
               </div>
               {' '}
               <div>
                 <div id="tp-ind-s3v" style={{ fontFamily: "'Outfit'", fontWeight: "700", fontSize: "clamp(26px,2.6vw,38px)", color: "#5E9DFF" }}>{"auto"}</div>
-                <div id="tp-ind-s3l" style={{ marginTop: "4px", fontFamily: "'Outfit'", fontWeight: "400", fontSize: "13px", color: "rgba(244,241,232,0.5)" }}>{"reminders, never duplicated"}</div>
+                <div id="tp-ind-s3l" style={{ marginTop: "4px", fontFamily: "'Outfit'", fontWeight: "400", fontSize: "13px", color: "rgba(244,241,232,0.65)" }}>{"reminders, never duplicated"}</div>
               </div>
               {' '}
             </div>
@@ -433,7 +442,7 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
                     {' '}
                     <div className="tp-phone-scale" style={{ position: "absolute", inset: "clamp(6px,0.9vh,9px)", borderRadius: "clamp(26px,3.4vh,38px)", overflow: "hidden", background: "#fff" }}>
                       {' '}
-                      <iframe id="tp-ind-frame" className="tp-app-frame" data-defer-src="app/embed.html?mode=property&route=/property" title="taptpay live app" style={{ width: "390px", height: "844px", border: "none", transformOrigin: "top left", pointerEvents: "none", display: "block", background: "#fff" }} />
+                      <iframe tabIndex={-1} aria-hidden="true" id="tp-ind-frame" className="tp-app-frame" data-defer-src="app/embed.html?mode=property&route=/property" title="taptpay industry app preview" style={{ width: "390px", height: "844px", border: "none", transformOrigin: "top left", pointerEvents: "none", display: "block", background: "#fff" }} />
                       {' '}
                     </div>
                     {' '}
@@ -480,7 +489,7 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
           {' '}
           <div className="tp-rev" style={{ flex: "1 1 400px", minWidth: "300px", padding: "clamp(30px,3.4vw,48px)", borderRadius: "28px", background: "rgba(94,157,255,0.07)", border: "1px solid rgba(94,157,255,0.28)" }}>
             {' '}
-            <div style={{ fontFamily: "'Outfit'", fontWeight: "500", fontSize: "13px", letterSpacing: "0.26em", textTransform: "uppercase", color: "rgba(244,241,232,0.5)" }}>{"retail & hospitality"}</div>
+            <div style={{ fontFamily: "'Outfit'", fontWeight: "500", fontSize: "13px", letterSpacing: "0.26em", textTransform: "uppercase", color: "rgba(244,241,232,0.65)" }}>{"retail & hospitality"}</div>
             {' '}
             <div style={{ marginTop: "18px", display: "flex", alignItems: "baseline", gap: "12px" }}>
               {' '}
@@ -496,7 +505,7 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
           {' '}
           <div className="tp-rev" style={{ flex: "1 1 400px", minWidth: "300px", padding: "clamp(30px,3.4vw,48px)", borderRadius: "28px", background: "rgba(94,157,255,0.07)", border: "1px solid rgba(94,157,255,0.28)" }}>
             {' '}
-            <div style={{ fontFamily: "'Outfit'", fontWeight: "500", fontSize: "13px", letterSpacing: "0.26em", textTransform: "uppercase", color: "rgba(244,241,232,0.5)" }}>{"property & trades"}</div>
+            <div style={{ fontFamily: "'Outfit'", fontWeight: "500", fontSize: "13px", letterSpacing: "0.26em", textTransform: "uppercase", color: "rgba(244,241,232,0.65)" }}>{"property & trades"}</div>
             {' '}
             <div style={{ marginTop: "18px", display: "flex", alignItems: "baseline", gap: "12px" }}>
               {' '}
@@ -523,7 +532,7 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
         {' '}
         <div className="tp-rev" style={{ marginTop: "54px", maxWidth: "1150px" }}>
           {' '}
-          <div style={{ fontFamily: "'Outfit'", fontWeight: "500", fontSize: "13px", letterSpacing: "0.26em", textTransform: "uppercase", color: "rgba(244,241,232,0.5)" }}>{"plus one simple subscription"}</div>
+          <div style={{ fontFamily: "'Outfit'", fontWeight: "500", fontSize: "13px", letterSpacing: "0.26em", textTransform: "uppercase", color: "rgba(244,241,232,0.65)" }}>{"plus one simple subscription"}</div>
           {' '}
           <div style={{ marginTop: "22px", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: "16px" }}>
             {' '}
@@ -533,7 +542,7 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
               {' '}
               <div style={{ marginTop: "14px", display: "flex", alignItems: "baseline", gap: "4px" }}>
                 <span style={{ fontFamily: "'Outfit'", fontWeight: "300", fontSize: "40px", letterSpacing: "-0.02em", color: "#F4F1E8" }}>{"$7.99"}</span>
-                <span style={{ fontFamily: "'Outfit'", fontWeight: "400", fontSize: "13px", color: "rgba(244,241,232,0.5)" }}>{"/mo"}</span>
+                <span style={{ fontFamily: "'Outfit'", fontWeight: "400", fontSize: "13px", color: "rgba(244,241,232,0.65)" }}>{"/mo"}</span>
               </div>
               {' '}
               <div style={{ marginTop: "10px", fontFamily: "'Outfit'", fontWeight: "400", fontSize: "13px", color: "rgba(244,241,232,0.55)" }}>{"1 login · the full stack"}</div>
@@ -549,7 +558,7 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
               {' '}
               <div style={{ marginTop: "14px", display: "flex", alignItems: "baseline", gap: "4px" }}>
                 <span style={{ fontFamily: "'Outfit'", fontWeight: "300", fontSize: "40px", letterSpacing: "-0.02em", color: "#F4F1E8" }}>{"$8.99"}</span>
-                <span style={{ fontFamily: "'Outfit'", fontWeight: "400", fontSize: "13px", color: "rgba(244,241,232,0.5)" }}>{"/mo"}</span>
+                <span style={{ fontFamily: "'Outfit'", fontWeight: "400", fontSize: "13px", color: "rgba(244,241,232,0.65)" }}>{"/mo"}</span>
               </div>
               {' '}
               <div style={{ marginTop: "10px", fontFamily: "'Outfit'", fontWeight: "400", fontSize: "13px", color: "rgba(244,241,232,0.55)" }}>{"5 logins · one dollar more"}</div>
@@ -562,7 +571,7 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
               {' '}
               <div style={{ marginTop: "14px", display: "flex", alignItems: "baseline", gap: "4px" }}>
                 <span style={{ fontFamily: "'Outfit'", fontWeight: "300", fontSize: "40px", letterSpacing: "-0.02em", color: "#F4F1E8" }}>{"$12.99"}</span>
-                <span style={{ fontFamily: "'Outfit'", fontWeight: "400", fontSize: "13px", color: "rgba(244,241,232,0.5)" }}>{"/mo"}</span>
+                <span style={{ fontFamily: "'Outfit'", fontWeight: "400", fontSize: "13px", color: "rgba(244,241,232,0.65)" }}>{"/mo"}</span>
               </div>
               {' '}
               <div style={{ marginTop: "10px", fontFamily: "'Outfit'", fontWeight: "400", fontSize: "13px", color: "rgba(244,241,232,0.55)" }}>{"10 logins · whole crew covered"}</div>
@@ -665,7 +674,7 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
             {' '}
             <div id="tpc-form" style={{ width: "248px", height: "58px", borderRadius: "9999px", overflow: "hidden", background: "rgba(244,241,232,0.05)", border: "1.5px solid rgba(94,157,255,0.55)", textAlign: "left" }}>
               {' '}
-              <div id="tpc-head" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", height: "58px", padding: "0 22px 0 26px", cursor: "pointer", flex: "0 0 auto" }}>
+              <button type="button" id="tpc-head" aria-expanded="false" aria-controls="tpc-body" style={{ border: 'none', background: 'transparent', display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", height: "58px", padding: "0 22px 0 26px", cursor: "pointer", flex: "0 0 auto" }}>
                 {' '}
                 <span style={{ fontFamily: "'Outfit'", fontWeight: "500", fontSize: "15px", color: "#5E9DFF" }}>{"send a message"}</span>
                 {' '}
@@ -673,9 +682,9 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
                   <path d="M12 5v14M5 12h14" />
                 </svg>
                 {' '}
-              </div>
+              </button>
               {' '}
-              <div id="tpc-body" style={{ opacity: "0", pointerEvents: "none" }}>
+              <div id="tpc-body" aria-hidden="true" {...{ inert: '' }} style={{ opacity: "0", pointerEvents: "none" }}>
                 {' '}
                 <div id="tpc-fields" style={{ display: "flex", flexDirection: "column", gap: "12px", padding: "4px 26px 26px" }}>
                   {' '}
@@ -727,15 +736,15 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
           {' '}
           <div style={{ display: "flex", flexWrap: "wrap", gap: "10px 22px", fontFamily: "'Outfit'", fontWeight: "500", fontSize: "13px" }}>
             {' '}
-            <a href="#tp-story" className="tp-anchor" style={{ textDecoration: "none", color: "rgba(244,241,232,0.5)", cursor: "pointer" }}>{"the tech"}</a>
+            <a href="#tp-story" className="tp-anchor" style={{ textDecoration: "none", color: "rgba(244,241,232,0.65)", cursor: "pointer" }}>{"the tech"}</a>
             {' '}
-            <a href="#tp-industries" className="tp-anchor" style={{ textDecoration: "none", color: "rgba(244,241,232,0.5)", cursor: "pointer" }}>{"industries"}</a>
+            <a href="#tp-industries" className="tp-anchor" style={{ textDecoration: "none", color: "rgba(244,241,232,0.65)", cursor: "pointer" }}>{"industries"}</a>
             {' '}
-            <a href="#tp-pricing" className="tp-anchor" style={{ textDecoration: "none", color: "rgba(244,241,232,0.5)", cursor: "pointer" }}>{"pricing"}</a>
+            <a href="#tp-pricing" className="tp-anchor" style={{ textDecoration: "none", color: "rgba(244,241,232,0.65)", cursor: "pointer" }}>{"pricing"}</a>
             {' '}
           </div>
           {' '}
-          <div style={{ fontFamily: "'Outfit'", fontWeight: "400", fontSize: "12px", letterSpacing: "0.06em", color: "rgba(244,241,232,0.35)" }}>{"all software, no hardware · © 2026 taptpay"}</div>
+          <div style={{ fontFamily: "'Outfit'", fontWeight: "400", fontSize: "12px", letterSpacing: "0.06em", color: "rgba(244,241,232,0.65)" }}>{"all software, no hardware · © 2026 taptpay"}</div>
           {' '}
         </div>
         {' '}

@@ -167,7 +167,9 @@ function JobsHome({ invoices, outstanding, go, onRowTap }: any) {
                     {(inv.clientName || '??').split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="tp-stack-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inv.clientName || '—'}</div>
+                    <button type="button" className="tp-stack-name"
+                      onClick={(event) => { event.stopPropagation(); onRowTap?.(inv); }}
+                      style={{ display: 'block', width: '100%', padding: 0, border: 0, background: 'transparent', textAlign: 'left', fontFamily: 'inherit', lineHeight: 'inherit', cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inv.clientName || 'View invoice'}</button>
                     <div className="tp-stack-meta">
                       <span className={`tp-dot ${dotCls}`} />
                       <span className="tp-stack-status">{st}</span>
@@ -1063,6 +1065,7 @@ export function TradesTerminalView(props: TradesTerminalViewProps) {
   return (
     <div
       className="trades-terminal-view tp-viewport"
+      tabIndex={0} role="region" aria-label="Trades terminal"
       ref={viewportRef}
       data-demo-id="trades-terminal"
       data-terminal-screen={props.screen}

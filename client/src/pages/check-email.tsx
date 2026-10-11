@@ -56,7 +56,7 @@ export default function CheckEmail() {
       <div className="w-full max-w-sm mb-4">
         <button
           onClick={() => setLocation("/signup")}
-          className="text-white/50 hover:text-white text-xs uppercase tracking-widest flex items-center gap-1.5 transition-colors"
+          className="text-white hover:text-white text-xs uppercase tracking-widest flex items-center gap-1.5 transition-colors"
         >
           <ArrowLeft className="w-3 h-3" /> back
         </button>
@@ -73,11 +73,11 @@ export default function CheckEmail() {
         </div>
 
         <div className="mx-auto w-16 h-16 rounded-full bg-[#00f1d7]/20 flex items-center justify-center mb-5">
-          <Mail className="w-8 h-8 text-[#00f1d7]" />
+          <Mail className="w-8 h-8 text-white" />
         </div>
 
         <h1 className="text-white text-2xl font-semibold mb-2">Check your email</h1>
-        <p className="text-white/60 text-sm leading-relaxed mb-2">
+        <p className="text-white text-sm leading-relaxed mb-2">
           We sent a confirmation link to
         </p>
         <p className="text-white font-medium text-sm mb-6">
@@ -85,17 +85,17 @@ export default function CheckEmail() {
         </p>
 
         <div className="bg-white/10 rounded-2xl p-5 text-left mb-6 border border-white/15">
-          <p className="text-white/80 text-sm leading-relaxed">
+          <p className="text-white text-sm leading-relaxed">
             Click the link in the email to confirm your address and submit your completed application to the TaptPay team.
           </p>
         </div>
 
-        <p className="text-white/40 text-xs mb-4">Didn't get it? Check your spam folder or</p>
+        <p className="text-white text-xs mb-4">Didn't get it? Check your spam folder or</p>
 
         <button
           onClick={handleResend}
           disabled={resending || resent}
-          className="w-full flex items-center justify-center gap-2 text-sm text-[#00f1d7] hover:text-white border border-[#00f1d7]/40 hover:border-white/40 rounded-2xl py-3 transition-colors disabled:opacity-50"
+          className="w-full flex items-center justify-center gap-2 text-sm text-white hover:text-white border border-[#00f1d7]/40 hover:border-white/40 rounded-2xl py-3 transition-colors disabled:opacity-50"
         >
           {resending ? (
             <RefreshCw className="w-4 h-4 animate-spin" />
@@ -110,7 +110,7 @@ export default function CheckEmail() {
             Already confirmed?{" "}
             <button
               onClick={() => setLocation("/login")}
-              className="text-[#00f1d7]/60 hover:text-[#00f1d7] underline"
+              className="text-white/60 hover:text-white underline"
             >
               Continue to sign in
             </button>

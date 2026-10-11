@@ -1289,7 +1289,7 @@ export default function RetailTerminalViewCore({
   useFitTerminalAmounts(viewportRef);
 
   return (
-    <div className="retail-terminal-view tp-viewport" data-retail-terminal-view ref={viewportRef}>
+    <div className="retail-terminal-view tp-viewport" data-retail-terminal-view ref={viewportRef} tabIndex={0} role="region" aria-label="Retail terminal">
       {conveyor && (
         <div key={'leave-' + conveyor.prevId} className={`tp-layer leaving ${conveyorDir}`}>
           {renderScreen(conveyor.prevId)}

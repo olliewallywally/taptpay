@@ -680,7 +680,7 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
                 </span>
                 <span className="ds-mode-text">
                   <span className="ds-mode-label" style={{ color: m.on ? NAVY : "#FFFFFF" }}>{m.label}</span>
-                  <span className="ds-mode-sub" style={{ color: m.on ? "rgba(10,17,40,0.66)" : "rgba(255,255,255,0.55)" }}>
+                  <span className="ds-mode-sub" style={{ color: m.on ? "#0A1128" : "rgba(255,255,255,0.7)" }}>
                     {m.sub}
                   </span>
                 </span>

@@ -31,12 +31,14 @@ describe("useDeviceClass", () => {
   const originalInnerWidth = window.innerWidth;
   const originalInnerHeight = window.innerHeight;
   const originalMatchMedia = window.matchMedia;
+  const originalOuterWidth = window.outerWidth;
 
   let coarsePointer = false;
   let changeListeners: Set<(event: MediaQueryListEvent) => void>;
   let mediaQuery: MediaQueryList;
 
-  function setViewport(width: number, height: number) {
+  function setViewport(width: number, height: number, outerWidth = width) {
+    Object.defineProperty(window, 'outerWidth', { configurable: true, value: outerWidth });
     Object.defineProperty(window, "innerWidth", {
       configurable: true,
       writable: true,
@@ -89,11 +91,13 @@ describe("useDeviceClass", () => {
 
     window.matchMedia = jest.fn(() => mediaQuery);
     setViewport(1440, 900);
+    Object.defineProperty(window, 'outerWidth', { configurable: true, value: 1440 });
   });
 
   afterEach(() => {
     window.matchMedia = originalMatchMedia;
     setViewport(originalInnerWidth, originalInnerHeight);
+    Object.defineProperty(window, 'outerWidth', { configurable: true, value: originalOuterWidth });
     jest.restoreAllMocks();
   });
 
@@ -125,6 +129,29 @@ describe("useDeviceClass", () => {
     });
 
     expect(result.current).toBe("tablet");
+  });
+
+  it('retains desktop device identity at true 200% browser zoom', () => {
+    setViewport(720, 450, 1440);
+    const { result } = renderHook(() => useDeviceClass());
+    expect(result.current).toBe('desktop');
+  });
+
+  it('retains tablet device identity at true 200% browser zoom', () => {
+    coarsePointer = true;
+    setViewport(597, 417, 1194);
+    const { result } = renderHook(() => useDeviceClass());
+    expect(result.current).toBe('tablet');
+  });
+
+  it('retains phone identity at native zoom and does not confuse screen density with zoom', () => {
+    coarsePointer = true;
+    setViewport(195, 422, 390);
+    const { result, rerender } = renderHook(() => useDeviceClass());
+    expect(result.current).toBe('mobile');
+    act(() => { setViewport(390, 844); window.dispatchEvent(new Event('resize')); });
+    rerender();
+    expect(result.current).toBe('mobile');
   });
 
   it("removes its resize and pointer listeners on unmount", () => {

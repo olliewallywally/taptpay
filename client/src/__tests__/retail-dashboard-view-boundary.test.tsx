@@ -10,6 +10,17 @@ import {
 
 configure({ testIdAttribute: "data-demo-id" });
 
+test('timeframe buttons expose the selected filter to assistive technology', () => {
+  render(<RetailDashboardView {...makeProps()} />);
+  const week = screen.getByTestId('retail-dashboard-timeframe-week');
+  const month = screen.getByTestId('retail-dashboard-timeframe-month');
+  expect(week).toHaveAttribute('aria-pressed', 'true');
+  expect(month).toHaveAttribute('aria-pressed', 'false');
+  fireEvent.click(month);
+  expect(month).toHaveAttribute('aria-pressed', 'true');
+  expect(week).toHaveAttribute('aria-pressed', 'false');
+});
+
 const viewSourcePath = path.resolve(
   process.cwd(),
   "client/src/features/dashboard/RetailDashboardView.tsx",

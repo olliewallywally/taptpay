@@ -863,7 +863,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
                   })}
                 </div>
 
-                <div className="tt-rows">
+                <div className="tt-rows" tabIndex={0} role="region" aria-label="Jobs">
                   {isLoading ? (
                     <div className="tt-empty">loading jobs…</div>
                   ) : invoicesUnavailable || clientsUnavailable ? (
@@ -1498,7 +1498,7 @@ const TT_CSS = `
 .tt-panel { flex:1; min-width:0; padding-left:36px; box-sizing:border-box; }
 .tt-mode { animation:tileIn var(--m-dur-ui) var(--m-ease-out) both; }
 .tt-mode-title { font-weight:300; font-size:15px; color:${PALE}; }
-.tt-field-label { font-weight:700; font-size:10px; letter-spacing:0.18em; color:rgba(244,246,255,0.45); }
+.tt-field-label { font-weight:700; font-size:10px; letter-spacing:0.18em; color:rgba(244,246,255,0.65); }
 
 /* invoice compose — the design pins both blocks to fixed y offsets */
 .tt-inv-top { position:absolute; left:668px; top:154px; width:445px; animation:tileIn var(--m-dur-ui) var(--m-ease-out) both; }
@@ -1524,7 +1524,7 @@ const TT_CSS = `
 .tt-note { height:50px; box-sizing:border-box; border-radius:9999px; border:none; outline:none; background:#fff; padding:0 22px; color:#12162E; font-family:'Outfit',sans-serif; font-weight:600; font-size:13.5px; }
 .tt-via { display:flex; align-items:center; gap:14px; height:54px; padding:0 20px; box-sizing:border-box; border-radius:12px; border:1.5px solid rgba(94,158,255,0.55); }
 .tt-via-text { display:flex; flex-direction:column; gap:1px; min-width:0; }
-.tt-via-label { font-weight:600; font-size:8.5px; letter-spacing:0.08em; color:rgba(244,246,255,0.45); text-transform:lowercase; }
+.tt-via-label { font-weight:600; font-size:8.5px; letter-spacing:0.08em; color:rgba(244,246,255,0.65); text-transform:lowercase; }
 .tt-via-value { font-weight:600; font-size:13px; color:${TEXT_SOFT}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .tt-type-chips { display:flex; gap:10px; margin-top:6px; }
 .tt-type-chip { flex:1; height:44px; border-radius:9999px; font-size:12.5px; cursor:pointer; transition:background .15s ease, color .15s ease; text-transform:lowercase; }
@@ -1610,7 +1610,7 @@ const TT_CSS = `
 .tt-rec-row-actions button { padding:3px 7px; border:1px solid rgba(94,158,255,.4); border-radius:999px; background:transparent; color:${ACCENT_SOFT}; font:inherit; font-size:10px; cursor:pointer; }
 
 .tt-paid-title { margin-top:100px; }
-.tt-paid-sub { margin-top:4px; font-weight:500; font-size:12px; color:rgba(244,246,255,0.45); }
+.tt-paid-sub { margin-top:4px; font-weight:500; font-size:12px; color:rgba(244,246,255,0.65); }
 .tt-paid-rows { margin-top:22px; display:flex; flex-direction:column; width:440px; max-height:420px; overflow-y:auto; scrollbar-width:none; }
 .tt-paid-rows::-webkit-scrollbar { display:none; }
 .tt-paid-row { display:flex; align-items:center; gap:14px; padding:11px 0; border-bottom:1px solid rgba(94,158,255,0.14); flex:0 0 auto; }

@@ -1,0 +1,31 @@
+import assert from 'node:assert/strict';
+import { chromium } from 'playwright';
+import { CHROMIUM_PATH } from './desktop-shots/retail-fixtures.mjs';
+import { auditScrollRows } from './scroll-audit.mjs';
+const browser = await chromium.launch({ executablePath: CHROMIUM_PATH, headless: true });
+const page = await browser.newPage({ viewport: { width: 600, height: 500 } });
+try {
+  const rows = '<div class="row" style="height:60px">PRIVATE-TEXT</div>'.repeat(8);
+  await page.setContent('<main>' + rows.slice(0, rows.length / 4) + '</main>');
+  assert.deepEqual((await auditScrollRows(page, '.row')).faults, []);
+  await page.setContent('<main tabindex="0" aria-label="Long rows" style="height:280px;overflow:auto">' + '<div class="row" style="height:170px">Row</div>'.repeat(8) + '</main>');
+  assert.deepEqual((await auditScrollRows(page, '.row')).faults, []);
+  const content = '<main tabindex="0" aria-label="PRIVATE-NAME" style="height:200px;overflow:auto">' + rows + '</main>';
+  await page.setContent(content);
+  const good = await auditScrollRows(page, '.row');
+  assert.equal(good.total, 8); assert.equal(good.seen, 8); assert.deepEqual(good.faults, []);
+  assert.ok(!JSON.stringify(good).includes('PRIVATE-'));
+  await page.setContent('<main tabindex="0" aria-label="Two dimensional canvas" style="width:500px;height:200px;overflow:auto"><div style="width:1800px"><div class="row" style="width:300px;height:60px">Row</div><button style="margin-left:1600px">Far control</button></div></main>');
+  await page.locator('button').focus();
+  assert.ok(await page.locator('main').evaluate(el => el.scrollLeft > 0));
+  assert.deepEqual((await auditScrollRows(page, '.row')).faults, []);
+  await page.setContent('<div style="height:800px"></div>' + content);
+  assert.deepEqual((await auditScrollRows(page, '.row')).faults, []);
+  await page.setContent(content.replace('aria-label="PRIVATE-NAME"', '').replace('tabindex="0"', ''));
+  assert.ok((await auditScrollRows(page, '.row')).faults.some(f => f.includes('keyboard target or name')));
+  await page.setContent(content.replace('overflow:auto', 'overflow:hidden'));
+  assert.ok((await auditScrollRows(page, '.row')).faults.some(f => f.includes('no native scroll region')));
+  await page.setContent(content.replace('height:200px;', 'height:200px;opacity:0;'));
+  assert.ok((await auditScrollRows(page, '.row')).faults.some(f => f.includes('fully readable')));
+  console.log('PASS native row scrolling, static visibility, clipping, naming and privacy controls');
+} finally { await browser.close(); }

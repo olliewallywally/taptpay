@@ -13,7 +13,7 @@ const C = {
   btn:   '#3F9BFF',
   white: '#FFFFFF',
   gray:  '#E7E6E5',
-  mute:  '#8C8C8C',
+  mute:  '#586079',
 };
 
 const STATUS_MAP: Record<string, { dot: string; bg: string; fg: string; label: string }> = {

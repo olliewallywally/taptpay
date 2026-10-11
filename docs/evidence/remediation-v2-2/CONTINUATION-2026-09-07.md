@@ -1,5 +1,28 @@
 # Full integration continuation audit — 2026-09-07
 
+Latest continuation **2026-10-11 — R1-T10e accessibility engineering checkpoint**,
+branch `fix/qwen-aligned-20261010`, exact base
+`10f12c8d9e6a6317b1416fd1a71f4c769e03aa0d`; implementation is the commit containing
+[this handover](../../HANDOFF-2026-10-11-r1-t10-accessibility-completion.md).
+[Evidence](r1/R1-T10e-completion-2026-10-11.md),
+[structural results](r1/R1-T10e-completion-browser-summary-2026-10-11.json),
+[review](r1/R1-T10e-completion-review-2026-10-11.md).
+
+- Captured contrast/target, keyboard/modal/hidden state, native zoom/reflow and
+  reduced-motion corrections. No business API/calculation/schema/provider change.
+- **124 client suites / 1,458 tests; 876 selected browser cells** (204 normal,
+  204 native zoom, 204 reduced; 88 tutorials in each variant) pass. Typecheck,
+  isolated builds and probe controls pass. Preserve adverse checks and the two
+  explicit checker manifests; reduced-only sampler correction has byte-proven
+  normal/zoom reuse and fresh reduced checks. No changed checker during any
+  selected final run; source/build remains frozen.
+- Incomplete contrast/ARIA, experimental semantics, real devices/Safari/AT,
+  owner visuals/goldens and final independent acceptance remain open. The handover
+  identifies the payment-return span and Radix guard candidates concretely.
+  **T10e/T10f/R1/release remain open.** No deployment or live provider/DB activity.
+
+Previous checkpoints follow; their narrower counts/claims are historical.
+
 Latest continuation **2026-10-11 — R1-T10 shared tutorial contrast**, implementation
 `f9ccd53c0777ec0b1e3d858ddf446927f20544c5` on `fix/qwen-aligned-20261010`;
 base `ea6c55379e36b17a971db3bba72165995f5ef7f7` verified published.

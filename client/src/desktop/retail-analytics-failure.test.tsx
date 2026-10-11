@@ -68,6 +68,23 @@ beforeEach(() => {
   fetchMock.mockReset();
 });
 
+test('keyboard tabs select, wrap and leave only the selected filter in the Tab order', async () => {
+  serve(() => reply(SALES)); renderPage(); await settle();
+  const user = userEvent.setup();
+  const tabs = screen.getAllByRole('tab');
+  tabs[0].focus();
+  await user.keyboard('{ArrowLeft}');
+  expect(tabs.at(-1)).toHaveFocus();
+  expect(tabs.at(-1)).toHaveAttribute('aria-selected', 'true');
+  await user.keyboard('{Home}{ArrowRight}');
+  expect(tabs[1]).toHaveFocus();
+  expect(tabs[1]).toHaveAttribute('aria-selected', 'true');
+  expect(tabs[0]).toHaveAttribute('tabindex', '-1');
+  await user.keyboard('{End}');
+  expect(tabs.at(-1)).toHaveFocus();
+  expect(tabs.filter(tab => tab.tabIndex === 0)).toEqual([tabs.at(-1)]);
+});
+
 describe("retail analytics when sales fail to load (R1-T9)", () => {
   it("says so in the frame, and shows no figure, no chart and no 'no sales yet'", async () => {
     serve(outage);

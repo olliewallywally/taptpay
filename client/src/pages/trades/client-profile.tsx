@@ -29,7 +29,7 @@ const C = {
   cream: TRADES_THEME.OFFW,
   white: "#FFFFFF",
   gray: "#E7E6E5",
-  mute: "#8C8C8C",
+  mute: "#586079",
   green: TRADES_THEME.GREEN,
   red: TRADES_THEME.RED,
   amber: TRADES_THEME.AMBER,

@@ -139,8 +139,9 @@ function TimeframeBar({ tf, onPick, onIndicator }: {
         {TIMEFRAMES.map((t, i) => (
           <button key={t} type="button" ref={el => (btnRefs.current[i] = el)}
             className="td-tap" onPointerDown={pulse}
+            aria-pressed={tf === t}
             onClick={() => onPick(t)}
-            style={{ position: 'relative', zIndex: 1, flex: 1, padding: '7px 0', borderRadius: 999, border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'Outfit, system-ui', fontWeight: tf === t ? 700 : 600, fontSize: 12, textTransform: 'capitalize', color: tf === t ? INK : 'rgba(88,171,255,0.55)', transition: 'color 0.25s ease', WebkitTapHighlightColor: 'transparent' }}>
+            style={{ position: 'relative', zIndex: 1, flex: 1, padding: '7px 0', borderRadius: 999, border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'Outfit, system-ui', fontWeight: tf === t ? 700 : 600, fontSize: 12, textTransform: 'capitalize', color: tf === t ? INK : '#93BAFF', transition: 'color 0.25s ease', WebkitTapHighlightColor: 'transparent' }}>
             {t}
           </button>
         ))}
@@ -208,7 +209,7 @@ function JobsBarChart({ buckets, selectedIdx, onSelectBar, animKey }: {
       {/* Value pill above the selected bar */}
       {sel && (
         <div key={`${animKey}-${selectedIdx}`} className="td-bar-pill"
-          style={{ position: 'absolute', left: `${(selX / W) * 100}%`, top: `${(selTop / H) * 100}%`, transform: 'translate(-50%, calc(-100% - 8px))', background: SEL, color: INK, padding: '5px 14px', borderRadius: 999, fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap', boxShadow: '0 6px 16px rgba(0,127,255,0.35)', pointerEvents: 'none' }}>
+          style={{ position: 'absolute', left: `${(selX / W) * 100}%`, top: `${(selTop / H) * 100}%`, transform: 'translate(-50%, calc(-100% - 8px))', background: SEL, color: "#000F3F", padding: '5px 14px', borderRadius: 999, fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap', boxShadow: '0 6px 16px rgba(0,127,255,0.35)', pointerEvents: 'none' }}>
           {fmtCompact(sel.valueCents)}
         </div>
       )}
