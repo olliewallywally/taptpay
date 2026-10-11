@@ -6,13 +6,15 @@ acceptance items and next work are unchanged.
 **T10e/T10f/R1/release and the final independent implementation review remain open.**
 
 Repository / branch: `olliewallywally/taptpay`, `ccr-e07e3100-0wm8kr`.
-Base: `fix/qwen-aligned-20261010` at `3720c5f1`, rechecked as the remote tip.
+Base: `fix/qwen-aligned-20261010` at `3720c5f1`; Codex's later `c7001802` (checkout
+wordmark `role="img"`, client-only) is merged in at `8bcac703`. With it: typecheck
+pass, client **126 / 1,463**.
 Implementation: `1bec6b68` (middleware removal, React-19-safe `inertWhen`),
 `128b09bb` (lockfile), `b6100c03` (the new push's hand-written `inert` sites).
 Derive the evidence checkpoint from the commit containing this handover and verify
 it with `git ls-remote origin refs/heads/ccr-e07e3100-0wm8kr`. To land it on the
 Codex branch, fast-forward `fix/qwen-aligned-20261010` to this branch if that
-branch has not moved past `3720c5f1`; otherwise rebase these four commits.
+branch has not moved past `c7001802`; otherwise merge it in again.
 
 ## Review of `10f12c8d`
 
