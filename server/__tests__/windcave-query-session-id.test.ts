@@ -1,3 +1,17 @@
+// R2-T1: the session client never calls the provider while payments are disabled,
+// which the test environment's default is. Configure UAT so the query is made.
+jest.mock("../config", () => {
+  const actual = jest.requireActual("../config");
+  return {
+    ...actual,
+    config: {
+      ...actual.config,
+      paymentMode: "uat",
+      windcave: { ...actual.config.windcave, endpoint: actual.UAT_WINDCAVE_ENDPOINT, username: "SyntheticUser", apiKey: "synthetic-key" },
+    },
+  };
+});
+
 import { queryWindcaveSession } from "../windcave";
 
 /**
@@ -9,11 +23,7 @@ import { queryWindcaveSession } from "../windcave";
  */
 
 function providerReply(): Response {
-  return {
-    status: 200,
-    ok: true,
-    json: async () => ({ transactions: [{ authorised: false, id: "provider-tx" }] }),
-  } as unknown as Response;
+  return new Response(JSON.stringify({ transactions: [{ authorised: false, id: "provider-tx" }] }), { status: 200 });
 }
 
 beforeEach(() => {

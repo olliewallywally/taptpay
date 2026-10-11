@@ -2,6 +2,7 @@
 import crypto from "crypto";
 import { redactSensitive } from "./request-log";
 import { config } from "./config";
+import { createWindcaveClient, type UnknownReason, type WindcaveClient } from "./windcave-client";
 
 const WINDCAVE_ENDPOINT = config.windcave.endpoint || "";
 const SESSION_URL = `${WINDCAVE_ENDPOINT}/sessions`;
@@ -76,6 +77,41 @@ export interface RefundResult {
   error?: string;
 }
 
+// Session creation and query run through the injectable client (R2-T1,
+// server/windcave-client.ts). These wrappers keep the return shapes the routes use
+// today; the routes move onto typed outcomes and the shared verifier in R2-T5.
+let sessionClient: WindcaveClient | undefined;
+
+function defaultSessionClient(): WindcaveClient {
+  return sessionClient ??= createWindcaveClient({
+    config: {
+      mode: config.paymentMode,
+      endpoint: config.windcave.endpoint || "",
+      username: config.windcave.username || "",
+      apiKey: config.windcave.apiKey || "",
+    },
+    // Resolved per call, so the no-network test guard and fetch spies still apply.
+    transport: (url, init) => fetch(url, init),
+    wait: delay,
+    clock: () => new Date(),
+    audit: logAudit,
+  });
+}
+
+function legacyFailure(outcome: { kind: "rejected"; status: number } | { kind: "unknown"; reason: UnknownReason } | { kind: "malformed" } | { kind: "disabled" }): string {
+  switch (outcome.kind) {
+    // Provider text is not carried: it can echo request details (RF-6).
+    case "rejected": return `Windcave ${outcome.status}`;
+    case "unknown":
+      return outcome.reason === "timeout" ? "Windcave request timed out"
+        : outcome.reason === "network" ? "Windcave network error"
+        : outcome.reason === "server_error" ? "Windcave server error"
+        : "Unexpected Windcave status";
+    case "malformed": return "Unreadable provider response body";
+    case "disabled": return "Payment provider is not configured";
+  }
+}
+
 // Create a Windcave payment session — returns all available submission URLs
 export async function createWindcaveSession(
   xId: string,
@@ -84,185 +120,77 @@ export async function createWindcaveSession(
   customerEmail: string,
   baseUrl: string,
   transactionId: number,
-  retries = 0,
+  /** Unused: retries now happen inside the client, with the same X-ID. */
+  _retries = 0,
   // Optional override for non-retail flows (e.g. property rent checkout) that need
   // their own callback/notification routes. callbackBase must already contain a `?`
   // query string so `&result=...` can be appended.
   callbacks?: { callbackBase: string; notificationUrl: string }
 ): Promise<CreateSessionResult> {
-  const callbackBase = callbacks?.callbackBase ?? `${baseUrl}/api/windcave/callback?transactionId=${transactionId}`;
-  const notificationUrl = callbacks?.notificationUrl ?? `${baseUrl}/api/windcave/notification`;
-  const body = {
-    type: "purchase",
+  const outcome = await defaultSessionClient().createSession({
+    xId,
     amount,
-    currency: "NZD",
     merchantReference,
-    customer: {
-      email: customerEmail,
-    },
-    callbackUrls: {
-      approved: `${callbackBase}&result=approved`,
-      declined: `${callbackBase}&result=declined`,
-      cancelled: `${callbackBase}&result=cancelled`,
-    },
-    notificationUrl,
-  };
+    customerEmail,
+    callbackBase: callbacks?.callbackBase ?? `${baseUrl}/api/windcave/callback?transactionId=${transactionId}`,
+    notificationUrl: callbacks?.notificationUrl ?? `${baseUrl}/api/windcave/notification`,
+  });
 
-  logAudit("CREATE_SESSION_REQUEST", { xId, merchantReference, amount, retries });
-
-  let response: Response;
-  try {
-    response = await fetchWithTimeout(SESSION_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: buildAuthHeader(),
-        "X-ID": xId,
-      },
-      body: JSON.stringify(body),
-    });
-  } catch (err: any) {
-    const isTimeout = err.name === "AbortError";
-    logAudit("CREATE_SESSION_NETWORK_ERROR", { xId, error: err.message, isTimeout });
-    if (retries < RETRY_LIMIT) {
-      await delay(5000);
-      return createWindcaveSession(xId, amount, merchantReference, customerEmail, baseUrl, transactionId, retries + 1, callbacks);
-    }
-    return { success: false, error: err.message };
-  }
-
-  if (response.status === 200) {
-    // Duplicate X-ID — session already complete
-    const data = await response.json();
-    const tx = data.transactions?.[0];
-    const approved = tx?.authorised === true;
-    logAudit("CREATE_SESSION_DUPLICATE_XID", { xId, approved, txId: tx?.id });
+  if (outcome.kind === "created") {
+    const findHref = (rel: string) => outcome.links.find((l) => l.rel === rel)?.href;
     return {
       success: true,
-      sessionId: data.id,
-      alreadyComplete: true,
-      approved,
-      windcaveTransactionId: approved ? tx?.id : undefined,
-    };
-  }
-
-  if (response.status === 202) {
-    const data = await response.json();
-    const links: any[] = data.links || [];
-
-    const findHref = (rel: string) =>
-      links.find((l) => l.rel === rel)?.href;
-
-    const hppUrl = findHref("hpp") || links.find((l) => l.method === "REDIRECT")?.href;
-    const ajaxSubmitCardUrl = findHref("ajaxSubmitCard");
-    const ajaxSubmitApplePayUrl = findHref("ajaxSubmitApplePay");
-    const ajaxSubmitGooglePayUrl = findHref("ajaxSubmitGooglePay");
-
-    logAudit("CREATE_SESSION_PENDING", {
-      xId,
-      sessionId: data.id,
-      hppUrl,
-      ajaxSubmitCardUrl: !!ajaxSubmitCardUrl,
-      ajaxSubmitApplePayUrl: !!ajaxSubmitApplePayUrl,
-      ajaxSubmitGooglePayUrl: !!ajaxSubmitGooglePayUrl,
-    });
-
-    return {
-      success: true,
-      sessionId: data.id,
-      hppUrl,
-      ajaxSubmitCardUrl,
-      ajaxSubmitApplePayUrl,
-      ajaxSubmitGooglePayUrl,
+      sessionId: outcome.sessionId,
+      hppUrl: findHref("hpp") || outcome.links.find((l) => l.method === "REDIRECT")?.href,
+      ajaxSubmitCardUrl: findHref("ajaxSubmitCard"),
+      ajaxSubmitApplePayUrl: findHref("ajaxSubmitApplePay"),
+      ajaxSubmitGooglePayUrl: findHref("ajaxSubmitGooglePay"),
       alreadyComplete: false,
     };
   }
 
-  if (response.status >= 400 && response.status < 500) {
-    const errorBody = await response.text().catch(() => "");
-    logAudit("CREATE_SESSION_4XX", { xId, status: response.status, errorBody });
-    return { success: false, error: `Windcave ${response.status}: ${errorBody}` };
+  if (outcome.kind === "duplicate") {
+    // Legacy reading of a duplicate X-ID, unchanged until R2-T5 confirms it by query (RF-3).
+    const data = outcome.body as { id?: unknown; transactions?: Array<{ authorised?: unknown; id?: unknown }> } | null;
+    if (!data || typeof data !== "object") return { success: false, error: legacyFailure({ kind: "malformed" }) };
+    const tx = Array.isArray(data.transactions) ? data.transactions[0] : undefined;
+    const approved = tx?.authorised === true;
+    return {
+      success: true,
+      sessionId: typeof data.id === "string" ? data.id : undefined,
+      alreadyComplete: true,
+      approved,
+      windcaveTransactionId: approved && typeof tx?.id === "string" ? tx.id : undefined,
+    };
   }
 
-  if (response.status >= 500) {
-    logAudit("CREATE_SESSION_5XX", { xId, status: response.status, retries });
-    if (retries < RETRY_LIMIT) {
-      await delay(5000);
-      return createWindcaveSession(xId, amount, merchantReference, customerEmail, baseUrl, transactionId, retries + 1, callbacks);
-    }
-    return { success: false, error: `Windcave server error ${response.status}` };
-  }
-
-  return { success: false, error: `Unexpected status ${response.status}` };
+  return { success: false, error: legacyFailure(outcome) };
 }
 
 // Query a session to determine the payment outcome
 export async function queryWindcaveSession(
   sessionId: string,
-  retries = 0
+  /** Unused: retries now happen inside the client. */
+  _retries = 0
 ): Promise<QuerySessionResult> {
-  logAudit("QUERY_SESSION", { sessionId, retries });
+  const outcome = await defaultSessionClient().querySession(sessionId);
 
-  let response: Response;
-  try {
-    // One encoded path segment: a split invoice passes on the id its page sent.
-    response = await fetchWithTimeout(`${SESSION_URL}/${encodeURIComponent(sessionId)}`, {
-      method: "GET",
-      headers: { Authorization: buildAuthHeader() },
-    });
-  } catch (err: any) {
-    logAudit("QUERY_SESSION_NETWORK_ERROR", { sessionId, error: err.message });
-    if (retries < RETRY_LIMIT) {
-      await delay(5000);
-      return queryWindcaveSession(sessionId, retries + 1);
-    }
-    return { success: false, error: err.message };
-  }
-
-  if (response.status === 200) {
-    // A 200 carrying a truncated or non-JSON body must be an unknown outcome,
-    // not a thrown exception: callers treat a throw as a crash and would strand
-    // the session mid-transition rather than leaving it reconcilable.
-    let data: any;
-    try {
-      data = await response.json();
-    } catch (err: any) {
-      logAudit("QUERY_SESSION_BODY_ERROR", { sessionId, error: err.message });
-      return { success: false, error: "Unreadable provider response body" };
-    }
-    const tx = data.transactions?.[0];
+  if (outcome.kind === "reply") {
+    // A body that is not an object must stay an unknown outcome, not a decline.
+    const data = outcome.body as { transactions?: Array<{ authorised?: unknown; id?: unknown }> } | null;
+    if (!data || typeof data !== "object") return { success: false, error: legacyFailure({ kind: "malformed" }) };
+    // Legacy reading of the 0th transaction, unchanged until R2-T3/T5 (RF-2).
+    const tx = Array.isArray(data.transactions) ? data.transactions[0] : undefined;
     const approved = tx?.authorised === true;
-    logAudit("QUERY_SESSION_RESULT", { sessionId, approved, txId: tx?.id });
     return {
       success: true,
       approved,
-      windcaveTransactionId: approved ? tx?.id : undefined,
+      windcaveTransactionId: approved && typeof tx?.id === "string" ? tx.id : undefined,
     };
   }
 
-  if (response.status === 202) {
-    if (retries < RETRY_LIMIT) {
-      await delay(5000);
-      return queryWindcaveSession(sessionId, retries + 1);
-    }
-    return { success: false, error: "Session still processing after max retries" };
-  }
-
-  if (response.status >= 400 && response.status < 500) {
-    const errorBody = await response.text().catch(() => "");
-    logAudit("QUERY_SESSION_4XX", { sessionId, status: response.status, errorBody });
-    return { success: false, error: `Windcave ${response.status}: ${errorBody}` };
-  }
-
-  if (response.status >= 500) {
-    if (retries < RETRY_LIMIT) {
-      await delay(5000);
-      return queryWindcaveSession(sessionId, retries + 1);
-    }
-    return { success: false, error: `Windcave server error ${response.status}` };
-  }
-
-  return { success: false, error: `Unexpected status ${response.status}` };
+  if (outcome.kind === "pending") return { success: false, error: "Session still processing after max retries" };
+  return { success: false, error: legacyFailure(outcome) };
 }
 
 // ---------------------------------------------------------------------------
