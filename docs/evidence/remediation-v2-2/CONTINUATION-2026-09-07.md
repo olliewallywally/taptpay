@@ -1,6 +1,35 @@
 # Full integration continuation audit — 2026-09-07
 
-Latest continuation **2026-10-11 — R1-T10 tutorial continuation on the reviewed
+Latest continuation **2026-10-11 — R1-T10 accessibility checkpoint**, implementation
+`0f123cc1d4e93482bdd91d7e09133e73233af0a0` on `fix/qwen-aligned-20261010`.
+[Immediate handover](../../HANDOFF-2026-10-11-r1-t10-accessibility-continuation.md),
+[accessibility evidence](r1/R1-T10e-accessibility-2026-10-11.md),
+[full structural report](r1/R1-T10e-browser-summary-2026-10-11.json),
+[bounded correction rereads](r1/R1-T10e-preflight-2026-10-11.md),
+[retained failures](r1/R1-T10e-regression-history-2026-10-11.md),
+[pending manual checklist](r1/R1-T10e-manual-acceptance-2026-10-11.md).
+
+- Verified the prior tutorial checkpoint was already published, then continued
+  T10e using actual WCAG scans on all real routes plus active tutorial keyboard tests.
+- Fixed tutorial focus return, names/labels and scroll access; the closed retail
+  stack is inert/hidden from AT while preserving its opened actions and boundaries.
+- Final **123 client suites / 1,447 tests**, typecheck and isolated client/server
+  builds pass. Evaluator **12 controls** and invalid mode/selection **seven checks**
+  pass. Preserve the initial evaluator/config/fixture and overloaded test failures.
+- Fresh **204 normal cells**: no route/session/shell/request/geometry/runtime or
+  name/field/link/scroll violation. Accessibility remains **76 pass / 128 fail**:
+  contrast in 124 cells, target-size in 18; incomplete checks remain pending.
+- Fresh **88 active tutorial cells / all 20 keys**: **176/176 keyboard cases pass**,
+  174 real-control returns and two explicit phone NFC document-origin returns.
+  Active full-document accessibility remains **1 pass / 87 fail**, due to contrast
+  and target-size. Every matrix process keeps its actual failing accessibility exit.
+- No deployment, live/provider/payment/database/message/flag or golden-baseline
+  activity. **R1/T10e/T10f and independent implementation review remain open.**
+  Next: concrete contrast/target corrections, incomplete/manual/zoom/AT checks and
+  owner visual acceptance. Derive the evidence checkpoint from this handover's commit
+  and verify the remote branch; source/build/harness hashes are in the evidence.
+
+Prior continuation **2026-10-11 — R1-T10 tutorial continuation on the reviewed
 security-fix branch.** [Immediate handover](../../HANDOFF-2026-10-11-r1-t10-tutorial-continuation.md),
 [tutorial evidence](r1/R1-T10d-tutorials-2026-10-11.md),
 [bounded preflight/correction rereads](r1/R1-T10d-preflight-2026-10-10.md),
