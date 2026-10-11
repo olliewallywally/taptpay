@@ -28,10 +28,11 @@ describe("inertWhen", () => {
         if (entry.isDirectory()) return entry.name === "__tests__" ? [] : sources(absolute);
         return /\.(tsx|jsx|ts)$/.test(entry.name) && !/\.(test|spec)\./.test(entry.name) ? [absolute] : [];
       });
-    // A JSX `inert={...}` or an `inert: ''` props object breaks silently on a React upgrade.
+    // A JSX `inert=` or a props object giving `inert` an empty string (directly or in a
+    // ternary) breaks silently on a React upgrade. DOM `el.inert = …` is unaffected.
     const offenders = sources(root)
       .filter((file) => file !== helper)
-      .filter((file) => /\binert\s*=\s*\{|\binert\s*:\s*(['"])\1/.test(fs.readFileSync(file, "utf8")))
+      .filter((file) => /\binert\s*=\s*[{'"]|\binert\s*:[^,}\n]*(['"])\1/.test(fs.readFileSync(file, "utf8")))
       .map((file) => path.relative(root, file));
     expect(offenders).toEqual([]);
   });

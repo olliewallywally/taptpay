@@ -17,6 +17,7 @@ import {
 import jsPDF from "jspdf";
 import { sessionFetch } from "@/lib/session";
 import { MERCHANTS_KEY, apiPath, apiTo, wholeNumber } from "@shared/api-path";
+import { inertWhen } from "@/features/terminal/inert-when";
 
 type LayoutKey = "taptpay-a5-portrait" | "taptpay-a5-landscape";
 
@@ -973,7 +974,7 @@ function ControlSection({
         </div>
         <ChevronDown size={16} className={`text-gray-600 transition-transform ${isOpen ? "rotate-180" : ""}`} />
       </button>
-      <div aria-hidden={!isOpen} {...{ inert: isOpen ? undefined : "" }} style={{ display: "grid", gridTemplateRows: isOpen ? "1fr" : "0fr", transition: "grid-template-rows 0.22s ease" }}>
+      <div aria-hidden={!isOpen} {...inertWhen(!isOpen)} style={{ display: "grid", gridTemplateRows: isOpen ? "1fr" : "0fr", transition: "grid-template-rows 0.22s ease" }}>
         <div style={{ overflow: "hidden" }}>
           <div className="px-4 pb-4 pt-2 bg-white border-t border-gray-50">
             {children}

@@ -2,6 +2,7 @@
 // styles use string values (fontWeight:"500", rows:"3", …) for 1:1 fidelity.
 import { useEffect, useState } from 'react';
 import { useAccessibleModal } from '@/hooks/use-accessible-modal';
+import { inertWhen } from '@/features/terminal/inert-when';
 import './landing.css';
 
 export interface LandingPageProps {
@@ -96,7 +97,7 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
       {' '}
       {/* mobile menu overlay */}
       {' '}
-      <div id="tp-menu" ref={menuRef} role="dialog" aria-label="Navigation menu" aria-modal={menuOpen ? 'true' : undefined} aria-hidden={!menuOpen} {...{ inert: menuOpen ? undefined : '' }} tabIndex={-1} style={{ position: "fixed", inset: "0", zIndex: "115", background: "rgba(3,9,74,0.97)", backdropFilter: "blur(14px)", display: "flex", flexDirection: "column", alignItems: "flex-start", justifyContent: "center", gap: "6px", padding: "0 10vw", opacity: menuOpen ? "1" : "0", pointerEvents: menuOpen ? "auto" : "none", transition: "opacity .35s ease" }}>
+      <div id="tp-menu" ref={menuRef} role="dialog" aria-label="Navigation menu" aria-modal={menuOpen ? 'true' : undefined} aria-hidden={!menuOpen} {...inertWhen(!menuOpen)} tabIndex={-1} style={{ position: "fixed", inset: "0", zIndex: "115", background: "rgba(3,9,74,0.97)", backdropFilter: "blur(14px)", display: "flex", flexDirection: "column", alignItems: "flex-start", justifyContent: "center", gap: "6px", padding: "0 10vw", opacity: menuOpen ? "1" : "0", pointerEvents: menuOpen ? "auto" : "none", transition: "opacity .35s ease" }}>
         {' '}
         <button id="tp-menu-close" aria-label="close menu" style={{ position: "absolute", top: "20px", right: "20px", background: "transparent", border: "none", cursor: "pointer", padding: "12px" }}>
           {' '}
@@ -684,7 +685,7 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
                 {' '}
               </button>
               {' '}
-              <div id="tpc-body" aria-hidden="true" {...{ inert: '' }} style={{ opacity: "0", pointerEvents: "none" }}>
+              <div id="tpc-body" aria-hidden="true" {...inertWhen(true)} style={{ opacity: "0", pointerEvents: "none" }}>
                 {' '}
                 <div id="tpc-fields" style={{ display: "flex", flexDirection: "column", gap: "12px", padding: "4px 26px 26px" }}>
                   {' '}

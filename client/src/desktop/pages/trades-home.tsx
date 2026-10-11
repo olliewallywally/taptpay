@@ -17,6 +17,7 @@ import {
 } from "../DesktopPageScaffold";
 import { useBucketMorph } from "../bucket-morph";
 import { SlidingIndicator, useSlidingIndicator } from "../sliding-indicator";
+import { inertWhen } from "@/features/terminal/inert-when";
 
 /* ── palette ── */
 const ACCENT = "#5E9EFF";
@@ -509,7 +510,7 @@ export default function DesktopTradesHome(props: DesktopRoutePageProps) {
           </button>
           <div
             className="th-notif-list"
-            aria-hidden={!notifOpen} {...{ inert: notifOpen ? undefined : "" }}
+            aria-hidden={!notifOpen} {...inertWhen(!notifOpen)}
             style={{ opacity: notifOpen ? 1 : 0, pointerEvents: notifOpen ? "auto" : "none" }}
           >
             <button type="button" className="th-notif-listhead" aria-label="close notifications" onClick={() => setNotifOpen(false)}>

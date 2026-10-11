@@ -8,6 +8,7 @@ import { usePropertyTenants, usePropertyInvoices } from "@/lib/property-data";
 import { AnimatedListRow } from "@/components/AnimatedScrollList";
 import { businessCsrfHeader } from "@/lib/session";
 import { apiPath } from "@shared/api-path";
+import { inertWhen } from "@/features/terminal/inert-when";
 
 /* ── Design tokens ── */
 const C = {
@@ -215,7 +216,7 @@ function AddTenantSheet({ onClose, onSave, saving, saveError }: {
             </button>
 
             {/* Expandable subtenant form — smooth slide */}
-            <div {...{ inert: subOpen ? undefined : '' }} aria-hidden={!subOpen} style={{
+            <div {...inertWhen(!subOpen)} aria-hidden={!subOpen} style={{
               overflow: 'hidden',
               maxHeight: subOpen ? '320px' : '0px',
               transition: 'max-height 0.38s cubic-bezier(0.16,1,0.3,1)',
