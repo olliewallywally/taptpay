@@ -78,3 +78,21 @@ Owner direction: `docs/decisions/2026-10-11-review-findings-fix-owner-direction.
 No deployment, migration, provider, payment, message, feature-flag or golden
 activity. Rollback: revert any of the four commits; no data rollback. Stage
 explicit paths only; never `git add -A`. Untracked `logs/` is runtime output.
+
+## Deferred to the final R1 review (owner, 2026-10-11)
+
+The owner moved this session to the next phase while Codex finishes R1. Two R1 items
+were started here and stopped before any code change:
+
+- **Zoom-detection fix (not implemented).** Keep Codex's requirement that native 200%
+  zoom preserves the device class (`verify-r1-t10-device-matrix.ts --zoom` faults a
+  changed class). Proposed fix: accept `z = outerWidth / innerWidth > 1.2` only when the
+  height agrees, i.e. `outerHeight - innerHeight * z` is a plausible toolbar height
+  (about `-z` to `200` px). Real zoom shrinks both axes; a side panel or right-docked
+  DevTools narrows only the width and gives a negative value. Otherwise return 1 (the
+  pre-`2e96a318` behaviour). Codex's `use-device-class.test.tsx` zoom cases set only
+  `outerWidth` and would need `outerHeight` too. Rerun the `--zoom` gate after it.
+- **Stock-sheet focus review (not started).** Owner request: from `3720c5f1`, investigate
+  the nine Radix focus-guard `aria-hidden-focus` findings on `/stock`, and check
+  expanded-sheet keyboard confinement, background exclusion and focus return. Report
+  findings before editing shared files. Codex owns payment-return semantics.
