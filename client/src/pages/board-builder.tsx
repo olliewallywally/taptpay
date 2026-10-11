@@ -672,12 +672,12 @@ export default function BoardBuilder() {
 
             <ControlSection anchor="bb-qr" icon={<QrCode size={16} />} title="Payment QR Code" isOpen={openSection === "stone"} onToggle={() => toggle("stone")}>
               <div className="space-y-2">
-                <Label className="text-xs text-gray-500">Select which Tapt Stone's QR code to show</Label>
+                <Label htmlFor="board-payment-stone" className="text-xs text-gray-500">Select which Tapt Stone's QR code to show</Label>
                 {stonesQuery.isSuccess && !stones.some((s) => s.isActive) && (
                   <p className="text-xs text-gray-500">No payment boards yet. Add one from the terminal first; its QR code goes on your print.</p>
                 )}
                 <Select value={selectedStoneId} onValueChange={setSelectedStoneId}>
-                  <SelectTrigger className="border-gray-200 focus:border-[#0055FF]">
+                  <SelectTrigger id="board-payment-stone" className="border-gray-200 focus:border-[#0055FF]">
                     <SelectValue placeholder="Select stone…" />
                   </SelectTrigger>
                   <SelectContent>
@@ -899,9 +899,9 @@ export default function BoardBuilder() {
             <ControlSection icon={<Type size={16} />} title="Font" isOpen={openSection === "font"} onToggle={() => toggle("font")}>
               <div className="space-y-3">
                 <div>
-                  <Label className="text-xs text-gray-500 mb-1 block">Google Fonts</Label>
+                  <Label htmlFor="board-google-font" className="text-xs text-gray-500 mb-1 block">Google Fonts</Label>
                   <Select value={selectedFont} onValueChange={(v) => { setSelectedFont(v); setCustomFontDataUrl(""); }}>
-                    <SelectTrigger className="border-gray-200 focus:border-[#0055FF]">
+                    <SelectTrigger id="board-google-font" className="border-gray-200 focus:border-[#0055FF]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>

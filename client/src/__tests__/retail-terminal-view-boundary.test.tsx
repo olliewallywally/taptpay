@@ -45,6 +45,19 @@ const existingState: RetailTerminalState = {
 };
 
 describe("RetailTerminalView safety boundary", () => {
+  it("keeps the collapsed stack out of keyboard/AT navigation and names its close action when opened", () => {
+    const { container } = render(<RetailTerminalView liveState={existingState} />);
+    const panel = container.querySelector<HTMLElement>('[style*="z-index: 55"]')!;
+    expect(panel).toHaveAttribute('aria-hidden', 'true');
+    expect(panel).toHaveAttribute('inert');
+    fireEvent.click(screen.getByRole('button', { name: 'expand active stack' }));
+    expect(panel).toHaveAttribute('aria-hidden', 'false');
+    expect(panel).not.toHaveAttribute('inert');
+    fireEvent.click(screen.getByRole('button', { name: 'Close active stack' }));
+    expect(panel).toHaveAttribute('inert');
+    expect(screen.queryByRole('button', { name: 'Close active stack' })).toBeNull();
+  });
+
   it("contains no auth, query, network, storage, provider, share or navigation effects", () => {
     for (const { file, source } of sourceFiles) {
       for (const forbidden of forbiddenSource) {

@@ -43,6 +43,9 @@
 //     [--context phone|tablet|desktop|desktop-short] [--surface /path] [--self-test | --tutorials] [--measure <selector>]
 // --tutorials runs real progress, Settings restart, targets/fallbacks, resize,
 // document persistence and SPA departure/browser-Back checks on merchant pages.
+// --accessibility adds a real WCAG A/AA axe audit to every normal matrix cell.
+// --tutorial-accessibility checks active dialogs, real keyboard navigation,
+// focus return on Escape/completion and axe on every merchant tutorial surface.
 //
 // --measure records the box of the first element a selector finds in each cell (results.json), to
 // compare a screen before and after a change.
@@ -80,6 +83,8 @@ const ONLY_SURFACE = flag("--surface");
 const MEASURE = flag("--measure");
 const SELF_TEST = argv.includes("--self-test") ? (argv.splice(argv.indexOf("--self-test"), 1), true) : false;
 const TUTORIALS = argv.includes("--tutorials") ? (argv.splice(argv.indexOf("--tutorials"), 1), true) : false;
+const ACCESSIBILITY = argv.includes("--accessibility") ? (argv.splice(argv.indexOf("--accessibility"), 1), true) : false;
+const TUTORIAL_ACCESSIBILITY = argv.includes("--tutorial-accessibility") ? (argv.splice(argv.indexOf("--tutorial-accessibility"), 1), true) : false;
 const out = argv[0];
 const builtClient = argv[1];
 if (argv.length !== 2 || !out || !builtClient || !existsSync(path.join(builtClient, "index.html"))) {
@@ -91,6 +96,9 @@ if (ONLY_CONTEXT && !["phone", "tablet", "desktop", "desktop-short"].includes(ON
 if (SELF_TEST && (ONLY_CONTEXT || ONLY_SURFACE)) throw new Error("--self-test cannot be combined with matrix filters");
 if (SELF_TEST && TUTORIALS) throw new Error("--self-test and --tutorials are separate gates");
 if (TUTORIALS && MEASURE) throw new Error("--tutorials records its own geometry; --measure belongs to the device gate");
+if (ACCESSIBILITY && (SELF_TEST || TUTORIALS || MEASURE)) throw new Error("--accessibility is a separate normal-surface audit");
+if (TUTORIAL_ACCESSIBILITY && (SELF_TEST || TUTORIALS || ACCESSIBILITY || MEASURE)) throw new Error("--tutorial-accessibility is a separate active-tutorial audit");
+const accessibilityAuditor = ACCESSIBILITY ? (await import('./accessibility-audit.mjs')).auditAccessibility : null;
 mkdirSync(out, { recursive: true });
 
 const OWNER_PASSWORD = "Matrix-password-1";
@@ -564,7 +572,7 @@ async function signIn(context: BrowserContext, email = OWNER_EMAIL, realm: "busi
   await page.close();
 }
 
-interface Cell { size: string; path: string; mode: Mode | "outside"; pageKey: string; faults: string[]; mark: string | null; byFallback: boolean; elsewhere: string[]; sent: number; routes: string[]; measured?: unknown; geometry?: Awaited<ReturnType<typeof measureGeometry>>; initialGeometry?: Awaited<ReturnType<typeof measureGeometry>>; interaction?: { name: string; coveredControlsCannotFocus: boolean; restoredControlsCanFocus: boolean; geometryRestored: boolean } }
+interface Cell { size: string; path: string; mode: Mode | "outside"; pageKey: string; faults: string[]; mark: string | null; byFallback: boolean; elsewhere: string[]; sent: number; routes: string[]; measured?: unknown; accessibility?: unknown; geometry?: Awaited<ReturnType<typeof measureGeometry>>; initialGeometry?: Awaited<ReturnType<typeof measureGeometry>>; interaction?: { name: string; coveredControlsCannotFocus: boolean; restoredControlsCanFocus: boolean; geometryRestored: boolean } }
 /** A fallback that names something of the screen's own (a class, an attribute), not any page's furniture. */
 const ownFallback = (selector: string | undefined | null): boolean => !!selector && /[.#\[]/.test(selector);
 const ERROR_SCREENS = /Something went wrong|couldn't check your session|taking longer than expected|Connection Lost/i;
@@ -611,6 +619,7 @@ async function visit(context: BrowserContext, size: Size, surface: Surface | Out
   let geometry: Cell["geometry"];
   let initialGeometry: Cell["initialGeometry"];
   let interaction: Cell["interaction"];
+  let accessibility: Cell["accessibility"];
   try {
     await page.goto(`${base}${surface.path}`, { waitUntil: "domcontentloaded", timeout: 120_000 });
     // Settled: a mark is up (or the wait runs out), nothing is being fetched, and no finite animation is running.
@@ -694,6 +703,15 @@ async function visit(context: BrowserContext, size: Size, surface: Surface | Out
     if (geometry.clippedTextCount) faults.push(`clipped text: ${geometry.clippedTextCount} elements`);
     if (geometry.tapCentreMiss) faults.push(`tap centre miss: ${geometry.tapCentreMiss} controls`);
     if (geometry.terminalRows && geometry.terminalRows.visible === 0) faults.push(`terminal has zero visible rows (${geometry.terminalRows.total} mounted)`);
+    if (accessibilityAuditor) {
+      const report = await accessibilityAuditor(page);
+      accessibility = report;
+      for (const rule of report.violations) faults.push(`accessibility: ${rule.id} (${rule.impact}), ${rule.nodes.length} element(s)`);
+      // Capture errors caused during the audit as well as during page startup.
+      for (const error of watch.pageErrors) if (!faults.includes(`page error: ${error}`)) faults.push(`page error: ${error}`);
+      for (const error of watch.consoleErrors) if (!faults.includes(`console error: ${error.text}`)) faults.push(`console error: ${error.text}`);
+      for (const failure of watch.failed) if (!faults.includes(`failed request: ${failure}`)) faults.push(`failed request: ${failure}`);
+    }
     if (MEASURE) {
       measured = await page.evaluate(`(function (selector) { var el = document.querySelector(selector); if (!el) return null; var r = el.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; })(${JSON.stringify(MEASURE)})`);
     }
@@ -706,7 +724,7 @@ async function visit(context: BrowserContext, size: Size, surface: Surface | Out
   } finally {
     await page.close().catch(() => undefined);
   }
-  return { size: size.name, path: called, mode: outside ? "outside" : mode, pageKey: outside ? outside.who : (surface as Surface).pageKey, faults, mark, byFallback, elsewhere: [...new Set(watch.elsewhere)], sent: watch.sent.length, routes: [...watch.routes].sort(), geometry, ...(initialGeometry ? { initialGeometry, interaction } : {}), ...(MEASURE ? { measured } : {}) };
+  return { size: size.name, path: called, mode: outside ? "outside" : mode, pageKey: outside ? outside.who : (surface as Surface).pageKey, faults, mark, byFallback, elsewhere: [...new Set(watch.elsewhere)], sent: watch.sent.length, routes: [...watch.routes].sort(), geometry, ...(initialGeometry ? { initialGeometry, interaction } : {}), ...(MEASURE ? { measured } : {}), ...(ACCESSIBILITY ? { accessibility } : {}) };
 }
 
 let exitCode = 0;
@@ -715,10 +733,11 @@ try {
   const surfaces = SURFACES.filter((surface) => !ONLY_SURFACE || surface.path === ONLY_SURFACE);
   const pages = OUTSIDE.filter((page) => !ONLY_SURFACE || page.path === ONLY_SURFACE || page.name === ONLY_SURFACE);
   if (!sizes.length || (!surfaces.length && !pages.length)) throw new Error("matrix filters selected zero cells");
-  if (TUTORIALS) {
+  if (TUTORIALS || TUTORIAL_ACCESSIBILITY) {
     if (!surfaces.length) throw new Error("tutorial filters selected zero merchant surfaces");
     const { runTutorialMatrix } = await import("./verify-r1-t10-tutorials");
-    exitCode = await runTutorialMatrix({ base, out, sizes, surfaces, openContext, openPage, signIn });
+    const { runTutorialAccessibilityMatrix } = TUTORIAL_ACCESSIBILITY ? await import("./verify-r1-t10-tutorial-accessibility") : { runTutorialAccessibilityMatrix: null };
+    exitCode = await (runTutorialAccessibilityMatrix ?? runTutorialMatrix)({ base, out, sizes, surfaces, openContext, openPage, signIn });
   } else if (SELF_TEST) {
     // One fault at a time, on the phone's terminal and the desktop's; every one must be caught.
     const phone = SIZES[0]; const desktop = SIZES[2]; const tablet = SIZES[1];
@@ -810,7 +829,10 @@ try {
     for (const size of sizes) {
       const context = await openContext(size);
       await signIn(context);
-      const say = (cell: Cell) => console.log(`${cell.faults.length ? "FAIL" : "PASS"} ${size.name.padEnd(13)} ${cell.mode.padEnd(8)} ${cell.path}${cell.faults.length ? ` — ${cell.faults.join("; ")}` : `  [${cell.mark}]${cell.byFallback ? " (a fallback: none of this screen's tutorial targets is on the page)" : ""}`}`);
+      const say = (cell: Cell) => {
+        if (ACCESSIBILITY) writeFileSync(path.join(out, 'accessibility-progress.json'), JSON.stringify({ expected: sizes.length * (surfaces.length + pages.length), cells }, null, 1));
+        console.log(`${cell.faults.length ? "FAIL" : "PASS"} ${size.name.padEnd(13)} ${cell.mode.padEnd(8)} ${cell.path}${cell.faults.length ? ` — ${cell.faults.join("; ")}` : `  [${cell.mark}]${cell.byFallback ? " (a fallback: none of this screen's tutorial targets is on the page)" : ""}`}`);
+      };
       for (const surface of surfaces) {
         const cell = await visit(context, size, surface);
         cells.push(cell); say(cell);

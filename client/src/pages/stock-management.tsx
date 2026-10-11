@@ -554,6 +554,7 @@ function StockManagementPage({ merchantId }: { merchantId: number }) {
           <button
             onClick={openAdd}
             data-testid="button-add-product"
+            aria-label="Add product"
             style={{ width: 44, height: 44, borderRadius: 999, background: '#040D6D', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 4px 14px rgba(4,13,109,0.3)' }}
           >
             <Plus size={20} color="#58ABFF" />

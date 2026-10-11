@@ -4,6 +4,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type HTMLAttributes,
   type KeyboardEvent,
   type MutableRefObject,
   type ReactNode,
@@ -61,7 +62,7 @@ export function AnimatedListRow({ as = "button", children, ...props }: AnimatedL
   );
 }
 
-interface AnimatedScrollListProps {
+interface AnimatedScrollListProps extends Pick<HTMLAttributes<HTMLDivElement>, 'tabIndex' | 'role' | 'aria-label'> {
   children: ReactNode;
   className?: string;
   style?: CSSProperties;
@@ -105,6 +106,9 @@ export function AnimatedScrollList({
   fadeColor,
   showGradients = true,
   enableArrowNavigation = true,
+  tabIndex,
+  role,
+  'aria-label': ariaLabel,
 }: AnimatedScrollListProps) {
   const innerRef = useRef<HTMLDivElement | null>(null);
   const [topOpacity, setTopOpacity] = useState(0);
@@ -168,6 +172,9 @@ export function AnimatedScrollList({
         ref={setInnerRef}
         className={className}
         style={style}
+        tabIndex={tabIndex}
+        role={role}
+        aria-label={ariaLabel}
         onScroll={measure}
         onKeyDown={handleKeyDown}
       >

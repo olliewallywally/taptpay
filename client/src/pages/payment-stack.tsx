@@ -103,11 +103,9 @@ function PaymentStackPage({ merchantId }: { merchantId: number }) {
     <div className="min-h-screen text-white" style={{ background: "#060D1F" }}>
       <div className="px-5 pt-12 pb-4">
         <div className="flex items-center gap-3 mb-1">
-          <Link href="/terminal">
-            <button className="w-9 h-9 rounded-xl flex items-center justify-center"
-              style={{ background: SURFACE, border: `1px solid ${BORDER}` }}>
-              <ArrowLeft size={16} className="text-white/60" />
-            </button>
+          <Link href="/terminal" aria-label="Back to terminal" className="w-9 h-9 rounded-xl flex items-center justify-center"
+            style={{ background: SURFACE, border: `1px solid ${BORDER}` }}>
+            <ArrowLeft size={16} className="text-white/60" />
           </Link>
           <div className="flex items-center gap-2">
             <Layers size={20} className="text-white/60" />

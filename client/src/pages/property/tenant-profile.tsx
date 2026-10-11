@@ -226,7 +226,7 @@ export default function TenantProfile() {
       {/* Top bar — slides down from above as the hero morphs into place */}
       <div className="pt-slide-top" style={{ '--pt-d': '0ms' } as any}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 18px 14px' }}>
-          <button onClick={() => startPropertyBack(() => setLocation('/property/tenants'))} style={{ width: 34, height: 34, borderRadius: 999, background: C.gray, border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+          <button aria-label="Back to tenants" onClick={() => startPropertyBack(() => setLocation('/property/tenants'))} style={{ width: 34, height: 34, borderRadius: 999, background: C.gray, border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
             <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={C.navy} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 6-6 6 6 6"/></svg>
           </button>
           <div style={{ fontWeight: 600, fontSize: 11, color: C.navy, letterSpacing: '0.16em', textTransform: 'uppercase' }}>tenant profile</div>

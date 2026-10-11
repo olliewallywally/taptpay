@@ -671,7 +671,7 @@ export default function DesktopPropertyAnalytics(props: DesktopRoutePageProps) {
             </div>
           </div>
 
-          <div className="pa-sheet-body">
+          <div className="pa-sheet-body" tabIndex={0} role="region" aria-label="Analytics details">
             {sheetMode === "history" &&
               (invoicesQuery.isLoading || tenantsQuery.isLoading ? (
                 <div className="pa-sheet-empty">loading payments…</div>

@@ -79,6 +79,7 @@ export function TutorialProvider({ enabled, children }: { enabled: boolean; chil
   const [isRestarting, setIsRestarting] = useState(false);
   const registrationId = useRef(0);
   const startAttempt = useRef<string | null>(null);
+  const focusOrigin = useRef<{ element: HTMLElement; location: string } | null>(null);
   const live = useRef({ mounted: false, enabled, location });
   live.current.enabled = enabled;
   live.current.location = location;
@@ -148,7 +149,11 @@ export function TutorialProvider({ enabled, children }: { enabled: boolean; chil
       started = true;
       try {
         await saveProgress(currentPage, "started", 0);
-        if (live.current.mounted && live.current.enabled && live.current.location === location) setActive({ pageKey: currentPage, stepIndex: 0, location });
+        if (live.current.mounted && live.current.enabled && live.current.location === location) {
+          const element = document.activeElement;
+          focusOrigin.current = element instanceof HTMLElement && element !== document.body ? { element, location } : null;
+          setActive({ pageKey: currentPage, stepIndex: 0, location });
+        }
       } catch {
         // Do not show an unpersisted first-run tutorial: it could unexpectedly
         // repeat after refresh. A later navigation can retry safely.
@@ -174,11 +179,19 @@ export function TutorialProvider({ enabled, children }: { enabled: boolean; chil
       lastStep,
     });
     setActive(null);
+    const origin = focusOrigin.current;
+    focusOrigin.current = null;
+    // Keep one origin across step remounts. Browser Back/route changes must not
+    // return focus to a control on the page the user has just left.
+    if (origin && live.current.enabled && live.current.location === origin.location &&
+        (currentPage === null || currentPage === closing.pageKey) && origin.element.isConnected) {
+      origin.element.focus({ preventScroll: true });
+    }
     void saveProgress(closing.pageKey, status, lastStep).catch(() => {
       // The already-saved "started" row still prevents an unwanted repeat.
       void queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/tutorial/state")] });
     });
-  }, [active, deviceClass, queryClient, saveProgress, setCachedProgress]);
+  }, [active, currentPage, deviceClass, queryClient, saveProgress, setCachedProgress]);
 
   useEffect(() => {
     // The overlay blocks in-app navigation, but browser Back/Forward can still
@@ -208,6 +221,7 @@ export function TutorialProvider({ enabled, children }: { enabled: boolean; chil
       const response = await apiRequest(...apiTo("POST /api/tutorial/restart"));
       const fresh = await response.json() as TutorialState;
       setActive(null);
+      focusOrigin.current = null;
       startAttempt.current = null;
       queryClient.setQueryData([apiPath("GET /api/tutorial/state")], fresh);
     } finally {

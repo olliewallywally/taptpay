@@ -377,10 +377,10 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
                     placeholder="e.g. TaptPay_Dev"
                     className="flex-1 bg-[#24263a] text-[#dbdfea] text-sm px-3 py-2 rounded-lg border border-[#0055FF]/50 focus:outline-none focus:border-[#0055FF]"
                   />
-                  <button onClick={() => saveWindcaveIdMutation.mutate()} disabled={saveWindcaveIdMutation.isPending} className="bg-[#4ade80] hover:bg-[#22c55e] text-[#1a1b2e] px-3 py-2 rounded-lg">
+                  <button aria-label="Save Windcave merchant ID" onClick={() => saveWindcaveIdMutation.mutate()} disabled={saveWindcaveIdMutation.isPending} className="bg-[#4ade80] hover:bg-[#22c55e] text-[#1a1b2e] px-3 py-2 rounded-lg">
                     <Check className="size-4" />
                   </button>
-                  <button onClick={() => setEditingWindcaveId(false)} className="bg-[#24263a] hover:bg-[#2a2c42] text-[#dbdfea] px-3 py-2 rounded-lg">
+                  <button aria-label="Cancel merchant ID edit" onClick={() => setEditingWindcaveId(false)} className="bg-[#24263a] hover:bg-[#2a2c42] text-[#dbdfea] px-3 py-2 rounded-lg">
                     <X className="size-4" />
                   </button>
                 </div>
@@ -388,6 +388,7 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-[#dbdfea] text-sm font-mono">{merchant.windcaveMerchantId || <span className="text-[#dbdfea]/30 italic text-xs">Not set — enter after Windcave provides it</span>}</p>
                   <button
+                    aria-label="Edit Windcave merchant ID"
                     onClick={() => { setWindcaveIdValue(merchant.windcaveMerchantId || ''); setEditingWindcaveId(true); }}
                     className="text-[#0055FF] hover:text-[#00E5CC] transition-colors"
                   >
@@ -474,7 +475,7 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
         {filteredTx.length === 0 ? (
           <div className="text-center py-12 text-[#dbdfea]/30 text-sm">No transactions found</div>
         ) : (
-          <div className="overflow-y-auto max-h-[520px] rounded-xl border border-[#1a1b2e]">
+          <div tabIndex={0} role="region" aria-label="Merchant transactions" className="overflow-y-auto max-h-[520px] rounded-xl border border-[#1a1b2e]">
             <table className="w-full min-w-[600px]">
               <thead className="sticky top-0 bg-[#1a1b2e]">
                 <tr>

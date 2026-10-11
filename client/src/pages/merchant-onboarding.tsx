@@ -236,8 +236,9 @@ export default function MerchantOnboarding() {
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-700">Estimated Annual Card Turnover</label>
+                  <label htmlFor="onboarding-annual-turnover" className="text-sm font-medium text-gray-700">Estimated Annual Card Turnover</label>
                   <select
+                    id="onboarding-annual-turnover"
                     value={form.estimatedAnnualTurnover}
                     onChange={(e) => set("estimatedAnnualTurnover", e.target.value)}
                     className={INPUT_CLASS}

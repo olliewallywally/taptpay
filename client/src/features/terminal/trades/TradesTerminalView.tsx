@@ -154,7 +154,7 @@ function JobsHome({ invoices, outstanding, go, onRowTap }: any) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <div className="tp-stack-title">jobs</div>
         </div>
-        <div className="tp-stack-scroll" style={{ flex: 1, overflow: 'auto', paddingRight: 2 }}>
+        <div className="tp-stack-scroll" tabIndex={0} role="region" aria-label="Active invoice stack" style={{ flex: 1, overflow: 'auto', paddingRight: 2 }}>
           <div className="tp-stack-card">
             {recent.length === 0 ? (
               <div className="tp-stack-empty">tap + to send an invoice</div>

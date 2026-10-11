@@ -514,7 +514,7 @@ export default function DesktopPropertyHome(props: DesktopRoutePageProps) {
               </span>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(191,209,255,0.7)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6" /></svg>
             </button>
-            <div className="ph-notif-rows">
+            <div className="ph-notif-rows" tabIndex={0} role="region" aria-label="Notifications">
               {notifications.length === 0 ? (
                 <div className="ph-empty">you're all caught up</div>
               ) : (

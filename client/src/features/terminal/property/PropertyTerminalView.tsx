@@ -259,6 +259,7 @@ function RequestsHome({ invoices, tenants, outstanding, outstandingExpenses = 0,
         </div>
         <AnimatedScrollList
           className="tp-stack-scroll"
+          tabIndex={0} role="region" aria-label="Active rent requests"
           style={{ flex: 1, overflow: 'auto', paddingRight: 2 }}
           fadeColor={OFFW}
         >
