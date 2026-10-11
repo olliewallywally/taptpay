@@ -27,6 +27,10 @@ Then read `docs/HANDOFF-2026-10-11-review-findings-fixes.md`: an independent rev
 the last two pushes and its fixes on `ccr-e07e3100-0wm8kr`, including an open zoom-detection
 finding for the owner.
 
+**R2 has started (2026-10-11) on `ccr-e07e3100-0wm8kr` while Codex finishes R1.** Read
+`docs/evidence/remediation-v2-2/r2/R2-preflight-2026-10-11.md` and its §21.1 review pass
+before any R2 work; no R2 code starts until the review reaches Approve after a second pass.
+
 This program's established discipline: failing-tests-first; independently re-verify a prior
 pass's own claims before trusting them, the way every session in this program has had to;
 escalate product/security tradeoffs to the owner rather than deciding them unilaterally; record
