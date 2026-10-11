@@ -1,5 +1,11 @@
 # R1-T10e / T10f manual acceptance — pending
 
+Latest automated shared tutorial text/focus contrast checkpoint:
+[2026-10-11 contrast evidence](R1-T10e-tutorial-contrast-2026-10-11.md), implementation
+`f9ccd53c0777ec0b1e3d858ddf446927f20544c5`. All 88 tutorial cells pass the bounded
+computed-color checks. The manual, visual/golden, broader surface and independent
+review acceptance below remains pending; no item is signed off by that checkpoint.
+
 No item below is signed off by automated Chromium or Jest results. Record the
 reviewer, date, exact commit/build, browser/OS/device, input mode, surface, outcome
 and retained evidence for each check. Use the complete 51-surface matrix and all

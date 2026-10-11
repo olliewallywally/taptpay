@@ -1,6 +1,40 @@
 # Full integration continuation audit — 2026-09-07
 
-Latest continuation **2026-10-11 — R1-T10 accessibility checkpoint**, implementation
+Latest continuation **2026-10-11 — R1-T10 shared tutorial contrast**, implementation
+`f9ccd53c0777ec0b1e3d858ddf446927f20544c5` on `fix/qwen-aligned-20261010`;
+base `ea6c55379e36b17a971db3bba72165995f5ef7f7` verified published.
+[Immediate handover](../../HANDOFF-2026-10-11-r1-t10-tutorial-contrast.md),
+[evidence](r1/R1-T10e-tutorial-contrast-2026-10-11.md),
+[complete structural report](r1/R1-T10e-tutorial-contrast-browser-summary-2026-10-11.json),
+[preflight/rereads](r1/R1-T10e-tutorial-contrast-preflight-2026-10-11.md),
+[retained failures](r1/R1-T10e-tutorial-contrast-regression-history-2026-10-11.md).
+
+- Reused existing card navy/body colors for small eyebrow/counter text and both
+  focus outlines; only three application CSS declarations change. No geometry,
+  tutorial/business logic or golden baseline change.
+- Failing-first actual CSS and four real-route baseline contexts retained.
+  Typecheck/build, **4 tutorial suites / 27 tests**, four CSS fixtures, four clean
+  settled-helper controls / 13 negative checks and 12 axe controls pass.
+- **204 normal cells** have no non-accessibility faults; **841 requests / 45 routes**.
+  Full-page accessibility remains **76 pass / 128 fail**: contrast 124 cells / 841
+  nodes; target-size 19 cells / 21 nodes. Additional phone Recurring target
+  reproduces on both old and candidate builds, and is retained as an existing issue.
+- Final **88 active tutorial cells / 176 keyboard cases / 382 settled step samples /
+  2,292 shared contrast measurements** pass their bounded checks. Thirty before/after
+  focused-card geometry comparisons match. Active full-page scans improve from
+  **1 pass / 87 fail** to **48 pass / 40 fail**; remaining contrast 40 cells / 226
+  nodes and target-size two cells / four nodes still keep actual exit 1.
+- First full active attempt's one animation/readiness sampling failure is retained.
+  Final sampler waits/measures atomically per control, with the same 10-second bound,
+  no forced focus and no threshold change; all 88 active cells rerun on the identical
+  frozen build. The 204 normal cells use unchanged normal source/evaluator.
+- No deployment/live provider/payment/database/message/flag or golden activity.
+  **T10e/T10f/R1/release, incomplete/manual/zoom/AT/visual and independent review
+  remain open.** Next: identify and review remaining target geometry, then bounded
+  correction; keep broader contrast/manual acceptance gates. Derive publication
+  checkpoint from this handover's commit and recheck the remote branch.
+
+Prior continuation **2026-10-11 — R1-T10 accessibility checkpoint**, implementation
 `0f123cc1d4e93482bdd91d7e09133e73233af0a0` on `fix/qwen-aligned-20261010`.
 [Immediate handover](../../HANDOFF-2026-10-11-r1-t10-accessibility-continuation.md),
 [accessibility evidence](r1/R1-T10e-accessibility-2026-10-11.md),
