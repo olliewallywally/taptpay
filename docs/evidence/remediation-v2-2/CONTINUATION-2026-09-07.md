@@ -1,9 +1,32 @@
 # Full integration continuation audit — 2026-09-07
 
+Latest continuation **2026-10-11 — independent review of `10f12c8d` and `3720c5f1`,
+and its fixes**: `1bec6b68`, `128b09bb`, `b6100c03` on `ccr-e07e3100-0wm8kr`, based on
+`fix/qwen-aligned-20261010` at `3720c5f1`.
+[Immediate handover](../../HANDOFF-2026-10-11-review-findings-fixes.md),
+[owner direction](../../decisions/2026-10-11-review-findings-fix-owner-direction.md).
+
+- Re-verified `10f12c8d` (client 123 / 1,447, server 186 / 4,573, contrast recomputed)
+  and the claims of `2e96a318` (server/shared unchanged, typecheck, client 124 / 1,458).
+- Fixed: removed the unmounted `merchant-validation` middleware the Qwen
+  "indistinguishable refusals" item edited; React-19-safe `inertWhen` on all nine
+  hand-written `inert` sites (seven added by `2e96a318`) with a widened source guard;
+  86 lockfile URLs moved off Replit's internal mirror. Withdrawn after recheck:
+  tutorial overlay polling cost and evidence JSON size.
+- **Open, escalated to the owner:** `browserZoomFactor()` treats a side panel or
+  docked DevTools as browser zoom (an 800px page in a 1200px window reads 1.5× and
+  becomes desktop instead of tablet; the scaled canvas stops fitting). Not changed.
+- Failing-first guard. Typecheck; client **125 / 1,461**; server **185 / 4,559**;
+  clean `npm ci`; isolated build. Device matrix on the 11 changed surfaces × four
+  contexts: normal **44/44**, `--accessibility` **44/44**, `--tutorial-accessibility`
+  **40/40**, all exit 0.
+- No deployment/provider/payment/database/flag/golden activity. **T10e/T10f/R1,
+  release and the independent implementation review remain open.**
+
 Publication checkpoint: implementation `2e96a318d277856f292d3d93fd848e30eba32a5d` was pushed to `origin/fix/qwen-aligned-20261010` on 2026-10-11. A fresh `git ls-remote` returned that exact SHA. This documentation checkpoint follows the implementation; deployment and the listed manual acceptance gates remain pending.
 
 
-Latest continuation **2026-10-11 — R1-T10e accessibility engineering checkpoint**,
+Prior continuation **2026-10-11 — R1-T10e accessibility engineering checkpoint**,
 branch `fix/qwen-aligned-20261010`, exact base
 `10f12c8d9e6a6317b1416fd1a71f4c769e03aa0d`; implementation is the commit containing
 [this handover](../../HANDOFF-2026-10-11-r1-t10-accessibility-completion.md).

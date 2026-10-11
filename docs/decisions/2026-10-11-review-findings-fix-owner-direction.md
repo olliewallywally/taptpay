@@ -1,8 +1,9 @@
 # Owner direction — fix the independent review's findings on the latest push
 
 Date: 2026-10-11 UTC. Owner: Oliver.
-Branch: `ccr-e07e3100-0wm8kr`, based on `fix/qwen-aligned-20261010` at
-`10f12c8d` (the latest push, reviewed in the same session).
+Branch: `ccr-e07e3100-0wm8kr`, first based on `fix/qwen-aligned-20261010` at
+`10f12c8d` (the latest push, reviewed in the same session), then rebased onto
+Codex's next push `3720c5f1`.
 
 ## Context
 
@@ -35,6 +36,10 @@ The same session then checked each finding again before changing code:
 - **3, fixed:** `inertWhen` chooses `""` (React 18) or `true` (React ≥19) from the
   installed React; the retail stack overlay and the trades phone quote directory
   now use it, and a source guard keeps hand-written `inert` out of React markup.
+  Codex's later push `2e96a318` added seven more hand-written sites (desktop home
+  notification panels, board builder, tenant directory, landing menu and form
+  body); under the same direction they were routed through the helper after the
+  rebase, and the guard was widened to the ternary form it had missed.
 - **5, fixed:** only the 86 `resolved` URLs were rewritten to
   `https://registry.npmjs.org/`; the other 1,497 entries already used it and install
   on Replit. Integrity hashes are unchanged and `npm ci` verifies them.

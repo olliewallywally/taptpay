@@ -23,6 +23,9 @@ The immediate R1-T10 handover is now `docs/HANDOFF-2026-10-11-r1-t10-accessibili
 Read it after the ledger; it supersedes the older October 6 task-state descriptions
 and October 10 immediate task state, and records the broader accessibility repairs, 876 selected browser checks,
 retained failures, incomplete/manual acceptance and next AI actions.
+Then read `docs/HANDOFF-2026-10-11-review-findings-fixes.md`: an independent review of
+the last two pushes and its fixes on `ccr-e07e3100-0wm8kr`, including an open zoom-detection
+finding for the owner.
 
 This program's established discipline: failing-tests-first; independently re-verify a prior
 pass's own claims before trusting them, the way every session in this program has had to;
