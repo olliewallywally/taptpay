@@ -663,7 +663,10 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
     if (!confirmed) return;
     try {
       await restartTutorials();
-      setActiveSection("tutorial");
+      // The phone walkthrough targets the grouped Settings controls. Its
+      // tutorial detail section replaces those controls rather than showing
+      // them alongside the restart button.
+      setActiveSection(null);
       toast({
         title: "Tutorials restarted",
         description: "Open each page normally to see its tutorial again.",

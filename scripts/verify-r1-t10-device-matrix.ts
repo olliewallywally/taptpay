@@ -40,7 +40,9 @@
 //
 //   npx vite build --outDir "$PWD/<build dir>"
 //   node --import tsx scripts/verify-r1-t10-device-matrix.ts <evidence dir> "$PWD/<build dir>"
-//     [--context phone|tablet|desktop|desktop-short] [--surface /path] [--self-test] [--measure <selector>]
+//     [--context phone|tablet|desktop|desktop-short] [--surface /path] [--self-test | --tutorials] [--measure <selector>]
+// --tutorials runs real progress, Settings restart, targets/fallbacks, resize,
+// document persistence and SPA departure/browser-Back checks on merchant pages.
 //
 // --measure records the box of the first element a selector finds in each cell (results.json), to
 // compare a screen before and after a change.
@@ -77,6 +79,7 @@ const ONLY_CONTEXT = flag("--context");
 const ONLY_SURFACE = flag("--surface");
 const MEASURE = flag("--measure");
 const SELF_TEST = argv.includes("--self-test") ? (argv.splice(argv.indexOf("--self-test"), 1), true) : false;
+const TUTORIALS = argv.includes("--tutorials") ? (argv.splice(argv.indexOf("--tutorials"), 1), true) : false;
 const out = argv[0];
 const builtClient = argv[1];
 if (argv.length !== 2 || !out || !builtClient || !existsSync(path.join(builtClient, "index.html"))) {
@@ -86,6 +89,8 @@ if (ONLY_CONTEXT && !["phone", "tablet", "desktop", "desktop-short"].includes(ON
   throw new Error(`unknown --context: ${ONLY_CONTEXT}`);
 }
 if (SELF_TEST && (ONLY_CONTEXT || ONLY_SURFACE)) throw new Error("--self-test cannot be combined with matrix filters");
+if (SELF_TEST && TUTORIALS) throw new Error("--self-test and --tutorials are separate gates");
+if (TUTORIALS && MEASURE) throw new Error("--tutorials records its own geometry; --measure belongs to the device gate");
 mkdirSync(out, { recursive: true });
 
 const OWNER_PASSWORD = "Matrix-password-1";
@@ -710,7 +715,11 @@ try {
   const surfaces = SURFACES.filter((surface) => !ONLY_SURFACE || surface.path === ONLY_SURFACE);
   const pages = OUTSIDE.filter((page) => !ONLY_SURFACE || page.path === ONLY_SURFACE || page.name === ONLY_SURFACE);
   if (!sizes.length || (!surfaces.length && !pages.length)) throw new Error("matrix filters selected zero cells");
-  if (SELF_TEST) {
+  if (TUTORIALS) {
+    if (!surfaces.length) throw new Error("tutorial filters selected zero merchant surfaces");
+    const { runTutorialMatrix } = await import("./verify-r1-t10-tutorials");
+    exitCode = await runTutorialMatrix({ base, out, sizes, surfaces, openContext, openPage, signIn });
+  } else if (SELF_TEST) {
     // One fault at a time, on the phone's terminal and the desktop's; every one must be caught.
     const phone = SIZES[0]; const desktop = SIZES[2]; const tablet = SIZES[1];
     const terminal = SURFACES.find((surface) => surface.path === "/terminal")!;

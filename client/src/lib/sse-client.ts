@@ -12,9 +12,15 @@ type Listener = (data: SSEMessage) => void;
 export class SSEClient {
   private eventSource: EventSource | null = null;
   private abortController: AbortController | null = null;
+  private pageHide: (() => void) | null = null;
+  private pageShow: ((event: PageTransitionEvent) => void) | null = null;
   private listeners = new Map<string, Listener[]>();
 
   private closeTransport() {
+    if (this.pageHide) window.removeEventListener('pagehide', this.pageHide);
+    if (this.pageShow) window.removeEventListener('pageshow', this.pageShow);
+    this.pageHide = null;
+    this.pageShow = null;
     this.eventSource?.close();
     this.eventSource = null;
     this.abortController?.abort();
@@ -54,6 +60,13 @@ export class SSEClient {
     this.closeTransport();
     const controller = new AbortController();
     this.abortController = controller;
+    // Document departure need not unmount React. Stop its fetch before the
+    // browser cancels the network; a cached page restoration needs a fresh
+    // cookie-authenticated stream rather than the aborted transport.
+    this.pageHide = () => controller.abort();
+    this.pageShow = event => { if (event.persisted) this.connectMerchant(merchantId); };
+    window.addEventListener('pagehide', this.pageHide);
+    window.addEventListener('pageshow', this.pageShow);
     void this.consumeMerchantStream(merchantId, controller.signal);
   }
 

@@ -12,6 +12,7 @@ import { createPortal } from "react-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ArrowRight, X } from "lucide-react";
+import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useDeviceClass } from "@/hooks/use-device-class";
 import type { TutorialPageKey, TutorialPageStatus } from "@shared/tutorial";
@@ -41,6 +42,7 @@ export interface TutorialState {
 interface ActiveTutorial {
   pageKey: TutorialPageKey;
   stepIndex: number;
+  location: string;
 }
 
 interface TutorialContextValue {
@@ -71,11 +73,19 @@ export function TutorialPageBoundary({ pageKey, children }: { pageKey: TutorialP
 export function TutorialProvider({ enabled, children }: { enabled: boolean; children: React.ReactNode }) {
   const queryClient = useQueryClient();
   const deviceClass = useDeviceClass();
+  const [location] = useLocation();
   const [currentPage, setCurrentPage] = useState<TutorialPageKey | null>(null);
   const [active, setActive] = useState<ActiveTutorial | null>(null);
   const [isRestarting, setIsRestarting] = useState(false);
   const registrationId = useRef(0);
   const startAttempt = useRef<string | null>(null);
+  const live = useRef({ mounted: false, enabled, location });
+  live.current.enabled = enabled;
+  live.current.location = location;
+  useEffect(() => {
+    live.current.mounted = true;
+    return () => { live.current.mounted = false; };
+  }, []);
 
   const stateQuery = useQuery<TutorialState>({
     queryKey: [apiPath("GET /api/tutorial/state")],
@@ -130,14 +140,15 @@ export function TutorialProvider({ enabled, children }: { enabled: boolean; chil
     const attemptKey = `${state.generation}:${currentPage}`;
     if (startAttempt.current === attemptKey) return;
     startAttempt.current = attemptKey;
-    let cancelled = false;
+    let started = false;
 
     // PageTransition exits for 220ms before the incoming route settles. This
     // delay also lets page data/empty states mount before the first measurement.
     const timer = window.setTimeout(async () => {
+      started = true;
       try {
         await saveProgress(currentPage, "started", 0);
-        if (!cancelled) setActive({ pageKey: currentPage, stepIndex: 0 });
+        if (live.current.mounted && live.current.enabled && live.current.location === location) setActive({ pageKey: currentPage, stepIndex: 0, location });
       } catch {
         // Do not show an unpersisted first-run tutorial: it could unexpectedly
         // repeat after refresh. A later navigation can retry safely.
@@ -146,31 +157,37 @@ export function TutorialProvider({ enabled, children }: { enabled: boolean; chil
     }, 420);
 
     return () => {
-      cancelled = true;
       window.clearTimeout(timer);
+      // An unsent first-visit attempt can retry after responsive registration
+      // returns. A write already in flight stays unique and uses live route
+      // eligibility above when it completes.
+      if (!started && startAttempt.current === attemptKey) startAttempt.current = null;
     };
-  }, [active, currentPage, enabled, saveProgress, stateQuery.data, stateQuery.isSuccess]);
+  }, [active, currentPage, enabled, location, saveProgress, stateQuery.data, stateQuery.isSuccess]);
 
   const closeTutorial = useCallback((status: "completed" | "dismissed") => {
     if (!active) return;
     const closing = active;
+    const lastStep = Math.min(closing.stepIndex, tutorialStepsForDevice(closing.pageKey, deviceClass).length - 1);
     setCachedProgress(closing.pageKey, {
       status,
-      lastStep: closing.stepIndex,
+      lastStep,
     });
     setActive(null);
-    void saveProgress(closing.pageKey, status, closing.stepIndex).catch(() => {
+    void saveProgress(closing.pageKey, status, lastStep).catch(() => {
       // The already-saved "started" row still prevents an unwanted repeat.
       void queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/tutorial/state")] });
     });
-  }, [active, queryClient, saveProgress, setCachedProgress]);
+  }, [active, deviceClass, queryClient, saveProgress, setCachedProgress]);
 
   useEffect(() => {
     // The overlay blocks in-app navigation, but browser Back/Forward can still
     // change routes. Treat leaving as a dismissal so an old page tutorial card
     // can never remain over the destination page.
-    if (active && currentPage !== active.pageKey) closeTutorial("dismissed");
-  }, [active, closeTutorial, currentPage]);
+    // Responsive chrome can briefly unregister and lazily remount the same
+    // page. Only a real route/page change or lost eligibility ends its tutorial.
+    if (active && (!enabled || location !== active.location || (currentPage !== null && currentPage !== active.pageKey))) closeTutorial("dismissed");
+  }, [active, closeTutorial, currentPage, enabled, location]);
 
   const nextStep = useCallback(() => {
     if (!active) return;
@@ -179,7 +196,7 @@ export function TutorialProvider({ enabled, children }: { enabled: boolean; chil
       closeTutorial("completed");
       return;
     }
-    const nextIndex = active.stepIndex + 1;
+    const nextIndex = Math.min(active.stepIndex, steps.length - 1) + 1;
     setActive({ ...active, stepIndex: nextIndex });
     setCachedProgress(active.pageKey, { status: "started", lastStep: nextIndex });
     void saveProgress(active.pageKey, "started", nextIndex).catch(() => {});
@@ -209,8 +226,10 @@ export function TutorialProvider({ enabled, children }: { enabled: boolean; chil
   }), [isRestarting, registerPage, restartTutorials, stateQuery.data?.pageCount, stateQuery.isSuccess, visitedPages]);
 
   const definition = active ? TUTORIAL_REGISTRY[active.pageKey] : null;
-  const steps = active ? tutorialStepsForDevice(active.pageKey, deviceClass) : [];
-  const step = definition && active ? steps[active.stepIndex] : null;
+  const activePage = active?.pageKey;
+  const steps = useMemo(() => activePage ? tutorialStepsForDevice(activePage, deviceClass) : [], [activePage, deviceClass]);
+  const displayedStep = active ? Math.min(active.stepIndex, steps.length - 1) : 0;
+  const step = definition && active ? steps[displayedStep] : null;
 
   return (
     <TutorialContext.Provider value={contextValue}>
@@ -218,10 +237,10 @@ export function TutorialProvider({ enabled, children }: { enabled: boolean; chil
       <AnimatePresence>
         {active && definition && step && (
           <TutorialOverlay
-            key={`${active.pageKey}:${active.stepIndex}`}
+            key={`${active.pageKey}:${displayedStep}`}
             pageLabel={definition.label}
             step={step}
-            stepIndex={active.stepIndex}
+            stepIndex={displayedStep}
             stepCount={steps.length}
             onNext={nextStep}
             onDismiss={() => closeTutorial("dismissed")}
@@ -244,11 +263,26 @@ interface Rect {
 function visibleElement(selector: string): HTMLElement | null {
   try {
     const candidates = Array.from(document.querySelectorAll<HTMLElement>(selector));
-    return candidates.find(element => {
+    const eligible = candidates.filter(element => {
       const rect = element.getBoundingClientRect();
-      const style = window.getComputedStyle(element);
-      return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" && style.display !== "none";
-    }) ?? null;
+      if (rect.width <= 0 || rect.height <= 0) return false;
+      for (let node: HTMLElement | null = element; node; node = node.parentElement) {
+        const style = window.getComputedStyle(node);
+        if (style.visibility === "hidden" || style.display === "none" || style.opacity === "0" || node.hasAttribute("inert") || node.getAttribute("aria-hidden") === "true") return false;
+        if (node !== element && node !== document.body && node !== document.documentElement) {
+          const clip = node.getBoundingClientRect();
+          if (/hidden|clip/.test(style.overflowX) && (rect.right <= clip.left || rect.left >= clip.right)) return false;
+          if (/hidden|clip/.test(style.overflowY) && (rect.bottom <= clip.top || rect.top >= clip.bottom)) return false;
+        }
+      }
+      return true;
+    });
+    // Prefer an already-visible candidate; offscreen, scrollable content can
+    // still be brought into view without opening a hidden application panel.
+    return eligible.find(element => {
+      const rect = element.getBoundingClientRect();
+      return rect.right > 0 && rect.left < window.innerWidth && rect.bottom > 0 && rect.top < window.innerHeight;
+    }) ?? eligible[0] ?? null;
   } catch {
     return null;
   }
@@ -262,6 +296,7 @@ function paddedRect(element: HTMLElement | null): Rect | null {
   const top = Math.max(8, raw.top - padding);
   const right = Math.min(window.innerWidth - 8, raw.right + padding);
   const bottom = Math.min(window.innerHeight - 8, raw.bottom + padding);
+  if (right <= left || bottom <= top) return null;
   return { left, top, right, bottom, width: right - left, height: bottom - top };
 }
 
@@ -276,59 +311,69 @@ function TutorialOverlay({ pageLabel, step, stepIndex, stepCount, onNext, onDism
   const reducedMotion = useReducedMotion();
   const cardRef = useRef<HTMLDivElement>(null);
   const nextRef = useRef<HTMLButtonElement>(null);
-  const [target, setTarget] = useState<HTMLElement | null>(null);
   const [rect, setRect] = useState<Rect | null>(null);
   const [cardHeight, setCardHeight] = useState(220);
 
   useLayoutEffect(() => {
-    const element = visibleElement(step.target) ?? (step.fallbackTarget ? visibleElement(step.fallbackTarget) : null);
-    setTarget(element);
-    if (element) {
-      const raw = element.getBoundingClientRect();
-      if (raw.top < 16 || raw.bottom > window.innerHeight - 16) {
-        element.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "center", inline: "nearest" });
-      }
-    }
-  }, [reducedMotion, step]);
-
-  useLayoutEffect(() => {
+    let selected: HTMLElement | null = null;
+    let raf = 0;
+    let until = 0;
+    const observer = new ResizeObserver(() => schedule());
     const measure = () => {
-      setRect(paddedRect(target));
+      const element = visibleElement(step.target) ?? (step.fallbackTarget ? visibleElement(step.fallbackTarget) : null);
+      if (selected !== element) {
+        selected = element;
+        observer.disconnect();
+        if (element) {
+          observer.observe(element);
+          const raw = element.getBoundingClientRect();
+          if (raw.top < 16 || raw.bottom > window.innerHeight - 16) {
+            element.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "center", inline: "nearest" });
+          }
+        }
+      }
+      const next = paddedRect(element);
+      setRect(old => old?.left === next?.left && old?.top === next?.top && old?.width === next?.width && old?.height === next?.height ? old : next);
       if (cardRef.current) setCardHeight(cardRef.current.offsetHeight);
     };
-    measure();
-    const raf = requestAnimationFrame(measure);
-    const settle = window.setTimeout(measure, reducedMotion ? 0 : 360);
-    const observer = target ? new ResizeObserver(measure) : null;
-    if (target && observer) observer.observe(target);
-    // The desktop entry cascade animates a transform on an ancestor block, which
-    // no ResizeObserver reports and which outlives the settle timer, so without
-    // this the spotlight freezes around a mid-bounce rect. Animation events are
-    // listened for in capture so an ancestor's completion still re-measures.
-    const onAnimationSettled = (event: Event) => {
-      const node = event.target;
-      if (!target || !(node instanceof Node)) return;
-      if (node === target || node.contains(target)) measure();
+    const tick = () => {
+      measure();
+      raf = performance.now() < until ? requestAnimationFrame(tick) : 0;
     };
-    document.addEventListener("animationend", onAnimationSettled, true);
-    document.addEventListener("transitionend", onAnimationSettled, true);
-    window.addEventListener("resize", measure);
-    window.addEventListener("scroll", measure, true);
+    function schedule() {
+      until = performance.now() + 800;
+      if (!raf) raf = requestAnimationFrame(tick);
+    }
+    // Measure through responsive/lazy entry animations, then stop polling.
+    // Ignore the overlay's own styles so its rect updates cannot feed back.
+    const mutations = new MutationObserver(records => {
+      if (records.some(record => !(record.target instanceof Element) || !record.target.closest('.tutorial-overlay'))) schedule();
+    });
+    mutations.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class', 'hidden', 'inert', 'aria-hidden'] });
+    const onAnimation = (event: Event) => {
+      if (event.target instanceof Element && !event.target.closest('.tutorial-overlay')) schedule();
+    };
+    measure(); schedule();
+    document.addEventListener("animationstart", onAnimation, true);
+    document.addEventListener("animationend", onAnimation, true);
+    document.addEventListener("transitionend", onAnimation, true);
+    window.addEventListener("resize", schedule);
+    window.addEventListener("scroll", schedule, true);
     return () => {
       cancelAnimationFrame(raf);
-      window.clearTimeout(settle);
-      observer?.disconnect();
-      document.removeEventListener("animationend", onAnimationSettled, true);
-      document.removeEventListener("transitionend", onAnimationSettled, true);
-      window.removeEventListener("resize", measure);
-      window.removeEventListener("scroll", measure, true);
+      mutations.disconnect(); observer.disconnect();
+      document.removeEventListener("animationstart", onAnimation, true);
+      document.removeEventListener("animationend", onAnimation, true);
+      document.removeEventListener("transitionend", onAnimation, true);
+      window.removeEventListener("resize", schedule);
+      window.removeEventListener("scroll", schedule, true);
     };
-  }, [reducedMotion, target]);
+  }, [reducedMotion, step]);
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    nextRef.current?.focus();
+    nextRef.current?.focus({ preventScroll: true });
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onDismiss();
       if (event.key === "Tab" && cardRef.current) {

@@ -311,7 +311,7 @@ export function TradesDashboardView({
         </div>
 
         {/* ── Stat cards ── */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.15fr', gap: 14, padding: '26px 22px 0' }}>
+        <div data-tutorial-id="trades-home-health" style={{ display: 'grid', gridTemplateColumns: '1fr 1.15fr', gap: 14, padding: '26px 22px 0' }}>
           <button type="button" className="td-card td-tap" data-demo-id="trades-dashboard-clients" onPointerDown={pulse} onClick={() => onNavigate('/trades/clients')}
             style={{ background: '#FFFFFF', borderRadius: 22, padding: '16px 18px', border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'Outfit, system-ui' }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
@@ -331,7 +331,7 @@ export function TradesDashboardView({
         </div>
 
         {/* ── Action shortcuts ── */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1.25fr 1fr 1fr', gap: 12, padding: '18px 22px 0' }}>
+        <div data-tutorial-id="trades-home-actions" style={{ display: 'grid', gridTemplateColumns: '1.25fr 1fr 1fr', gap: 12, padding: '18px 22px 0' }}>
           {[
             { label: <>new<br />quote</>, Ico: IcoPlus, to: '/trades/quote', aria: 'new quote' },
             { label: <>quick<br />invoice</>, Ico: IcoBill, to: '/trades/terminal?quick=1', aria: 'quick invoice' },
