@@ -7,6 +7,7 @@ import type { BrowserContext, Page } from 'playwright';
 import { tutorialStepsForDevice } from '../client/src/features/tutorial/tutorial-registry';
 import type { TutorialPageKey } from '../shared/tutorial';
 import { auditAccessibility } from './accessibility-audit.mjs';
+import { measureSettledTutorialContrast, TUTORIAL_CONTRAST_PROBE_SHA256 } from './tutorial-contrast.mjs';
 
 const harnessSHA256 = createHash('sha256').update(readFileSync(new URL(import.meta.url))).digest('hex');
 
@@ -28,8 +29,16 @@ export async function runTutorialAccessibilityMatrix(harness: Harness) {
       try {
         await page.goto(`${base}${surface.path}`, { waitUntil: 'domcontentloaded' });
         for (const action of ['escape', 'complete'] as const) {
-          const trial: any = { action, focusReturned: false, trap: false, visibleFocus: false, faults: [] };
+          const trial: any = { action, focusReturned: false, trap: false, visibleFocus: false, faults: [], contrast: [] };
           cell.cases.push(trial);
+          const sampleContrast = async (step: number) => {
+            const next = await measureSettledTutorialContrast(page, '.tutorial-next');
+            await page.keyboard.press('Tab');
+            const close = await measureSettledTutorialContrast(page, '.tutorial-close');
+            await page.keyboard.press('Shift+Tab');
+            assert.ok(await page.evaluate(() => document.activeElement?.classList.contains('tutorial-next')), 'contrast sampling did not return keyboard focus');
+            trial.contrast.push({ step, next, close });
+          };
           await page.evaluate(async () => {
             const session = await (await fetch('/api/auth/session')).json();
             const r = await fetch('/api/tutorial/restart', { method: 'POST', headers: { 'X-CSRF-Token': session.csrfToken } });
@@ -83,16 +92,18 @@ export async function runTutorialAccessibilityMatrix(harness: Harness) {
           assert.ok(await page.evaluate(() => document.activeElement?.classList.contains('tutorial-next')), 'Shift-Tab escaped the tutorial');
           trial.trap = true;
           if (action === 'escape') {
+            await sampleContrast(0);
             trial.audit = await auditAccessibility(page);
             await page.keyboard.press('Escape');
           } else {
-            for (const step of steps) {
+            for (const [stepIndex, step] of steps.entries()) {
               await page.locator('.tutorial-card').last().getByRole('heading', { name: step.title, exact: true }).waitFor();
               await page.waitForTimeout(250);
               await page.waitForFunction(() => {
                 const cards = document.querySelectorAll('.tutorial-card');
                 return document.activeElement === cards[cards.length - 1]?.querySelector('.tutorial-next');
               }, undefined, { timeout: 10000 });
+              await sampleContrast(stepIndex);
               await page.keyboard.press('Enter');
             }
           }
@@ -116,12 +127,13 @@ export async function runTutorialAccessibilityMatrix(harness: Harness) {
         await page.close();
       }
       cells.push(cell);
-      writeFileSync(path.join(out, 'tutorial-accessibility-results.json'), JSON.stringify({ expected: sizes.length * surfaces.length, harnessSHA256, cells }, null, 2));
+      writeFileSync(path.join(out, 'tutorial-accessibility-results.json'), JSON.stringify({ expected: sizes.length * surfaces.length, harnessSHA256, contrastProbeSHA256: TUTORIAL_CONTRAST_PROBE_SHA256, cells }, null, 2));
       const focus = cell.faults.length + cell.cases.reduce((n, x) => n + x.faults.length, 0);
       const rules = cell.cases.reduce((n, x) => n + (x.audit?.violations.length ?? 0), 0);
-      console.log(`${focus || rules ? 'FAIL' : 'PASS'} tutorial accessibility ${size.name} ${surface.mode} ${surface.path}: ${focus} interaction/runtime faults; ${rules} accessibility rules`);
+      const contrast = cell.cases.reduce((n, x) => n + x.contrast.reduce((m: number, step: any) => m + [...step.next.checks, ...step.close.checks].filter(c => !c.pass).length, 0), 0);
+      console.log(`${focus || rules || contrast ? 'FAIL' : 'PASS'} tutorial accessibility ${size.name} ${surface.mode} ${surface.path}: ${focus} interaction/runtime faults; ${rules} accessibility rules; ${contrast} shared contrast faults`);
     }
     await context.close();
   }
-  return cells.some(c => c.faults.length || c.cases.some((x: any) => x.faults.length || x.audit?.violations.length)) ? 1 : 0;
+  return cells.some(c => c.faults.length || c.cases.some((x: any) => x.faults.length || x.audit?.violations.length || x.contrast.some((s: any) => [...s.next.checks, ...s.close.checks].some(check => !check.pass)))) ? 1 : 0;
 }

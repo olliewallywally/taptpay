@@ -80,7 +80,7 @@
 }
 
 .tutorial-eyebrow {
-  color: #58abff;
+  color: #040d6d;
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.12em;
@@ -117,7 +117,7 @@
 }
 
 .tutorial-footer > span {
-  color: rgba(4, 13, 109, 0.48);
+  color: #586079;
   font-size: 12px;
   font-weight: 650;
 }
@@ -135,7 +135,7 @@
 .tutorial-next:hover { background: #73b9ff; transform: translateY(-1px); }
 .tutorial-next:active { transform: scale(0.96); }
 .tutorial-close:focus-visible,
-.tutorial-next:focus-visible { outline: 3px solid #00e5cc; outline-offset: 2px; }
+.tutorial-next:focus-visible { outline: 3px solid #040d6d; outline-offset: 2px; }
 
 @media (prefers-reduced-motion: reduce) {
   .tutorial-next { transition: none; }
