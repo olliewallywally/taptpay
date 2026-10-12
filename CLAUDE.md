@@ -36,8 +36,10 @@ before any R2 work. Passes 1–2 approved T1–T3 only; they are implemented (se
 `docs/evidence/remediation-v2-2/r2/R2-T1-T3-2026-10-11.md`). T4 is implemented as repository
 work (`docs/evidence/remediation-v2-2/r2/R2-T4-2026-10-12.md`); migration 0034 is applied nowhere.
 T5 is implemented on every enabled completion path, retail, numbered and invoice
-(`docs/evidence/remediation-v2-2/r2/R2-T5-2026-10-12.md`); T6 is next. The owner will review
-R1–R2 together once all of it is complete.
+(`docs/evidence/remediation-v2-2/r2/R2-T5-2026-10-12.md`). T6 is implemented and the R2 exit
+record is `docs/evidence/remediation-v2-2/r2/R2-exit-2026-10-12.md`: repository work is complete
+for the enabled flows, but R2 is not closed until the owner items listed there are decided.
+The owner will review R1–R2 together.
 
 This program's established discipline: failing-tests-first; independently re-verify a prior
 pass's own claims before trusting them, the way every session in this program has had to;
