@@ -1,7 +1,7 @@
 import { hashBearerCredential } from "./payment-credential";
 import { users, type User, type UserStatus, merchants, merchantTutorialProgress, transactions, uploadedFiles, uploadedFileScans, appleIdentities, type AppleIdentityRecord, merchantSettlements, refunds, splitPayments, paymentAttempts, PAYMENT_RETURN_STATE_MAX_AGE_MS, taptStones, stockItems, merchantSubscriptions, subscriptionBillingHistory, pushSubscriptions, pushNotificationDeliveries, normalizePushNotificationPreferences, DEFAULT_PUSH_NOTIFICATION_PREFERENCES, tenantProfiles, activeSchedules, invoicesRentRequests, transactionEvents, clientProfiles, quotes, jobInvoices, jobSchedules, jobEvents, type Merchant, type MerchantTutorialProgress, type Transaction, type SplitPayment, type PaymentAttempt, type InsertMerchant, type InsertTransaction, type CreateMerchant, type Refund, type InsertRefund, type TaptStone, type InsertTaptStone, type StockItem, type InsertStockItem, type MerchantSubscription, type SubscriptionBillingHistory, type PushSubscription, type PushNotificationPreferences, type PushNotificationEventType } from "@shared/schema";
 import { DEFAULT_PLAN_ID, isUpgrade, planFor, planForOrDefault, type PlanId } from "@shared/plans";
-import { paymentAttemptExpectations, paymentSessionBindings, paymentNotificationInbox, paymentSettlementEvents, paymentDeliveryOutbox } from "@shared/schema";
+import { paymentSessionBindings, paymentNotificationInbox, paymentSettlementEvents, paymentDeliveryOutbox } from "@shared/schema";
 import { evidenceMatchesExpectation } from "./payment-reconciliation";
 import { mintPublicLinkToken, hashPublicLinkTokenData } from "./public-link-token-compatibility";
 import { decideBilling, failedPaymentUpdates, immediatePlanUpdates, MAX_PAYMENT_ATTEMPTS, nextBillingPeriodStart, nextPeriodUpdates, proratedUpgradeCents, queuedPlanUpdates, renewalPlan } from "./subscription-billing";
@@ -30,6 +30,10 @@ import type {
   FinalizePaymentAttemptRecordInput,
   FinalizePaymentAttemptResult,
   PaymentAttemptRepository,
+  RecordPaymentAttemptExpectedValuesRecordInput,
+  RecordPaymentAttemptExpectedValuesResult,
+  RecordPaymentAttemptReconciliationRecordInput,
+  RecordPaymentAttemptReconciliationResult,
 } from "./payment-attempt-service";
 
 // The anonymous business-wide "legacy-no-board" scope was retired on 2026-09-25 with the
@@ -734,7 +738,7 @@ async function retailMoneyChangeBlocked(tx: any, row: Transaction): Promise<bool
     or exists (select 1 from payment_attempts a where a.transaction_id = ${aggregateId}
       and (a.state not in ('declined', 'cancelled', 'abandoned')
         or (a.state = 'abandoned' and (a.processor_session_id is not null
-          or exists (select 1 from payment_attempt_expectations e where e.payment_attempt_id = a.id)))))
+          or a.send_started_at is not null))))
   )` }).from(transactions).where(and(eq(transactions.id, row.id), eq(transactions.merchantId, row.merchantId!))).limit(1);
   return !activity || !!activity.blocked;
 }
@@ -785,6 +789,30 @@ function isPostgresUniqueViolation(error: unknown): boolean {
     current = (current as { cause?: unknown }).cause;
   }
   return false;
+}
+
+/** A unique violation on one named constraint (R2-T4), anywhere in the cause chain. */
+function isPostgresUniqueViolationOn(error: unknown, constraint: string): boolean {
+  const seen = new Set<object>();
+  let current = error;
+  while (current && typeof current === "object" && !seen.has(current)) {
+    const { code, constraint: name } = current as { code?: unknown; constraint?: unknown };
+    if (code === "23505" && name === constraint) return true;
+    seen.add(current);
+    current = (current as { cause?: unknown }).cause;
+  }
+  return false;
+}
+
+/** R2-T4: whether an attempt already carries exactly these expected values. */
+function expectedValuesMatch(
+  attempt: PaymentAttempt,
+  input: RecordPaymentAttemptExpectedValuesRecordInput,
+): boolean {
+  return attempt.expectedAmountCents === input.amountCents &&
+    attempt.expectedCurrency === input.currency &&
+    attempt.expectedMerchantReference === input.merchantReference &&
+    attempt.providerEnvironment === input.providerEnvironment;
 }
 
 function isNeonEmptyResultError(error: unknown): boolean {
@@ -1972,7 +2000,7 @@ export class MemStorage implements IStorage {
         // A processor-bound attempt must be reconciled before another key can
         // claim this payment target. Abandoning it here could leave an HPP/card
         // session chargeable while a replacement session is created.
-        if (active.processorSessionId) {
+        if (active.processorSessionId || active.sendStartedAt || active.expectedAmountCents !== null) {
           return { kind: "expired", attempt: active };
         }
         const abandoned: PaymentAttempt = {
@@ -2035,6 +2063,16 @@ export class MemStorage implements IStorage {
         returnStateExpiresAt: null,
         outcome: null,
         receiptShare: null,
+        expectedAmountCents: null,
+        expectedCurrency: null,
+        expectedMerchantReference: null,
+        providerEnvironment: null,
+        providerTransactionId: null,
+        lastReconciliationCode: null,
+        lastReconciledAt: null,
+        expectedProviderAccount: null,
+        requestFingerprint: null,
+        sendStartedAt: null,
         createdAt: input.now,
         updatedAt: input.now,
       };
@@ -2044,6 +2082,53 @@ export class MemStorage implements IStorage {
         attempt,
         ...(abandonedAttemptId ? { abandonedAttemptId } : {}),
       };
+    });
+  }
+
+  async recordPaymentAttemptExpectedValuesRecord(
+    input: RecordPaymentAttemptExpectedValuesRecordInput,
+  ): Promise<RecordPaymentAttemptExpectedValuesResult> {
+    return withMemLock(this.paymentAttemptLocks, `attempt:${input.attemptId}`, async () => {
+      const attempt = this.paymentAttempts.get(input.attemptId);
+      if (!attempt) return { kind: "not-found" };
+      if (attempt.expectedAmountCents !== null) {
+        return expectedValuesMatch(attempt, input)
+          ? { kind: "reused", attempt }
+          : { kind: "conflict", attempt };
+      }
+      if (paymentAttemptLeaseExpired(attempt, input.now)) {
+        const abandoned: PaymentAttempt = { ...attempt, state: "abandoned", updatedAt: input.now };
+        this.paymentAttempts.set(abandoned.id, abandoned);
+        return { kind: "expired", attempt: abandoned };
+      }
+      if (attempt.state === "abandoned") return { kind: "expired", attempt };
+      if (paymentAttemptIsTerminal(attempt)) return { kind: "terminal", attempt };
+      // Never fixed after the fact: a session attached without them stays without them.
+      if (attempt.state !== "claiming" || attempt.processorSessionId !== null) {
+        return { kind: "conflict", attempt };
+      }
+      const recorded: PaymentAttempt = {
+        ...attempt,
+        expectedAmountCents: input.amountCents,
+        expectedCurrency: input.currency,
+        expectedMerchantReference: input.merchantReference,
+        providerEnvironment: input.providerEnvironment,
+        updatedAt: input.now,
+      };
+      this.paymentAttempts.set(recorded.id, recorded);
+      return { kind: "recorded", attempt: recorded };
+    });
+  }
+
+  async recordPaymentAttemptReconciliationRecord(
+    input: RecordPaymentAttemptReconciliationRecordInput,
+  ): Promise<RecordPaymentAttemptReconciliationResult> {
+    return withMemLock(this.paymentAttemptLocks, `attempt:${input.attemptId}`, async () => {
+      const attempt = this.paymentAttempts.get(input.attemptId);
+      if (!attempt) return { kind: "not-found" };
+      const recorded: PaymentAttempt = { ...attempt, lastReconciliationCode: input.code, lastReconciledAt: input.now };
+      this.paymentAttempts.set(recorded.id, recorded);
+      return { kind: "recorded", attempt: recorded };
     });
   }
 
@@ -2102,6 +2187,9 @@ export class MemStorage implements IStorage {
       }
       if (attempt.state !== "claiming") {
         return { kind: "conflict", attempt };
+      }
+      if (attempt.expectedAmountCents === null) {
+        return { kind: "expected-values-missing", attempt };
       }
 
       const attached: PaymentAttempt = {
@@ -2192,7 +2280,7 @@ export class MemStorage implements IStorage {
         if (paymentAttemptIsTerminal(attempt)) {
           return attempt.state === input.outcome &&
             attempt.outcome === input.outcome &&
-            attempt.processorTransactionId === input.processorTransactionId &&
+            attempt.providerTransactionId === input.processorTransactionId &&
             attempt.receiptShare === input.receiptShare
             ? {
                 kind: "reused",
@@ -2209,6 +2297,15 @@ export class MemStorage implements IStorage {
         if (
           !["pending", "processing"].includes(transaction.status) ||
           (splitPayment && !["pending", "processing"].includes(splitPayment.status))
+        ) {
+          return { kind: "conflict", attempt };
+        }
+        // R2-T4: one provider transaction funds one attempt.
+        if (
+          input.outcome === "approved" &&
+          Array.from(this.paymentAttempts.values()).some(
+            (other) => other.id !== attempt.id && other.providerTransactionId === input.processorTransactionId,
+          )
         ) {
           return { kind: "conflict", attempt };
         }
@@ -2262,7 +2359,7 @@ export class MemStorage implements IStorage {
           state: input.outcome,
           outcome: input.outcome,
           receiptShare: input.receiptShare,
-          processorTransactionId: input.processorTransactionId,
+          providerTransactionId: input.processorTransactionId,
           updatedAt: input.now,
         };
 
@@ -5447,9 +5544,7 @@ export class DatabaseStorage implements IStorage {
         // Keep a processor-bound attempt live until the route queries and
         // terminalizes that exact session. This transaction lock prevents a
         // conflicting key from creating a second chargeable session meanwhile.
-        const [sendIntent] = await tx.select({ id: paymentAttemptExpectations.paymentAttemptId })
-          .from(paymentAttemptExpectations).where(eq(paymentAttemptExpectations.paymentAttemptId, active.id)).limit(1);
-        if (active.processorSessionId || sendIntent) {
+        if (active.processorSessionId || active.sendStartedAt || active.expectedAmountCents !== null) {
           return { kind: "expired", attempt: active };
         }
         const rows = await tx
@@ -5526,7 +5621,95 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
+  async recordPaymentAttemptExpectedValuesRecord(
+    input: RecordPaymentAttemptExpectedValuesRecordInput,
+  ): Promise<RecordPaymentAttemptExpectedValuesResult> {
+    const db = this.db;
+    if (!db) throw new Error('Database not available');
+
+    return db.transaction(async (tx) => {
+      const attempts = await tx
+        .select()
+        .from(paymentAttempts)
+        .where(eq(paymentAttempts.id, input.attemptId))
+        .for("update")
+        .limit(1);
+      const attempt = attempts[0];
+      if (!attempt) return { kind: "not-found" };
+      if (attempt.expectedAmountCents !== null) {
+        return expectedValuesMatch(attempt, input)
+          ? { kind: "reused", attempt }
+          : { kind: "conflict", attempt };
+      }
+      if (paymentAttemptLeaseExpired(attempt, input.now)) {
+        const rows = await tx
+          .update(paymentAttempts)
+          .set({ state: "abandoned", updatedAt: input.now })
+          .where(eq(paymentAttempts.id, attempt.id))
+          .returning();
+        return { kind: "expired", attempt: rows[0] };
+      }
+      if (attempt.state === "abandoned") return { kind: "expired", attempt };
+      if (paymentAttemptIsTerminal(attempt)) return { kind: "terminal", attempt };
+      // Never fixed after the fact: a session attached without them stays without them.
+      if (attempt.state !== "claiming" || attempt.processorSessionId !== null) {
+        return { kind: "conflict", attempt };
+      }
+      const rows = await tx
+        .update(paymentAttempts)
+        .set({
+          expectedAmountCents: input.amountCents,
+          expectedCurrency: input.currency,
+          expectedMerchantReference: input.merchantReference,
+          providerEnvironment: input.providerEnvironment,
+          updatedAt: input.now,
+        })
+        .where(and(
+          eq(paymentAttempts.id, attempt.id),
+          eq(paymentAttempts.state, "claiming"),
+          isNull(paymentAttempts.processorSessionId),
+          isNull(paymentAttempts.expectedAmountCents),
+        ))
+        .returning();
+      if (!rows[0]) throw new Error("Payment attempt expected-values compare-and-set failed");
+      return { kind: "recorded", attempt: rows[0] };
+    });
+  }
+
+  async recordPaymentAttemptReconciliationRecord(
+    input: RecordPaymentAttemptReconciliationRecordInput,
+  ): Promise<RecordPaymentAttemptReconciliationResult> {
+    const db = this.db;
+    if (!db) throw new Error('Database not available');
+    // One statement on the two reconciliation columns only; no state, lease or
+    // updated_at changes, so it cannot race the attempt's own transitions.
+    const rows = await db
+      .update(paymentAttempts)
+      .set({ lastReconciliationCode: input.code, lastReconciledAt: input.now })
+      .where(eq(paymentAttempts.id, input.attemptId))
+      .returning();
+    return rows[0] ? { kind: "recorded", attempt: rows[0] } : { kind: "not-found" };
+  }
+
   async attachPaymentAttemptSessionRecord(
+    input: AttachPaymentAttemptSessionRecordInput,
+  ): Promise<AttachPaymentAttemptSessionResult> {
+    try {
+      return await this.attachPaymentAttemptSessionRecordInTransaction(input);
+    } catch (error) {
+      // R2-T7: two attaches raced past the duplicate check below; the database's own
+      // indexes (0022's session ID, 0035's X-ID) refused the second. Same answer as
+      // the check gives: a conflict, never an unhandled error.
+      if (
+        !isPostgresUniqueViolationOn(error, "payment_attempts_processor_x_id_uq") &&
+        !isPostgresUniqueViolationOn(error, "payment_attempts_processor_session_id_uq")
+      ) throw error;
+      const attempt = await this.getPaymentAttempt(input.attemptId);
+      return attempt ? { kind: "conflict", attempt } : { kind: "not-found" };
+    }
+  }
+
+  private async attachPaymentAttemptSessionRecordInTransaction(
     input: AttachPaymentAttemptSessionRecordInput,
   ): Promise<AttachPaymentAttemptSessionResult> {
     const db = this.db;
@@ -5542,10 +5725,8 @@ export class DatabaseStorage implements IStorage {
       const attempt = attempts[0];
       if (!attempt) return { kind: "not-found" };
 
-      const [sendIntent] = await tx.select().from(paymentAttemptExpectations)
-        .where(eq(paymentAttemptExpectations.paymentAttemptId, attempt.id)).limit(1);
-      if (sendIntent && sendIntent.processorXId !== input.processorXId) return { kind: "conflict", attempt };
-      if (paymentAttemptLeaseExpired(attempt, input.now) && !sendIntent) {
+      if (attempt.processorXId !== null && attempt.processorXId !== input.processorXId) return { kind: "conflict", attempt };
+      if (paymentAttemptLeaseExpired(attempt, input.now) && !attempt.sendStartedAt && attempt.expectedAmountCents === null) {
         const rows = await tx
           .update(paymentAttempts)
           .set({ state: "abandoned", updatedAt: input.now })
@@ -5602,6 +5783,9 @@ export class DatabaseStorage implements IStorage {
       }
       if (attempt.state !== "claiming") {
         return { kind: "conflict", attempt };
+      }
+      if (attempt.expectedAmountCents === null) {
+        return { kind: "expected-values-missing", attempt };
       }
 
       const rows = await tx
@@ -5664,6 +5848,19 @@ export class DatabaseStorage implements IStorage {
   }
 
   async finalizePaymentAttemptRecord(
+    input: FinalizePaymentAttemptRecordInput,
+  ): Promise<FinalizePaymentAttemptResult> {
+    try {
+      return await this.finalizePaymentAttemptRecordInTransaction(input);
+    } catch (error) {
+      // R2-T4: a concurrent finalization already recorded this provider transaction.
+      if (!isPostgresUniqueViolationOn(error, "payment_attempts_provider_transaction_id_uq")) throw error;
+      const attempt = await this.getPaymentAttempt(input.attemptId);
+      return attempt ? { kind: "conflict", attempt } : { kind: "not-found" };
+    }
+  }
+
+  private async finalizePaymentAttemptRecordInTransaction(
     input: FinalizePaymentAttemptRecordInput,
   ): Promise<FinalizePaymentAttemptResult> {
     const db = this.db;
@@ -5745,12 +5942,15 @@ export class DatabaseStorage implements IStorage {
           sql`${paymentNotificationInbox.leaseExpiresAt} > GREATEST(${input.now}::timestamptz, clock_timestamp())`,
         )).for("update").limit(1);
         if (!lease) return { kind: "conflict", attempt, reason: "lease-lost" };
-        const [expected] = await tx.select().from(paymentAttemptExpectations)
-          .where(eq(paymentAttemptExpectations.paymentAttemptId, attempt.id)).limit(1);
+        const expected = attempt.expectedProviderAccount !== null && attempt.expectedAmountCents !== null ? {
+          amountCents: attempt.expectedAmountCents, currency: attempt.expectedCurrency!,
+          reference: attempt.expectedMerchantReference!, environment: attempt.providerEnvironment!,
+          providerAccount: attempt.expectedProviderAccount, processorXId: attempt.processorXId!,
+        } : undefined;
         const [binding] = await tx.select().from(paymentSessionBindings)
           .where(eq(paymentSessionBindings.sessionId, input.processorSessionId)).for("update").limit(1);
-        if (!expected || !binding || binding.paymentAttemptId !== attempt.id || expected.merchantId !== transaction.merchantId ||
-          expected.transactionId !== transaction.id || expected.processorXId !== attempt.processorXId ||
+        if (!expected || !binding || binding.paymentAttemptId !== attempt.id || attempt.transactionId !== transaction.id ||
+          expected.processorXId !== attempt.processorXId ||
           binding.processorXId !== expected.processorXId || expected.amountCents !== moneyStringToCents(splitPayment?.amount ?? transaction.price) ||
           evidence.outcome !== input.outcome || evidence.transactionId !== input.processorTransactionId ||
           !evidenceMatchesExpectation({ ...expected, sessionId: binding.sessionId, processorXId: binding.processorXId }, evidence) ||
@@ -5766,7 +5966,7 @@ export class DatabaseStorage implements IStorage {
       if (paymentAttemptIsTerminal(attempt)) {
         return attempt.state === input.outcome &&
           attempt.outcome === input.outcome &&
-          attempt.processorTransactionId === input.processorTransactionId &&
+          attempt.providerTransactionId === input.processorTransactionId &&
           attempt.receiptShare === input.receiptShare
           ? {
               kind: "reused",
@@ -5786,6 +5986,19 @@ export class DatabaseStorage implements IStorage {
         (splitPayment && !["pending", "processing"].includes(splitPayment.status))
       ) {
         return { kind: "conflict", attempt };
+      }
+      // R2-T4: one provider transaction funds one attempt. A concurrent duplicate
+      // still meets payment_attempts_provider_transaction_id_uq (caught below).
+      if (input.outcome === "approved" && input.processorTransactionId !== null) {
+        const claimedElsewhere = await tx
+          .select({ id: paymentAttempts.id })
+          .from(paymentAttempts)
+          .where(and(
+            ne(paymentAttempts.id, attempt.id),
+            eq(paymentAttempts.providerTransactionId, input.processorTransactionId),
+          ))
+          .limit(1);
+        if (claimedElsewhere[0]) return { kind: "conflict", attempt };
       }
 
       if (input.reconciliation && attempt.state === "ready") {
@@ -5901,7 +6114,7 @@ export class DatabaseStorage implements IStorage {
           state: input.outcome,
           outcome: input.outcome,
           receiptShare: input.receiptShare,
-          processorTransactionId: input.processorTransactionId,
+          providerTransactionId: input.processorTransactionId,
           updatedAt: input.now,
         })
         .where(and(

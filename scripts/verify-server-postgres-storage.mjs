@@ -1119,6 +1119,17 @@ async function verifyPaymentAttemptConcurrency(
   });
   assert.equal(conflict.kind, "conflict");
 
+  // R2-T4: a session is attached only after the attempt's expected provider values.
+  const recordedExpected = await storage.recordPaymentAttemptExpectedValuesRecord({
+    attemptId: attempt.id,
+    amountCents: 1000,
+    currency: "NZD",
+    merchantReference: `TAPT_${attempt.id}`,
+    providerEnvironment: "uat",
+    now: new Date(now.getTime() + 500),
+  });
+  assert.equal(recordedExpected.kind, "recorded");
+
   const returnStateHash = digest();
   const attached = await storage.attachPaymentAttemptSessionRecord({
     attemptId: attempt.id,
@@ -1298,6 +1309,17 @@ async function verifyApprovedSplitFinalization(
     )?.id,
     attempt.id,
   );
+
+  // R2-T4: a session is attached only after the attempt's expected provider values.
+  const recordedExpected = await storage.recordPaymentAttemptExpectedValuesRecord({
+    attemptId: attempt.id,
+    amountCents: 1000,
+    currency: "NZD",
+    merchantReference: `TAPT_${attempt.id}`,
+    providerEnvironment: "uat",
+    now: new Date(start.getTime() + 500),
+  });
+  assert.equal(recordedExpected.kind, "recorded");
 
   const attached = await storage.attachPaymentAttemptSessionRecord({
     attemptId: attempt.id,

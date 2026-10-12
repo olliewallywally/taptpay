@@ -18,6 +18,7 @@ import { useBucketMorph } from "../bucket-morph";
 import { SlidingIndicator, useSlidingIndicator } from "../sliding-indicator";
 import { sessionFetch } from "@/lib/session";
 import { MERCHANTS_KEY, apiPath } from "@shared/api-path";
+import { inertWhen } from "@/features/terminal/inert-when";
 
 /* ── Retail palette (from the desktop design tokens) ── */
 const ACCENT = "#5E9EFF";
@@ -587,7 +588,7 @@ export default function DesktopRetailHome(props: DesktopRoutePageProps) {
           {/* expanded list */}
           <div
             className="rh-notif-list"
-            aria-hidden={!notifOpen} {...{ inert: notifOpen ? undefined : "" }}
+            aria-hidden={!notifOpen} {...inertWhen(!notifOpen)}
             style={{ opacity: notifOpen ? 1 : 0, pointerEvents: notifOpen ? "auto" : "none" }}
           >
             <button type="button" className="rh-notif-listhead" onClick={() => setNotifOpen(false)}>

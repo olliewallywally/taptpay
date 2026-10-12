@@ -43,6 +43,20 @@ describe("PaymentAttemptService with MemStorage", () => {
     service = new PaymentAttemptService(storage, () => new Date(now));
   });
 
+  // R2-T4: a session can be attached only after the attempt's expected provider values.
+  async function recordExpected(attemptId: string) {
+    const recorded = await service.recordExpectedValues({
+      attemptId,
+      amountCents: 1000,
+      currency: "NZD",
+      merchantReference: `TAPT_${attemptId}`,
+      providerEnvironment: "uat",
+    });
+    if (recorded.kind !== "recorded" && recorded.kind !== "reused") {
+      throw new Error(`expected values not recorded: ${recorded.kind}`);
+    }
+  }
+
   test("claims one live attempt, reuses the same key, and abandons an expired lease", async () => {
     const transaction = await storage.createTransaction(transactionInput());
 
@@ -99,6 +113,7 @@ describe("PaymentAttemptService with MemStorage", () => {
     });
     if (claimed.kind !== "claimed") throw new Error("expected a claimed attempt");
 
+    await recordExpected(claimed.attempt.id);
     await service.attachSession({
       attemptId: claimed.attempt.id,
       processorSessionId: "session-expired",
@@ -135,6 +150,7 @@ describe("PaymentAttemptService with MemStorage", () => {
     if (firstClaim.kind !== "claimed") throw new Error("expected first claim");
 
     now = new Date("2026-08-06T10:00:10.000Z");
+    await recordExpected(firstClaim.attempt.id);
     const attached = await service.attachSession({
       attemptId: firstClaim.attempt.id,
       processorSessionId: "session-one",
@@ -153,6 +169,7 @@ describe("PaymentAttemptService with MemStorage", () => {
     expect(attached.attempt.returnStateExpiresAt).toEqual(
       new Date("2026-08-06T10:30:00.000Z"),
     );
+    await recordExpected(firstClaim.attempt.id);
     await expect(service.attachSession({
       attemptId: firstClaim.attempt.id,
       processorSessionId: "session-one",
@@ -173,6 +190,7 @@ describe("PaymentAttemptService with MemStorage", () => {
       idempotencyKey: KEY_TWO,
     });
     if (secondClaim.kind !== "claimed") throw new Error("expected second claim");
+    await recordExpected(secondClaim.attempt.id);
     await expect(service.attachSession({
       attemptId: secondClaim.attempt.id,
       processorSessionId: "session-one",
@@ -189,6 +207,7 @@ describe("PaymentAttemptService with MemStorage", () => {
       idempotencyKey: KEY_ONE,
     });
     if (claim.kind !== "claimed") throw new Error("expected claim");
+    await recordExpected(claim.attempt.id);
     await service.attachSession({
       attemptId: claim.attempt.id,
       processorSessionId: "session-approved",
@@ -257,6 +276,7 @@ describe("PaymentAttemptService with MemStorage", () => {
         idempotencyKey: KEY_ONE,
       });
       if (claim.kind !== "claimed") throw new Error("expected claim");
+      await recordExpected(claim.attempt.id);
       await service.attachSession({
         attemptId: claim.attempt.id,
         processorSessionId: `session-${outcome}`,
@@ -330,6 +350,7 @@ describe("PaymentAttemptService with MemStorage", () => {
     if (declinedShareOne.kind !== "claimed") {
       throw new Error("expected declined share claim");
     }
+    await recordExpected(declinedShareOne.attempt.id);
     await service.attachSession({
       attemptId: declinedShareOne.attempt.id,
       processorSessionId: "session-share-one-declined",
@@ -366,6 +387,7 @@ describe("PaymentAttemptService with MemStorage", () => {
       kind: "target-conflict",
       reason: "split-target-required",
     });
+    await recordExpected(shareTwo.attempt.id);
     await service.attachSession({
       attemptId: shareTwo.attempt.id,
       processorSessionId: "session-share-two",
@@ -411,6 +433,8 @@ describe("PaymentAttemptService with MemStorage", () => {
     if (shareOne.kind !== "claimed" || shareThree.kind !== "claimed") {
       throw new Error("expected remaining share claims");
     }
+    await recordExpected(shareOne.attempt.id);
+    await recordExpected(shareThree.attempt.id);
     await Promise.all([
       service.attachSession({
         attemptId: shareOne.attempt.id,

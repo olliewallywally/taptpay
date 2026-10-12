@@ -1338,7 +1338,7 @@ export default function RetailTerminalViewCore({
       <div className={`tp-toast${toastMsg ? ' show' : ''}`}>{toastMsg}</div>
 
       {/* ── Active Stack Full-Page Overlay ── */}
-      <div aria-hidden={!stackExpanded} inert={stackExpanded ? undefined : ''} style={{
+      <div aria-hidden={!stackExpanded} {...inertWhen(!stackExpanded)} style={{
         position: 'absolute', inset: 0, zIndex: 55,
         background: OFFW,
         transform: stackExpanded ? 'translateY(0)' : 'translateY(100%)',

@@ -1,5 +1,12 @@
 # R3 durability foundation handoff
 
+Latest follow-up: R2 `14942392` is now integrated on this working branch.
+The original R3 expansion is byte-identical 0036, followed by canonical retail
+alignment 0037. See [integration ADR](decisions/2026-10-12-r2-r3-schema-integration.md)
+and [verification](evidence/remediation-v2-2/r3/R2-INTEGRATION-REVIEW-2026-10-12.md).
+The original foundation evidence below retains its original migration scope;
+new combined evidence is recorded separately. R3 is still open.
+
 Branch `fix/qwen-aligned-20261010`, base `e408f597`.
 Claude owns all of R2; Codex owns R3. The foundation is implemented and tested.
 **R3 remains open.** No R3 worker timer, notification registration, provider

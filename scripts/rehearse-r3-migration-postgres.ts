@@ -21,13 +21,14 @@ assertSafePostgresVerifierEnvironment({ testDatabaseUrl, configuredDatabaseUrl: 
   marker: process.env.TAPTPAY_TEST_DATABASE });
 const url = new URL(testDatabaseUrl);
 assert.equal(url.hostname, "127.0.0.1", "this populated synthetic rehearsal requires an isolated loopback server");
-assert.match(url.pathname, /^\/r3_(scratch|snapshot|restore)$/);
+assert.match(url.pathname, /^\/r3_(scratch|snapshot|restore|integrated_scratch|integrated_snapshot|integrated_restore)$/);
 await import("../server/__tests__/support/test-env");
 const runner = await import("../server/migrate");
 const inventoryTools = await import("../server/upload-ownership-inventory");
 const client = new pg.Client({ connectionString: testDatabaseUrl });
 await client.connect();
-const expansion = "0034_durable_payment_reconciliation.sql";
+const expansion = "0034_payment_attempt_expected_values.sql";
+const evidencePrefix=url.pathname.includes('integrated_') ? 'integrated-' : '';
 try {
   const restored = process.argv.includes("--restored");
   const before = process.argv.includes("--before-expansion");
@@ -75,8 +76,8 @@ try {
     if (restored) assert.deepEqual(count.rows[0], { property: 1000, trades: 1000, quotes:1000 });
     const fingerprint = buildFingerprint(await collectSchema(client));
     const afterCounts=await readPaymentDurabilityPreflight(client);
-    await writeFile(`/tmp/taptpay-r3-postgres/${restored ? 'restored' : 'scratch'}-preflight.json`,JSON.stringify({before:beforeCounts,after:afterCounts},null,2));
-    await writeFile(`/tmp/taptpay-r3-postgres/${restored ? "restored" : "scratch"}-fingerprint.json`, JSON.stringify(fingerprint, null, 2));
+    await writeFile(`/tmp/taptpay-r3-postgres/${evidencePrefix}${restored ? 'restored' : 'scratch'}-preflight.json`,JSON.stringify({before:beforeCounts,after:afterCounts},null,2));
+    await writeFile(`/tmp/taptpay-r3-postgres/${evidencePrefix}${restored ? "restored" : "scratch"}-fingerprint.json`, JSON.stringify(fingerprint, null, 2));
     console.log(JSON.stringify({ applied: result.appliedNow, counts: count.rows[0], fingerprintSaved: true }));
   }
 } finally { await client.end(); }

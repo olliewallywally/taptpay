@@ -15,7 +15,7 @@ import {
 } from "./storage";
 import { TUTORIAL_PAGE_KEYS, isTutorialPageKey } from "@shared/tutorial";
 import { inviteTeamMemberSchema, acceptInviteSchema, retailTransactionCreateRequestSchema, cashSaleRequestSchema, updateMerchantDetailsSchema, updateThemeSchema, updateDailyGoalSchema, forgotPasswordSchema, resetPasswordSchema, changePasswordSchema, newPasswordSchema, createRefundSchema, insertRefundSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, merchantOnboardingSchema, pushNotificationPreferencesSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createClientProfileSchema, updateClientProfileSchema, createQuoteSchema, acceptQuoteSchema, createJobInvoiceSchema, markJobPaidExternalSchema, sendJobBalanceSchema, createJobScheduleSchema, updateJobScheduleSchema, updateTradeReminderSettingsSchema, updateTradeGstSettingsSchema } from "@shared/schema";
-import { isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, getWindcaveEnv, submitGooglePayToken, createAttendedSession, submitTapToPayToken, createCardStorageSession, queryStoredCardSession, chargeStoredCard } from "./windcave";
+import { isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, getWindcaveEnv, submitGooglePayToken, createAttendedSession, submitTapToPayToken, createCardStorageSession, queryStoredCardSession, chargeStoredCard, currentProviderEnvironment, type WindcaveExpectedOutcome } from "./windcave";
 import { authenticateUser, checkPasswordEvenly, passwordCheckBudget, authenticateToken, createUser, loginForUserId, sessionLoginForUserRow, isAccountOwner, requestPasswordReset, resetPassword, validateResetToken, type AuthenticatedRequest, logSecurityEvent, syncVerifiedMerchants, startBusinessSession, startAdminSession, endAuthSession, endLoginSessions, csrfTokenForRequest, clearSessionCookie, hasSessionCookie, readBusinessSession, respondAuthBackendUnavailable, isStreamSessionActive, liveBusinessSessionLogin } from "./auth";
 import {
   HANDOFF_CODE_TTL_MS, clearSignInCookie, googleVerifiedEmail, handoffCodeHash, newHandoffCode, readCookie,
@@ -25,6 +25,7 @@ import { type SignInRealm, type TooManyWhat, boardPrintBucket, confirmEmailBucke
 import { BOARD_PRINT_JSON_LIMIT, boardPrintRequestSchema, decodeBoardPrintPdf } from "./board-print";
 import { clientAddressForLimits, limitAddress } from "./client-address";
 import { tapToPayAmountSchema, tapToPayRequestSchema } from "./tap-to-pay-request";
+import { parseCentsExact } from "./windcave-query";
 import { ACCOUNT_EMAIL_REPLY_FLOOR_MS, SIGN_UP_REPLY_FLOOR_MS, replyNoSoonerThan, replyStart } from "./even-reply";
 import { deviceKnowsEmail, markSignInDevice, readSignInDevice, signInBucketFor, signInDeviceCookie, type SignInDevice } from "./sign-in-device";
 import { generateReceiptPdf } from "./pdf-generator";
@@ -226,10 +227,6 @@ const invoiceAjaxUrlCache = new Map<string, {
 }>();
 
 // Validate that a URL belongs to a known Windcave domain before using it with auth headers.
-function assertWindcaveUrl(url: string): void {
-  const allowed = /^https:\/\/(?:uat|sec)\.windcave\.com\//;
-  if (!allowed.test(url)) throw new Error(`Blocked non-Windcave URL: ${url}`);
-}
 
 // Rate limiting: Track requests per IP
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
@@ -2107,6 +2104,122 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     amount: z.string().regex(/^\d+(\.\d{1,2})?$/).optional(),
   }).strict();
 
+  // ── R2-T5 (plan §9.5): what each flow's provider outcome must match ──────────
+  // A null answer means the payment cannot be verified; the caller leaves it
+  // reconcilable and queryWindcaveSession never asks the provider.
+
+  /** A retail token attempt: its stored expected values (R2-T4), or, for an attempt
+   * claimed before migration 0034, the values its session was opened with. */
+  async function expectedForTokenAttempt(
+    attempt: {
+      id: string;
+      transactionId: number;
+      shareIndex: number;
+      expectedAmountCents?: number | null;
+      expectedCurrency?: string | null;
+      expectedMerchantReference?: string | null;
+      providerEnvironment?: "uat" | "production" | null;
+    },
+    sessionId: string,
+  ): Promise<WindcaveExpectedOutcome | null> {
+    if (
+      attempt.expectedAmountCents != null && attempt.expectedCurrency &&
+      attempt.expectedMerchantReference && attempt.providerEnvironment
+    ) {
+      return {
+        sessionId,
+        amountCents: attempt.expectedAmountCents,
+        currency: attempt.expectedCurrency,
+        merchantReference: attempt.expectedMerchantReference,
+        providerEnvironment: attempt.providerEnvironment,
+      };
+    }
+    const transaction = await storage.getTransaction(attempt.transactionId);
+    if (!transaction) return null;
+    let amount: string = transaction.price;
+    if (attempt.shareIndex > 0) {
+      const splits = await storage.getSplitPaymentsByTransaction(transaction.id);
+      const share = splits.find((split: { splitIndex: number }) => split.splitIndex === attempt.shareIndex);
+      if (!share) return null;
+      amount = share.amount;
+    }
+    const cents = parseCentsExact(amount);
+    if (!cents.ok) return null;
+    return {
+      sessionId,
+      amountCents: cents.cents,
+      currency: "NZD",
+      merchantReference: `TAPT_${attempt.id}`,
+      providerEnvironment: currentProviderEnvironment(),
+    };
+  }
+
+  /** A numbered sale: its price, or the split the next payment pays, with the
+   * reference /api/transactions/:id/pay sends (TXN_<sale> / SPLIT_<split>_TXN_<sale>). */
+  async function expectedForNumberedSale(
+    transaction: { id: number; price: string; isSplit?: boolean | null },
+    sessionId: string,
+  ): Promise<WindcaveExpectedOutcome | null> {
+    const split = transaction.isSplit ? await storage.getNextPendingSplit(transaction.id) : null;
+    if (transaction.isSplit && !split) return null;
+    const cents = parseCentsExact(split ? split.amount : transaction.price);
+    if (!cents.ok) return null;
+    return {
+      sessionId,
+      amountCents: cents.cents,
+      currency: "NZD",
+      merchantReference: split ? `SPLIT_${split.id}_TXN_${transaction.id}` : `TXN_${transaction.id}`,
+      providerEnvironment: currentProviderEnvironment(),
+    };
+  }
+
+  /** A property/trades invoice: the amount recorded with a split share's session
+   * (0030), or the invoice amount, with the reference /api/checkout/:token/session sends. */
+  async function expectedForCheckoutInvoice(
+    invoice: { id: string; amountCents: number; checkoutVertical?: "property" | "trades"; splitEnabled?: boolean | null; splitCount?: number | null },
+    sessionId: string,
+  ): Promise<WindcaveExpectedOutcome | null> {
+    const isSplit = !!(invoice.splitEnabled && invoice.splitCount && invoice.splitCount > 1);
+    let amountCents = invoice.amountCents;
+    if (isSplit) {
+      const opened = await storage.getInvoiceSplitSession(sessionId);
+      const forThisInvoice = opened && (invoice.checkoutVertical === "trades"
+        ? opened.jobInvoiceId === invoice.id
+        : opened.rentInvoiceId === invoice.id);
+      if (!opened || !forThisInvoice) return null;
+      amountCents = opened.amountCents;
+    }
+    if (!Number.isSafeInteger(amountCents) || amountCents < 0) return null;
+    return {
+      sessionId,
+      amountCents,
+      currency: "NZD",
+      merchantReference: (invoice.checkoutVertical === "trades" ? "JOB-" : "RENT-") + invoice.id.slice(0, 8).toUpperCase(),
+      providerEnvironment: currentProviderEnvironment(),
+    };
+  }
+
+  /** R2-T6 (plan §9.4): a retail provider query's outcome as a sanitized code. */
+  function reconciliationCode(result: { success: boolean; approved?: boolean; windcaveTransactionId?: string; error?: string }): string {
+    if (result.success && result.approved && !result.windcaveTransactionId) return "approved_without_transaction_id";
+    if (result.success) return result.approved ? "approved" : "declined";
+    // The wrapper's failures are already fixed strings (R2-T6, RF-6); reduce them to a code.
+    const code = String(result.error ?? "unknown").toLowerCase().replace(/[^a-z0-9_:]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 64);
+    return /^[a-z]/.test(code) ? code : "unknown";
+  }
+
+  /** Leaves the query's outcome on the attempt; failing to record never blocks a payment. */
+  async function recordTokenReconciliation(
+    attemptId: string,
+    result: { success: boolean; approved?: boolean; windcaveTransactionId?: string; error?: string },
+  ) {
+    try {
+      await paymentAttempts.recordReconciliation({ attemptId, code: reconciliationCode(result) });
+    } catch {
+      console.error("Token payment reconciliation code was not recorded");
+    }
+  }
+
   function tokenAttemptOutcome(attempt: { state: string; receiptShare: number | null }) {
     const outcome = ["approved", "declined", "cancelled"].includes(attempt.state)
       ? attempt.state as "approved" | "declined" | "cancelled"
@@ -2136,7 +2249,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
 
     if (!isWindcaveConfigured()) return { kind: "pending" as const };
-    const result = await queryWindcaveSession(attempt.processorSessionId);
+    const result = await queryWindcaveSession(
+      attempt.processorSessionId,
+      await expectedForTokenAttempt(claim.attempt, attempt.processorSessionId),
+    );
+    await recordTokenReconciliation(claim.attempt.id, result);
     if (!result.success || (result.approved && !result.windcaveTransactionId)) {
       return { kind: "pending" as const };
     }
@@ -2293,6 +2410,21 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           code: "PAYMENT_PROVIDER_UNAVAILABLE",
           message: "Payment gateway unavailable. Please try again.",
         });
+      }
+      // R2-T4 (plan §9.4): fix what Windcave must confirm before the session exists.
+      const expectedCents = parseCentsExact(paymentAmount);
+      if (!expectedCents.ok) {
+        return res.status(409).json({ message: "Payment amount cannot be verified" });
+      }
+      const expected = await paymentAttempts.recordExpectedValues({
+        attemptId: claim.attempt.id,
+        amountCents: expectedCents.cents,
+        currency: "NZD",
+        merchantReference,
+        providerEnvironment: config.paymentMode === "production" ? "production" : "uat",
+      });
+      if (expected.kind !== "recorded" && expected.kind !== "reused") {
+        return res.status(409).json({ message: "Payment session could not be prepared" });
       }
       const sessionResult = await createWindcaveSession(
           xId,
@@ -2478,7 +2610,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!isWindcaveConfigured()) {
         return res.status(503).json({ message: "Payment outcome is still being reconciled" });
       }
-      const queryResult = await queryWindcaveSession(validation.data.sessionId);
+      const queryResult = await queryWindcaveSession(
+        validation.data.sessionId,
+        await expectedForTokenAttempt(prepared.attempt, validation.data.sessionId),
+      );
+      await recordTokenReconciliation(prepared.attempt.id, queryResult);
       if (!queryResult.success) {
         return res.status(503).json({ message: "Payment outcome is still being reconciled" });
       }
@@ -2530,31 +2666,23 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!isWindcaveConfigured()) {
         return res.status(503).json({ message: "Payment outcome is still being reconciled" });
       }
-      let queryResult: { success: boolean; approved?: boolean; windcaveTransactionId?: string; error?: string };
       {
         const cached = tokenAttemptSessionCache.get(prepared.attempt.id);
         const ajaxUrl = prepared.firstFinalizer
           ? cached?.ajaxSubmitGooglePayUrl
           : undefined;
+        // A replay never resubmits the wallet token, so recovery cannot double charge.
         if (ajaxUrl && validation.data.googlePayToken) {
-          assertWindcaveUrl(ajaxUrl);
-          const submitted = await submitGooglePayToken(ajaxUrl, validation.data.googlePayToken);
-          if (submitted.error !== "3DS_REQUIRED") {
-            queryResult = {
-              success: submitted.success,
-              approved: submitted.approved,
-              windcaveTransactionId: submitted.windcaveTransactionId,
-              error: submitted.error,
-            };
-          } else {
-            queryResult = await queryWindcaveSession(validation.data.sessionId);
-          }
-        } else {
-          // A replay never resubmits the wallet token. Query the already-bound
-          // processor session so recovery cannot double charge.
-          queryResult = await queryWindcaveSession(validation.data.sessionId);
+          await submitGooglePayToken(ajaxUrl, validation.data.googlePayToken);
         }
       }
+      // R2-T5 (RF-1): submitting the token never decides the outcome; the verified
+      // session query does, whatever the wallet submission answered.
+      const queryResult = await queryWindcaveSession(
+        validation.data.sessionId,
+        await expectedForTokenAttempt(prepared.attempt, validation.data.sessionId),
+      );
+      await recordTokenReconciliation(prepared.attempt.id, queryResult);
       if (!queryResult.success) {
         return res.status(503).json({ message: "Payment outcome is still being reconciled" });
       }
@@ -2607,7 +2735,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
 
     if (!isWindcaveConfigured()) return { kind: "pending" as const, attempt: claim.attempt };
-    const queryResult = await queryWindcaveSession(attempt.processorSessionId);
+    const queryResult = await queryWindcaveSession(
+      attempt.processorSessionId,
+      await expectedForTokenAttempt(claim.attempt, attempt.processorSessionId),
+    );
+    await recordTokenReconciliation(claim.attempt.id, queryResult);
     if (!queryResult.success) {
       return { kind: "pending" as const, attempt: claim.attempt };
     }
@@ -2615,11 +2747,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       return { kind: "pending" as const, attempt: claim.attempt };
     }
 
-    const outcome = queryResult.approved
-      ? "approved" as const
-      : resultHint === "cancelled"
-        ? "cancelled" as const
-        : "declined" as const;
+    // R2-T5: the provider's verified answer decides; the browser's `result` is a hint
+    // and no longer chooses between "cancelled" and "declined".
+    void resultHint;
+    const outcome = queryResult.approved ? "approved" as const : "declined" as const;
     const settled = await persistTokenOutcome({
       attempt: claim.attempt,
       sessionId: attempt.processorSessionId,
@@ -3370,27 +3501,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
 
       if (sessionResult.alreadyComplete) {
-        // Session already processed (duplicate X-ID scenario)
-        const status = sessionResult.approved ? 'completed' : 'failed';
-        const finalTxn = await storage.updateTransactionStatus(transactionId, status, sessionResult.windcaveTransactionId);
-        if (finalTxn) {
-          broadcastToStone(finalTxn.merchantId!, finalTxn.taptStoneId, { type: 'transaction_updated', transaction: finalTxn });
-          sendPushToMerchant(finalTxn.merchantId!, sessionResult.approved
-            ? {
-                type: "payment_received",
-                itemName: finalTxn.itemName,
-                amount: finalTxn.price,
-                transactionId: finalTxn.id,
-              }
-            : {
-                type: "payment_failed",
-                reason: "failed",
-                itemName: finalTxn.itemName,
-                amount: finalTxn.price,
-                transactionId: finalTxn.id,
-              }).catch(() => {});
-        }
-        return res.json({ status, message: sessionResult.approved ? 'Payment already completed' : 'Payment was declined' });
+        // Duplicate X-ID (a create retried after its reply was lost). R2-T5: the reply
+        // verifies nothing, so it settles nothing; it used to settle the sale from the
+        // reply's own claim. The session is recorded so the notification or callback
+        // settles it through a verified query.
+        await storage.updateTransactionWindcaveSession(transactionId, sessionResult.sessionId!, 'pending', xId);
+        return res.status(503).json({ message: 'Payment outcome is still being reconciled' });
       }
 
       // Save session tracking info to the transaction
@@ -3533,7 +3649,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!isWindcaveConfigured()) {
         return res.status(503).json({ code: "PAYMENT_PROVIDER_UNAVAILABLE", message: "Payment outcome is unavailable" });
       }
-      const queryResult = await queryWindcaveSession(sessionId);
+      const queryResult = await queryWindcaveSession(sessionId, await expectedForNumberedSale(transaction, sessionId));
+      // R2-T5: only a verified approval or decline settles; anything else (a timeout,
+      // a session still open, a mismatch) used to be recorded here as a decline.
+      if (!queryResult.success || (queryResult.approved && !queryResult.windcaveTransactionId)) {
+        return res.status(503).json({ message: "Payment outcome is still being reconciled" });
+      }
 
       const method = paymentMethod === "apple_pay" ? "apple_pay" : "card";
       const result = await finaliseHostedPayment(transactionId, queryResult.approved === true, queryResult.windcaveTransactionId, method);
@@ -3573,43 +3694,26 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(403).json({ message: "Session ID mismatch" });
       }
 
-      let approved = false;
-      let windcaveTransactionId: string | undefined;
-
       if (!isWindcaveConfigured()) {
         return res.status(503).json({ code: "PAYMENT_PROVIDER_UNAVAILABLE", message: "Payment outcome is unavailable" });
-      } else {
-        // Look up the AJAX URL from server-side cache (set at session creation)
-        const cachedUrls = sessionAjaxUrlCache.get(transactionId);
-        const ajaxUrl = cachedUrls?.ajaxSubmitGooglePayUrl;
+      }
+      // Look up the AJAX URL from server-side cache (set at session creation)
+      const cachedUrls = sessionAjaxUrlCache.get(transactionId);
+      const ajaxUrl = cachedUrls?.ajaxSubmitGooglePayUrl;
+      if (ajaxUrl && googlePayToken) {
+        await submitGooglePayToken(ajaxUrl, googlePayToken);
+      }
+      // Clear cache entry after use
+      sessionAjaxUrlCache.delete(transactionId);
 
-        if (ajaxUrl && googlePayToken) {
-          // Validate it's a Windcave domain before forwarding credentials
-          assertWindcaveUrl(ajaxUrl);
-          const gpayResult = await submitGooglePayToken(ajaxUrl, googlePayToken);
-          if (gpayResult.error === "3DS_REQUIRED") {
-            // 3DS required — fall back to session query to determine outcome
-            console.warn(`[googlepay-complete] 3DS required for txn ${transactionId}, querying session`);
-            const queryResult = await queryWindcaveSession(sessionId);
-            approved = queryResult.approved === true;
-            windcaveTransactionId = queryResult.windcaveTransactionId;
-          } else {
-            approved = gpayResult.approved === true;
-            windcaveTransactionId = gpayResult.windcaveTransactionId;
-          }
-        } else {
-          // URL not cached (session may have been created before this deploy) — fall back to query
-          console.warn(`[googlepay-complete] No cached AJAX URL for txn ${transactionId}, falling back to session query`);
-          const queryResult = await queryWindcaveSession(sessionId);
-          approved = queryResult.approved === true;
-          windcaveTransactionId = queryResult.windcaveTransactionId;
-        }
-
-        // Clear cache entry after use
-        sessionAjaxUrlCache.delete(transactionId);
+      // R2-T5 (RF-1): the wallet submission never decides the outcome; the verified
+      // session query does, and only a verified approval or decline settles.
+      const queryResult = await queryWindcaveSession(sessionId, await expectedForNumberedSale(transaction, sessionId));
+      if (!queryResult.success || (queryResult.approved && !queryResult.windcaveTransactionId)) {
+        return res.status(503).json({ message: "Payment outcome is still being reconciled" });
       }
 
-      const result = await finaliseHostedPayment(transactionId, approved, windcaveTransactionId, "google_pay");
+      const result = await finaliseHostedPayment(transactionId, queryResult.approved === true, queryResult.windcaveTransactionId, "google_pay");
       return res.json(result);
     } catch (error) {
       console.error("googlepay-complete error:", error);
@@ -4479,30 +4583,29 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       // Per Windcave pseudo code: sessionId is a URL query parameter (Request.Url.getParameter("sessionid"))
       const sessionId = (req.query?.sessionid as string) || (req.query?.sessionId as string) || req.body?.sessionId || req.body?.sessionid;
-      console.log(`[WINDCAVE_NOTIF] ${req.method} notification received, sessionId=${sessionId}, query=${JSON.stringify(req.query)}`);
+      // R2-T6 (RF-6): the provider's session ID, the raw query and the body are never
+      // logged; the internal sale ID is, once the session has found one.
       if (!sessionId) {
-        console.warn('[WINDCAVE_NOTIF] No sessionId found. Query:', req.query, 'Body:', req.body);
+        console.warn('[WINDCAVE_NOTIF] A notification arrived without a session ID');
         return;
       }
 
-      console.log(`[WINDCAVE_NOTIF] Received for session ${sessionId}`);
-
       const transaction = await storage.getTransactionByWindcaveSessionId(sessionId);
       if (!transaction) {
-        console.warn(`[WINDCAVE_NOTIF] No transaction found for session ${sessionId}`);
+        console.warn('[WINDCAVE_NOTIF] No sale holds the notified session');
         return;
       }
 
       // Only process if still pending (atomic state transition)
       if (transaction.windcaveSessionState !== 'pending') {
-        console.log(`[WINDCAVE_NOTIF] Session ${sessionId} already processed (state: ${transaction.windcaveSessionState})`);
+        console.log(`[WINDCAVE_NOTIF] Sale ${transaction.id} already processed (state: ${transaction.windcaveSessionState})`);
         return;
       }
 
       // Without a configured provider there is nothing to reconcile against —
       // do not even take the transient "processing" lock.
       if (!isWindcaveConfigured()) {
-        console.log(`[WINDCAVE_NOTIF] Provider not configured, ignoring notification for ${sessionId}`);
+        console.log(`[WINDCAVE_NOTIF] Provider not configured, ignoring the notification for sale ${transaction.id}`);
         return;
       }
 
@@ -4511,11 +4614,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       let queryResult;
       try {
-        queryResult = await queryWindcaveSession(sessionId);
+        queryResult = await queryWindcaveSession(sessionId, await expectedForNumberedSale(transaction, sessionId));
       } catch (error) {
         // Leaving 'processing' behind would make this session permanently
         // unreconcilable: the guard above refuses anything not 'pending'.
-        console.error(`[WINDCAVE_NOTIF] querySession threw for ${sessionId}:`, error);
+        console.error(`[WINDCAVE_NOTIF] The session query threw for sale ${transaction.id}:`, error);
         await storage.updateTransactionSessionState(transaction.id, 'pending');
         return;
       }
@@ -4523,7 +4626,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // Same condition the token flows use: an approval with no processor
       // transaction id is not a settlement we can record.
       if (!queryResult.success || (queryResult.approved && !queryResult.windcaveTransactionId)) {
-        console.error(`[WINDCAVE_NOTIF] querySession unusable for ${sessionId}:`, queryResult.error);
+        console.error(`[WINDCAVE_NOTIF] The session query was unusable for sale ${transaction.id}:`, queryResult.error);
         await storage.updateTransactionSessionState(transaction.id, 'pending');
         return;
       }
@@ -4610,7 +4713,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // Fallback: by sessionId (legacy / simulation)
       const sessionId = req.query.sessionid as string || req.query.sessionId as string;
 
-      console.log(`[WINDCAVE_CALLBACK] transactionId=${txnIdParam} sessionId=${sessionId} result=${resultParam}`);
+      // R2-T6 (RF-6): the browser's parameters (the provider's session ID among them) are
+      // never logged; the internal sale ID is, once found.
 
       let transaction: any = null;
 
@@ -4626,7 +4730,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // missing one is (R1-T3, P2.2's tenant-safe answer), where a 404 told a caller counting through
       // the numbers which ones were link sales.
       if (!transaction || isTokenAddressedTransaction(transaction)) {
-        console.warn(`[WINDCAVE_CALLBACK] No transaction found (txnId=${txnIdParam}, session=${sessionId})`);
+        console.warn('[WINDCAVE_CALLBACK] No sale found for a browser return');
         return res.redirect('/');
       }
 
@@ -4650,38 +4754,14 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.redirect(`/payment/result/${txnId}?status=pending`);
       }
 
-      // Handle cancelled — don't charge, just update status.
-      // Guard: only trust the cancel signal if the sessionId in the URL matches what
-      // we stored for this transaction, preventing a DoS where an attacker fires
-      // ?transactionId=X&result=cancelled with an arbitrary/missing sessionId.
+      // A cancel signal comes from the browser. R2-T5: it may show the payer the
+      // cancelled page, but it never settles the sale; only a verified query (below,
+      // or the provider's notification) does. Previously it marked the sale failed,
+      // which a payer could do after paying.
       if (resultParam === 'cancelled') {
-        const cancelSessionId = req.query.sessionid as string || req.query.sessionId as string;
         const sessionMatches =
-          cancelSessionId && transaction.windcaveSessionId &&
-          cancelSessionId === transaction.windcaveSessionId;
-        if (sessionMatches && transaction.windcaveSessionState === 'pending') {
-          await storage.updateTransactionStatus(txnId, 'failed');
-          await storage.updateTransactionSessionState(txnId, 'declined');
-          broadcastToStone(transaction.merchantId!, transaction.taptStoneId, {
-            type: 'transaction_updated',
-            transaction: { ...transaction, status: 'failed' }
-          });
-          sendPushToMerchant(transaction.merchantId!, {
-            type: "payment_failed",
-            reason: "cancelled",
-            itemName: transaction.itemName,
-            amount: transaction.price,
-            transactionId: transaction.id,
-          }).catch(() => {});
-          return res.redirect(`/payment/result/${txnId}?status=cancelled`);
-        } else if (!sessionMatches) {
-          // Mismatched or absent sessionId — possible DoS probe, not a real browser redirect.
-          // Do not update state; redirect neutrally so the notification handler resolves it.
-          console.warn(`[WINDCAVE_CALLBACK] Ignoring cancel for txn ${txnId} — sessionId mismatch (got=${cancelSessionId}, expected=${transaction.windcaveSessionId})`);
-          return res.redirect(`/payment/result/${txnId}?status=pending`);
-        }
-        // Already processed (not pending) — show the existing result
-        return res.redirect(`/payment/result/${txnId}?status=cancelled`);
+          sessionId && transaction.windcaveSessionId && sessionId === transaction.windcaveSessionId;
+        return res.redirect(`/payment/result/${txnId}?status=${sessionMatches ? 'cancelled' : 'pending'}`);
       }
 
       // Notification hasn't arrived yet — query the persisted processor session.
@@ -4697,11 +4777,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       let queryResult;
       try {
-        queryResult = await queryWindcaveSession(sessionToQuery);
+        queryResult = await queryWindcaveSession(sessionToQuery, await expectedForNumberedSale(transaction, sessionToQuery));
       } catch (error) {
         // A throwing provider client must not strand the session in 'processing',
         // where the notification handler refuses it forever as already-handled.
-        console.error(`[WINDCAVE_CALLBACK] querySession threw for ${sessionToQuery}:`, error);
+        console.error(`[WINDCAVE_CALLBACK] The session query threw for sale ${txnId}:`, error);
         await storage.updateTransactionSessionState(txnId, 'pending');
         return res.redirect(`/payment/result/${txnId}?status=pending`);
       }
@@ -4709,7 +4789,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // Same condition the token flows use: an approval with no processor
       // transaction id is not a settlement we can record.
       if (!queryResult.success || (queryResult.approved && !queryResult.windcaveTransactionId)) {
-        console.error(`[WINDCAVE_CALLBACK] querySession unusable for ${sessionToQuery}:`, queryResult.error);
+        console.error(`[WINDCAVE_CALLBACK] The session query was unusable for sale ${txnId}:`, queryResult.error);
         await storage.updateTransactionSessionState(txnId, 'pending');
         return res.redirect(`/payment/result/${txnId}?status=pending`);
       }
@@ -8066,11 +8146,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         });
       }
 
-      // Duplicate X-ID — Windcave reports the session already completed; finalize now
-      // and tell the page to show its success/declined state without a second submit.
+      // Duplicate X-ID (a create retried after its reply was lost). R2-T5: the reply
+      // verifies nothing, so it settles nothing; the session recorded above is settled
+      // by the notification through a verified query.
       if (sessionResult.alreadyComplete) {
-        await finalizeCheckoutInvoice(invoice, !!sessionResult.approved, sessionResult.windcaveTransactionId, sessionResult.sessionId);
-        return res.json({ alreadyComplete: true, approved: !!sessionResult.approved });
+        return res.status(503).json({ message: "Payment outcome is still being reconciled" });
       }
 
       invoiceAjaxUrlCache.set(token, {
@@ -8114,8 +8194,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!isWindcaveConfigured()) {
         return res.status(503).json({ code: "PAYMENT_PROVIDER_UNAVAILABLE", message: "Payment outcome is unavailable" });
       }
-      const queryResult = await queryWindcaveSession(sessionId);
+      // R2-T5: settles only on an outcome verified against what this invoice expected;
+      // anything else (pending, unknown, mismatch) stays reconcilable, never a decline.
+      const queryResult = await queryWindcaveSession(sessionId, await expectedForCheckoutInvoice(invoice, sessionId));
       invoiceAjaxUrlCache.delete(token);
+      if (!queryResult.success || (queryResult.approved && !queryResult.windcaveTransactionId)) {
+        return res.status(503).json({ message: "Payment outcome is still being reconciled" });
+      }
       const updated = await finalizeCheckoutInvoice(invoice, queryResult.approved === true, queryResult.windcaveTransactionId, sessionId);
       return res.json({
         approved: queryResult.approved === true,
@@ -8148,30 +8233,19 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(403).json({ message: "Session ID mismatch" });
       }
 
-      let approved = false;
-      let windcaveTransactionId: string | undefined;
       if (!isWindcaveConfigured()) {
         return res.status(503).json({ code: "PAYMENT_PROVIDER_UNAVAILABLE", message: "Payment outcome is unavailable" });
-      } else {
-        const ajaxUrl = invoiceAjaxUrlCache.get(token)?.ajaxSubmitGooglePayUrl;
-        if (ajaxUrl && googlePayToken) {
-          assertWindcaveUrl(ajaxUrl);
-          const gpayResult = await submitGooglePayToken(ajaxUrl, googlePayToken);
-          if (gpayResult.error === "3DS_REQUIRED") {
-            const queryResult = await queryWindcaveSession(sessionId);
-            approved = queryResult.approved === true;
-            windcaveTransactionId = queryResult.windcaveTransactionId;
-          } else {
-            approved = gpayResult.approved === true;
-            windcaveTransactionId = gpayResult.windcaveTransactionId;
-          }
-        } else {
-          const queryResult = await queryWindcaveSession(sessionId);
-          approved = queryResult.approved === true;
-          windcaveTransactionId = queryResult.windcaveTransactionId;
-        }
-        invoiceAjaxUrlCache.delete(token);
       }
+      const ajaxUrl = invoiceAjaxUrlCache.get(token)?.ajaxSubmitGooglePayUrl;
+      if (ajaxUrl && googlePayToken) await submitGooglePayToken(ajaxUrl, googlePayToken);
+      invoiceAjaxUrlCache.delete(token);
+      // R2-T5: the submit's own reply never settles; the verified session query does.
+      const queryResult = await queryWindcaveSession(sessionId, await expectedForCheckoutInvoice(invoice, sessionId));
+      if (!queryResult.success || (queryResult.approved && !queryResult.windcaveTransactionId)) {
+        return res.status(503).json({ message: "Payment outcome is still being reconciled" });
+      }
+      const approved = queryResult.approved === true;
+      const windcaveTransactionId = queryResult.windcaveTransactionId;
 
       const updated = await finalizeCheckoutInvoice(invoice, approved, windcaveTransactionId, sessionId);
       return res.json({
@@ -8202,7 +8276,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const sessionId = invoice.windcaveSessionId;
       let queryResult: any;
       if (!isWindcaveConfigured() || !sessionId) return res.redirect(back);
-      queryResult = await queryWindcaveSession(sessionId);
+      queryResult = await queryWindcaveSession(sessionId, await expectedForCheckoutInvoice(invoice, sessionId));
       if (queryResult.success) {
         await finalizeCheckoutInvoice(invoice, !!queryResult.approved, queryResult.windcaveTransactionId, sessionId);
       }
@@ -8217,18 +8291,18 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     res.status(200).send("OK"); // respond fast so Windcave stops retrying
     try {
       const sessionId = (req.query?.sessionid as string) || (req.query?.sessionId as string) || req.body?.sessionId || req.body?.sessionid;
-      if (!sessionId) { console.warn("[RENT_NOTIF] No sessionId", req.query); return; }
+      if (!sessionId) { console.warn("[RENT_NOTIF] A notification arrived without a session ID"); return; }
       let invoice = await storage.getInvoiceRentRequestByWindcaveSessionId(sessionId);
       if (!invoice) {
         // A split share's session is recorded, not pinned (0030).
         const opened = await storage.getInvoiceSplitSession(sessionId);
         if (opened?.rentInvoiceId) invoice = await storage.getInvoiceRentRequest(opened.rentInvoiceId);
       }
-      if (!invoice) { console.warn(`[RENT_NOTIF] No invoice for session ${sessionId}`); return; }
+      if (!invoice) { console.warn("[RENT_NOTIF] No invoice holds the notified session"); return; }
       if (["paid", "paid_external", "voided"].includes(invoice.status)) return; // already settled
       if (!isWindcaveConfigured()) return;
-      const queryResult = await queryWindcaveSession(sessionId);
-      if (!queryResult.success) { console.error(`[RENT_NOTIF] query failed for ${sessionId}:`, queryResult.error); return; }
+      const queryResult = await queryWindcaveSession(sessionId, await expectedForCheckoutInvoice({ ...invoice, checkoutVertical: "property" }, sessionId));
+      if (!queryResult.success) { console.error(`[RENT_NOTIF] The session query failed for invoice ${invoice.id}:`, queryResult.error); return; }
       await finalizeRentInvoice(invoice.id, !!queryResult.approved, queryResult.windcaveTransactionId, sessionId);
       console.log(`[RENT_NOTIF] invoice ${invoice.id} → ${queryResult.approved ? "paid" : "declined"}`);
     } catch (err) { console.error("[RENT_NOTIF] Error:", err); }
@@ -8239,19 +8313,19 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     res.status(200).send("OK");
     try {
       const sessionId = (req.query?.sessionid as string) || (req.query?.sessionId as string) || req.body?.sessionId || req.body?.sessionid;
-      if (!sessionId) { console.warn("[TRADES_NOTIF] No sessionId", req.query); return; }
+      if (!sessionId) { console.warn("[TRADES_NOTIF] A notification arrived without a session ID"); return; }
       let stored = await storage.getJobInvoiceByWindcaveSessionId(sessionId);
       if (!stored) {
         // A split share's session is recorded, not pinned (0030).
         const opened = await storage.getInvoiceSplitSession(sessionId);
         if (opened?.jobInvoiceId) stored = await storage.getJobInvoice(opened.jobInvoiceId);
       }
-      if (!stored) { console.warn(`[TRADES_NOTIF] No invoice for session ${sessionId}`); return; }
+      if (!stored) { console.warn("[TRADES_NOTIF] No invoice holds the notified session"); return; }
       if (["paid", "paid_external", "voided"].includes(stored.status)) return;
       if (!isWindcaveConfigured()) return;
-      const queryResult = await queryWindcaveSession(sessionId);
-      if (!queryResult.success) { console.error(`[TRADES_NOTIF] query failed for ${sessionId}:`, queryResult.error); return; }
       const invoice = { ...stored, checkoutVertical: "trades" as const };
+      const queryResult = await queryWindcaveSession(sessionId, await expectedForCheckoutInvoice(invoice, sessionId));
+      if (!queryResult.success) { console.error(`[TRADES_NOTIF] The session query failed for invoice ${invoice.id}:`, queryResult.error); return; }
       await finalizeCheckoutInvoice(invoice, !!queryResult.approved, queryResult.windcaveTransactionId, sessionId);
       console.log(`[TRADES_NOTIF] invoice ${invoice.id} -> ${queryResult.approved ? "paid" : "declined"}`);
     } catch (err) { console.error("[TRADES_NOTIF] Error:", err); }

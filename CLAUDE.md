@@ -26,10 +26,33 @@ motion tutorials and the owner decision to retain the property feed-under-dock
 layout. Historical October 11 evidence remains linked; actual devices, owner
 visual/golden acceptance and independent review are still open. Claude owns task 7
 and the stock hidden-focus review. The next-task readiness review is linked there.
+Then read `docs/HANDOFF-2026-10-11-review-findings-fixes.md`: an independent review of
+the last two pushes and its fixes on `ccr-e07e3100-0wm8kr`, including an open zoom-detection
+finding for the owner.
+
+**R2 has started (2026-10-11) on `ccr-e07e3100-0wm8kr` while Codex finishes R1.** Read
+`docs/evidence/remediation-v2-2/r2/R2-preflight-2026-10-11.md` and its §21.1 review pass
+before any R2 work. Passes 1–2 approved T1–T3 only; they are implemented (see
+`docs/evidence/remediation-v2-2/r2/R2-T1-T3-2026-10-11.md`). T4 is implemented as repository
+work (`docs/evidence/remediation-v2-2/r2/R2-T4-2026-10-12.md`); migration 0034 is applied nowhere.
+T5 is implemented on every enabled completion path, retail, numbered and invoice
+(`docs/evidence/remediation-v2-2/r2/R2-T5-2026-10-12.md`). T6 is implemented and the R2 exit
+record is `docs/evidence/remediation-v2-2/r2/R2-exit-2026-10-12.md`: repository work is complete
+for the enabled flows, but R2 is not closed until the owner items listed there are decided.
+T7 (migration 0035, unique X-ID) is implemented, applied nowhere. The owner will review R1–R2 together.
+
+**Before merging R2 and Codex's R3 (`fix/qwen-aligned-20261010`), read
+`docs/evidence/remediation-v2-2/R2-R3-SCHEMA-CONFLICT-2026-10-12.md`:** both added a migration
+0034, and R3's `payment_attempts` trigger would refuse R2's writes. The owner decides the
+representation. R4 (durable refunds) has a preflight at
+`docs/evidence/remediation-v2-2/r4/R4-preflight-2026-10-12.md`; its code waits on that decision.
 
 The active R3 handoff is `docs/HANDOFF-2026-10-12-r3-durability-foundation.md`.
-Claude owns all of R2; Codex owns R3. The foundation is inactive pending verified
-R2 integration and active caller convergence; the R3 phase is not closed.
+Claude owns all of R2; Codex owns R3. R2 `14942392` is integrated into the R3
+working branch, with canonical retail storage and migrations 0034–0037. Read
+`docs/decisions/2026-10-12-r2-r3-schema-integration.md` and the R3 integration
+review before further migration work. R3 route convergence remains incomplete;
+the phase is not closed, and there is no deployment approval.
 
 This program's established discipline: failing-tests-first; independently re-verify a prior
 pass's own claims before trusting them, the way every session in this program has had to;

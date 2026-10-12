@@ -117,9 +117,9 @@ const NUMBERED_SALE_FINDING =
 const CHECK_RATE_LIMIT =
   "checkRateLimit (100 a minute per normalized IPv4 address or IPv6 /64, counted in this server process only; until TRUST_PROXY_HOPS is set visitors behind a proxy share its address — R1-T4 phase B)";
 const SPLIT_SHARE_FINDING =
-  "A split share is marked paid without comparing what the provider charged with the share. Until 2026-09-26 the pay route let the customer choose the amount, so every share of a $100 sale could be paid with $0.01 and the sale showed fully paid (shown in the harness); the owner chose exact shares only, and the pay route now opens every session for exactly what is owed. What remains is one session settling twice (gap 11's replay; the read-then-write settlement, R3/C20); the amount check itself is R2/R3 (plan lines 870, 1511).";
+  "A split share is marked paid without comparing what the provider charged with the share. Until 2026-09-26 the pay route let the customer choose the amount, so every share of a $100 sale could be paid with $0.01 and the sale showed fully paid (shown in the harness); the owner chose exact shares only, and the pay route now opens every session for exactly what is owed. Since R2-T5 the provider's amount, currency and reference are compared with the share's before it counts (the verified query). What remains is one session settling twice (gap 11's replay; the read-then-write settlement, R3/C20).";
 const GAP11_REPLAY_FINDING =
-  "Gap 11 (known, escalated 2026-09-13): the finaliser re-settles on every call with the bound session, and after a share it resets the session to pending, so one approved session can complete the next share too. Closed by moving onto the payment_attempts engine (C3).";
+  "Gap 11 (known, escalated 2026-09-13): the finaliser re-settles on every call with the bound session (an unsplit sale is counted and pushed again). After a share it resets the session to pending; until R2-T5 one approved session could then complete the next share too, and now cannot, since the next share's reference differs from the one that session carries (r2-t5-split-share-replay.test.ts). Closed by moving onto the payment_attempts engine (C3).";
 
 // ── Invoice checkout (property rent and trades invoices): /api/checkout/* ──
 const CHECKOUT_TENANT_RULE =
@@ -281,13 +281,13 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       },
     ],
     input:
-      "state: an opaque return state, only resolved by its hash; result (query or body): read only to label a provider-declined outcome as cancelled rather than declined",
+      "state: an opaque return state, only resolved by its hash; result (query or body): read, and decides nothing (R2-T5: the verified provider outcome alone settles)",
     capability: "isWindcaveConfigured(): with no provider configured the attempt stays pending",
     entitlement: null,
     idempotency:
       "paymentAttempts.claimFinalization claims the attempt before the provider is queried; a terminal or conflicting attempt is left alone, so repeated or concurrent notifications settle it once",
     sideEffects:
-      "queries the provider for the attempt's session; on settlement, a live update and a push to the business (persistTokenOutcome, broadcastToStone)",
+      "queries the provider for the attempt's session and verifies the outcome against the attempt's expected values (R2-T5); on settlement, a live update and a push to the business (persistTokenOutcome, broadcastToStone)",
     successDto: PROVIDER_ACK,
     errorDisclosure: ["fixed"],
     controls: {
@@ -314,7 +314,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     idempotency:
       "only a sale whose session is still pending is processed, but pending → processing is a read then a write, not a claim (finding)",
     sideEffects:
-      "queries the provider; settles the sale or its next split share, counts the sale on the business, and sends the business a live update and a push",
+      "queries the provider; on an outcome verified against the sale's expected values (R2-T5) settles the sale or its next split share, counts the sale on the business, and sends the business a live update and a push",
     successDto: PROVIDER_ACK,
     errorDisclosure: ["fixed"],
     controls: {
@@ -325,7 +325,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     },
     findings: [
       "pending → processing is a read then a write, not an atomic claim: two simultaneous notifications for one session can both query the provider and both settle it (a second count increment, a second push). Plan 22.7 / R3 (C20) owns the single atomic finaliser.",
-      "Logs the raw query (with the session id), and the query and body when no session id is found, to the server log.",
+      "Until R2-T6 (2026-10-12) it logged the raw query (with the provider's session id), and the query and body when no session id was found; it now logs fixed text and the internal sale id only (r2-t6-provider-log-guard.test.ts).",
     ],
   },
 
@@ -450,7 +450,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     entitlement: null,
     idempotency:
       "a settled invoice (paid, paid externally, voided) is skipped; a split share is claimed atomically per session (storage.atomicClaimSplitShare), but a single payment is marked paid by a read then a write (finding)",
-    sideEffects: "queries the provider; when paid, emails the GST invoice (sendRentGstInvoices → sendGstInvoices)",
+    sideEffects: "queries the provider and settles only a verified outcome (R2-T5); when paid, emails the GST invoice (sendRentGstInvoices → sendGstInvoices)",
     successDto: PROVIDER_ACK,
     errorDisclosure: ["fixed"],
     controls: {
@@ -478,7 +478,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     idempotency:
       "a settled invoice is skipped; a split share is claimed atomically per session (storage.atomicClaimJobSplitShare), but a single payment is marked paid by a read then a write (finding)",
     sideEffects:
-      "queries the provider; when paid, sends the payment invoice (sendTradePaymentInvoice: email or SMS). The facts also list the rent path's GST email, which finalizeCheckoutInvoice can call, but this route always passes a trades invoice",
+      "queries the provider and settles only a verified outcome (R2-T5); when paid, sends the payment invoice (sendTradePaymentInvoice: email or SMS). The facts also list the rent path's GST email, which finalizeCheckoutInvoice can call, but this route always passes a trades invoice",
     successDto: PROVIDER_ACK,
     errorDisclosure: ["fixed"],
     controls: {
@@ -712,7 +712,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     idempotency:
       "paymentAttempts.claimFinalization: only the first finaliser submits the wallet token; a replay only queries the session, so it cannot charge twice",
     sideEffects:
-      "the first finaliser submits the Google Pay token to the provider's submit URL cached for this attempt (assertWindcaveUrl checks it is the provider's); otherwise queries the session; on settlement a live update and a push to the business",
+      "the first finaliser submits the Google Pay token to the provider's submit URL cached for this attempt (assertWindcaveUrl checks it is the provider's); every finaliser then queries the session, and only the verified outcome settles (R2-T5: never the submit's reply); on settlement a live update and a push to the business",
     successDto: "{ approved, outcome, receiptShare } (tokenAttemptOutcome)",
     errorDisclosure: ["fixed"],
     controls: {
@@ -732,7 +732,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       },
     ],
     input:
-      "state: an opaque return state, resolved by its hash; source: only 'hpp' is acted on; result: only 'cancelled' changes anything (a provider-declined outcome is labelled cancelled)",
+      "state: an opaque return state, resolved by its hash; source 'hpp' or any result marks a provider return; result decides nothing (R2-T5: the verified provider outcome alone settles)",
     capability: "isWindcaveConfigured() (unconfigured, the attempt stays pending)",
     entitlement: null,
     idempotency:
@@ -796,7 +796,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     idempotency:
       "a completed or processing sale is refused (409); otherwise every call creates a new provider session and binds it to the sale, replacing the last one",
     sideEffects:
-      "creates a payment session with the provider (createWindcaveSession); when the provider reports the session already complete, settles the sale (live update and push)",
+      "creates a payment session with the provider (createWindcaveSession); a duplicate-request reply binds its session and settles nothing (503: the notification or callback settles it by a verified query, R2-T5)",
     successDto: "the provider session id and its hosted-page and submit URLs (kept server-side too, and never taken back from a client)",
     errorDisclosure: ["input-issues"],
     controls: {
@@ -826,7 +826,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     errorDisclosure: ["fixed"],
     controls: {
       authenticity: `${NUMBER_AUTHENTICITY}, with the provider session id bound to it`,
-      replay: "settles again; after a share, the same session can complete the next one (gap 11)",
+      replay: "settles again (gap 11); after a share, the same session no longer completes the next one (R2-T5: its reference is the counted share's)",
       rate: "none — no limit",
     },
     findings: [NUMBERED_SALE_FINDING, GAP11_REPLAY_FINDING, SPLIT_SHARE_FINDING],
@@ -845,14 +845,14 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     capability: "isWindcaveConfigured() (503 while unconfigured)",
     entitlement: null,
     idempotency:
-      "none: the wallet token is submitted to the provider's submit URL cached for the sale when there is one, otherwise the session is queried, and the result is settled again on every call (gap 11)",
+      "none: the wallet token is submitted to the provider's submit URL cached for the sale when there is one (the cache is then cleared); the session is always queried, and a verified result is settled again on every call (gap 11)",
     sideEffects:
-      "submits the Google Pay token to the provider's cached submit URL (assertWindcaveUrl checks it) or queries the session; settles the sale or its next share, counts it, and sends a live update and a push",
+      "submits the Google Pay token to the provider's cached submit URL (assertWindcaveUrl checks it), then queries the session; only an outcome verified against the sale's expected values settles the sale or its next share (R2-T5; anything else is 503), counts it, and sends a live update and a push",
     successDto: "{ approved, redirectPath } to the receipt or the declined page",
     errorDisclosure: ["fixed"],
     controls: {
       authenticity: `${NUMBER_AUTHENTICITY}, with the provider session id bound to it`,
-      replay: "settles again; after a share, the same session can complete the next one (gap 11)",
+      replay: "settles again (gap 11); after a share, the same session no longer completes the next one (R2-T5: its reference is the counted share's)",
       rate: "none — no limit",
     },
     findings: [NUMBERED_SALE_FINDING, GAP11_REPLAY_FINDING, SPLIT_SHARE_FINDING],
@@ -907,22 +907,22 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
         principal: "public",
         tenant: "number",
         tenantRule:
-          "the sale's number (transactionId), or else the provider session id, selects the sale; a sale with its own link is sent home as a missing one is (302, since 2026-09-27: its 404 told a caller counting through the numbers which were link sales); a cancel is believed only with the bound session id",
+          "the sale's number (transactionId), or else the provider session id, selects the sale; a sale with its own link is sent home as a missing one is (302, since 2026-09-27: its 404 told a caller counting through the numbers which were link sales); a cancel only chooses the page, and only with the bound session id",
       },
     ],
     input:
-      "transactionId: read into a variable, then strictPositiveIntegerQueryParam (a malformed one finds nothing, since 2026-09-26); sessionId / sessionid: compared with the bound session before a cancel is believed; result: only 'cancelled' is acted on; any 'sim' key rejects the request (400)",
+      "transactionId: read into a variable, then strictPositiveIntegerQueryParam (a malformed one finds nothing, since 2026-09-26); sessionId / sessionid: compared with the bound session to choose the cancelled page; result: 'cancelled' only redirects (R2-T5: it settles nothing); any 'sim' key rejects the request (400)",
     capability: "isWindcaveConfigured(): unconfigured, nothing is settled and the customer sees pending",
     entitlement: null,
     idempotency:
       "an already approved or declined sale only redirects; otherwise pending → processing is a read then a write, like the notification's (R3 / C20)",
     sideEffects:
-      "queries the provider for the bound session and settles the sale or its next share (count, live update, push); a matching cancel fails the sale (live update, push)",
+      "queries the provider for the bound session and settles the sale or its next share only on an outcome verified against the sale's expected values (count, live update, push; R2-T5); a cancel changes nothing",
     successDto: "302 to the receipt, or to the result page (declined, cancelled or pending), or home",
     errorDisclosure: ["fixed"],
     controls: {
       authenticity:
-        `${NUMBER_AUTHENTICITY}; the outcome always comes from querying the provider, and a cancel needs the bound session id`,
+        `${NUMBER_AUTHENTICITY}; the outcome always comes from querying the provider and verifying it (R2-T5); a cancel settles nothing`,
       replay: "a settled sale only redirects; simultaneous calls can both settle (R3 / C20)",
       rate: "none — anyone can prompt a provider query for a pending numbered sale",
     },
@@ -993,9 +993,9 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     entitlement: null,
     idempotency: "none: every call opens another provider session (finding)",
     sideEffects:
-      "creates a payment session with the provider (createWindcaveSession) and, for a split invoice, records it with its amount and payer's email (recordInvoiceSplitSession, 0030); when the provider reports it already complete, settles the invoice: events, and once paid the GST invoice email (rent, sendGstInvoices) or the payment invoice (trades, sendTradePaymentInvoice)",
+      "creates a payment session with the provider (createWindcaveSession) and, for a split invoice, records it with its amount and payer's email (recordInvoiceSplitSession, 0030); a duplicate-request reply settles nothing (503: the notification settles the recorded session by a verified query, R2-T5)",
     successDto:
-      "the provider session id, the amount and the hosted-fields submit URLs (also cached here against the token, invoiceAjaxUrlCache); or { alreadyComplete, approved }",
+      "the provider session id, the amount and the hosted-fields submit URLs (also cached here against the token, invoiceAjaxUrlCache)",
     errorDisclosure: ["fixed"],
     controls: {
       authenticity: CHECKOUT_AUTHENTICITY,
@@ -1019,7 +1019,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     idempotency:
       "finalizeCheckoutInvoice: a settled invoice is left alone; a split share counts once per recorded session (atomicClaimSplitShare / atomicClaimJobSplitShare, then markInvoiceSplitSessionPaid), and an approved session that finds every share paid is recorded for a refund; a single payment settles by a read then a write",
     sideEffects:
-      "queries the provider for the session (queryWindcaveSession); once paid, the GST invoice email (rent, sendGstInvoices) or the payment invoice (trades, sendTradePaymentInvoice)",
+      "queries the provider for the session (queryWindcaveSession); only an outcome verified against the invoice's expected values settles (R2-T5; anything else is 503, never a decline); once paid, the GST invoice email (rent, sendGstInvoices) or the payment invoice (trades, sendTradePaymentInvoice)",
     successDto: "{ approved, status, splitCount, splitPaidCount }",
     errorDisclosure: ["fixed"],
     controls: {
@@ -1044,7 +1044,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     idempotency:
       "finalizeCheckoutInvoice: a settled invoice is left alone; a split share counts once per session; a single payment settles by a read then a write",
     sideEffects:
-      "submits the Google Pay token to the cached submit URL (submitGooglePayToken, checked by assertWindcaveUrl) or queries the provider (queryWindcaveSession); once paid, the GST invoice email (rent) or the payment invoice (trades)",
+      "submits the Google Pay token to the cached submit URL (submitGooglePayToken, checked by assertWindcaveUrl), then queries the provider (queryWindcaveSession); only an outcome verified against the invoice's expected values settles (R2-T5; anything else is 503); once paid, the GST invoice email (rent) or the payment invoice (trades)",
     successDto: "{ approved, status, splitCount, splitPaidCount }",
     errorDisclosure: ["fixed"],
     controls: {
@@ -1071,7 +1071,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     entitlement: null,
     idempotency: "a settled invoice only redirects; otherwise the invoice's pinned session is queried and settled (a split invoice pins none, so nothing is)",
     sideEffects:
-      "queries the provider for the pinned session (queryWindcaveSession); once paid, the GST invoice email (rent) or the payment invoice (trades)",
+      "queries the provider for the pinned session (queryWindcaveSession) and settles only a verified outcome (R2-T5); once paid, the GST invoice email (rent) or the payment invoice (trades)",
     successDto: "a 302 to the invoice's checkout page (/r/<token>), or to / for an unknown token",
     errorDisclosure: ["fixed"],
     controls: {

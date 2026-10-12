@@ -4,7 +4,7 @@ import { isSessionId, isUuid } from "./durable-payment-contract";
 
 export function evidenceMatchesExpectation(expected: ProviderExpectation, result: ProviderQueryResult): boolean {
   return result?.kind === "verified" && result.transactionCount === 1 && isSessionId(result.transactionId) &&
-    Number.isSafeInteger(result.amountCents) && result.amountCents>0 && result.amountCents<=2147483647 &&
+    Number.isSafeInteger(result.amountCents) && result.amountCents>0 && result.amountCents<=9999999999 &&
     (result.paymentMethod===undefined || (typeof result.paymentMethod==='string' && result.paymentMethod.length>0 && result.paymentMethod.length<=100)) &&
     ["approved", "declined", "cancelled"].includes(result.outcome) &&
     ["sessionId","processorXId","amountCents","currency","reference","environment","providerAccount"].every((key) =>

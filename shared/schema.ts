@@ -1,4 +1,4 @@
-import { pgTable, text, serial, decimal, timestamp, boolean, integer, jsonb, uuid, uniqueIndex, index, customType, check, unique, foreignKey } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, decimal, timestamp, boolean, integer, bigint, jsonb, uuid, uniqueIndex, index, customType, check, unique, foreignKey } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -263,6 +263,8 @@ export type PaymentAttemptState = (typeof paymentAttemptStates)[number];
 export const paymentAttemptOutcomes = ["approved", "declined", "cancelled"] as const;
 
 export type PaymentAttemptOutcome = (typeof paymentAttemptOutcomes)[number];
+export const paymentProviderEnvironments = ["uat", "production"] as const;
+export type PaymentProviderEnvironment = (typeof paymentProviderEnvironments)[number];
 
 // Phase 3 claim/return services must use these exact bounds; the database checks
 // below are the final guard against accidentally creating longer-lived secrets.
@@ -287,10 +289,26 @@ export const paymentAttempts = pgTable("payment_attempts", {
   returnStateExpiresAt: timestamp("return_state_expires_at"),
   outcome: text("outcome").$type<PaymentAttemptOutcome>(),
   receiptShare: integer("receipt_share"),
+  // R2-T4 (migration 0034; docs/decisions/2026-10-12-r2-t4-expected-values-schema.md):
+  // what the provider must confirm, fixed before the session is created and never
+  // changed once one is attached. Null on attempts claimed before 0034.
+  expectedAmountCents: bigint("expected_amount_cents", { mode: "number" }),
+  expectedCurrency: text("expected_currency"),
+  expectedMerchantReference: text("expected_merchant_reference"),
+  providerEnvironment: text("provider_environment").$type<PaymentProviderEnvironment>(),
+  providerTransactionId: text("provider_transaction_id"),
+  lastReconciliationCode: text("last_reconciliation_code"),
+  lastReconciledAt: timestamp("last_reconciled_at"),
+  expectedProviderAccount: text("expected_provider_account"),
+  requestFingerprint: text("request_fingerprint"),
+  sendStartedAt: timestamp("send_started_at", { withTimezone: true }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => ({
   r3TenantIdentity: unique("payment_attempts_id_transaction_uq").on(t.id, t.transactionId),
+  accountFingerprintCheck: check("payment_attempts_account_fingerprint_check", sql`(${t.expectedProviderAccount} is null and ${t.requestFingerprint} is null) or (${t.expectedProviderAccount} is not null and length(${t.expectedProviderAccount}) between 1 and 200 and ${t.requestFingerprint} is not null and ${t.requestFingerprint} ~ '^[0-9a-f]{64}$' and ${t.expectedAmountCents} is not null)`),
+  sendStartedCheck: check("payment_attempts_send_started_check", sql`${t.sendStartedAt} is null or (${t.sendStartedAt} >= ${t.createdAt} and ${t.sendStartedAt} <= ${t.leaseExpiresAt})`),
+  reconciliationCodeCheck: check("payment_attempts_reconciliation_code_check", sql`${t.lastReconciliationCode} is null or ${t.lastReconciliationCode} ~ '^[a-z][a-z0-9_:]{0,63}$'`),
   transactionIdx: index("payment_attempts_transaction_idx").on(t.transactionId),
   transactionShareKeyUnique: uniqueIndex("payment_attempts_transaction_share_key_uq")
     .on(t.transactionId, t.shareIndex, t.idempotencyKey),
@@ -310,6 +328,33 @@ export const paymentAttempts = pgTable("payment_attempts", {
   processorTransactionIdUnique: uniqueIndex("payment_attempts_processor_transaction_id_uq")
     .on(t.processorTransactionId)
     .where(sql`${t.processorTransactionId} is not null`),
+  providerTransactionIdUnique: uniqueIndex("payment_attempts_provider_transaction_id_uq")
+    .on(t.providerTransactionId)
+    .where(sql`${t.providerTransactionId} is not null`),
+  // R2-T7 (plan §9.4, migration 0035): the provider idempotency key is one attempt's.
+  processorXIdUnique: uniqueIndex("payment_attempts_processor_x_id_uq")
+    .on(t.processorXId)
+    .where(sql`${t.processorXId} is not null`),
+  expectedPairCheck: check(
+    "payment_attempts_expected_pair_check",
+    sql`(${t.expectedAmountCents} is null) = (${t.expectedCurrency} is null) and (${t.expectedAmountCents} is null) = (${t.expectedMerchantReference} is null) and (${t.expectedAmountCents} is null) = (${t.providerEnvironment} is null)`,
+  ),
+  expectedAmountCheck: check(
+    "payment_attempts_expected_amount_check",
+    sql`${t.expectedAmountCents} is null or (${t.expectedAmountCents} >= 0 and ${t.expectedAmountCents} <= 9999999999)`,
+  ),
+  expectedCurrencyCheck: check(
+    "payment_attempts_expected_currency_check",
+    sql`${t.expectedCurrency} is null or ${t.expectedCurrency} ~ '^[A-Z]{3}$'`,
+  ),
+  expectedReferenceCheck: check(
+    "payment_attempts_expected_reference_check",
+    sql`${t.expectedMerchantReference} is null or length(${t.expectedMerchantReference}) between 1 and 64`,
+  ),
+  providerEnvironmentCheck: check(
+    "payment_attempts_provider_environment_check",
+    sql`${t.providerEnvironment} is null or ${t.providerEnvironment} in ('uat', 'production')`,
+  ),
   shareIndexCheck: check(
     "payment_attempts_share_index_check",
     sql`${t.shareIndex} >= 0`,
@@ -1873,7 +1918,7 @@ export const paymentSettlementEvents = pgTable("payment_settlement_events", {
   sessionId: text("session_id").notNull(),
   merchantId: integer("merchant_id").notNull(),
   outcome: text("outcome").notNull(),
-  amountCents: integer("amount_cents").notNull(),
+  amountCents: bigint("amount_cents", { mode: "number" }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
 }, (t) => ({
   constraint0: check("payment_settlement_events_outcome_check", sql.raw("((outcome = ANY (ARRAY['approved'::text, 'declined'::text, 'cancelled'::text])))")),

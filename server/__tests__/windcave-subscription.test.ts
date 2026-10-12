@@ -1,3 +1,18 @@
+// R2-T6: card setup validates its hosted-page link for the payment mode and its
+// callback addresses against PUBLIC_ORIGIN, so this contract runs as UAT.
+jest.mock("../config", () => {
+  const actual = jest.requireActual("../config");
+  return {
+    ...actual,
+    config: {
+      ...actual.config,
+      paymentMode: "uat",
+      publicOrigin: "https://app.example.test",
+      windcave: { ...actual.config.windcave, endpoint: actual.UAT_WINDCAVE_ENDPOINT, username: "SyntheticUser", apiKey: "synthetic-key" },
+    },
+  };
+});
+
 import {
   chargeStoredCard,
   createCardStorageSession,
@@ -30,7 +45,7 @@ describe("Windcave subscription stored-card contract", () => {
       id: "session-123",
       links: [
         { rel: "self", method: "GET", href: "https://uat.windcave.com/api/v1/sessions/session-123" },
-        { rel: "hpp", method: "REDIRECT", href: "https://uat.windcave.com/hpp/session-123" },
+        { rel: "hpp", method: "REDIRECT", href: "https://uat.windcave.com/pxmi3/session-123" },
       ],
     }));
 
@@ -46,7 +61,7 @@ describe("Windcave subscription stored-card contract", () => {
     expect(result).toEqual({
       success: true,
       sessionId: "session-123",
-      hppUrl: "https://uat.windcave.com/hpp/session-123",
+      hppUrl: "https://uat.windcave.com/pxmi3/session-123",
     });
     expect(request).toHaveBeenCalledTimes(1);
 
@@ -116,7 +131,8 @@ describe("Windcave subscription stored-card contract", () => {
 
   it("reads the official stored-card transaction shape from a completed session", async () => {
     const request = requestSequence(jsonResponse(200, {
-      id: "session-transaction",
+      // R2-T6: a session query names the session asked about (it named another before).
+      id: "session_ABC-123",
       transactions: [{
         id: "validation-transaction",
         authorised: true,

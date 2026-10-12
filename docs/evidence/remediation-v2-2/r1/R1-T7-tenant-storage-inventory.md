@@ -1,11 +1,11 @@
 # R1-T7 tenant/storage execution inventory
 
-Generated from working-tree sources on base `d86d6f114ae6806820f74a99248698d17cd556b1`; the phase evidence names the final commit.
+Generated from working-tree sources on base `9c9126e4a5d00d5d0591c71678fa234b265ac46b`; the phase evidence names the final commit.
 
 Registrations: **194**; registrations with session/admin authentication: **122**;
 registrations calling checkMerchantOwnership: **25**.
 IStorage: **258** declared methods;
-PaymentAttemptRepository: **8** inherited methods.
+PaymentAttemptRepository: **10** inherited methods.
 
 Classifications come from the reviewed per-route branches, including mixed public/signed-in routes.
 Authentication counts include middleware and handler checks. Storage calls follow same-file helpers,
@@ -21,7 +21,7 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | Registration | Reviewed scope(s) | Storage calls in handler/helpers |
 |---|---|---|
 | ALL /api/billing/card/notification | provider (provider/none) | — |
-| ALL /api/pay/notification/:state | provider (provider/token) | — |
+| ALL /api/pay/notification/:state | provider (provider/token) | `getSplitPaymentsByTransaction`, `getTransaction` |
 | ALL /api/windcave/notification | provider (provider/provider-session) | `getNextPendingSplit`, `getTransaction`, `getTransactionByWindcaveSessionId`, `incrementTransactionCount`, `updateSplitPaymentStatus`, `updateTransactionSessionState`, `updateTransactionStatus` |
 | ALL /api/windcave/rent-notification | provider (provider/provider-session) | `atomicClaimSplitShare`, `getInvoiceRentRequest`, `getInvoiceRentRequestByWindcaveSessionId`, `getInvoiceSplitSession`, `getMerchant`, `getPaidInvoiceSplitPayerEmails`, `getTenantProfile`, `logTransactionEvent`, `markInvoiceSplitSessionPaid`, `updateInvoiceRentRequest` |
 | ALL /api/windcave/trades-notification | provider (provider/provider-session) | `atomicClaimJobSplitShare`, `atomicClaimSplitShare`, `createJobEvent`, `getInvoiceRentRequest`, `getInvoiceSplitSession`, `getJobInvoice`, `getJobInvoiceByWindcaveSessionId`, `getMerchant`, `getPaidInvoiceSplitPayerEmails`, `getTenantProfile`, `logTransactionEvent`, `markInvoiceSplitSessionPaid`, `updateInvoiceRentRequest`, `updateJobInvoice` |
@@ -55,7 +55,7 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | GET /api/auth/validate-reset-token/:token | single-resource bearer (public-bearer/token) | — |
 | GET /api/billing/card | tenant (merchant/session) | `getMerchant`, `getOrCreateSubscription` |
 | GET /api/billing/card/callback | public (public/none) | — |
-| GET /api/checkout/callback | single-resource bearer (public-bearer/token) | `atomicClaimJobSplitShare`, `atomicClaimSplitShare`, `createJobEvent`, `getInvoiceRentRequest`, `getInvoiceRentRequestByToken`, `getJobInvoice`, `getJobInvoiceByToken`, `getMerchant`, `getPaidInvoiceSplitPayerEmails`, `getTenantProfile`, `logTransactionEvent`, `markInvoiceSplitSessionPaid`, `updateInvoiceRentRequest`, `updateJobInvoice` |
+| GET /api/checkout/callback | single-resource bearer (public-bearer/token) | `atomicClaimJobSplitShare`, `atomicClaimSplitShare`, `createJobEvent`, `getInvoiceRentRequest`, `getInvoiceRentRequestByToken`, `getInvoiceSplitSession`, `getJobInvoice`, `getJobInvoiceByToken`, `getMerchant`, `getPaidInvoiceSplitPayerEmails`, `getTenantProfile`, `logTransactionEvent`, `markInvoiceSplitSessionPaid`, `updateInvoiceRentRequest`, `updateJobInvoice` |
 | GET /api/checkout/document/:token | single-resource bearer (public-bearer/token) | `consumeInvoiceDocumentReadLimit`, `getCleanUploadedFileForMerchant`, `getInvoiceRentRequestByToken`, `getJobInvoiceByToken` |
 | GET /api/checkout/resolve/:token | single-resource bearer (public-bearer/token) | `cleanUploadedFileOwnedByMerchant`, `getActiveSchedule`, `getClientProfile`, `getInvoiceRentRequestByToken`, `getJobInvoiceByToken`, `getMerchant`, `getQuote`, `getTenantProfile` |
 | GET /api/internal/cron/status | scheduler (cron/none) | — |
@@ -72,7 +72,7 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | GET /api/merchants/:merchantId/refunds | tenant (merchant/resource) | `getRefundsByMerchant` |
 | GET /api/merchants/:merchantId/stock-items | tenant (merchant/path-merchant) | `getStockItemsByMerchant` |
 | GET /api/nfc/capabilities | public (public/none) | — |
-| GET /api/pay/return/:state | single-resource bearer (public-bearer/token) | — |
+| GET /api/pay/return/:state | single-resource bearer (public-bearer/token) | `getSplitPaymentsByTransaction`, `getTransaction` |
 | GET /api/pay/t/:token | single-resource bearer (public-bearer/token) | `getMerchant` |
 | GET /api/pay/t/:token/qr | single-resource bearer (public-bearer/token) | — |
 | GET /api/pay/t/:token/receipt | single-resource bearer (public-bearer/token) | `getMerchant`, `getSplitPaymentsByTransaction` |
@@ -140,7 +140,7 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | POST /api/board-builder/submit | tenant (merchant/session) | `getMerchant`, `getTaptStoneForMerchant`, `settleAuthThrottle`, `takeAuthThrottleSlot` |
 | POST /api/checkout/:token/googlepay-complete | single-resource bearer (public-bearer/token) | `atomicClaimJobSplitShare`, `atomicClaimSplitShare`, `createJobEvent`, `getInvoiceRentRequest`, `getInvoiceRentRequestByToken`, `getInvoiceSplitSession`, `getJobInvoice`, `getJobInvoiceByToken`, `getMerchant`, `getPaidInvoiceSplitPayerEmails`, `getTenantProfile`, `logTransactionEvent`, `markInvoiceSplitSessionPaid`, `updateInvoiceRentRequest`, `updateJobInvoice` |
 | POST /api/checkout/:token/hosted-fields-complete | single-resource bearer (public-bearer/token) | `atomicClaimJobSplitShare`, `atomicClaimSplitShare`, `createJobEvent`, `getInvoiceRentRequest`, `getInvoiceRentRequestByToken`, `getInvoiceSplitSession`, `getJobInvoice`, `getJobInvoiceByToken`, `getMerchant`, `getPaidInvoiceSplitPayerEmails`, `getTenantProfile`, `logTransactionEvent`, `markInvoiceSplitSessionPaid`, `updateInvoiceRentRequest`, `updateJobInvoice` |
-| POST /api/checkout/:token/session | single-resource bearer (public-bearer/token) | `atomicClaimJobSplitShare`, `atomicClaimSplitShare`, `createJobEvent`, `getClientProfile`, `getInvoiceRentRequest`, `getInvoiceRentRequestByToken`, `getJobInvoice`, `getJobInvoiceByToken`, `getMerchant`, `getPaidInvoiceSplitPayerEmails`, `getTenantProfile`, `logTransactionEvent`, `markInvoiceSplitSessionPaid`, `recordInvoiceSplitSession`, `updateInvoiceRentRequest`, `updateJobInvoice` |
+| POST /api/checkout/:token/session | single-resource bearer (public-bearer/token) | `getClientProfile`, `getInvoiceRentRequestByToken`, `getJobInvoiceByToken`, `getMerchant`, `getTenantProfile`, `recordInvoiceSplitSession`, `updateInvoiceRentRequest`, `updateJobInvoice` |
 | POST /api/checkout/:token/split | single-resource bearer (public-bearer/token) | `getInvoiceRentRequestByToken`, `getJobInvoiceByToken`, `invoiceHasSplitSessions`, `updateInvoiceRentRequest`, `updateJobInvoice` |
 | POST /api/info-pack-leads | public (public/none) | `createInfoPackLead` |
 | POST /api/internal/cron | scheduler (cron/system) | — |
@@ -149,10 +149,10 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | POST /api/merchants/:id/tapt-stones | tenant (merchant/path-merchant) | `createNextTaptStone`, `getMerchant`, `updateTaptStoneUrlsForMerchant` |
 | POST /api/merchants/:merchantId/stock-items | tenant (merchant/path-merchant) | `createStockItemForMerchant` |
 | POST /api/merchants/signup | account entry/recovery (public/mailbox) | `createMerchantWithSignup`, `getMerchantByEmail`, `getUserByEmail`, `takeAuthThrottleSlot` |
-| POST /api/pay/t/:token/googlepay-complete | single-resource bearer (public-bearer/token) | — |
-| POST /api/pay/t/:token/hosted-fields-complete | single-resource bearer (public-bearer/token) | — |
+| POST /api/pay/t/:token/googlepay-complete | single-resource bearer (public-bearer/token) | `getSplitPaymentsByTransaction`, `getTransaction` |
+| POST /api/pay/t/:token/hosted-fields-complete | single-resource bearer (public-bearer/token) | `getSplitPaymentsByTransaction`, `getTransaction` |
 | POST /api/pay/t/:token/receipt-pdf | single-resource bearer (public-bearer/token) | `getMerchant`, `getSplitPaymentsByTransaction` |
-| POST /api/pay/t/:token/session | single-resource bearer (public-bearer/token) | `getMerchant`, `getNextPendingSplit`, `updateTransactionStatus` |
+| POST /api/pay/t/:token/session | single-resource bearer (public-bearer/token) | `getMerchant`, `getNextPendingSplit`, `getSplitPaymentsByTransaction`, `getTransaction`, `updateTransactionStatus` |
 | POST /api/pay/t/:token/split | single-resource bearer (public-bearer/token) | `createBillSplit`, `getMerchant` |
 | POST /api/property/invoices | tenant (merchant/resource) | `cleanUploadedFileOwnedByMerchant`, `createOrReuseInvoiceRentRequestForMerchant`, `getInvoiceRentRequestForMerchant`, `getOrCreateSubscription`, `getTenantProfileForMerchant` |
 | POST /api/property/invoices/:id/mark-paid-external | tenant (merchant/resource) | `getInvoiceRentRequestForMerchant`, `markInvoiceRentRequestPaidExternalForMerchant` |
@@ -188,7 +188,7 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | POST /api/transactions/:id/cancel | tenant (merchant/resource) | `cancelTransactionForMerchant`, `getTransaction`, `getTransactionForMerchant` |
 | POST /api/transactions/:id/googlepay-complete | public (public/number) | `getNextPendingSplit`, `getTransaction`, `incrementTransactionCount`, `updateSplitPaymentStatus`, `updateTransactionPaymentMethod`, `updateTransactionSessionState`, `updateTransactionStatus` |
 | POST /api/transactions/:id/hosted-fields-complete | public (public/number) | `getNextPendingSplit`, `getTransaction`, `incrementTransactionCount`, `updateSplitPaymentStatus`, `updateTransactionPaymentMethod`, `updateTransactionSessionState`, `updateTransactionStatus` |
-| POST /api/transactions/:id/pay | public (public/number) | `getMerchant`, `getNextPendingSplit`, `getTaptStone`, `getTransaction`, `updateTransactionStatus`, `updateTransactionWindcaveSession` |
+| POST /api/transactions/:id/pay | public (public/number) | `getMerchant`, `getNextPendingSplit`, `getTaptStone`, `getTransaction`, `updateTransactionWindcaveSession` |
 | POST /api/transactions/:id/receipt-pdf | public (public/number) | `getMerchant`, `getSplitPaymentById`, `getSplitPaymentsByTransaction`, `getTransaction` |
 | POST /api/transactions/:id/split | public (public/number) | `createBillSplit`, `getTransaction` |
 | POST /api/transactions/:transactionId/refunds | tenant (merchant/resource) | `createRefundForMerchant`, `getTransactionForMerchant`, `releaseRefundAmountForMerchant`, `reserveRefundAmountForMerchant`, `updateRefundStatusForMerchant` |
@@ -481,6 +481,8 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | PaymentAttemptRepository | getPaymentAttemptByProcessorSessionId | no | `getPaymentAttemptByProcessorSessionId( processorSessionId: string, ): Promise<PaymentAttempt \| undefined>` |
 | PaymentAttemptRepository | getPaymentAttemptByTransactionShareKey | no | `getPaymentAttemptByTransactionShareKey( transactionId: number, shareIndex: number, idempotencyKey: string, ): Promise<PaymentAttempt \| undefined>` |
 | PaymentAttemptRepository | claimPaymentAttemptRecord | no | `claimPaymentAttemptRecord( input: ClaimPaymentAttemptRecordInput, ): Promise<ClaimPaymentAttemptResult>` |
+| PaymentAttemptRepository | recordPaymentAttemptExpectedValuesRecord | no | `recordPaymentAttemptExpectedValuesRecord( input: RecordPaymentAttemptExpectedValuesRecordInput, ): Promise<RecordPaymentAttemptExpectedValuesResult>` |
+| PaymentAttemptRepository | recordPaymentAttemptReconciliationRecord | no | `recordPaymentAttemptReconciliationRecord( input: RecordPaymentAttemptReconciliationRecordInput, ): Promise<RecordPaymentAttemptReconciliationResult>` |
 | PaymentAttemptRepository | attachPaymentAttemptSessionRecord | no | `attachPaymentAttemptSessionRecord( input: AttachPaymentAttemptSessionRecordInput, ): Promise<AttachPaymentAttemptSessionResult>` |
 | PaymentAttemptRepository | getPaymentAttemptByReturnStateHash | no | `getPaymentAttemptByReturnStateHash( returnStateHash: string, ): Promise<PaymentAttempt \| undefined>` |
 | PaymentAttemptRepository | claimPaymentAttemptFinalizationRecord | no | `claimPaymentAttemptFinalizationRecord( input: ClaimPaymentAttemptFinalizationRecordInput, ): Promise<ClaimPaymentAttemptFinalizationResult>` |

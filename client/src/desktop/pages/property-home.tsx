@@ -17,6 +17,7 @@ import {
 } from "../DesktopPageScaffold";
 import { useBucketMorph } from "../bucket-morph";
 import { SlidingIndicator, useSlidingIndicator } from "../sliding-indicator";
+import { inertWhen } from "@/features/terminal/inert-when";
 
 /* ── palette ── */
 const ACCENT = "#5E9EFF";
@@ -506,7 +507,7 @@ export default function DesktopPropertyHome(props: DesktopRoutePageProps) {
           </button>
           <div
             className="ph-notif-list"
-            aria-hidden={!notifOpen} {...{ inert: notifOpen ? undefined : "" }}
+            aria-hidden={!notifOpen} {...inertWhen(!notifOpen)}
             style={{ opacity: notifOpen ? 1 : 0, pointerEvents: notifOpen ? "auto" : "none" }}
           >
             <button type="button" className="ph-notif-listhead" onClick={() => setNotifOpen(false)}>

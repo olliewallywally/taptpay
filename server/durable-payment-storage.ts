@@ -176,9 +176,11 @@ export class DurablePaymentStorage implements ReconciliationRepository, PaymentO
   async bindRetailSession(input: ProviderExpectation & { paymentAttemptId: string }, now = new Date()): Promise<boolean> {
     if (!isUuid(input.paymentAttemptId) || !isSessionId(input.sessionId)) throw new Error("invalid_retail_binding");
     return this.transaction(async(client)=>{
-      const row=(await client.query(`SELECT a.*,e.amount_cents,e.currency,e.reference,e.environment,e.provider_account
-        FROM payment_attempts a JOIN payment_attempt_expectations e ON e.payment_attempt_id=a.id AND e.processor_x_id=a.processor_x_id
+      const row=(await client.query(`SELECT a.*,a.expected_amount_cents AS amount_cents,a.expected_currency AS currency,
+        a.expected_merchant_reference AS reference,a.provider_environment AS environment,a.expected_provider_account AS provider_account
+        FROM payment_attempts a
         WHERE a.id=$1 FOR UPDATE OF a`,[input.paymentAttemptId])).rows[0];
+      if(row && row.amount_cents!==null) row.amount_cents=Number(row.amount_cents);
       if (!row || row.processor_session_id!==input.sessionId || row.processor_x_id!==input.processorXId ||
         !evidenceMatchesExpectation({...camelRow<ProviderExpectation>(row),sessionId:row.processor_session_id,processorXId:row.processor_x_id},
           {...input,kind:"verified",outcome:"approved",transactionId:"binding-check",transactionCount:1})) return false;
@@ -220,18 +222,19 @@ export class DurablePaymentStorage implements ReconciliationRepository, PaymentO
       if(!/^\d+(?:\.\d{1,2})?$/.test(decimal)) return undefined;
       const [whole,fraction='']=decimal.split('.');
       const amountCents=Number(whole)*100+Number(fraction.padEnd(2,'0'));
-      if(!Number.isSafeInteger(amountCents) || amountCents<1 || amountCents>2147483647) return undefined;
-      const expected={amountCents,currency:input.currency,reference:`PAY-${parent.id}-S${attempt.share_index}-${attempt.id}`,
-        environment:input.environment,providerAccount:input.providerAccount,processorXId:`taptpay-${attempt.id}`};
+      if(!Number.isSafeInteger(amountCents) || amountCents<1 || amountCents>9999999999) return undefined;
+      const expected={amountCents,currency:input.currency,reference:attempt.expected_merchant_reference??`TAPT_${attempt.id}`,
+        environment:input.environment,providerAccount:input.providerAccount,processorXId:attempt.processor_x_id??attempt.id.replace(/-/g,'').slice(0,16)};
       const fingerprint=requestFingerprint({...input,...expected,transactionId:parent.id,shareIndex:attempt.share_index});
-      const stored=(await client.query('SELECT * FROM payment_attempt_expectations WHERE payment_attempt_id=$1',[attempt.id])).rows[0];
-      if(stored) return stored.request_fingerprint===fingerprint ? expected : undefined;
-      // Never invent missing expectations for an already-sent historical session.
+      if(attempt.request_fingerprint) return attempt.request_fingerprint===fingerprint ? expected : undefined;
+      if(attempt.expected_amount_cents!==null && (Number(attempt.expected_amount_cents)!==amountCents ||
+        attempt.expected_currency!==input.currency || attempt.expected_merchant_reference!==expected.reference || attempt.provider_environment!==input.environment)) return undefined;
+      // Never infer historical expectations after session attachment.
       if(attempt.state!=='claiming' || attempt.processor_session_id || attempt.lease_expires_at<=now) return undefined;
-      await client.query(`INSERT INTO payment_attempt_expectations(payment_attempt_id,transaction_id,merchant_id,amount_cents,
-        currency,reference,environment,provider_account,request_fingerprint,processor_x_id,created_at)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,[attempt.id,parent.id,input.merchantId,amountCents,input.currency,
-          expected.reference,input.environment,input.providerAccount,fingerprint,expected.processorXId,now]);
+      await client.query(`UPDATE payment_attempts SET expected_amount_cents=$2,expected_currency=$3,
+        expected_merchant_reference=$4,provider_environment=$5,expected_provider_account=$6,
+        request_fingerprint=$7,processor_x_id=$8,send_started_at=$9::timestamptz,updated_at=$9::timestamptz WHERE id=$1`,
+        [attempt.id,amountCents,input.currency,expected.reference,input.environment,input.providerAccount,fingerprint,expected.processorXId,now]);
       return expected;
     });
   }
@@ -268,17 +271,17 @@ export class DurablePaymentStorage implements ReconciliationRepository, PaymentO
       // and registry insertion. Only an independently persisted expectation and
       // that engine's exact session/X-ID can create the binding.
       await client.query(`INSERT INTO payment_session_bindings(session_id,processor_x_id,payment_attempt_id)
-        SELECT r.processor_session_id,e.processor_x_id,r.id FROM payment_attempts r
-        JOIN payment_attempt_expectations e ON e.payment_attempt_id=r.id AND e.processor_x_id=r.processor_x_id
-        WHERE r.processor_session_id=$1 ON CONFLICT DO NOTHING`,[sessionId]);
+        SELECT r.processor_session_id,r.processor_x_id,r.id FROM payment_attempts r
+        WHERE r.processor_session_id=$1 AND r.expected_provider_account IS NOT NULL AND r.request_fingerprint IS NOT NULL
+          AND r.processor_x_id IS NOT NULL ON CONFLICT DO NOTHING`,[sessionId]);
       const row=(await client.query(`SELECT b.session_id,b.processor_x_id,b.invoice_attempt_id,b.payment_attempt_id,
-        COALESCE(a.amount_cents,e.amount_cents) AS amount_cents,COALESCE(a.currency,e.currency) AS currency,
-        COALESCE(a.reference,e.reference) AS reference,COALESCE(a.environment,e.environment) AS environment,
-        COALESCE(a.provider_account,e.provider_account) AS provider_account
+        COALESCE(a.amount_cents,r.expected_amount_cents) AS amount_cents,COALESCE(a.currency,r.expected_currency) AS currency,
+        COALESCE(a.reference,r.expected_merchant_reference) AS reference,COALESCE(a.environment,r.provider_environment) AS environment,
+        COALESCE(a.provider_account,r.expected_provider_account) AS provider_account
         FROM payment_session_bindings b LEFT JOIN invoice_payment_attempts a ON a.id=b.invoice_attempt_id AND a.processor_x_id=b.processor_x_id
         LEFT JOIN payment_attempts r ON r.id=b.payment_attempt_id AND r.processor_session_id=b.session_id AND r.processor_x_id=b.processor_x_id
-        LEFT JOIN payment_attempt_expectations e ON e.payment_attempt_id=r.id AND e.processor_x_id=b.processor_x_id
         WHERE b.session_id=$1`,[sessionId])).rows[0];
+      if(row && row.amount_cents!==null) row.amount_cents=Number(row.amount_cents);
       if (!row || row.amount_cents===null) return undefined;
       if (row.invoice_attempt_id) delete row.payment_attempt_id; else delete row.invoice_attempt_id;
       return camelRow(row);

@@ -122,3 +122,14 @@ No commit, push, migration or deployment was performed. Remote tip remained
 
 Validation logs and exported patch are under
 `/workspace/reviews/push-compatibility-2026-10-10/`.
+
+## Correction — 2026-10-11 later review
+
+The "indistinguishable merchant and transaction refusals" item above changed
+`server/middleware/merchant-validation.ts`, which no route mounts: nothing outside
+its own test imported it (already recorded as dead in
+`docs/PLAN-2026-08-10-finish-review-and-fix.md` Step 10 and the R1-T6 evidence).
+That item therefore changed no runtime behaviour. On owner direction the module
+and its test were removed; see
+`docs/decisions/2026-10-11-review-findings-fix-owner-direction.md`. The other
+corrections recorded above are unaffected.

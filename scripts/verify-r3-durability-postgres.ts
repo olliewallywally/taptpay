@@ -10,12 +10,13 @@ import {PaymentReconciliationWorker} from '../server/payment-reconciliation';
 import {PaymentOutboxWorker} from '../server/payment-outbox';
 import {DurableInvoiceCheckout} from '../server/durable-invoice-checkout';
 import {createRetailReconciliationFinalizer} from '../server/retail-reconciliation-adapter';
+import {createWindcaveReconciliationProvider} from '../server/windcave-reconciliation-provider';
 import type {SessionBinding,VerifiedOutcome} from '../server/durable-payment-contract';
 
 const {testDatabaseUrl}=assertSafePostgresVerifierEnvironment({testDatabaseUrl:process.env.TEST_DATABASE_URL,
   configuredDatabaseUrl:process.env.DATABASE_URL,marker:process.env.TAPTPAY_TEST_DATABASE});
 assertSafePostgresVerifierEnvironment({testDatabaseUrl,configuredDatabaseUrl:process.env.NEON_DATABASE_URL,marker:process.env.TAPTPAY_TEST_DATABASE});
-const target=new URL(testDatabaseUrl);assert.equal(target.hostname,'127.0.0.1');assert.equal(target.pathname,'/r3_scratch');
+const target=new URL(testDatabaseUrl);assert.equal(target.hostname,'127.0.0.1');assert.ok(['/r3_scratch','/r3_integrated_scratch'].includes(target.pathname));
 await import('../server/__tests__/support/test-env');
 const {DatabaseStorage}=await import('../server/storage');
 const {PaymentAttemptService}=await import('../server/payment-attempt-service');
@@ -65,7 +66,7 @@ async function row(vertical:'property'|'trades',id:string) {
 try {
   const runner=await import('../server/migrate');
   const applied=await runner.readMigrationLedger(pool);
-  assert.ok(applied.some(row=>row.filename==='0034_durable_payment_reconciliation.sql'),'final expansion must be applied first');
+  assert.ok(applied.some(row=>row.filename==='0037_retail_payment_canonical_integration.sql'),'integrated expansion must be applied first');
   merchant=(await pool.query("INSERT INTO merchants(name,business_name,email,status) VALUES ('R3','R3',$1,'active') RETURNING id",[`${randomUUID()}@synthetic.test`])).rows[0].id;
   otherMerchant=(await pool.query("INSERT INTO merchants(name,business_name,email,status) VALUES ('Other','Other',$1,'active') RETURNING id",[`${randomUUID()}@synthetic.test`])).rows[0].id;
   tenant=(await pool.query("INSERT INTO tenant_profiles(merchant_id,first_name,last_name,property_address) VALUES ($1,'Test','Tenant','Synthetic') RETURNING id",[merchant])).rows[0].id;
@@ -297,6 +298,53 @@ try {
     const renewed=fresh.id===stale.id ? fresh : await two.claimOutbox(owner,now);assert.ok(renewed);assert.equal(renewed.id,stale.id);
     assert.equal(await one.finishOutbox(stale,'complete',now),false);
     assert.equal(await two.finishOutbox(renewed,'complete',now),true);
+  });
+  await check('actual R2 transport/parser/verifier reconciles invoice and original retail engine',async()=>{
+    const {createWindcaveClient}=await import('../server/windcave-client');
+    const {UAT_WINDCAVE_ENDPOINT}=await import('../server/config');
+    for(const vertical of ['property','trades','retail'] as const) {
+      let binding:SessionBinding;
+      if(vertical==='retail') {
+        const sale=await original.createTransaction({merchantId:merchant,itemName:'Synthetic R2 worker',price:'10.01',status:'pending',paymentMethod:'qr_code',splitEnabled:false});
+        const claim=await retail.claim({transactionId:sale.id,shareIndex:0,idempotencyKey:randomUUID()});assert.equal(claim.kind,'claimed');
+        if(claim.kind!=='claimed') throw new Error('fixture_claim');
+        const prepared=await one.prepareRetailExpectation({paymentAttemptId:claim.attempt.id,merchantId:merchant,currency:'NZD',environment:'uat',providerAccount:'synthetic-account'},now);assert.ok(prepared);
+        const session=`s-${randomUUID()}`;
+        assert.equal((await retail.attachSession({attemptId:claim.attempt.id,processorSessionId:session,processorXId:prepared.processorXId})).kind,'attached');
+        binding=(await one.resolveSession(session))!;
+      } else binding=(await opened(vertical)).binding;
+      assert.ok(binding);const transactionId=`tx-${randomUUID()}`;
+      const client=createWindcaveClient({config:{mode:'uat',endpoint:UAT_WINDCAVE_ENDPOINT,username:'synthetic-account',apiKey:'synthetic-test-only',publicOrigin:'https://harness.test'},
+        transport:async(url,init)=>{
+          assert.equal(url,`${UAT_WINDCAVE_ENDPOINT}/sessions/${binding.sessionId}`);assert.equal(init.method,'GET');
+          const cents=binding.amountCents;
+          return new Response(JSON.stringify({id:binding.sessionId,state:'complete',transactions:[{id:transactionId,authorised:true,type:'purchase',
+            amount:`${Math.floor(cents/100)}.${String(cents%100).padStart(2,'0')}`,currency:binding.currency,
+            merchantReference:binding.reference,sessionId:binding.sessionId,username:'synthetic-account'}]}),{status:200});
+        },wait:async()=>{},clock,audit:()=>undefined});
+      await one.receive(binding.sessionId,'fprn',now);
+      await new PaymentReconciliationWorker(one,createWindcaveReconciliationProvider(client,{providerEnvironment:'uat',accountUsername:'synthetic-account'}),clock).runOne(randomUUID());
+      assert.equal((await pool.query('SELECT outcome FROM payment_settlement_events WHERE session_id=$1',[binding.sessionId])).rows[0]?.outcome,'approved');
+      assert.equal((await pool.query('SELECT status FROM payment_notification_inbox WHERE session_id=$1',[binding.sessionId])).rows[0].status,'complete');
+    }
+  });
+  await check('R2 expected/reconciliation writes coexist with R3 canonical write-once identity',async()=>{
+    const sale=await original.createTransaction({merchantId:merchant,itemName:'Synthetic R2 integration',price:'10.01',status:'pending',paymentMethod:'qr_code',splitEnabled:false});
+    const claim=await retail.claim({transactionId:sale.id,shareIndex:0,idempotencyKey:randomUUID()});assert.equal(claim.kind,'claimed');
+    if(claim.kind!=='claimed') throw new Error('fixture_claim');
+    const expected={attemptId:claim.attempt.id,amountCents:1001,currency:'NZD',merchantReference:`TAPT_${claim.attempt.id}`,providerEnvironment:'uat' as const};
+    assert.equal((await retail.recordExpectedValues(expected)).kind,'recorded');
+    assert.equal((await retail.recordExpectedValues(expected)).kind,'reused');
+    assert.equal((await retail.recordReconciliation({attemptId:claim.attempt.id,code:'pending'})).kind,'recorded');
+    const prepared=await one.prepareRetailExpectation({paymentAttemptId:claim.attempt.id,merchantId:merchant,currency:'NZD',environment:'uat',providerAccount:'synthetic-account'},now);
+    assert.ok(prepared);assert.equal(prepared.reference,expected.merchantReference);
+    assert.equal((await retail.recordReconciliation({attemptId:claim.attempt.id,code:'integrity_mismatch:amount'})).kind,'recorded');
+    for(const patch of ["expected_amount_cents=1002","expected_currency='AUD'","expected_merchant_reference='other'","provider_environment='production'","expected_provider_account='other'","processor_x_id='other'"])
+      await assert.rejects(pool.query(`UPDATE payment_attempts SET ${patch} WHERE id=$1`,[claim.attempt.id]),{code:'23514'});
+    const persisted=(await pool.query('SELECT * FROM payment_attempts WHERE id=$1',[claim.attempt.id])).rows[0];
+    assert.equal(persisted.expected_amount_cents,'1001');assert.equal(persisted.last_reconciliation_code,'integrity_mismatch:amount');
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM payment_attempt_expectations WHERE payment_attempt_id=$1',[claim.attempt.id])).rows[0].n,0);
+    assert.ok(persisted.send_started_at);assert.equal(persisted.processor_transaction_id,null);
   });
   await check('retail reuses original engine with exact expectations, inbox fence and atomic outbox',async()=>{
     const transaction=await original.createTransaction({merchantId:merchant,itemName:'Synthetic',price:'10.01',status:'pending',paymentMethod:'qr_code',splitEnabled:false} as any);

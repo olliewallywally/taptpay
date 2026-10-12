@@ -235,7 +235,8 @@ const RECIPES: Record<string, OwnServedRecipe> = {
         expect(res.body).toEqual({ approved: true, outcome: "approved", receiptShare: null });
         // The wallet's token goes to the provider's own submit address for this attempt, and nowhere else.
         expect(submitGooglePay.mock.calls).toEqual([[expect.stringMatching(/^https:\/\/uat\.windcave\.com\/.*\/googlepay$/), { signature: "synthetic" }]]);
-        expect(await sale(paying.id)).toMatchObject({ status: "completed", paymentMethod: "google_pay", windcaveTransactionId: "provider-google-pay" });
+        // R2-T5: the verified session query settles it, never the submit's own reply.
+        expect(await sale(paying.id)).toMatchObject({ status: "completed", paymentMethod: "google_pay", windcaveTransactionId: expect.stringMatching(/^provider-matrix-session-\d+$/) });
       },
     };
   },
@@ -330,7 +331,8 @@ const RECIPES: Record<string, OwnServedRecipe> = {
       check: async (res) => {
         expect(res.body).toEqual({ approved: true, redirectPath: `/receipt/${paying.id}` });
         expect(submitGooglePay.mock.calls).toEqual([[expect.stringMatching(/^https:\/\/uat\.windcave\.com\/.*\/googlepay$/), { signature: "synthetic" }]]);
-        expect(await sale(paying.id)).toMatchObject({ status: "completed", paymentMethod: "google_pay", windcaveTransactionId: "provider-google-pay" });
+        // R2-T5: the verified session query settles it, never the submit's own reply.
+        expect(await sale(paying.id)).toMatchObject({ status: "completed", paymentMethod: "google_pay", windcaveTransactionId: expect.stringMatching(/^provider-matrix-session-\d+$/) });
       },
     };
   },
