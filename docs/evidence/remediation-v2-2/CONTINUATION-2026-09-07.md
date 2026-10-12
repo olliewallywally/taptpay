@@ -2,8 +2,11 @@
 
 Latest continuation **2026-10-12 — terminal repairs, completed automated followup
 and next-task readiness review**, branch `fix/qwen-aligned-20261010`, base
-`b5730b8aa7f5ebdd224509499a7c11381594e921`. Implementation is the commit containing
-[the new immediate handover](../../HANDOFF-2026-10-12-r1-t10-terminal-followup.md).
+`b5730b8aa7f5ebdd224509499a7c11381594e921`. Implementation
+`7b10df91c2fb1c0a7d2527a2357d69388a875d79` was committed and pushed; fresh
+`git ls-remote` verified that exact SHA on `origin/fix/qwen-aligned-20261010`.
+A documentation-only publication record follows it.
+[New immediate handover](../../HANDOFF-2026-10-12-r1-t10-terminal-followup.md).
 [Preflight](r1/R1-T10-terminal-followup-preflight-2026-10-12.md),
 [structural evidence](r1/R1-T10-terminal-followup-browser-summary-2026-10-12.json),
 [implementer reread](r1/R1-T10-terminal-followup-review-2026-10-12.md) and

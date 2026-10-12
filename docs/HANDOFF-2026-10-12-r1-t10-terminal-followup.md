@@ -1,8 +1,10 @@
 # Handoff — R1-T10 terminal/harness followup, 2026-10-12
 
 Repository `olliewallywally/taptpay`, branch `fix/qwen-aligned-20261010`, published
-base `b5730b8aa7f5ebdd224509499a7c11381594e921`. The implementation is the commit
-containing this handover; record its exact remote verification after publication.
+base `b5730b8aa7f5ebdd224509499a7c11381594e921`. Implementation
+`7b10df91c2fb1c0a7d2527a2357d69388a875d79` was committed and pushed to
+`origin/fix/qwen-aligned-20261010`; fresh `git ls-remote` verified that exact SHA.
+This documentation-only publication record follows it.
 Oliver authorized continued outstanding work and commit/push. He deploys on Replit.
 Claude retains independent task 7 and the separate stock hidden-focus review.
 
