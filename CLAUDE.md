@@ -30,7 +30,9 @@ finding for the owner.
 **R2 has started (2026-10-11) on `ccr-e07e3100-0wm8kr` while Codex finishes R1.** Read
 `docs/evidence/remediation-v2-2/r2/R2-preflight-2026-10-11.md` and its §21.1 review pass
 before any R2 work. Passes 1–2 approved T1–T3 only; they are implemented (see
-`docs/evidence/remediation-v2-2/r2/R2-T1-T3-2026-10-11.md`). T4–T6 wait on the owner's answers.
+`docs/evidence/remediation-v2-2/r2/R2-T1-T3-2026-10-11.md`). T4 is implemented as repository
+work (`docs/evidence/remediation-v2-2/r2/R2-T4-2026-10-12.md`); migration 0034 is applied nowhere.
+T5–T6 for legacy numbered and invoice flows wait on the owner's answers.
 
 This program's established discipline: failing-tests-first; independently re-verify a prior
 pass's own claims before trusting them, the way every session in this program has had to;
