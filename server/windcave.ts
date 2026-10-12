@@ -3,8 +3,8 @@ import crypto from "crypto";
 import { redactSensitive } from "./request-log";
 import { config } from "./config";
 import { createWindcaveClient, type UnknownReason, type WindcaveClient } from "./windcave-client";
-import { validateWindcaveLink, windcaveScriptEnv } from "./windcave-links";
-import { normalizeSessionQuery } from "./windcave-query";
+import { selectSessionLinks, validateCallbackAddress, validateWindcaveLink, windcaveScriptEnv } from "./windcave-links";
+import { normalizeSessionQuery, parseCentsExact } from "./windcave-query";
 import { verifyWindcaveOutcome, type WindcaveExpectedOutcome } from "./windcave-verify";
 import { writeSecurityAuditEvent } from "./security-audit-log";
 
@@ -57,7 +57,8 @@ async function fetchWithTimeout(url: string, options: RequestInit): Promise<Resp
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
   try {
-    return await fetch(url, { ...options, signal: controller.signal });
+    // R2-T6: never follow a redirect with credentials or a wallet token.
+    return await fetch(url, { ...options, redirect: "manual", signal: controller.signal });
   } finally {
     clearTimeout(id);
   }
@@ -351,6 +352,13 @@ export async function createCardStorageSession(
     notificationUrl,
   };
 
+  // R2-T6: the addresses the provider calls back are on exactly PUBLIC_ORIGIN (R2-T2).
+  if (!validateCallbackAddress(callbackBase, config.publicOrigin, { needsQuery: true }) ||
+      !validateCallbackAddress(notificationUrl, config.publicOrigin, { needsQuery: false })) {
+    logAudit("STORE_CARD_SESSION_INVALID_REQUEST", { reason: "callback_origin" });
+    return { success: false, error: "invalid_request" };
+  }
+
   logAudit("STORE_CARD_SESSION_REQUEST", { xId, merchantReference });
 
   let response: Response;
@@ -358,6 +366,7 @@ export async function createCardStorageSession(
     const request = options.request ?? fetchWithTimeout;
     response = await request(SESSION_URL, {
       method: "POST",
+      redirect: "manual",
       headers: {
         "Content-Type": "application/json",
         Authorization: buildAuthHeader(),
@@ -372,14 +381,19 @@ export async function createCardStorageSession(
 
   const text = await response.text();
   if (response.status === 202 || response.status === 200) {
-    let data: any = {};
-    try { data = JSON.parse(text); } catch {}
-    const links: any[] = data.links || [];
-    const hppUrl =
-      links.find((l) => l.rel === "hpp")?.href ||
-      links.find((l) => l.method === "REDIRECT")?.href;
-    logAudit("STORE_CARD_SESSION_CREATED", { xId, sessionId: data.id, hppUrl });
-    return { success: true, sessionId: data.id, hppUrl };
+    const data = parseWindcaveJson(text);
+    // R2-T6: only the `hpp` relation, valid for this mode (R2-T2), goes to the browser;
+    // no other REDIRECT link stands in for it.
+    const links = Array.isArray(data?.links)
+      ? data.links.filter((link: any) => typeof link?.rel === "string" && typeof link?.href === "string")
+      : [];
+    const selected = selectSessionLinks(links, config.paymentMode);
+    if (typeof data?.id !== "string" || data.id.length === 0 || !selected.links.hpp) {
+      logAudit("STORE_CARD_SESSION_LINK_REJECTED", { xId, rejectedLinks: selected.rejected });
+      return { success: false, error: "Windcave card setup reply had no valid hosted page" };
+    }
+    logAudit("STORE_CARD_SESSION_CREATED", { xId, sessionId: data.id, rejectedLinks: selected.rejected });
+    return { success: true, sessionId: data.id, hppUrl: selected.links.hpp };
   }
 
   logAudit("STORE_CARD_SESSION_ERROR", { xId, status: response.status, bytes: text.length });
@@ -403,6 +417,7 @@ export async function queryStoredCardSession(
     const request = options.request ?? fetchWithTimeout;
     response = await request(`${SESSION_URL}/${encodeURIComponent(sessionId)}`, {
       method: "GET",
+      redirect: "manual",
       headers: { Authorization: buildAuthHeader() },
     });
   } catch (err: any) {
@@ -421,16 +436,33 @@ export async function queryStoredCardSession(
   }
 
   const data = parseWindcaveJson(text);
-  const tx = Array.isArray(data?.transactions) ? data.transactions[0] : undefined;
-  if (!tx || typeof tx.authorised !== "boolean") {
+  // R2-T6: a reply that names another session is never this card's (checked when the
+  // reply names one; whether to require it waits on UAT, owner direction 2026-10-12).
+  if (data && typeof data === "object" && data.id !== undefined && data.id !== sessionId) {
+    logAudit("STORE_CARD_QUERY_MISMATCH", { field: "session" });
+    writeSecurityAuditEvent("PROVIDER_OUTCOME_MISMATCH", { field: "session" });
+    return { success: false, error: "integrity_mismatch:session" };
+  }
+  if (typeof data?.state === "string" && data.state !== "complete") {
+    return { success: true, complete: false };
+  }
+  const transactions: any[] | undefined = Array.isArray(data?.transactions) ? data.transactions : undefined;
+  if (!transactions || transactions.length === 0 || transactions.some((entry) => typeof entry?.authorised !== "boolean")) {
     logAudit("STORE_CARD_QUERY_INVALID_RESULT", { sessionId });
     return {
       success: false,
       error: "Windcave stored-card session response did not include a final transaction result",
     };
   }
+  // One authorised result, or only declines; two authorised results are ambiguous.
+  const authorisedEntries = transactions.filter((entry) => entry.authorised === true);
+  if (authorisedEntries.length > 1) {
+    logAudit("STORE_CARD_QUERY_AMBIGUOUS", { sessionId, authorised: authorisedEntries.length });
+    return { success: false, error: "Windcave stored-card session response was ambiguous" };
+  }
+  const tx = authorisedEntries[0] ?? transactions[0];
 
-  const approved = tx.authorised;
+  const approved = authorisedEntries.length === 1;
   const card = approved ? extractStoredCard(tx) : undefined;
   logAudit("STORE_CARD_QUERY_RESULT", { sessionId, approved, hasCard: !!card });
 
@@ -483,6 +515,7 @@ export async function chargeStoredCard(
     const request = options.request ?? fetchWithTimeout;
     response = await request(TRANSACTION_URL, {
       method: "POST",
+      redirect: "manual",
       headers: {
         "Content-Type": "application/json",
         Authorization: buildAuthHeader(),
@@ -503,7 +536,7 @@ export async function chargeStoredCard(
       logAudit("CHARGE_STORED_CARD_PENDING_INVALID", { xId, bytes: text.length });
       return { success: false, error: "Windcave returned a pending transaction without an id" };
     }
-    return pollStoredCardCharge(xId, pollUrl, pending?.id ?? pending?.transactionId, options);
+    return pollStoredCardCharge(xId, pollUrl, pending?.id ?? pending?.transactionId, { amount, merchantReference }, options);
   }
 
   if (response.status !== 200 && response.status !== 201) {
@@ -511,7 +544,7 @@ export async function chargeStoredCard(
     return { success: false, error: providerFailure(response.status) };
   }
 
-  return finalStoredCardChargeResult(xId, parseWindcaveJson(text));
+  return finalStoredCardChargeResult(xId, parseWindcaveJson(text), { amount, merchantReference });
 }
 
 function parseWindcaveJson(text: string): any | undefined {
@@ -522,9 +555,33 @@ function parseWindcaveJson(text: string): any | undefined {
   }
 }
 
+/** What a stored-card charge asked for: its reply must not say otherwise. */
+interface StoredCardCharge {
+  amount: string;
+  merchantReference: string;
+}
+
+/**
+ * R2-T6 (plan §9.5 for the card-on-file charge): the reply's type, exact amount, currency
+ * and reference must be what was charged. Each is checked when the reply carries it;
+ * requiring them waits on an official UAT reply (owner direction 2026-10-12).
+ */
+function storedCardChargeMismatch(data: any, charged: StoredCardCharge): "type" | "amount" | "currency" | "reference" | null {
+  if (data.type !== undefined && data.type !== "purchase") return "type";
+  if (data.amount !== undefined) {
+    const replied = parseCentsExact(data.amount);
+    const asked = parseCentsExact(charged.amount);
+    if (!replied.ok || !asked.ok || replied.cents !== asked.cents) return "amount";
+  }
+  if (data.currency !== undefined && data.currency !== "NZD") return "currency";
+  if (data.merchantReference !== undefined && data.merchantReference !== charged.merchantReference) return "reference";
+  return null;
+}
+
 function finalStoredCardChargeResult(
   xId: string,
   data: any,
+  charged: StoredCardCharge,
   fallbackTransactionId?: string,
 ): ChargeStoredCardResult {
   const rawTransactionId = data?.id ?? data?.transactionId ?? fallbackTransactionId;
@@ -540,6 +597,14 @@ function finalStoredCardChargeResult(
       windcaveTransactionId,
       error: "Windcave transaction response did not include an authorised result",
     };
+  }
+
+  // A reply for something other than this charge is neither an approval nor a decline.
+  const mismatch = storedCardChargeMismatch(data, charged);
+  if (mismatch) {
+    logAudit("CHARGE_STORED_CARD_MISMATCH", { xId, field: mismatch });
+    writeSecurityAuditEvent("PROVIDER_OUTCOME_MISMATCH", { field: mismatch });
+    return { success: false, windcaveTransactionId, error: `integrity_mismatch:${mismatch}` };
   }
 
   const approved = data.authorised;
@@ -587,6 +652,7 @@ async function pollStoredCardCharge(
   xId: string,
   pollUrl: string,
   fallbackTransactionId: unknown,
+  charged: StoredCardCharge,
   options: CardOnFileRequestOptions,
 ): Promise<ChargeStoredCardResult> {
   const request = options.request ?? fetchWithTimeout;
@@ -604,6 +670,7 @@ async function pollStoredCardCharge(
     try {
       response = await request(pollUrl, {
         method: "GET",
+        redirect: "manual",
         headers: { Authorization: buildAuthHeader() },
       });
     } catch (err: any) {
@@ -630,7 +697,7 @@ async function pollStoredCardCharge(
       };
     }
 
-    return finalStoredCardChargeResult(xId, parseWindcaveJson(text), fallbackId);
+    return finalStoredCardChargeResult(xId, parseWindcaveJson(text), charged, fallbackId);
   }
 
   logAudit("CHARGE_STORED_CARD_POLL_EXHAUSTED", { xId, pollLimit, txId: fallbackId });

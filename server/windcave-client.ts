@@ -132,7 +132,9 @@ export function createWindcaveClient(deps: WindcaveClientDeps): WindcaveClient {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const response = await transport(url, { ...init, signal: controller.signal });
+      // R2-T6 (§9.6 "redirect"): a redirect is never followed with credentials; its 3xx
+      // comes back as an unexpected status, which is unknown, never a decision.
+      const response = await transport(url, { ...init, redirect: "manual", signal: controller.signal });
       const text = await response.text();
       return { kind: "response", status: response.status, text };
     } catch (error) {
