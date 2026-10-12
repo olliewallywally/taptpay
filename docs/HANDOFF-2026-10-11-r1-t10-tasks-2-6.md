@@ -1,8 +1,12 @@
 # Handoff — R1-T10 tasks 2–6 engineering checkpoint, 2026-10-11
 
 Repository `olliewallywally/taptpay`, branch `fix/qwen-aligned-20261010`.
-Base `c70018022d19b641ddc7612d79061ddb8aee8a45`. Implementation is the commit
-containing this checkpoint; publication will be verified against the remote.
+Base `c70018022d19b641ddc7612d79061ddb8aee8a45`. Implementation
+`95ad8bb63171531414e955bb04e9f493468e88f3` was committed and pushed to
+`origin/fix/qwen-aligned-20261010`; a fresh `git ls-remote` returned that exact SHA.
+This documentation checkpoint follows the implementation; use the implementation
+SHA above when comparing application changes and the current remote branch for
+the publication record.
 Oliver authorized commit/push and deploys on Replit. **Do not deploy, update
 goldens or declare R1-T10/R1/release closed.** Claude owns independent task 7
 and the separate stock hidden-focus review.

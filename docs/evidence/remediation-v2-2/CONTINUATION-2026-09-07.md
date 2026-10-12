@@ -3,8 +3,11 @@
 Latest continuation **2026-10-12 — publish completed R1-T10 tasks 2–6 work**,
 branch `fix/qwen-aligned-20261010`, exact base
 `c70018022d19b641ddc7612d79061ddb8aee8a45`. The owner requested commit/push of
-completed work; he deploys on Replit. Implementation is the commit containing
-[the immediate handover](../../HANDOFF-2026-10-11-r1-t10-tasks-2-6.md).
+completed work; he deploys on Replit. Implementation
+`95ad8bb63171531414e955bb04e9f493468e88f3` was committed and pushed to
+`origin/fix/qwen-aligned-20261010`; fresh `git ls-remote` verified that exact SHA.
+A documentation-only publication record follows it.
+[Immediate handover](../../HANDOFF-2026-10-11-r1-t10-tasks-2-6.md).
 [Evidence](r1/R1-T10-tasks-2-6-checkpoint-2026-10-11.md),
 [structural report](r1/R1-T10-tasks-2-6-browser-summary-2026-10-11.json),
 [preflight](r1/R1-T10-tasks-2-6-preflight-2026-10-11.md),
