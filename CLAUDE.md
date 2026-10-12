@@ -19,11 +19,13 @@ doing anything:
 - `docs/PLAN-2026-08-24-taptpay-remediation-v2-2.md` — the authoritative remediation plan,
   including §21.1's required reviewer-pass template.
 
-The immediate R1-T10 handover is now `docs/HANDOFF-2026-10-11-r1-t10-tasks-2-6.md`.
-Read it after the ledger; it supersedes the earlier October 11 immediate task state
-and records the contrast/semantics and expanded-draft repairs, exact frozen builds,
-retained gate failures, the Replit device-preview procedure and owner decisions
-still needed. Claude owns independent task 7 and the stock hidden-focus review.
+The immediate R1-T10 handover is now `docs/HANDOFF-2026-10-12-r1-t10-terminal-followup.md`.
+Read it after the ledger; it records terminal contrast/name repairs, actual keypad
+operations, corrected golden fixtures, exact frozen builds, completed reduced
+motion tutorials and the owner decision to retain the property feed-under-dock
+layout. Historical October 11 evidence remains linked; actual devices, owner
+visual/golden acceptance and independent review are still open. Claude owns task 7
+and the stock hidden-focus review. The next-task readiness review is linked there.
 
 This program's established discipline: failing-tests-first; independently re-verify a prior
 pass's own claims before trusting them, the way every session in this program has had to;

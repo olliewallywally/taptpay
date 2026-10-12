@@ -75,21 +75,21 @@
 .property-terminal-view .tp-stack-meta { display: flex; align-items: center; gap: 5px; }
 .property-terminal-view .tp-stack-status { font-weight: 500; font-size: 11px; color: #586079; }
 .property-terminal-view .tp-stack-price { font-weight: 700; font-size: 15px; color: #040D6D; letter-spacing: -0.3px; }
-.property-terminal-view .tp-stack-empty { padding: 14px 16px; font-size: 13px; color: rgba(4,13,109,0.4); text-align: center; }
+.property-terminal-view .tp-stack-empty { padding: 14px 16px; font-size: 13px; color: #586079; text-align: center; }
 .property-terminal-view .tp-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; animation: tp-pulse 2s ease-in-out infinite; }
 .property-terminal-view .tp-dot.awaiting { background: #58ABFF; }
 .property-terminal-view .tp-dot.payment-sent { background: #58ABFF; }
 .property-terminal-view .tp-dot.paid { background: #1BBF85; animation: none; opacity: 1; }
 .property-terminal-view .tp-dot.declined { background: #FF5B5B; animation: none; opacity: 1; }
 .property-terminal-view .tp-field { width: 100%; padding: 18px 24px; border-radius: 999px; background: #F4F4F4; border: none; color: #040D6D; font-family: 'Outfit', system-ui; font-weight: 500; font-size: 17px; letter-spacing: -0.01em; outline: none; box-sizing: border-box; }
-.property-terminal-view .tp-field::placeholder { color: rgba(4,13,109,0.35); }
+.property-terminal-view .tp-field::placeholder { color: #586079; }
 .property-terminal-view .tp-cta { display: inline-flex; align-items: center; justify-content: center; padding: 14px 36px; border-radius: 999px; background: #58ABFF; color: #040D6D; font-family: 'Outfit', system-ui; font-weight: 600; font-size: 15px; transition: transform 120ms, opacity 120ms; white-space: nowrap; border: none; cursor: pointer; box-sizing: border-box; }
 .property-terminal-view .tp-cta:active { transform: scale(0.96); opacity: 0.92; }
 .property-terminal-view .tp-cta-wire { display: inline-flex; align-items: center; justify-content: center; padding: 14px 36px; border-radius: 999px; background: transparent; color: #58ABFF; font-family: 'Outfit', system-ui; font-weight: 600; font-size: 15px; border: 1.5px solid #58ABFF; transition: background 160ms ease, color 160ms ease, transform 120ms; white-space: nowrap; cursor: pointer; box-sizing: border-box; }
 .property-terminal-view .tp-cta-wire:active { background: #58ABFF; color: #040D6D; transform: scale(0.96); }
 /* --kp-size: docs/SPEC-2026-08-20-dock-implementation.md §5 — declared on
    .tp-panel-body (terminal-tokens.css), capped at --kp-max (76px). */
-.property-terminal-view .tp-kp { width: var(--kp-size, 76px); height: var(--kp-size, 76px); border-radius: 999px; display: flex; align-items: center; justify-content: center; font-family: 'Outfit', system-ui; font-weight: 700; font-size: calc(var(--kp-size, 76px) * 0.3947); transition: transform 100ms, background 100ms; background: #58ABFF; color: #fff; border: none; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.35); }
+.property-terminal-view .tp-kp { width: var(--kp-size, 76px); height: var(--kp-size, 76px); border-radius: 999px; display: flex; align-items: center; justify-content: center; font-family: 'Outfit', system-ui; font-weight: 700; font-size: calc(var(--kp-size, 76px) * 0.3947); transition: transform 100ms, background 100ms; background: #58ABFF; color: #040D6D; border: none; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.35); }
 .property-terminal-view .tp-kp:active { transform: scale(0.92); }
 /* Backspace only — transparent, icon-only, no ring (dropped per Oliver's
    request). Its own box-shadow: none so the base drop shadow above doesn't

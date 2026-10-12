@@ -22,7 +22,7 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import { auditFonts, openGoldenPage, settle, type Vertical } from "./support/fixtures";
-import { cancel, commit, expectScreen, pressKeys, tapFab, tapSubbar } from "./support/screens";
+import { commit, expectScreen, pressKeys, tapFab, tapSubbar } from "./support/screens";
 
 const REFERENCE = { width: 390, height: 844 };
 
@@ -146,6 +146,9 @@ async function reachRetailShare(page: Page) {
    Tier 3 — fidelity, 390×844 @ DPR 1: the rest of §6.6.1's 31 screens
    ───────────────────────────────────────────────────────────────────────── */
 test.describe("tier 3 — terminal sub-screens @ 390×844", () => {
+  // Each strict screenshot can use its existing 20s bound before reporting a
+  // difference. Budget the complete flow without skipping later comparisons.
+  test.setTimeout(360_000);
   test("retail", async ({ browser }) => {
     const { context, page, unpinnedFonts } = await openGoldenPage(browser, "retail", REFERENCE);
     try {
@@ -273,7 +276,8 @@ test.describe("tier 3 — terminal sub-screens @ 390×844", () => {
       await expectScreen(page, '[data-demo-id="trades-quote"]', "QuoteView");
       await capture(page, "tier3", "trades-quote");
 
-      await cancel(page);
+      await page.getByRole("button", { name: "Close quote", exact: true }).click();
+      await settle(page);
       await tapSubbar(page, "trades", "clients");
       await expectScreen(page, '[data-demo-id^="trades-client-"]', "ChooseClient");
       await capture(page, "tier3", "trades-clients");

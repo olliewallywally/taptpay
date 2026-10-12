@@ -337,7 +337,7 @@ function SplitPill({ on, onToggle }: any) {
         borderRadius: 999,
         border: `1.5px solid ${on ? NAVY : 'rgba(4,13,109,0.28)'}`,
         background: on ? NAVY : 'transparent',
-        color: on ? BLUE : 'rgba(4,13,109,0.55)',
+        color: on ? BLUE : '#586079',
         fontWeight: 700, fontSize: 11,
         letterSpacing: '0.02em',
         whiteSpace: 'nowrap',
@@ -382,7 +382,7 @@ function ChooseTenant({ tenants, invoices, go, onSelect, splitMode, onToggleSpli
       <div className="stagger tp-hero" style={{ background: OFFW, color: NAVY, display: 'flex', flexDirection: 'column' }}>
         <SubHead onCancel={() => go('home', 'down')} onCommit={() => go('home', 'down')} />
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div style={{ color: 'rgba(4,13,109,0.35)', fontWeight: 500, fontSize: 18 }}>choose tenant</div>
+          <div style={{ color: '#586079', fontWeight: 500, fontSize: 18 }}>choose tenant</div>
         </div>
         {/* Reserved space so the subbar sits at the same level as in home screen */}
         <div style={{ height: 52 }} />
@@ -421,7 +421,7 @@ function ChooseTenant({ tenants, invoices, go, onSelect, splitMode, onToggleSpli
           fadeColor={NAVY}
         >
           {filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '32px 0', color: 'rgba(88,171,255,0.4)', fontSize: 13 }}>no tenants found</div>
+            <div style={{ textAlign: 'center', padding: '32px 0', color: 'rgba(88,171,255,0.85)', fontSize: 13 }}>no tenants found</div>
           ) : filtered.map((t: any) => {
             const inv = latestInvoice(t.id);
             const amount = inv?.amountCents ?? 0;
@@ -440,7 +440,7 @@ function ChooseTenant({ tenants, invoices, go, onSelect, splitMode, onToggleSpli
                 </div>
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
                   <div style={{ fontWeight: 700, fontSize: 14, color: BLUE, fontVariantNumeric: 'tabular-nums' }}>{amount ? fmt(amount) : '—'}</div>
-                  {st && <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end', marginTop: 3 }}><span className={`tp-dot ${dotCls}`} /><span style={{ fontSize: 10, color: 'rgba(88,171,255,0.5)' }}>{st}</span></div>}
+                  {st && <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end', marginTop: 3 }}><span className={`tp-dot ${dotCls}`} /><span style={{ fontSize: 10, color: 'rgba(88,171,255,0.85)' }}>{st}</span></div>}
                 </div>
               </AnimatedListRow>
             );
@@ -471,9 +471,9 @@ function RentAmount({ go, selectedTenant, onCommit, backTo = 'send' }: any) {
       <div className="stagger tp-hero" style={{ background: OFFW, color: NAVY, display: 'flex', flexDirection: 'column' }}>
         <SubHead onCancel={() => go(backTo, 'down')} onCommit={commit} demoCommitId="property-amount-confirm" />
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-          <div className="tp-amount" data-demo-id="property-amount" style={amountStyle(fmt(cents), 82, { color: cents === 0 ? 'rgba(4,13,109,0.25)' : NAVY, marginTop: 18 })}>{fmt(cents)}</div>
+          <div className="tp-amount" data-demo-id="property-amount" style={amountStyle(fmt(cents), 82, { color: cents === 0 ? '#586079' : NAVY, marginTop: 18 })}>{fmt(cents)}</div>
           {selectedTenant && (
-            <div style={{ fontWeight: 500, fontSize: 15, color: 'rgba(4,13,109,0.5)', paddingBottom: 8 }}>
+            <div style={{ fontWeight: 500, fontSize: 15, color: '#586079', paddingBottom: 8 }}>
               {tenantName(selectedTenant)} · {selectedTenant.propertyAddress}
             </div>
           )}
@@ -490,7 +490,7 @@ function RentAmount({ go, selectedTenant, onCommit, backTo = 'send' }: any) {
               decimal key — this cell is an inert spacer to keep the 3×4 grid. */}
           <div className="tp-kp" style={{ visibility: 'hidden' }} aria-hidden />
           <button className="tp-kp" data-demo-id="property-key-0" onClick={() => press('0')}>0</button>
-          <button className="tp-kp outline" data-demo-id="property-key-back" onClick={back}><Ic.Back /></button>
+          <button type="button" aria-label="Delete last digit" className="tp-kp outline" data-demo-id="property-key-back" onClick={back}><Ic.Back /></button>
         </div>
         </div>
       </div>
@@ -507,7 +507,7 @@ function SendRentLink({ go, selectedTenant, amount, onSend, sending, frequency, 
         <div className="stagger tp-hero" style={{ background: OFFW, color: NAVY, display: 'flex', flexDirection: 'column' }}>
           <SubHead onCancel={() => go('home', 'down')} onCommit={() => go('tenants')} />
           <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            <div style={{ color: 'rgba(4,13,109,0.35)', fontWeight: 500, fontSize: 18 }}>choose a tenant</div>
+            <div style={{ color: '#586079', fontWeight: 500, fontSize: 18 }}>choose a tenant</div>
           </div>
           <div style={{ height: 52 }} />
         </div>
@@ -534,7 +534,7 @@ function SendRentLink({ go, selectedTenant, amount, onSend, sending, frequency, 
           {selectedTenant && (
             <div style={{ marginTop: 14, fontWeight: 500, fontSize: 16, color: NAVY, lineHeight: 1.4 }}>
               {tenantName(selectedTenant)}
-              <div style={{ fontWeight: 400, fontSize: 14, color: 'rgba(4,13,109,0.5)', marginTop: 4 }}>{selectedTenant.propertyAddress}</div>
+              <div style={{ fontWeight: 400, fontSize: 14, color: '#586079', marginTop: 4 }}>{selectedTenant.propertyAddress}</div>
             </div>
           )}
         </div>
@@ -620,7 +620,7 @@ function ChargeBill({ go, selectedTenant, amount, onEditAmount, chargeType, setC
         <div className="stagger tp-hero" style={{ background: OFFW, color: NAVY, display: 'flex', flexDirection: 'column' }}>
           <SubHead onCancel={() => go('home', 'down')} onCommit={() => go('tenants')} />
           <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            <div style={{ color: 'rgba(4,13,109,0.35)', fontWeight: 500, fontSize: 18 }}>choose a tenant</div>
+            <div style={{ color: '#586079', fontWeight: 500, fontSize: 18 }}>choose a tenant</div>
           </div>
           <div style={{ height: 52 }} />
         </div>
@@ -654,12 +654,12 @@ function ChargeBill({ go, selectedTenant, amount, onEditAmount, chargeType, setC
         <SubHead onCancel={() => go('home', 'down')} onCommit={() => ready && onSend()} />
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <button onClick={onEditAmount} data-demo-id="property-bill-amount" style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'baseline', gap: 10 }}>
-            <span className="tp-amount" style={amountStyle(fmt(amount), 82, { color: amount === 0 ? 'rgba(4,13,109,0.25)' : NAVY })}>{fmt(amount)}</span>
-            <span style={{ fontWeight: 600, fontSize: 12, color: 'rgba(4,13,109,0.4)', textDecoration: 'underline', textUnderlineOffset: 2 }}>edit</span>
+            <span className="tp-amount" style={amountStyle(fmt(amount), 82, { color: amount === 0 ? '#586079' : NAVY })}>{fmt(amount)}</span>
+            <span style={{ fontWeight: 600, fontSize: 12, color: '#586079', textDecoration: 'underline', textUnderlineOffset: 2 }}>edit</span>
           </button>
           <div style={{ marginTop: 14, fontWeight: 500, fontSize: 16, color: NAVY, lineHeight: 1.4 }}>
             {tenantName(selectedTenant)}
-            <div style={{ fontWeight: 400, fontSize: 14, color: 'rgba(4,13,109,0.5)', marginTop: 4 }}>{selectedTenant.propertyAddress}</div>
+            <div style={{ fontWeight: 400, fontSize: 14, color: '#586079', marginTop: 4 }}>{selectedTenant.propertyAddress}</div>
           </div>
         </div>
         <div style={{ height: 52 }} />
@@ -734,7 +734,7 @@ function ChargeBill({ go, selectedTenant, amount, onEditAmount, chargeType, setC
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '13px 16px', background: 'rgba(88,171,255,0.06)', border: '1px solid rgba(88,171,255,0.18)', borderRadius: 16 }}>
             {channel === 'email' ? <Ic.Mail sz={18} c={BLUE} /> : <Ic.Msg sz={18} c={BLUE} />}
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: 600, fontSize: 10.5, color: 'rgba(88,171,255,0.5)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>sending via {channel}</div>
+              <div style={{ fontWeight: 600, fontSize: 10.5, color: 'rgba(88,171,255,0.85)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>sending via {channel}</div>
               <div style={{ fontWeight: 500, fontSize: 13.5, color: BLUE, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>{dest || `tenant's ${channel}`}</div>
             </div>
           </div>
@@ -762,7 +762,7 @@ function ReminderSettingsCard({ settings, onUpdate }: any) {
 
   const Row = ({ label, value, options, onPick, fmt }: any) => (
     <div style={{ marginTop: 12 }}>
-      <div style={{ fontSize: 10.5, fontWeight: 600, color: 'rgba(88,171,255,0.5)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 7 }}>{label}</div>
+      <div style={{ fontSize: 10.5, fontWeight: 600, color: 'rgba(88,171,255,0.85)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 7 }}>{label}</div>
       <div style={{ display: 'flex', gap: 7 }}>
         {options.map((o: number) => {
           const on = value === o;
@@ -783,7 +783,7 @@ function ReminderSettingsCard({ settings, onUpdate }: any) {
         <Ic.Repeat sz={16} c={AMBER} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: 700, fontSize: 13.5, color: BLUE }}>overdue reminders</div>
-          <div style={{ fontSize: 11, color: 'rgba(88,171,255,0.5)', marginTop: 1 }}>auto-resend the link until paid</div>
+          <div style={{ fontSize: 11, color: 'rgba(88,171,255,0.85)', marginTop: 1 }}>auto-resend the link until paid</div>
         </div>
         <button onClick={() => onUpdate({ rentReminderEnabled: !enabled })} aria-label="toggle reminders"
           style={{ width: 46, minWidth: 46, height: 27, borderRadius: 999, border: 'none', cursor: 'pointer', background: enabled ? GREEN : 'rgba(88,171,255,0.25)', position: 'relative', transition: 'background 0.2s', flexShrink: 0, flexGrow: 0, padding: 0, boxSizing: 'border-box' }}>
@@ -815,7 +815,7 @@ function AutomateScreen({ go, schedules, tenants, onPauseResume, onCancel, busyI
         <SubHead onCancel={() => go('home', 'down')} onCommit={() => go('home', 'down')} />
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <div className="tp-amount" style={amountStyle(String(live.length), 64)}>{live.length}</div>
-          <div style={{ marginTop: 10, fontWeight: 500, fontSize: 15, color: 'rgba(4,13,109,0.5)' }}>
+          <div style={{ marginTop: 10, fontWeight: 500, fontSize: 15, color: '#586079' }}>
             active automation{live.length !== 1 ? 's' : ''}
           </div>
         </div>
@@ -826,9 +826,9 @@ function AutomateScreen({ go, schedules, tenants, onPauseResume, onCancel, busyI
         <div style={{ color: BLUE, fontWeight: 500, fontSize: 18, textAlign: 'center', marginBottom: 16, flexShrink: 0 }}>automation</div>
         <div className="tp-thin-scroll" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 130 }}>
           <ReminderSettingsCard settings={reminderSettings} onUpdate={onUpdateReminders} />
-          <div style={{ fontSize: 10.5, fontWeight: 600, color: 'rgba(88,171,255,0.45)', letterSpacing: '0.12em', textTransform: 'uppercase', margin: '6px 2px 0' }}>recurring rent</div>
+          <div style={{ fontSize: 10.5, fontWeight: 600, color: 'rgba(88,171,255,0.85)', letterSpacing: '0.12em', textTransform: 'uppercase', margin: '6px 2px 0' }}>recurring rent</div>
           {live.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '20px 16px', color: 'rgba(88,171,255,0.5)', fontSize: 13, lineHeight: 1.6 }}>
+            <div style={{ textAlign: 'center', padding: '20px 16px', color: 'rgba(88,171,255,0.85)', fontSize: 13, lineHeight: 1.6 }}>
               no schedules yet — choose a repeat frequency when sending a rent request to set one up
             </div>
           ) : live.map((s: any) => {
@@ -854,7 +854,7 @@ function AutomateScreen({ go, schedules, tenants, onPauseResume, onCancel, busyI
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(88,171,255,0.12)' }}>
-                  <div style={{ fontSize: 11, color: 'rgba(88,171,255,0.5)' }}>
+                  <div style={{ fontSize: 11, color: 'rgba(88,171,255,0.85)' }}>
                     next {paused ? '—' : fmtDate(s.nextRunDate)}
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
@@ -890,7 +890,7 @@ function MarkExternal({ go, selectedTenant, amount, invoices, onMark, marking }:
         <div className="stagger tp-hero" style={{ background: OFFW, color: NAVY, display: 'flex', flexDirection: 'column' }}>
           <SubHead onCancel={() => go('home', 'down')} onCommit={() => go('tenants')} />
           <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            <div style={{ color: 'rgba(4,13,109,0.35)', fontWeight: 500, fontSize: 18 }}>choose a tenant</div>
+            <div style={{ color: '#586079', fontWeight: 500, fontSize: 18 }}>choose a tenant</div>
           </div>
           <div style={{ height: 52 }} />
         </div>
@@ -928,14 +928,14 @@ function MarkExternal({ go, selectedTenant, amount, invoices, onMark, marking }:
         <div className="tp-panel-body" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         <div style={{ color: BLUE, fontWeight: 500, fontSize: 18, textAlign: 'center' }}>mark as received externally</div>
         {!picked && (
-          <div style={{ marginTop: 16, textAlign: 'center', color: 'rgba(88,171,255,0.5)', fontSize: 13 }}>no outstanding invoice found for this tenant</div>
+          <div style={{ marginTop: 16, textAlign: 'center', color: 'rgba(88,171,255,0.85)', fontSize: 13 }}>no outstanding invoice found for this tenant</div>
         )}
         {picked && (
           <>
             {/* Chooser — only when the tenant has more than one outstanding invoice */}
             {outstanding.length > 1 && (
               <div style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ fontSize: 10.5, fontWeight: 600, color: 'rgba(88,171,255,0.5)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>which invoice?</div>
+                <div style={{ fontSize: 10.5, fontWeight: 600, color: 'rgba(88,171,255,0.85)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>which invoice?</div>
                 {outstanding.map((inv: any) => {
                   const on = inv.id === picked.id;
                   return (
@@ -946,7 +946,7 @@ function MarkExternal({ go, selectedTenant, amount, invoices, onMark, marking }:
                       </span>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 600, fontSize: 13.5, color: BLUE, textTransform: 'capitalize', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{labelFor(inv)}</div>
-                        <div style={{ fontSize: 10.5, color: 'rgba(88,171,255,0.5)', marginTop: 1 }}>{invoiceStatusFor(inv)}</div>
+                        <div style={{ fontSize: 10.5, color: BLUE, marginTop: 1 }}>{invoiceStatusFor(inv)}</div>
                       </div>
                       <div style={{ fontWeight: 700, fontSize: 13.5, color: BLUE, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{fmt(inv.amountCents)}</div>
                     </button>
@@ -1001,12 +1001,12 @@ function BatchAndAutoScreen({ go, tenants, invoices, onBatchSend, sending, sched
 
   /* ── Top half headline ── */
   const headline = tab === 'batch'
-    ? <><div className="tp-amount" style={amountStyle(fmt(totalCents), 82, { color: totalCents === 0 ? 'rgba(4,13,109,0.25)' : NAVY })}>{fmt(totalCents)}</div>
-        <div style={{ marginTop: 10, fontWeight: 500, fontSize: 15, color: 'rgba(4,13,109,0.5)' }}>
+    ? <><div className="tp-amount" style={amountStyle(fmt(totalCents), 82, { color: totalCents === 0 ? '#586079' : NAVY })}>{fmt(totalCents)}</div>
+        <div style={{ marginTop: 10, fontWeight: 500, fontSize: 15, color: '#586079' }}>
           {selected.size === 0 ? 'select tenants below' : `${selected.size} selected`}
         </div></>
-    : <><div className="tp-amount" style={amountStyle(String(liveSchedules.length), 82, { color: liveSchedules.length === 0 ? 'rgba(4,13,109,0.25)' : NAVY })}>{liveSchedules.length}</div>
-        <div style={{ marginTop: 10, fontWeight: 500, fontSize: 15, color: 'rgba(4,13,109,0.5)' }}>
+    : <><div className="tp-amount" style={amountStyle(String(liveSchedules.length), 82, { color: liveSchedules.length === 0 ? '#586079' : NAVY })}>{liveSchedules.length}</div>
+        <div style={{ marginTop: 10, fontWeight: 500, fontSize: 15, color: '#586079' }}>
           active automation{liveSchedules.length !== 1 ? 's' : ''}
         </div></>;
 
@@ -1053,11 +1053,11 @@ function BatchAndAutoScreen({ go, tenants, invoices, onBatchSend, sending, sched
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 600, fontSize: 14, color: BLUE, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tenantName(t)}</div>
-                    <div style={{ fontWeight: 400, fontSize: 11.5, color: 'rgba(88,171,255,0.5)', marginTop: 2 }}>{t.propertyAddress}</div>
+                    <div style={{ fontWeight: 400, fontSize: 11.5, color: 'rgba(88,171,255,0.85)', marginTop: 2 }}>{t.propertyAddress}</div>
                   </div>
                   <div style={{ flexShrink: 0 }}>
                     {inv ? <div style={{ fontWeight: 700, fontSize: 13.5, color: BLUE, fontVariantNumeric: 'tabular-nums' }}>{fmt(inv.amountCents)}</div>
-                         : <div style={{ fontSize: 10.5, color: 'rgba(88,171,255,0.4)' }}>no invoice</div>}
+                         : <div style={{ fontSize: 10.5, color: 'rgba(88,171,255,0.85)' }}>no invoice</div>}
                   </div>
                 </button>
               );
@@ -1078,9 +1078,9 @@ function BatchAndAutoScreen({ go, tenants, invoices, onBatchSend, sending, sched
         <div className="tp-panel-body" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
           <div className="tp-thin-scroll" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 130 }}>
             <ReminderSettingsCard settings={reminderSettings} onUpdate={onUpdateReminders} />
-            <div style={{ fontSize: 10.5, fontWeight: 600, color: 'rgba(88,171,255,0.45)', letterSpacing: '0.12em', textTransform: 'uppercase', margin: '6px 2px 0' }}>recurring rent</div>
+            <div style={{ fontSize: 10.5, fontWeight: 600, color: 'rgba(88,171,255,0.85)', letterSpacing: '0.12em', textTransform: 'uppercase', margin: '6px 2px 0' }}>recurring rent</div>
             {liveSchedules.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '20px 16px', color: 'rgba(88,171,255,0.5)', fontSize: 13, lineHeight: 1.6 }}>
+              <div style={{ textAlign: 'center', padding: '20px 16px', color: 'rgba(88,171,255,0.85)', fontSize: 13, lineHeight: 1.6 }}>
                 no schedules yet — set a repeat frequency when sending a request
               </div>
             ) : liveSchedules.map((s: any) => {
@@ -1102,7 +1102,7 @@ function BatchAndAutoScreen({ go, tenants, invoices, onBatchSend, sending, sched
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(88,171,255,0.12)' }}>
-                    <div style={{ fontSize: 11, color: 'rgba(88,171,255,0.5)' }}>next {paused ? '—' : fmtDate(s.nextRunDate)}</div>
+                    <div style={{ fontSize: 11, color: 'rgba(88,171,255,0.85)' }}>next {paused ? '—' : fmtDate(s.nextRunDate)}</div>
                     <div style={{ display: 'flex', gap: 8 }}>
                       <button onClick={() => !busy && onPauseResume(s)} disabled={busy}
                         style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 999, border: '1px solid rgba(88,171,255,0.3)', background: 'rgba(88,171,255,0.1)', color: BLUE, fontWeight: 600, fontSize: 12, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1, fontFamily: 'Outfit, system-ui' }}>
@@ -1143,7 +1143,7 @@ function SentSuccess({ amount, label, go, kind = 'rent' }: any) {
         <div className="tp-panel-body" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%' }}>
         <div style={{ color: BLUE, fontWeight: 900, fontSize: 42, letterSpacing: '-0.04em' }}>sent</div>
         <div className="tp-success-check tp-pulse" style={{ marginTop: 14 }}><Ic.Check sz={40} sw={3.2} /></div>
-        {label && <div style={{ marginTop: 18, color: 'rgba(88,171,255,0.6)', fontWeight: 500, fontSize: 14 }}>{label}</div>}
+        {label && <div style={{ marginTop: 18, color: 'rgba(88,171,255,0.85)', fontWeight: 500, fontSize: 14 }}>{label}</div>}
         <div style={{ flex: 1 }} />
         <WireframeLiquidButton onClick={() => go('home', 'down')} style={CTA_SIZE}>done</WireframeLiquidButton>
         </div>
@@ -1181,7 +1181,7 @@ function InvoiceActionSheet({ invoice, onClose, onEditResend, onResend, onMarkRe
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontWeight: 700, fontSize: 17, color: NAVY, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{invoice.tenantName || 'tenant'}</div>
-            <div style={{ fontWeight: 500, fontSize: 12.5, color: 'rgba(4,13,109,0.5)', marginTop: 2 }}>
+            <div style={{ fontWeight: 500, fontSize: 12.5, color: '#586079', marginTop: 2 }}>
               {isCharge ? (invoice.description || 'charge') : 'rent'} · {fmt(owing)}
             </div>
           </div>
@@ -1189,7 +1189,7 @@ function InvoiceActionSheet({ invoice, onClose, onEditResend, onResend, onMarkRe
         </div>
 
         {settled ? (
-          <div style={{ textAlign: 'center', padding: '8px 0 18px', color: 'rgba(4,13,109,0.5)', fontSize: 14, fontWeight: 500 }}>
+          <div style={{ textAlign: 'center', padding: '8px 0 18px', color: '#586079', fontSize: 14, fontWeight: 500 }}>
             this {isCharge ? 'charge' : 'invoice'} is already settled
           </div>
         ) : (

@@ -8,7 +8,10 @@ inferred from emulator or unit-test results.
 
 Use the development workspace, not the deployed app. Preserve any uncommitted
 work before switching branches. Obtain the published candidate branch
-`fix/qwen-aligned-20261010`; the completion handover records its exact commit.
+`fix/qwen-aligned-20261010`; the
+[current handover](../HANDOFF-2026-10-12-r1-t10-terminal-followup.md) records its
+exact implementation commit and final source/build hashes. Check the branch and
+commit before building; an earlier preview does not establish the new repairs.
 Stop only the workspace's existing development Run process before using port 5000.
 
 Build a separate client and run the synthetic acceptance mode:
