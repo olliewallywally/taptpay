@@ -3,6 +3,8 @@
  * from an empty database, its constraints, the service's write order through DatabaseStorage,
  * the provider-transaction uniqueness (sequential and concurrent), and the deploy overlap: an
  * attempt attached by the old code before 0034 still finalizes afterwards.
+ * R2-T6 adds the last reconciliation code (0034's two reconciliation columns), written
+ * through DatabaseStorage without touching the attempt's state, lease or updated_at.
  * TEST_DATABASE_URL=... TAPTPAY_TEST_DATABASE=1 node --import tsx scripts/verify-r2-t4-expected-values-postgres.ts
  */
 import assert from "node:assert/strict";
@@ -237,6 +239,22 @@ try {
     const error = await sqlError(() => pool.query(`UPDATE payment_attempts SET provider_transaction_id = '0000000c00000U01' WHERE id = $1`, [two.id]));
     assert.equal(error.code, "23505");
     assert.equal(error.constraint, "payment_attempts_provider_transaction_id_uq");
+  });
+  await check("R2-T6: the last reconciliation code and time are written alone, and an unknown attempt is not found", async () => {
+    const id = await claimed();
+    const before = await pool.query(`SELECT state, lease_expires_at, updated_at, processor_session_id FROM payment_attempts WHERE id = $1`, [id]);
+    const first = await service.recordReconciliation({ attemptId: id, code: "integrity_mismatch:amount" });
+    assert.equal(first.kind, "recorded");
+    const second = await service.recordReconciliation({ attemptId: id, code: "approved" });
+    assert.equal(second.kind, "recorded");
+    const after = await pool.query(
+      `SELECT state, lease_expires_at, updated_at, processor_session_id, last_reconciliation_code, last_reconciled_at IS NOT NULL AS stamped
+       FROM payment_attempts WHERE id = $1`, [id]);
+    const { last_reconciliation_code, stamped, ...rest } = after.rows[0];
+    assert.deepEqual(rest, before.rows[0]);
+    assert.equal(last_reconciliation_code, "approved");
+    assert.equal(stamped, true);
+    assert.equal((await service.recordReconciliation({ attemptId: randomUUID(), code: "pending" })).kind, "not-found");
   });
 } finally {
   await pool.end();

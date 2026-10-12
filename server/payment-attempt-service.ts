@@ -17,6 +17,8 @@ import {
 // decimal(10,2) on the ledger: 99,999,999.99.
 const MAX_EXPECTED_CENTS = 9_999_999_999;
 const CURRENCY_PATTERN = /^[A-Z]{3}$/;
+// A reconciliation code is ours, never provider text: lowercase words, digits, `_` and `:`.
+const RECONCILIATION_CODE_PATTERN = /^[a-z][a-z0-9_:]{0,63}$/;
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -74,6 +76,17 @@ export type RecordPaymentAttemptExpectedValuesResult =
   | { kind: "expired"; attempt: PaymentAttempt }
   | { kind: "terminal"; attempt: PaymentAttempt }
   | { kind: "conflict"; attempt: PaymentAttempt }
+  | { kind: "not-found" };
+
+/** R2-T6: the last provider query's sanitized outcome on an attempt. */
+export interface RecordPaymentAttemptReconciliationRecordInput {
+  attemptId: string;
+  code: string;
+  now: Date;
+}
+
+export type RecordPaymentAttemptReconciliationResult =
+  | { kind: "recorded"; attempt: PaymentAttempt }
   | { kind: "not-found" };
 
 export type AttachPaymentAttemptSessionResult =
@@ -137,6 +150,9 @@ export interface PaymentAttemptRepository {
   recordPaymentAttemptExpectedValuesRecord(
     input: RecordPaymentAttemptExpectedValuesRecordInput,
   ): Promise<RecordPaymentAttemptExpectedValuesResult>;
+  recordPaymentAttemptReconciliationRecord(
+    input: RecordPaymentAttemptReconciliationRecordInput,
+  ): Promise<RecordPaymentAttemptReconciliationResult>;
   attachPaymentAttemptSessionRecord(
     input: AttachPaymentAttemptSessionRecordInput,
   ): Promise<AttachPaymentAttemptSessionResult>;
@@ -170,7 +186,8 @@ export class PaymentAttemptInputError extends Error {
       | "amountCents"
       | "currency"
       | "merchantReference"
-      | "providerEnvironment",
+      | "providerEnvironment"
+      | "reconciliationCode",
     message: string,
   ) {
     super(message);
@@ -242,6 +259,19 @@ export class PaymentAttemptService {
       throw new PaymentAttemptInputError("providerEnvironment", "providerEnvironment must be uat or production");
     }
     return this.repository.recordPaymentAttemptExpectedValuesRecord({ ...input, now: this.clock() });
+  }
+
+  /**
+   * R2-T6 (plan §9.4): what the last provider query for this attempt answered, as a
+   * sanitized code ("approved", "pending", "integrity_mismatch:amount", ...) and the
+   * time. It changes nothing else about the attempt.
+   */
+  recordReconciliation(input: { attemptId: string; code: string }): Promise<RecordPaymentAttemptReconciliationResult> {
+    assertUuid(input.attemptId, "attemptId");
+    if (typeof input.code !== "string" || !RECONCILIATION_CODE_PATTERN.test(input.code)) {
+      throw new PaymentAttemptInputError("reconciliationCode", "reconciliationCode must be a short lowercase code");
+    }
+    return this.repository.recordPaymentAttemptReconciliationRecord({ ...input, now: this.clock() });
   }
 
   attachSession(input: {

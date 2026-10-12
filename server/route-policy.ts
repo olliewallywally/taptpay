@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 1359e646a1e05615e4df94ec446e7ffc6f3205e7 on 2026-10-12.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ f68a8459002457a6e861d67f4154f964fe5504b9 on 2026-10-12.
  *
  * 194 registrations (81 GET, 81 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -634,7 +634,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       capabilityGates: ["isWindcaveConfigured"],
       rateLimits: ["paymentTokenRateLimiter.allow","requirePaymentTokenRateLimit"],
       idempotency: ["claim","claimFinalization"],
-      helpers: ["broadcastToStone","cacheTokenAttemptSession","expectedForTokenAttempt","persistTokenOutcome","reconcileExpiredTokenAttempt","requirePaymentTokenRateLimit","setPaymentTokenHeaders","tokenAttemptOutcome"],
+      helpers: ["broadcastToStone","cacheTokenAttemptSession","expectedForTokenAttempt","persistTokenOutcome","reconcileExpiredTokenAttempt","reconciliationCode","recordTokenReconciliation","requirePaymentTokenRateLimit","setPaymentTokenHeaders","tokenAttemptOutcome"],
     },
   },
   "POST /api/pay/t/:token/hosted-fields-complete": {
@@ -652,7 +652,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       capabilityGates: ["isWindcaveConfigured"],
       rateLimits: ["paymentTokenRateLimiter.allow","requirePaymentTokenRateLimit"],
       idempotency: ["claimFinalization"],
-      helpers: ["broadcastToStone","expectedForTokenAttempt","persistTokenOutcome","requirePaymentTokenRateLimit","setPaymentTokenHeaders","tokenAttemptOutcome"],
+      helpers: ["broadcastToStone","expectedForTokenAttempt","persistTokenOutcome","reconciliationCode","recordTokenReconciliation","requirePaymentTokenRateLimit","setPaymentTokenHeaders","tokenAttemptOutcome"],
     },
   },
   "POST /api/pay/t/:token/googlepay-complete": {
@@ -670,7 +670,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       capabilityGates: ["isWindcaveConfigured"],
       rateLimits: ["paymentTokenRateLimiter.allow","requirePaymentTokenRateLimit"],
       idempotency: ["claimFinalization"],
-      helpers: ["broadcastToStone","expectedForTokenAttempt","persistTokenOutcome","requirePaymentTokenRateLimit","setPaymentTokenHeaders","tokenAttemptOutcome"],
+      helpers: ["broadcastToStone","expectedForTokenAttempt","persistTokenOutcome","reconciliationCode","recordTokenReconciliation","requirePaymentTokenRateLimit","setPaymentTokenHeaders","tokenAttemptOutcome"],
     },
   },
   "GET /api/pay/return/:state": {
@@ -688,7 +688,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       capabilityGates: ["isWindcaveConfigured"],
       rateLimits: ["paymentTokenRateLimiter.allow","requirePaymentTokenRateLimit"],
       idempotency: ["claimFinalization"],
-      helpers: ["broadcastToStone","expectedForTokenAttempt","persistTokenOutcome","reconcileTokenReturnState","requirePaymentTokenRateLimit","setPaymentTokenHeaders","tokenAttemptOutcome"],
+      helpers: ["broadcastToStone","expectedForTokenAttempt","persistTokenOutcome","reconcileTokenReturnState","reconciliationCode","recordTokenReconciliation","requirePaymentTokenRateLimit","setPaymentTokenHeaders","tokenAttemptOutcome"],
     },
   },
   "ALL /api/pay/notification/:state": {
@@ -707,7 +707,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       capabilityGates: ["isWindcaveConfigured"],
       rateLimits: ["paymentTokenRateLimiter.allow","requirePaymentTokenRateLimit"],
       idempotency: ["claimFinalization"],
-      helpers: ["broadcastToStone","expectedForTokenAttempt","persistTokenOutcome","reconcileTokenReturnState","requirePaymentTokenRateLimit","setPaymentTokenHeaders"],
+      helpers: ["broadcastToStone","expectedForTokenAttempt","persistTokenOutcome","reconcileTokenReturnState","reconciliationCode","recordTokenReconciliation","requirePaymentTokenRateLimit","setPaymentTokenHeaders"],
     },
   },
   "GET /api/merchants/:id/active-transaction": {

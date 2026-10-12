@@ -2199,6 +2199,27 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     };
   }
 
+  /** R2-T6 (plan §9.4): a retail provider query's outcome as a sanitized code. */
+  function reconciliationCode(result: { success: boolean; approved?: boolean; windcaveTransactionId?: string; error?: string }): string {
+    if (result.success && result.approved && !result.windcaveTransactionId) return "approved_without_transaction_id";
+    if (result.success) return result.approved ? "approved" : "declined";
+    // The wrapper's failures are already fixed strings (R2-T6, RF-6); reduce them to a code.
+    const code = String(result.error ?? "unknown").toLowerCase().replace(/[^a-z0-9_:]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 64);
+    return /^[a-z]/.test(code) ? code : "unknown";
+  }
+
+  /** Leaves the query's outcome on the attempt; failing to record never blocks a payment. */
+  async function recordTokenReconciliation(
+    attemptId: string,
+    result: { success: boolean; approved?: boolean; windcaveTransactionId?: string; error?: string },
+  ) {
+    try {
+      await paymentAttempts.recordReconciliation({ attemptId, code: reconciliationCode(result) });
+    } catch {
+      console.error("Token payment reconciliation code was not recorded");
+    }
+  }
+
   function tokenAttemptOutcome(attempt: { state: string; receiptShare: number | null }) {
     const outcome = ["approved", "declined", "cancelled"].includes(attempt.state)
       ? attempt.state as "approved" | "declined" | "cancelled"
@@ -2232,6 +2253,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       attempt.processorSessionId,
       await expectedForTokenAttempt(claim.attempt, attempt.processorSessionId),
     );
+    await recordTokenReconciliation(claim.attempt.id, result);
     if (!result.success || (result.approved && !result.windcaveTransactionId)) {
       return { kind: "pending" as const };
     }
@@ -2592,6 +2614,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         validation.data.sessionId,
         await expectedForTokenAttempt(prepared.attempt, validation.data.sessionId),
       );
+      await recordTokenReconciliation(prepared.attempt.id, queryResult);
       if (!queryResult.success) {
         return res.status(503).json({ message: "Payment outcome is still being reconciled" });
       }
@@ -2659,6 +2682,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         validation.data.sessionId,
         await expectedForTokenAttempt(prepared.attempt, validation.data.sessionId),
       );
+      await recordTokenReconciliation(prepared.attempt.id, queryResult);
       if (!queryResult.success) {
         return res.status(503).json({ message: "Payment outcome is still being reconciled" });
       }
@@ -2715,6 +2739,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       attempt.processorSessionId,
       await expectedForTokenAttempt(claim.attempt, attempt.processorSessionId),
     );
+    await recordTokenReconciliation(claim.attempt.id, queryResult);
     if (!queryResult.success) {
       return { kind: "pending" as const, attempt: claim.attempt };
     }

@@ -1,11 +1,11 @@
 # R1-T7 tenant/storage execution inventory
 
-Generated from working-tree sources on base `1359e646a1e05615e4df94ec446e7ffc6f3205e7`; the phase evidence names the final commit.
+Generated from working-tree sources on base `f68a8459002457a6e861d67f4154f964fe5504b9`; the phase evidence names the final commit.
 
 Registrations: **194**; registrations with session/admin authentication: **122**;
 registrations calling checkMerchantOwnership: **25**.
 IStorage: **258** declared methods;
-PaymentAttemptRepository: **9** inherited methods.
+PaymentAttemptRepository: **10** inherited methods.
 
 Classifications come from the reviewed per-route branches, including mixed public/signed-in routes.
 Authentication counts include middleware and handler checks. Storage calls follow same-file helpers,
@@ -482,6 +482,7 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | PaymentAttemptRepository | getPaymentAttemptByTransactionShareKey | no | `getPaymentAttemptByTransactionShareKey( transactionId: number, shareIndex: number, idempotencyKey: string, ): Promise<PaymentAttempt \| undefined>` |
 | PaymentAttemptRepository | claimPaymentAttemptRecord | no | `claimPaymentAttemptRecord( input: ClaimPaymentAttemptRecordInput, ): Promise<ClaimPaymentAttemptResult>` |
 | PaymentAttemptRepository | recordPaymentAttemptExpectedValuesRecord | no | `recordPaymentAttemptExpectedValuesRecord( input: RecordPaymentAttemptExpectedValuesRecordInput, ): Promise<RecordPaymentAttemptExpectedValuesResult>` |
+| PaymentAttemptRepository | recordPaymentAttemptReconciliationRecord | no | `recordPaymentAttemptReconciliationRecord( input: RecordPaymentAttemptReconciliationRecordInput, ): Promise<RecordPaymentAttemptReconciliationResult>` |
 | PaymentAttemptRepository | attachPaymentAttemptSessionRecord | no | `attachPaymentAttemptSessionRecord( input: AttachPaymentAttemptSessionRecordInput, ): Promise<AttachPaymentAttemptSessionResult>` |
 | PaymentAttemptRepository | getPaymentAttemptByReturnStateHash | no | `getPaymentAttemptByReturnStateHash( returnStateHash: string, ): Promise<PaymentAttempt \| undefined>` |
 | PaymentAttemptRepository | claimPaymentAttemptFinalizationRecord | no | `claimPaymentAttemptFinalizationRecord( input: ClaimPaymentAttemptFinalizationRecordInput, ): Promise<ClaimPaymentAttemptFinalizationResult>` |

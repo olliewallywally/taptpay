@@ -28,6 +28,8 @@ import type {
   PaymentAttemptRepository,
   RecordPaymentAttemptExpectedValuesRecordInput,
   RecordPaymentAttemptExpectedValuesResult,
+  RecordPaymentAttemptReconciliationRecordInput,
+  RecordPaymentAttemptReconciliationResult,
 } from "./payment-attempt-service";
 
 // The anonymous business-wide "legacy-no-board" scope was retired on 2026-09-25 with the
@@ -2062,6 +2064,18 @@ export class MemStorage implements IStorage {
         providerEnvironment: input.providerEnvironment,
         updatedAt: input.now,
       };
+      this.paymentAttempts.set(recorded.id, recorded);
+      return { kind: "recorded", attempt: recorded };
+    });
+  }
+
+  async recordPaymentAttemptReconciliationRecord(
+    input: RecordPaymentAttemptReconciliationRecordInput,
+  ): Promise<RecordPaymentAttemptReconciliationResult> {
+    return withMemLock(this.paymentAttemptLocks, `attempt:${input.attemptId}`, async () => {
+      const attempt = this.paymentAttempts.get(input.attemptId);
+      if (!attempt) return { kind: "not-found" };
+      const recorded: PaymentAttempt = { ...attempt, lastReconciliationCode: input.code, lastReconciledAt: input.now };
       this.paymentAttempts.set(recorded.id, recorded);
       return { kind: "recorded", attempt: recorded };
     });
@@ -5604,6 +5618,21 @@ export class DatabaseStorage implements IStorage {
       if (!rows[0]) throw new Error("Payment attempt expected-values compare-and-set failed");
       return { kind: "recorded", attempt: rows[0] };
     });
+  }
+
+  async recordPaymentAttemptReconciliationRecord(
+    input: RecordPaymentAttemptReconciliationRecordInput,
+  ): Promise<RecordPaymentAttemptReconciliationResult> {
+    const db = this.db;
+    if (!db) throw new Error('Database not available');
+    // One statement on the two reconciliation columns only; no state, lease or
+    // updated_at changes, so it cannot race the attempt's own transitions.
+    const rows = await db
+      .update(paymentAttempts)
+      .set({ lastReconciliationCode: input.code, lastReconciledAt: input.now })
+      .where(eq(paymentAttempts.id, input.attemptId))
+      .returning();
+    return rows[0] ? { kind: "recorded", attempt: rows[0] } : { kind: "not-found" };
   }
 
   async attachPaymentAttemptSessionRecord(

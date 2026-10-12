@@ -87,3 +87,36 @@ it("an unverified outcome settles nothing, whatever the browser's result says", 
   expect(await outcomeOf(app, returnState)).toBe("pending");
   expect(await storage.getTransaction(sale.id)).toMatchObject({ status: before?.status, windcaveTransactionId: before?.windcaveTransactionId ?? null });
 });
+
+// R2-T6 (plan §9.4): each provider query leaves its sanitized outcome on the attempt.
+describe("the attempt's last reconciliation", () => {
+  const attemptOf = async (sessionId: string) => storage.getPaymentAttemptByProcessorSessionId(sessionId);
+
+  it("records an unverified outcome's code and time", async () => {
+    const { app, returnState, sessionId } = await openedAttempt();
+    query.mockResolvedValueOnce({ success: false, error: "integrity_mismatch:amount" });
+
+    await request(app).get(`/api/pay/return/${returnState}`).query({ source: "hpp" });
+
+    expect(await attemptOf(sessionId)).toMatchObject({
+      lastReconciliationCode: "integrity_mismatch:amount", lastReconciledAt: expect.any(Date),
+    });
+  });
+
+  it("records a verified approval as approved", async () => {
+    const { app, returnState, sessionId } = await openedAttempt();
+
+    await request(app).get(`/api/pay/return/${returnState}`).query({ source: "hpp" });
+
+    expect(await attemptOf(sessionId)).toMatchObject({ lastReconciliationCode: "approved" });
+  });
+
+  it("reduces a failure that is not already a code to one", async () => {
+    const { app, returnState, sessionId } = await openedAttempt();
+    query.mockResolvedValueOnce({ success: false, error: "Session still processing after max retries" });
+
+    await request(app).get(`/api/pay/return/${returnState}`).query({ source: "hpp" });
+
+    expect(await attemptOf(sessionId)).toMatchObject({ lastReconciliationCode: "session_still_processing_after_max_retries" });
+  });
+});
