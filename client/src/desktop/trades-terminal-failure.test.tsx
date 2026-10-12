@@ -199,7 +199,7 @@ describe("trades terminal when invoices fail to load (R1-T9)", () => {
     expect(screen.queryByRole("alert")).toBeNull();
     expect(document.querySelector(".tt-hero")).toHaveTextContent("$1,800");
     expect(document.querySelector(".tt-hero-2")).toHaveTextContent("$420");
-    expect(screen.getByRole("button", { name: "select Aroha Ngata" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "select Aroha Ngata | 14 Rimu Street" })).toBeInTheDocument();
     await chooseAroha();
     await keyInAmount(["1", "2", "0"]);
     expect(sendButton()).toBeEnabled();
@@ -234,7 +234,7 @@ describe("trades terminal when clients fail to load (R1-T9)", () => {
     await userEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Try again" }));
     await settle();
     expect(screen.queryByRole("alert")).toBeNull();
-    expect(screen.getByRole("button", { name: "select Aroha Ngata" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "select Aroha Ngata | 14 Rimu Street" })).toBeInTheDocument();
   });
 });
 

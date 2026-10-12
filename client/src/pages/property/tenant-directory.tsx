@@ -199,7 +199,11 @@ function AddTenantSheet({ onClose, onSave, saving, saveError }: {
                     </div>
                   )}
                 </div>
-                <button onClick={() => setSubtenants(p => p.filter((_, j) => j !== i))}
+                <button aria-label={`Remove subtenant ${i + 1}`} onClick={(event) => {
+                  const toggle = event.currentTarget.closest('[role="dialog"]')?.querySelector<HTMLButtonElement>('button[aria-expanded]');
+                  setSubtenants(p => p.filter((_, j) => j !== i));
+                  toggle?.focus();
+                }}
                   style={{ width: 26, height: 26, borderRadius: 999, background: 'rgba(4,13,109,0.08)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={C.navy} strokeWidth="2.4" strokeLinecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg>
                 </button>

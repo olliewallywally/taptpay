@@ -192,7 +192,7 @@ describe("property terminal when reminder settings or schedules fail to load (R1
     renderPage();
     await settle();
 
-    const toggle = screen.getByRole("button", { name: "automation" });
+    const toggle = screen.getByRole("button", { name: /^repeat & reminders:/i });
     expect(toggle).toHaveTextContent("reminders unavailable");
     await userEvent.click(toggle);
     await settle();
@@ -214,7 +214,7 @@ describe("property terminal when reminder settings or schedules fail to load (R1
     renderPage();
     await settle();
 
-    await userEvent.click(screen.getByRole("button", { name: "automation" }));
+    await userEvent.click(screen.getByRole("button", { name: /^repeat & reminders:/i }));
     await settle();
     expect(screen.queryByText(/no schedules yet/)).toBeNull();
     const failed = screen.getByText("recurring rent didn't load");
@@ -251,7 +251,7 @@ describe("property terminal when a reply says OK and is not the data (external r
     renderPage();
     await settle();
 
-    const toggle = screen.getByRole("button", { name: "automation" });
+    const toggle = screen.getByRole("button", { name: /^repeat & reminders:/i });
     expect(toggle).toHaveTextContent("reminders unavailable");
     await userEvent.click(toggle);
     await settle();
@@ -264,7 +264,7 @@ describe("property terminal when a reply says OK and is not the data (external r
     renderPage();
     await settle();
 
-    await userEvent.click(screen.getByRole("button", { name: "automation" }));
+    await userEvent.click(screen.getByRole("button", { name: /^repeat & reminders:/i }));
     await settle();
     expect(screen.queryByText(/no schedules yet/)).toBeNull();
     expect(screen.getByText("recurring rent didn't load")).toBeInTheDocument();

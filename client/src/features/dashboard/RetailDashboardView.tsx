@@ -328,7 +328,7 @@ function SalesBarChart({
             fontFamily="Outfit, system-ui"
             fontWeight="600"
             fontSize={count > 8 ? 11 : 13}
-            fill={TEAL}
+            fill="#FFFFFF"
           >
             {bucket.label}
           </text>

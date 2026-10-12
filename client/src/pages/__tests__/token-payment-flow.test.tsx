@@ -146,7 +146,7 @@ describe("token customer entry and HPP return", () => {
     mockParams = { state: "unknown-state" };
     renderWithQuery(<PaymentReturn />);
 
-    expect(screen.getByText("Reopen the original payment link")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Reopen the original payment link", level: 1 })).toBeInTheDocument();
     expect(global.fetch).not.toHaveBeenCalled();
     expect(mockSetLocation).not.toHaveBeenCalled();
   });

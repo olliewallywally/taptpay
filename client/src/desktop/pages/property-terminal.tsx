@@ -1142,9 +1142,10 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
                     aria-haspopup="menu"
                     aria-expanded={rowMenu?.id === r.id}
                     aria-label={`actions for ${r.name}, ${r.label}`}
+                    aria-describedby={`pt-request-${r.id}-amount`}
                     onClick={(e) => toggleRowMenu(r.id, e.currentTarget)}
                   >
-                    <span className="pt-avatar">{r.initials}</span>
+                    <span className="pt-avatar" aria-hidden="true">{r.initials}</span>
                     <span className="pt-row-mid">
                       <span className="pt-row-name">{r.name}</span>
                       <span className="pt-row-status">
@@ -1163,7 +1164,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
                         )}
                       </span>
                     </span>
-                    <span className="pt-row-right">
+                    <span className="pt-row-right" id={`pt-request-${r.id}-amount`}>
                       <span className="pt-row-amt">{fmtNZD(r.amountCents)}</span>
                       {r.partPaid && (
                         <span className="pt-row-cap">left of {fmtNZD(r.fullAmountCents)}</span>
@@ -1343,7 +1344,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
                     type="button"
                     className="pt-auto-toggle"
                     aria-expanded={autoOpen}
-                    aria-label="automation"
+                    aria-label={`repeat & reminders: ${autoSummary}`}
                     onClick={() => setAutoOpen((o) => !o)}
                   >
                     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={ACCENT_SOFT} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 11a8 8 0 0 0-13.7-5.6L3 8.5" /><path d="M3 4v4.5h4.5" /><path d="M4 13a8 8 0 0 0 13.7 5.6L21 15.5" /><path d="M21 20v-4.5h-4.5" /></svg>

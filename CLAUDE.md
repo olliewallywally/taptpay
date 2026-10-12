@@ -19,10 +19,13 @@ doing anything:
 - `docs/PLAN-2026-08-24-taptpay-remediation-v2-2.md` — the authoritative remediation plan,
   including §21.1's required reviewer-pass template.
 
-The immediate R1-T10 handover is now `docs/HANDOFF-2026-10-11-r1-t10-accessibility-completion.md`.
-Read it after the ledger; it supersedes the older October 6 task-state descriptions
-and October 10 immediate task state, and records the broader accessibility repairs, 876 selected browser checks,
-retained failures, incomplete/manual acceptance and next AI actions.
+The immediate R1-T10 handover is now `docs/HANDOFF-2026-10-12-r1-t10-terminal-followup.md`.
+Read it after the ledger; it records terminal contrast/name repairs, actual keypad
+operations, corrected golden fixtures, exact frozen builds, completed reduced
+motion tutorials and the owner decision to retain the property feed-under-dock
+layout. Historical October 11 evidence remains linked; actual devices, owner
+visual/golden acceptance and independent review are still open. Claude owns task 7
+and the stock hidden-focus review. The next-task readiness review is linked there.
 Then read `docs/HANDOFF-2026-10-11-review-findings-fixes.md`: an independent review of
 the last two pushes and its fixes on `ccr-e07e3100-0wm8kr`, including an open zoom-detection
 finding for the owner.

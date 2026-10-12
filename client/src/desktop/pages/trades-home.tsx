@@ -462,13 +462,14 @@ export default function DesktopTradesHome(props: DesktopRoutePageProps) {
                     type="button"
                     className="th-stat"
                     aria-label={`view ${st.label}`}
+                    aria-describedby={`th-health-${st.id}-values`}
                     style={{
                       borderLeft: i ? "1px solid rgba(94,158,255,0.2)" : "none",
                       paddingLeft: i ? 22 : 0,
                     }}
                     onClick={() => setHealthBox(st.id)}
                   >
-                    <span className="th-stat-top">
+                    <span className="th-stat-top" id={`th-health-${st.id}-values`}>
                       <span className="th-stat-v" style={{ color: st.id === "overdue" ? ACCENT : TEXT_SOFT }}>{isLoading ? "—" : st.id === "awaiting-reply" ? String(st.count) : fmtDollars(st.amountCents)}</span>
                       <span className="th-stat-n">{isLoading ? "" : st.id === "awaiting-reply" ? fmtDollars(st.amountCents) : String(st.count)}</span>
                     </span>
@@ -487,7 +488,7 @@ export default function DesktopTradesHome(props: DesktopRoutePageProps) {
             type="button"
             className="th-notif-prev"
             aria-hidden={notifOpen} tabIndex={notifOpen ? -1 : 0} aria-expanded={notifOpen}
-            aria-label="open notifications"
+            aria-label={`open ${notifications.length} notifications`}
             style={{ opacity: notifOpen ? 0 : 1, pointerEvents: notifOpen ? "none" : "auto" }}
             onClick={() => setNotifOpen(true)}
           >
@@ -564,14 +565,15 @@ export default function DesktopTradesHome(props: DesktopRoutePageProps) {
                 type="button"
                 className="th-client"
                 aria-label={`view ${t.name}`}
+                aria-describedby={`th-client-${t.id}-site th-client-${t.id}-summary`}
                 onClick={go(`/trades/clients/${t.id}`)}
               >
-                <span className="th-client-avatar">{t.initials}</span>
+                <span className="th-client-avatar" aria-hidden="true">{t.initials}</span>
                 <span className="th-client-mid">
                   <span className="th-client-name">{t.name}</span>
-                  <span className="th-client-sub">{t.siteAddress || "no site address"}</span>
+                  <span className="th-client-sub" id={`th-client-${t.id}-site`}>{t.siteAddress || "no site address"}</span>
                 </span>
-                <span className="th-client-right">
+                <span className="th-client-right" id={`th-client-${t.id}-summary`}>
                   <span className="th-client-amt">{t.amountCents === null ? "—" : money2(t.amountCents)}</span>
                   <span className="th-client-label">{clientStatusLabel(t)}</span>
                   <span className="th-client-due">{clientDueLabel(t)}</span>
