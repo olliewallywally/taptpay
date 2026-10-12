@@ -43,9 +43,15 @@ T7 (migration 0035, unique X-ID) is implemented, applied nowhere. The owner will
 
 **Before merging R2 and Codex's R3 (`fix/qwen-aligned-20261010`), read
 `docs/evidence/remediation-v2-2/R2-R3-SCHEMA-CONFLICT-2026-10-12.md`:** both added a migration
-0034, and R3's `payment_attempts` trigger would refuse R2's writes. The owner decides the
-representation. R4 (durable refunds) has a preflight at
-`docs/evidence/remediation-v2-2/r4/R4-preflight-2026-10-12.md`; its code waits on that decision.
+0034, and R3's `payment_attempts` trigger would refuse R2's writes. **The owner chose Option A
+(2026-10-12, `docs/decisions/2026-10-12-r2-r3-option-a-owner-decision.md`): R2's columns stay
+the retail representation and R3 adapts — the exact R3 changes (renumber to 0036, drop its
+duplicate expectations table and `processor_transaction_id`, write-once trigger for R2's
+columns, verify through R2's verifier) are in
+`docs/evidence/remediation-v2-2/R2-R3-OPTION-A-ADAPTATION-2026-10-12.md`.** R4 (durable
+refunds): preflight at `docs/evidence/remediation-v2-2/r4/R4-preflight-2026-10-12.md`; R4-T1
+(refund provider boundary, no schema) may proceed on the R2 branch, R4-T2 onward wait for the
+merged R2+R3 tree.
 
 This program's established discipline: failing-tests-first; independently re-verify a prior
 pass's own claims before trusting them, the way every session in this program has had to;

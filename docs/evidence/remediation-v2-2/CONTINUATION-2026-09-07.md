@@ -1,6 +1,15 @@
 # Full integration continuation audit — 2026-09-07
 
-Latest continuation **2026-10-12 — R2-T7 (migration 0035), an R2↔R3 schema conflict, and the R4
+Latest continuation **2026-10-12 — owner chose Option A for the R2↔R3 conflict.**
+[Decision](../../decisions/2026-10-12-r2-r3-option-a-owner-decision.md),
+[exact R3 adaptation](R2-R3-OPTION-A-ADAPTATION-2026-10-12.md). R2's `payment_attempts` columns
+stay the retail representation; R3 (Codex, `fix/qwen-aligned-20261010`) renumbers its migration
+to 0036, drops its duplicate expectations table and `processor_transaction_id`, protects R2's
+columns write-once instead of freezing them, and verifies through R2's verifier. R2 is unchanged.
+R4-T1 (refund provider boundary, no schema) may start on the R2 branch; R4-T2 onward wait for
+the merged tree.
+
+Prior continuation **2026-10-12 — R2-T7 (migration 0035), an R2↔R3 schema conflict, and the R4
 preflight** on `ccr-e07e3100-0wm8kr`. [R2-T7 evidence](r2/R2-T7-2026-10-12.md),
 [owner direction](../../decisions/2026-10-12-r2-t7-processor-x-id-index-owner-direction.md),
 [conflict record](R2-R3-SCHEMA-CONFLICT-2026-10-12.md), [R4 preflight](r4/R4-preflight-2026-10-12.md).
