@@ -62,20 +62,22 @@ function session(transactions: unknown, overrides: Record<string, unknown> = {})
 
 describe("normalizeSessionQuery", () => {
   it("approves exactly one authorised purchase, with exact cents and its identities", () => {
+    const normalized = {
+      id: "0000000c00000001",
+      authorised: true,
+      type: "purchase",
+      amountCents: 1234,
+      currency: "NZD",
+      merchantReference: "TAPT_synthetic-attempt",
+      sessionId: SESSION_ID,
+      username: "SyntheticUser",
+    };
     expect(normalizeSessionQuery(session([transaction()]), SESSION_ID)).toEqual({
       kind: "approved",
       sessionId: SESSION_ID,
       transactionCount: 1,
-      transaction: {
-        id: "0000000c00000001",
-        authorised: true,
-        type: "purchase",
-        amountCents: 1234,
-        currency: "NZD",
-        merchantReference: "TAPT_synthetic-attempt",
-        sessionId: SESSION_ID,
-        username: "SyntheticUser",
-      },
+      transaction: normalized,
+      transactions: [normalized],
     });
   });
 
@@ -93,11 +95,14 @@ describe("normalizeSessionQuery", () => {
     ["one unauthorised transaction", [transaction({ authorised: false, reCo: "51" })]],
     ["several unauthorised transactions", [transaction({ id: "a1", authorised: false }), transaction({ id: "a2", authorised: false })]],
   ])("declines a complete session with %s", (_label, transactions) => {
-    expect(normalizeSessionQuery(session(transactions), SESSION_ID)).toEqual({
+    expect(normalizeSessionQuery(session(transactions), SESSION_ID)).toMatchObject({
       kind: "declined",
       sessionId: SESSION_ID,
       transactionCount: transactions.length,
     });
+    const result = normalizeSessionQuery(session(transactions), SESSION_ID);
+    expect(result.kind === "declined" ? result.transactions.map((t) => t.authorised) : null)
+      .toEqual(transactions.map(() => false));
   });
 
   it.each(["init", "pending", "processing"])("leaves a session in state %p pending", (state) => {

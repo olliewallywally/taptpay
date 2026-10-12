@@ -11,6 +11,7 @@ jest.mock("../config", () => {
   };
 });
 
+import * as securityAuditLog from "../security-audit-log";
 import { createWindcaveSession, getWindcaveEnv, queryWindcaveSession, submitGooglePayToken } from "../windcave";
 
 /**
@@ -34,25 +35,89 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
+const EXPECTED = {
+  sessionId: SESSION_ID,
+  amountCents: 1234,
+  currency: "NZD",
+  merchantReference: "TAPT_synthetic",
+  providerEnvironment: "uat" as const,
+};
+
+function documented(transactions: unknown[], state = "complete") {
+  return { id: SESSION_ID, state, transactions };
+}
+
+function transaction(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "0000000c00000001", username: "SyntheticUser", authorised: true, reCo: "00", type: "purchase",
+    amount: "12.34", currency: "NZD", merchantReference: "TAPT_synthetic", sessionId: SESSION_ID, ...overrides,
+  };
+}
+
+// R2-T5: every query is verified against what the payment expected (plan §9.5).
 describe("queryWindcaveSession", () => {
-  it("reads the 0th transaction as before", async () => {
-    jest.spyOn(global, "fetch").mockResolvedValue(reply(200, { id: SESSION_ID, transactions: [{ id: "0000000c00000001", authorised: true }] }));
-    await expect(queryWindcaveSession(SESSION_ID)).resolves.toEqual({ success: true, approved: true, windcaveTransactionId: "0000000c00000001" });
+  it("settles an approval that matches what the payment expected", async () => {
+    jest.spyOn(global, "fetch").mockResolvedValue(reply(200, documented([transaction()])));
+    await expect(queryWindcaveSession(SESSION_ID, EXPECTED)).resolves.toEqual({ success: true, approved: true, windcaveTransactionId: "0000000c00000001" });
   });
 
-  it("keeps an unauthorised 0th transaction's reading", async () => {
-    jest.spyOn(global, "fetch").mockResolvedValue(reply(200, { id: SESSION_ID, transactions: [{ id: "0000000c00000002", authorised: false }] }));
-    await expect(queryWindcaveSession(SESSION_ID)).resolves.toEqual({ success: true, approved: false, windcaveTransactionId: undefined });
+  it("settles a decline whose transactions are this payment's", async () => {
+    jest.spyOn(global, "fetch").mockResolvedValue(reply(200, documented([transaction({ authorised: false, reCo: "51" })])));
+    await expect(queryWindcaveSession(SESSION_ID, EXPECTED)).resolves.toEqual({ success: true, approved: false });
+  });
+
+  it.each([
+    ["a complete session with no transaction", documented([]), "unverifiable:no_transaction"],
+    ["a session that is not complete", documented([], "init"), "pending"],
+    ["two authorised transactions", documented([transaction(), transaction({ id: "0000000c00000002" })]), "unverifiable:multiple_authorised"],
+    ["a reply with no state (the old reading would decline it)", { id: SESSION_ID, transactions: [{ id: "x", authorised: false }] }, "unverifiable:malformed"],
+  ])("keeps %s reconcilable instead of declining it (RF-2)", async (_label, body, error) => {
+    jest.spyOn(global, "fetch").mockResolvedValue(reply(200, body));
+    await expect(queryWindcaveSession(SESSION_ID, EXPECTED)).resolves.toEqual({ success: false, error });
+  });
+
+  it.each([
+    ["amount", { amount: "12.35" }],
+    ["currency", { currency: "AUD" }],
+    ["reference", { merchantReference: "TAPT_other" }],
+    ["account", { username: "AnotherUser" }],
+  ])("refuses an approval with a different %s and records a sanitized security event", async (field, change) => {
+    jest.spyOn(global, "fetch").mockResolvedValue(reply(200, documented([transaction(change)])));
+    const audit = jest.spyOn(securityAuditLog, "writeSecurityAuditEvent").mockImplementation(() => undefined);
+    await expect(queryWindcaveSession(SESSION_ID, EXPECTED)).resolves.toEqual({ success: false, error: `integrity_mismatch:${field}` });
+    expect(audit).toHaveBeenCalledWith("PROVIDER_OUTCOME_MISMATCH", { field });
+    expect(JSON.stringify(audit.mock.calls)).not.toContain(SESSION_ID);
+  });
+
+  it("refuses a payment recorded under another provider environment", async () => {
+    jest.spyOn(global, "fetch").mockResolvedValue(reply(200, documented([transaction()])));
+    jest.spyOn(securityAuditLog, "writeSecurityAuditEvent").mockImplementation(() => undefined);
+    await expect(queryWindcaveSession(SESSION_ID, { ...EXPECTED, providerEnvironment: "production" }))
+      .resolves.toEqual({ success: false, error: "integrity_mismatch:environment" });
+  });
+
+  it("does not ask the provider when there is nothing to verify against", async () => {
+    const fetchSpy = jest.spyOn(global, "fetch");
+    await expect(queryWindcaveSession(SESSION_ID, null)).resolves.toEqual({ success: false, error: "unverifiable:no_expected" });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("does not ask about a session other than the one the payment expects", async () => {
+    const fetchSpy = jest.spyOn(global, "fetch");
+    jest.spyOn(securityAuditLog, "writeSecurityAuditEvent").mockImplementation(() => undefined);
+    await expect(queryWindcaveSession("0000120000000000ffffffffffffffff", EXPECTED))
+      .resolves.toEqual({ success: false, error: "integrity_mismatch:session" });
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it.each([["JSON null", "null"], ["a truncated body", "{\"transactions\":["]])("answers %s as unreadable, not as a decline", async (_label, raw) => {
     jest.spyOn(global, "fetch").mockResolvedValue(reply(200, undefined, raw));
-    await expect(queryWindcaveSession(SESSION_ID)).resolves.toEqual({ success: false, error: "Unreadable provider response body" });
+    await expect(queryWindcaveSession(SESSION_ID, EXPECTED)).resolves.toMatchObject({ success: false });
   });
 
   it("drops the provider's text from a 4xx error", async () => {
     jest.spyOn(global, "fetch").mockResolvedValue(reply(404, undefined, "PROVIDER-DETAIL"));
-    const result = await queryWindcaveSession(SESSION_ID);
+    const result = await queryWindcaveSession(SESSION_ID, EXPECTED);
     expect(result).toEqual({ success: false, error: "Windcave 404" });
   });
 });
@@ -111,14 +176,12 @@ describe("createWindcaveSession", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it("keeps the legacy reading of a duplicate X-ID until R2-T5", async () => {
+  it("never reads an approval from a duplicate X-ID reply; the session must be confirmed by query (RF-3)", async () => {
     jest.spyOn(global, "fetch").mockResolvedValue(reply(200, { id: SESSION_ID, transactions: [{ id: "0000000c00000003", authorised: true }] }));
     await expect(createWindcaveSession("x-id", "1.00", "r", "", "https://app.example.test", 1)).resolves.toEqual({
       success: true,
       sessionId: SESSION_ID,
       alreadyComplete: true,
-      approved: true,
-      windcaveTransactionId: "0000000c00000003",
     });
   });
 

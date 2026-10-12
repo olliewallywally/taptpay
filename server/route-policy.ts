@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ f0578517a4b5c45159357e64917dd082af0703e5 on 2026-10-12.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 6f1a67e2ab66f3712b2f5112edb038193f6769ef on 2026-10-12.
  *
  * 194 registrations (81 GET, 81 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -628,13 +628,13 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       params: ["token: raw"],
       body: ["schema: tokenSessionRequestSchema"],
       authChecks: ["resolvePaymentToken"],
-      storageMethods: ["getMerchant","getNextPendingSplit","updateTransactionStatus"],
+      storageMethods: ["getMerchant","getNextPendingSplit","getSplitPaymentsByTransaction","getTransaction","updateTransactionStatus"],
       sideEffects: ["live update: sseBroker.broadcast","provider: createWindcaveSession","provider: queryWindcaveSession","push: sendPushToMerchant"],
       statuses: [200,400,404,409,410,429,500,503],
       capabilityGates: ["isWindcaveConfigured"],
       rateLimits: ["paymentTokenRateLimiter.allow","requirePaymentTokenRateLimit"],
       idempotency: ["claim","claimFinalization"],
-      helpers: ["broadcastToStone","cacheTokenAttemptSession","persistTokenOutcome","reconcileExpiredTokenAttempt","requirePaymentTokenRateLimit","setPaymentTokenHeaders","tokenAttemptOutcome"],
+      helpers: ["broadcastToStone","cacheTokenAttemptSession","expectedForTokenAttempt","persistTokenOutcome","reconcileExpiredTokenAttempt","requirePaymentTokenRateLimit","setPaymentTokenHeaders","tokenAttemptOutcome"],
     },
   },
   "POST /api/pay/t/:token/hosted-fields-complete": {
@@ -646,12 +646,13 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       params: ["token: raw"],
       body: ["schema: tokenCompletionBaseSchema.extend({ paymentMethod: z.enum([\"card\", \"apple_pay\"]).optional().default(\"card\"), }).strict()"],
       authChecks: ["prepareTokenCompletion","resolvePaymentToken"],
+      storageMethods: ["getSplitPaymentsByTransaction","getTransaction"],
       sideEffects: ["live update: sseBroker.broadcast","provider: queryWindcaveSession","push: sendPushToMerchant"],
       statuses: [200,400,404,409,429,500,503],
       capabilityGates: ["isWindcaveConfigured"],
       rateLimits: ["paymentTokenRateLimiter.allow","requirePaymentTokenRateLimit"],
       idempotency: ["claimFinalization"],
-      helpers: ["broadcastToStone","persistTokenOutcome","requirePaymentTokenRateLimit","setPaymentTokenHeaders","tokenAttemptOutcome"],
+      helpers: ["broadcastToStone","expectedForTokenAttempt","persistTokenOutcome","requirePaymentTokenRateLimit","setPaymentTokenHeaders","tokenAttemptOutcome"],
     },
   },
   "POST /api/pay/t/:token/googlepay-complete": {
@@ -663,12 +664,13 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       params: ["token: raw"],
       body: ["schema: tokenCompletionBaseSchema.extend({ googlePayToken: z.record(z.unknown()).optional(), }).strict()"],
       authChecks: ["prepareTokenCompletion","resolvePaymentToken"],
+      storageMethods: ["getSplitPaymentsByTransaction","getTransaction"],
       sideEffects: ["live update: sseBroker.broadcast","provider: queryWindcaveSession","provider: submitGooglePayToken","push: sendPushToMerchant"],
       statuses: [200,400,404,409,429,500,503],
       capabilityGates: ["isWindcaveConfigured"],
       rateLimits: ["paymentTokenRateLimiter.allow","requirePaymentTokenRateLimit"],
       idempotency: ["claimFinalization"],
-      helpers: ["broadcastToStone","persistTokenOutcome","requirePaymentTokenRateLimit","setPaymentTokenHeaders","tokenAttemptOutcome"],
+      helpers: ["broadcastToStone","expectedForTokenAttempt","persistTokenOutcome","requirePaymentTokenRateLimit","setPaymentTokenHeaders","tokenAttemptOutcome"],
     },
   },
   "GET /api/pay/return/:state": {
@@ -680,12 +682,13 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       params: ["state: raw"],
       query: ["result: raw","source: raw"],
       authChecks: ["paymentAttempts.resolveReturnState"],
+      storageMethods: ["getSplitPaymentsByTransaction","getTransaction"],
       sideEffects: ["live update: sseBroker.broadcast","provider: queryWindcaveSession","push: sendPushToMerchant"],
       statuses: [200,303,404,410,429,500],
       capabilityGates: ["isWindcaveConfigured"],
       rateLimits: ["paymentTokenRateLimiter.allow","requirePaymentTokenRateLimit"],
       idempotency: ["claimFinalization"],
-      helpers: ["broadcastToStone","persistTokenOutcome","reconcileTokenReturnState","requirePaymentTokenRateLimit","setPaymentTokenHeaders","tokenAttemptOutcome"],
+      helpers: ["broadcastToStone","expectedForTokenAttempt","persistTokenOutcome","reconcileTokenReturnState","requirePaymentTokenRateLimit","setPaymentTokenHeaders","tokenAttemptOutcome"],
     },
   },
   "ALL /api/pay/notification/:state": {
@@ -698,12 +701,13 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       query: ["result: raw"],
       body: ["fields: result"],
       authChecks: ["paymentAttempts.resolveReturnState"],
+      storageMethods: ["getSplitPaymentsByTransaction","getTransaction"],
       sideEffects: ["live update: sseBroker.broadcast","provider: queryWindcaveSession","push: sendPushToMerchant"],
       statuses: [200,429],
       capabilityGates: ["isWindcaveConfigured"],
       rateLimits: ["paymentTokenRateLimiter.allow","requirePaymentTokenRateLimit"],
       idempotency: ["claimFinalization"],
-      helpers: ["broadcastToStone","persistTokenOutcome","reconcileTokenReturnState","requirePaymentTokenRateLimit","setPaymentTokenHeaders"],
+      helpers: ["broadcastToStone","expectedForTokenAttempt","persistTokenOutcome","reconcileTokenReturnState","requirePaymentTokenRateLimit","setPaymentTokenHeaders"],
     },
   },
   "GET /api/merchants/:id/active-transaction": {
@@ -842,13 +846,13 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       params: ["id: strictPositiveIntegerParam"],
       body: ["schema: paymentRequestSchema"],
       authChecks: ["compares stone.merchantId !== transaction.merchantId","compares transaction.merchantId !== requestMerchantId","isTokenAddressedTransaction"],
-      storageMethods: ["getMerchant","getNextPendingSplit","getTaptStone","getTransaction","updateTransactionStatus","updateTransactionWindcaveSession"],
-      sideEffects: ["live update: sseBroker.broadcast","provider: createWindcaveSession","push: sendPushToMerchant"],
+      storageMethods: ["getMerchant","getNextPendingSplit","getTaptStone","getTransaction","updateTransactionWindcaveSession"],
+      sideEffects: ["provider: createWindcaveSession"],
       statuses: [200,400,403,404,409,429,500,503],
       errorTextInResponse: ["validation.error.errors"],
       capabilityGates: ["isWindcaveConfigured"],
       rateLimits: ["checkRateLimit"],
-      helpers: ["broadcastToStone","checkRateLimit"],
+      helpers: ["checkRateLimit"],
     },
   },
   "GET /api/windcave/env": {
@@ -873,7 +877,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       sideEffects: ["live update: sseBroker.broadcast","provider: queryWindcaveSession","push: sendPushToMerchant"],
       statuses: [200,400,403,404,500,503],
       capabilityGates: ["isWindcaveConfigured"],
-      helpers: ["broadcastToStone","finaliseHostedPayment"],
+      helpers: ["broadcastToStone","expectedForNumberedSale","finaliseHostedPayment"],
     },
   },
   "POST /api/transactions/:id/googlepay-complete": {
@@ -889,7 +893,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       sideEffects: ["live update: sseBroker.broadcast","provider: queryWindcaveSession","provider: submitGooglePayToken","push: sendPushToMerchant"],
       statuses: [200,400,403,404,500,503],
       capabilityGates: ["isWindcaveConfigured"],
-      helpers: ["broadcastToStone","finaliseHostedPayment"],
+      helpers: ["broadcastToStone","expectedForNumberedSale","finaliseHostedPayment"],
     },
   },
   "GET /api/transactions/:id": {
@@ -1216,7 +1220,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       sideEffects: ["live update: sseBroker.broadcast","provider: queryWindcaveSession","push: sendPushToMerchant"],
       statuses: [200],
       capabilityGates: ["isWindcaveConfigured"],
-      helpers: ["broadcastToStone"],
+      helpers: ["broadcastToStone","expectedForNumberedSale"],
     },
   },
   "GET /api/windcave/callback": {
@@ -1231,7 +1235,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       sideEffects: ["live update: sseBroker.broadcast","provider: queryWindcaveSession","push: sendPushToMerchant"],
       statuses: [302,400],
       capabilityGates: ["isWindcaveConfigured"],
-      helpers: ["broadcastToStone"],
+      helpers: ["broadcastToStone","expectedForNumberedSale"],
     },
   },
   "GET /api/admin/analytics": {
@@ -2260,13 +2264,12 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       params: ["token: raw"],
       body: ["fields: payerEmail"],
       authChecks: ["getCheckoutInvoiceByToken"],
-      storageMethods: ["atomicClaimJobSplitShare","atomicClaimSplitShare","createJobEvent","getClientProfile","getInvoiceRentRequest","getInvoiceRentRequestByToken","getJobInvoice","getJobInvoiceByToken","getMerchant","getPaidInvoiceSplitPayerEmails","getTenantProfile","logTransactionEvent","markInvoiceSplitSessionPaid","recordInvoiceSplitSession","updateInvoiceRentRequest","updateJobInvoice"],
-      sideEffects: ["email/SMS: sendTradePaymentInvoice","email: sendGstInvoices","provider: createWindcaveSession"],
+      storageMethods: ["getClientProfile","getInvoiceRentRequestByToken","getJobInvoiceByToken","getMerchant","getTenantProfile","recordInvoiceSplitSession","updateInvoiceRentRequest","updateJobInvoice"],
+      sideEffects: ["provider: createWindcaveSession"],
       statuses: [200,404,409,429,500,502,503],
       capabilityGates: ["isWindcaveConfigured"],
       rateLimits: ["tokenRateLimit"],
-      idempotency: ["atomicClaimJobSplitShare","atomicClaimSplitShare"],
-      helpers: ["finalizeCheckoutInvoice","finalizeRentInvoice","finalizeTradeInvoice","getCheckoutParty","recordUncountedShare","sendRentGstInvoices","splitInvoiceRef","tokenRateLimit","updateCheckoutInvoice"],
+      helpers: ["getCheckoutParty","splitInvoiceRef","tokenRateLimit","updateCheckoutInvoice"],
     },
   },
   "POST /api/checkout/:token/hosted-fields-complete": {
@@ -2283,7 +2286,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       statuses: [200,400,403,404,500,503],
       capabilityGates: ["isWindcaveConfigured"],
       idempotency: ["atomicClaimJobSplitShare","atomicClaimSplitShare"],
-      helpers: ["finalizeCheckoutInvoice","finalizeRentInvoice","finalizeTradeInvoice","recordUncountedShare","sendRentGstInvoices","splitSessionOpenedFor"],
+      helpers: ["expectedForCheckoutInvoice","finalizeCheckoutInvoice","finalizeRentInvoice","finalizeTradeInvoice","recordUncountedShare","sendRentGstInvoices","splitSessionOpenedFor"],
     },
   },
   "POST /api/checkout/:token/googlepay-complete": {
@@ -2300,7 +2303,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       statuses: [200,400,403,404,500,503],
       capabilityGates: ["isWindcaveConfigured"],
       idempotency: ["atomicClaimJobSplitShare","atomicClaimSplitShare"],
-      helpers: ["finalizeCheckoutInvoice","finalizeRentInvoice","finalizeTradeInvoice","recordUncountedShare","sendRentGstInvoices","splitSessionOpenedFor"],
+      helpers: ["expectedForCheckoutInvoice","finalizeCheckoutInvoice","finalizeRentInvoice","finalizeTradeInvoice","recordUncountedShare","sendRentGstInvoices","splitSessionOpenedFor"],
     },
   },
   "GET /api/checkout/callback": {
@@ -2311,12 +2314,12 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       query: ["result: raw","token: raw"],
       authChecks: ["getCheckoutInvoiceByToken"],
-      storageMethods: ["atomicClaimJobSplitShare","atomicClaimSplitShare","createJobEvent","getInvoiceRentRequest","getInvoiceRentRequestByToken","getJobInvoice","getJobInvoiceByToken","getMerchant","getPaidInvoiceSplitPayerEmails","getTenantProfile","logTransactionEvent","markInvoiceSplitSessionPaid","updateInvoiceRentRequest","updateJobInvoice"],
+      storageMethods: ["atomicClaimJobSplitShare","atomicClaimSplitShare","createJobEvent","getInvoiceRentRequest","getInvoiceRentRequestByToken","getInvoiceSplitSession","getJobInvoice","getJobInvoiceByToken","getMerchant","getPaidInvoiceSplitPayerEmails","getTenantProfile","logTransactionEvent","markInvoiceSplitSessionPaid","updateInvoiceRentRequest","updateJobInvoice"],
       sideEffects: ["email/SMS: sendTradePaymentInvoice","email: sendGstInvoices","provider: queryWindcaveSession"],
       statuses: [302],
       capabilityGates: ["isWindcaveConfigured"],
       idempotency: ["atomicClaimJobSplitShare","atomicClaimSplitShare"],
-      helpers: ["finalizeCheckoutInvoice","finalizeRentInvoice","finalizeTradeInvoice","recordUncountedShare","sendRentGstInvoices"],
+      helpers: ["expectedForCheckoutInvoice","finalizeCheckoutInvoice","finalizeRentInvoice","finalizeTradeInvoice","recordUncountedShare","sendRentGstInvoices"],
     },
   },
   "ALL /api/windcave/rent-notification": {
@@ -2333,7 +2336,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       statuses: [200],
       capabilityGates: ["isWindcaveConfigured"],
       idempotency: ["atomicClaimSplitShare"],
-      helpers: ["finalizeRentInvoice","recordUncountedShare","sendRentGstInvoices"],
+      helpers: ["expectedForCheckoutInvoice","finalizeRentInvoice","recordUncountedShare","sendRentGstInvoices"],
     },
   },
   "ALL /api/windcave/trades-notification": {
@@ -2350,7 +2353,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       statuses: [200],
       capabilityGates: ["isWindcaveConfigured"],
       idempotency: ["atomicClaimJobSplitShare","atomicClaimSplitShare"],
-      helpers: ["finalizeCheckoutInvoice","finalizeRentInvoice","finalizeTradeInvoice","recordUncountedShare","sendRentGstInvoices"],
+      helpers: ["expectedForCheckoutInvoice","finalizeCheckoutInvoice","finalizeRentInvoice","finalizeTradeInvoice","recordUncountedShare","sendRentGstInvoices"],
     },
   },
   "POST /api/webhooks/whatsapp": {

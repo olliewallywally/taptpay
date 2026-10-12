@@ -4,6 +4,11 @@ import { redactSensitive } from "./request-log";
 import { config } from "./config";
 import { createWindcaveClient, type UnknownReason, type WindcaveClient } from "./windcave-client";
 import { validateWindcaveLink, windcaveScriptEnv } from "./windcave-links";
+import { normalizeSessionQuery } from "./windcave-query";
+import { verifyWindcaveOutcome, type WindcaveExpectedOutcome } from "./windcave-verify";
+import { writeSecurityAuditEvent } from "./security-audit-log";
+
+export type { WindcaveExpectedOutcome } from "./windcave-verify";
 
 const WINDCAVE_ENDPOINT = config.windcave.endpoint || "";
 const SESSION_URL = `${WINDCAVE_ENDPOINT}/sessions`;
@@ -152,47 +157,57 @@ export async function createWindcaveSession(
   }
 
   if (outcome.kind === "duplicate") {
-    // Legacy reading of a duplicate X-ID, unchanged until R2-T5 confirms it by query (RF-3).
-    const data = outcome.body as { id?: unknown; transactions?: Array<{ authorised?: unknown; id?: unknown }> } | null;
-    if (!data || typeof data !== "object") return { success: false, error: legacyFailure({ kind: "malformed" }) };
-    const tx = Array.isArray(data.transactions) ? data.transactions[0] : undefined;
-    const approved = tx?.authorised === true;
-    return {
-      success: true,
-      sessionId: typeof data.id === "string" ? data.id : undefined,
-      alreadyComplete: true,
-      approved,
-      windcaveTransactionId: approved && typeof tx?.id === "string" ? tx.id : undefined,
-    };
+    // R2-T5 (RF-3): an X-ID already used names a session that exists; whether it paid
+    // is confirmed only by a verified query, never read from this reply.
+    const data = outcome.body as { id?: unknown } | null;
+    if (!data || typeof data !== "object" || typeof data.id !== "string" || data.id.length === 0) {
+      return { success: false, error: legacyFailure({ kind: "malformed" }) };
+    }
+    return { success: true, sessionId: data.id, alreadyComplete: true };
   }
 
   return { success: false, error: legacyFailure(outcome) };
 }
 
-// Query a session to determine the payment outcome
+/** The environment this server's provider configuration targets. */
+export function currentProviderEnvironment(): "uat" | "production" {
+  return config.paymentMode === "production" ? "production" : "uat";
+}
+
+// Query a session and settle only on an outcome verified against what the payment
+// expected (R2-T5, plan §9.5). success:true means a verified approval or decline; every
+// other answer (pending, unverifiable, mismatch, provider failure) leaves the payment
+// reconcilable. A mismatch is recorded as a sanitized security event (field only).
 export async function queryWindcaveSession(
   sessionId: string,
-  /** Unused: retries now happen inside the client. */
-  _retries = 0
+  expected: WindcaveExpectedOutcome | null,
 ): Promise<QuerySessionResult> {
-  const outcome = await defaultSessionClient().querySession(sessionId);
-
-  if (outcome.kind === "reply") {
-    // A body that is not an object must stay an unknown outcome, not a decline.
-    const data = outcome.body as { transactions?: Array<{ authorised?: unknown; id?: unknown }> } | null;
-    if (!data || typeof data !== "object") return { success: false, error: legacyFailure({ kind: "malformed" }) };
-    // Legacy reading of the 0th transaction, unchanged until R2-T3/T5 (RF-2).
-    const tx = Array.isArray(data.transactions) ? data.transactions[0] : undefined;
-    const approved = tx?.authorised === true;
-    return {
-      success: true,
-      approved,
-      windcaveTransactionId: approved && typeof tx?.id === "string" ? tx.id : undefined,
-    };
+  if (!expected) return { success: false, error: "unverifiable:no_expected" };
+  if (expected.sessionId !== sessionId) {
+    writeSecurityAuditEvent("PROVIDER_OUTCOME_MISMATCH", { field: "session" });
+    return { success: false, error: "integrity_mismatch:session" };
   }
-
+  const outcome = await defaultSessionClient().querySession(sessionId);
   if (outcome.kind === "pending") return { success: false, error: "Session still processing after max retries" };
-  return { success: false, error: legacyFailure(outcome) };
+  if (outcome.kind !== "reply") return { success: false, error: legacyFailure(outcome) };
+
+  const verified = verifyWindcaveOutcome(expected, normalizeSessionQuery(outcome.body, sessionId), {
+    providerEnvironment: currentProviderEnvironment(),
+    accountUsername: config.windcave.username || "",
+  });
+  switch (verified.kind) {
+    case "approved":
+      return { success: true, approved: true, windcaveTransactionId: verified.providerTransactionId };
+    case "declined":
+      return { success: true, approved: false };
+    case "pending":
+      return { success: false, error: "pending" };
+    case "unverifiable":
+      return { success: false, error: `unverifiable:${verified.reason}` };
+    case "mismatch":
+      writeSecurityAuditEvent("PROVIDER_OUTCOME_MISMATCH", { field: verified.field });
+      return { success: false, error: `integrity_mismatch:${verified.field}` };
+  }
 }
 
 // ---------------------------------------------------------------------------

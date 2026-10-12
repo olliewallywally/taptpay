@@ -36,8 +36,8 @@ export interface NormalizedTransaction {
 }
 
 export type SessionQueryResult =
-  | { kind: "approved"; sessionId: string; transactionCount: number; transaction: NormalizedTransaction }
-  | { kind: "declined"; sessionId: string; transactionCount: number }
+  | { kind: "approved"; sessionId: string; transactionCount: number; transaction: NormalizedTransaction; transactions: NormalizedTransaction[] }
+  | { kind: "declined"; sessionId: string; transactionCount: number; transactions: NormalizedTransaction[] }
   | { kind: "pending"; sessionId: string }
   | { kind: "ambiguous"; reason: "no_transaction" | "multiple_authorised" | "type" }
   | { kind: "integrity_mismatch"; reason: "session" }
@@ -95,7 +95,7 @@ export function normalizeSessionQuery(body: unknown, queriedSessionId: string): 
   if (authorised.length > 1) return { kind: "ambiguous", reason: "multiple_authorised" };
   if (authorised.length === 1) {
     if (authorised[0].type !== "purchase") return { kind: "ambiguous", reason: "type" };
-    return { kind: "approved", sessionId: body.id, transactionCount: transactions.length, transaction: authorised[0] };
+    return { kind: "approved", sessionId: body.id, transactionCount: transactions.length, transaction: authorised[0], transactions };
   }
-  return { kind: "declined", sessionId: body.id, transactionCount: transactions.length };
+  return { kind: "declined", sessionId: body.id, transactionCount: transactions.length, transactions };
 }

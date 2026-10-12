@@ -187,7 +187,8 @@ const RECIPES: Record<string, OwnServedRecipe> = {
       check: () => {
         // The wallet's token goes to the provider's own submit address for this session, and nowhere else.
         expect(submitGooglePay.mock.calls).toEqual([[expect.stringMatching(/^https:\/\/uat\.windcave\.com\/.*\/googlepay$/), { signature: "synthetic" }]]);
-        expect(job()).toMatchObject({ status: "paid", windcaveTransactionId: "provider-google-pay" });
+        // R2-T5: the verified session query settles it, never the submit's own reply.
+        expect(job()).toMatchObject({ status: "paid", windcaveTransactionId: expect.stringMatching(/^provider-matrix-session-\d+$/) });
         // The client is sent the paid invoice.
         expect(delivery.sendTradePaymentInvoice).toHaveBeenCalledWith(expect.objectContaining({ id: JOB_INVOICE, status: "paid" }));
       },

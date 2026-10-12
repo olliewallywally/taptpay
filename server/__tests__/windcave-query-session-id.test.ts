@@ -23,6 +23,11 @@ import { queryWindcaveSession } from "../windcave";
  * now one encoded path segment, as queryStoredCardSession already does.
  */
 
+// R2-T5: a query names what it expects; this suite only checks the address it asks.
+function expectedFor(sessionId: string) {
+  return { sessionId, amountCents: 100, currency: "NZD", merchantReference: "r", providerEnvironment: "uat" as const };
+}
+
 function providerReply(): Response {
   return new Response(JSON.stringify({ transactions: [{ authorised: false, id: "provider-tx" }] }), { status: 200 });
 }
@@ -38,7 +43,7 @@ it.each([
 ])("keeps %s inside the one session it names", async (_label, sessionId, encoded) => {
   const fetchSpy = jest.spyOn(global, "fetch").mockResolvedValue(providerReply());
 
-  await queryWindcaveSession(sessionId);
+  await queryWindcaveSession(sessionId, expectedFor(sessionId));
 
   expect(fetchSpy).toHaveBeenCalledTimes(1);
   expect(String(fetchSpy.mock.calls[0][0])).toMatch(new RegExp(`/sessions/${encoded.replace(/[.%]/g, "\\$&")}$`));
@@ -47,7 +52,7 @@ it.each([
 it("asks for an ordinary session id unchanged", async () => {
   const fetchSpy = jest.spyOn(global, "fetch").mockResolvedValue(providerReply());
 
-  await queryWindcaveSession("00001200030255390bbd02ba0dbcf0e7");
+  await queryWindcaveSession("00001200030255390bbd02ba0dbcf0e7", expectedFor("00001200030255390bbd02ba0dbcf0e7"));
 
   expect(String(fetchSpy.mock.calls[0][0])).toMatch(/\/sessions\/00001200030255390bbd02ba0dbcf0e7$/);
 });
