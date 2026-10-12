@@ -325,7 +325,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     },
     findings: [
       "pending → processing is a read then a write, not an atomic claim: two simultaneous notifications for one session can both query the provider and both settle it (a second count increment, a second push). Plan 22.7 / R3 (C20) owns the single atomic finaliser.",
-      "Logs the raw query (with the session id), and the query and body when no session id is found, to the server log.",
+      "Until R2-T6 (2026-10-12) it logged the raw query (with the provider's session id), and the query and body when no session id was found; it now logs fixed text and the internal sale id only (r2-t6-provider-log-guard.test.ts).",
     ],
   },
 

@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 6f1a67e2ab66f3712b2f5112edb038193f6769ef on 2026-10-12.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 1359e646a1e05615e4df94ec446e7ffc6f3205e7 on 2026-10-12.
  *
  * 194 registrations (81 GET, 81 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -1215,7 +1215,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       middleware: ["express.urlencoded(…)","express.json(…)"],
       query: ["sessionId: raw","sessionid: raw"],
-      body: ["fields: sessionId, sessionid","whole body: console.warn"],
+      body: ["fields: sessionId, sessionid"],
       storageMethods: ["getNextPendingSplit","getTransaction","getTransactionByWindcaveSessionId","incrementTransactionCount","updateSplitPaymentStatus","updateTransactionSessionState","updateTransactionStatus"],
       sideEffects: ["live update: sseBroker.broadcast","provider: queryWindcaveSession","push: sendPushToMerchant"],
       statuses: [200],

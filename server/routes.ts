@@ -4555,30 +4555,29 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       // Per Windcave pseudo code: sessionId is a URL query parameter (Request.Url.getParameter("sessionid"))
       const sessionId = (req.query?.sessionid as string) || (req.query?.sessionId as string) || req.body?.sessionId || req.body?.sessionid;
-      console.log(`[WINDCAVE_NOTIF] ${req.method} notification received, sessionId=${sessionId}, query=${JSON.stringify(req.query)}`);
+      // R2-T6 (RF-6): the provider's session ID, the raw query and the body are never
+      // logged; the internal sale ID is, once the session has found one.
       if (!sessionId) {
-        console.warn('[WINDCAVE_NOTIF] No sessionId found. Query:', req.query, 'Body:', req.body);
+        console.warn('[WINDCAVE_NOTIF] A notification arrived without a session ID');
         return;
       }
 
-      console.log(`[WINDCAVE_NOTIF] Received for session ${sessionId}`);
-
       const transaction = await storage.getTransactionByWindcaveSessionId(sessionId);
       if (!transaction) {
-        console.warn(`[WINDCAVE_NOTIF] No transaction found for session ${sessionId}`);
+        console.warn('[WINDCAVE_NOTIF] No sale holds the notified session');
         return;
       }
 
       // Only process if still pending (atomic state transition)
       if (transaction.windcaveSessionState !== 'pending') {
-        console.log(`[WINDCAVE_NOTIF] Session ${sessionId} already processed (state: ${transaction.windcaveSessionState})`);
+        console.log(`[WINDCAVE_NOTIF] Sale ${transaction.id} already processed (state: ${transaction.windcaveSessionState})`);
         return;
       }
 
       // Without a configured provider there is nothing to reconcile against —
       // do not even take the transient "processing" lock.
       if (!isWindcaveConfigured()) {
-        console.log(`[WINDCAVE_NOTIF] Provider not configured, ignoring notification for ${sessionId}`);
+        console.log(`[WINDCAVE_NOTIF] Provider not configured, ignoring the notification for sale ${transaction.id}`);
         return;
       }
 
@@ -4591,7 +4590,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       } catch (error) {
         // Leaving 'processing' behind would make this session permanently
         // unreconcilable: the guard above refuses anything not 'pending'.
-        console.error(`[WINDCAVE_NOTIF] querySession threw for ${sessionId}:`, error);
+        console.error(`[WINDCAVE_NOTIF] The session query threw for sale ${transaction.id}:`, error);
         await storage.updateTransactionSessionState(transaction.id, 'pending');
         return;
       }
@@ -4599,7 +4598,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // Same condition the token flows use: an approval with no processor
       // transaction id is not a settlement we can record.
       if (!queryResult.success || (queryResult.approved && !queryResult.windcaveTransactionId)) {
-        console.error(`[WINDCAVE_NOTIF] querySession unusable for ${sessionId}:`, queryResult.error);
+        console.error(`[WINDCAVE_NOTIF] The session query was unusable for sale ${transaction.id}:`, queryResult.error);
         await storage.updateTransactionSessionState(transaction.id, 'pending');
         return;
       }
@@ -4686,7 +4685,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // Fallback: by sessionId (legacy / simulation)
       const sessionId = req.query.sessionid as string || req.query.sessionId as string;
 
-      console.log(`[WINDCAVE_CALLBACK] transactionId=${txnIdParam} sessionId=${sessionId} result=${resultParam}`);
+      // R2-T6 (RF-6): the browser's parameters (the provider's session ID among them) are
+      // never logged; the internal sale ID is, once found.
 
       let transaction: any = null;
 
@@ -4702,7 +4702,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // missing one is (R1-T3, P2.2's tenant-safe answer), where a 404 told a caller counting through
       // the numbers which ones were link sales.
       if (!transaction || isTokenAddressedTransaction(transaction)) {
-        console.warn(`[WINDCAVE_CALLBACK] No transaction found (txnId=${txnIdParam}, session=${sessionId})`);
+        console.warn('[WINDCAVE_CALLBACK] No sale found for a browser return');
         return res.redirect('/');
       }
 
@@ -4753,7 +4753,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       } catch (error) {
         // A throwing provider client must not strand the session in 'processing',
         // where the notification handler refuses it forever as already-handled.
-        console.error(`[WINDCAVE_CALLBACK] querySession threw for ${sessionToQuery}:`, error);
+        console.error(`[WINDCAVE_CALLBACK] The session query threw for sale ${txnId}:`, error);
         await storage.updateTransactionSessionState(txnId, 'pending');
         return res.redirect(`/payment/result/${txnId}?status=pending`);
       }
@@ -4761,7 +4761,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // Same condition the token flows use: an approval with no processor
       // transaction id is not a settlement we can record.
       if (!queryResult.success || (queryResult.approved && !queryResult.windcaveTransactionId)) {
-        console.error(`[WINDCAVE_CALLBACK] querySession unusable for ${sessionToQuery}:`, queryResult.error);
+        console.error(`[WINDCAVE_CALLBACK] The session query was unusable for sale ${txnId}:`, queryResult.error);
         await storage.updateTransactionSessionState(txnId, 'pending');
         return res.redirect(`/payment/result/${txnId}?status=pending`);
       }
@@ -8257,18 +8257,18 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     res.status(200).send("OK"); // respond fast so Windcave stops retrying
     try {
       const sessionId = (req.query?.sessionid as string) || (req.query?.sessionId as string) || req.body?.sessionId || req.body?.sessionid;
-      if (!sessionId) { console.warn("[RENT_NOTIF] No sessionId", req.query); return; }
+      if (!sessionId) { console.warn("[RENT_NOTIF] A notification arrived without a session ID"); return; }
       let invoice = await storage.getInvoiceRentRequestByWindcaveSessionId(sessionId);
       if (!invoice) {
         // A split share's session is recorded, not pinned (0030).
         const opened = await storage.getInvoiceSplitSession(sessionId);
         if (opened?.rentInvoiceId) invoice = await storage.getInvoiceRentRequest(opened.rentInvoiceId);
       }
-      if (!invoice) { console.warn(`[RENT_NOTIF] No invoice for session ${sessionId}`); return; }
+      if (!invoice) { console.warn("[RENT_NOTIF] No invoice holds the notified session"); return; }
       if (["paid", "paid_external", "voided"].includes(invoice.status)) return; // already settled
       if (!isWindcaveConfigured()) return;
       const queryResult = await queryWindcaveSession(sessionId, await expectedForCheckoutInvoice({ ...invoice, checkoutVertical: "property" }, sessionId));
-      if (!queryResult.success) { console.error(`[RENT_NOTIF] query failed for ${sessionId}:`, queryResult.error); return; }
+      if (!queryResult.success) { console.error(`[RENT_NOTIF] The session query failed for invoice ${invoice.id}:`, queryResult.error); return; }
       await finalizeRentInvoice(invoice.id, !!queryResult.approved, queryResult.windcaveTransactionId, sessionId);
       console.log(`[RENT_NOTIF] invoice ${invoice.id} → ${queryResult.approved ? "paid" : "declined"}`);
     } catch (err) { console.error("[RENT_NOTIF] Error:", err); }
@@ -8279,19 +8279,19 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     res.status(200).send("OK");
     try {
       const sessionId = (req.query?.sessionid as string) || (req.query?.sessionId as string) || req.body?.sessionId || req.body?.sessionid;
-      if (!sessionId) { console.warn("[TRADES_NOTIF] No sessionId", req.query); return; }
+      if (!sessionId) { console.warn("[TRADES_NOTIF] A notification arrived without a session ID"); return; }
       let stored = await storage.getJobInvoiceByWindcaveSessionId(sessionId);
       if (!stored) {
         // A split share's session is recorded, not pinned (0030).
         const opened = await storage.getInvoiceSplitSession(sessionId);
         if (opened?.jobInvoiceId) stored = await storage.getJobInvoice(opened.jobInvoiceId);
       }
-      if (!stored) { console.warn(`[TRADES_NOTIF] No invoice for session ${sessionId}`); return; }
+      if (!stored) { console.warn("[TRADES_NOTIF] No invoice holds the notified session"); return; }
       if (["paid", "paid_external", "voided"].includes(stored.status)) return;
       if (!isWindcaveConfigured()) return;
       const invoice = { ...stored, checkoutVertical: "trades" as const };
       const queryResult = await queryWindcaveSession(sessionId, await expectedForCheckoutInvoice(invoice, sessionId));
-      if (!queryResult.success) { console.error(`[TRADES_NOTIF] query failed for ${sessionId}:`, queryResult.error); return; }
+      if (!queryResult.success) { console.error(`[TRADES_NOTIF] The session query failed for invoice ${invoice.id}:`, queryResult.error); return; }
       await finalizeCheckoutInvoice(invoice, !!queryResult.approved, queryResult.windcaveTransactionId, sessionId);
       console.log(`[TRADES_NOTIF] invoice ${invoice.id} -> ${queryResult.approved ? "paid" : "declined"}`);
     } catch (err) { console.error("[TRADES_NOTIF] Error:", err); }

@@ -36,6 +36,17 @@ function logAudit(action: string, details: Record<string, any>) {
   console.log(`[WINDCAVE] [${new Date().toISOString()}] ${action}:`, JSON.stringify(sanitized));
 }
 
+// R2-T6 (RF-6): what a failure may say outside this module. Provider reply text can echo
+// request details (session IDs, references, tokens), and a transport error can name the
+// request, so callers get a status or a category only; they log, store and show these.
+function providerFailure(status: number, label = "Windcave"): string {
+  return `${label} ${status}`;
+}
+
+function transportFailure(err: unknown): "timeout" | "network" {
+  return (err as Error | undefined)?.name === "AbortError" ? "timeout" : "network";
+}
+
 function buildAuthHeader(): string {
   const username = config.windcave.username || "";
   const apiKey = config.windcave.apiKey || "";
@@ -355,8 +366,8 @@ export async function createCardStorageSession(
       body: JSON.stringify(body),
     });
   } catch (err: any) {
-    logAudit("STORE_CARD_SESSION_NETWORK_ERROR", { xId, error: err.message });
-    return { success: false, error: err.message };
+    logAudit("STORE_CARD_SESSION_NETWORK_ERROR", { xId, error: transportFailure(err) });
+    return { success: false, error: transportFailure(err) };
   }
 
   const text = await response.text();
@@ -371,8 +382,8 @@ export async function createCardStorageSession(
     return { success: true, sessionId: data.id, hppUrl };
   }
 
-  logAudit("STORE_CARD_SESSION_ERROR", { xId, status: response.status, body: text.slice(0, 300) });
-  return { success: false, error: `Windcave ${response.status}: ${text.slice(0, 200)}` };
+  logAudit("STORE_CARD_SESSION_ERROR", { xId, status: response.status, bytes: text.length });
+  return { success: false, error: providerFailure(response.status) };
 }
 
 /** Reads back the card token once the shopper has finished the hosted form. */
@@ -395,8 +406,8 @@ export async function queryStoredCardSession(
       headers: { Authorization: buildAuthHeader() },
     });
   } catch (err: any) {
-    logAudit("STORE_CARD_QUERY_NETWORK_ERROR", { sessionId, error: err.message });
-    return { success: false, error: err.message };
+    logAudit("STORE_CARD_QUERY_NETWORK_ERROR", { sessionId, error: transportFailure(err) });
+    return { success: false, error: transportFailure(err) };
   }
 
   const text = await response.text();
@@ -406,7 +417,7 @@ export async function queryStoredCardSession(
   }
   if (response.status !== 200) {
     logAudit("STORE_CARD_QUERY_ERROR", { sessionId, status: response.status });
-    return { success: false, error: `Windcave ${response.status}: ${text.slice(0, 200)}` };
+    return { success: false, error: providerFailure(response.status) };
   }
 
   const data = parseWindcaveJson(text);
@@ -480,8 +491,8 @@ export async function chargeStoredCard(
       body: JSON.stringify(body),
     });
   } catch (err: any) {
-    logAudit("CHARGE_STORED_CARD_NETWORK_ERROR", { xId, error: err.message });
-    return { success: false, error: err.message };
+    logAudit("CHARGE_STORED_CARD_NETWORK_ERROR", { xId, error: transportFailure(err) });
+    return { success: false, error: transportFailure(err) };
   }
 
   const text = await response.text();
@@ -489,15 +500,15 @@ export async function chargeStoredCard(
     const pending = parseWindcaveJson(text);
     const pollUrl = transactionPollUrl(pending);
     if (!pollUrl) {
-      logAudit("CHARGE_STORED_CARD_PENDING_INVALID", { xId, body: text.slice(0, 300) });
+      logAudit("CHARGE_STORED_CARD_PENDING_INVALID", { xId, bytes: text.length });
       return { success: false, error: "Windcave returned a pending transaction without an id" };
     }
     return pollStoredCardCharge(xId, pollUrl, pending?.id ?? pending?.transactionId, options);
   }
 
   if (response.status !== 200 && response.status !== 201) {
-    logAudit("CHARGE_STORED_CARD_ERROR", { xId, status: response.status, body: text.slice(0, 300) });
-    return { success: false, error: `Windcave ${response.status}: ${text.slice(0, 200)}` };
+    logAudit("CHARGE_STORED_CARD_ERROR", { xId, status: response.status, bytes: text.length });
+    return { success: false, error: providerFailure(response.status) };
   }
 
   return finalStoredCardChargeResult(xId, parseWindcaveJson(text));
@@ -596,8 +607,8 @@ async function pollStoredCardCharge(
         headers: { Authorization: buildAuthHeader() },
       });
     } catch (err: any) {
-      logAudit("CHARGE_STORED_CARD_POLL_NETWORK_ERROR", { xId, pollAttempt: attempt, error: err.message });
-      return { success: false, windcaveTransactionId: fallbackId, error: err.message };
+      logAudit("CHARGE_STORED_CARD_POLL_NETWORK_ERROR", { xId, pollAttempt: attempt, error: transportFailure(err) });
+      return { success: false, windcaveTransactionId: fallbackId, error: transportFailure(err) };
     }
 
     const text = await response.text();
@@ -610,12 +621,12 @@ async function pollStoredCardCharge(
         xId,
         pollAttempt: attempt,
         status: response.status,
-        body: text.slice(0, 300),
+        bytes: text.length,
       });
       return {
         success: false,
         windcaveTransactionId: fallbackId,
-        error: `Windcave ${response.status}: ${text.slice(0, 200)}`,
+        error: providerFailure(response.status),
       };
     }
 
@@ -658,7 +669,7 @@ export async function submitGooglePayToken(
     });
 
     const text = await response.text();
-    logAudit("GOOGLEPAY_RESPONSE", { status: response.status, body: text });
+    logAudit("GOOGLEPAY_RESPONSE", { status: response.status, bytes: text.length });
 
     if (response.ok) {
       let data: any = {};
@@ -667,7 +678,7 @@ export async function submitGooglePayToken(
       // Windcave returns { links: [{ rel: "done"|"3DSecure", href: "..." }] }
       if (data.links && Array.isArray(data.links) && data.links.length > 0) {
         const link = data.links[0];
-        logAudit("GOOGLEPAY_LINK", { rel: link.rel, href: link.href?.slice(0, 200) });
+        logAudit("GOOGLEPAY_LINK", { rel: link.rel });
 
         if (link.rel === "done") {
           // href is our callback URL — result is embedded in the query string
@@ -677,7 +688,7 @@ export async function submitGooglePayToken(
 
         if (link.rel === "3DSecure") {
           // 3DS not supported in server-side submission — log and fall back to session query
-          logAudit("GOOGLEPAY_3DS_REQUIRED", { href: link.href?.slice(0, 200) });
+          logAudit("GOOGLEPAY_3DS_REQUIRED", {});
           return { success: false, error: "3DS_REQUIRED" };
         }
       }
@@ -687,11 +698,11 @@ export async function submitGooglePayToken(
       return { success: true, approved, windcaveTransactionId: data.id || data.transactionId };
     }
 
-    logAudit("GOOGLEPAY_ERROR_BODY", { status: response.status, body: text });
-    return { success: false, error: `Windcave GooglePay ${response.status}: ${text}` };
+    logAudit("GOOGLEPAY_ERROR_BODY", { status: response.status, bytes: text.length });
+    return { success: false, error: providerFailure(response.status, "Windcave GooglePay") };
   } catch (err: any) {
-    logAudit("GOOGLEPAY_ERROR", { error: err.message });
-    return { success: false, error: err.message };
+    logAudit("GOOGLEPAY_ERROR", { error: transportFailure(err) });
+    return { success: false, error: transportFailure(err) };
   }
 }
 
@@ -729,12 +740,11 @@ export async function createWindcaveRefund(
       return { success: true, refundTransactionId: data.id };
     }
 
-    const errorBody = await response.text().catch(() => "");
-    logAudit("REFUND_FAILED", { status: response.status, errorBody });
-    return { success: false, error: `Refund failed: ${response.status} ${errorBody}` };
+    logAudit("REFUND_FAILED", { status: response.status });
+    return { success: false, error: providerFailure(response.status, "Refund failed:") };
   } catch (err: any) {
-    logAudit("REFUND_ERROR", { error: err.message });
-    return { success: false, error: err.message };
+    logAudit("REFUND_ERROR", { error: transportFailure(err) });
+    return { success: false, error: transportFailure(err) };
   }
 }
 
@@ -808,16 +818,16 @@ export async function createAttendedSession(
       body: JSON.stringify(body),
     });
   } catch (err: any) {
-    logAudit("ATTENDED_SESSION_NETWORK_ERROR", { xId, error: err.message });
+    logAudit("ATTENDED_SESSION_NETWORK_ERROR", { xId, error: transportFailure(err) });
     if (retries < RETRY_LIMIT) {
       await delay(5000);
       return createAttendedSession(amount, merchantReference, retries + 1, xId);
     }
-    return { success: false, error: err.message };
+    return { success: false, error: transportFailure(err) };
   }
 
   const text = await response.text();
-  logAudit("ATTENDED_SESSION_RESPONSE", { status: response.status, body: text.slice(0, 400) });
+  logAudit("ATTENDED_SESSION_RESPONSE", { status: response.status, bytes: text.length });
 
   if (response.status === 200 || response.status === 202) {
     let data: any = {};
@@ -832,7 +842,7 @@ export async function createAttendedSession(
     return createAttendedSession(amount, merchantReference, retries + 1, xId);
   }
 
-  return { success: false, error: `Windcave ${response.status}: ${text.slice(0, 200)}` };
+  return { success: false, error: providerFailure(response.status) };
 }
 
 /**
@@ -871,16 +881,16 @@ export async function submitTapToPayToken(
       body: JSON.stringify(body),
     });
   } catch (err: any) {
-    logAudit("TAP_TO_PAY_NETWORK_ERROR", { xId, error: err.message });
+    logAudit("TAP_TO_PAY_NETWORK_ERROR", { xId, error: transportFailure(err) });
     if (retries < RETRY_LIMIT) {
       await delay(5000);
       return submitTapToPayToken(sessionId, windcaveToken, retries + 1, xId);
     }
-    return { success: false, error: err.message };
+    return { success: false, error: transportFailure(err) };
   }
 
   const text = await response.text();
-  logAudit("TAP_TO_PAY_RESPONSE", { status: response.status, body: text.slice(0, 400) });
+  logAudit("TAP_TO_PAY_RESPONSE", { status: response.status, bytes: text.length });
 
   if (response.ok) {
     let data: any = {};
@@ -894,7 +904,7 @@ export async function submitTapToPayToken(
     return submitTapToPayToken(sessionId, windcaveToken, retries + 1, xId);
   }
 
-  return { success: false, error: `Windcave ${response.status}: ${text.slice(0, 200)}` };
+  return { success: false, error: providerFailure(response.status) };
 }
 
 // Legacy service wrapper kept for backward compatibility with NFC routes
