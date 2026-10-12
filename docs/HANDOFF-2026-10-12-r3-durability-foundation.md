@@ -78,3 +78,15 @@ Cloud setup draft saving is confirmed; publication/new-task restoration is not.
 Owner app PID 4196 was preserved. Stop only the test clusters created for this work.
 Private dumps/credentials/logs/bundles are excluded. Prior R1 manual/device/visual
 gates and the owner's feed-under-dock decision remain unchanged.
+
+## Follow-up: active manual-change guards
+
+Foundation `9d52d8a5` is pushed and its remote SHA is recorded in the ledger.
+The subsequent guard checkpoint hardens the existing retail cancellation and
+property/trades void/external-payment methods, with fixed `409 PAYMENT_ACTIVE`
+responses. Existing parent locks are followed by a fresh activity statement;
+live/expired or possibly accepted attempts, legacy sessions and paid shares
+cannot be discarded by these actions. See
+[guard review and verification](evidence/remediation-v2-2/r3/MANUAL-CHANGE-REVIEW-2026-10-12.md).
+Legacy sends before attachment, split-route migration, command idempotency/audit/
+outbox and cash remain outstanding; this is not full convergence or R3 exit.

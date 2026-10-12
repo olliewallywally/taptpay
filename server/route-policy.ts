@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ bd5d120498503e0e0607c0bc814a88c81a80e1e9 on 2026-10-10.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 9d52d8a5ee72be2493f12e6cf323131e4df31481 on 2026-10-12.
  *
  * 194 registrations (81 GET, 81 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -818,7 +818,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       authChecks: ["checkMerchantOwnership","compares req.user?.role === \"admin\""],
       storageMethods: ["cancelTransactionForMerchant","getTransaction","getTransactionForMerchant"],
       sideEffects: ["live update: sseBroker.broadcast"],
-      statuses: [200,400,401,403,404,500,503],
+      statuses: [200,400,401,403,404,409,500,503],
       dtos: ["ownerTransactionDto"],
       helpers: ["broadcastToStone"],
     },

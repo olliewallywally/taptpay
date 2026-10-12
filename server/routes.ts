@@ -3190,6 +3190,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(404).json({ message: "Transaction not found" });
       }
       if (cancellation.kind === "conflict") {
+        if (cancellation.reason === "payment-active") return res.status(409).json({
+          message: "Payment is in progress or a share is already paid", code: "PAYMENT_ACTIVE",
+        });
         return res.status(400).json({ message: `Cannot cancel transaction with status: ${cancellation.status}` });
       }
       const updatedTransaction = cancellation.transaction;
@@ -7835,6 +7838,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (["paid", "paid_external"].includes(invoice.status)) return res.status(409).json({ message: "Cannot void a paid invoice" }); // P2.2 (R1-T3): was 400
       const result = await storage.voidInvoiceRentRequestForMerchant(id, merchantId);
       if (result.kind === "not-found") return res.status(404).json({ message: "Invoice not found" });
+      if (result.kind === "conflict" && result.reason === "payment-active") return res.status(409).json({
+        message: "Payment is in progress or a share is already paid", code: "PAYMENT_ACTIVE",
+      });
       if (result.kind === "conflict") return res.status(409).json({ message: "Cannot void a paid invoice" });
       res.json(result.invoice);
     } catch (err) { console.error("[PROP_INVOICE_VOID]", err); res.status(500).json({ message: "Failed to void invoice" }); }
@@ -7854,6 +7860,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const { externalPaymentReference } = markInvoicePaidExternalSchema.parse(req.body);
       const result = await storage.markInvoiceRentRequestPaidExternalForMerchant(id, merchantId, externalPaymentReference);
       if (result.kind === "not-found") return res.status(404).json({ message: "Invoice not found" });
+      if (result.kind === "conflict" && result.reason === "payment-active") return res.status(409).json({
+        message: "Payment is in progress or a share is already paid", code: "PAYMENT_ACTIVE",
+      });
       if (result.kind === "conflict") return res.status(409).json({ message: result.reason === "voided" ? "This invoice was voided" : "Invoice is already paid" });
       res.json(result.invoice);
     } catch (err) {
@@ -8872,6 +8881,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // Storage rechecks the business and the invoice's state at the write, and saves the history with it.
       const result = await storage.markJobInvoicePaidExternalForMerchant(id, merchantId, parsed.data.externalPaymentReference);
       if (result.kind === "not-found") return res.status(404).json({ message: "Not found" });
+      if (result.kind === "conflict" && result.reason === "payment-active") return res.status(409).json({
+        message: "Payment is in progress or a share is already paid", code: "PAYMENT_ACTIVE",
+      });
       if (result.kind === "conflict") return res.status(409).json({ message: result.reason === "voided" ? "This invoice was voided" : "This invoice is already paid" });
       await sendTradePaymentInvoiceForMerchant(id, merchantId);
       res.json(result.invoice);
@@ -8911,6 +8923,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // 2026-09-27): storage saves it with the change.
       const result = await storage.voidJobInvoiceForMerchant(id, merchantId);
       if (result.kind === "not-found") return res.status(404).json({ message: "Not found" });
+      if (result.kind === "conflict" && result.reason === "payment-active") return res.status(409).json({
+        message: "Payment is in progress or a share is already paid", code: "PAYMENT_ACTIVE",
+      });
       if (result.kind === "conflict") return res.status(409).json({ message: "This invoice is paid" });
       res.json(result.invoice);
     } catch (err) { console.error("[TRADES_INVOICES_VOID]", err); res.status(500).json({ message: "Failed to void invoice" }); }

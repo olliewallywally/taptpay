@@ -326,6 +326,69 @@ try {
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM payment_settlement_events WHERE session_id=$1',[sessionId])).rows[0].n,1);
     await assert.rejects(pool.query('UPDATE payment_attempts SET share_index=1 WHERE id=$1',[claim.attempt.id]));
   });
+  await check('retail cancellation holds live, expired, possibly accepted, legacy and captured-share records',async()=>{
+    const create=()=>original.createTransaction({merchantId:merchant,itemName:'Synthetic guard',price:'10.01',status:'pending',paymentMethod:'qr_code',splitEnabled:false});
+    const clean=await create();assert.equal((await original.cancelTransactionForMerchant(clean.id,otherMerchant)).kind,'not-found');
+    assert.equal((await original.cancelTransactionForMerchant(clean.id,merchant)).kind,'cancelled');
+    const sale=await create(),claim=await retail.claim({transactionId:sale.id,shareIndex:0,idempotencyKey:randomUUID()});
+    assert.equal(claim.kind,'claimed');if(claim.kind!=='claimed') throw new Error('fixture_claim');
+    assert.equal((await original.cancelTransactionForMerchant(sale.id,merchant)).kind,'conflict');
+    await one.prepareRetailExpectation({paymentAttemptId:claim.attempt.id,merchantId:merchant,currency:'NZD',environment:'uat',providerAccount:'synthetic-account'},now);
+    now=new Date(now.getTime()+300001);
+    assert.equal((await original.cancelTransactionForMerchant(sale.id,merchant)).kind,'conflict');
+    assert.equal((await original.getTransaction(sale.id))?.status,'pending');
+    for(const field of ['windcave_session_id','windcave_transaction_id','completed_splits']) {
+      const held=await create();await pool.query(`UPDATE transactions SET ${field}=$2 WHERE id=$1`,[held.id,field==='completed_splits'?1:`synthetic-${randomUUID()}`]);
+      assert.equal((await original.cancelTransactionForMerchant(held.id,merchant)).kind,'conflict');
+      assert.equal((await original.getTransaction(held.id))?.status,'pending');
+    }
+    const split=await create();await pool.query(`INSERT INTO split_payments(transaction_id,merchant_id,split_index,amount,status,windcave_transaction_id)
+      VALUES ($1,$2,1,'5.01','completed',$3)`,[split.id,merchant,`synthetic-${randomUUID()}`]);
+    assert.equal((await original.cancelTransactionForMerchant(split.id,merchant)).kind,'conflict');
+    assert.equal((await original.getTransaction(split.id))?.status,'pending');
+  });
+  await check('cancellation rechecks newly committed attempts after waiting for the parent lock',async()=>{
+    const sale=await original.createTransaction({merchantId:merchant,itemName:'Synthetic race',price:'10.01',status:'pending',paymentMethod:'qr_code',splitEnabled:false});
+    const holder=await pool.connect();let cancellation:ReturnType<typeof original.cancelTransactionForMerchant>|undefined;
+    try {
+      await holder.query('BEGIN');await holder.query('SELECT id FROM transactions WHERE id=$1 FOR UPDATE',[sale.id]);
+      cancellation=original.cancelTransactionForMerchant(sale.id,merchant);
+      const deadline=Date.now()+3000;let waiting=false;
+      while(Date.now()<deadline) {
+        waiting=(await pool.query("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND query LIKE '%transactions%') AS waiting")).rows[0].waiting;
+        if(waiting) break;await new Promise(resolve=>setTimeout(resolve,10));
+      }
+      assert.ok(waiting,'cancellation must really wait on a competing transaction');
+      await holder.query(`INSERT INTO payment_attempts(transaction_id,share_index,idempotency_key,lease_expires_at)
+        VALUES ($1,0,$2,now()+interval '5 minutes')`,[sale.id,randomUUID()]);
+      await holder.query('COMMIT');assert.equal((await cancellation).kind,'conflict');
+      assert.equal((await original.getTransaction(sale.id))?.status,'pending');
+    } finally {await holder.query('ROLLBACK');holder.release();if(cancellation) await cancellation.catch(()=>undefined);}
+  });
+  for(const vertical of ['property','trades'] as const) await check(`${vertical}: active void/manual-paid holds attempts, legacy sessions and partial payment`,async()=>{
+    const methods=vertical==='property' ? ['voidInvoiceRentRequestForMerchant','markInvoiceRentRequestPaidExternalForMerchant'] as const
+      : ['voidJobInvoiceForMerchant','markJobInvoicePaidExternalForMerchant'] as const;
+    const table=vertical==='property'?'invoices_rent_requests':'job_invoices',events=vertical==='property'?'transaction_events':'job_events';
+    const column=vertical==='property'?'invoice_id':'job_invoice_id';
+    for(const method of methods) {
+      const clean=await invoice(vertical);assert.equal((await (original[method] as any)(clean,merchant)).kind,'ok');
+      const held=await invoice(vertical),claim=await one.claimInvoice(claimInput(vertical,held),now);assert.equal(claim.kind,'claimed');
+      if(claim.kind!=='claimed') throw new Error('fixture_claim');
+      for(const expired of [false,true]) {
+        if(expired) now=new Date(now.getTime()+300001);
+        assert.equal((await (original[method] as any)(held,merchant)).kind,'conflict');
+        assert.equal((await row(vertical,held)).status,vertical==='property'?'dispatched':'sent');
+      }
+      assert.equal((await pool.query(`SELECT count(*)::int AS n FROM ${events} WHERE ${column}=$1`,[held])).rows[0].n,0);
+      for(const field of ['windcave_session_id','windcave_transaction_id','split_paid_count']) {
+        const legacy=await invoice(vertical);await pool.query(`UPDATE ${table} SET ${field}=$2 WHERE id=$1`,[legacy,field==='split_paid_count'?1:`synthetic-${randomUUID()}`]);
+        assert.equal((await (original[method] as any)(legacy,merchant)).kind,'conflict');
+        assert.equal((await row(vertical,legacy)).status,vertical==='property'?'dispatched':'sent');
+      }
+      const legacy=await invoice(vertical);await original.recordInvoiceSplitSession({vertical,invoiceId:legacy,sessionId:`synthetic-${randomUUID()}`,amountCents:1001,payerEmail:null});
+      assert.equal((await (original[method] as any)(legacy,merchant)).kind,'conflict');
+    }
+  });
   assert.deepEqual(failures,[],`${failures.length} R3 verification checks failed`);
   console.log(`R3 PostgreSQL: ${passed} checks passed; synthetic only, no provider or production activity`);
 } finally {await Promise.all(pools.map(p=>p.end()));}

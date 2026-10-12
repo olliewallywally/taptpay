@@ -7,6 +7,21 @@ beforeEach(() => resetTestStorage());
 afterEach(() => jest.restoreAllMocks());
 
 test.each([
+  ['void','voidInvoiceRentRequestForMerchant'],
+  ['mark-paid-external','markInvoiceRentRequestPaidExternalForMerchant'],
+] as const)('%s reports recorded provider activity without mutation or delivery',async(action,method)=>{
+  const {app}=await createTestApp();const owner=await createOwnerPrincipal();
+  const fake=fakeProperty();seedProperty(fake,owner.merchantId);
+  jest.spyOn(storage,method).mockResolvedValue({kind:'conflict',reason:'payment-active'});
+  const before=JSON.stringify([...fake.invoices]),effects=observeRefusalEffects();
+  try {
+    const response=await request(app).post(`/api/property/invoices/${INVOICE}/${action}`).set(signedIn(owner)).send({externalPaymentReference:null});
+    expect(response.status).toBe(409);expect(response.body).toEqual({message:'Payment is in progress or a share is already paid',code:'PAYMENT_ACTIVE'});
+    expect(JSON.stringify([...fake.invoices])).toBe(before);expect(fake.events).toEqual([]);expect(fake.writes).toEqual([]);effects.assertNone();
+  } finally {effects.restore();}
+});
+
+test.each([
   ["void", "invoice", "moved", 404], ["mark-paid-external", "invoice", "moved", 404],
   ["void", "parent", "moved", 404], ["mark-paid-external", "parent", "moved", 404],
   ["void", "invoice", "paid", 409], ["mark-paid-external", "invoice", "paid", 409],

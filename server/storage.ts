@@ -67,7 +67,7 @@ export type PropertyScheduleMutationResult =
 export type PropertyInvoiceMutationResult =
   | { kind: "ok"; invoice: typeof invoicesRentRequests.$inferSelect }
   | { kind: "not-found" }
-  | { kind: "conflict"; reason: "paid" | "voided" };
+  | { kind: "conflict"; reason: "paid" | "voided" | "payment-active" };
 
 export type PropertyInvoiceInput = Pick<typeof invoicesRentRequests.$inferInsert,
   "amountCents" | "deliveryChannel" | "dueAt" | "splitEnabled" | "kind" | "chargeType" | "description" | "documentUrl" | "documentName">;
@@ -103,7 +103,7 @@ function clientProfileChanges(data: ClientProfileChanges): ClientProfileChanges 
 export type JobInvoiceMutationResult =
   | { kind: "ok"; invoice: typeof jobInvoices.$inferSelect }
   | { kind: "not-found" }
-  | { kind: "conflict"; reason: "paid" | "voided" | "deposit" | "unpaid" };
+  | { kind: "conflict"; reason: "paid" | "voided" | "deposit" | "unpaid" | "payment-active" };
 export type TradesQuoteDeliverySnapshot = {
   quote: typeof quotes.$inferSelect;
   client: typeof clientProfiles.$inferSelect;
@@ -191,7 +191,7 @@ function scopedTransactionInput(merchantId: number, input: TransactionStorageInp
 export type TransactionCancellationResult =
   | { kind: "cancelled"; transaction: Transaction }
   | { kind: "not-found" }
-  | { kind: "conflict"; status: string };
+  | { kind: "conflict"; status: string; reason?: "payment-active" };
 
 export class PushSessionEndedError extends Error {
   constructor() { super("The session registering this device has ended"); }
@@ -717,6 +717,42 @@ function paymentAttemptIsTerminal(attempt: PaymentAttempt): boolean {
 
 function paymentAttemptLeaseExpired(attempt: PaymentAttempt, now: Date): boolean {
   return paymentAttemptIsLive(attempt) && attempt.leaseExpiresAt.getTime() <= now.getTime();
+}
+
+/** Caller holds the aggregate row lock. This must be a separate statement after
+ * acquiring that lock: a correlated projection in the locking SELECT could use
+ * a snapshot from before a competing attempt creator committed. */
+async function retailMoneyChangeBlocked(tx: any, row: Transaction): Promise<boolean> {
+  // Explicit identifiers keep the outer correlation qualified when Drizzle
+  // optimizes a single-table projection; an inner attempt's `id` is a UUID.
+  const aggregateId = sql`${sql.identifier("transactions")}.${sql.identifier("id")}`;
+  const [activity] = await tx.select({ blocked: sql<boolean>`(
+    ${transactions.windcaveSessionId} is not null or ${transactions.windcaveTransactionId} is not null
+    or coalesce(${transactions.completedSplits}, 0) > 0
+    or exists (select 1 from split_payments s where s.transaction_id = ${aggregateId}
+      and (s.status in ('processing', 'completed') or s.windcave_transaction_id is not null or s.paid_at is not null))
+    or exists (select 1 from payment_attempts a where a.transaction_id = ${aggregateId}
+      and (a.state not in ('declined', 'cancelled', 'abandoned')
+        or (a.state = 'abandoned' and (a.processor_session_id is not null
+          or exists (select 1 from payment_attempt_expectations e where e.payment_attempt_id = a.id)))))
+  )` }).from(transactions).where(and(eq(transactions.id, row.id), eq(transactions.merchantId, row.merchantId!))).limit(1);
+  return !activity || !!activity.blocked;
+}
+
+async function invoiceMoneyChangeBlocked(tx: any, vertical: "property" | "trades", id: string, merchantId: number): Promise<boolean> {
+  const table = vertical === "property" ? invoicesRentRequests : jobInvoices;
+  const aggregateId = sql`${sql.identifier(vertical === "property" ? "invoices_rent_requests" : "job_invoices")}.${sql.identifier("id")}`;
+  const invoiceColumn = sql.raw(vertical === "property" ? "rent_invoice_id" : "job_invoice_id");
+  const [activity] = await tx.select({ blocked: sql<boolean>`(
+    ${table.windcaveSessionId} is not null or ${table.windcaveTransactionId} is not null
+    or coalesce(${table.splitPaidCount}, 0) > 0 or coalesce(cardinality(${table.splitPaidSessions}), 0) > 0
+    or exists (select 1 from invoice_split_sessions s where s.${invoiceColumn} = ${aggregateId})
+    or exists (select 1 from invoice_payment_attempts a where a.${invoiceColumn} = ${aggregateId}
+      and (a.state not in ('declined', 'cancelled', 'abandoned')
+        or (a.state = 'abandoned' and (a.send_started_at is not null
+          or exists (select 1 from payment_session_bindings b where b.invoice_attempt_id = a.id)))))
+  )` }).from(table).where(and(eq(table.id, id), eq(table.merchantId, merchantId))).limit(1);
+  return !activity || !!activity.blocked;
 }
 
 async function withMemLock<T>(
@@ -1861,6 +1897,13 @@ export class MemStorage implements IStorage {
     if (!row || row.merchantId !== merchantId) return { kind: "not-found" };
     if (row.status !== "pending" && row.status !== "processing") {
       return { kind: "conflict", status: row.status };
+    }
+    if (row.windcaveSessionId || row.windcaveTransactionId || (row.completedSplits ?? 0) > 0 ||
+      Array.from(this.paymentAttempts.values()).some(a => a.transactionId === id &&
+        (!['declined', 'cancelled', 'abandoned'].includes(a.state) || (a.state === 'abandoned' && a.processorSessionId))) ||
+      Array.from(this.splitPayments.values()).some(s => s.transactionId === id &&
+        (['processing', 'completed'].includes(s.status) || s.windcaveTransactionId || s.paidAt))) {
+      return { kind: "conflict", status: row.status, reason: "payment-active" };
     }
     const transaction = { ...row, status: "cancelled" };
     this.transactions.set(id, transaction);
@@ -5305,6 +5348,9 @@ export class DatabaseStorage implements IStorage {
       if (!row) return { kind: "not-found" };
       if (row.status !== "pending" && row.status !== "processing") {
         return { kind: "conflict", status: row.status };
+      }
+      if (await retailMoneyChangeBlocked(tx, row)) {
+        return { kind: "conflict", status: row.status, reason: "payment-active" };
       }
       const [transaction] = await tx.update(transactions).set({ status: "cancelled" })
         .where(and(
@@ -8849,6 +8895,9 @@ export class DatabaseStorage implements IStorage {
       if (!invoice) return { kind: "not-found" };
       if (invoice.status === "paid" || invoice.status === "paid_external") return { kind: "conflict", reason: "paid" };
       if (operation !== "void" && invoice.status === "voided") return { kind: "conflict", reason: "voided" };
+      if ((operation === "void" || operation === "paid-external") && await invoiceMoneyChangeBlocked(tx, "property", id, merchantId)) {
+        return { kind: "conflict", reason: "payment-active" };
+      }
       // Issued invoices stay payable when the profile is archived (owner decision
       // 2026-09-27). Only ownership and current invoice state gate this write.
       const now = new Date();
@@ -9278,6 +9327,9 @@ export class DatabaseStorage implements IStorage {
       } else {
         if (operation !== "void" && invoice.status === "voided") return { kind: "conflict", reason: "voided" };
         if (paid) return { kind: "conflict", reason: "paid" };
+      }
+      if ((operation === "void" || operation === "paid-external") && await invoiceMoneyChangeBlocked(tx, "trades", id, merchantId)) {
+        return { kind: "conflict", reason: "payment-active" };
       }
       const now = new Date();
       const patch = operation === "void"

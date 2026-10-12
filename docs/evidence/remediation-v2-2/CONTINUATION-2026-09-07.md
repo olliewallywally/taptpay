@@ -2841,4 +2841,20 @@ deployment occurred. Private fixtures, dumps, credentials, logs and generated
 bundles are excluded. Cloud setup draft save is confirmed; publication and fresh
 task restoration are not. Prior R1 device/visual/review gates remain open.
 
-Publication acknowledgment will record the exact verified remote SHA after push.
+Foundation publication verified: `9d52d8a5ee72be2493f12e6cf323131e4df31481`
+is the remote head of `fix/qwen-aligned-20261010`. No merge or deployment.
+
+### 23.1 Active manual-change safeguards
+
+The next bounded R3 change guards retail cancellation and both invoice verticals'
+void/external-payment writes against recorded live or expired attempts, send
+intent, legacy sessions and captured shares. See
+[preflight and scope limits](r3/MANUAL-CHANGE-REVIEW-2026-10-12.md). The regression
+first failed in memory/HTTP (six cases) and real PostgreSQL (three new checks).
+An actual waiting cancellation proves the activity read must be a fresh statement
+after acquiring the aggregate lock. The underlying legacy initiation interval
+before durable attachment still requires R2-backed convergence. These guards do
+not claim that the cancellation command's audit/outbox or cash is complete.
+Final guard verification: 12 scoped server suites / 177 tests, 33 actual
+PostgreSQL checks, both type checks and the build passed. The earlier foundation
+full-server evidence is not relabelled as a full run of these later changes.

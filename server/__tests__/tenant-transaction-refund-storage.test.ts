@@ -116,7 +116,7 @@ describe("R1-T7 S2a — SQL boundaries", () => {
     const { storage, calls, db } = queryCapture();
     expect(await storage.cancelTransactionForMerchant(71, 29)).toMatchObject({ kind: "cancelled" });
     expect(db.transaction).toHaveBeenCalledTimes(1);
-    expect(calls).toHaveLength(2);
+    expect(calls).toHaveLength(3);
     expect(calls[0].locked).toBe("update");
     for (const call of calls) {
       const query = new PgDialect().sqlToQuery(call.where);
@@ -124,8 +124,9 @@ describe("R1-T7 S2a — SQL boundaries", () => {
       expect(query.sql).toContain('"transactions"."merchant_id" = $2');
       expect(query.params.slice(0, 2)).toEqual([71, 29]);
     }
-    expect(new PgDialect().sqlToQuery(calls[1].where).params).toEqual([71, 29, "pending", "processing"]);
-    expect(calls[1].set).toEqual({ status: "cancelled" });
+    expect(new PgDialect().sqlToQuery(calls[1].where).params).toEqual([71, 29]);
+    expect(new PgDialect().sqlToQuery(calls[2].where).params).toEqual([71, 29, "pending", "processing"]);
+    expect(calls[2].set).toEqual({ status: "cancelled" });
   });
 
   test("a completed locked row is never updated", async () => {
