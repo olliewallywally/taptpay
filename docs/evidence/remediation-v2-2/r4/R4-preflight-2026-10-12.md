@@ -1,6 +1,8 @@
 # R4 preflight — durable refunds, 2026-10-12
 
-Phase: R4 (plan v2.2 §11). Status: **preflight and first review only; no R4 code.**
+Phase: R4 (plan v2.2 §11). Status: preflight and first review; **R4-T1 implemented
+2026-10-12** ([evidence](R4-T1-2026-10-12.md)) after the owner's Option A decision; R4-T2
+onward still wait for the merged R2+R3 tree.
 Branch `ccr-e07e3100-0wm8kr` at the R2-T7 commit. Line numbers are at that commit.
 Authority: the owner's direction of 2026-10-12 ("skip to next step beyond [R3] as long as
 you are 100% done of what you can do"; recorded with R2-T7). Review:

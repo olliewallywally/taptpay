@@ -1,6 +1,14 @@
 # Full integration continuation audit — 2026-09-07
 
-Latest continuation **2026-10-12 — owner chose Option A for the R2↔R3 conflict.**
+Latest continuation **2026-10-12 — R4-T1 implemented (refund provider boundary).**
+[Evidence](r4/R4-T1-2026-10-12.md), [review pass 2](r4/R4-review-pass-2-2026-10-12.md).
+Refunds go out under the caller's X-ID, are never resent, and count only when the reply is
+strictly this refund; the refund route releases a reservation only when the provider definitely
+did not refund, and keeps it on anything ambiguous (RD-2, RD-3 closed). The flag stays off. The
+refund request's original-transaction field is unconfirmed (UAT). Server 201 / 4,924. R4-T2
+onward wait for the merged R2+R3 tree.
+
+Prior continuation **2026-10-12 — owner chose Option A for the R2↔R3 conflict.**
 [Decision](../../decisions/2026-10-12-r2-r3-option-a-owner-decision.md),
 [exact R3 adaptation](R2-R3-OPTION-A-ADAPTATION-2026-10-12.md). R2's `payment_attempts` columns
 stay the retail representation; R3 (Codex, `fix/qwen-aligned-20261010`) renumbers its migration

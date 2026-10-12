@@ -50,8 +50,9 @@ duplicate expectations table and `processor_transaction_id`, write-once trigger 
 columns, verify through R2's verifier) are in
 `docs/evidence/remediation-v2-2/R2-R3-OPTION-A-ADAPTATION-2026-10-12.md`.** R4 (durable
 refunds): preflight at `docs/evidence/remediation-v2-2/r4/R4-preflight-2026-10-12.md`; R4-T1
-(refund provider boundary, no schema) may proceed on the R2 branch, R4-T2 onward wait for the
-merged R2+R3 tree.
+(refund provider boundary, no schema) is implemented on the R2 branch
+(`docs/evidence/remediation-v2-2/r4/R4-T1-2026-10-12.md`); R4-T2 onward wait for the merged
+R2+R3 tree.
 
 This program's established discipline: failing-tests-first; independently re-verify a prior
 pass's own claims before trusting them, the way every session in this program has had to;
