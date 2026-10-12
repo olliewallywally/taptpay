@@ -40,6 +40,7 @@ describe("Phase 2 Drizzle schema", () => {
     expect(attemptConfig.indexes.map(({ config }) => config.name).sort()).toEqual([
       "payment_attempts_live_transaction_share_uq",
       "payment_attempts_processor_session_id_uq",
+      "payment_attempts_processor_transaction_id_uq",
       "payment_attempts_return_state_hash_uq",
       "payment_attempts_transaction_idx",
       "payment_attempts_transaction_share_key_uq",

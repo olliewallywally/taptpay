@@ -11,6 +11,7 @@ import {
   hashBearerCredential,
   PAYMENT_TOKEN_PATTERN,
 } from "./payment-credential";
+import type { InboxClaim, VerifiedOutcome } from "./durable-payment-contract";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -77,18 +78,20 @@ export interface FinalizePaymentAttemptRecordInput {
   outcome: PaymentAttemptOutcome;
   receiptShare: number | null;
   now: Date;
+  reconciliation?: { claim: InboxClaim; evidence: VerifiedOutcome };
 }
 
 export interface FinalizedPaymentAttemptEffects {
   transaction: Transaction;
   splitPayment: SplitPayment | null;
   counterIncremented: boolean;
+  eventId?: string;
 }
 
 export type FinalizePaymentAttemptResult =
   | ({ kind: "finalized"; attempt: PaymentAttempt } & FinalizedPaymentAttemptEffects)
   | ({ kind: "reused"; attempt: PaymentAttempt } & FinalizedPaymentAttemptEffects)
-  | { kind: "conflict"; attempt: PaymentAttempt }
+  | { kind: "conflict"; attempt: PaymentAttempt; reason?: "lease-lost" }
   | { kind: "not-found" };
 
 export interface PaymentAttemptRepository {
@@ -290,6 +293,7 @@ export class PaymentAttemptService {
     paymentMethod?: string | null;
     outcome: PaymentAttemptOutcome;
     receiptShare?: number | null;
+    reconciliation?: { claim: InboxClaim; evidence: VerifiedOutcome };
   }): Promise<FinalizePaymentAttemptResult> {
     assertUuid(input.attemptId, "attemptId");
     assertNonEmpty(input.processorSessionId, "processorSessionId");
@@ -329,6 +333,7 @@ export class PaymentAttemptService {
       outcome: input.outcome,
       receiptShare,
       now: this.clock(),
+      ...(input.reconciliation ? { reconciliation: input.reconciliation } : {}),
     });
   }
 }

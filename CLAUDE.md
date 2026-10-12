@@ -27,6 +27,10 @@ layout. Historical October 11 evidence remains linked; actual devices, owner
 visual/golden acceptance and independent review are still open. Claude owns task 7
 and the stock hidden-focus review. The next-task readiness review is linked there.
 
+The active R3 handoff is `docs/HANDOFF-2026-10-12-r3-durability-foundation.md`.
+Claude owns all of R2; Codex owns R3. The foundation is inactive pending verified
+R2 integration and active caller convergence; the R3 phase is not closed.
+
 This program's established discipline: failing-tests-first; independently re-verify a prior
 pass's own claims before trusting them, the way every session in this program has had to;
 escalate product/security tradeoffs to the owner rather than deciding them unilaterally; record

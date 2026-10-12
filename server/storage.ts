@@ -1,5 +1,9 @@
+import { hashBearerCredential } from "./payment-credential";
 import { users, type User, type UserStatus, merchants, merchantTutorialProgress, transactions, uploadedFiles, uploadedFileScans, appleIdentities, type AppleIdentityRecord, merchantSettlements, refunds, splitPayments, paymentAttempts, PAYMENT_RETURN_STATE_MAX_AGE_MS, taptStones, stockItems, merchantSubscriptions, subscriptionBillingHistory, pushSubscriptions, pushNotificationDeliveries, normalizePushNotificationPreferences, DEFAULT_PUSH_NOTIFICATION_PREFERENCES, tenantProfiles, activeSchedules, invoicesRentRequests, transactionEvents, clientProfiles, quotes, jobInvoices, jobSchedules, jobEvents, type Merchant, type MerchantTutorialProgress, type Transaction, type SplitPayment, type PaymentAttempt, type InsertMerchant, type InsertTransaction, type CreateMerchant, type Refund, type InsertRefund, type TaptStone, type InsertTaptStone, type StockItem, type InsertStockItem, type MerchantSubscription, type SubscriptionBillingHistory, type PushSubscription, type PushNotificationPreferences, type PushNotificationEventType } from "@shared/schema";
 import { DEFAULT_PLAN_ID, isUpgrade, planFor, planForOrDefault, type PlanId } from "@shared/plans";
+import { paymentAttemptExpectations, paymentSessionBindings, paymentNotificationInbox, paymentSettlementEvents, paymentDeliveryOutbox } from "@shared/schema";
+import { evidenceMatchesExpectation } from "./payment-reconciliation";
+import { mintPublicLinkToken, hashPublicLinkTokenData } from "./public-link-token-compatibility";
 import { decideBilling, failedPaymentUpdates, immediatePlanUpdates, MAX_PAYMENT_ATTEMPTS, nextBillingPeriodStart, nextPeriodUpdates, proratedUpgradeCents, queuedPlanUpdates, renewalPlan } from "./subscription-billing";
 import { getDb, isDatabaseConnected } from "./database";
 import { config } from "./config";
@@ -1982,6 +1986,7 @@ export class MemStorage implements IStorage {
         state: "claiming",
         leaseExpiresAt: input.leaseExpiresAt,
         processorSessionId: null,
+        processorTransactionId: null,
         processorXId: null,
         returnStateHash: null,
         returnStateExpiresAt: null,
@@ -2112,6 +2117,7 @@ export class MemStorage implements IStorage {
       async () => {
         const attempt = this.paymentAttempts.get(input.attemptId);
         if (!attempt) return { kind: "not-found" };
+        if (input.reconciliation) return { kind: "conflict", attempt };
         const transaction = this.transactions.get(attempt.transactionId);
         if (!transaction) return { kind: "not-found" };
 
@@ -2143,6 +2149,7 @@ export class MemStorage implements IStorage {
         if (paymentAttemptIsTerminal(attempt)) {
           return attempt.state === input.outcome &&
             attempt.outcome === input.outcome &&
+            attempt.processorTransactionId === input.processorTransactionId &&
             attempt.receiptShare === input.receiptShare
             ? {
                 kind: "reused",
@@ -2212,6 +2219,7 @@ export class MemStorage implements IStorage {
           state: input.outcome,
           outcome: input.outcome,
           receiptShare: input.receiptShare,
+          processorTransactionId: input.processorTransactionId,
           updatedAt: input.now,
         };
 
@@ -5393,7 +5401,9 @@ export class DatabaseStorage implements IStorage {
         // Keep a processor-bound attempt live until the route queries and
         // terminalizes that exact session. This transaction lock prevents a
         // conflicting key from creating a second chargeable session meanwhile.
-        if (active.processorSessionId) {
+        const [sendIntent] = await tx.select({ id: paymentAttemptExpectations.paymentAttemptId })
+          .from(paymentAttemptExpectations).where(eq(paymentAttemptExpectations.paymentAttemptId, active.id)).limit(1);
+        if (active.processorSessionId || sendIntent) {
           return { kind: "expired", attempt: active };
         }
         const rows = await tx
@@ -5486,7 +5496,10 @@ export class DatabaseStorage implements IStorage {
       const attempt = attempts[0];
       if (!attempt) return { kind: "not-found" };
 
-      if (paymentAttemptLeaseExpired(attempt, input.now)) {
+      const [sendIntent] = await tx.select().from(paymentAttemptExpectations)
+        .where(eq(paymentAttemptExpectations.paymentAttemptId, attempt.id)).limit(1);
+      if (sendIntent && sendIntent.processorXId !== input.processorXId) return { kind: "conflict", attempt };
+      if (paymentAttemptLeaseExpired(attempt, input.now) && !sendIntent) {
         const rows = await tx
           .update(paymentAttempts)
           .set({ state: "abandoned", updatedAt: input.now })
@@ -5676,9 +5689,38 @@ export class DatabaseStorage implements IStorage {
         return { kind: "conflict", attempt };
       }
 
+      let reconciliationEventId: string | undefined;
+      if (input.reconciliation) {
+        const { claim, evidence } = input.reconciliation;
+        const [lease] = await tx.select().from(paymentNotificationInbox).where(and(
+          eq(paymentNotificationInbox.id, claim.id), eq(paymentNotificationInbox.leaseOwner, claim.owner),
+          eq(paymentNotificationInbox.sessionId, input.processorSessionId), eq(paymentNotificationInbox.status, "processing"),
+          eq(paymentNotificationInbox.attemptCount, claim.attemptCount), eq(paymentNotificationInbox.leaseExpiresAt, claim.leaseExpiresAt),
+          sql`${paymentNotificationInbox.leaseExpiresAt} > GREATEST(${input.now}::timestamptz, clock_timestamp())`,
+        )).for("update").limit(1);
+        if (!lease) return { kind: "conflict", attempt, reason: "lease-lost" };
+        const [expected] = await tx.select().from(paymentAttemptExpectations)
+          .where(eq(paymentAttemptExpectations.paymentAttemptId, attempt.id)).limit(1);
+        const [binding] = await tx.select().from(paymentSessionBindings)
+          .where(eq(paymentSessionBindings.sessionId, input.processorSessionId)).for("update").limit(1);
+        if (!expected || !binding || binding.paymentAttemptId !== attempt.id || expected.merchantId !== transaction.merchantId ||
+          expected.transactionId !== transaction.id || expected.processorXId !== attempt.processorXId ||
+          binding.processorXId !== expected.processorXId || expected.amountCents !== moneyStringToCents(splitPayment?.amount ?? transaction.price) ||
+          evidence.outcome !== input.outcome || evidence.transactionId !== input.processorTransactionId ||
+          !evidenceMatchesExpectation({ ...expected, sessionId: binding.sessionId, processorXId: binding.processorXId }, evidence) ||
+          (binding.providerTransactionId !== null && binding.providerTransactionId !== evidence.transactionId)) {
+          return { kind: "conflict", attempt };
+        }
+        const [event] = await tx.select({ id: paymentSettlementEvents.id }).from(paymentSettlementEvents)
+          .where(eq(paymentSettlementEvents.sessionId, binding.sessionId)).limit(1);
+        reconciliationEventId = event?.id;
+        if (paymentAttemptIsTerminal(attempt) && !reconciliationEventId) return { kind: "conflict", attempt };
+      }
+
       if (paymentAttemptIsTerminal(attempt)) {
         return attempt.state === input.outcome &&
           attempt.outcome === input.outcome &&
+          attempt.processorTransactionId === input.processorTransactionId &&
           attempt.receiptShare === input.receiptShare
           ? {
               kind: "reused",
@@ -5686,10 +5728,11 @@ export class DatabaseStorage implements IStorage {
               transaction,
               splitPayment,
               counterIncremented: false,
+              ...(reconciliationEventId ? { eventId: reconciliationEventId } : {}),
             }
           : { kind: "conflict", attempt };
       }
-      if (attempt.state !== "finalizing") {
+      if (attempt.state !== "finalizing" && !(input.reconciliation && attempt.state === "ready")) {
         return { kind: "conflict", attempt };
       }
       if (
@@ -5697,6 +5740,11 @@ export class DatabaseStorage implements IStorage {
         (splitPayment && !["pending", "processing"].includes(splitPayment.status))
       ) {
         return { kind: "conflict", attempt };
+      }
+
+      if (input.reconciliation && attempt.state === "ready") {
+        await tx.update(paymentAttempts).set({ state: "finalizing", updatedAt: input.now })
+          .where(eq(paymentAttempts.id, attempt.id));
       }
 
       let updatedSplit: SplitPayment | null = null;
@@ -5807,6 +5855,7 @@ export class DatabaseStorage implements IStorage {
           state: input.outcome,
           outcome: input.outcome,
           receiptShare: input.receiptShare,
+          processorTransactionId: input.processorTransactionId,
           updatedAt: input.now,
         })
         .where(and(
@@ -5819,12 +5868,24 @@ export class DatabaseStorage implements IStorage {
       if (!finalizedAttempt) {
         throw new Error("Payment attempt finalization compare-and-set failed");
       }
+      if (input.reconciliation) {
+        const { evidence } = input.reconciliation;
+        await tx.update(paymentSessionBindings).set({ providerTransactionId: evidence.transactionId })
+          .where(eq(paymentSessionBindings.sessionId, input.processorSessionId));
+        const [event] = await tx.insert(paymentSettlementEvents).values({ sessionId: input.processorSessionId,
+          merchantId: transaction.merchantId!, outcome: input.outcome, amountCents: evidence.amountCents, createdAt: input.now }).returning();
+        reconciliationEventId = event.id;
+        await tx.insert(paymentDeliveryOutbox).values({ eventId: event.id, channel: "merchant_payment_update", nextAttemptAt: input.now });
+        if (input.outcome === "approved") await tx.insert(paymentDeliveryOutbox)
+          .values({ eventId: event.id, channel: "payer_receipt", nextAttemptAt: input.now });
+      }
       return {
         kind: "finalized",
         attempt: finalizedAttempt,
         transaction: updatedTransaction,
         splitPayment: updatedSplit,
         counterIncremented,
+        ...(reconciliationEventId ? { eventId: reconciliationEventId } : {}),
       };
     });
   }
@@ -8859,7 +8920,7 @@ export class DatabaseStorage implements IStorage {
         }
       }
       const [invoice] = await tx.insert(invoicesRentRequests).values({ ...input, merchantId, tenantProfileId: parent.id,
-        token: randomBytes(20).toString("base64url"), status: "pending_dispatch" }).returning();
+        ...mintPublicLinkToken(), status: "pending_dispatch" }).returning();
       await tx.insert(transactionEvents).values({ merchantId, tenantProfileId: parent.id, invoiceId: invoice.id,
         eventType: input.kind === "charge" ? "Charge_Created" : "Invoice_Generated",
         payload: { amountCents: invoice.amountCents, channel: invoice.deliveryChannel,
@@ -8873,16 +8934,18 @@ export class DatabaseStorage implements IStorage {
       const existing = await db.select().from(invoicesRentRequests).where(and(eq(invoicesRentRequests.scheduleId, data.scheduleId), eq(invoicesRentRequests.billingPeriodStart, data.billingPeriodStart))).limit(1);
       if (existing[0]) return existing[0];
     }
-    const [r] = await db.insert(invoicesRentRequests).values(data).returning(); return r;
+    const [r] = await db.insert(invoicesRentRequests).values(hashPublicLinkTokenData(data)).returning(); return r;
   }
   async getInvoiceRentRequest(id: string): Promise<any> {
     const db = getDb(); if (!db) return undefined;
     const [r] = await db.select().from(invoicesRentRequests).where(eq(invoicesRentRequests.id, id)).limit(1); return r;
   }
   async getInvoiceRentRequestByToken(token: string): Promise<any> {
-    const db = getDb(); if (!db) return undefined;
+    const db = this.db; if (!db) return undefined;
     try {
-      const [row] = await db.select().from(invoicesRentRequests).where(eq(invoicesRentRequests.token, token)).limit(1);
+      const [hashed] = await db.select().from(invoicesRentRequests).where(eq(invoicesRentRequests.tokenHash, hashBearerCredential(token))).limit(1);
+      if (hashed) return hashed;
+      const [row] = await db.select().from(invoicesRentRequests).where(and(eq(invoicesRentRequests.token, token), isNull(invoicesRentRequests.tokenHash))).limit(1);
       return row;
     } catch (error) {
       if (isNeonEmptyResultError(error)) return undefined;
@@ -9105,7 +9168,7 @@ export class DatabaseStorage implements IStorage {
       if (!(await this.holdOwnedInvoiceDocument(tx, merchantId, input.documentUrl))) return { kind: "invalid-document" };
       if (!parent) parent = await this.insertTradesProspect(tx, merchantId, (client as { prospect: ClientProfileChanges }).prospect);
       const [quote] = await tx.insert(quotes).values({ ...input, merchantId, clientProfileId: parent.id,
-        token: randomBytes(20).toString("base64url"), status: "sent", sentAt: new Date() }).returning();
+        ...mintPublicLinkToken(), status: "sent", sentAt: new Date() }).returning();
       await tx.insert(jobEvents).values({ merchantId, clientProfileId: parent.id, quoteId: quote.id, eventType: "quote_sent" });
       return { kind: "ok", quote, client: parent };
     });
@@ -9132,9 +9195,11 @@ export class DatabaseStorage implements IStorage {
     return row;
   }
   async getQuoteByToken(token: string): Promise<any> {
-    const db = getDb(); if (!db) return undefined;
+    const db = this.db; if (!db) return undefined;
     try {
-      const [row] = await db.select().from(quotes).where(eq(quotes.token, token)).limit(1);
+      const [hashed] = await db.select().from(quotes).where(eq(quotes.tokenHash, hashBearerCredential(token))).limit(1);
+      if (hashed) return hashed;
+      const [row] = await db.select().from(quotes).where(and(eq(quotes.token, token), isNull(quotes.tokenHash))).limit(1);
       return row;
     } catch (error) {
       if (isNeonEmptyResultError(error)) return undefined;
@@ -9284,7 +9349,7 @@ export class DatabaseStorage implements IStorage {
       if (!(await this.holdOwnedInvoiceDocument(tx, merchantId, input.documentUrl))) return { kind: "invalid-document" };
       if (!parent) parent = await this.insertTradesProspect(tx, merchantId, (client as { prospect: ClientProfileChanges }).prospect);
       const [invoice] = await tx.insert(jobInvoices).values({ ...input, merchantId, clientProfileId: parent.id,
-        token: randomBytes(20).toString("base64url"), status: "pending_dispatch" }).returning();
+        ...mintPublicLinkToken(), status: "pending_dispatch" }).returning();
       await tx.insert(jobEvents).values({ merchantId, clientProfileId: parent.id, jobInvoiceId: invoice.id, eventType: "invoice_sent" });
       return { kind: "ok", invoice, client: parent };
     });
@@ -9320,7 +9385,7 @@ export class DatabaseStorage implements IStorage {
       if (balanceCents <= 0) return { kind: "conflict", reason: "none-remaining" };
       const due = new Date(); due.setDate(due.getDate() + 7);
       const [invoice] = await tx.insert(jobInvoices).values({ merchantId, clientProfileId: parent.id, quoteId: deposit.quoteId,
-        kind: "balance", amountCents: balanceCents, token: randomBytes(20).toString("base64url"),
+        kind: "balance", amountCents: balanceCents, ...mintPublicLinkToken(),
         deliveryChannel: deposit.deliveryChannel, status: "pending_dispatch", dueAt: due, splitEnabled: !!splitEnabled }).returning();
       await tx.insert(jobEvents).values({ merchantId, clientProfileId: parent.id, jobInvoiceId: invoice.id, eventType: "balance_sent" });
       return { kind: "ok", invoice };
@@ -9328,7 +9393,7 @@ export class DatabaseStorage implements IStorage {
   }
   async createJobInvoice(data: any): Promise<any> {
     const db = getDb(); if (!db) throw new Error('No database');
-    const [row] = await db.insert(jobInvoices).values(data).returning();
+    const [row] = await db.insert(jobInvoices).values(hashPublicLinkTokenData(data)).returning();
     return row;
   }
   async getJobInvoice(id: string): Promise<any> {
@@ -9337,9 +9402,11 @@ export class DatabaseStorage implements IStorage {
     return row;
   }
   async getJobInvoiceByToken(token: string): Promise<any> {
-    const db = getDb(); if (!db) return undefined;
+    const db = this.db; if (!db) return undefined;
     try {
-      const [row] = await db.select().from(jobInvoices).where(eq(jobInvoices.token, token)).limit(1);
+      const [hashed] = await db.select().from(jobInvoices).where(eq(jobInvoices.tokenHash, hashBearerCredential(token))).limit(1);
+      if (hashed) return hashed;
+      const [row] = await db.select().from(jobInvoices).where(and(eq(jobInvoices.token, token), isNull(jobInvoices.tokenHash))).limit(1);
       return row;
     } catch (error) {
       if (isNeonEmptyResultError(error)) return undefined;
