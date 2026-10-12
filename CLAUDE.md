@@ -39,7 +39,13 @@ T5 is implemented on every enabled completion path, retail, numbered and invoice
 (`docs/evidence/remediation-v2-2/r2/R2-T5-2026-10-12.md`). T6 is implemented and the R2 exit
 record is `docs/evidence/remediation-v2-2/r2/R2-exit-2026-10-12.md`: repository work is complete
 for the enabled flows, but R2 is not closed until the owner items listed there are decided.
-The owner will review R1–R2 together.
+T7 (migration 0035, unique X-ID) is implemented, applied nowhere. The owner will review R1–R2 together.
+
+**Before merging R2 and Codex's R3 (`fix/qwen-aligned-20261010`), read
+`docs/evidence/remediation-v2-2/R2-R3-SCHEMA-CONFLICT-2026-10-12.md`:** both added a migration
+0034, and R3's `payment_attempts` trigger would refuse R2's writes. The owner decides the
+representation. R4 (durable refunds) has a preflight at
+`docs/evidence/remediation-v2-2/r4/R4-preflight-2026-10-12.md`; its code waits on that decision.
 
 This program's established discipline: failing-tests-first; independently re-verify a prior
 pass's own claims before trusting them, the way every session in this program has had to;
