@@ -97,3 +97,16 @@ cannot be discarded by these actions. See
 [guard review and verification](evidence/remediation-v2-2/r3/MANUAL-CHANGE-REVIEW-2026-10-12.md).
 Legacy sends before attachment, split-route migration, command idempotency/audit/
 outbox and cash remain outstanding; this is not full convergence or R3 exit.
+
+## Follow-up: cash command identity
+
+Cash now requires a UUID `Idempotency-Key`; both retained clients save it before
+send and retain it across failure/reload/edits. A fingerprint conflict returns
+409; matching committed retries return the original public receipt. Cash sale,
+authenticated actor audit and manual-event outbox commit together, with locked
+board ownership and database immutable identity. Migration 0038 is synthetic-only.
+See [cash verification and scope](evidence/remediation-v2-2/r3/CASH-COMMAND-REVIEW-2026-10-12.md).
+39 PostgreSQL checks, 332 server tests across nine suites, 33 client tests,
+typecheck/build and scratch/restored full schema comparison passed. First-record
+legacy communication is temporary until real keyed delivery is wired. R3 stays
+open; active route convergence and concrete card/billing durability continue.

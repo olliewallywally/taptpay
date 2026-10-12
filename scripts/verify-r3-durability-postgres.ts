@@ -437,6 +437,43 @@ try {
       assert.equal((await (original[method] as any)(legacy,merchant)).kind,'conflict');
     }
   });
+  await check('two instances record one concurrent cash command, audit and manual outbox event',async()=>{
+    const other=new DatabaseStorage(drizzle(pools[1],{schema}) as any),key=randomUUID();
+    const input={merchantId:merchant,itemName:'Synthetic cash concurrency',price:'10.01',idempotencyKey:key,actor:{userId:1,role:'owner' as const}};
+    const results=await Promise.all(Array.from({length:12},(_,i)=>(i%2?other:original).recordCashSaleForMerchant(input)));
+    assert.equal(results.filter(r=>r.kind==='recorded').length,1);
+    assert.equal(new Set(results.filter(r=>r.kind==='recorded'||r.kind==='reused').map(r=>r.transaction.id)).size,1);
+    const sale=await original.getCashSaleByKeyForMerchant(merchant,key);assert.ok(sale);assert.equal(sale.paymentMethod,'cash');assert.equal(sale.windcaveTransactionId,null);
+    const events=(await pool.query('SELECT * FROM transaction_events WHERE transaction_id=$1',[sale.id])).rows;
+    assert.equal(events.length,1);assert.equal(events[0].event_type,'Cash_Recorded');assert.equal(events[0].payload.source,'manual_cash');
+    const outbox=(await pool.query('SELECT * FROM payment_delivery_outbox WHERE transaction_event_id=$1',[events[0].id])).rows;
+    assert.equal(outbox.length,1);assert.equal(outbox[0].event_id,null);assert.equal(outbox[0].channel,'merchant_payment_update');
+    assert.equal((await original.recordCashSaleForMerchant({...input,price:'10.02'})).kind,'conflict');
+    assert.equal((await original.recordCashSaleForMerchant({...input,itemName:'different'})).kind,'conflict');
+    assert.equal((await original.recordCashSaleForMerchant(input)).kind,'reused');
+    await assert.rejects(pool.query("UPDATE transactions SET price='10.02' WHERE id=$1",[sale.id]),{code:'23514'});
+    await assert.rejects(pool.query('UPDATE transactions SET merchant_id=$2 WHERE id=$1',[sale.id,otherMerchant]),{code:'23514'});
+  });
+  await check('cash key scope, unchanged request and audited read-only replay cannot bypass new-record gating',async()=>{
+    const key=randomUUID(),input={merchantId:merchant,itemName:'Synthetic cash scope',price:'0010.01',idempotencyKey:key,actor:{userId:1,role:'owner' as const}};
+    assert.equal((await original.recordCashSaleForMerchant(input,{allowCreate:false})).kind,'not-found');
+    assert.equal((await original.recordCashSaleForMerchant(input)).kind,'recorded');
+    const replay=await original.recordCashSaleForMerchant({...input,price:'10.01',idempotencyKey:key.toUpperCase()},{allowCreate:false});assert.equal(replay.kind,'reused');
+    assert.equal(await original.getCashSaleByKeyForMerchant(otherMerchant,key),undefined);
+    assert.equal((await original.recordCashSaleForMerchant({...input,merchantId:otherMerchant})).kind,'recorded');
+    assert.notEqual((await original.getCashSaleByKeyForMerchant(merchant,key))?.id,(await original.getCashSaleByKeyForMerchant(otherMerchant,key))?.id);
+  });
+  for(const failure of ['audit','outbox'] as const) await check(`cash ${failure} failure rolls back record and all local effects`,async()=>{
+    const key=randomUUID(),input={merchantId:merchant,itemName:'Synthetic cash rollback',price:'10.01',idempotencyKey:key,actor:{userId:1,role:'owner' as const}};
+    const table=failure==='audit'?'transaction_events':'payment_delivery_outbox';
+    const condition=failure==='audit'?"NEW.event_type='Cash_Recorded'":'NEW.transaction_event_id IS NOT NULL';
+    await pool.query(`CREATE FUNCTION test_r3_cash_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF ${condition} THEN RAISE EXCEPTION 'synthetic cash rollback'; END IF; RETURN NEW; END $$`);
+    await pool.query(`CREATE TRIGGER test_r3_cash_failure BEFORE INSERT ON ${table} FOR EACH ROW EXECUTE FUNCTION test_r3_cash_failure()`);
+    try {await assert.rejects(original.recordCashSaleForMerchant(input));assert.equal(await original.getCashSaleByKeyForMerchant(merchant,key),undefined);}
+    finally {await pool.query(`DROP TRIGGER test_r3_cash_failure ON ${table}`);await pool.query('DROP FUNCTION test_r3_cash_failure()');}
+    const result=await original.recordCashSaleForMerchant(input);assert.equal(result.kind,'recorded');
+    if(result.kind==='recorded')assert.equal((await pool.query('SELECT count(*)::int AS n FROM transaction_events WHERE transaction_id=$1',[result.transaction.id])).rows[0].n,1);
+  });
   assert.deepEqual(failures,[],`${failures.length} R3 verification checks failed`);
   console.log(`R3 PostgreSQL: ${passed} checks passed; synthetic only, no provider or production activity`);
 } finally {await Promise.all(pools.map(p=>p.end()));}

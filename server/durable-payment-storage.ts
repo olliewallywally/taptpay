@@ -369,7 +369,7 @@ export class DurablePaymentStorage implements ReconciliationRepository, PaymentO
         UPDATE payment_delivery_outbox o SET status='processing',lease_owner=$2,lease_started_at=$1,
           lease_expires_at=$1::timestamptz+interval '1 minute',attempt_count=attempt_count+1
         FROM due WHERE o.id=due.id RETURNING o.*`,[now,owner])).rows[0];
-      return row ? {id:row.id,eventId:row.event_id,channel:row.channel,owner,
+      return row ? {id:row.id,eventId:row.event_id??row.transaction_event_id,eventSource:row.event_id?'provider_settlement':'transaction_event',channel:row.channel,owner,
         attemptCount:row.attempt_count,leaseExpiresAt:row.lease_expires_at} : undefined;
     });
   }

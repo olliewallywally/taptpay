@@ -419,6 +419,20 @@ export const BASELINE_EFFECT_REQUIREMENTS: readonly Requirement[] = [
   r("0037_retail_payment_canonical_integration.sql", "constraint", "payment_attempts", "payment_attempts_reconciliation_code_check"),
   r("0037_retail_payment_canonical_integration.sql", "function", "", "taptpay_r3_retail_expected_identity"),
   r("0037_retail_payment_canonical_integration.sql", "trigger", "payment_attempts", "retail_expected_identity"),
+  r("0038_cash_command_identity.sql", "column_nullable", "transactions", "cash_idempotency_key"),
+  r("0038_cash_command_identity.sql", "column_nullable", "transactions", "cash_request_fingerprint"),
+  r("0038_cash_command_identity.sql", "constraint", "transactions", "transactions_cash_identity_check"),
+  r("0038_cash_command_identity.sql", "index", "transactions", "transactions_cash_key_uq"),
+  r("0038_cash_command_identity.sql", "column_nullable", "transaction_events", "transaction_id"),
+  r("0038_cash_command_identity.sql", "constraint", "transaction_events", "transaction_events_transaction_merchant_fk"),
+  r("0038_cash_command_identity.sql", "index", "transaction_events", "transaction_events_cash_record_uq"),
+  r("0038_cash_command_identity.sql", "column_nullable", "payment_delivery_outbox", "event_id"),
+  r("0038_cash_command_identity.sql", "column_nullable", "payment_delivery_outbox", "transaction_event_id"),
+  r("0038_cash_command_identity.sql", "constraint", "payment_delivery_outbox", "payment_delivery_outbox_transaction_event_id_fkey"),
+  r("0038_cash_command_identity.sql", "constraint", "payment_delivery_outbox", "payment_outbox_transaction_event_channel_uq"),
+  r("0038_cash_command_identity.sql", "constraint", "payment_delivery_outbox", "payment_outbox_event_source_check"),
+  r("0038_cash_command_identity.sql", "function", "", "taptpay_cash_identity"),
+  r("0038_cash_command_identity.sql", "trigger", "transactions", "cash_command_immutable"),
 ];
 
 export const FIND_MISSING_BASELINE_EFFECTS_SQL = `

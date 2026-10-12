@@ -27,7 +27,7 @@ test.each(["ownership", "inactive"])("cash sale refuses board %s change at inser
   });
   const effects = observeRefusalEffects();
   try {
-    const res = await request(app).post("/api/transactions/cash-sale").set(signedIn(owner))
+    const res = await request(app).post("/api/transactions/cash-sale").set(signedIn(owner)).set("Idempotency-Key","33333333-3333-4333-8333-333333333333")
       .send({ merchantId: owner.merchantId, stoneId: board.id, itemName: "Synthetic", price: "10.00" });
     expect(res.status).toBe(400);
     expect(storageSnapshot()).toBe(before);

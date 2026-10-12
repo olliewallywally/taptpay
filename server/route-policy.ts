@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ f1e34585e7927891f62523f2863524b52d0e675f on 2026-10-12.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 3e1bf582bc8b9e7bc182814e582d182f2e03c1bb on 2026-10-12.
  *
  * 194 registrations (81 GET, 81 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -754,9 +754,9 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       middleware: ["authenticateToken"],
       body: ["schema: cashSaleRequestSchema"],
       authChecks: ["checkMerchantOwnership","compares stone.merchantId !== merchantId"],
-      storageMethods: ["createTransactionForMerchant","getOrCreateSubscription","getTaptStoneForMerchant"],
+      storageMethods: ["getCashSaleByKeyForMerchant","getOrCreateSubscription","getTaptStoneForMerchant","recordCashSaleForMerchant"],
       sideEffects: ["live update: sseBroker.broadcast","push: sendPushToMerchant"],
-      statuses: [200,400,401,402,403,500,503],
+      statuses: [200,400,401,402,403,409,500,503],
       dtos: ["ownerTransactionDto"],
       errorTextInResponse: ["validation.error.errors"],
       entitlementGates: ["BILLING_CARD_REQUIRED","billingCardIsReady","requireBillingCard"],

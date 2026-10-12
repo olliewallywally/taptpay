@@ -23,12 +23,14 @@ export const PAYMENT_DURABILITY_PREFLIGHT_QUERIES = {
 export async function readPaymentDurabilityPreflight(client:{query(sql:string,values?:any[]):Promise<{rows:any[]}>}) {
   const counts:Record<string,number>={};
   for(const [name,sql] of Object.entries(PAYMENT_DURABILITY_PREFLIGHT_QUERIES)) counts[name]=(await client.query(sql)).rows[0].n;
-  const expanded=(await client.query("SELECT to_regclass('public.payment_attempt_expectations') IS NOT NULL AS yes")).rows[0].yes;
-  const missingExpected=expanded ? (await client.query(`SELECT count(*)::int AS n FROM payment_attempts a
-    LEFT JOIN payment_attempt_expectations e ON e.payment_attempt_id=a.id WHERE a.state IN ('claiming','ready','finalizing') AND e.payment_attempt_id IS NULL`)).rows[0].n :
+  const expanded=(await client.query("SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='payment_attempts' AND column_name='expected_provider_account') AS yes")).rows[0].yes;
+  const canonical=(await client.query("SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='payment_attempts' AND column_name='expected_amount_cents') AS yes")).rows[0].yes;
+  const missingExpected=canonical ? (await client.query(`SELECT count(*)::int AS n FROM payment_attempts a
+    WHERE a.state IN ('claiming','ready','finalizing') AND (a.expected_amount_cents IS NULL OR a.expected_currency IS NULL
+      OR a.expected_merchant_reference IS NULL OR a.provider_environment IS NULL${expanded ? ' OR a.expected_provider_account IS NULL OR a.request_fingerprint IS NULL' : ''})`)).rows[0].n :
     (await client.query("SELECT count(*)::int AS n FROM payment_attempts WHERE state IN ('claiming','ready','finalizing')")).rows[0].n;
   const sizes=(await client.query(`SELECT c.relname AS table,pg_total_relation_size(c.oid)::float8 AS bytes FROM pg_class c
     JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname=ANY($1) ORDER BY c.relname`,
-    [['transactions','payment_attempts','split_payments','invoices_rent_requests','job_invoices']])).rows;
+    [['transactions','payment_attempts','split_payments','invoices_rent_requests','job_invoices','quotes','invoice_payment_attempts','payment_session_bindings','payment_notification_inbox','payment_settlement_events','payment_delivery_outbox']])).rows;
   return {counts,liveRetailMissingExpectations:missingExpected,expanded,sizes};
 }

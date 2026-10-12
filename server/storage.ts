@@ -4,6 +4,8 @@ import { DEFAULT_PLAN_ID, isUpgrade, planFor, planForOrDefault, type PlanId } fr
 import { paymentSessionBindings, paymentNotificationInbox, paymentSettlementEvents, paymentDeliveryOutbox } from "@shared/schema";
 import { evidenceMatchesExpectation } from "./payment-reconciliation";
 import { mintPublicLinkToken, hashPublicLinkTokenData } from "./public-link-token-compatibility";
+import {canonicalCashCommand,type CashCommandInput,type CashCommandResult} from './cash-command';
+import {isUuid} from './durable-payment-contract';
 import { decideBilling, failedPaymentUpdates, immediatePlanUpdates, MAX_PAYMENT_ATTEMPTS, nextBillingPeriodStart, nextPeriodUpdates, proratedUpgradeCents, queuedPlanUpdates, renewalPlan } from "./subscription-billing";
 import { getDb, isDatabaseConnected } from "./database";
 import { config } from "./config";
@@ -331,6 +333,8 @@ export function toTransactionStorageInput(
     rawToken: _rawToken,
     paymentToken: _paymentToken,
     token: _token,
+    cashIdempotencyKey: _cashKey,
+    cashRequestFingerprint: _cashFingerprint,
     ...canonical
   } = transaction as RuntimeTransactionFields;
   return {
@@ -358,6 +362,8 @@ function sanitizeTransactionStorageInput(
     rawToken: _rawToken,
     paymentToken: _paymentToken,
     token: _token,
+    cashIdempotencyKey: _cashKey,
+    cashRequestFingerprint: _cashFingerprint,
     ...canonical
   } = input as TransactionStorageInput & {
     selectedStoneId?: number | null;
@@ -365,6 +371,8 @@ function sanitizeTransactionStorageInput(
     rawToken?: unknown;
     paymentToken?: unknown;
     token?: unknown;
+    cashIdempotencyKey?: unknown;
+    cashRequestFingerprint?: unknown;
   };
   return {
     ...canonical,
@@ -905,6 +913,8 @@ export interface IStorage extends PaymentAttemptRepository {
   getTransactionByNfcSession(nfcSessionId: string): Promise<Transaction | undefined>;
   createTransaction(transaction: TransactionStorageInput): Promise<Transaction>;
   createTransactionForMerchant(merchantId: number, transaction: TransactionStorageInput): Promise<Transaction>;
+  getCashSaleByKeyForMerchant(merchantId:number,idempotencyKey:string):Promise<Transaction|undefined>;
+  recordCashSaleForMerchant(input:CashCommandInput,options?:{allowCreate?:boolean}):Promise<CashCommandResult>;
   updateTransactionStatusForMerchant(id: number, merchantId: number, status: string, windcaveTransactionId?: string): Promise<Transaction | undefined>;
   updateTransactionPaymentMethodForMerchant(id: number, merchantId: number, paymentMethod: string): Promise<Transaction | undefined>;
   updateTransactionStatus(id: number, status: string, windcaveTransactionId?: string): Promise<Transaction | undefined>;
@@ -1463,6 +1473,8 @@ export class MemStorage implements IStorage {
   private authHandoffCodes = new Map<string, { userId: number; newUser: boolean; expiresAt: Date; consumedAt: Date | null }>();
   private authThrottleRows = new Map<string, AuthThrottleRow>();
   private invoiceSplitSessionRows = new Map<string, InvoiceSplitSession>();
+  private cashAuditEvents=new Map<string,{id:string;merchantId:number;transactionId:number;eventType:string;payload:unknown}>();
+  private cashOutboxEntries=new Map<string,{id:string;eventId:string;eventSource:string;status:string}>();
   private authSessionRows = new Map<string, AuthSession>();
   private documentAccessAudit: Array<{ adminUserId: number; documentName: string }> = [];
 
@@ -2421,6 +2433,33 @@ export class MemStorage implements IStorage {
       .find(t => t.nfcSessionId === nfcSessionId);
   }
 
+  async getCashSaleByKeyForMerchant(merchantId:number,idempotencyKey:string):Promise<Transaction|undefined> {
+    if(!isManagementTenantId(merchantId) || !isUuid(idempotencyKey)) return undefined;
+    return Array.from(this.transactions.values()).find(row=>row.merchantId===merchantId && row.cashIdempotencyKey===idempotencyKey.toLowerCase());
+  }
+  async recordCashSaleForMerchant(input:CashCommandInput,options:{allowCreate?:boolean}={}):Promise<CashCommandResult> {
+    const command=canonicalCashCommand(input);
+    return withMemLock(this.paymentAttemptLocks,`cash:${command.merchantId}:${command.idempotencyKey}`,async()=>{
+      const existing=await this.getCashSaleByKeyForMerchant(command.merchantId,command.idempotencyKey);
+      if(existing) {
+        if(existing.cashRequestFingerprint!==command.fingerprint) return {kind:'conflict'};
+        const event=Array.from(this.cashAuditEvents.values()).find(event=>event.transactionId===existing.id);
+        if(!event) throw new Error('cash_audit_missing');
+        return {kind:'reused',transaction:existing,eventId:event.id};
+      }
+      if(options.allowCreate===false) return {kind:'not-found'};
+      const created=await this.createTransactionForMerchant(command.merchantId,{merchantId:command.merchantId,taptStoneId:command.stoneId,
+        itemName:command.itemName,price:command.price,status:'completed',paymentMethod:'cash',splitEnabled:false});
+      const transaction={...created,merchantNet:command.price,refundableAmount:command.price,
+        cashIdempotencyKey:command.idempotencyKey,cashRequestFingerprint:command.fingerprint};
+      const eventId=randomUUID(),outboxId=randomUUID();
+      this.transactions.set(transaction.id,transaction);
+      this.cashAuditEvents.set(eventId,{id:eventId,merchantId:command.merchantId,transactionId:transaction.id,eventType:'Cash_Recorded',payload:command.audit});
+      this.cashOutboxEntries.set(outboxId,{id:outboxId,eventId,eventSource:'transaction_event',status:'pending'});
+      return {kind:'recorded',transaction,eventId};
+    });
+  }
+
   async createTransactionForMerchant(merchantId: number, input: TransactionStorageInput): Promise<Transaction> {
     if (!isManagementTenantId(merchantId)) throw new TransactionCreationScopeError();
     const data = scopedTransactionInput(merchantId, input);
@@ -2468,6 +2507,8 @@ export class MemStorage implements IStorage {
       windcaveSessionState: null,
       windcaveXId: null,
       paymentTokenHash: insertTransaction.paymentTokenHash ?? null,
+      cashIdempotencyKey:null,
+      cashRequestFingerprint:null,
       completedAt: insertTransaction.status === "completed" ? createdAt : null,
     };
     this.transactions.set(id, transaction);
@@ -3115,6 +3156,8 @@ export class MemStorage implements IStorage {
     this.refunds.clear();
     this.splitPayments.clear();
     this.paymentAttempts.clear();
+    this.cashAuditEvents.clear();
+    this.cashOutboxEntries.clear();
     this.merchantTransactionCounts.clear();
     this.taptStones.clear();
     this.stockItems.clear();
@@ -3440,6 +3483,8 @@ export class MemStorage implements IStorage {
         windcaveSessionState: null,
         windcaveXId: null,
         paymentTokenHash: null,
+        cashIdempotencyKey:null,
+        cashRequestFingerprint:null,
         createdAt: createdDate,
         completedAt:
           ["completed", "partially_refunded", "refunded"].includes(transaction.status)
@@ -6194,6 +6239,44 @@ export class DatabaseStorage implements IStorage {
       .orderBy(sql`${transactions.createdAt} desc nulls last`, desc(transactions.id))
       .limit(1);
     return completedResult[0];
+  }
+
+  async getCashSaleByKeyForMerchant(merchantId:number,idempotencyKey:string):Promise<Transaction|undefined> {
+    if(!isManagementTenantId(merchantId) || !isUuid(idempotencyKey)) return undefined;
+    if(!this.db) throw new Error('Database not available');
+    const [row]=await this.db.select().from(transactions).where(and(eq(transactions.merchantId,merchantId),
+      eq(transactions.cashIdempotencyKey,idempotencyKey.toLowerCase()))).limit(1);
+    return row;
+  }
+  async recordCashSaleForMerchant(input:CashCommandInput,options:{allowCreate?:boolean}={}):Promise<CashCommandResult> {
+    const command=canonicalCashCommand(input);if(!this.db) throw new Error('Database not available');
+    return this.db.transaction(async(tx:any):Promise<CashCommandResult>=>{
+      await tx.execute(sql`SET LOCAL lock_timeout='2s'`);await tx.execute(sql`SET LOCAL statement_timeout='5s'`);
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(${0x43415348},hashtext(${`${command.merchantId}:${command.idempotencyKey}`}))`);
+      const scoped=new DatabaseStorage(tx),existing=await scoped.getCashSaleByKeyForMerchant(command.merchantId,command.idempotencyKey);
+      if(existing) {
+        if(existing.cashRequestFingerprint!==command.fingerprint) return {kind:'conflict'};
+        const [event]=await tx.select({id:transactionEvents.id}).from(transactionEvents).where(and(
+          eq(transactionEvents.transactionId,existing.id),eq(transactionEvents.merchantId,command.merchantId),eq(transactionEvents.eventType,'Cash_Recorded'))).limit(1);
+        if(!event) throw new Error('cash_audit_missing');
+        return {kind:'reused',transaction:existing,eventId:event.id};
+      }
+      if(options.allowCreate===false) return {kind:'not-found'};
+      if(command.stoneId!==null) {
+        const [board]=await tx.select().from(taptStones).where(and(eq(taptStones.id,command.stoneId),
+          eq(taptStones.merchantId,command.merchantId),eq(taptStones.isActive,true))).limit(1).for('update');
+        if(!board) throw new TransactionCreationScopeError();
+      }
+      const [transaction]=await tx.insert(transactions).values({merchantId:command.merchantId,taptStoneId:command.stoneId,
+        itemName:command.itemName,price:command.price,status:'completed',paymentMethod:'cash',splitEnabled:false,
+        windcaveFeeRate:'0.0000',windcaveFeeAmount:'0.00',platformFeeRate:'0.0000',platformFeeAmount:'0.00',
+        merchantNet:command.price,refundableAmount:command.price,totalRefunded:'0.00',completedAt:new Date(),
+        cashIdempotencyKey:command.idempotencyKey,cashRequestFingerprint:command.fingerprint}).returning();
+      const [event]=await tx.insert(transactionEvents).values({merchantId:command.merchantId,transactionId:transaction.id,
+        eventType:'Cash_Recorded',payload:command.audit}).returning({id:transactionEvents.id});
+      await tx.insert(paymentDeliveryOutbox).values({transactionEventId:event.id,channel:'merchant_payment_update',nextAttemptAt:new Date()});
+      return {kind:'recorded',transaction,eventId:event.id};
+    });
   }
 
   async createTransactionForMerchant(merchantId: number, input: TransactionStorageInput): Promise<Transaction> {

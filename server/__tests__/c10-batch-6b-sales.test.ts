@@ -49,7 +49,7 @@ describe("a cash sale is held to the rules creating a sale uses", () => {
     const owner = await createOwnerPrincipal();
     billingInOrder();
 
-    const res = await request(app).post("/api/transactions/cash-sale").set(signedIn(owner))
+    const res = await request(app).post("/api/transactions/cash-sale").set(signedIn(owner)).set("Idempotency-Key","33333333-3333-4333-8333-333333333333")
       .send({ merchantId: owner.merchantId, itemName: "Flat white", price: "5.50" });
 
     expect(res.status).toBe(200);
@@ -62,7 +62,7 @@ describe("a cash sale is held to the rules creating a sale uses", () => {
     const board = await storage.createNextTaptStone(owner.merchantId);
     billingInOrder();
 
-    const res = await request(app).post("/api/transactions/cash-sale").set(signedIn(owner))
+    const res = await request(app).post("/api/transactions/cash-sale").set(signedIn(owner)).set("Idempotency-Key","33333333-3333-4333-8333-333333333333")
       .send({ merchantId: owner.merchantId, itemName: "Flat white", price: "5.50", stoneId: board.id });
 
     expect(res.status).toBe(200);
@@ -83,7 +83,7 @@ describe("a cash sale is held to the rules creating a sale uses", () => {
     billingInOrder();
     const before = storageSnapshot();
 
-    const res = await request(app).post("/api/transactions/cash-sale").set(signedIn(owner))
+    const res = await request(app).post("/api/transactions/cash-sale").set(signedIn(owner)).set("Idempotency-Key","33333333-3333-4333-8333-333333333333")
       .send({ merchantId: owner.merchantId, itemName: "Flat white", price: "5.50", ...change });
 
     expect(res.status).toBe(400);
@@ -98,7 +98,7 @@ describe("a cash sale is held to the rules creating a sale uses", () => {
     billingInOrder();
     const before = storageSnapshot();
 
-    const res = await request(app).post("/api/transactions/cash-sale").set(signedIn(owner))
+    const res = await request(app).post("/api/transactions/cash-sale").set(signedIn(owner)).set("Idempotency-Key","33333333-3333-4333-8333-333333333333")
       .send({ merchantId: owner.merchantId, itemName: "Flat white", price: "5.50", stoneId: theirs.id });
 
     expect(res.status).toBe(400);
@@ -114,7 +114,7 @@ describe("a cash sale is held to the rules creating a sale uses", () => {
     billingInOrder();
     const before = storageSnapshot();
 
-    const res = await request(app).post("/api/transactions/cash-sale").set(signedIn(owner))
+    const res = await request(app).post("/api/transactions/cash-sale").set(signedIn(owner)).set("Idempotency-Key","33333333-3333-4333-8333-333333333333")
       .send({ merchantId: owner.merchantId, itemName: "Flat white", price: "5.50", stoneId: board.id });
 
     expect(res.status).toBe(400);

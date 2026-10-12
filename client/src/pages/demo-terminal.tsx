@@ -1,3 +1,4 @@
+import {cashCommandKey,completeCashCommand} from "@/lib/cash-command-key";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
@@ -1063,13 +1064,19 @@ export default function DemoTerminal() {
                       }
                       setCashSaleLoading(true);
                       try {
+                        if(!merchantId) throw new Error('Sign in before recording a cash sale');
+                        const body={merchantId,itemName:cashItemName.trim(),price:parseFloat(cashAmount).toFixed(2),stoneId:selectedStoneId};
+                        const key=cashCommandKey(body);
                         const res = await sessionFetch("/api/transactions/cash-sale", {
                           method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ merchantId, itemName: cashItemName.trim(), price: parseFloat(cashAmount).toFixed(2), stoneId: selectedStoneId }),
+                          headers: { "Content-Type": "application/json", "Idempotency-Key":key },
+                          body: JSON.stringify(body),
                         });
                         if (!res.ok) throw new Error("Failed to record cash sale");
                         const { transaction } = await res.json();
+                        if(!Number.isSafeInteger(transaction?.id) || transaction.id<1 || transaction.merchantId!==merchantId || transaction.paymentMethod!=='cash')
+                          throw new Error('Cash sale confirmation is incomplete');
+                        completeCashCommand(merchantId,key);
                         setCashSaleTransaction(transaction);
                         setShowCashModal(true);
                         setActiveDropdown(null);

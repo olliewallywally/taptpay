@@ -3018,3 +3018,17 @@ No new full-server/client run is claimed on this combined checkpoint.
 R3 remains open. Cash/commands, active callbacks/FPRNs, card/billing and receiver
 integration continue next. Shared migration/UAT/production-sized restore/release
 gates remain separate. Preserve the older evidence with its original SHA/scope.
+
+## 25. October 12 — durable cash command checkpoint
+
+Cash command identity is implemented on the same R3 working branch: stable
+client UUID across failures/reloads, merchant-scoped fingerprint, one atomic
+sale/audit/manual outbox and immutable database identity. Matching committed
+retries reuse the original receipt; changed details conflict. Both callers send
+the required header. See [review and exact evidence](r3/CASH-COMMAND-REVIEW-2026-10-12.md).
+39 synthetic PostgreSQL checks, nine server suites / 332 tests, three client
+suites / 33 tests, typecheck/build and full scratch/restored fingerprint match
+passed. 0038 is applied only on owned synthetic integrated databases. No shared
+migration or outbound activity. R3 remains open: compatibility cash delivery,
+other commands, active payment convergence and card/billing remain. Continue the
+phase after committing/pushing this checkpoint; do not stop here or claim exit.

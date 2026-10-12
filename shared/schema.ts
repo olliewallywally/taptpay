@@ -195,6 +195,8 @@ export const transactions = pgTable("transactions", {
   // SHA-256 digest of the per-payment bearer credential. The raw credential is
   // returned once by the create service and is never stored on a transaction.
   paymentTokenHash: text("payment_token_hash"),
+  cashIdempotencyKey: uuid("cash_idempotency_key"),
+  cashRequestFingerprint: text("cash_request_fingerprint"),
 
   // Split bill toggle (set by merchant at transaction creation time)
   splitEnabled: boolean("split_enabled").default(false),
@@ -206,6 +208,8 @@ export const transactions = pgTable("transactions", {
   completedAt: timestamp("completed_at"),
 }, (t) => ({
   r3TenantIdentity: unique("transactions_id_merchant_uq").on(t.id, t.merchantId),
+  cashKeyUnique: uniqueIndex("transactions_cash_key_uq").on(t.merchantId,t.cashIdempotencyKey).where(sql`${t.cashIdempotencyKey} is not null`),
+  cashIdentityCheck: check("transactions_cash_identity_check",sql`(${t.cashIdempotencyKey} is null and ${t.cashRequestFingerprint} is null) or (${t.cashIdempotencyKey} is not null and ${t.cashRequestFingerprint} is not null and ${t.cashRequestFingerprint} ~ '^[0-9a-f]{64}$' and ${t.paymentMethod} = 'cash')`),
   merchantIdIdx: index("transactions_merchant_id_idx").on(t.merchantId),
   taptStoneIdIdx: index("transactions_tapt_stone_id_idx").on(t.taptStoneId),
   paymentTokenHashUnique: uniqueIndex("transactions_payment_token_hash_uq")
@@ -1196,6 +1200,7 @@ export const invoicesRentRequests = pgTable("invoices_rent_requests", {
 export const transactionEvents = pgTable("transaction_events", {
   id: uuid("id").primaryKey().defaultRandom(),
   merchantId: integer("merchant_id").references(() => merchants.id).notNull(),
+  transactionId: integer("transaction_id"),
   tenantProfileId: uuid("tenant_profile_id").references(() => tenantProfiles.id),
   invoiceId: uuid("invoice_id").references(() => invoicesRentRequests.id),
   scheduleId: uuid("schedule_id").references(() => activeSchedules.id),
@@ -1205,6 +1210,8 @@ export const transactionEvents = pgTable("transaction_events", {
 }, (t) => ({
   tenantCreatedIdx: index("transaction_events_tenant_created_idx").on(t.tenantProfileId, t.createdAt),
   merchantCreatedIdx: index("transaction_events_merchant_created_idx").on(t.merchantId, t.createdAt),
+  cashRecordUnique: uniqueIndex("transaction_events_cash_record_uq").on(t.transactionId).where(sql`${t.eventType}='Cash_Recorded'`),
+  transactionMerchantFk: foreignKey({name:"transaction_events_transaction_merchant_fk",columns:[t.transactionId,t.merchantId],foreignColumns:[transactions.id,transactions.merchantId]}),
 }));
 
 // Property management Zod schemas
@@ -1838,7 +1845,8 @@ export const paymentAttemptExpectations = pgTable("payment_attempt_expectations"
 // R3 expansion (0034); services remain inactive until verified integration.
 export const paymentDeliveryOutbox = pgTable("payment_delivery_outbox", {
   id: uuid("id").primaryKey().defaultRandom(),
-  eventId: uuid("event_id").notNull(),
+  eventId: uuid("event_id"),
+  transactionEventId: uuid("transaction_event_id"),
   channel: text("channel").notNull(),
   status: text("status").notNull().default("pending"),
   attemptCount: integer("attempt_count").notNull().default(0),
@@ -1853,6 +1861,9 @@ export const paymentDeliveryOutbox = pgTable("payment_delivery_outbox", {
   constraint2: check("payment_delivery_outbox_attempt_count_check", sql.raw("((attempt_count >= 0))")),
   constraint3: check("payment_outbox_lease_check", sql.raw("((((status = 'processing'::text) AND (lease_owner IS NOT NULL) AND (lease_started_at IS NOT NULL) AND (lease_expires_at IS NOT NULL) AND (lease_expires_at > lease_started_at) AND (lease_expires_at <= (lease_started_at + '00:01:00'::interval))) OR ((status <> 'processing'::text) AND (lease_owner IS NULL) AND (lease_started_at IS NULL) AND (lease_expires_at IS NULL))))")),
   constraint5: unique("payment_delivery_outbox_event_id_channel_key").on(t.eventId, t.channel),
+  transactionEventChannel: unique("payment_outbox_transaction_event_channel_uq").on(t.transactionEventId,t.channel),
+  transactionEventFk: foreignKey({name:"payment_delivery_outbox_transaction_event_id_fkey",columns:[t.transactionEventId],foreignColumns:[transactionEvents.id]}),
+  eventSourceCheck: check("payment_outbox_event_source_check",sql`(${t.eventId} is not null)::integer + (${t.transactionEventId} is not null)::integer = 1`),
   constraint6: foreignKey({ name: "payment_delivery_outbox_event_id_fkey", columns: [t.eventId], foreignColumns: [paymentSettlementEvents.id] }),
   index12: index("payment_outbox_due_idx").on(t.nextAttemptAt).where(sql.raw("(status = ANY (ARRAY['pending'::text, 'retry'::text, 'processing'::text]))")),
 }));

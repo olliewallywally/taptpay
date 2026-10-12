@@ -1,3 +1,4 @@
+import {randomUUID} from "node:crypto";
 import "./support/test-env";
 
 // The capabilities these routes check before serving anyone (a flag needs enforce mode, config.ts):
@@ -174,7 +175,7 @@ const RECIPES: Record<string, ServedRecipe> = {
   "POST /api/transactions/cash-sale": async (ctx) => {
     await paidMonth(ctx);
     return {
-      req: { method: "post", path: "/api/transactions/cash-sale", body: { merchantId: ctx.merchantId, itemName: "Flat white", price: "5.50" } },
+      req: { method: "post", path: "/api/transactions/cash-sale", headers:{"Idempotency-Key":randomUUID()}, body: { merchantId: ctx.merchantId, itemName: "Flat white", price: "5.50" } },
       status: 200,
       check: async (res) => {
         expect(res.body.transaction).toMatchObject({ itemName: "Flat white", price: "5.50", status: "completed", paymentMethod: "cash" });
