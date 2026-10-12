@@ -200,6 +200,19 @@ export const BASELINE_EFFECT_REQUIREMENTS: readonly Requirement[] = [
   r("0033_apple_identities.sql", "constraint", "apple_identities", "apple_identities_user_id_fkey"),
   r("0033_apple_identities.sql", "index", "apple_identities", "apple_identities_subject_uq"),
   r("0033_apple_identities.sql", "index", "apple_identities", "apple_identities_user_id_uq"),
+  r("0034_payment_attempt_expected_values.sql", "column_nullable", "payment_attempts", "expected_amount_cents"),
+  r("0034_payment_attempt_expected_values.sql", "column_nullable", "payment_attempts", "expected_currency"),
+  r("0034_payment_attempt_expected_values.sql", "column_nullable", "payment_attempts", "expected_merchant_reference"),
+  r("0034_payment_attempt_expected_values.sql", "column_nullable", "payment_attempts", "provider_environment"),
+  r("0034_payment_attempt_expected_values.sql", "column_nullable", "payment_attempts", "provider_transaction_id"),
+  r("0034_payment_attempt_expected_values.sql", "column_nullable", "payment_attempts", "last_reconciliation_code"),
+  r("0034_payment_attempt_expected_values.sql", "column_nullable", "payment_attempts", "last_reconciled_at"),
+  r("0034_payment_attempt_expected_values.sql", "constraint", "payment_attempts", "payment_attempts_expected_pair_check"),
+  r("0034_payment_attempt_expected_values.sql", "constraint", "payment_attempts", "payment_attempts_expected_amount_check"),
+  r("0034_payment_attempt_expected_values.sql", "constraint", "payment_attempts", "payment_attempts_expected_currency_check"),
+  r("0034_payment_attempt_expected_values.sql", "constraint", "payment_attempts", "payment_attempts_expected_reference_check"),
+  r("0034_payment_attempt_expected_values.sql", "constraint", "payment_attempts", "payment_attempts_provider_environment_check"),
+  r("0034_payment_attempt_expected_values.sql", "index", "payment_attempts", "payment_attempts_provider_transaction_id_uq"),
 ];
 
 export const FIND_MISSING_BASELINE_EFFECTS_SQL = `

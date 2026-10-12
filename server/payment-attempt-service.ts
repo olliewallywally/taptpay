@@ -2,8 +2,10 @@ import {
   PAYMENT_ATTEMPT_MAX_LEASE_MS,
   PAYMENT_RETURN_STATE_MAX_AGE_MS,
   paymentAttemptOutcomes,
+  paymentProviderEnvironments,
   type PaymentAttempt,
   type PaymentAttemptOutcome,
+  type PaymentProviderEnvironment,
   type SplitPayment,
   type Transaction,
 } from "@shared/schema";
@@ -11,6 +13,10 @@ import {
   hashBearerCredential,
   PAYMENT_TOKEN_PATTERN,
 } from "./payment-credential";
+
+// decimal(10,2) on the ledger: 99,999,999.99.
+const MAX_EXPECTED_CENTS = 9_999_999_999;
+const CURRENCY_PATTERN = /^[A-Z]{3}$/;
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -48,8 +54,32 @@ export interface AttachPaymentAttemptSessionRecordInput {
   now: Date;
 }
 
+export interface RecordPaymentAttemptExpectedValuesRecordInput {
+  attemptId: string;
+  amountCents: number;
+  currency: string;
+  merchantReference: string;
+  providerEnvironment: PaymentProviderEnvironment;
+  now: Date;
+}
+
+/**
+ * R2-T4: "reused" means the same values were already recorded (before or after a
+ * session was attached); "conflict" means different values are recorded, or the
+ * attempt already has a session without any (attached before migration 0034).
+ */
+export type RecordPaymentAttemptExpectedValuesResult =
+  | { kind: "recorded"; attempt: PaymentAttempt }
+  | { kind: "reused"; attempt: PaymentAttempt }
+  | { kind: "expired"; attempt: PaymentAttempt }
+  | { kind: "terminal"; attempt: PaymentAttempt }
+  | { kind: "conflict"; attempt: PaymentAttempt }
+  | { kind: "not-found" };
+
 export type AttachPaymentAttemptSessionResult =
   | { kind: "attached"; attempt: PaymentAttempt }
+  /** R2-T4: a session is attached only after the attempt's expected values. */
+  | { kind: "expected-values-missing"; attempt: PaymentAttempt }
   | { kind: "reused"; attempt: PaymentAttempt }
   | { kind: "expired"; attempt: PaymentAttempt }
   | { kind: "terminal"; attempt: PaymentAttempt }
@@ -104,6 +134,9 @@ export interface PaymentAttemptRepository {
   claimPaymentAttemptRecord(
     input: ClaimPaymentAttemptRecordInput,
   ): Promise<ClaimPaymentAttemptResult>;
+  recordPaymentAttemptExpectedValuesRecord(
+    input: RecordPaymentAttemptExpectedValuesRecordInput,
+  ): Promise<RecordPaymentAttemptExpectedValuesResult>;
   attachPaymentAttemptSessionRecord(
     input: AttachPaymentAttemptSessionRecordInput,
   ): Promise<AttachPaymentAttemptSessionResult>;
@@ -133,7 +166,11 @@ export class PaymentAttemptInputError extends Error {
       | "paymentMethod"
       | "returnState"
       | "receiptShare"
-      | "outcome",
+      | "outcome"
+      | "amountCents"
+      | "currency"
+      | "merchantReference"
+      | "providerEnvironment",
     message: string,
   ) {
     super(message);
@@ -177,6 +214,34 @@ export class PaymentAttemptService {
       now,
       leaseExpiresAt: new Date(now.getTime() + PAYMENT_ATTEMPT_MAX_LEASE_MS),
     });
+  }
+
+  /**
+   * R2-T4 (plan §9.4): fix what the provider must confirm before its session is
+   * created. Recorded once; the same values again are "reused", different values a
+   * "conflict"; once a session is attached they cannot change.
+   */
+  recordExpectedValues(input: {
+    attemptId: string;
+    amountCents: number;
+    currency: string;
+    merchantReference: string;
+    providerEnvironment: PaymentProviderEnvironment;
+  }): Promise<RecordPaymentAttemptExpectedValuesResult> {
+    assertUuid(input.attemptId, "attemptId");
+    if (!Number.isSafeInteger(input.amountCents) || input.amountCents < 0 || input.amountCents > MAX_EXPECTED_CENTS) {
+      throw new PaymentAttemptInputError("amountCents", "amountCents must be whole cents within the ledger's range");
+    }
+    if (!CURRENCY_PATTERN.test(input.currency)) {
+      throw new PaymentAttemptInputError("currency", "currency must be an uppercase ISO 4217 code");
+    }
+    if (typeof input.merchantReference !== "string" || input.merchantReference.length < 1 || input.merchantReference.length > 64) {
+      throw new PaymentAttemptInputError("merchantReference", "merchantReference must be 1 to 64 characters");
+    }
+    if (!(paymentProviderEnvironments as readonly string[]).includes(input.providerEnvironment)) {
+      throw new PaymentAttemptInputError("providerEnvironment", "providerEnvironment must be uat or production");
+    }
+    return this.repository.recordPaymentAttemptExpectedValuesRecord({ ...input, now: this.clock() });
   }
 
   attachSession(input: {

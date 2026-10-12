@@ -25,6 +25,7 @@ import { type SignInRealm, type TooManyWhat, boardPrintBucket, confirmEmailBucke
 import { BOARD_PRINT_JSON_LIMIT, boardPrintRequestSchema, decodeBoardPrintPdf } from "./board-print";
 import { clientAddressForLimits, limitAddress } from "./client-address";
 import { tapToPayAmountSchema, tapToPayRequestSchema } from "./tap-to-pay-request";
+import { parseCentsExact } from "./windcave-query";
 import { ACCOUNT_EMAIL_REPLY_FLOOR_MS, SIGN_UP_REPLY_FLOOR_MS, replyNoSoonerThan, replyStart } from "./even-reply";
 import { deviceKnowsEmail, markSignInDevice, readSignInDevice, signInBucketFor, signInDeviceCookie, type SignInDevice } from "./sign-in-device";
 import { generateReceiptPdf } from "./pdf-generator";
@@ -2289,6 +2290,21 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           code: "PAYMENT_PROVIDER_UNAVAILABLE",
           message: "Payment gateway unavailable. Please try again.",
         });
+      }
+      // R2-T4 (plan §9.4): fix what Windcave must confirm before the session exists.
+      const expectedCents = parseCentsExact(paymentAmount);
+      if (!expectedCents.ok) {
+        return res.status(409).json({ message: "Payment amount cannot be verified" });
+      }
+      const expected = await paymentAttempts.recordExpectedValues({
+        attemptId: claim.attempt.id,
+        amountCents: expectedCents.cents,
+        currency: "NZD",
+        merchantReference,
+        providerEnvironment: config.paymentMode === "production" ? "production" : "uat",
+      });
+      if (expected.kind !== "recorded" && expected.kind !== "reused") {
+        return res.status(409).json({ message: "Payment session could not be prepared" });
       }
       const sessionResult = await createWindcaveSession(
           xId,

@@ -26,6 +26,8 @@ import type {
   FinalizePaymentAttemptRecordInput,
   FinalizePaymentAttemptResult,
   PaymentAttemptRepository,
+  RecordPaymentAttemptExpectedValuesRecordInput,
+  RecordPaymentAttemptExpectedValuesResult,
 } from "./payment-attempt-service";
 
 // The anonymous business-wide "legacy-no-board" scope was retired on 2026-09-25 with the
@@ -745,6 +747,30 @@ function isPostgresUniqueViolation(error: unknown): boolean {
     current = (current as { cause?: unknown }).cause;
   }
   return false;
+}
+
+/** A unique violation on one named constraint (R2-T4), anywhere in the cause chain. */
+function isPostgresUniqueViolationOn(error: unknown, constraint: string): boolean {
+  const seen = new Set<object>();
+  let current = error;
+  while (current && typeof current === "object" && !seen.has(current)) {
+    const { code, constraint: name } = current as { code?: unknown; constraint?: unknown };
+    if (code === "23505" && name === constraint) return true;
+    seen.add(current);
+    current = (current as { cause?: unknown }).cause;
+  }
+  return false;
+}
+
+/** R2-T4: whether an attempt already carries exactly these expected values. */
+function expectedValuesMatch(
+  attempt: PaymentAttempt,
+  input: RecordPaymentAttemptExpectedValuesRecordInput,
+): boolean {
+  return attempt.expectedAmountCents === input.amountCents &&
+    attempt.expectedCurrency === input.currency &&
+    attempt.expectedMerchantReference === input.merchantReference &&
+    attempt.providerEnvironment === input.providerEnvironment;
 }
 
 function isNeonEmptyResultError(error: unknown): boolean {
@@ -1987,6 +2013,13 @@ export class MemStorage implements IStorage {
         returnStateExpiresAt: null,
         outcome: null,
         receiptShare: null,
+        expectedAmountCents: null,
+        expectedCurrency: null,
+        expectedMerchantReference: null,
+        providerEnvironment: null,
+        providerTransactionId: null,
+        lastReconciliationCode: null,
+        lastReconciledAt: null,
         createdAt: input.now,
         updatedAt: input.now,
       };
@@ -1996,6 +2029,41 @@ export class MemStorage implements IStorage {
         attempt,
         ...(abandonedAttemptId ? { abandonedAttemptId } : {}),
       };
+    });
+  }
+
+  async recordPaymentAttemptExpectedValuesRecord(
+    input: RecordPaymentAttemptExpectedValuesRecordInput,
+  ): Promise<RecordPaymentAttemptExpectedValuesResult> {
+    return withMemLock(this.paymentAttemptLocks, `attempt:${input.attemptId}`, async () => {
+      const attempt = this.paymentAttempts.get(input.attemptId);
+      if (!attempt) return { kind: "not-found" };
+      if (attempt.expectedAmountCents !== null) {
+        return expectedValuesMatch(attempt, input)
+          ? { kind: "reused", attempt }
+          : { kind: "conflict", attempt };
+      }
+      if (paymentAttemptLeaseExpired(attempt, input.now)) {
+        const abandoned: PaymentAttempt = { ...attempt, state: "abandoned", updatedAt: input.now };
+        this.paymentAttempts.set(abandoned.id, abandoned);
+        return { kind: "expired", attempt: abandoned };
+      }
+      if (attempt.state === "abandoned") return { kind: "expired", attempt };
+      if (paymentAttemptIsTerminal(attempt)) return { kind: "terminal", attempt };
+      // Never fixed after the fact: a session attached without them stays without them.
+      if (attempt.state !== "claiming" || attempt.processorSessionId !== null) {
+        return { kind: "conflict", attempt };
+      }
+      const recorded: PaymentAttempt = {
+        ...attempt,
+        expectedAmountCents: input.amountCents,
+        expectedCurrency: input.currency,
+        expectedMerchantReference: input.merchantReference,
+        providerEnvironment: input.providerEnvironment,
+        updatedAt: input.now,
+      };
+      this.paymentAttempts.set(recorded.id, recorded);
+      return { kind: "recorded", attempt: recorded };
     });
   }
 
@@ -2054,6 +2122,9 @@ export class MemStorage implements IStorage {
       }
       if (attempt.state !== "claiming") {
         return { kind: "conflict", attempt };
+      }
+      if (attempt.expectedAmountCents === null) {
+        return { kind: "expected-values-missing", attempt };
       }
 
       const attached: PaymentAttempt = {
@@ -2162,6 +2233,15 @@ export class MemStorage implements IStorage {
         ) {
           return { kind: "conflict", attempt };
         }
+        // R2-T4: one provider transaction funds one attempt.
+        if (
+          input.outcome === "approved" &&
+          Array.from(this.paymentAttempts.values()).some(
+            (other) => other.id !== attempt.id && other.providerTransactionId === input.processorTransactionId,
+          )
+        ) {
+          return { kind: "conflict", attempt };
+        }
 
         const updatedSplit: SplitPayment | null = splitPayment
           ? {
@@ -2212,6 +2292,7 @@ export class MemStorage implements IStorage {
           state: input.outcome,
           outcome: input.outcome,
           receiptShare: input.receiptShare,
+          providerTransactionId: input.outcome === "approved" ? input.processorTransactionId : null,
           updatedAt: input.now,
         };
 
@@ -5470,6 +5551,61 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
+  async recordPaymentAttemptExpectedValuesRecord(
+    input: RecordPaymentAttemptExpectedValuesRecordInput,
+  ): Promise<RecordPaymentAttemptExpectedValuesResult> {
+    const db = this.db;
+    if (!db) throw new Error('Database not available');
+
+    return db.transaction(async (tx) => {
+      const attempts = await tx
+        .select()
+        .from(paymentAttempts)
+        .where(eq(paymentAttempts.id, input.attemptId))
+        .for("update")
+        .limit(1);
+      const attempt = attempts[0];
+      if (!attempt) return { kind: "not-found" };
+      if (attempt.expectedAmountCents !== null) {
+        return expectedValuesMatch(attempt, input)
+          ? { kind: "reused", attempt }
+          : { kind: "conflict", attempt };
+      }
+      if (paymentAttemptLeaseExpired(attempt, input.now)) {
+        const rows = await tx
+          .update(paymentAttempts)
+          .set({ state: "abandoned", updatedAt: input.now })
+          .where(eq(paymentAttempts.id, attempt.id))
+          .returning();
+        return { kind: "expired", attempt: rows[0] };
+      }
+      if (attempt.state === "abandoned") return { kind: "expired", attempt };
+      if (paymentAttemptIsTerminal(attempt)) return { kind: "terminal", attempt };
+      // Never fixed after the fact: a session attached without them stays without them.
+      if (attempt.state !== "claiming" || attempt.processorSessionId !== null) {
+        return { kind: "conflict", attempt };
+      }
+      const rows = await tx
+        .update(paymentAttempts)
+        .set({
+          expectedAmountCents: input.amountCents,
+          expectedCurrency: input.currency,
+          expectedMerchantReference: input.merchantReference,
+          providerEnvironment: input.providerEnvironment,
+          updatedAt: input.now,
+        })
+        .where(and(
+          eq(paymentAttempts.id, attempt.id),
+          eq(paymentAttempts.state, "claiming"),
+          isNull(paymentAttempts.processorSessionId),
+          isNull(paymentAttempts.expectedAmountCents),
+        ))
+        .returning();
+      if (!rows[0]) throw new Error("Payment attempt expected-values compare-and-set failed");
+      return { kind: "recorded", attempt: rows[0] };
+    });
+  }
+
   async attachPaymentAttemptSessionRecord(
     input: AttachPaymentAttemptSessionRecordInput,
   ): Promise<AttachPaymentAttemptSessionResult> {
@@ -5544,6 +5680,9 @@ export class DatabaseStorage implements IStorage {
       if (attempt.state !== "claiming") {
         return { kind: "conflict", attempt };
       }
+      if (attempt.expectedAmountCents === null) {
+        return { kind: "expected-values-missing", attempt };
+      }
 
       const rows = await tx
         .update(paymentAttempts)
@@ -5605,6 +5744,19 @@ export class DatabaseStorage implements IStorage {
   }
 
   async finalizePaymentAttemptRecord(
+    input: FinalizePaymentAttemptRecordInput,
+  ): Promise<FinalizePaymentAttemptResult> {
+    try {
+      return await this.finalizePaymentAttemptRecordInTransaction(input);
+    } catch (error) {
+      // R2-T4: a concurrent finalization already recorded this provider transaction.
+      if (!isPostgresUniqueViolationOn(error, "payment_attempts_provider_transaction_id_uq")) throw error;
+      const attempt = await this.getPaymentAttempt(input.attemptId);
+      return attempt ? { kind: "conflict", attempt } : { kind: "not-found" };
+    }
+  }
+
+  private async finalizePaymentAttemptRecordInTransaction(
     input: FinalizePaymentAttemptRecordInput,
   ): Promise<FinalizePaymentAttemptResult> {
     const db = this.db;
@@ -5697,6 +5849,19 @@ export class DatabaseStorage implements IStorage {
         (splitPayment && !["pending", "processing"].includes(splitPayment.status))
       ) {
         return { kind: "conflict", attempt };
+      }
+      // R2-T4: one provider transaction funds one attempt. A concurrent duplicate
+      // still meets payment_attempts_provider_transaction_id_uq (caught below).
+      if (input.outcome === "approved" && input.processorTransactionId !== null) {
+        const claimedElsewhere = await tx
+          .select({ id: paymentAttempts.id })
+          .from(paymentAttempts)
+          .where(and(
+            ne(paymentAttempts.id, attempt.id),
+            eq(paymentAttempts.providerTransactionId, input.processorTransactionId),
+          ))
+          .limit(1);
+        if (claimedElsewhere[0]) return { kind: "conflict", attempt };
       }
 
       let updatedSplit: SplitPayment | null = null;
@@ -5807,6 +5972,7 @@ export class DatabaseStorage implements IStorage {
           state: input.outcome,
           outcome: input.outcome,
           receiptShare: input.receiptShare,
+          providerTransactionId: input.outcome === "approved" ? input.processorTransactionId : null,
           updatedAt: input.now,
         })
         .where(and(
