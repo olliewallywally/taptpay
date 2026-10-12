@@ -1,6 +1,6 @@
 # R1-T7 tenant/storage execution inventory
 
-Generated from working-tree sources on base `f68a8459002457a6e861d67f4154f964fe5504b9`; the phase evidence names the final commit.
+Generated from working-tree sources on base `9c9126e4a5d00d5d0591c71678fa234b265ac46b`; the phase evidence names the final commit.
 
 Registrations: **194**; registrations with session/admin authentication: **122**;
 registrations calling checkMerchantOwnership: **25**.

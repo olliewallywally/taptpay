@@ -319,6 +319,10 @@ export const paymentAttempts = pgTable("payment_attempts", {
   providerTransactionIdUnique: uniqueIndex("payment_attempts_provider_transaction_id_uq")
     .on(t.providerTransactionId)
     .where(sql`${t.providerTransactionId} is not null`),
+  // R2-T7 (plan §9.4, migration 0035): the provider idempotency key is one attempt's.
+  processorXIdUnique: uniqueIndex("payment_attempts_processor_x_id_uq")
+    .on(t.processorXId)
+    .where(sql`${t.processorXId} is not null`),
   expectedPairCheck: check(
     "payment_attempts_expected_pair_check",
     sql`(${t.expectedAmountCents} is null) = (${t.expectedCurrency} is null) and (${t.expectedAmountCents} is null) = (${t.expectedMerchantReference} is null) and (${t.expectedAmountCents} is null) = (${t.providerEnvironment} is null)`,

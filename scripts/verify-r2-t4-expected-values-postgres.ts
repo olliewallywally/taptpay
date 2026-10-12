@@ -58,11 +58,13 @@ try {
   try {
     await runner.ensureMigrationLedger(client);
     const files = runner.listMigrationFiles();
-    assert.equal(files[files.length - 1], MIGRATION, "0034 is the newest migration");
+    // 0034 and everything before it; later migrations (0035, R2-T7) have their own verifier.
+    const at = files.indexOf(MIGRATION);
+    assert.ok(at > 0, "0034 is in the migration list");
     // Everything before 0034 through the runner's own path, from a copy of the folder that
     // stops at 0033; 0023-0025 take the (empty) upload-ownership inventory as in production.
     const before = await mkdtemp(path.join(process.env.TMPDIR ?? os.tmpdir(), "r2t4-migrations-"));
-    for (const file of files.slice(0, -1)) await copyFile(`migrations/${file}`, path.join(before, file));
+    for (const file of files.slice(0, at)) await copyFile(`migrations/${file}`, path.join(before, file));
     for (const file of files) {
       if (file === "0023_uploaded_files_tenant_column.sql") break;
       await runner.applyMigration(client, file, await readFile(`migrations/${file}`, "utf8"));

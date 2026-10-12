@@ -74,6 +74,7 @@ const REAL_MIGRATIONS = [
   "0032_uploaded_file_scans.sql",
   "0033_apple_identities.sql",
   "0034_payment_attempt_expected_values.sql",
+  "0035_payment_attempt_processor_x_id_unique.sql",
 ];
 
 /** Migrations that own a `BEGIN;` / `COMMIT;` pair. */

@@ -5638,6 +5638,24 @@ export class DatabaseStorage implements IStorage {
   async attachPaymentAttemptSessionRecord(
     input: AttachPaymentAttemptSessionRecordInput,
   ): Promise<AttachPaymentAttemptSessionResult> {
+    try {
+      return await this.attachPaymentAttemptSessionRecordInTransaction(input);
+    } catch (error) {
+      // R2-T7: two attaches raced past the duplicate check below; the database's own
+      // indexes (0022's session ID, 0035's X-ID) refused the second. Same answer as
+      // the check gives: a conflict, never an unhandled error.
+      if (
+        !isPostgresUniqueViolationOn(error, "payment_attempts_processor_x_id_uq") &&
+        !isPostgresUniqueViolationOn(error, "payment_attempts_processor_session_id_uq")
+      ) throw error;
+      const attempt = await this.getPaymentAttempt(input.attemptId);
+      return attempt ? { kind: "conflict", attempt } : { kind: "not-found" };
+    }
+  }
+
+  private async attachPaymentAttemptSessionRecordInTransaction(
+    input: AttachPaymentAttemptSessionRecordInput,
+  ): Promise<AttachPaymentAttemptSessionResult> {
     const db = this.db;
     if (!db) throw new Error('Database not available');
 

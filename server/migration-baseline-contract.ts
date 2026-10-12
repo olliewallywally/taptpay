@@ -213,6 +213,7 @@ export const BASELINE_EFFECT_REQUIREMENTS: readonly Requirement[] = [
   r("0034_payment_attempt_expected_values.sql", "constraint", "payment_attempts", "payment_attempts_expected_reference_check"),
   r("0034_payment_attempt_expected_values.sql", "constraint", "payment_attempts", "payment_attempts_provider_environment_check"),
   r("0034_payment_attempt_expected_values.sql", "index", "payment_attempts", "payment_attempts_provider_transaction_id_uq"),
+  r("0035_payment_attempt_processor_x_id_unique.sql", "index", "payment_attempts", "payment_attempts_processor_x_id_uq"),
 ];
 
 export const FIND_MISSING_BASELINE_EFFECTS_SQL = `
