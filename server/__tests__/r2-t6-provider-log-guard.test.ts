@@ -107,7 +107,7 @@ describe("the provider module never passes on provider text or IDs", () => {
 
   it("createWindcaveRefund on a 4xx with text (refunds are off, R4)", async () => {
     jest.spyOn(global, "fetch").mockImplementation(providerText(400) as any);
-    expectNoMarker(errorOf(await windcave.createWindcaveRefund(`tx-${BODY}`, "1.00", "REFUND_1")));
+    expectNoMarker(errorOf(await windcave.createWindcaveRefund({ xId: XID, originalTransactionId: "tx-0001", amount: "1.00", merchantReference: "REFUND_1" })));
   });
 
   it("createAttendedSession and submitTapToPayToken on a 4xx with text (Tap to Pay is off, R7)", async () => {

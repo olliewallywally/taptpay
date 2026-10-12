@@ -6043,31 +6043,35 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(503).json({ code: "REFUND_RECONCILIATION_REQUIRED", message: "Refund needs reconciliation before retrying" });
       }
 
-      let windcaveRefundId: string;
-      {
-        // Windcave refund against the original transaction
-        const merchantReference = `REFUND-${transaction.id}-${Date.now()}`;
-        const refundResult = await createWindcaveRefund(
-          transaction.windcaveTransactionId!,
-          parseFloat(refundAmount).toFixed(2),
-          merchantReference
-        );
+      // R4-T1 (plan §11.4): each request is sent under an X-ID of its own; R4-T3 persists it
+      // with the refund operation so a retry reuses it. The flag stays off until then.
+      const merchantReference = `REFUND-${transaction.id}-${Date.now()}`;
+      const refundResult = await createWindcaveRefund({
+        xId: crypto.randomBytes(16).toString("hex"),
+        originalTransactionId: transaction.windcaveTransactionId!,
+        amount: parseFloat(refundAmount).toFixed(2),
+        merchantReference,
+      });
+      const outcome = refundResult.outcome;
 
-        if (!refundResult.success) {
-          // Money did not move — release the reservation so the balance is restored
-          // and the merchant can retry.
-          const released = await storage.releaseRefundAmountForMerchant(transactionId, merchantId, requestedAmount);
-          const failed = released && await storage.updateRefundStatusForMerchant(refund.id, merchantId, "failed");
-          if (!failed) {
-            return res.status(503).json({ code: "REFUND_RECONCILIATION_REQUIRED", message: "Refund needs reconciliation before retrying" });
-          }
-          return res.status(502).json({
-            message: refundResult.error || "Windcave refund failed. Please try again."
-          });
+      if (outcome.kind === "declined" || outcome.kind === "rejected" ||
+          outcome.kind === "invalid_request" || outcome.kind === "disabled") {
+        // The provider did not move money: release the reservation so the balance is
+        // restored and the merchant can try again.
+        const released = await storage.releaseRefundAmountForMerchant(transactionId, merchantId, requestedAmount);
+        const failed = released && await storage.updateRefundStatusForMerchant(refund.id, merchantId, "failed");
+        if (!failed) {
+          return res.status(503).json({ code: "REFUND_RECONCILIATION_REQUIRED", message: "Refund needs reconciliation before retrying" });
         }
-
-        windcaveRefundId = refundResult.refundTransactionId!;
+        return res.status(502).json({ message: "The refund was not made. Please try again." });
       }
+      if (outcome.kind !== "refunded") {
+        // Unknown, pending, malformed or not this refund: the provider may have refunded.
+        // The reservation stays and the refund stays unsettled for reconciliation (R4-T4);
+        // releasing it here used to invite a second refund of the same money.
+        return res.status(503).json({ code: "REFUND_RECONCILIATION_REQUIRED", message: "The refund is being checked. Do not try again." });
+      }
+      const windcaveRefundId = outcome.refundTransactionId;
 
       // Mark refund record as completed. Transaction totals were already updated
       // atomically by reserveRefundAmount above.

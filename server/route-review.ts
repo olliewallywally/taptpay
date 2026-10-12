@@ -3060,12 +3060,12 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     capability: "refunds must be on (config.features.refundInitiation: 503 otherwise), and the provider configured with the sale's provider transaction (isWindcaveConfigured: 503 otherwise)",
     entitlement: null,
     idempotency:
-      "reserves against the remaining balance with tenant/status/cap predicates (409 on refusal), creates the scoped refund, calls the provider, and releases only the same tenant's balance on failure; persistence refusal after reservation/provider requires reconciliation (503), with no success event. This legacy choreography is not durable/idempotent and remains disabled pending R4",
-    sideEffects: "refunds at the provider (createWindcaveRefund); a live update (sseBroker, via broadcastToStone); a push notification (sendPushToMerchant)",
+      "reserves against the remaining balance with tenant/status/cap predicates (409 on refusal), creates the scoped refund, calls the provider under a per-request X-ID (R4-T1; R4-T3 persists it), and releases only the same tenant's balance, only when the provider definitely did not refund (declined, refused, never sent: 502 with a fixed message); an unknown, pending, malformed or mismatched reply keeps the reservation (503 REFUND_RECONCILIATION_REQUIRED, R4-T1). Persistence refusal after reservation/provider requires reconciliation (503), with no success event. Not yet durable/idempotent; remains disabled pending R4",
+    sideEffects: "refunds at the provider (createWindcaveRefund, verified as exactly this refund, R4-T1); a live update (sseBroker, via broadcastToStone); a push notification (sendPushToMerchant)",
     successDto: "{ success, message, refund: the whole refund row, transaction: the whole sale row }",
-    errorDisclosure: ["input-issues", "provider-text"],
+    errorDisclosure: ["input-issues"],
     findings: [
-      "A provider refusal answers with the provider's own error text (refundResult.error), to the owner (R2's provider boundary).",
+      "Until R4-T1 (2026-10-12) a provider refusal answered with the provider's error text, and an ambiguous failure released the reservation (a second refund possible); both fixed.",
       "Not durable across a crash between the provider's refund and the record's update: the refund stays pending and its amount reserved (R4, durable refunds).",
     ],
   },

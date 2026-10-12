@@ -100,7 +100,7 @@ const ROWS = Object.entries(ROUTE_MATRIX).filter(([key, row]) =>
 beforeEach(() => {
   resetTestStorage();
   // A refund reaching the provider is answered as a failure here: no live system (R1-T1).
-  jest.spyOn(windcave, "createWindcaveRefund").mockResolvedValue({ success: false, error: "stubbed" } as any);
+  jest.spyOn(windcave, "createWindcaveRefund").mockResolvedValue({ success: false, error: "declined", outcome: { kind: "declined" } } as any);
 });
 
 afterEach(() => jest.restoreAllMocks());

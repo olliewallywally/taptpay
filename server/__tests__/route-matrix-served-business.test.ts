@@ -233,7 +233,7 @@ const RECIPES: Record<string, ServedRecipe> = {
     const paid = await sale(ctx, "completed", "matrix-card-payment");
     jest.spyOn(windcave, "isWindcaveConfigured").mockReturnValue(true);
     const provider = jest.spyOn(windcave, "createWindcaveRefund")
-      .mockResolvedValue({ success: true, refundTransactionId: "matrix-refund" } as any);
+      .mockResolvedValue({ success: true, refundTransactionId: "matrix-refund", outcome: { kind: "refunded", refundTransactionId: "matrix-refund" } } as any);
     return {
       req: { method: "post", path: `/api/transactions/${paid}/refunds`, body: { refundAmount: "1.00", refundReason: "Changed their mind" } },
       status: 200,
@@ -243,7 +243,7 @@ const RECIPES: Record<string, ServedRecipe> = {
           refund: { transactionId: paid, refundAmount: "1.00", status: "completed", windcaveRefundId: "matrix-refund" },
           transaction: { id: paid, status: "partially_refunded" },
         });
-        expect(provider).toHaveBeenCalledWith("matrix-card-payment", "1.00", expect.any(String));
+        expect(provider).toHaveBeenCalledWith(expect.objectContaining({ originalTransactionId: "matrix-card-payment", amount: "1.00", xId: expect.any(String) }));
       },
     };
   },

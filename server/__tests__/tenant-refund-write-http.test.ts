@@ -16,7 +16,7 @@ async function fixture() {
   const row = await storage.createTransaction({ merchantId: owner.merchantId, itemName: "Synthetic", price: "10.00", status: "completed" } as any);
   (storage as any).transactions.get(row.id).windcaveTransactionId = "synthetic-capture";
   jest.spyOn(windcave, "isWindcaveConfigured").mockReturnValue(true);
-  const provider = jest.spyOn(windcave, "createWindcaveRefund").mockResolvedValue({ success: true, refundTransactionId: "synthetic-refund" });
+  const provider = jest.spyOn(windcave, "createWindcaveRefund").mockResolvedValue({ success: true, refundTransactionId: "synthetic-refund", outcome: { kind: "refunded", refundTransactionId: "synthetic-refund" } });
   const send = () => request(app).post(`/api/transactions/${row.id}/refunds`).set(signedIn(owner))
     .send({ refundAmount: "2.00", refundReason: "Synthetic return" });
   return { owner, other, row, provider, send };
@@ -43,7 +43,7 @@ test("successful provider result cannot publish when parent ownership changed", 
   const { other, row, provider, send } = await fixture();
   provider.mockImplementation(async () => {
     (storage as any).transactions.get(row.id).merchantId = other.merchantId;
-    return { success: true, refundTransactionId: "synthetic-refund" };
+    return { success: true, refundTransactionId: "synthetic-refund", outcome: { kind: "refunded" as const, refundTransactionId: "synthetic-refund" } };
   });
   const stream = jest.spyOn(sseBroker, "broadcast");
   const notify = jest.spyOn(push, "sendPushToMerchant");
@@ -61,7 +61,8 @@ test("provider failure cannot release another tenant's balance", async () => {
   provider.mockImplementation(async () => {
     (storage as any).transactions.get(row.id).merchantId = other.merchantId;
     afterProvider = storageSnapshot();
-    return { success: false, error: "Synthetic refusal" };
+    // R4-T1: a definite decline is the one failure that releases the reservation.
+    return { success: false, error: "declined", outcome: { kind: "declined" as const } };
   });
   const res = await send();
   expect(res.status).toBe(503);

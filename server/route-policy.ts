@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 9c9126e4a5d00d5d0591c71678fa234b265ac46b on 2026-10-12.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 01b8bcdd55a56f62c315bc32db57495b87b02606 on 2026-10-12.
  *
  * 194 registrations (81 GET, 81 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -1559,7 +1559,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       storageMethods: ["createRefundForMerchant","getTransactionForMerchant","releaseRefundAmountForMerchant","reserveRefundAmountForMerchant","updateRefundStatusForMerchant"],
       sideEffects: ["live update: sseBroker.broadcast","provider: createWindcaveRefund","push: sendPushToMerchant"],
       statuses: [200,400,401,403,404,409,500,502,503],
-      errorTextInResponse: ["refundResult.error","validation.error.errors"],
+      errorTextInResponse: ["validation.error.errors"],
       capabilityGates: ["config.features.refundInitiation","isWindcaveConfigured"],
       helpers: ["broadcastToStone"],
     },

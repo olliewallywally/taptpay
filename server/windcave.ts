@@ -2,7 +2,7 @@
 import crypto from "crypto";
 import { redactSensitive } from "./request-log";
 import { config } from "./config";
-import { createWindcaveClient, type UnknownReason, type WindcaveClient } from "./windcave-client";
+import { createWindcaveClient, type RefundOutcome, type RefundRequest, type UnknownReason, type WindcaveClient } from "./windcave-client";
 import { selectSessionLinks, validateCallbackAddress, validateWindcaveLink, windcaveScriptEnv } from "./windcave-links";
 import { normalizeSessionQuery, parseCentsExact } from "./windcave-query";
 import { verifyWindcaveOutcome, type WindcaveExpectedOutcome } from "./windcave-verify";
@@ -91,7 +91,10 @@ export interface QuerySessionResult {
 export interface RefundResult {
   success: boolean;
   refundTransactionId?: string;
+  /** A fixed code, never provider text (R2-T6). */
   error?: string;
+  /** R4-T1: what the provider's reply established; the route acts on this. */
+  outcome: RefundOutcome;
 }
 
 // Session creation and query run through the injectable client (R2-T1,
@@ -773,46 +776,29 @@ export async function submitGooglePayToken(
   }
 }
 
-// Process a refund against an approved transaction
-export async function createWindcaveRefund(
-  originalTransactionId: string,
-  amount: string,
-  merchantReference: string
-): Promise<RefundResult> {
-  const xId = crypto.randomBytes(8).toString("hex");
-  logAudit("REFUND_REQUEST", { originalTransactionId, amount, merchantReference });
+// R4-T1 (plan §11.4): refund a captured transaction through the session client, under the
+// caller's X-ID (never generated here), never resent, and successful only when the reply is
+// strictly this refund. Everything else carries a typed outcome the route acts on.
+export type { RefundOutcome, RefundRequest } from "./windcave-client";
 
-  const body = {
-    type: "refund",
-    amount,
-    currency: "NZD",
-    merchantReference,
-    transaction2Id: originalTransactionId,
-  };
-
-  try {
-    const response = await fetchWithTimeout(TRANSACTION_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: buildAuthHeader(),
-        "X-ID": xId,
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      logAudit("REFUND_SUCCESS", { refundTxId: data.id });
-      return { success: true, refundTransactionId: data.id };
-    }
-
-    logAudit("REFUND_FAILED", { status: response.status });
-    return { success: false, error: providerFailure(response.status, "Refund failed:") };
-  } catch (err: any) {
-    logAudit("REFUND_ERROR", { error: transportFailure(err) });
-    return { success: false, error: transportFailure(err) };
+function refundFailureCode(outcome: Exclude<RefundOutcome, { kind: "refunded" }>): string {
+  switch (outcome.kind) {
+    case "rejected": return `rejected_${outcome.status}`;
+    case "unknown": return `unknown_${outcome.reason}`;
+    case "mismatch": return `mismatch_${outcome.field}`;
+    default: return outcome.kind;
   }
+}
+
+export async function createWindcaveRefund(request: RefundRequest): Promise<RefundResult> {
+  const outcome = await defaultSessionClient().createRefund(request);
+  if (outcome.kind === "mismatch") {
+    writeSecurityAuditEvent("PROVIDER_OUTCOME_MISMATCH", { field: outcome.field });
+  }
+  if (outcome.kind === "refunded") {
+    return { success: true, refundTransactionId: outcome.refundTransactionId, outcome };
+  }
+  return { success: false, error: refundFailureCode(outcome), outcome };
 }
 
 export function isWindcaveConfigured(): boolean {

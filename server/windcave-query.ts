@@ -47,7 +47,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
-function normalizeTransaction(value: unknown): NormalizedTransaction | null {
+/** One provider transaction, strictly: also used for refund replies (R4-T1). */
+export function normalizeTransaction(value: unknown): NormalizedTransaction | null {
   if (!isRecord(value)) return null;
   const { id, authorised, type, amount, currency, merchantReference, sessionId, username } = value;
   if (typeof id !== "string" || id.length === 0) return null;
