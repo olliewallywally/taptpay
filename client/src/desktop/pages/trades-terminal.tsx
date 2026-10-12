@@ -1425,18 +1425,19 @@ function JobRow({ row, onPick }: { row: TradesClientRow; onPick: (id: string) =>
       type="button"
       className="tt-row"
       title={label}
-      aria-label={`select ${row.name}`}
+      aria-label={`select ${label}`}
+      aria-describedby={`tt-job-${row.id}-status tt-job-${row.id}-amount`}
       onClick={() => onPick(row.id)}
     >
-      <span className="tt-avatar">{row.initials}</span>
+      <span className="tt-avatar" aria-hidden="true">{row.initials}</span>
       <span className="tt-row-mid">
         <span className="tt-row-name">{label}</span>
-        <span className="tt-row-status">
+        <span className="tt-row-status" id={`tt-job-${row.id}-status`}>
           <span className="tt-dot" style={{ background: STATUS_DOT[row.status] }} />
           <span>{row.status}</span>
         </span>
       </span>
-      <span className="tt-row-amt">
+      <span className="tt-row-amt" id={`tt-job-${row.id}-amount`}>
         {row.amountCents === null ? "—" : formatNzd(row.amountCents)}
       </span>
     </button>

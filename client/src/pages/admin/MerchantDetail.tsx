@@ -479,8 +479,8 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
             <table className="w-full min-w-[600px]">
               <thead className="sticky top-0 bg-[#1a1b2e]">
                 <tr>
-                  {['#ID', 'Amount', 'Item', 'Method', 'Status', 'Date', ''].map((h) => (
-                    <th key={h} className="text-left px-4 py-3 text-[#dbdfea]/70 text-xs font-normal uppercase tracking-wide">{h}</th>
+                  {['#ID', 'Amount', 'Item', 'Method', 'Status', 'Date', 'Action'].map((h) => (
+                    <th key={h} scope="col" className="text-left px-4 py-3 text-[#dbdfea]/70 text-xs font-normal uppercase tracking-wide">{h}</th>
                   ))}
                 </tr>
               </thead>

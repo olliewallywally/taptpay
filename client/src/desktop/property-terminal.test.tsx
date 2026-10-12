@@ -716,7 +716,7 @@ describe("desktop property terminal — external payment reference", () => {
 
 describe("desktop property terminal — automation", () => {
   const openAutomation = (user: ReturnType<typeof userEvent.setup>) =>
-    user.click(screen.getByRole("button", { name: "automation" }));
+    user.click(screen.getByRole("button", { name: /^repeat & reminders:/i }));
 
   /* Scoped to the schedules list: the request list carries the same names, and
      "cancel" is also a row-popover item. */
@@ -741,7 +741,7 @@ describe("desktop property terminal — automation", () => {
     const { user } = renderTerminal();
     await screen.findByRole("button", { name: "send rent request" });
 
-    const toggle = screen.getByRole("button", { name: "automation" });
+    const toggle = screen.getByRole("button", { name: /^repeat & reminders:/i });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     expect(document.querySelector(".pt-auto-panel")).toBeNull();
     /* The rail's five modes, with no automation among them. */
@@ -1036,7 +1036,7 @@ describe("desktop property terminal — pending and failed actions (R1-T9)", () 
     let release!: () => void;
     reminderPutGate = new Promise<void>((resolve) => { release = resolve; });
     const { user } = renderTerminal();
-    await user.click(screen.getByRole("button", { name: "automation" }));
+    await user.click(screen.getByRole("button", { name: /^repeat & reminders:/i }));
     const remindAfter = await screen.findByRole("group", { name: "remind after" });
     await user.click(within(remindAfter).getByRole("button", { name: "7d" }));
 

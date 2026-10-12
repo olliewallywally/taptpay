@@ -1,7 +1,7 @@
 /* Native 200% zoom can reduce a phone-sized browser to 195 CSS pixels.
    Reflow content at narrow widths while preserving its authored text size.
    The accepted matrix layouts start at 390px and do not use these rules. */
-@media (max-width: 320px) {
+@media (max-width: 260px) {
   html { scroll-padding-bottom: 100px; }
   main, section, form, header { max-width: 100%; }
   div, span, p, input, select, textarea { min-width: 0 !important; }
@@ -54,6 +54,9 @@
   }
   html .tp-viewport .tp-overlay > :is(.tp-pfab, .tp-psubbar).hide { display: none; }
   html .tp-viewport .tp-home-stack { overflow: visible; padding-bottom: 100px !important; }
+  html .property-analytics-view { height: auto !important; overflow: visible !important; padding-bottom: 100px; }
+  html .property-analytics-view .pa-history-sheet { position: relative !important; height: auto !important; transform: none !important; overflow: visible !important; }
+  html .property-analytics-view .pa-history-sheet > div:first-child { display: none; }
   html .tp-viewport .tp-stack-scroll { flex: none !important; max-height: min(280px, calc(100svh - 116px)); overflow: auto; }
   html :is(.retail-terminal-view, .property-terminal-view, .trades-terminal-view).tp-viewport .tp-home-hero .tp-amount {
     font-size: var(--amount-authored, 88px) !important;

@@ -57,6 +57,8 @@
 import express from "express";
 import bcrypt from "bcrypt";
 import https from "node:https";
+import http from "node:http";
+import { createHash } from 'node:crypto';
 import net from "node:net";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -79,12 +81,23 @@ const flag = (name: string) => {
   return value;
 };
 const ONLY_CONTEXT = flag("--context");
+const PREVIEW_ORIGIN = flag("--preview-origin");
+const PREVIEW_PORT = flag("--preview-port");
+const MANUAL_PREVIEW = argv.includes('--manual-preview') ? (argv.splice(argv.indexOf('--manual-preview'), 1), true) : false;
+if (MANUAL_PREVIEW) {
+  if (!PREVIEW_ORIGIN) throw new Error('--manual-preview requires --preview-origin');
+  const origin = new URL(PREVIEW_ORIGIN);
+  if (origin.origin !== PREVIEW_ORIGIN || origin.protocol !== 'https:') throw new Error('preview origin must be an HTTPS origin');
+  if (PREVIEW_PORT && (!/^\d+$/.test(PREVIEW_PORT) || Number(PREVIEW_PORT) < 1024 || Number(PREVIEW_PORT) > 65535)) throw new Error('preview port must be 1024–65535');
+} else if (PREVIEW_ORIGIN || PREVIEW_PORT) throw new Error('preview options require --manual-preview');
 const ONLY_SURFACE = flag("--surface");
 const MEASURE = flag("--measure");
 const SELF_TEST = argv.includes("--self-test") ? (argv.splice(argv.indexOf("--self-test"), 1), true) : false;
 const TUTORIALS = argv.includes("--tutorials") ? (argv.splice(argv.indexOf("--tutorials"), 1), true) : false;
 const ACCESSIBILITY = argv.includes("--accessibility") ? (argv.splice(argv.indexOf("--accessibility"), 1), true) : false;
 const DIAGNOSTICS = argv.includes("--diagnostics") ? (argv.splice(argv.indexOf("--diagnostics"), 1), true) : false;
+const CANDIDATE_REVIEW = argv.includes("--candidate-review") ? (argv.splice(argv.indexOf("--candidate-review"), 1), true) : false;
+const DRAFTS = argv.includes("--drafts") ? (argv.splice(argv.indexOf("--drafts"), 1), true) : false;
 const KEYBOARD = argv.includes("--keyboard") ? (argv.splice(argv.indexOf("--keyboard"), 1), true) : false;
 const DIALOGS = argv.includes("--dialogs") ? (argv.splice(argv.indexOf("--dialogs"), 1), true) : false;
 const ZOOM = argv.includes("--zoom") ? (argv.splice(argv.indexOf("--zoom"), 1), true) : false;
@@ -104,6 +117,9 @@ if (TUTORIALS && MEASURE) throw new Error("--tutorials records its own geometry;
 if (ACCESSIBILITY && (SELF_TEST || TUTORIALS || MEASURE)) throw new Error("--accessibility is a separate normal-surface audit");
 if (TUTORIAL_ACCESSIBILITY && (SELF_TEST || TUTORIALS || ACCESSIBILITY || MEASURE)) throw new Error("--tutorial-accessibility is a separate active-tutorial audit");
 if (DIAGNOSTICS && !ACCESSIBILITY) throw new Error("--diagnostics requires --accessibility");
+if (CANDIDATE_REVIEW && !ACCESSIBILITY) throw new Error("--candidate-review requires --accessibility");
+if (DRAFTS && (!ACCESSIBILITY || !DIALOGS)) throw new Error("--drafts requires --accessibility --dialogs");
+if (MANUAL_PREVIEW && (SELF_TEST || TUTORIALS || ACCESSIBILITY || TUTORIAL_ACCESSIBILITY || ONLY_CONTEXT || ONLY_SURFACE || MEASURE || KEYBOARD || DIALOGS || ZOOM || REDUCED_MOTION)) throw new Error('manual preview is separate from automated gates');
 if (KEYBOARD && !ACCESSIBILITY) throw new Error("--keyboard requires --accessibility");
 if (DIALOGS && !ACCESSIBILITY) throw new Error("--dialogs requires --accessibility");
 if ((ZOOM || REDUCED_MOTION) && !ACCESSIBILITY && !TUTORIAL_ACCESSIBILITY) throw new Error("--zoom/--reduced-motion require --accessibility or --tutorial-accessibility");
@@ -124,7 +140,7 @@ const freePort = () => new Promise<number>((resolve) => {
     probe.close(() => resolve(found));
   });
 });
-const port = await freePort();
+const port = MANUAL_PREVIEW ? Number(PREVIEW_PORT ?? 5000) : await freePort();
 const base = `https://localhost:${port}`;
 const certDir = mkdtempSync(path.join(process.env.TMPDIR ?? os.tmpdir(), "taptpay-matrix-"));
 execFileSync("openssl", [
@@ -150,7 +166,7 @@ Object.assign(process.env, {
   PAYMENT_MODE: "disabled",
   EMAIL_PROVIDER: "simulation",
   JWT_SECRET: "device-matrix-not-a-real-secret-0001",
-  PUBLIC_ORIGIN: base,
+  PUBLIC_ORIGIN: MANUAL_PREVIEW ? PREVIEW_ORIGIN! : base,
   ADMIN_EMAIL,
   ADMIN_PASSWORD_HASH: bcrypt.hashSync(ADMIN_PASSWORD, 4),
 });
@@ -174,14 +190,32 @@ function routeFor(method: string, pathname: string): string | null {
 }
 
 const requestLog: string[] = [];
+const previewRoutes: Array<{ path: string; label: string }> = [];
 const app = createApp({ writeRequestLog: (line: string) => requestLog.push(line) });
+if (MANUAL_PREVIEW) {
+  // Only this explicit synthetic preview mode accepts the hosting reverse proxy.
+  app.set('trust proxy', 1);
+  app.use((req, res, next) => {
+    const permitted = (req.method === 'POST' && ['/api/auth/login', '/api/admin/auth/login', '/api/auth/logout', '/api/tutorial/restart'].includes(req.path))
+      || (req.method === 'PATCH' && /^\/api\/tutorial\/pages\/[a-z-]+$/.test(req.path));
+    if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !permitted) return res.status(403).json({ message: 'Acceptance preview: business submissions are disabled' });
+    next();
+  });
+  app.get('/__acceptance', (_req, res) => {
+    if (!previewRoutes.length) return res.status(503).send('Synthetic fixtures are still starting');
+    const escape = (v: string) => v.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
+    const indexSha = createHash('sha256').update(readFileSync(path.join(builtClient, 'index.html'))).digest('hex');
+    res.type('html').send(`<!doctype html><html lang="en"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TaptPay acceptance preview</title><main style="font-family:system-ui;max-width:700px;margin:auto;padding:24px"><h1>Synthetic acceptance preview</h1><p>Temporary memory-only data. Business submissions and payments are disabled. Nothing here is production evidence.</p><p>Open <a href="/login">sign in</a> using <strong>${OWNER_EMAIL}</strong> and <strong>${OWNER_PASSWORD}</strong>. For admin, select Admin and use ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}. These are synthetic fixture accounts. For onboarding, use ${NEW_EMAIL} / ${OWNER_PASSWORD}.</p><p><a href="/dashboard">Retail</a> · <a href="/property">Property</a> · <a href="/trades">Trades</a> · <a href="/settings">Settings</a></p><p>Use Safari and VoiceOver on your actual device. Record iOS version, route, input mode and index SHA256 <code>${indexSha}</code>.</p><ul>${previewRoutes.map(r => `<li><a href="${escape(r.path)}">${escape(r.label)}</a></li>`).join('')}</ul></main></html>`);
+  });
+}
 await registerRoutes(app);
 app.use(createGlobalErrorHandler());
 // As server/vite.ts serveStatic does in production: the built files, and the app's page for any other address.
 app.use(express.static(builtClient));
 app.use("*", (_req, res) => res.sendFile(path.join(builtClient, "index.html")));
-const server = https.createServer(tls, app);
-await new Promise<void>((resolve) => server.listen(port, "127.0.0.1", resolve));
+const previewIsLocal = MANUAL_PREVIEW && ['127.0.0.1', 'localhost'].includes(new URL(PREVIEW_ORIGIN!).hostname);
+const server = MANUAL_PREVIEW && !previewIsLocal ? http.createServer(app) : https.createServer(tls, app);
+await new Promise<void>((resolve) => server.listen(port, MANUAL_PREVIEW ? '0.0.0.0' : "127.0.0.1", resolve));
 
 // ── One business in good standing, with rows for all three verticals ─────────────────────────────
 const DAY = 24 * 3600_000;
@@ -406,6 +440,16 @@ const OUTSIDE: Outside[] = [
   { path: "/admin/settings", who: "admin", mark: { text: "Settings page coming soon" } },
 ];
 
+if (MANUAL_PREVIEW) {
+  previewRoutes.push(...SURFACES.map(s => ({ path: s.path, label: `${s.mode}: ${s.path}` })), ...OUTSIDE.map(s => ({ path: s.path, label: `${s.who}: ${s.name ?? s.path}` })));
+  if (previewIsLocal) writeFileSync(path.join(out, 'manual-preview-cert.pem'), tls.cert);
+  const stop = () => { server.close(); rmSync(certDir, { recursive: true, force: true }); process.exit(0); };
+  process.once('SIGINT', stop); process.once('SIGTERM', stop);
+  const timeout = setTimeout(stop, 2 * 60 * 60 * 1000);
+  console.log(`Synthetic acceptance preview ready; public origin ${PREVIEW_ORIGIN}; business submissions disabled; expires in two hours.`);
+  try { await new Promise(() => {}); } finally { clearTimeout(timeout); }
+}
+
 // ── What is read from a page (a string, not a function: tsx wraps nested functions in a helper the page lacks) ──
 const FACTS = `(function (selectors) {
   function box(el) { var r = el.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; }
@@ -615,15 +659,15 @@ async function signIn(context: BrowserContext, email = OWNER_EMAIL, realm: "busi
   await page.close();
 }
 
-interface Cell { size: string; path: string; mode: Mode | "outside"; pageKey: string; faults: string[]; mark: string | null; byFallback: boolean; elsewhere: string[]; sent: number; routes: string[]; measured?: unknown; accessibility?: unknown; geometry?: Awaited<ReturnType<typeof measureGeometry>>; initialGeometry?: Awaited<ReturnType<typeof measureGeometry>>; interaction?: { name: string; coveredControlsCannotFocus: boolean; restoredControlsCanFocus: boolean; geometryRestored: boolean } }
+interface Cell { size: string; path: string; mode: Mode | "outside"; pageKey: string; faults: string[]; mark: string | null; byFallback: boolean; elsewhere: string[]; sent: number; routes: string[]; measured?: unknown; accessibility?: unknown; geometry?: Awaited<ReturnType<typeof measureGeometry>>; initialGeometry?: Awaited<ReturnType<typeof measureGeometry>>; interaction?: { name: string; coveredControlsCannotFocus?: boolean; restoredControlsCanFocus?: boolean; geometryRestored: boolean } }
 /** A fallback that names something of the screen's own (a class, an attribute), not any page's furniture. */
 const ownFallback = (selector: string | undefined | null): boolean => !!selector && /[.#\[]/.test(selector);
 const ERROR_SCREENS = /Something went wrong|couldn't check your session|taking longer than expected|Connection Lost/i;
 
-async function dragTransactionsSheet(page: Page, expand: boolean): Promise<void> {
-  const sheet = page.locator('[data-tutorial-id="tx-history"]').locator("..").locator("..").locator("..");
+async function dragTransactionsSheet(page: Page, expand: boolean, historyId = "tx-history"): Promise<void> {
+  const sheet = page.locator(`[data-tutorial-id="${historyId}"]`).locator("..").locator("..").locator("..");
   const box = await sheet.locator(":scope > div").first().boundingBox();
-  if (!box) throw new Error("transactions sheet has no drag handle");
+  if (!box) throw new Error(`${historyId} sheet has no drag handle`);
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
   const layoutHeight = await page.evaluate(() => innerHeight);
@@ -632,13 +676,13 @@ async function dragTransactionsSheet(page: Page, expand: boolean): Promise<void>
   await page.waitForTimeout(600);
 }
 
-async function focusPeriod(page: Page): Promise<boolean> {
-  return page.evaluate(() => {
-    const button = document.querySelector<HTMLButtonElement>('[data-tutorial-id="tx-period"] button');
+async function focusPeriod(page: Page, periodId = "tx-period"): Promise<boolean> {
+  return page.evaluate((id) => {
+    const button = document.querySelector<HTMLButtonElement>(`[data-tutorial-id="${id}"] button`);
     if (!button) throw new Error("transactions has no period button");
     button.focus();
     return document.activeElement === button;
-  });
+  }, periodId);
 }
 
 /**
@@ -716,6 +760,27 @@ async function visit(context: BrowserContext, size: Size, surface: Surface | Out
         if (facts.running === 0 && watch.pending.size === 0 && Date.now() - interactionQuietSince >= 1000) break;
       } while (Date.now() < interactionDeadline);
     }
+    if (!outside && !ZOOM && size.deviceClass === "mobile" && surface.path === "/property/analytics") {
+      // Exercise the overlay's covered controls as well as its parked state.
+      // At narrow native zoom the page instead uses ordinary document reflow.
+      initialGeometry = await measureGeometry(page, null);
+      const heading = page.locator('[data-tutorial-id="pa-history"]');
+      const before = await heading.boundingBox();
+      await dragTransactionsSheet(page, true, "pa-history");
+      const expanded = await heading.boundingBox();
+      if (!before || !expanded || expanded.y >= before.y - 20) faults.push("analytics history sheet did not expand by its drag handle");
+      const coveredControlsCannotFocus = !(await focusPeriod(page, "pa-period"));
+      if (!coveredControlsCannotFocus) faults.push("covered analytics period controls can focus");
+      await dragTransactionsSheet(page, false, "pa-history");
+      const restoredControlsCanFocus = await focusPeriod(page, "pa-period");
+      if (!restoredControlsCanFocus) faults.push("revealed analytics period controls cannot focus");
+      const restored = await heading.boundingBox();
+      const geometryRestored = !!before && !!restored && ["x", "y", "width", "height"].every(key => Math.abs(before[key as keyof typeof before] - restored[key as keyof typeof restored]) < 1.25);
+      if (!geometryRestored) faults.push("analytics history sheet did not restore its parked geometry");
+      await dragTransactionsSheet(page, true, "pa-history");
+      interaction = { name: "expanded Property Analytics history by its drag handle", geometryRestored, coveredControlsCannotFocus, restoredControlsCanFocus };
+      facts = await readFacts(page, steps);
+    }
     if (options.plant) { await options.plant(page); await page.waitForTimeout(600); facts = await readFacts(page, steps); }
 
     const meantFor = outside?.movesTo ?? surface.path;
@@ -765,7 +830,7 @@ async function visit(context: BrowserContext, size: Size, surface: Surface | Out
     if (geometry.terminalRows && geometry.terminalRows.visible === 0 && !(ZOOM && KEYBOARD)) faults.push(`terminal has zero visible rows (${geometry.terminalRows.total} mounted)`);
     if (accessibilityAuditor) {
       const report = await accessibilityAuditor(page, { diagnostics: DIAGNOSTICS });
-      accessibility = report;
+      accessibility = CANDIDATE_REVIEW ? { ...report, candidateReview: await (await import('./accessibility-candidate-review.mjs')).reviewAccessibilityCandidates(page) } : report;
       for (const rule of report.violations) faults.push(`accessibility: ${rule.id} (${rule.impact}), ${rule.nodes.length} element(s)`);
       // Capture errors caused during the audit as well as during page startup.
       for (const error of watch.pageErrors) if (!faults.includes(`page error: ${error}`)) faults.push(`page error: ${error}`);
@@ -809,6 +874,11 @@ async function visit(context: BrowserContext, size: Size, surface: Surface | Out
         for (const fault of report.faults) faults.push(`dialog: ${fault}`);
         for (const rule of report.audit.violations) faults.push(`dialog accessibility: ${rule.id}, ${rule.nodes.length} element(s)`);
         for (const expanded of report.expandedAudits) for (const rule of expanded.violations) faults.push(`expanded dialog accessibility: ${rule.id}, ${rule.nodes.length} element(s)`);
+        if (DRAFTS) {
+          const draft = await (await import('./expanded-draft-audit.mjs')).auditExpandedDraft(page, surface.path, size.deviceClass === 'mobile');
+          (dialog as any).draft = draft;
+          for (const fault of draft?.faults ?? []) faults.push(`expanded draft: ${fault}`);
+        }
         for (const call of watch.sent.slice(before)) if (!call.startsWith('GET ')) faults.push(`dialog performed a mutation: ${call}`);
       }
     }

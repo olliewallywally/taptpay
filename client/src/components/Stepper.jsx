@@ -189,7 +189,7 @@ function StepIndicator({ step, label, currentStep, onClickStep, disableStepIndic
       onClick={() => step !== currentStep && !disableStepIndicators && onClickStep(step)}
       className={`step-indicator tap-target ${status}`}
       disabled={disableStepIndicators}
-      aria-label={`${label || `Step ${step}`}${status === "active" ? ", current step" : ""}`}
+      aria-label={`Step ${step}${label ? `: ${label}` : ""}${status === "active" ? ", current step" : ""}`}
     >
       <motion.span
         variants={{
@@ -201,6 +201,7 @@ function StepIndicator({ step, label, currentStep, onClickStep, disableStepIndic
         animate={status}
         initial={false}
         className="step-indicator-inner"
+        aria-hidden="true"
       >
         {status === "complete" ? <CheckIcon className="check-icon" /> : <span className="step-number">{step}</span>}
       </motion.span>

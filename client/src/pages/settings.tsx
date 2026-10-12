@@ -146,7 +146,7 @@ function SettingsItem({ icon, title, value, onClick, delay = 0, testId, tutorial
       data-testid={testId}
       data-tutorial-id={tutorialId}
       data-settings-section={settingsSection}
-      aria-label={title}
+      aria-label={value ? `${title}: ${value}` : title}
       className="pt-bounce w-full flex items-center justify-between px-5 py-4 text-left"
       style={{ '--pt-d': `${delay}ms`, borderBottom: last ? 'none' : '1px solid rgba(0,0,0,0.06)' } as any}
     >
@@ -1554,14 +1554,14 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
             <button
               type="button"
               onClick={() => setActiveSection('account')}
-              aria-label="Account"
+              aria-label={`Account: ${businessName}, ${statusActive ? 'active' : 'pending'}`}
               data-testid="settings-row-account"
               className="pt-bounce w-full bg-white p-5 flex items-center justify-between mb-4 text-left"
               style={{ '--pt-d': '0ms', borderRadius: 22, boxShadow: '0 4px 14px rgba(4,13,109,0.08)' } as any}
             >
               <div className="flex items-center gap-4 min-w-0">
                 <div style={{ width: 52, height: 52, borderRadius: 999, background: APPLE_FILL, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <span style={{ fontWeight: 700, fontSize: 17, color: APPLE_INK }}>{initials}</span>
+                  <span aria-hidden="true" style={{ fontWeight: 700, fontSize: 17, color: APPLE_INK }}>{initials}</span>
                 </div>
                 <div className="min-w-0">
                   <div style={{ fontWeight: 700, fontSize: 16, color: APPLE_INK, letterSpacing: '-0.2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

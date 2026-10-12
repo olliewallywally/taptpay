@@ -215,8 +215,8 @@ function RequestsHome({ invoices, tenants, outstanding, outstandingExpenses = 0,
           <div className="tp-amount" style={amountStyle(fmt(outstanding), 82, { color: BLUE })}>{fmt(outstanding)}</div>
           <div style={{ marginTop: 10, color: BLUE, fontWeight: 500, fontSize: 16 }}>outstanding rent</div>
           {/* Expenses — smaller and lighter than the hero figure, faded */}
-          <div className="tp-amount" style={amountStyle(fmt(outstandingExpenses), 42, { marginTop: 12, fontWeight: 500, color: 'rgba(88,171,255,0.55)' })}>{fmt(outstandingExpenses)}</div>
-          <div style={{ marginTop: 4, color: 'rgba(88,171,255,0.55)', fontWeight: 400, fontSize: 13 }}>outstanding expenses</div>
+          <div className="tp-amount" style={amountStyle(fmt(outstandingExpenses), 42, { marginTop: 12, fontWeight: 500, color: 'rgba(88,171,255,0.85)' })}>{fmt(outstandingExpenses)}</div>
+          <div style={{ marginTop: 4, color: 'rgba(88,171,255,0.85)', fontWeight: 400, fontSize: 13 }}>outstanding expenses</div>
         </div>
       </div>
       <div className="tp-home-chrome" aria-hidden="true" style={{ background: OFFW }} />
@@ -252,7 +252,7 @@ function RequestsHome({ invoices, tenants, outstanding, outstandingExpenses = 0,
         <div className="tp-home-stack-filters" style={{ display: 'flex', gap: 6, marginBottom: 9, overflowX: 'auto', scrollbarWidth: 'none' as any, WebkitOverflowScrolling: 'touch' }}>
           {(['all', 'overdue', 'sent', 'paid', 'failed'] as const).map(f => (
             <button className="tap-target" key={f} type="button" onClick={() => onFilter?.(f)}
-              style={{ flexShrink: 0, padding: '6px 14px', borderRadius: 999, border: `1.5px solid ${filter === f ? NAVY : 'rgba(4,13,109,0.25)'}`, cursor: 'pointer', fontFamily: 'Outfit, system-ui', fontWeight: 700, fontSize: 11, letterSpacing: '0.04em', textTransform: 'uppercase', background: filter === f ? NAVY : 'transparent', color: filter === f ? BLUE : 'rgba(4,13,109,0.45)', transition: 'all 0.2s ease', WebkitTapHighlightColor: 'transparent' }}>
+              style={{ flexShrink: 0, padding: '6px 14px', borderRadius: 999, border: `1.5px solid ${filter === f ? NAVY : 'rgba(4,13,109,0.25)'}`, cursor: 'pointer', fontFamily: 'Outfit, system-ui', fontWeight: 700, fontSize: 11, letterSpacing: '0.04em', textTransform: 'uppercase', background: filter === f ? NAVY : 'transparent', color: filter === f ? BLUE : '#586079', transition: 'all 0.2s ease', WebkitTapHighlightColor: 'transparent' }}>
               {f}
             </button>
           ))}
@@ -436,7 +436,7 @@ function ChooseTenant({ tenants, invoices, go, onSelect, splitMode, onToggleSpli
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 600, fontSize: 14, color: BLUE, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textTransform: 'capitalize' }}>{tenantName(t)}</div>
-                  <div style={{ fontWeight: 400, fontSize: 11.5, color: 'rgba(88,171,255,0.55)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.propertyAddress}</div>
+                  <div style={{ fontWeight: 400, fontSize: 11.5, color: 'rgba(88,171,255,0.85)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.propertyAddress}</div>
                 </div>
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
                   <div style={{ fontWeight: 700, fontSize: 14, color: BLUE, fontVariantNumeric: 'tabular-nums' }}>{amount ? fmt(amount) : '—'}</div>
@@ -546,7 +546,7 @@ function SendRentLink({ go, selectedTenant, amount, onSend, sending, frequency, 
         <div style={{ width: '100%' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
             <Ic.Receipt sz={15} c="rgba(88,171,255,0.7)" />
-            <span style={{ fontWeight: 600, fontSize: 11, color: 'rgba(88,171,255,0.55)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>rent amount</span>
+            <span style={{ fontWeight: 600, fontSize: 11, color: 'rgba(88,171,255,0.85)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>rent amount</span>
           </div>
           <button onClick={() => (onEditAmount ? onEditAmount() : go('amount'))} data-demo-id="property-rent-amount"
             style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '15px 18px', borderRadius: 16, border: `1.5px solid rgba(88,171,255,0.2)`, background: 'rgba(255,255,255,0.05)', cursor: 'pointer', fontFamily: 'Outfit, system-ui' }}>
@@ -559,7 +559,7 @@ function SendRentLink({ go, selectedTenant, amount, onSend, sending, frequency, 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 22px', background: 'rgba(88,171,255,0.08)', border: `1px solid rgba(88,171,255,0.2)`, borderRadius: 20, width: '100%', boxSizing: 'border-box', marginTop: 18 }}>
           {channel === 'email' ? <Ic.Mail sz={22} c={BLUE} /> : <Ic.Msg sz={22} c={BLUE} />}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 600, fontSize: 11, color: 'rgba(88,171,255,0.55)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 4 }}>sending via {channel}</div>
+            <div style={{ fontWeight: 600, fontSize: 11, color: 'rgba(88,171,255,0.85)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 4 }}>sending via {channel}</div>
             <div style={{ fontWeight: 500, fontSize: 14, color: BLUE, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {dest || `tenant's ${channel}`}
             </div>
@@ -570,7 +570,7 @@ function SendRentLink({ go, selectedTenant, amount, onSend, sending, frequency, 
         <div style={{ width: '100%', marginTop: 18 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
             <Ic.Repeat sz={15} c="rgba(88,171,255,0.7)" />
-            <span style={{ fontWeight: 600, fontSize: 11, color: 'rgba(88,171,255,0.55)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>repeat</span>
+            <span style={{ fontWeight: 600, fontSize: 11, color: 'rgba(88,171,255,0.85)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>repeat</span>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>
             {FREQ_OPTIONS.map(({ id, label }) => {
@@ -670,7 +670,7 @@ function ChargeBill({ go, selectedTenant, amount, onEditAmount, chargeType, setC
         <div className="tp-panel-body" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         <div className="tp-thin-scroll" style={{ flex: 1, overflowY: 'auto', paddingBottom: 16 }}>
           {/* What for */}
-          <div style={{ fontWeight: 600, fontSize: 11, color: 'rgba(88,171,255,0.55)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 10 }}>what for</div>
+          <div style={{ fontWeight: 600, fontSize: 11, color: 'rgba(88,171,255,0.85)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 10 }}>what for</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
             {CHARGE_TYPES.map((c: any) => {
               const on = chargeType === c.id;
@@ -684,12 +684,12 @@ function ChargeBill({ go, selectedTenant, amount, onEditAmount, chargeType, setC
           </div>
 
           {/* Description */}
-          <div style={{ fontWeight: 600, fontSize: 11, color: 'rgba(88,171,255,0.55)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 10 }}>description</div>
+          <div style={{ fontWeight: 600, fontSize: 11, color: 'rgba(88,171,255,0.85)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 10 }}>description</div>
           <input className="tp-field" data-demo-id="property-bill-description" value={label} onChange={e => setLabel(e.target.value)}
             placeholder={chargeType === 'other' ? 'what is this charge for?' : 'add a note (optional)'} style={{ marginBottom: 20 }} />
 
           {/* Invoice document — optional PDF/image the tenant can view from the checkout page */}
-          <div style={{ fontWeight: 600, fontSize: 11, color: 'rgba(88,171,255,0.55)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 10 }}>invoice <span style={{ opacity: 0.6 }}>· optional</span></div>
+          <div style={{ fontWeight: 600, fontSize: 11, color: 'rgba(88,171,255,0.85)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 10 }}>invoice <span style={{ opacity: 0.6 }}>· optional</span></div>
           {docUrl ? (
             <div data-demo-id="property-bill-document" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '13px 16px', background: 'rgba(88,171,255,0.1)', border: '1px solid rgba(88,171,255,0.4)', borderRadius: 16, marginBottom: 20 }}>
               <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={BLUE} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 13h6M9 16.5h6"/></svg>
@@ -707,7 +707,7 @@ function ChargeBill({ go, selectedTenant, amount, onEditAmount, chargeType, setC
           )}
 
           {/* Due */}
-          <div style={{ fontWeight: 600, fontSize: 11, color: 'rgba(88,171,255,0.55)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 10 }}>due</div>
+          <div style={{ fontWeight: 600, fontSize: 11, color: 'rgba(88,171,255,0.85)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 10 }}>due</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 20 }}>
             {DUE_OPTIONS.map((d: any) => {
               const on = dueSel === d.id;
@@ -795,7 +795,7 @@ function ReminderSettingsCard({ settings, onUpdate }: any) {
           <Row label="remind after"  value={delay}    options={[1, 3, 7]}    onPick={(v: number) => onUpdate({ rentReminderDelayDays: v })}    fmt={(o: number) => `${o}d`} />
           <Row label="repeat every"  value={interval} options={[1, 3, 7]}    onPick={(v: number) => onUpdate({ rentReminderIntervalDays: v })} fmt={(o: number) => `${o}d`} />
           <Row label="max reminders" value={max}      options={[1, 3, 5, 0]} onPick={(v: number) => onUpdate({ rentReminderMaxCount: v })}     fmt={(o: number) => (o === 0 ? '∞' : String(o))} />
-          <div style={{ marginTop: 11, fontSize: 11, color: 'rgba(88,171,255,0.55)', lineHeight: 1.5 }}>
+          <div style={{ marginTop: 11, fontSize: 11, color: 'rgba(88,171,255,0.85)', lineHeight: 1.5 }}>
             once overdue, we email the payment link after {delay} day{delay !== 1 ? 's' : ''}, then every {interval} day{interval !== 1 ? 's' : ''}{max > 0 ? ` (up to ${max}×)` : ''}.
           </div>
         </>
@@ -843,7 +843,7 @@ function AutomateScreen({ go, schedules, tenants, onPauseResume, onCancel, busyI
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 600, fontSize: 14, color: BLUE, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textTransform: 'capitalize' }}>{t ? tenantName(t) : 'unknown tenant'}</div>
-                    <div style={{ fontWeight: 400, fontSize: 11.5, color: 'rgba(88,171,255,0.55)', marginTop: 2 }}>
+                    <div style={{ fontWeight: 400, fontSize: 11.5, color: 'rgba(88,171,255,0.85)', marginTop: 2 }}>
                       {fmt(s.amountCents)} · {FREQ_LABEL[s.frequency] || s.frequency}
                     </div>
                   </div>
@@ -1095,7 +1095,7 @@ function BatchAndAutoScreen({ go, tenants, invoices, onBatchSend, sending, sched
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 600, fontSize: 14, color: BLUE, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textTransform: 'capitalize' }}>{t ? tenantName(t) : 'unknown'}</div>
-                      <div style={{ fontWeight: 400, fontSize: 11.5, color: 'rgba(88,171,255,0.55)', marginTop: 2 }}>{fmt(s.amountCents)} · {FREQ_LABEL[s.frequency] || s.frequency}</div>
+                      <div style={{ fontWeight: 400, fontSize: 11.5, color: 'rgba(88,171,255,0.85)', marginTop: 2 }}>{fmt(s.amountCents)} · {FREQ_LABEL[s.frequency] || s.frequency}</div>
                     </div>
                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 9px', borderRadius: 8, background: paused ? 'rgba(255,176,46,0.18)' : 'rgba(19,194,154,0.16)', color: paused ? '#FFB02E' : GREEN, fontWeight: 700, fontSize: 9.5, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
                       {paused ? 'paused' : 'active'}

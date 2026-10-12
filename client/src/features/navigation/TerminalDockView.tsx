@@ -551,7 +551,10 @@ export function TerminalDockView({ mode, activeId, onPick, placement = "fixed", 
           <>
             <svg aria-hidden="true" width="0" height="0" style={{ position: "absolute" }}>
               <defs>
-                <filter id={filterId} x="-60%" y="-60%" width="220%" height="220%" colorInterpolationFilters="sRGB">
+                {/* Three blur radii cover every blob without rasterizing a
+                    220% surface on each frame. Use the expanded height so the
+                    filter bounds stay constant throughout the collapse. */}
+                <filter id={filterId} filterUnits="userSpaceOnUse" x="-24" y="-24" width={navWidth + 48} height="106" colorInterpolationFilters="sRGB">
                   <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="tp-goo-blur" />
                   <feColorMatrix in="tp-goo-blur" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -10" />
                 </filter>

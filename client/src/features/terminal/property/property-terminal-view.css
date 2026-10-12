@@ -73,7 +73,7 @@
 .property-terminal-view .tp-stack-row + .tp-stack-row { border-top: 1px solid rgba(4,13,109,0.05); }
 .property-terminal-view .tp-stack-name { font-weight: 600; font-size: 14px; color: #040D6D; margin-bottom: 1px; }
 .property-terminal-view .tp-stack-meta { display: flex; align-items: center; gap: 5px; }
-.property-terminal-view .tp-stack-status { font-weight: 500; font-size: 11px; color: rgba(4,13,109,0.35); }
+.property-terminal-view .tp-stack-status { font-weight: 500; font-size: 11px; color: #586079; }
 .property-terminal-view .tp-stack-price { font-weight: 700; font-size: 15px; color: #040D6D; letter-spacing: -0.3px; }
 .property-terminal-view .tp-stack-empty { padding: 14px 16px; font-size: 13px; color: rgba(4,13,109,0.4); text-align: center; }
 .property-terminal-view .tp-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; animation: tp-pulse 2s ease-in-out infinite; }

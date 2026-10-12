@@ -112,7 +112,7 @@ export default function MerchantOnboarding() {
             <Building2 className="w-7 h-7 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900">Complete Your Business Profile</h1>
-          <p className="text-gray-500 mt-2 text-sm max-w-md mx-auto">
+          <p className="text-gray-600 mt-2 text-sm max-w-md mx-auto">
             To activate your account and start accepting payments, we need a few more details for identity verification.
           </p>
         </div>

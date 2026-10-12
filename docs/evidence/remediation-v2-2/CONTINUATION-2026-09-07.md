@@ -1,6 +1,49 @@
 # Full integration continuation audit — 2026-09-07
 
-Publication checkpoint: implementation `2e96a318d277856f292d3d93fd848e30eba32a5d` was pushed to `origin/fix/qwen-aligned-20261010` on 2026-10-11. A fresh `git ls-remote` returned that exact SHA. This documentation checkpoint follows the implementation; deployment and the listed manual acceptance gates remain pending.
+Latest continuation **2026-10-12 — publish completed R1-T10 tasks 2–6 work**,
+branch `fix/qwen-aligned-20261010`, exact base
+`c70018022d19b641ddc7612d79061ddb8aee8a45`. The owner requested commit/push of
+completed work; he deploys on Replit. Implementation is the commit containing
+[the immediate handover](../../HANDOFF-2026-10-11-r1-t10-tasks-2-6.md).
+[Evidence](r1/R1-T10-tasks-2-6-checkpoint-2026-10-11.md),
+[structural report](r1/R1-T10-tasks-2-6-browser-summary-2026-10-11.json),
+[preflight](r1/R1-T10-tasks-2-6-preflight-2026-10-11.md),
+[implementer reread](r1/R1-T10-tasks-2-6-review-2026-10-11.md) and
+[actual-device procedure](../../operations/r1-t10-real-device-acceptance.md).
+
+- Completed bounded contrast/semantics, Analytics focus/reflow, expanded local
+  draft keyboard checks and a bounded dock SVG filter. Frozen candidate 6 client
+  source SHA256 `4cb64b978be8098113e9589ae4c97c53ed9bb3f4c96976939a8679dfb9185857`.
+- **126 client suites / 1,461 tests**, typecheck/build, 36 geometry controls and
+  **306 selected browser cells** pass. Active tutorials: normal 88/88 and native
+  zoom 88/88 pass; reduced motion has 87/88 full cells and one pre-tutorial
+  focus-origin failure, actual exit 1. The exact failed cell passes in isolation;
+  the full-run failure is retained. Full isolated dock phases A–F pass: 29ms goo
+  and 20ms flag-off worst frames, unchanged 32ms limit.
+- A subsequent meaningful control exposed animated text suppression/restoration.
+  The completed conservative guard leaves paint transitions untouched/manual.
+  Final controls and a targeted real-route smoke pass. The report retains the
+  original matrix checker hashes/counts and separately hashes the guarded checks;
+  it does not claim a full guarded-matrix rerun.
+- Strict mobile remains red at five property tap centres. Canonical goldens
+  remain red (11 failed scenarios / 31 rendered comparisons); references and
+  tolerances are unchanged. The complete private review packet has 42 candidate
+  states, strict comparison triples, 20 auth pairs and tested visual alternatives.
+  Owner visual acceptance and the property layout choice remain pending.
+- A later 15-state terminal audit remains red: split-rent contrast, two unnamed
+  backspace keys and additional static-paint contrast defects need followup app
+  repairs. No unfinished palette/keypad change is included in this publication.
+  Actual iPhone/iPad/Safari/VoiceOver and other manual acceptance remain open;
+  no reachable public dev URL or actual-device pass is claimed. Claude owns
+  independent task 7 and the stock hidden-focus review.
+- **Tasks 2–6 / R1-T10 / R1 / release remain open.** No live provider/payment/DB,
+  message, migration, golden update or deployment. Private artifacts remain outside
+  Git; the owner's development server is preserved.
+
+Previous checkpoints follow; their counts and immediate task-state claims are
+historical and are superseded by the checkpoint above.
+
+Historical publication checkpoint: implementation `2e96a318d277856f292d3d93fd848e30eba32a5d` was pushed to `origin/fix/qwen-aligned-20261010` on 2026-10-11. A fresh `git ls-remote` returned that exact SHA. This documentation checkpoint follows the implementation; deployment and the listed manual acceptance gates remain pending.
 
 
 Latest continuation **2026-10-11 — R1-T10e accessibility engineering checkpoint**,
