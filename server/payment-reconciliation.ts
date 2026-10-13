@@ -61,6 +61,7 @@ export class PaymentReconciliationWorker {
       if (settlement.kind === "lease-lost") return true;
       if (settlement.kind === "adapter-unavailable") { await this.retry(claim, "provider_unavailable"); return true; }
       if (settlement.kind !== "finalized" && settlement.kind !== "reused") {
+        this.signalDeadLetter({ code: "settlement_conflict" });
         await this.repository.finishInbox(claim, {status:"dead_letter",code:"settlement_conflict",transactionId:result.transactionId}, this.clock());
         return true;
       }
@@ -72,10 +73,18 @@ export class PaymentReconciliationWorker {
     return true;
   }
 
+  /** D4: a dead-letter is never silent. Fixed codes only: no session, transaction or provider text. */
+  private signalDeadLetter(details: { code: ReconciliationError; cause?: ReconciliationError }) {
+    try { this.audit("PAYMENT_RECONCILIATION_DEAD_LETTER", details); } catch { /* the inbox row still records it */ }
+  }
+
   private retry(claim: InboxClaim, code: ReconciliationError): Promise<boolean> {
     const now = this.clock();
-    if (claim.attemptCount >= 20 || now.getTime() - claim.firstReceivedAt.getTime() >= 24 * 60 * 60 * 1000)
+    if (claim.attemptCount >= 20 || now.getTime() - claim.firstReceivedAt.getTime() >= 24 * 60 * 60 * 1000) {
+      // The row keeps only retry_exhausted; the signal keeps why (outage, ambiguity, unbound session).
+      this.signalDeadLetter({ code: "retry_exhausted", cause: code });
       return this.repository.finishInbox(claim, {status:"dead_letter",code:"retry_exhausted"}, now);
+    }
     const delay = Math.min(300000, 1000 * 2 ** Math.min(claim.attemptCount - 1, 12));
     const jitter = Math.max(0, Math.min(1, this.random())) * delay * 0.25;
     return this.repository.finishInbox(claim, {status:"retry",code,nextAttemptAt:new Date(now.getTime()+delay+jitter)},now);

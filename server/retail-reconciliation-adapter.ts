@@ -14,10 +14,12 @@ export function createRetailReconciliationFinalizer(service: PaymentAttemptServi
     if (!binding.paymentAttemptId) return {kind:"conflict"};
     const attempt=await service.getAttempt(binding.paymentAttemptId);
     if (!attempt) return {kind:"not-found"};
+    // D2: R2's money columns carry a provider transaction only for an approval, as R2's route
+    // stores them; the decline's transaction stays in the binding registry.
     const result=await service.finalize({attemptId:attempt.id,processorSessionId:binding.sessionId,
-      processorTransactionId:evidence.transactionId,paymentMethod:evidence.paymentMethod,
+      processorTransactionId:evidence.outcome==='approved' ? evidence.transactionId : null,paymentMethod:evidence.paymentMethod,
       outcome:evidence.outcome,receiptShare:evidence.outcome==='approved' && attempt.shareIndex>0 ? attempt.shareIndex : null,
-      reconciliation:{claim,evidence}});
+      reconciliation:{claim,evidence,expectedProviderAccount:binding.providerAccount}});
     if (result.kind==='conflict') return {kind:result.reason==='lease-lost' ? 'lease-lost' : 'conflict'};
     return result.kind==='not-found' ? {kind:'not-found'} : {kind:result.kind,eventId:result.eventId};
   };

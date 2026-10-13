@@ -2193,7 +2193,9 @@ export class MemStorage implements IStorage {
       const attempt = this.paymentAttempts.get(input.attemptId);
       if (!attempt) return { kind: "not-found" };
 
-      if (paymentAttemptLeaseExpired(attempt, input.now)) {
+      // As the PostgreSQL twin: a pre-set X-ID refuses another; R3 send intent is not abandoned.
+      if (attempt.processorXId !== null && attempt.processorXId !== input.processorXId) return { kind: "conflict", attempt };
+      if (paymentAttemptLeaseExpired(attempt, input.now) && !attempt.sendStartedAt) {
         const abandoned: PaymentAttempt = {
           ...attempt,
           state: "abandoned",
@@ -6098,17 +6100,20 @@ export class DatabaseStorage implements IStorage {
           sql`${paymentNotificationInbox.leaseExpiresAt} > GREATEST(${input.now}::timestamptz, clock_timestamp())`,
         )).for("update").limit(1);
         if (!lease) return { kind: "conflict", attempt, reason: "lease-lost" };
-        const expected = attempt.expectedProviderAccount !== null && attempt.expectedAmountCents !== null ? {
+        // H-1 (Option A): R2's recorded values, with the configured account unless one was pinned.
+        const expected = attempt.expectedAmountCents !== null ? {
           amountCents: attempt.expectedAmountCents, currency: attempt.expectedCurrency!,
           reference: attempt.expectedMerchantReference!, environment: attempt.providerEnvironment!,
-          providerAccount: attempt.expectedProviderAccount, processorXId: attempt.processorXId!,
+          providerAccount: attempt.expectedProviderAccount ?? input.reconciliation.expectedProviderAccount, processorXId: attempt.processorXId!,
         } : undefined;
         const [binding] = await tx.select().from(paymentSessionBindings)
           .where(eq(paymentSessionBindings.sessionId, input.processorSessionId)).for("update").limit(1);
         if (!expected || !binding || binding.paymentAttemptId !== attempt.id || attempt.transactionId !== transaction.id ||
           expected.processorXId !== attempt.processorXId ||
           binding.processorXId !== expected.processorXId || expected.amountCents !== moneyStringToCents(splitPayment?.amount ?? transaction.price) ||
-          evidence.outcome !== input.outcome || evidence.transactionId !== input.processorTransactionId ||
+          evidence.outcome !== input.outcome ||
+          // D2: only an approval's transaction reaches R2's money columns.
+          (input.outcome === "approved" ? evidence.transactionId !== input.processorTransactionId : input.processorTransactionId !== null) ||
           !evidenceMatchesExpectation({ ...expected, sessionId: binding.sessionId, processorXId: binding.processorXId }, evidence) ||
           (binding.providerTransactionId !== null && binding.providerTransactionId !== evidence.transactionId)) {
           return { kind: "conflict", attempt };
@@ -6116,7 +6121,25 @@ export class DatabaseStorage implements IStorage {
         const [event] = await tx.select({ id: paymentSettlementEvents.id }).from(paymentSettlementEvents)
           .where(eq(paymentSettlementEvents.sessionId, binding.sessionId)).limit(1);
         reconciliationEventId = event?.id;
-        if (paymentAttemptIsTerminal(attempt) && !reconciliationEventId) return { kind: "conflict", attempt };
+        if (paymentAttemptIsTerminal(attempt) && !reconciliationEventId) {
+          // Settled first by R2's route, which already notified: adopt exactly that outcome into the
+          // registry (no outbox, no second count). Anything else stays a loud conflict.
+          const routeSettledSame = attempt.state === evidence.outcome && attempt.outcome === evidence.outcome &&
+            attempt.receiptShare === input.receiptShare &&
+            attempt.providerTransactionId === (evidence.outcome === "approved" ? evidence.transactionId : null);
+          if (!routeSettledSame) return { kind: "conflict", attempt };
+          const [elsewhere] = await tx.select({ sessionId: paymentSessionBindings.sessionId }).from(paymentSessionBindings)
+            .where(and(eq(paymentSessionBindings.providerTransactionId, evidence.transactionId),
+              ne(paymentSessionBindings.sessionId, binding.sessionId))).limit(1);
+          if (elsewhere) return { kind: "conflict", attempt };
+          if (binding.providerTransactionId === null) {
+            await tx.update(paymentSessionBindings).set({ providerTransactionId: evidence.transactionId })
+              .where(eq(paymentSessionBindings.sessionId, binding.sessionId));
+          }
+          const [adopted] = await tx.insert(paymentSettlementEvents).values({ sessionId: binding.sessionId,
+            merchantId: transaction.merchantId!, outcome: evidence.outcome, amountCents: evidence.amountCents, createdAt: input.now }).returning();
+          reconciliationEventId = adopted.id;
+        }
       }
 
       if (paymentAttemptIsTerminal(attempt)) {

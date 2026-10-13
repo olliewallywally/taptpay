@@ -27,7 +27,7 @@ let now=new Date(Date.now()+600000);
 const clock=()=>new Date(now);
 const original=new DatabaseStorage(drizzle(pool,{schema}) as any);
 const retail=new PaymentAttemptService(original,clock);
-const stores=pools.map(p=>new DurablePaymentStorage(p,createRetailReconciliationFinalizer(retail),createRetailReconciliationRecorder(retail)));
+const stores=pools.map(p=>new DurablePaymentStorage(p,createRetailReconciliationFinalizer(retail),createRetailReconciliationRecorder(retail),'synthetic-account'));
 const [one,two]=stores;
 let merchant:number,otherMerchant:number,tenant:string,clientProfile:string;
 const failures:string[]=[];let passed=0;
@@ -370,6 +370,61 @@ try {
     assert.deepEqual([inbox.status,inbox.last_error_code],['dead_letter','integrity_mismatch']);
     assert.equal((await retail.getAttempt(attemptId))?.lastReconciliationCode,'integrity_mismatch:amount');
     assert.deepEqual(audit,[['PROVIDER_OUTCOME_MISMATCH',{field:'amount'}]]);
+  });
+  // H-1 (Option A, merge review 2026-10-13): the worker settles what R2's live route records — its four
+  // expected values and X-ID, with the configured account — and adopts a payment the route already settled.
+  await check('H-1: the worker settles R2-recorded retail payments; a route-settled one is adopted; declines stay out of the money columns',async()=>{
+    const {createWindcaveClient}=await import('../server/windcave-client');
+    const {UAT_WINDCAVE_ENDPOINT}=await import('../server/config');
+    const live=async()=>{
+      const sale=await original.createTransaction({merchantId:merchant,itemName:'Synthetic live R2',price:'10.01',status:'pending',paymentMethod:'qr_code',splitEnabled:false});
+      const claim=await retail.claim({transactionId:sale.id,shareIndex:0,idempotencyKey:randomUUID()});
+      if(claim.kind!=='claimed') throw new Error('fixture_claim');
+      assert.equal((await retail.recordExpectedValues({attemptId:claim.attempt.id,amountCents:1001,currency:'NZD',merchantReference:`TAPT_${claim.attempt.id}`,providerEnvironment:'uat'})).kind,'recorded');
+      const sessionId=`s-${randomUUID()}`;
+      assert.equal((await retail.attachSession({attemptId:claim.attempt.id,processorSessionId:sessionId,processorXId:randomBytes(8).toString('hex')})).kind,'attached');
+      return {sale,attemptId:claim.attempt.id,sessionId,reference:`TAPT_${claim.attempt.id}`};
+    };
+    const run=async(target:{sessionId:string;reference:string},transaction:{id:string;authorised:boolean})=>{
+      const client=createWindcaveClient({config:{mode:'uat',endpoint:UAT_WINDCAVE_ENDPOINT,username:'synthetic-account',apiKey:'synthetic-test-only',publicOrigin:'https://harness.test'},
+        transport:async()=>new Response(JSON.stringify({id:target.sessionId,state:'complete',transactions:[{id:transaction.id,authorised:transaction.authorised,type:'purchase',
+          amount:'10.01',currency:'NZD',merchantReference:target.reference,sessionId:target.sessionId,username:'synthetic-account'}]}),{status:200}),
+        wait:async()=>{},clock,audit:()=>undefined});
+      await one.receive(target.sessionId,'fprn',now);
+      await new PaymentReconciliationWorker(one,createWindcaveReconciliationProvider(client,{providerEnvironment:'uat',accountUsername:'synthetic-account'}),clock,()=>0,()=>undefined).runOne(randomUUID());
+      return (await pool.query('SELECT status,last_error_code FROM payment_notification_inbox WHERE session_id=$1',[target.sessionId])).rows[0];
+    };
+    const events=async(sessionId:string)=>(await pool.query('SELECT id FROM payment_settlement_events WHERE session_id=$1',[sessionId])).rows;
+    // R2's live path alone: bound from R2's columns, settled once.
+    const paid=await live(),approvedId=`tx-${randomUUID()}`;
+    assert.equal((await run(paid,{id:approvedId,authorised:true})).status,'complete');
+    assert.equal((await original.getTransaction(paid.sale.id))?.status,'completed');
+    assert.equal((await events(paid.sessionId)).length,1);
+    // Settled first by the route: adopted into the registry, no second notification, no second count.
+    const routed=await live(),routedId=`tx-${randomUUID()}`;
+    assert.ok(['claimed','reused'].includes((await retail.claimFinalization(routed.attemptId,routed.sessionId)).kind));
+    assert.equal((await retail.finalize({attemptId:routed.attemptId,processorSessionId:routed.sessionId,processorTransactionId:routedId,paymentMethod:'card',outcome:'approved'})).kind,'finalized');
+    const counted=(await pool.query('SELECT total_lifetime_transactions FROM merchant_subscriptions WHERE merchant_id=$1',[merchant])).rows[0]?.total_lifetime_transactions;
+    assert.equal((await run(routed,{id:routedId,authorised:true})).status,'complete');
+    const adopted=await events(routed.sessionId);assert.equal(adopted.length,1);
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM payment_delivery_outbox WHERE event_id=$1',[adopted[0].id])).rows[0].n,0,'the route already notified');
+    assert.equal((await pool.query('SELECT provider_transaction_id FROM payment_session_bindings WHERE session_id=$1',[routed.sessionId])).rows[0].provider_transaction_id,routedId);
+    if(counted!==undefined) assert.equal((await pool.query('SELECT total_lifetime_transactions FROM merchant_subscriptions WHERE merchant_id=$1',[merchant])).rows[0].total_lifetime_transactions,counted);
+    // D2: a decline settled by the worker leaves R2's money columns empty, so the sale can still be cancelled.
+    const declined=await live();
+    assert.equal((await run(declined,{id:`tx-${randomUUID()}`,authorised:false})).status,'complete');
+    assert.equal((await retail.getAttempt(declined.attemptId))?.providerTransactionId,null);
+    assert.equal((await original.getTransaction(declined.sale.id))?.windcaveTransactionId,null);
+    // A decline the route recorded is adopted too; an approval after it is a loud conflict.
+    const routeDeclined=await live();
+    await retail.claimFinalization(routeDeclined.attemptId,routeDeclined.sessionId);
+    assert.equal((await retail.finalize({attemptId:routeDeclined.attemptId,processorSessionId:routeDeclined.sessionId,processorTransactionId:null,outcome:'declined'})).kind,'finalized');
+    assert.equal((await run(routeDeclined,{id:`tx-${randomUUID()}`,authorised:false})).status,'complete');
+    const contradicted=await live();
+    await retail.claimFinalization(contradicted.attemptId,contradicted.sessionId);
+    await retail.finalize({attemptId:contradicted.attemptId,processorSessionId:contradicted.sessionId,processorTransactionId:null,outcome:'declined'});
+    const loud=await run(contradicted,{id:`tx-${randomUUID()}`,authorised:true});
+    assert.deepEqual([loud.status,loud.last_error_code],['dead_letter','settlement_conflict']);
   });
   await check('R2 expected/reconciliation writes coexist with R3 canonical write-once identity',async()=>{
     const sale=await original.createTransaction({merchantId:merchant,itemName:'Synthetic R2 integration',price:'10.01',status:'pending',paymentMethod:'qr_code',splitEnabled:false});

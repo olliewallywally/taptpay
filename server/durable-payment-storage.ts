@@ -39,7 +39,10 @@ const terminal = (state: string) => ["approved","declined","cancelled"].includes
 export class DurablePaymentStorage implements ReconciliationRepository, PaymentOutboxRepository {
   constructor(private readonly pool: PaymentSqlPool,
     private readonly retailFinalizer?: (binding: SessionBinding, outcome: VerifiedOutcome, claim: InboxClaim, now: Date) => Promise<SettlementResult>,
-    private readonly retailRecorder?: (binding: SessionBinding, code: string) => Promise<unknown>) {}
+    private readonly retailRecorder?: (binding: SessionBinding, code: string) => Promise<unknown>,
+    /** H-1 (Option A): the configured Windcave account, the same value the provider adapter's context
+     * pins. R2's live route records a retail attempt's four expected values and X-ID, not an account. */
+    private readonly retailProviderAccount?: string) {}
 
   /** H-3: a retail attempt's sanitized reconciliation code goes through R2's service (Option A).
    * Invoice attempts have no such column (0036), so nothing is written for them. */
@@ -184,9 +187,10 @@ export class DurablePaymentStorage implements ReconciliationRepository, PaymentO
     if (!isUuid(input.paymentAttemptId) || !isSessionId(input.sessionId)) throw new Error("invalid_retail_binding");
     return this.transaction(async(client)=>{
       const row=(await client.query(`SELECT a.*,a.expected_amount_cents AS amount_cents,a.expected_currency AS currency,
-        a.expected_merchant_reference AS reference,a.provider_environment AS environment,a.expected_provider_account AS provider_account
+        a.expected_merchant_reference AS reference,a.provider_environment AS environment,
+        COALESCE(a.expected_provider_account,$2) AS provider_account
         FROM payment_attempts a
-        WHERE a.id=$1 FOR UPDATE OF a`,[input.paymentAttemptId])).rows[0];
+        WHERE a.id=$1 FOR UPDATE OF a`,[input.paymentAttemptId,this.retailProviderAccount ?? null])).rows[0];
       if(row && row.amount_cents!==null) row.amount_cents=Number(row.amount_cents);
       if (!row || row.processor_session_id!==input.sessionId || row.processor_x_id!==input.processorXId ||
         !evidenceMatchesExpectation({...camelRow<ProviderExpectation>(row),sessionId:row.processor_session_id,processorXId:row.processor_x_id},
@@ -277,19 +281,21 @@ export class DurablePaymentStorage implements ReconciliationRepository, PaymentO
       // Recover a crash between the original retail engine's durable attachment
       // and registry insertion. Only an independently persisted expectation and
       // that engine's exact session/X-ID can create the binding.
+      // H-1 (Option A): R2's expected values are that expectation. 0037 lets them be set first only
+      // while the attempt is claiming and unattached, and makes them write-once.
       await client.query(`INSERT INTO payment_session_bindings(session_id,processor_x_id,payment_attempt_id)
         SELECT r.processor_session_id,r.processor_x_id,r.id FROM payment_attempts r
-        WHERE r.processor_session_id=$1 AND r.expected_provider_account IS NOT NULL AND r.request_fingerprint IS NOT NULL
+        WHERE r.processor_session_id=$1 AND r.expected_amount_cents IS NOT NULL
           AND r.processor_x_id IS NOT NULL ON CONFLICT DO NOTHING`,[sessionId]);
       const row=(await client.query(`SELECT b.session_id,b.processor_x_id,b.invoice_attempt_id,b.payment_attempt_id,
         COALESCE(a.amount_cents,r.expected_amount_cents) AS amount_cents,COALESCE(a.currency,r.expected_currency) AS currency,
         COALESCE(a.reference,r.expected_merchant_reference) AS reference,COALESCE(a.environment,r.provider_environment) AS environment,
-        COALESCE(a.provider_account,r.expected_provider_account) AS provider_account
+        COALESCE(a.provider_account,r.expected_provider_account,$2) AS provider_account
         FROM payment_session_bindings b LEFT JOIN invoice_payment_attempts a ON a.id=b.invoice_attempt_id AND a.processor_x_id=b.processor_x_id
         LEFT JOIN payment_attempts r ON r.id=b.payment_attempt_id AND r.processor_session_id=b.session_id AND r.processor_x_id=b.processor_x_id
-        WHERE b.session_id=$1`,[sessionId])).rows[0];
+        WHERE b.session_id=$1`,[sessionId,this.retailProviderAccount ?? null])).rows[0];
       if(row && row.amount_cents!==null) row.amount_cents=Number(row.amount_cents);
-      if (!row || row.amount_cents===null) return undefined;
+      if (!row || row.amount_cents===null || row.provider_account===null) return undefined;
       if (row.invoice_attempt_id) delete row.payment_attempt_id; else delete row.invoice_attempt_id;
       return camelRow(row);
     });
