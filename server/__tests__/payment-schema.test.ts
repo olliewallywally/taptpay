@@ -40,6 +40,7 @@ describe("Phase 2 Drizzle schema", () => {
     expect(attemptConfig.indexes.map(({ config }) => config.name).sort()).toEqual([
       "payment_attempts_live_transaction_share_uq",
       "payment_attempts_processor_session_id_uq",
+      "payment_attempts_processor_transaction_id_uq",
       "payment_attempts_processor_x_id_uq",
       "payment_attempts_provider_transaction_id_uq",
       "payment_attempts_return_state_hash_uq",
@@ -47,6 +48,7 @@ describe("Phase 2 Drizzle schema", () => {
       "payment_attempts_transaction_share_key_uq",
     ]);
     expect(attemptConfig.checks.map(({ name }) => name).sort()).toEqual([
+      "payment_attempts_account_fingerprint_check",
       "payment_attempts_expected_amount_check",
       "payment_attempts_expected_currency_check",
       "payment_attempts_expected_pair_check",
@@ -55,9 +57,11 @@ describe("Phase 2 Drizzle schema", () => {
       "payment_attempts_outcome_check",
       "payment_attempts_provider_environment_check",
       "payment_attempts_receipt_share_check",
+      "payment_attempts_reconciliation_code_check",
       "payment_attempts_return_state_expiry_check",
       "payment_attempts_return_state_hash_shape_check",
       "payment_attempts_return_state_pair_check",
+      "payment_attempts_send_started_check",
       "payment_attempts_share_index_check",
       "payment_attempts_state_check",
     ]);

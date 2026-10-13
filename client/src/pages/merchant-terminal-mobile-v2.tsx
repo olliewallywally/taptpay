@@ -1,3 +1,4 @@
+import {cashCommandKey,completeCashCommand} from "@/lib/cash-command-key";
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -493,12 +494,12 @@ export default function MerchantTerminalMobile() {
   const handleCashSale = async (draft: RetailSaleDraft) => {
     setLiveReceipt(null);
     try {
-      const r = await apiRequest(...apiTo("POST /api/transactions/cash-sale"), {
-        merchantId,
-        itemName: draft.name,
-        price: (draft.amount / 100).toFixed(2),
-      });
+      const body={merchantId,itemName:draft.name,price:(draft.amount/100).toFixed(2)};
+      const key=cashCommandKey(body);
+      const r = await apiRequest(...apiTo("POST /api/transactions/cash-sale"),body,{idempotencyKey:key});
       const { transaction } = await r.json();
+      if(!Number.isSafeInteger(transaction?.id) || transaction.id<1 || transaction.merchantId!==merchantId || transaction.paymentMethod!=='cash')
+        throw new Error('Cash sale confirmation is incomplete. Retry the same sale.');
       queryClient.setQueryData<any[]>(
         [MERCHANTS_KEY, merchantId, "transactions"],
         (prev: any[] = []) => (prev.some((t: any) => t.id === transaction.id) ? prev : [transaction, ...prev]),
@@ -508,6 +509,7 @@ export default function MerchantTerminalMobile() {
         amount: Math.round(parseFloat(transaction?.price) * 100),
         url: `${window.location.origin}/receipt/${transaction.id}`,
       });
+      completeCashCommand(merchantId,key);
     } catch (error) {
       if (!isBillingCardRequired(error)) {
         toast({ title: "Error", description: apiErrorMessage(error, "Failed to record cash sale"), variant: "destructive" });

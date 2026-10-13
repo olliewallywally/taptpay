@@ -1,6 +1,35 @@
 # Full integration continuation audit — 2026-09-07
 
-Latest continuation **2026-10-12 — R4-T1 implemented (refund provider boundary).**
+Latest continuation **2026-10-13 — R2 and R3 merged on `ccr-e07e3100-0wm8kr`; two merge
+fixes; owner runbook for the test database.**
+[Claude's independent review](r3/R2-R3-MERGE-REVIEW-2026-10-13.md),
+[runbook](../../operations/runbook-2026-10-13-apply-0034-0038-test-database.md).
+
+- **Merged:** Codex's `fix/qwen-aligned-20261010` at `27d235b8` (0036–0038, manual-change
+  guards, cash commands), on top of `332b0153` (Option A decision, R4-T1).
+- **B-1 fixed (blocker, found by three reviewers):** a failed Windcave session creation left
+  the attempt held forever. The sale could never be paid or cancelled.
+  - R2's rule is restored: an expired attempt with no attached session and no R3 send
+    intent is abandoned by the next claim, by a late attach and by the merchant's cancel.
+  - R3's other holds are unchanged.
+  - Failing first in memory/HTTP (2) and PostgreSQL (1).
+- **B-2 fixed:** the cash write takes its business explicitly. This was red on Codex's head:
+  `tenant-storage-inventory`, 3 tests.
+- **Latent (R3 worker/inbox unmounted):** H-1–H-3 must be fixed before activation.
+- **Owner items:** OI-1 (the cancel/void guard holds after a verified decline; needs a UAT
+  answer) and OI-2 (multi-transaction sessions).
+- **Review coverage:** four of six reviewers completed. The worker and cash dimensions, the
+  verify pass and the critic stopped at a session limit. Claude covered the cash commit
+  directly.
+- **Results:**
+  - server 208 / 4,993 and client 128 / 1,471, all pass; typecheck pass;
+  - PostgreSQL 16 on fresh databases: 0023–0038 rehearsal applied, R3 durability 40/40,
+    R2-T4 12/12, R2-T7 7/7.
+- **Migrations:** 0034–0038 are applied nowhere shared. The owner applies them to the test
+  database by the runbook, with the app stopped (0036/0037 commit separately). R4-T2 onward
+  may start.
+
+Prior continuation **2026-10-12 — R4-T1 implemented (refund provider boundary).**
 [Evidence](r4/R4-T1-2026-10-12.md), [review pass 2](r4/R4-review-pass-2-2026-10-12.md).
 Refunds go out under the caller's X-ID, are never resent, and count only when the reply is
 strictly this refund; the refund route releases a reservation only when the provider definitely
@@ -2736,8 +2765,8 @@ may proceed where the plan allows it. Code lanes remain gated by their dependenc
 | R1-T8 | Fix the hook-order crash | 758 | Engineering | **External review note applied 2026-10-01 (`d9382672`):** the cleaned commit id is `53f5a8b9` (`387d189d` in the history kept locally), checked against the commit map. **IMPLEMENTED 2026-09-21, commit `387d189d` — awaiting independent review** ([evidence](r1/R1-T8-hook-order-crash-2026-09-21.md)). `MerchantGate` resolves the merchant above the page (keyed by merchant, redirects once from an effect); a client test gates `rules-of-hooks` over the whole client (67 → 0); `jest.setup.js` fails any client test in which React warns (18 act() warnings → 0); the repro now asserts no throw. Client 60/552; mutations 5/5; the four routed phone pages pixel-identical to the pre-fix build; Sign out on /settings reproduces React #300 before the fix and lands on /login after it. Originally recorded: **UNBLOCKED 2026-09-21** (R0 exit established; R1-H1 accepted 2026-09-14). Scope measured the same day: `react-hooks/rules-of-hooks` reports **66 violations in exactly the seven named pages** (settings 18, merchant-terminal 13, merchant-terminal-mobile 12, transactions 11, stock-management 6, exports 3, payment-stack 3) plus 1 in `merchant-terminal-mobile-v2.test.tsx` — 67 in the client; the repro test still asserts the crash; the client suite prints 18 `act(...)` warnings (12 from `Settings`, 6 from `MerchantTerminal`). Crash characterization is not a fix. |
 | R1-T9 | Truthful frontend failure states | 773 | Engineering | **External review fix applied 2026-10-01 (`9fede25d`; local, awaiting independent review; [evidence](r1/R1-review-fixes-on-phase-E-2026-10-01.md)):** a reply that says OK and is not the data reads as a failed load (desktop retail pages, desktop settings, property and trades lists and settings). **COMPLETE 2026-09-23 (`c37f1602..025d638d`, `e4c25fb1..b86f0071`; local), awaiting independent review** ([handoff and brief](r1/R1-T9-INDEPENDENT-REVIEW-BRIEF-2026-09-25.md), 2026-09-25; re-run at `b86f0071`: `tsc` clean, client 86/760, server 79/1,432). Was: **ROLLOUT IN PROGRESS 2026-09-23: retail stock and terminal (`0b0a9fb7`), property analytics (`5805a416`), property terminal (`f48139f6`), trades analytics (`64e12ef8`) done; local, awaiting independent review** ([evidence](r1/R1-T9-rollout-2026-09-23.md)): a failed load says so with Try again instead of "0 products", "$0 today", "$0.00 total revenue" or "no sales yet"; the terminal's send buttons wait for its sales; reports and exports wait for their data (on trades analytics, made only from loaded data); loaded views unchanged. Reports and exports on all three analytics screens are made only from loaded data, each waiting for its sources (`0c75e747`, `d5cf4d5f`, `88fe0e3f`, `721ce328`). Trades terminal (`2e8b308a`) and desktop settings (`6dd7bc68`) done: **the screen list is complete**. 402 banners done (`1f6a8673`, `8a4e8c20`, `09b07a43`, `a2dee290`; [evidence](r1/R1-T9-billing-402-2026-09-23.md)). Pending/double-submit done (`0a257926`, `0220c6f9`, `09000e9f`; [evidence](r1/R1-T9-pending-and-double-submit-2026-09-23.md)): **every R1-T9 item is done, awaiting independent review.** Found on the way and fixed (`707cff2f`, `0f748fde`): exports lacked the business details after a password sign-in ([evidence](r1/R1-T9-export-business-details-2026-09-23.md)). Was: **DESIGN APPROVED 2026-09-21** ([decision](../../decisions/2026-09-21-r1-t4-t9-owner-answers.md)); rollout to the remaining screens follows R1-T4 A–D in the working order. Was: **PILOT 2026-09-21, commit `2c013f33` (cleaned: `025d638d`) — design awaiting owner approval** ([proposal and evidence](r1/R1-T9-failure-states-2026-09-21.md)). `DesktopLoadFailure` (desktop palette only, one `role="alert"` per failure, Try again) on retail analytics: a failed sales load no longer reads "$0.00 / 0 transactions / no sales yet"; Reports/Export unavailable; loaded view pixel-identical. Remaining after approval: retail stock and terminal, property analytics and terminal, trades analytics and terminal (incl. `trades-terminal.tsx:165` mapping a failed request to `[]`), settings; optional-source "unavailable", mutation pending/double-submit rules, 402 banners. Was: GATED: R1-T8. |
 | R1-T10 | Device and tutorial acceptance matrix | 780 | Engineering | **IN PROGRESS 2026-10-12** — typed route/device/tutorial engineering and bounded accessibility repairs are implemented; [latest terminal/harness handover](../../HANDOFF-2026-10-12-r1-t10-terminal-followup.md) records the fresh 15-state/six-route checks and 88-cell reduced tutorials. Owner keeps the property feed-under-dock design; five measured covered centres remain recorded. Actual devices/AT, owner visuals/goldens, manual candidates and independent task 7 remain open. Earlier counts and full matrices are retained with their exact original hashes, not relabelled. |
-| R2 | Provider boundary and exact verification | 818 | Engineering | **T7 IMPLEMENTED 2026-10-12 ([evidence](r2/R2-T7-2026-10-12.md)): 0035, applied nowhere. R2↔R3 schema conflict open for the owner ([record](R2-R3-SCHEMA-CONFLICT-2026-10-12.md)).** **T6 IMPLEMENTED 2026-10-12 (`1f1fe82a`–`7f017808`; [evidence](r2/R2-T6-2026-10-12.md)); [exit record](r2/R2-exit-2026-10-12.md): repository work complete for the enabled flows, R2 NOT CLOSED (owner items O-1–O-7, residuals R-1–R-5).** **T5 IMPLEMENTED 2026-10-12 (`657134de`; [evidence](r2/R2-T5-2026-10-12.md)): the shared verifier on every enabled completion path (retail token, numbered, invoices); RF-1–RF-3 closed; T6 next.** **T4 IMPLEMENTED 2026-10-12 (`673a7043`; [evidence](r2/R2-T4-2026-10-12.md)): migration 0034 rehearsed locally, not applied anywhere.** **T1–T3 IMPLEMENTED 2026-10-11 (`8bca01cc`, `956e74d4`, `a044533e`; [evidence](r2/R2-T1-T3-2026-10-11.md)), awaiting independent review; T4–T6 wait on owner answers.** **STARTED 2026-10-11 on owner direction, in parallel with R1 completion** ([decision](../../decisions/2026-10-11-r2-start-while-codex-finishes-r1.md)): [preflight](r2/R2-preflight-2026-10-11.md) (RF-1–RF-9) and [§21.1 pass 1](r2/R2-review-pass-1-2026-10-11.md) — Approve T1–T3 only, pending the second pass; T4–T6 wait on owner answers. No R2 code yet. Was: GATED: implement only after the source dependencies; no full-phase completion evidence recorded. |
-| R3 | Durable notifications and payment convergence | 831 | Engineering | GATED: implement only after the source dependencies; no full-phase completion evidence recorded. |
+| R2 | Provider boundary and exact verification | 818 | Claude | R2 repository work at `14942392` is integrated into the R3 working branch and independently checked. Preserve [R2 exit limits](r2/R2-exit-2026-10-12.md): official UAT, owner/professional gates and independent review remain open. |
+| R3 | Durable notifications and payment convergence | 831 | Codex | IN PROGRESS 2026-10-12 — foundation, manual guards and actual R2 integration implemented and tested; [handoff](../../HANDOFF-2026-10-12-r3-durability-foundation.md). Cash/command idempotency, active route convergence, card/billing attempts, receivers, production restore and exit review remain open. |
 | R4 | Durable refunds | 871 | Engineering | GATED: implement only after the source dependencies; no full-phase completion evidence recorded. |
 | R5 | Encryption | 881 | Engineering | GATED: implement only after the source dependencies; no full-phase completion evidence recorded. |
 | R6 | Entitlement, scheduler, health, observability | 905 | Engineering | GATED: implement only after the source dependencies; no full-phase completion evidence recorded. |
@@ -2965,3 +2994,96 @@ Source: [v2.2 audit input](../../PLAN-2026-08-24-taptpay-remediation-v2-2.md).
 
 
 ### 22.16 Checklist stop conditions and final approval
+
+## 23. October 12 — R3 durability foundation checkpoint
+
+Owner assigned all R2 to Claude and R3 to Codex. Starting from `e408f597` on
+`fix/qwen-aligned-20261010`, the bounded foundation adds concrete invoice attempts,
+immutable retail expectations, global session ownership, durable receipt inbox,
+atomic settlement/event/outbox, bounded reconciliation and delivery workers,
+aggregate graphs and compatible invoice/quote token hashing. Components have
+injected ports; no new worker timer or notification endpoint is activated.
+
+Verification: 189 server suites / 4,604 tests passed on the frozen full run;
+later graph and lease-generation corrections passed 4 scoped suites / 40 tests
+and application type checking. The real PostgreSQL verifier passed 29 checks on
+each of two owned PostgreSQL 17.11 clusters. A populated synthetic snapshot
+(1,000 invoices per vertical and 1,000 quotes) was dumped/restored, migrated by
+the real runner and matched the scratch schema fingerprint. The blocked-table
+rehearsal timed out after 5,030 ms, rolled back all DDL and its ledger entry,
+then succeeded after release in 62 ms. See the
+[exact evidence and limits](r3/VERIFICATION-2026-10-12.md) and
+[required preflight plus separate reread](r3/IMPLEMENTATION-REVIEW-2026-10-12.md).
+
+**R3 remains open.** R2 is absent from this checkout; legacy active completion
+routes remain. Cash/cancellation safeguards and card/billing attempt durability
+are still R3 work. Actual provider integration, receiver deduplication,
+production-sized restore/count review and exit approval are not satisfied by
+synthetic tests. No live provider request, email/push, migration, merge or
+deployment occurred. Private fixtures, dumps, credentials, logs and generated
+bundles are excluded. Cloud setup draft save is confirmed; publication and fresh
+task restoration are not. Prior R1 device/visual/review gates remain open.
+
+Foundation publication verified: `9d52d8a5ee72be2493f12e6cf323131e4df31481`
+is the remote head of `fix/qwen-aligned-20261010`. No merge or deployment.
+
+### 23.1 Active manual-change safeguards
+
+The next bounded R3 change guards retail cancellation and both invoice verticals'
+void/external-payment writes against recorded live or expired attempts, send
+intent, legacy sessions and captured shares. See
+[preflight and scope limits](r3/MANUAL-CHANGE-REVIEW-2026-10-12.md). The regression
+first failed in memory/HTTP (six cases) and real PostgreSQL (three new checks).
+An actual waiting cancellation proves the activity read must be a fresh statement
+after acquiring the aggregate lock. The underlying legacy initiation interval
+before durable attachment still requires R2-backed convergence. These guards do
+not claim that the cancellation command's audit/outbox or cash is complete.
+Final guard verification: 12 scoped server suites / 177 tests, 33 actual
+PostgreSQL checks, both type checks and the build passed. The earlier foundation
+full-server evidence is not relabelled as a full run of these later changes.
+
+## 24. October 12 — actual R2 integration
+
+The owner instructed Codex to finish R3. Found Claude's R2 `14942392` on
+`ccr-e07e3100-0wm8kr`; integrate it on the current working branch, with no main
+merge or deployment. A real synthetic clone first reproduced the incompatible
+trigger rejecting three R2 update classes. The
+[canonical-retail ADR](../../decisions/2026-10-12-r2-r3-schema-integration.md)
+follows §10.1: R2 retail columns are canonical; R3 invoice/inbox/binding/outbox
+remain. The original R3 expansion is byte-identical 0036; 0037 aligns triggers
+and preserves compatibility data without inventing historical expectations.
+
+Verification: 10 core/policy suites / 184 tests; 15 provider/route suites / 330
+tests; 35 R3 PostgreSQL checks including actual R2 client/parser/verifier through
+all three settlement domains; 12 R2-T4 and seven R2-T7 PostgreSQL checks; typecheck
+and build passed. Populated synthetic restore (1,000 invoices per vertical plus
+1,000 quotes) matches the fresh full schema. See
+[exact evidence and separate implementation reread](r3/R2-INTEGRATION-REVIEW-2026-10-12.md).
+No new full-server/client run is claimed on this combined checkpoint.
+
+R3 remains open. Cash/commands, active callbacks/FPRNs, card/billing and receiver
+integration continue next. Shared migration/UAT/production-sized restore/release
+gates remain separate. Preserve the older evidence with its original SHA/scope.
+
+## 25. October 12 — durable cash command checkpoint
+
+Cash command identity is implemented on the same R3 working branch: stable
+client UUID across failures/reloads, merchant-scoped fingerprint, one atomic
+sale/audit/manual outbox and immutable database identity. Matching committed
+retries reuse the original receipt; changed details conflict. Both callers send
+the required header. See [review and exact evidence](r3/CASH-COMMAND-REVIEW-2026-10-12.md).
+39 synthetic PostgreSQL checks, nine server suites / 332 tests, three client
+suites / 33 tests, typecheck/build and full scratch/restored fingerprint match
+passed. 0038 is applied only on owned synthetic integrated databases. No shared
+migration or outbound activity. R3 remains open: compatibility cash delivery,
+other commands, active payment convergence and card/billing remain. Continue the
+phase after committing/pushing this checkpoint; do not stop here or claim exit.
+
+## 26. October 13 — R2 and R3 merged (Claude)
+
+Codex's `27d235b8` is merged into `ccr-e07e3100-0wm8kr` with R4-T1. Claude's independent review
+is [R2-R3-MERGE-REVIEW-2026-10-13](r3/R2-R3-MERGE-REVIEW-2026-10-13.md). It fixes B-1 (an expired
+attempt with expected values but no session was held forever) and B-2 (the cash storage write
+now names its business). It lists latent worker findings H-1–H-3, which must be fixed before
+activation, and owner items OI-1/OI-2. Full suites and PostgreSQL verifiers pass. The summary is
+at the top of this file.

@@ -118,6 +118,7 @@ const mockWriteText = jest.fn(async (_text: string) => {});
 let saleBodies: Record<string, unknown>[];
 let saleHandler: Handler;
 let cashBodies: Record<string, unknown>[];
+let cashKeys: Array<string|null>;
 let cashHandler: Handler;
 let tapToPayRequests: number;
 let tapToPayHandler: () => Response;
@@ -162,6 +163,7 @@ function installFetchMock() {
     if (method === "POST" && url === "/api/transactions/cash-sale") {
       const body = JSON.parse(String(init?.body ?? "{}"));
       cashBodies.push(body);
+      cashKeys.push(new Headers(init?.headers).get('Idempotency-Key'));
       return cashHandler(body);
     }
     if (method === "POST" && url === "/api/transactions/tap-to-pay") {
@@ -202,8 +204,12 @@ const SALE_LINKS_KEY = "taptpay:retail-sale-links:v1:1";
 beforeEach(() => {
   jest.clearAllMocks();
   localStorage.clear();
+  sessionStorage.clear();
   saleBodies = [];
   cashBodies = [];
+  cashKeys = [];
+  let sequence=0;
+  jest.spyOn(global.crypto,'randomUUID').mockImplementation(()=>`00000000-0000-4000-8000-${String(++sequence).padStart(12,'0')}`);
   mockCreateOutcomes.length = 0;
   mockCashOutcomes.length = 0;
   tapToPayRequests = 0;
@@ -223,7 +229,7 @@ beforeEach(() => {
     });
   cashHandler = (body) =>
     jsonResponse({
-      transaction: { id: 77, itemName: body.itemName, price: body.price, status: "completed", paymentMethod: "cash", taptStoneId: null },
+      transaction: { id: 77, merchantId:body.merchantId, itemName: body.itemName, price: body.price, status: "completed", paymentMethod: "cash", taptStoneId: null },
     });
   installFetchMock();
 });
@@ -438,6 +444,38 @@ describe("a cash sale on the phone", () => {
     expect(liveReceipt()).toEqual({ name: "muffin", amount: 450, url: `${window.location.origin}/receipt/77` });
     expect(queryClient.getQueryData<any[]>(["/api/merchants", 1, "transactions"])?.[0]).toMatchObject({ id: 77, paymentMethod: "cash" });
     expect(banners).toBe(0);
+  });
+
+  it('reuses the saved command after a lost response and a reload, then releases it after success', async () => {
+    cashHandler=async()=>{throw new Error('Response lost');};
+    const first=renderTerminal();
+    await screen.findByTestId('retail-terminal-view-stub');
+    fireEvent.click(screen.getByText('record cash sale'));
+    await waitFor(()=>expect(mockCashOutcomes).toEqual(['rejected']));
+    expect(liveReceipt()).toBeNull();
+    const key=cashKeys[0];
+    expect(key).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-8[0-9a-f]{3}-[0-9a-f]{12}$/);
+    first.unmount();
+    cashHandler=body=>jsonResponse({transaction:{id:77,merchantId:1,itemName:body.itemName,price:body.price,paymentMethod:'cash',status:'completed'}});
+    renderTerminal();
+    await screen.findByTestId('retail-terminal-view-stub');
+    fireEvent.click(screen.getByText('record cash sale'));
+    await waitFor(()=>expect(mockCashOutcomes).toEqual(['rejected','resolved']));
+    expect(cashKeys).toEqual([key,key]);
+    expect(sessionStorage.getItem('taptpay:cash-command:v1:1')).toBeNull();
+  });
+
+  it('holds the same command after a malformed success response without showing a receipt',async()=>{
+    cashHandler=()=>jsonResponse({transaction:{id:77,merchantId:2,paymentMethod:'cash'}});
+    renderTerminal();
+    await screen.findByTestId('retail-terminal-view-stub');
+    fireEvent.click(screen.getByText('record cash sale'));
+    await waitFor(()=>expect(mockCashOutcomes).toEqual(['rejected']));
+    expect(liveReceipt()).toBeNull();
+    fireEvent.click(screen.getByText('record cash sale'));
+    await waitFor(()=>expect(mockCashOutcomes).toEqual(['rejected','rejected']));
+    expect(cashKeys[1]).toBe(cashKeys[0]);
+    expect(sessionStorage.getItem('taptpay:cash-command:v1:1')).toContain(cashKeys[0]!);
   });
 
   it("refused for billing: the banner alone says so, and the success screen is not shown", async () => {

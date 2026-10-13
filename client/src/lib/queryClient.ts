@@ -51,8 +51,10 @@ export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
+  options: {idempotencyKey?:string} = {},
 ): Promise<Response> {
   const headers: Record<string, string> = {};
+  if(options.idempotencyKey) headers['Idempotency-Key']=options.idempotencyKey;
   
   if (data) {
     headers["Content-Type"] = "application/json";

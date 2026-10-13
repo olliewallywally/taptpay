@@ -54,6 +54,22 @@ refunds): preflight at `docs/evidence/remediation-v2-2/r4/R4-preflight-2026-10-1
 (`docs/evidence/remediation-v2-2/r4/R4-T1-2026-10-12.md`); R4-T2 onward wait for the merged
 R2+R3 tree.
 
+The active R3 handoff is `docs/HANDOFF-2026-10-12-r3-durability-foundation.md`.
+Claude owns all of R2; Codex owns R3. R2 `14942392` is integrated into the R3
+working branch, with canonical retail storage and migrations 0034–0037. Read
+`docs/decisions/2026-10-12-r2-r3-schema-integration.md` and the R3 integration
+review before further migration work. R3 route convergence remains incomplete;
+the phase is not closed, and there is no deployment approval.
+
+**R2 and R3 are merged on `ccr-e07e3100-0wm8kr` (2026-10-13).** Codex's `27d235b8`
+(migrations 0036–0038, cash commands) is merged with R4-T1. Claude's independent review is
+`docs/evidence/remediation-v2-2/r3/R2-R3-MERGE-REVIEW-2026-10-13.md`. Two merge fixes are in it:
+B-1, a failed session creation no longer locks a sale, and B-2, the cash write names its
+business. R3's worker/inbox stays unmounted until the review's H-1–H-3 are fixed. OI-1 and
+OI-2 are owner decisions. The owner applies 0034–0038 to the test database by
+`docs/operations/runbook-2026-10-13-apply-0034-0038-test-database.md`, with the app stopped.
+R4-T2 onward may now start on this branch.
+
 This program's established discipline: failing-tests-first; independently re-verify a prior
 pass's own claims before trusting them, the way every session in this program has had to;
 escalate product/security tradeoffs to the owner rather than deciding them unilaterally; record

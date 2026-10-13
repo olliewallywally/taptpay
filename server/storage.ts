@@ -1,5 +1,11 @@
+import { hashBearerCredential } from "./payment-credential";
 import { users, type User, type UserStatus, merchants, merchantTutorialProgress, transactions, uploadedFiles, uploadedFileScans, appleIdentities, type AppleIdentityRecord, merchantSettlements, refunds, splitPayments, paymentAttempts, PAYMENT_RETURN_STATE_MAX_AGE_MS, taptStones, stockItems, merchantSubscriptions, subscriptionBillingHistory, pushSubscriptions, pushNotificationDeliveries, normalizePushNotificationPreferences, DEFAULT_PUSH_NOTIFICATION_PREFERENCES, tenantProfiles, activeSchedules, invoicesRentRequests, transactionEvents, clientProfiles, quotes, jobInvoices, jobSchedules, jobEvents, type Merchant, type MerchantTutorialProgress, type Transaction, type SplitPayment, type PaymentAttempt, type InsertMerchant, type InsertTransaction, type CreateMerchant, type Refund, type InsertRefund, type TaptStone, type InsertTaptStone, type StockItem, type InsertStockItem, type MerchantSubscription, type SubscriptionBillingHistory, type PushSubscription, type PushNotificationPreferences, type PushNotificationEventType } from "@shared/schema";
 import { DEFAULT_PLAN_ID, isUpgrade, planFor, planForOrDefault, type PlanId } from "@shared/plans";
+import { paymentSessionBindings, paymentNotificationInbox, paymentSettlementEvents, paymentDeliveryOutbox } from "@shared/schema";
+import { evidenceMatchesExpectation } from "./payment-reconciliation";
+import { mintPublicLinkToken, hashPublicLinkTokenData } from "./public-link-token-compatibility";
+import {canonicalCashCommand,type CashCommandInput,type CashCommandResult} from './cash-command';
+import {isUuid} from './durable-payment-contract';
 import { decideBilling, failedPaymentUpdates, immediatePlanUpdates, MAX_PAYMENT_ATTEMPTS, nextBillingPeriodStart, nextPeriodUpdates, proratedUpgradeCents, queuedPlanUpdates, renewalPlan } from "./subscription-billing";
 import { getDb, isDatabaseConnected } from "./database";
 import { config } from "./config";
@@ -67,7 +73,7 @@ export type PropertyScheduleMutationResult =
 export type PropertyInvoiceMutationResult =
   | { kind: "ok"; invoice: typeof invoicesRentRequests.$inferSelect }
   | { kind: "not-found" }
-  | { kind: "conflict"; reason: "paid" | "voided" };
+  | { kind: "conflict"; reason: "paid" | "voided" | "payment-active" };
 
 export type PropertyInvoiceInput = Pick<typeof invoicesRentRequests.$inferInsert,
   "amountCents" | "deliveryChannel" | "dueAt" | "splitEnabled" | "kind" | "chargeType" | "description" | "documentUrl" | "documentName">;
@@ -103,7 +109,7 @@ function clientProfileChanges(data: ClientProfileChanges): ClientProfileChanges 
 export type JobInvoiceMutationResult =
   | { kind: "ok"; invoice: typeof jobInvoices.$inferSelect }
   | { kind: "not-found" }
-  | { kind: "conflict"; reason: "paid" | "voided" | "deposit" | "unpaid" };
+  | { kind: "conflict"; reason: "paid" | "voided" | "deposit" | "unpaid" | "payment-active" };
 export type TradesQuoteDeliverySnapshot = {
   quote: typeof quotes.$inferSelect;
   client: typeof clientProfiles.$inferSelect;
@@ -191,7 +197,7 @@ function scopedTransactionInput(merchantId: number, input: TransactionStorageInp
 export type TransactionCancellationResult =
   | { kind: "cancelled"; transaction: Transaction }
   | { kind: "not-found" }
-  | { kind: "conflict"; status: string };
+  | { kind: "conflict"; status: string; reason?: "payment-active" };
 
 export class PushSessionEndedError extends Error {
   constructor() { super("The session registering this device has ended"); }
@@ -327,6 +333,8 @@ export function toTransactionStorageInput(
     rawToken: _rawToken,
     paymentToken: _paymentToken,
     token: _token,
+    cashIdempotencyKey: _cashKey,
+    cashRequestFingerprint: _cashFingerprint,
     ...canonical
   } = transaction as RuntimeTransactionFields;
   return {
@@ -354,6 +362,8 @@ function sanitizeTransactionStorageInput(
     rawToken: _rawToken,
     paymentToken: _paymentToken,
     token: _token,
+    cashIdempotencyKey: _cashKey,
+    cashRequestFingerprint: _cashFingerprint,
     ...canonical
   } = input as TransactionStorageInput & {
     selectedStoneId?: number | null;
@@ -361,6 +371,8 @@ function sanitizeTransactionStorageInput(
     rawToken?: unknown;
     paymentToken?: unknown;
     token?: unknown;
+    cashIdempotencyKey?: unknown;
+    cashRequestFingerprint?: unknown;
   };
   return {
     ...canonical,
@@ -719,6 +731,52 @@ function paymentAttemptLeaseExpired(attempt: PaymentAttempt, now: Date): boolean
   return paymentAttemptIsLive(attempt) && attempt.leaseExpiresAt.getTime() <= now.getTime();
 }
 
+/** R2 records an attempt's expected values before it asks Windcave for a session, and
+ * serves the session's links only after attaching it. A claim whose lease ran out with
+ * no session attached and no R3 send intent therefore never reached a payer: nothing
+ * can be charged through it, so it is abandoned rather than held (merge of R2 and R3). */
+function paymentAttemptReleasable(attempt: PaymentAttempt, now: Date): boolean {
+  return attempt.state === "claiming" && !attempt.processorSessionId && !attempt.sendStartedAt &&
+    paymentAttemptLeaseExpired(attempt, now);
+}
+
+/** Caller holds the aggregate row lock. This must be a separate statement after
+ * acquiring that lock: a correlated projection in the locking SELECT could use
+ * a snapshot from before a competing attempt creator committed. */
+async function retailMoneyChangeBlocked(tx: any, row: Transaction, releasable: string[] = []): Promise<boolean> {
+  // Explicit identifiers keep the outer correlation qualified when Drizzle
+  // optimizes a single-table projection; an inner attempt's `id` is a UUID.
+  const aggregateId = sql`${sql.identifier("transactions")}.${sql.identifier("id")}`;
+  const [activity] = await tx.select({ blocked: sql<boolean>`(
+    ${transactions.windcaveSessionId} is not null or ${transactions.windcaveTransactionId} is not null
+    or coalesce(${transactions.completedSplits}, 0) > 0
+    or exists (select 1 from split_payments s where s.transaction_id = ${aggregateId}
+      and (s.status in ('processing', 'completed') or s.windcave_transaction_id is not null or s.paid_at is not null))
+    or exists (select 1 from payment_attempts a where a.transaction_id = ${aggregateId}
+      and (a.state not in ('declined', 'cancelled', 'abandoned')
+        or (a.state = 'abandoned' and (a.processor_session_id is not null
+          or a.send_started_at is not null)))${releasable.length
+        ? sql` and a.id not in (${sql.join(releasable.map(id => sql`${id}`), sql`, `)})` : sql``})
+  )` }).from(transactions).where(and(eq(transactions.id, row.id), eq(transactions.merchantId, row.merchantId!))).limit(1);
+  return !activity || !!activity.blocked;
+}
+
+async function invoiceMoneyChangeBlocked(tx: any, vertical: "property" | "trades", id: string, merchantId: number): Promise<boolean> {
+  const table = vertical === "property" ? invoicesRentRequests : jobInvoices;
+  const aggregateId = sql`${sql.identifier(vertical === "property" ? "invoices_rent_requests" : "job_invoices")}.${sql.identifier("id")}`;
+  const invoiceColumn = sql.raw(vertical === "property" ? "rent_invoice_id" : "job_invoice_id");
+  const [activity] = await tx.select({ blocked: sql<boolean>`(
+    ${table.windcaveSessionId} is not null or ${table.windcaveTransactionId} is not null
+    or coalesce(${table.splitPaidCount}, 0) > 0 or coalesce(cardinality(${table.splitPaidSessions}), 0) > 0
+    or exists (select 1 from invoice_split_sessions s where s.${invoiceColumn} = ${aggregateId})
+    or exists (select 1 from invoice_payment_attempts a where a.${invoiceColumn} = ${aggregateId}
+      and (a.state not in ('declined', 'cancelled', 'abandoned')
+        or (a.state = 'abandoned' and (a.send_started_at is not null
+          or exists (select 1 from payment_session_bindings b where b.invoice_attempt_id = a.id)))))
+  )` }).from(table).where(and(eq(table.id, id), eq(table.merchantId, merchantId))).limit(1);
+  return !activity || !!activity.blocked;
+}
+
 async function withMemLock<T>(
   locks: Map<string, Promise<void>>,
   key: string,
@@ -852,7 +910,7 @@ export interface IStorage extends PaymentAttemptRepository {
   getTransaction(id: number): Promise<Transaction | undefined>;
   getTransactionForMerchant(id: number, merchantId: number): Promise<Transaction | undefined>;
   /** Recheck tenant and pending/processing state at the write boundary. */
-  cancelTransactionForMerchant(id: number, merchantId: number): Promise<TransactionCancellationResult>;
+  cancelTransactionForMerchant(id: number, merchantId: number, now?: Date): Promise<TransactionCancellationResult>;
   getTransactionByPaymentTokenHash(paymentTokenHash: string): Promise<Transaction | undefined>;
   /**
    * Find the merchant's newest active transaction within an explicit scope: a
@@ -865,6 +923,8 @@ export interface IStorage extends PaymentAttemptRepository {
   getTransactionByNfcSession(nfcSessionId: string): Promise<Transaction | undefined>;
   createTransaction(transaction: TransactionStorageInput): Promise<Transaction>;
   createTransactionForMerchant(merchantId: number, transaction: TransactionStorageInput): Promise<Transaction>;
+  getCashSaleByKeyForMerchant(merchantId:number,idempotencyKey:string):Promise<Transaction|undefined>;
+  recordCashSaleForMerchant(merchantId:number,input:CashCommandInput,options?:{allowCreate?:boolean}):Promise<CashCommandResult>;
   updateTransactionStatusForMerchant(id: number, merchantId: number, status: string, windcaveTransactionId?: string): Promise<Transaction | undefined>;
   updateTransactionPaymentMethodForMerchant(id: number, merchantId: number, paymentMethod: string): Promise<Transaction | undefined>;
   updateTransactionStatus(id: number, status: string, windcaveTransactionId?: string): Promise<Transaction | undefined>;
@@ -1423,6 +1483,8 @@ export class MemStorage implements IStorage {
   private authHandoffCodes = new Map<string, { userId: number; newUser: boolean; expiresAt: Date; consumedAt: Date | null }>();
   private authThrottleRows = new Map<string, AuthThrottleRow>();
   private invoiceSplitSessionRows = new Map<string, InvoiceSplitSession>();
+  private cashAuditEvents=new Map<string,{id:string;merchantId:number;transactionId:number;eventType:string;payload:unknown}>();
+  private cashOutboxEntries=new Map<string,{id:string;eventId:string;eventSource:string;status:string}>();
   private authSessionRows = new Map<string, AuthSession>();
   private documentAccessAudit: Array<{ adminUserId: number; documentName: string }> = [];
 
@@ -1878,13 +1940,26 @@ export class MemStorage implements IStorage {
     return row?.merchantId === merchantId ? row : undefined;
   }
 
-  async cancelTransactionForMerchant(id: number, merchantId: number): Promise<TransactionCancellationResult> {
+  async cancelTransactionForMerchant(id: number, merchantId: number, now: Date = new Date()): Promise<TransactionCancellationResult> {
     if (!isManagementTenantId(merchantId)) return { kind: "not-found" };
     // No await between checking and replacing: the memory mutation is atomic.
     const row = this.transactions.get(id);
     if (!row || row.merchantId !== merchantId) return { kind: "not-found" };
     if (row.status !== "pending" && row.status !== "processing") {
       return { kind: "conflict", status: row.status };
+    }
+    const attempts = Array.from(this.paymentAttempts.values()).filter(a => a.transactionId === id);
+    const releasable = attempts.filter(a => paymentAttemptReleasable(a, now));
+    if (row.windcaveSessionId || row.windcaveTransactionId || (row.completedSplits ?? 0) > 0 ||
+      attempts.some(a => !releasable.includes(a) &&
+        (!['declined', 'cancelled', 'abandoned'].includes(a.state) ||
+          (a.state === 'abandoned' && (a.processorSessionId || a.sendStartedAt)))) ||
+      Array.from(this.splitPayments.values()).some(s => s.transactionId === id &&
+        (['processing', 'completed'].includes(s.status) || s.windcaveTransactionId || s.paidAt))) {
+      return { kind: "conflict", status: row.status, reason: "payment-active" };
+    }
+    for (const attempt of releasable) {
+      this.paymentAttempts.set(attempt.id, { ...attempt, state: "abandoned", updatedAt: now });
     }
     const transaction = { ...row, status: "cancelled" };
     this.transactions.set(id, transaction);
@@ -1952,8 +2027,10 @@ export class MemStorage implements IStorage {
       if (active && paymentAttemptLeaseExpired(active, input.now)) {
         // A processor-bound attempt must be reconciled before another key can
         // claim this payment target. Abandoning it here could leave an HPP/card
-        // session chargeable while a replacement session is created.
-        if (active.processorSessionId) {
+        // session chargeable while a replacement session is created. So must one
+        // carrying R3 send intent. Expected values alone do not hold it: see
+        // paymentAttemptReleasable.
+        if (active.processorSessionId || active.sendStartedAt) {
           return { kind: "expired", attempt: active };
         }
         const abandoned: PaymentAttempt = {
@@ -2010,6 +2087,7 @@ export class MemStorage implements IStorage {
         state: "claiming",
         leaseExpiresAt: input.leaseExpiresAt,
         processorSessionId: null,
+        processorTransactionId: null,
         processorXId: null,
         returnStateHash: null,
         returnStateExpiresAt: null,
@@ -2022,6 +2100,9 @@ export class MemStorage implements IStorage {
         providerTransactionId: null,
         lastReconciliationCode: null,
         lastReconciledAt: null,
+        expectedProviderAccount: null,
+        requestFingerprint: null,
+        sendStartedAt: null,
         createdAt: input.now,
         updatedAt: input.now,
       };
@@ -2197,6 +2278,7 @@ export class MemStorage implements IStorage {
       async () => {
         const attempt = this.paymentAttempts.get(input.attemptId);
         if (!attempt) return { kind: "not-found" };
+        if (input.reconciliation) return { kind: "conflict", attempt };
         const transaction = this.transactions.get(attempt.transactionId);
         if (!transaction) return { kind: "not-found" };
 
@@ -2228,6 +2310,7 @@ export class MemStorage implements IStorage {
         if (paymentAttemptIsTerminal(attempt)) {
           return attempt.state === input.outcome &&
             attempt.outcome === input.outcome &&
+            attempt.providerTransactionId === input.processorTransactionId &&
             attempt.receiptShare === input.receiptShare
             ? {
                 kind: "reused",
@@ -2306,7 +2389,7 @@ export class MemStorage implements IStorage {
           state: input.outcome,
           outcome: input.outcome,
           receiptShare: input.receiptShare,
-          providerTransactionId: input.outcome === "approved" ? input.processorTransactionId : null,
+          providerTransactionId: input.processorTransactionId,
           updatedAt: input.now,
         };
 
@@ -2368,6 +2451,35 @@ export class MemStorage implements IStorage {
       .find(t => t.nfcSessionId === nfcSessionId);
   }
 
+  async getCashSaleByKeyForMerchant(merchantId:number,idempotencyKey:string):Promise<Transaction|undefined> {
+    if(!isManagementTenantId(merchantId) || !isUuid(idempotencyKey)) return undefined;
+    return Array.from(this.transactions.values()).find(row=>row.merchantId===merchantId && row.cashIdempotencyKey===idempotencyKey.toLowerCase());
+  }
+  async recordCashSaleForMerchant(merchantId:number,input:CashCommandInput,options:{allowCreate?:boolean}={}):Promise<CashCommandResult> {
+    // The business is named to storage, as every other *ForMerchant write (R1-T7 S5).
+    if(!isManagementTenantId(merchantId) || input.merchantId!==merchantId) throw new TransactionCreationScopeError();
+    const command=canonicalCashCommand(input);
+    return withMemLock(this.paymentAttemptLocks,`cash:${command.merchantId}:${command.idempotencyKey}`,async()=>{
+      const existing=await this.getCashSaleByKeyForMerchant(command.merchantId,command.idempotencyKey);
+      if(existing) {
+        if(existing.cashRequestFingerprint!==command.fingerprint) return {kind:'conflict'};
+        const event=Array.from(this.cashAuditEvents.values()).find(event=>event.transactionId===existing.id);
+        if(!event) throw new Error('cash_audit_missing');
+        return {kind:'reused',transaction:existing,eventId:event.id};
+      }
+      if(options.allowCreate===false) return {kind:'not-found'};
+      const created=await this.createTransactionForMerchant(command.merchantId,{merchantId:command.merchantId,taptStoneId:command.stoneId,
+        itemName:command.itemName,price:command.price,status:'completed',paymentMethod:'cash',splitEnabled:false});
+      const transaction={...created,merchantNet:command.price,refundableAmount:command.price,
+        cashIdempotencyKey:command.idempotencyKey,cashRequestFingerprint:command.fingerprint};
+      const eventId=randomUUID(),outboxId=randomUUID();
+      this.transactions.set(transaction.id,transaction);
+      this.cashAuditEvents.set(eventId,{id:eventId,merchantId:command.merchantId,transactionId:transaction.id,eventType:'Cash_Recorded',payload:command.audit});
+      this.cashOutboxEntries.set(outboxId,{id:outboxId,eventId,eventSource:'transaction_event',status:'pending'});
+      return {kind:'recorded',transaction,eventId};
+    });
+  }
+
   async createTransactionForMerchant(merchantId: number, input: TransactionStorageInput): Promise<Transaction> {
     if (!isManagementTenantId(merchantId)) throw new TransactionCreationScopeError();
     const data = scopedTransactionInput(merchantId, input);
@@ -2415,6 +2527,8 @@ export class MemStorage implements IStorage {
       windcaveSessionState: null,
       windcaveXId: null,
       paymentTokenHash: insertTransaction.paymentTokenHash ?? null,
+      cashIdempotencyKey:null,
+      cashRequestFingerprint:null,
       completedAt: insertTransaction.status === "completed" ? createdAt : null,
     };
     this.transactions.set(id, transaction);
@@ -3062,6 +3176,8 @@ export class MemStorage implements IStorage {
     this.refunds.clear();
     this.splitPayments.clear();
     this.paymentAttempts.clear();
+    this.cashAuditEvents.clear();
+    this.cashOutboxEntries.clear();
     this.merchantTransactionCounts.clear();
     this.taptStones.clear();
     this.stockItems.clear();
@@ -3387,6 +3503,8 @@ export class MemStorage implements IStorage {
         windcaveSessionState: null,
         windcaveXId: null,
         paymentTokenHash: null,
+        cashIdempotencyKey:null,
+        cashRequestFingerprint:null,
         createdAt: createdDate,
         completedAt:
           ["completed", "partially_refunded", "refunded"].includes(transaction.status)
@@ -5381,7 +5499,7 @@ export class DatabaseStorage implements IStorage {
     return rows[0];
   }
 
-  async cancelTransactionForMerchant(id: number, merchantId: number): Promise<TransactionCancellationResult> {
+  async cancelTransactionForMerchant(id: number, merchantId: number, now: Date = new Date()): Promise<TransactionCancellationResult> {
     if (!isManagementTenantId(merchantId)) return { kind: "not-found" };
     if (!this.db) throw new Error('Database not available');
     return this.db.transaction(async (tx: any): Promise<TransactionCancellationResult> => {
@@ -5392,6 +5510,23 @@ export class DatabaseStorage implements IStorage {
       if (!row) return { kind: "not-found" };
       if (row.status !== "pending" && row.status !== "processing") {
         return { kind: "conflict", status: row.status };
+      }
+      // An expired claim that never reached a payer is released with the sale (paymentAttemptReleasable).
+      // Locked in the parent's order (transaction, then attempts), as a claim locks them, and
+      // scoped through the business's own parent row like every other query here (R1-T7 S2a).
+      const ownParent = sql`exists (select 1 from ${transactions} where ${transactions.id} = ${id}
+        and ${transactions.merchantId} = ${merchantId} and ${transactions.id} = ${paymentAttempts.transactionId})`;
+      const releasable = (await tx.select().from(paymentAttempts).where(and(
+        ownParent, eq(paymentAttempts.state, "claiming"),
+        isNull(paymentAttempts.processorSessionId), isNull(paymentAttempts.sendStartedAt),
+      )).for("update")).filter((attempt: PaymentAttempt) => paymentAttemptReleasable(attempt, now))
+        .map((attempt: PaymentAttempt) => attempt.id);
+      if (await retailMoneyChangeBlocked(tx, row, releasable)) {
+        return { kind: "conflict", status: row.status, reason: "payment-active" };
+      }
+      if (releasable.length > 0) {
+        await tx.update(paymentAttempts).set({ state: "abandoned", updatedAt: now })
+          .where(and(ownParent, inArray(paymentAttempts.id, releasable), eq(paymentAttempts.state, "claiming")));
       }
       const [transaction] = await tx.update(transactions).set({ status: "cancelled" })
         .where(and(
@@ -5488,7 +5623,9 @@ export class DatabaseStorage implements IStorage {
         // Keep a processor-bound attempt live until the route queries and
         // terminalizes that exact session. This transaction lock prevents a
         // conflicting key from creating a second chargeable session meanwhile.
-        if (active.processorSessionId) {
+        // R3 send intent holds it too; expected values alone do not (see
+        // paymentAttemptReleasable).
+        if (active.processorSessionId || active.sendStartedAt) {
           return { kind: "expired", attempt: active };
         }
         const rows = await tx
@@ -5669,7 +5806,9 @@ export class DatabaseStorage implements IStorage {
       const attempt = attempts[0];
       if (!attempt) return { kind: "not-found" };
 
-      if (paymentAttemptLeaseExpired(attempt, input.now)) {
+      if (attempt.processorXId !== null && attempt.processorXId !== input.processorXId) return { kind: "conflict", attempt };
+      // A session returned after the lease ran out is never served (R2): its links reach no payer.
+      if (paymentAttemptLeaseExpired(attempt, input.now) && !attempt.sendStartedAt) {
         const rows = await tx
           .update(paymentAttempts)
           .set({ state: "abandoned", updatedAt: input.now })
@@ -5875,9 +6014,41 @@ export class DatabaseStorage implements IStorage {
         return { kind: "conflict", attempt };
       }
 
+      let reconciliationEventId: string | undefined;
+      if (input.reconciliation) {
+        const { claim, evidence } = input.reconciliation;
+        const [lease] = await tx.select().from(paymentNotificationInbox).where(and(
+          eq(paymentNotificationInbox.id, claim.id), eq(paymentNotificationInbox.leaseOwner, claim.owner),
+          eq(paymentNotificationInbox.sessionId, input.processorSessionId), eq(paymentNotificationInbox.status, "processing"),
+          eq(paymentNotificationInbox.attemptCount, claim.attemptCount), eq(paymentNotificationInbox.leaseExpiresAt, claim.leaseExpiresAt),
+          sql`${paymentNotificationInbox.leaseExpiresAt} > GREATEST(${input.now}::timestamptz, clock_timestamp())`,
+        )).for("update").limit(1);
+        if (!lease) return { kind: "conflict", attempt, reason: "lease-lost" };
+        const expected = attempt.expectedProviderAccount !== null && attempt.expectedAmountCents !== null ? {
+          amountCents: attempt.expectedAmountCents, currency: attempt.expectedCurrency!,
+          reference: attempt.expectedMerchantReference!, environment: attempt.providerEnvironment!,
+          providerAccount: attempt.expectedProviderAccount, processorXId: attempt.processorXId!,
+        } : undefined;
+        const [binding] = await tx.select().from(paymentSessionBindings)
+          .where(eq(paymentSessionBindings.sessionId, input.processorSessionId)).for("update").limit(1);
+        if (!expected || !binding || binding.paymentAttemptId !== attempt.id || attempt.transactionId !== transaction.id ||
+          expected.processorXId !== attempt.processorXId ||
+          binding.processorXId !== expected.processorXId || expected.amountCents !== moneyStringToCents(splitPayment?.amount ?? transaction.price) ||
+          evidence.outcome !== input.outcome || evidence.transactionId !== input.processorTransactionId ||
+          !evidenceMatchesExpectation({ ...expected, sessionId: binding.sessionId, processorXId: binding.processorXId }, evidence) ||
+          (binding.providerTransactionId !== null && binding.providerTransactionId !== evidence.transactionId)) {
+          return { kind: "conflict", attempt };
+        }
+        const [event] = await tx.select({ id: paymentSettlementEvents.id }).from(paymentSettlementEvents)
+          .where(eq(paymentSettlementEvents.sessionId, binding.sessionId)).limit(1);
+        reconciliationEventId = event?.id;
+        if (paymentAttemptIsTerminal(attempt) && !reconciliationEventId) return { kind: "conflict", attempt };
+      }
+
       if (paymentAttemptIsTerminal(attempt)) {
         return attempt.state === input.outcome &&
           attempt.outcome === input.outcome &&
+          attempt.providerTransactionId === input.processorTransactionId &&
           attempt.receiptShare === input.receiptShare
           ? {
               kind: "reused",
@@ -5885,10 +6056,11 @@ export class DatabaseStorage implements IStorage {
               transaction,
               splitPayment,
               counterIncremented: false,
+              ...(reconciliationEventId ? { eventId: reconciliationEventId } : {}),
             }
           : { kind: "conflict", attempt };
       }
-      if (attempt.state !== "finalizing") {
+      if (attempt.state !== "finalizing" && !(input.reconciliation && attempt.state === "ready")) {
         return { kind: "conflict", attempt };
       }
       if (
@@ -5909,6 +6081,11 @@ export class DatabaseStorage implements IStorage {
           ))
           .limit(1);
         if (claimedElsewhere[0]) return { kind: "conflict", attempt };
+      }
+
+      if (input.reconciliation && attempt.state === "ready") {
+        await tx.update(paymentAttempts).set({ state: "finalizing", updatedAt: input.now })
+          .where(eq(paymentAttempts.id, attempt.id));
       }
 
       let updatedSplit: SplitPayment | null = null;
@@ -6019,7 +6196,7 @@ export class DatabaseStorage implements IStorage {
           state: input.outcome,
           outcome: input.outcome,
           receiptShare: input.receiptShare,
-          providerTransactionId: input.outcome === "approved" ? input.processorTransactionId : null,
+          providerTransactionId: input.processorTransactionId,
           updatedAt: input.now,
         })
         .where(and(
@@ -6032,12 +6209,24 @@ export class DatabaseStorage implements IStorage {
       if (!finalizedAttempt) {
         throw new Error("Payment attempt finalization compare-and-set failed");
       }
+      if (input.reconciliation) {
+        const { evidence } = input.reconciliation;
+        await tx.update(paymentSessionBindings).set({ providerTransactionId: evidence.transactionId })
+          .where(eq(paymentSessionBindings.sessionId, input.processorSessionId));
+        const [event] = await tx.insert(paymentSettlementEvents).values({ sessionId: input.processorSessionId,
+          merchantId: transaction.merchantId!, outcome: input.outcome, amountCents: evidence.amountCents, createdAt: input.now }).returning();
+        reconciliationEventId = event.id;
+        await tx.insert(paymentDeliveryOutbox).values({ eventId: event.id, channel: "merchant_payment_update", nextAttemptAt: input.now });
+        if (input.outcome === "approved") await tx.insert(paymentDeliveryOutbox)
+          .values({ eventId: event.id, channel: "payer_receipt", nextAttemptAt: input.now });
+      }
       return {
         kind: "finalized",
         attempt: finalizedAttempt,
         transaction: updatedTransaction,
         splitPayment: updatedSplit,
         counterIncremented,
+        ...(reconciliationEventId ? { eventId: reconciliationEventId } : {}),
       };
     });
   }
@@ -6087,6 +6276,46 @@ export class DatabaseStorage implements IStorage {
       .orderBy(sql`${transactions.createdAt} desc nulls last`, desc(transactions.id))
       .limit(1);
     return completedResult[0];
+  }
+
+  async getCashSaleByKeyForMerchant(merchantId:number,idempotencyKey:string):Promise<Transaction|undefined> {
+    if(!isManagementTenantId(merchantId) || !isUuid(idempotencyKey)) return undefined;
+    if(!this.db) throw new Error('Database not available');
+    const [row]=await this.db.select().from(transactions).where(and(eq(transactions.merchantId,merchantId),
+      eq(transactions.cashIdempotencyKey,idempotencyKey.toLowerCase()))).limit(1);
+    return row;
+  }
+  async recordCashSaleForMerchant(merchantId:number,input:CashCommandInput,options:{allowCreate?:boolean}={}):Promise<CashCommandResult> {
+    // The business is named to storage, as every other *ForMerchant write (R1-T7 S5).
+    if(!isManagementTenantId(merchantId) || input.merchantId!==merchantId) throw new TransactionCreationScopeError();
+    const command=canonicalCashCommand(input);if(!this.db) throw new Error('Database not available');
+    return this.db.transaction(async(tx:any):Promise<CashCommandResult>=>{
+      await tx.execute(sql`SET LOCAL lock_timeout='2s'`);await tx.execute(sql`SET LOCAL statement_timeout='5s'`);
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(${0x43415348},hashtext(${`${command.merchantId}:${command.idempotencyKey}`}))`);
+      const scoped=new DatabaseStorage(tx),existing=await scoped.getCashSaleByKeyForMerchant(command.merchantId,command.idempotencyKey);
+      if(existing) {
+        if(existing.cashRequestFingerprint!==command.fingerprint) return {kind:'conflict'};
+        const [event]=await tx.select({id:transactionEvents.id}).from(transactionEvents).where(and(
+          eq(transactionEvents.transactionId,existing.id),eq(transactionEvents.merchantId,command.merchantId),eq(transactionEvents.eventType,'Cash_Recorded'))).limit(1);
+        if(!event) throw new Error('cash_audit_missing');
+        return {kind:'reused',transaction:existing,eventId:event.id};
+      }
+      if(options.allowCreate===false) return {kind:'not-found'};
+      if(command.stoneId!==null) {
+        const [board]=await tx.select().from(taptStones).where(and(eq(taptStones.id,command.stoneId),
+          eq(taptStones.merchantId,command.merchantId),eq(taptStones.isActive,true))).limit(1).for('update');
+        if(!board) throw new TransactionCreationScopeError();
+      }
+      const [transaction]=await tx.insert(transactions).values({merchantId:command.merchantId,taptStoneId:command.stoneId,
+        itemName:command.itemName,price:command.price,status:'completed',paymentMethod:'cash',splitEnabled:false,
+        windcaveFeeRate:'0.0000',windcaveFeeAmount:'0.00',platformFeeRate:'0.0000',platformFeeAmount:'0.00',
+        merchantNet:command.price,refundableAmount:command.price,totalRefunded:'0.00',completedAt:new Date(),
+        cashIdempotencyKey:command.idempotencyKey,cashRequestFingerprint:command.fingerprint}).returning();
+      const [event]=await tx.insert(transactionEvents).values({merchantId:command.merchantId,transactionId:transaction.id,
+        eventType:'Cash_Recorded',payload:command.audit}).returning({id:transactionEvents.id});
+      await tx.insert(paymentDeliveryOutbox).values({transactionEventId:event.id,channel:'merchant_payment_update',nextAttemptAt:new Date()});
+      return {kind:'recorded',transaction,eventId:event.id};
+    });
   }
 
   async createTransactionForMerchant(merchantId: number, input: TransactionStorageInput): Promise<Transaction> {
@@ -9001,6 +9230,9 @@ export class DatabaseStorage implements IStorage {
       if (!invoice) return { kind: "not-found" };
       if (invoice.status === "paid" || invoice.status === "paid_external") return { kind: "conflict", reason: "paid" };
       if (operation !== "void" && invoice.status === "voided") return { kind: "conflict", reason: "voided" };
+      if ((operation === "void" || operation === "paid-external") && await invoiceMoneyChangeBlocked(tx, "property", id, merchantId)) {
+        return { kind: "conflict", reason: "payment-active" };
+      }
       // Issued invoices stay payable when the profile is archived (owner decision
       // 2026-09-27). Only ownership and current invoice state gate this write.
       const now = new Date();
@@ -9072,7 +9304,7 @@ export class DatabaseStorage implements IStorage {
         }
       }
       const [invoice] = await tx.insert(invoicesRentRequests).values({ ...input, merchantId, tenantProfileId: parent.id,
-        token: randomBytes(20).toString("base64url"), status: "pending_dispatch" }).returning();
+        ...mintPublicLinkToken(), status: "pending_dispatch" }).returning();
       await tx.insert(transactionEvents).values({ merchantId, tenantProfileId: parent.id, invoiceId: invoice.id,
         eventType: input.kind === "charge" ? "Charge_Created" : "Invoice_Generated",
         payload: { amountCents: invoice.amountCents, channel: invoice.deliveryChannel,
@@ -9086,16 +9318,18 @@ export class DatabaseStorage implements IStorage {
       const existing = await db.select().from(invoicesRentRequests).where(and(eq(invoicesRentRequests.scheduleId, data.scheduleId), eq(invoicesRentRequests.billingPeriodStart, data.billingPeriodStart))).limit(1);
       if (existing[0]) return existing[0];
     }
-    const [r] = await db.insert(invoicesRentRequests).values(data).returning(); return r;
+    const [r] = await db.insert(invoicesRentRequests).values(hashPublicLinkTokenData(data)).returning(); return r;
   }
   async getInvoiceRentRequest(id: string): Promise<any> {
     const db = getDb(); if (!db) return undefined;
     const [r] = await db.select().from(invoicesRentRequests).where(eq(invoicesRentRequests.id, id)).limit(1); return r;
   }
   async getInvoiceRentRequestByToken(token: string): Promise<any> {
-    const db = getDb(); if (!db) return undefined;
+    const db = this.db; if (!db) return undefined;
     try {
-      const [row] = await db.select().from(invoicesRentRequests).where(eq(invoicesRentRequests.token, token)).limit(1);
+      const [hashed] = await db.select().from(invoicesRentRequests).where(eq(invoicesRentRequests.tokenHash, hashBearerCredential(token))).limit(1);
+      if (hashed) return hashed;
+      const [row] = await db.select().from(invoicesRentRequests).where(and(eq(invoicesRentRequests.token, token), isNull(invoicesRentRequests.tokenHash))).limit(1);
       return row;
     } catch (error) {
       if (isNeonEmptyResultError(error)) return undefined;
@@ -9318,7 +9552,7 @@ export class DatabaseStorage implements IStorage {
       if (!(await this.holdOwnedInvoiceDocument(tx, merchantId, input.documentUrl))) return { kind: "invalid-document" };
       if (!parent) parent = await this.insertTradesProspect(tx, merchantId, (client as { prospect: ClientProfileChanges }).prospect);
       const [quote] = await tx.insert(quotes).values({ ...input, merchantId, clientProfileId: parent.id,
-        token: randomBytes(20).toString("base64url"), status: "sent", sentAt: new Date() }).returning();
+        ...mintPublicLinkToken(), status: "sent", sentAt: new Date() }).returning();
       await tx.insert(jobEvents).values({ merchantId, clientProfileId: parent.id, quoteId: quote.id, eventType: "quote_sent" });
       return { kind: "ok", quote, client: parent };
     });
@@ -9345,9 +9579,11 @@ export class DatabaseStorage implements IStorage {
     return row;
   }
   async getQuoteByToken(token: string): Promise<any> {
-    const db = getDb(); if (!db) return undefined;
+    const db = this.db; if (!db) return undefined;
     try {
-      const [row] = await db.select().from(quotes).where(eq(quotes.token, token)).limit(1);
+      const [hashed] = await db.select().from(quotes).where(eq(quotes.tokenHash, hashBearerCredential(token))).limit(1);
+      if (hashed) return hashed;
+      const [row] = await db.select().from(quotes).where(and(eq(quotes.token, token), isNull(quotes.tokenHash))).limit(1);
       return row;
     } catch (error) {
       if (isNeonEmptyResultError(error)) return undefined;
@@ -9427,6 +9663,9 @@ export class DatabaseStorage implements IStorage {
         if (operation !== "void" && invoice.status === "voided") return { kind: "conflict", reason: "voided" };
         if (paid) return { kind: "conflict", reason: "paid" };
       }
+      if ((operation === "void" || operation === "paid-external") && await invoiceMoneyChangeBlocked(tx, "trades", id, merchantId)) {
+        return { kind: "conflict", reason: "payment-active" };
+      }
       const now = new Date();
       const patch = operation === "void"
         ? { status: "voided", voidedAt: now, updatedAt: now }
@@ -9497,7 +9736,7 @@ export class DatabaseStorage implements IStorage {
       if (!(await this.holdOwnedInvoiceDocument(tx, merchantId, input.documentUrl))) return { kind: "invalid-document" };
       if (!parent) parent = await this.insertTradesProspect(tx, merchantId, (client as { prospect: ClientProfileChanges }).prospect);
       const [invoice] = await tx.insert(jobInvoices).values({ ...input, merchantId, clientProfileId: parent.id,
-        token: randomBytes(20).toString("base64url"), status: "pending_dispatch" }).returning();
+        ...mintPublicLinkToken(), status: "pending_dispatch" }).returning();
       await tx.insert(jobEvents).values({ merchantId, clientProfileId: parent.id, jobInvoiceId: invoice.id, eventType: "invoice_sent" });
       return { kind: "ok", invoice, client: parent };
     });
@@ -9533,7 +9772,7 @@ export class DatabaseStorage implements IStorage {
       if (balanceCents <= 0) return { kind: "conflict", reason: "none-remaining" };
       const due = new Date(); due.setDate(due.getDate() + 7);
       const [invoice] = await tx.insert(jobInvoices).values({ merchantId, clientProfileId: parent.id, quoteId: deposit.quoteId,
-        kind: "balance", amountCents: balanceCents, token: randomBytes(20).toString("base64url"),
+        kind: "balance", amountCents: balanceCents, ...mintPublicLinkToken(),
         deliveryChannel: deposit.deliveryChannel, status: "pending_dispatch", dueAt: due, splitEnabled: !!splitEnabled }).returning();
       await tx.insert(jobEvents).values({ merchantId, clientProfileId: parent.id, jobInvoiceId: invoice.id, eventType: "balance_sent" });
       return { kind: "ok", invoice };
@@ -9541,7 +9780,7 @@ export class DatabaseStorage implements IStorage {
   }
   async createJobInvoice(data: any): Promise<any> {
     const db = getDb(); if (!db) throw new Error('No database');
-    const [row] = await db.insert(jobInvoices).values(data).returning();
+    const [row] = await db.insert(jobInvoices).values(hashPublicLinkTokenData(data)).returning();
     return row;
   }
   async getJobInvoice(id: string): Promise<any> {
@@ -9550,9 +9789,11 @@ export class DatabaseStorage implements IStorage {
     return row;
   }
   async getJobInvoiceByToken(token: string): Promise<any> {
-    const db = getDb(); if (!db) return undefined;
+    const db = this.db; if (!db) return undefined;
     try {
-      const [row] = await db.select().from(jobInvoices).where(eq(jobInvoices.token, token)).limit(1);
+      const [hashed] = await db.select().from(jobInvoices).where(eq(jobInvoices.tokenHash, hashBearerCredential(token))).limit(1);
+      if (hashed) return hashed;
+      const [row] = await db.select().from(jobInvoices).where(and(eq(jobInvoices.token, token), isNull(jobInvoices.tokenHash))).limit(1);
       return row;
     } catch (error) {
       if (isNeonEmptyResultError(error)) return undefined;

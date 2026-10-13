@@ -1,0 +1,47 @@
+import {randomBytes} from 'node:crypto';
+import type {DurablePaymentStorage} from './durable-payment-storage';
+import type {ProviderExpectation} from './durable-payment-contract';
+import {isSessionId} from './durable-payment-contract';
+
+export interface DurableInvoiceSessionInitiator {
+  /** R2 validates transport, session identity and links; approved booleans are
+   * not a settlement result. It builds callbacks using this raw state. */
+  create(expected:Readonly<Omit<ProviderExpectation,'sessionId'>>,rawReturnState:string):Promise<
+    {kind:'ready';sessionId:string}|{kind:'unknown'|'unavailable'}>;
+}
+export type DurableInvoiceCheckoutResult=
+  | {kind:'ready';attemptId:string;sessionId:string;rawReturnState?:string}
+  | {kind:'processing'|'terminal';attemptId:string}
+  | {kind:'conflict'|'not-found'|'expired'|'unavailable'};
+
+/** Inactive until an actual R2 adapter and public caller migration are reviewed.
+ * Unknown acceptance keeps the exact attempt/X-ID live; never resends blindly. */
+export class DurableInvoiceCheckout {
+  constructor(private readonly repository:DurablePaymentStorage,private readonly provider:DurableInvoiceSessionInitiator,
+    private readonly clock=()=>new Date(),private readonly initiationEnabled=()=>false) {}
+  async open(input:Parameters<DurablePaymentStorage['claimInvoice']>[0]):Promise<DurableInvoiceCheckoutResult> {
+    if(!this.initiationEnabled()) return {kind:'unavailable'};
+    const claim=await this.repository.claimInvoice(input,this.clock());
+    if(!('attempt' in claim)) return claim;
+    const attempt=claim.attempt;
+    if(claim.kind==='terminal') return {kind:'terminal',attemptId:attempt.id};
+    if(claim.kind==='reused') {
+      const binding=await this.repository.getInvoiceSession(attempt.id);
+      if(!binding) return {kind:'processing',attemptId:attempt.id};
+      await this.repository.receive(binding.sessionId,'poll',this.clock());
+      return {kind:'ready',attemptId:attempt.id,sessionId:binding.sessionId};
+    }
+    const raw=randomBytes(32).toString('base64url');
+    if(!await this.repository.markInvoiceSendStarted(attempt.id,this.clock())) return {kind:'processing',attemptId:attempt.id};
+    try {
+      const expected={amountCents:attempt.amountCents,currency:attempt.currency,reference:attempt.reference,
+        environment:attempt.environment,providerAccount:attempt.providerAccount,processorXId:attempt.processorXId};
+      const result=await this.provider.create(Object.freeze(expected),raw);
+      if(result.kind!=='ready' || !isSessionId(result.sessionId)) return {kind:'processing',attemptId:attempt.id};
+      const attached=await this.repository.attachInvoiceSession(attempt.id,result.sessionId,raw,this.clock());
+      if(attached.kind!=='attached' && attached.kind!=='reused') return {kind:'processing',attemptId:attempt.id};
+      await this.repository.receive(result.sessionId,'poll',this.clock());
+      return {kind:'ready',attemptId:attempt.id,sessionId:result.sessionId,rawReturnState:raw};
+    } catch {return {kind:'processing',attemptId:attempt.id};}
+  }
+}

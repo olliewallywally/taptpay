@@ -203,7 +203,7 @@ export function receiptQrEndpoint(source: ReceiptSource): string {
   return source.share == null ? base : `${base}?share=${source.share}`;
 }
 
-function uuid(): string {
+export function createOperationUuid(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
   }
@@ -236,7 +236,7 @@ export function getOrCreatePaymentIdempotencyKey(
   const key = attemptStorageKey(source, shareIndex);
   const existing = storage.getItem(key);
   if (existing) return existing;
-  const created = uuid();
+  const created = createOperationUuid();
   storage.setItem(key, created);
   return created;
 }

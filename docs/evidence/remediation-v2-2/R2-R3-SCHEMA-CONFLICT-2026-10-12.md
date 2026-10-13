@@ -1,5 +1,14 @@
 # R2 ↔ R3 schema conflict — owner decision needed before either branch merges, 2026-10-12
 
+Integration follow-up: the owner's later instruction to finish R3 authorizes
+repository integration. Codex selected canonical R2 retail storage under plan
+§10.1; see [ADR](../../decisions/2026-10-12-r2-r3-schema-integration.md) and
+[review/evidence](r3/R2-INTEGRATION-REVIEW-2026-10-12.md). The original R3 SQL
+moves byte-for-byte to 0036, followed by forward alignment in 0037. Historical
+R3 0034 was applied to owned synthetic databases; no shared application is
+claimed. An old-name shared ledger must receive an explicit reconciliation
+review before deployment. The original findings below are retained as history.
+
 Found by Claude while starting the phase after R3. Compared `ccr-e07e3100-0wm8kr` (R2, at
 the R2-T7 commit) with Codex's `fix/qwen-aligned-20261010` (R3, at `f1e34585`). Their
 merge base is `e408f597`: the R3 branch contains none of R2 (T1–T7), and R2 contains none

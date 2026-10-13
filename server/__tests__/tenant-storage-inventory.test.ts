@@ -71,10 +71,16 @@ test("authenticated refunds use scoped writes and no retired global mutator", ()
 test("authenticated sale creation and disabled native writes have explicit tenant scope", () => {
   expect(storageContract().find(method => method.name === "associateTransactionWithStone")).toBeUndefined();
   const facts = currentRouteFacts();
-  for (const key of ["POST /api/transactions", "POST /api/transactions/cash-sale", "POST /api/v1/transactions", "POST /api/transactions/tap-to-pay"]) {
+  for (const key of ["POST /api/transactions", "POST /api/v1/transactions", "POST /api/transactions/tap-to-pay"]) {
     expect(facts.get(key)?.storageMethods).toContain("createTransactionForMerchant");
     expect(facts.get(key)?.storageMethods).not.toContain("createTransaction");
   }
+  // R3 (cash commands): a cash sale is recorded with its audit event and outbox entry in one
+  // business-scoped storage call, which names the business explicitly.
+  const cash = facts.get("POST /api/transactions/cash-sale")!.storageMethods;
+  expect(cash).toContain("recordCashSaleForMerchant");
+  expect(cash).not.toContain("createTransaction");
+  expect(storageContract().find(method => method.name === "recordCashSaleForMerchant")?.requiredTenant).toBe(true);
   const native = facts.get("POST /api/transactions/tap-to-pay")!.storageMethods;
   expect(native).toContain("getTransactionForMerchant");
   expect(native).not.toContain("getTransaction");

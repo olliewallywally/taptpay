@@ -1,4 +1,4 @@
-import { pgTable, text, serial, decimal, timestamp, boolean, integer, bigint, jsonb, uuid, uniqueIndex, index, customType, check } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, decimal, timestamp, boolean, integer, bigint, jsonb, uuid, uniqueIndex, index, customType, check, unique, foreignKey } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -195,6 +195,8 @@ export const transactions = pgTable("transactions", {
   // SHA-256 digest of the per-payment bearer credential. The raw credential is
   // returned once by the create service and is never stored on a transaction.
   paymentTokenHash: text("payment_token_hash"),
+  cashIdempotencyKey: uuid("cash_idempotency_key"),
+  cashRequestFingerprint: text("cash_request_fingerprint"),
 
   // Split bill toggle (set by merchant at transaction creation time)
   splitEnabled: boolean("split_enabled").default(false),
@@ -205,6 +207,9 @@ export const transactions = pgTable("transactions", {
   // safely supports date-windowed payout summaries.
   completedAt: timestamp("completed_at"),
 }, (t) => ({
+  r3TenantIdentity: unique("transactions_id_merchant_uq").on(t.id, t.merchantId),
+  cashKeyUnique: uniqueIndex("transactions_cash_key_uq").on(t.merchantId,t.cashIdempotencyKey).where(sql`${t.cashIdempotencyKey} is not null`),
+  cashIdentityCheck: check("transactions_cash_identity_check",sql`(${t.cashIdempotencyKey} is null and ${t.cashRequestFingerprint} is null) or (${t.cashIdempotencyKey} is not null and ${t.cashRequestFingerprint} is not null and ${t.cashRequestFingerprint} ~ '^[0-9a-f]{64}$' and ${t.paymentMethod} = 'cash')`),
   merchantIdIdx: index("transactions_merchant_id_idx").on(t.merchantId),
   taptStoneIdIdx: index("transactions_tapt_stone_id_idx").on(t.taptStoneId),
   paymentTokenHashUnique: uniqueIndex("transactions_payment_token_hash_uq")
@@ -282,6 +287,7 @@ export const paymentAttempts = pgTable("payment_attempts", {
   state: text("state").$type<PaymentAttemptState>().notNull().default("claiming"),
   leaseExpiresAt: timestamp("lease_expires_at").notNull(),
   processorSessionId: text("processor_session_id"),
+  processorTransactionId: text("processor_transaction_id"),
   processorXId: text("processor_x_id"),
   returnStateHash: text("return_state_hash"),
   returnStateExpiresAt: timestamp("return_state_expires_at"),
@@ -297,9 +303,16 @@ export const paymentAttempts = pgTable("payment_attempts", {
   providerTransactionId: text("provider_transaction_id"),
   lastReconciliationCode: text("last_reconciliation_code"),
   lastReconciledAt: timestamp("last_reconciled_at"),
+  expectedProviderAccount: text("expected_provider_account"),
+  requestFingerprint: text("request_fingerprint"),
+  sendStartedAt: timestamp("send_started_at", { withTimezone: true }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => ({
+  r3TenantIdentity: unique("payment_attempts_id_transaction_uq").on(t.id, t.transactionId),
+  accountFingerprintCheck: check("payment_attempts_account_fingerprint_check", sql`(${t.expectedProviderAccount} is null and ${t.requestFingerprint} is null) or (${t.expectedProviderAccount} is not null and length(${t.expectedProviderAccount}) between 1 and 200 and ${t.requestFingerprint} is not null and ${t.requestFingerprint} ~ '^[0-9a-f]{64}$' and ${t.expectedAmountCents} is not null)`),
+  sendStartedCheck: check("payment_attempts_send_started_check", sql`${t.sendStartedAt} is null or (${t.sendStartedAt} >= ${t.createdAt} and ${t.sendStartedAt} <= ${t.leaseExpiresAt})`),
+  reconciliationCodeCheck: check("payment_attempts_reconciliation_code_check", sql`${t.lastReconciliationCode} is null or ${t.lastReconciliationCode} ~ '^[a-z][a-z0-9_:]{0,63}$'`),
   transactionIdx: index("payment_attempts_transaction_idx").on(t.transactionId),
   transactionShareKeyUnique: uniqueIndex("payment_attempts_transaction_share_key_uq")
     .on(t.transactionId, t.shareIndex, t.idempotencyKey),
@@ -316,6 +329,9 @@ export const paymentAttempts = pgTable("payment_attempts", {
   processorSessionIdUnique: uniqueIndex("payment_attempts_processor_session_id_uq")
     .on(t.processorSessionId)
     .where(sql`${t.processorSessionId} is not null`),
+  processorTransactionIdUnique: uniqueIndex("payment_attempts_processor_transaction_id_uq")
+    .on(t.processorTransactionId)
+    .where(sql`${t.processorTransactionId} is not null`),
   providerTransactionIdUnique: uniqueIndex("payment_attempts_provider_transaction_id_uq")
     .on(t.providerTransactionId)
     .where(sql`${t.providerTransactionId} is not null`),
@@ -1130,6 +1146,7 @@ export const invoicesRentRequests = pgTable("invoices_rent_requests", {
   scheduleId: uuid("schedule_id").references(() => activeSchedules.id),
   amountCents: integer("amount_cents").notNull(),
   token: text("token").notNull().unique(),
+  tokenHash: text("token_hash"),
   deliveryChannel: text("delivery_channel").notNull(),
   billingPeriodStart: timestamp("billing_period_start"),
   // What this invoice is for. "rent" is the default (recurring or one-off rent);
@@ -1168,6 +1185,9 @@ export const invoicesRentRequests = pgTable("invoices_rent_requests", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (t) => ({
+  tokenHashUnique: uniqueIndex("invoices_token_hash_uq").on(t.tokenHash).where(sql`${t.tokenHash} is not null`),
+  tokenHashCheck: check("invoices_token_hash_check", sql`${t.tokenHash} is null or ${t.tokenHash} ~ '^[0-9a-f]{64}$'`),
+  r3TenantIdentity: unique("invoices_id_merchant_uq").on(t.id, t.merchantId),
   scheduleBillingPeriodUnique: uniqueIndex("invoices_schedule_billing_period_unique")
     .on(t.scheduleId, t.billingPeriodStart)
     .where(sql`${t.scheduleId} IS NOT NULL AND ${t.billingPeriodStart} IS NOT NULL`),
@@ -1180,6 +1200,7 @@ export const invoicesRentRequests = pgTable("invoices_rent_requests", {
 export const transactionEvents = pgTable("transaction_events", {
   id: uuid("id").primaryKey().defaultRandom(),
   merchantId: integer("merchant_id").references(() => merchants.id).notNull(),
+  transactionId: integer("transaction_id"),
   tenantProfileId: uuid("tenant_profile_id").references(() => tenantProfiles.id),
   invoiceId: uuid("invoice_id").references(() => invoicesRentRequests.id),
   scheduleId: uuid("schedule_id").references(() => activeSchedules.id),
@@ -1189,6 +1210,8 @@ export const transactionEvents = pgTable("transaction_events", {
 }, (t) => ({
   tenantCreatedIdx: index("transaction_events_tenant_created_idx").on(t.tenantProfileId, t.createdAt),
   merchantCreatedIdx: index("transaction_events_merchant_created_idx").on(t.merchantId, t.createdAt),
+  cashRecordUnique: uniqueIndex("transaction_events_cash_record_uq").on(t.transactionId).where(sql`${t.eventType}='Cash_Recorded'`),
+  transactionMerchantFk: foreignKey({name:"transaction_events_transaction_merchant_fk",columns:[t.transactionId,t.merchantId],foreignColumns:[transactions.id,transactions.merchantId]}),
 }));
 
 // Property management Zod schemas
@@ -1313,6 +1336,7 @@ export const quotes = pgTable("quotes", {
   merchantId: integer("merchant_id").references(() => merchants.id).notNull(),
   clientProfileId: uuid("client_profile_id").references(() => clientProfiles.id).notNull(),
   token: text("token").notNull().unique(),
+  tokenHash: text("token_hash"),
   // draft · sent · viewed · accepted · declined · expired
   status: text("status").notNull().default("draft"),
   // [{ description, qty, unitPriceCents, lineTotalCents }]
@@ -1338,6 +1362,8 @@ export const quotes = pgTable("quotes", {
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (t) => ({
   merchantStatusIdx: index("quotes_merchant_status_idx").on(t.merchantId, t.status),
+  tokenHashUnique: uniqueIndex("quotes_token_hash_uq").on(t.tokenHash).where(sql`${t.tokenHash} is not null`),
+  tokenHashCheck: check("quotes_token_hash_check", sql`${t.tokenHash} is null or ${t.tokenHash} ~ '^[0-9a-f]{64}$'`),
   tokenIdx: index("quotes_token_idx").on(t.token),
 }));
 
@@ -1371,6 +1397,7 @@ export const jobInvoices = pgTable("job_invoices", {
   kind: text("kind").notNull().default("full"),
   amountCents: integer("amount_cents").notNull(),
   token: text("token").notNull().unique(),
+  tokenHash: text("token_hash"),
   deliveryChannel: text("delivery_channel").notNull(),
   jobDetails: text("job_details"),
   status: text("status").notNull().default("pending_dispatch"),
@@ -1399,6 +1426,9 @@ export const jobInvoices = pgTable("job_invoices", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (t) => ({
+  tokenHashUnique: uniqueIndex("job_invoices_token_hash_uq").on(t.tokenHash).where(sql`${t.tokenHash} is not null`),
+  tokenHashCheck: check("job_invoices_token_hash_check", sql`${t.tokenHash} is null or ${t.tokenHash} ~ '^[0-9a-f]{64}$'`),
+  r3TenantIdentity: unique("job_invoices_id_merchant_uq").on(t.id, t.merchantId),
   statusDueIdx: index("job_invoices_status_due_idx").on(t.status, t.dueAt),
   merchantStatusIdx: index("job_invoices_merchant_status_idx").on(t.merchantId, t.status),
   tokenIdx: index("job_invoices_token_idx").on(t.token),
@@ -1731,3 +1761,180 @@ export const uploadedFileOwnershipEvidence = pgTable("uploaded_file_ownership_ev
   inventorySha256: text("inventory_sha256").notNull(),
   recordedAt: timestamp("recorded_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+// R3 expansion (0034); services remain inactive until verified integration.
+export const invoicePaymentAttempts = pgTable("invoice_payment_attempts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  merchantId: integer("merchant_id").notNull(),
+  rentInvoiceId: uuid("rent_invoice_id"),
+  jobInvoiceId: uuid("job_invoice_id"),
+  shareIndex: integer("share_index").notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  idempotencyKey: uuid("idempotency_key").notNull(),
+  requestFingerprint: text("request_fingerprint").notNull(),
+  processorXId: text("processor_x_id").notNull(),
+  currency: text("currency").notNull(),
+  reference: text("reference").notNull(),
+  environment: text("environment").$type<"uat" | "production">().notNull(),
+  providerAccount: text("provider_account").notNull(),
+  state: text("state").notNull().default("claiming"),
+  outcome: text("outcome"),
+  leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }).notNull(),
+  sendStartedAt: timestamp("send_started_at", { withTimezone: true }),
+  returnStateHash: text("return_state_hash"),
+  returnStateExpiresAt: timestamp("return_state_expires_at", { withTimezone: true }),
+  reconciledAt: timestamp("reconciled_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  constraint0: check("invoice_payment_attempts_environment_check", sql.raw("((environment = ANY (ARRAY['uat'::text, 'production'::text])))")),
+  constraint1: check("invoice_payment_attempts_share_index_check", sql.raw("((share_index >= 0))")),
+  sendStartedCheck: check("invoice_attempt_send_started_check", sql`${t.sendStartedAt} is null or (${t.sendStartedAt} >= ${t.createdAt} and ${t.sendStartedAt} <= ${t.leaseExpiresAt})`),
+  constraint2: check("invoice_payment_attempts_amount_cents_check", sql.raw("((amount_cents > 0))")),
+  constraint3: check("invoice_payment_attempts_request_fingerprint_check", sql.raw("((request_fingerprint ~ '^[0-9a-f]{64}$'::text))")),
+  constraint4: check("invoice_payment_attempts_processor_x_id_check", sql.raw("(((length(processor_x_id) >= 1) AND (length(processor_x_id) <= 200)))")),
+  constraint5: check("invoice_payment_attempts_currency_check", sql.raw("((currency ~ '^[A-Z]{3}$'::text))")),
+  constraint6: check("invoice_payment_attempts_reference_check", sql.raw("(((length(reference) >= 1) AND (length(reference) <= 200)))")),
+  constraint7: check("invoice_payment_attempts_provider_account_check", sql.raw("(((length(provider_account) >= 1) AND (length(provider_account) <= 200)))")),
+  constraint8: check("invoice_payment_attempts_state_check", sql.raw("((state = ANY (ARRAY['claiming'::text, 'ready'::text, 'finalizing'::text, 'approved'::text, 'declined'::text, 'cancelled'::text, 'abandoned'::text])))")),
+  constraint9: check("invoice_payment_attempts_outcome_check", sql.raw("((outcome = ANY (ARRAY['approved'::text, 'declined'::text, 'cancelled'::text])))")),
+  constraint10: check("invoice_payment_attempts_return_state_hash_check", sql.raw("(((return_state_hash IS NULL) OR (return_state_hash ~ '^[0-9a-f]{64}$'::text)))")),
+  constraint11: check("invoice_attempt_one_invoice_check", sql.raw("(((rent_invoice_id IS NULL) <> (job_invoice_id IS NULL)))")),
+  constraint12: check("invoice_attempt_lease_check", sql.raw("(((lease_expires_at > created_at) AND (lease_expires_at <= (created_at + '00:05:00'::interval))))")),
+  constraint13: check("invoice_attempt_return_check", sql.raw("((((return_state_hash IS NULL) = (return_state_expires_at IS NULL)) AND ((return_state_expires_at IS NULL) OR ((return_state_expires_at > created_at) AND (return_state_expires_at <= (created_at + '00:30:00'::interval))))))")),
+  constraint14: check("invoice_attempt_outcome_check", sql.raw("((((state = ANY (ARRAY['approved'::text, 'declined'::text, 'cancelled'::text])) AND (outcome IS NOT NULL) AND (state = outcome)) OR ((state = ANY (ARRAY['claiming'::text, 'ready'::text, 'finalizing'::text, 'abandoned'::text])) AND (outcome IS NULL))))")),
+  constraint16: unique("invoice_payment_attempts_processor_x_id_key").on(t.processorXId),
+  constraint17: unique("invoice_payment_attempts_return_state_hash_key").on(t.returnStateHash),
+  constraint18: foreignKey({ name: "invoice_payment_attempts_merchant_id_fkey", columns: [t.merchantId], foreignColumns: [merchants.id] }),
+  constraint19: foreignKey({ name: "invoice_attempt_rent_tenant_fk", columns: [t.rentInvoiceId, t.merchantId], foreignColumns: [invoicesRentRequests.id, invoicesRentRequests.merchantId] }),
+  constraint20: foreignKey({ name: "invoice_attempt_job_tenant_fk", columns: [t.jobInvoiceId, t.merchantId], foreignColumns: [jobInvoices.id, jobInvoices.merchantId] }),
+  index3: uniqueIndex("invoice_attempt_rent_key_uq").on(t.rentInvoiceId, t.shareIndex, t.idempotencyKey).where(sql.raw("(rent_invoice_id IS NOT NULL)")),
+  index4: uniqueIndex("invoice_attempt_job_key_uq").on(t.jobInvoiceId, t.shareIndex, t.idempotencyKey).where(sql.raw("(job_invoice_id IS NOT NULL)")),
+  index5: uniqueIndex("invoice_attempt_rent_live_uq").on(t.rentInvoiceId, t.shareIndex).where(sql.raw("((rent_invoice_id IS NOT NULL) AND (state = ANY (ARRAY['claiming'::text, 'ready'::text, 'finalizing'::text])))")),
+  index6: uniqueIndex("invoice_attempt_job_live_uq").on(t.jobInvoiceId, t.shareIndex).where(sql.raw("((job_invoice_id IS NOT NULL) AND (state = ANY (ARRAY['claiming'::text, 'ready'::text, 'finalizing'::text])))")),
+  index7: uniqueIndex("invoice_attempt_rent_paid_uq").on(t.rentInvoiceId, t.shareIndex).where(sql.raw("((rent_invoice_id IS NOT NULL) AND (state = 'approved'::text))")),
+  index8: uniqueIndex("invoice_attempt_job_paid_uq").on(t.jobInvoiceId, t.shareIndex).where(sql.raw("((job_invoice_id IS NOT NULL) AND (state = 'approved'::text))")),
+}));
+
+// R3 expansion (0034); services remain inactive until verified integration.
+export const paymentAttemptExpectations = pgTable("payment_attempt_expectations", {
+  paymentAttemptId: uuid("payment_attempt_id").primaryKey(),
+  transactionId: integer("transaction_id").notNull(),
+  merchantId: integer("merchant_id").notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  currency: text("currency").notNull(),
+  reference: text("reference").notNull(),
+  environment: text("environment").$type<"uat" | "production">().notNull(),
+  providerAccount: text("provider_account").notNull(),
+  requestFingerprint: text("request_fingerprint").notNull(),
+  processorXId: text("processor_x_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  xIdUnique: unique("payment_attempt_expectations_processor_x_id_key").on(t.processorXId),
+  xIdCheck: check("payment_attempt_expectations_processor_x_id_check", sql`length(${t.processorXId}) between 1 and 200`),
+  constraint0: check("payment_attempt_expectations_amount_cents_check", sql.raw("((amount_cents > 0))")),
+  constraint1: check("payment_attempt_expectations_currency_check", sql.raw("((currency ~ '^[A-Z]{3}$'::text))")),
+  constraint2: check("payment_attempt_expectations_reference_check", sql.raw("(((length(reference) >= 1) AND (length(reference) <= 200)))")),
+  constraint3: check("payment_attempt_expectations_environment_check", sql.raw("((environment = ANY (ARRAY['uat'::text, 'production'::text])))")),
+  constraint4: check("payment_attempt_expectations_provider_account_check", sql.raw("(((length(provider_account) >= 1) AND (length(provider_account) <= 200)))")),
+  constraint5: check("payment_attempt_expectations_request_fingerprint_check", sql.raw("((request_fingerprint ~ '^[0-9a-f]{64}$'::text))")),
+  constraint7: foreignKey({ name: "payment_attempt_expectations_payment_attempt_id_transactio_fkey", columns: [t.paymentAttemptId, t.transactionId], foreignColumns: [paymentAttempts.id, paymentAttempts.transactionId] }),
+  constraint8: foreignKey({ name: "payment_attempt_expectations_transaction_id_merchant_id_fkey", columns: [t.transactionId, t.merchantId], foreignColumns: [transactions.id, transactions.merchantId] }),
+}));
+
+// R3 expansion (0034); services remain inactive until verified integration.
+export const paymentDeliveryOutbox = pgTable("payment_delivery_outbox", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  eventId: uuid("event_id"),
+  transactionEventId: uuid("transaction_event_id"),
+  channel: text("channel").notNull(),
+  status: text("status").notNull().default("pending"),
+  attemptCount: integer("attempt_count").notNull().default(0),
+  nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull(),
+  leaseOwner: uuid("lease_owner"),
+  leaseStartedAt: timestamp("lease_started_at", { withTimezone: true }),
+  leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+}, (t) => ({
+  constraint0: check("payment_delivery_outbox_channel_check", sql.raw("((channel = ANY (ARRAY['merchant_payment_update'::text, 'payer_receipt'::text])))")),
+  constraint1: check("payment_delivery_outbox_status_check", sql.raw("((status = ANY (ARRAY['pending'::text, 'processing'::text, 'retry'::text, 'complete'::text, 'dead_letter'::text])))")),
+  constraint2: check("payment_delivery_outbox_attempt_count_check", sql.raw("((attempt_count >= 0))")),
+  constraint3: check("payment_outbox_lease_check", sql.raw("((((status = 'processing'::text) AND (lease_owner IS NOT NULL) AND (lease_started_at IS NOT NULL) AND (lease_expires_at IS NOT NULL) AND (lease_expires_at > lease_started_at) AND (lease_expires_at <= (lease_started_at + '00:01:00'::interval))) OR ((status <> 'processing'::text) AND (lease_owner IS NULL) AND (lease_started_at IS NULL) AND (lease_expires_at IS NULL))))")),
+  constraint5: unique("payment_delivery_outbox_event_id_channel_key").on(t.eventId, t.channel),
+  transactionEventChannel: unique("payment_outbox_transaction_event_channel_uq").on(t.transactionEventId,t.channel),
+  transactionEventFk: foreignKey({name:"payment_delivery_outbox_transaction_event_id_fkey",columns:[t.transactionEventId],foreignColumns:[transactionEvents.id]}),
+  eventSourceCheck: check("payment_outbox_event_source_check",sql`(${t.eventId} is not null)::integer + (${t.transactionEventId} is not null)::integer = 1`),
+  constraint6: foreignKey({ name: "payment_delivery_outbox_event_id_fkey", columns: [t.eventId], foreignColumns: [paymentSettlementEvents.id] }),
+  index12: index("payment_outbox_due_idx").on(t.nextAttemptAt).where(sql.raw("(status = ANY (ARRAY['pending'::text, 'retry'::text, 'processing'::text]))")),
+}));
+
+// R3 expansion (0034); services remain inactive until verified integration.
+export const paymentNotificationInbox = pgTable("payment_notification_inbox", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  provider: text("provider").notNull(),
+  kind: text("kind").notNull(),
+  sessionId: text("session_id").notNull(),
+  status: text("status").notNull().default("pending"),
+  firstReceivedAt: timestamp("first_received_at", { withTimezone: true }).notNull(),
+  lastReceivedAt: timestamp("last_received_at", { withTimezone: true }).notNull(),
+  arrivalCount: integer("arrival_count").notNull().default(1),
+  attemptCount: integer("attempt_count").notNull().default(0),
+  nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull(),
+  leaseOwner: uuid("lease_owner"),
+  leaseStartedAt: timestamp("lease_started_at", { withTimezone: true }),
+  leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
+  lastErrorCode: text("last_error_code"),
+  observedTransactionId: text("observed_transaction_id"),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+}, (t) => ({
+  constraint0: unique("payment_notification_inbox_provider_kind_session_id_key").on(t.provider, t.kind, t.sessionId),
+  constraint1: check("payment_notification_inbox_provider_check", sql.raw("((provider = 'windcave'::text))")),
+  constraint2: check("payment_notification_inbox_kind_check", sql.raw("((kind = ANY (ARRAY['fprn'::text, 'browser'::text, 'poll'::text])))")),
+  constraint3: check("payment_notification_inbox_session_id_check", sql.raw("((session_id ~ '^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$'::text))")),
+  constraint4: check("payment_notification_inbox_status_check", sql.raw("((status = ANY (ARRAY['pending'::text, 'processing'::text, 'retry'::text, 'complete'::text, 'dead_letter'::text])))")),
+  constraint5: check("payment_notification_inbox_arrival_count_check", sql.raw("((arrival_count > 0))")),
+  constraint6: check("payment_notification_inbox_attempt_count_check", sql.raw("((attempt_count >= 0))")),
+  constraint7: check("payment_notification_inbox_last_error_code_check", sql.raw("((last_error_code = ANY (ARRAY['provider_pending'::text, 'provider_unknown'::text, 'provider_unavailable'::text, 'unbound_session'::text, 'integrity_mismatch'::text, 'settlement_conflict'::text, 'internal_error'::text, 'retry_exhausted'::text])))")),
+  constraint8: check("payment_notification_inbox_observed_transaction_id_check", sql.raw("(((observed_transaction_id IS NULL) OR ((length(observed_transaction_id) >= 1) AND (length(observed_transaction_id) <= 200))))")),
+  constraint9: check("payment_inbox_lease_check", sql.raw("((((status = 'processing'::text) AND (lease_owner IS NOT NULL) AND (lease_started_at IS NOT NULL) AND (lease_expires_at IS NOT NULL) AND (lease_expires_at > lease_started_at) AND (lease_expires_at <= (lease_started_at + '00:01:00'::interval))) OR ((status <> 'processing'::text) AND (lease_owner IS NULL) AND (lease_started_at IS NULL) AND (lease_expires_at IS NULL))))")),
+  index15: index("payment_inbox_due_idx").on(t.nextAttemptAt).where(sql.raw("(status = ANY (ARRAY['pending'::text, 'retry'::text, 'processing'::text]))")),
+}));
+
+// R3 expansion (0034); services remain inactive until verified integration.
+export const paymentSessionBindings = pgTable("payment_session_bindings", {
+  sessionId: text("session_id").primaryKey(),
+  provider: text("provider").notNull().default("windcave"),
+  processorXId: text("processor_x_id").notNull(),
+  paymentAttemptId: uuid("payment_attempt_id"),
+  invoiceAttemptId: uuid("invoice_attempt_id"),
+  providerTransactionId: text("provider_transaction_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  constraint0: foreignKey({ name: "payment_session_bindings_invoice_attempt_id_fkey", columns: [t.invoiceAttemptId], foreignColumns: [invoicePaymentAttempts.id] }),
+  constraint1: check("payment_session_bindings_session_id_check", sql.raw("((session_id ~ '^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$'::text))")),
+  constraint2: check("payment_session_bindings_provider_check", sql.raw("((provider = 'windcave'::text))")),
+  constraint3: check("payment_session_bindings_processor_x_id_check", sql.raw("(((length(processor_x_id) >= 1) AND (length(processor_x_id) <= 200)))")),
+  constraint4: check("payment_session_bindings_provider_transaction_id_check", sql.raw("(((provider_transaction_id IS NULL) OR ((length(provider_transaction_id) >= 1) AND (length(provider_transaction_id) <= 200))))")),
+  constraint5: check("payment_binding_one_attempt_check", sql.raw("(((payment_attempt_id IS NULL) <> (invoice_attempt_id IS NULL)))")),
+  constraint7: unique("payment_session_bindings_processor_x_id_key").on(t.processorXId),
+  constraint8: unique("payment_session_bindings_payment_attempt_id_key").on(t.paymentAttemptId),
+  constraint9: unique("payment_session_bindings_invoice_attempt_id_key").on(t.invoiceAttemptId),
+  constraint10: unique("payment_session_bindings_provider_transaction_id_key").on(t.providerTransactionId),
+  constraint11: foreignKey({ name: "payment_session_bindings_payment_attempt_id_fkey", columns: [t.paymentAttemptId], foreignColumns: [paymentAttempts.id] }),
+}));
+
+// R3 expansion (0034); services remain inactive until verified integration.
+export const paymentSettlementEvents = pgTable("payment_settlement_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  sessionId: text("session_id").notNull(),
+  merchantId: integer("merchant_id").notNull(),
+  outcome: text("outcome").notNull(),
+  amountCents: bigint("amount_cents", { mode: "number" }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+}, (t) => ({
+  constraint0: check("payment_settlement_events_outcome_check", sql.raw("((outcome = ANY (ARRAY['approved'::text, 'declined'::text, 'cancelled'::text])))")),
+  constraint1: check("payment_settlement_events_amount_cents_check", sql.raw("((amount_cents > 0))")),
+  constraint3: unique("payment_settlement_events_session_id_key").on(t.sessionId),
+  constraint4: foreignKey({ name: "payment_settlement_events_session_id_fkey", columns: [t.sessionId], foreignColumns: [paymentSessionBindings.sessionId] }),
+  constraint5: foreignKey({ name: "payment_settlement_events_merchant_id_fkey", columns: [t.merchantId], foreignColumns: [merchants.id] }),
+}));

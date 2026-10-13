@@ -58,7 +58,7 @@ try {
     await runner.ensureMigrationLedger(client);
     const files = runner.listMigrationFiles();
     const at = files.indexOf(MIGRATION);
-    assert.equal(at, files.length - 1, "0035 is the newest migration");
+    assert.ok(at>=0, "0035 is present in the complete migration history");
     const before = await mkdtemp(path.join(process.env.TMPDIR ?? os.tmpdir(), "r2t7-migrations-"));
     for (const file of files.slice(0, at)) await copyFile(`migrations/${file}`, path.join(before, file));
     for (const file of files) {
@@ -148,6 +148,13 @@ try {
     client.release();
   }
 
+  // Index-only historical checks above stay at 0035. Current storage needs
+  // the forward integrated columns/triggers before its attachment checks.
+  const forward=await pool.connect();
+  try {
+    for(const file of runner.listMigrationFiles().filter(file=>file>MIGRATION))
+      await runner.applyMigration(forward,file,readFileSync(file));
+  } finally {forward.release();}
   const merchantIdValue = (globalThis as any).__merchantId as number;
   async function claimedWithExpected() {
     const sale = await pool.query(

@@ -246,9 +246,15 @@ describe("PaymentAttemptService with MemStorage", () => {
       outcome: "approved",
     });
     expect(replay).toMatchObject({
-      kind: "reused",
-      counterIncremented: false,
+      kind: "conflict",
     });
+    await expect(service.finalize({
+      attemptId: claim.attempt.id,
+      processorSessionId: "session-approved",
+      processorTransactionId: "processor-txn-approved",
+      paymentMethod: "card",
+      outcome: "approved",
+    })).resolves.toMatchObject({ kind: "reused", counterIncremented: false });
     await expect(storage.getTransaction(transaction.id)).resolves.toMatchObject({
       windcaveTransactionId: "processor-txn-approved",
       paymentMethod: "card",

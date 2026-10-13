@@ -45,6 +45,7 @@ interface Req {
   method: "get" | "post" | "put" | "delete";
   path: string;
   body?: Record<string, unknown>;
+  headers?:Record<string,string>;
   png?: boolean;
 }
 
@@ -125,7 +126,7 @@ const RECIPES: Record<string, (ctx: Ctx) => Promise<Req> | Req> = {
   "GET /api/merchants/:merchantId/refunds": (ctx) => ({ method: "get", path: `/api/merchants/${ctx.merchantId}/refunds` }),
   "POST /api/transactions": (ctx) => ({ method: "post", path: "/api/transactions", body: { merchantId: ctx.merchantId, itemName: "Flat white", price: "5.50" } }),
   "POST /api/transactions/cash-sale": (ctx) => ({
-    method: "post", path: "/api/transactions/cash-sale", body: { merchantId: ctx.merchantId, itemName: "Flat white", price: "5.50" },
+    method: "post", path: "/api/transactions/cash-sale", headers:{"Idempotency-Key":crypto.randomUUID()}, body: { merchantId: ctx.merchantId, itemName: "Flat white", price: "5.50" },
   }),
   "POST /api/transactions/tap-to-pay": (ctx) => ({ method: "post", path: "/api/transactions/tap-to-pay", body: { merchantId: ctx.merchantId, amount: "5.50" } }),
   "GET /api/merchants/:id/export/pdf": (ctx) => ({ method: "get", path: `/api/merchants/${ctx.merchantId}/export/pdf` }),
@@ -156,6 +157,7 @@ const RECIPES: Record<string, (ctx: Ctx) => Promise<Req> | Req> = {
 
 async function send(ctx: Ctx, who: Principal, req: Req) {
   let pending = request(ctx.app)[req.method](req.path).set(signedIn(who));
+  for(const [name,value] of Object.entries(req.headers??{})) pending=pending.set(name,value);
   if (req.png) return pending.attach("logo", PNG, { filename: "logo.png", contentType: "image/png" });
   if (req.body) pending = pending.send(req.body);
   return pending;

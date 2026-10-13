@@ -1,10 +1,10 @@
 # R1-T7 tenant/storage execution inventory
 
-Generated from working-tree sources on base `01b8bcdd55a56f62c315bc32db57495b87b02606`; the phase evidence names the final commit.
+Generated from working-tree sources on base `332b01537506d5b15120eee1213217e6ddeca5b4`; the phase evidence names the final commit.
 
 Registrations: **194**; registrations with session/admin authentication: **122**;
 registrations calling checkMerchantOwnership: **25**.
-IStorage: **258** declared methods;
+IStorage: **260** declared methods;
 PaymentAttemptRepository: **10** inherited methods.
 
 Classifications come from the reviewed per-route branches, including mixed public/signed-in routes.
@@ -192,7 +192,7 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | POST /api/transactions/:id/receipt-pdf | public (public/number) | `getMerchant`, `getSplitPaymentById`, `getSplitPaymentsByTransaction`, `getTransaction` |
 | POST /api/transactions/:id/split | public (public/number) | `createBillSplit`, `getTransaction` |
 | POST /api/transactions/:transactionId/refunds | tenant (merchant/resource) | `createRefundForMerchant`, `getTransactionForMerchant`, `releaseRefundAmountForMerchant`, `reserveRefundAmountForMerchant`, `updateRefundStatusForMerchant` |
-| POST /api/transactions/cash-sale | tenant (merchant/path-merchant) | `createTransactionForMerchant`, `getOrCreateSubscription`, `getTaptStoneForMerchant` |
+| POST /api/transactions/cash-sale | tenant (merchant/path-merchant) | `getCashSaleByKeyForMerchant`, `getOrCreateSubscription`, `getTaptStoneForMerchant`, `recordCashSaleForMerchant` |
 | POST /api/transactions/tap-to-pay | tenant (merchant/path-merchant) | `createTransactionForMerchant`, `getActiveTransactionByMerchant`, `getOrCreateSubscription`, `getTransactionForMerchant`, `updateTransactionPaymentMethodForMerchant`, `updateTransactionStatusForMerchant` |
 | POST /api/tutorial/restart | tenant (merchant/session) | `restartMerchantTutorial` |
 | POST /api/v1/transactions | API-key tenant (api-key/key) | `createTransactionForMerchant`, `createWebhookDelivery`, `getApiKeyByKey`, `getOrCreateSubscription`, `logApiRequest`, `updateApiKeyLastUsed` |
@@ -251,12 +251,14 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | IStorage | deleteMerchant | no | `deleteMerchant(id: number): Promise<boolean>` |
 | IStorage | getTransaction | no | `getTransaction(id: number): Promise<Transaction \| undefined>` |
 | IStorage | getTransactionForMerchant | yes | `getTransactionForMerchant(id: number, merchantId: number): Promise<Transaction \| undefined>` |
-| IStorage | cancelTransactionForMerchant | yes | `cancelTransactionForMerchant(id: number, merchantId: number): Promise<TransactionCancellationResult>` |
+| IStorage | cancelTransactionForMerchant | yes | `cancelTransactionForMerchant(id: number, merchantId: number, now?: Date): Promise<TransactionCancellationResult>` |
 | IStorage | getTransactionByPaymentTokenHash | no | `getTransactionByPaymentTokenHash(paymentTokenHash: string): Promise<Transaction \| undefined>` |
 | IStorage | getActiveTransactionByMerchant | yes | `getActiveTransactionByMerchant(merchantId: number, scope: ActiveTransactionScope): Promise<Transaction \| undefined>` |
 | IStorage | getTransactionByNfcSession | no | `getTransactionByNfcSession(nfcSessionId: string): Promise<Transaction \| undefined>` |
 | IStorage | createTransaction | no | `createTransaction(transaction: TransactionStorageInput): Promise<Transaction>` |
 | IStorage | createTransactionForMerchant | yes | `createTransactionForMerchant(merchantId: number, transaction: TransactionStorageInput): Promise<Transaction>` |
+| IStorage | getCashSaleByKeyForMerchant | yes | `getCashSaleByKeyForMerchant(merchantId:number,idempotencyKey:string):Promise<Transaction\|undefined>` |
+| IStorage | recordCashSaleForMerchant | yes | `recordCashSaleForMerchant(merchantId:number,input:CashCommandInput,options?:{allowCreate?:boolean}):Promise<CashCommandResult>` |
 | IStorage | updateTransactionStatusForMerchant | yes | `updateTransactionStatusForMerchant(id: number, merchantId: number, status: string, windcaveTransactionId?: string): Promise<Transaction \| undefined>` |
 | IStorage | updateTransactionPaymentMethodForMerchant | yes | `updateTransactionPaymentMethodForMerchant(id: number, merchantId: number, paymentMethod: string): Promise<Transaction \| undefined>` |
 | IStorage | updateTransactionStatus | no | `updateTransactionStatus(id: number, status: string, windcaveTransactionId?: string): Promise<Transaction \| undefined>` |

@@ -1,3 +1,5 @@
+import {isUuid} from './durable-payment-contract';
+import {canonicalCashCommand,CashCommandInputError} from './cash-command';
 import type { Express } from "express";
 import express from "express";
 import { config } from "./config";
@@ -3027,6 +3029,20 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!checkMerchantOwnership(req, merchantId)) {
         return res.status(403).json({ message: "Access denied" });
       }
+      const idempotencyKey=req.get('Idempotency-Key');
+      if(!isUuid(idempotencyKey)) return res.status(400).json({code:'IDEMPOTENCY_KEY_REQUIRED',message:'Refresh this page before recording a cash sale'});
+      const requestId=res.getHeader('X-Request-Id');
+      const commandInput={...validation.data,idempotencyKey,actor:{userId:req.user!.id,role:req.user!.role as 'owner'|'member'|'admin',
+        ...(typeof requestId==='string' && /^[A-Za-z0-9._:-]{1,100}$/.test(requestId)?{requestId}:{})}};
+      const command=canonicalCashCommand(commandInput);
+      const existing=await storage.getCashSaleByKeyForMerchant(merchantId,idempotencyKey);
+      if(existing) {
+        if(existing.cashRequestFingerprint!==command.fingerprint) return res.status(409).json({code:'IDEMPOTENCY_CONFLICT',message:'Cash retry details differ from the original sale'});
+        const persisted=await storage.recordCashSaleForMerchant(merchantId,commandInput,{allowCreate:false});
+        if(persisted.kind==='conflict') return res.status(409).json({code:'IDEMPOTENCY_CONFLICT',message:'Cash retry details differ from the original sale'});
+        if(persisted.kind==='not-found') return res.status(503).json({message:'Cash sale is being checked. Retry with the same request'});
+        return res.json({transaction:ownerTransactionDto(persisted.transaction)});
+      }
       if (!(await requireBillingCard(merchantId, res))) return;
       if (stoneId != null) {
         const stone = await storage.getTaptStoneForMerchant(stoneId, merchantId);
@@ -3034,28 +3050,17 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           return res.status(400).json({ message: "Selected payment board is unavailable" });
         }
       }
-      const price = Number(validation.data.price).toFixed(2);
-
-      // No per-transaction fee — merchants pay a monthly subscription.
-      const transaction = await storage.createTransactionForMerchant(merchantId, {
-        merchantId,
-        taptStoneId: stoneId ?? null,
-        itemName,
-        price,
-        status: "completed",
-        paymentMethod: "cash",
-        windcaveFeeRate: "0.0000",
-        windcaveFeeAmount: "0.00",
-        platformFeeRate: "0.0000",
-        platformFeeAmount: "0.00",
-        merchantNet: price,
-        splitEnabled: false,
-      });
-
+      const result=await storage.recordCashSaleForMerchant(merchantId,commandInput);
+      if(result.kind==='conflict') return res.status(409).json({code:'IDEMPOTENCY_CONFLICT',message:'Cash retry details differ from the original sale'});
+      if(result.kind==='not-found') return res.status(503).json({message:'Cash sale is being checked. Retry with the same request'});
+      const transaction=result.transaction;
+      if(result.kind==='reused') return res.json({transaction:ownerTransactionDto(transaction)});
+      // Temporary first-commit compatibility delivery, keyed to the persisted
+      // event. The durable manual event remains queued for receiver cutover.
       // Broadcast completion to SSE clients
       broadcastToStone(transaction.merchantId!, transaction.taptStoneId, {
         type: 'transaction_updated',
-        transaction: { ...transaction, paymentMethod: 'cash' },
+        transaction: { ...transaction, paymentMethod: 'cash' }, eventId:result.eventId,
       });
 
       sendPushToMerchant(transaction.merchantId!, {
@@ -3068,7 +3073,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       res.json({ transaction: ownerTransactionDto(transaction) });
     } catch (error) {
       if (error instanceof TransactionCreationScopeError) return res.status(400).json({ message: "Selected payment board is unavailable" });
-      console.error("Cash sale error:", error);
+      if(error instanceof CashCommandInputError) return res.status(400).json({message:"Invalid cash sale"});
+      console.error("[CASH_COMMAND_FAILED]");
       res.status(500).json({ message: "Failed to record cash sale" });
     }
   });
@@ -3321,6 +3327,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(404).json({ message: "Transaction not found" });
       }
       if (cancellation.kind === "conflict") {
+        if (cancellation.reason === "payment-active") return res.status(409).json({
+          message: "Payment is in progress or a share is already paid", code: "PAYMENT_ACTIVE",
+        });
         return res.status(400).json({ message: `Cannot cancel transaction with status: ${cancellation.status}` });
       }
       const updatedTransaction = cancellation.transaction;
@@ -7919,6 +7928,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (["paid", "paid_external"].includes(invoice.status)) return res.status(409).json({ message: "Cannot void a paid invoice" }); // P2.2 (R1-T3): was 400
       const result = await storage.voidInvoiceRentRequestForMerchant(id, merchantId);
       if (result.kind === "not-found") return res.status(404).json({ message: "Invoice not found" });
+      if (result.kind === "conflict" && result.reason === "payment-active") return res.status(409).json({
+        message: "Payment is in progress or a share is already paid", code: "PAYMENT_ACTIVE",
+      });
       if (result.kind === "conflict") return res.status(409).json({ message: "Cannot void a paid invoice" });
       res.json(result.invoice);
     } catch (err) { console.error("[PROP_INVOICE_VOID]", err); res.status(500).json({ message: "Failed to void invoice" }); }
@@ -7938,6 +7950,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const { externalPaymentReference } = markInvoicePaidExternalSchema.parse(req.body);
       const result = await storage.markInvoiceRentRequestPaidExternalForMerchant(id, merchantId, externalPaymentReference);
       if (result.kind === "not-found") return res.status(404).json({ message: "Invoice not found" });
+      if (result.kind === "conflict" && result.reason === "payment-active") return res.status(409).json({
+        message: "Payment is in progress or a share is already paid", code: "PAYMENT_ACTIVE",
+      });
       if (result.kind === "conflict") return res.status(409).json({ message: result.reason === "voided" ? "This invoice was voided" : "Invoice is already paid" });
       res.json(result.invoice);
     } catch (err) {
@@ -8950,6 +8965,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // Storage rechecks the business and the invoice's state at the write, and saves the history with it.
       const result = await storage.markJobInvoicePaidExternalForMerchant(id, merchantId, parsed.data.externalPaymentReference);
       if (result.kind === "not-found") return res.status(404).json({ message: "Not found" });
+      if (result.kind === "conflict" && result.reason === "payment-active") return res.status(409).json({
+        message: "Payment is in progress or a share is already paid", code: "PAYMENT_ACTIVE",
+      });
       if (result.kind === "conflict") return res.status(409).json({ message: result.reason === "voided" ? "This invoice was voided" : "This invoice is already paid" });
       await sendTradePaymentInvoiceForMerchant(id, merchantId);
       res.json(result.invoice);
@@ -8989,6 +9007,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // 2026-09-27): storage saves it with the change.
       const result = await storage.voidJobInvoiceForMerchant(id, merchantId);
       if (result.kind === "not-found") return res.status(404).json({ message: "Not found" });
+      if (result.kind === "conflict" && result.reason === "payment-active") return res.status(409).json({
+        message: "Payment is in progress or a share is already paid", code: "PAYMENT_ACTIVE",
+      });
       if (result.kind === "conflict") return res.status(409).json({ message: "This invoice is paid" });
       res.json(result.invoice);
     } catch (err) { console.error("[TRADES_INVOICES_VOID]", err); res.status(500).json({ message: "Failed to void invoice" }); }

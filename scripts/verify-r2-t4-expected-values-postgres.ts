@@ -138,6 +138,14 @@ try {
     client.release();
   }
 
+  // The current DatabaseStorage selects the complete integrated model. Keep
+  // the preceding 0034-specific assertions, then apply forward migrations
+  // before exercising current runtime methods against that legacy fixture.
+  const forward=await pool.connect();
+  try {
+    for(const file of runner.listMigrationFiles().filter(file=>file>MIGRATION))
+      await runner.applyMigration(forward,file,await readFile(`migrations/${file}`,'utf8'));
+  } finally {forward.release();}
   const merchantIdValue = (globalThis as any).__merchantId as number;
   async function sale(price = "10.00") {
     const row = await pool.query(
