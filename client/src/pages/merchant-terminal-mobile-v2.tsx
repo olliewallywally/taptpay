@@ -10,6 +10,7 @@ import {
   isBillingCardRequired,
   notifyIfBillingCardRequired,
 } from "@/lib/queryClient";
+import { cancelRefusalMessage } from "@/lib/cancel-refusal";
 import { apiErrorMessage } from "@/lib/api-error";
 import { sseClient } from "@/lib/sse-client";
 import { useToast } from "@/hooks/use-toast";
@@ -356,8 +357,13 @@ export default function MerchantTerminalMobile() {
       queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "active-transaction"] });
       queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "transactions"] });
     },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to cancel transaction", variant: "destructive" });
+    onError: (error: Error) => {
+      const refusal = cancelRefusalMessage(error);
+      if (refusal) {
+        queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "active-transaction"] });
+        queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "transactions"] });
+      }
+      toast({ title: "Error", description: refusal ?? "Failed to cancel transaction", variant: "destructive" });
     },
   });
 

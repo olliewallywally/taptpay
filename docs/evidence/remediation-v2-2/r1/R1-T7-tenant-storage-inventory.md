@@ -1,10 +1,10 @@
 # R1-T7 tenant/storage execution inventory
 
-Generated from working-tree sources on base `332b01537506d5b15120eee1213217e6ddeca5b4`; the phase evidence names the final commit.
+Generated from working-tree sources on base `9888af20a2fd70df04f7a8b6f866fec15add6554`; the phase evidence names the final commit.
 
 Registrations: **194**; registrations with session/admin authentication: **122**;
 registrations calling checkMerchantOwnership: **25**.
-IStorage: **260** declared methods;
+IStorage: **262** declared methods;
 PaymentAttemptRepository: **10** inherited methods.
 
 Classifications come from the reviewed per-route branches, including mixed public/signed-in routes.
@@ -155,9 +155,9 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | POST /api/pay/t/:token/session | single-resource bearer (public-bearer/token) | `getMerchant`, `getNextPendingSplit`, `getSplitPaymentsByTransaction`, `getTransaction`, `updateTransactionStatus` |
 | POST /api/pay/t/:token/split | single-resource bearer (public-bearer/token) | `createBillSplit`, `getMerchant` |
 | POST /api/property/invoices | tenant (merchant/resource) | `cleanUploadedFileOwnedByMerchant`, `createOrReuseInvoiceRentRequestForMerchant`, `getInvoiceRentRequestForMerchant`, `getOrCreateSubscription`, `getTenantProfileForMerchant` |
-| POST /api/property/invoices/:id/mark-paid-external | tenant (merchant/resource) | `getInvoiceRentRequestForMerchant`, `markInvoiceRentRequestPaidExternalForMerchant` |
+| POST /api/property/invoices/:id/mark-paid-external | tenant (merchant/resource) | `getInvoiceRentRequestForMerchant`, `getOpenInvoiceSessionsForMerchant`, `markInvoiceRentRequestPaidExternalForMerchant` |
 | POST /api/property/invoices/:id/resend | tenant (merchant/resource) | `getInvoiceRentRequestForMerchant`, `getOrCreateSubscription` |
-| POST /api/property/invoices/:id/void | tenant (merchant/resource) | `getInvoiceRentRequestForMerchant`, `voidInvoiceRentRequestForMerchant` |
+| POST /api/property/invoices/:id/void | tenant (merchant/resource) | `getInvoiceRentRequestForMerchant`, `getOpenInvoiceSessionsForMerchant`, `voidInvoiceRentRequestForMerchant` |
 | POST /api/property/invoices/document | tenant (merchant/session) | `saveScannedUploadedFile` |
 | POST /api/property/tenants | tenant (merchant/session) | `createTenantProfileForMerchant` |
 | POST /api/property/tenants/:id/archive | tenant (merchant/resource) | `archiveTenantProfileForMerchant`, `getTenantProfileForMerchant` |
@@ -178,14 +178,14 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | POST /api/trades/clients/:id/unarchive | tenant (merchant/resource) | `getClientProfileForMerchant`, `unarchiveClientProfileForMerchant` |
 | POST /api/trades/invoices | tenant (merchant/resource) | `cleanUploadedFileOwnedByMerchant`, `createJobInvoiceForMerchant`, `getClientProfileForMerchant`, `getJobInvoiceForMerchant`, `getOrCreateSubscription`, `getQuoteDeliveryForMerchant` |
 | POST /api/trades/invoices/:id/complete | tenant (merchant/resource) | `completeJobInvoiceForMerchant`, `getJobInvoiceForMerchant` |
-| POST /api/trades/invoices/:id/mark-paid-external | tenant (merchant/resource) | `getJobInvoiceForMerchant`, `markJobInvoicePaidExternalForMerchant` |
+| POST /api/trades/invoices/:id/mark-paid-external | tenant (merchant/resource) | `getJobInvoiceForMerchant`, `getOpenInvoiceSessionsForMerchant`, `markJobInvoicePaidExternalForMerchant` |
 | POST /api/trades/invoices/:id/send-balance | tenant (merchant/resource) | `createJobBalanceInvoiceForMerchant`, `getJobInvoiceForMerchant`, `getOrCreateSubscription` |
-| POST /api/trades/invoices/:id/void | tenant (merchant/resource) | `getJobInvoiceForMerchant`, `voidJobInvoiceForMerchant` |
+| POST /api/trades/invoices/:id/void | tenant (merchant/resource) | `getJobInvoiceForMerchant`, `getOpenInvoiceSessionsForMerchant`, `voidJobInvoiceForMerchant` |
 | POST /api/trades/quotes | tenant (merchant/resource) | `cleanUploadedFileOwnedByMerchant`, `createQuoteForMerchant`, `getClientProfileForMerchant`, `getMerchant`, `getOrCreateSubscription`, `getQuoteDeliveryForMerchant`, `recordQuoteDeliveryForMerchant` |
 | POST /api/trades/quotes/token/:token/respond | single-resource bearer (public-bearer/token) | `createJobEvent`, `createJobInvoice`, `getOrCreateSubscription`, `getQuoteByToken`, `updateQuote` |
 | POST /api/trades/schedules | tenant (merchant/resource) | `createJobScheduleForMerchant`, `getClientProfileForMerchant`, `getOrCreateSubscription` |
 | POST /api/transactions | tenant (merchant/path-merchant) | `createTransactionForMerchant`, `getOrCreateSubscription`, `getTaptStoneForMerchant` |
-| POST /api/transactions/:id/cancel | tenant (merchant/resource) | `cancelTransactionForMerchant`, `getTransaction`, `getTransactionForMerchant` |
+| POST /api/transactions/:id/cancel | tenant (merchant/resource) | `cancelTransactionForMerchant`, `getRetailCancellationContextForMerchant`, `getTransaction`, `getTransactionForMerchant` |
 | POST /api/transactions/:id/googlepay-complete | public (public/number) | `getNextPendingSplit`, `getTransaction`, `incrementTransactionCount`, `updateSplitPaymentStatus`, `updateTransactionPaymentMethod`, `updateTransactionSessionState`, `updateTransactionStatus` |
 | POST /api/transactions/:id/hosted-fields-complete | public (public/number) | `getNextPendingSplit`, `getTransaction`, `incrementTransactionCount`, `updateSplitPaymentStatus`, `updateTransactionPaymentMethod`, `updateTransactionSessionState`, `updateTransactionStatus` |
 | POST /api/transactions/:id/pay | public (public/number) | `getMerchant`, `getNextPendingSplit`, `getTaptStone`, `getTransaction`, `updateTransactionWindcaveSession` |
@@ -252,6 +252,8 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | IStorage | getTransaction | no | `getTransaction(id: number): Promise<Transaction \| undefined>` |
 | IStorage | getTransactionForMerchant | yes | `getTransactionForMerchant(id: number, merchantId: number): Promise<Transaction \| undefined>` |
 | IStorage | cancelTransactionForMerchant | yes | `cancelTransactionForMerchant(id: number, merchantId: number, now?: Date): Promise<TransactionCancellationResult>` |
+| IStorage | getRetailCancellationContextForMerchant | yes | `getRetailCancellationContextForMerchant(id: number, merchantId: number): Promise<RetailCancellationContext \| undefined>` |
+| IStorage | getOpenInvoiceSessionsForMerchant | yes | `getOpenInvoiceSessionsForMerchant(vertical: "property" \| "trades", invoiceId: string, merchantId: number): Promise<Array<{ sessionId: string; amountCents: number }>>` |
 | IStorage | getTransactionByPaymentTokenHash | no | `getTransactionByPaymentTokenHash(paymentTokenHash: string): Promise<Transaction \| undefined>` |
 | IStorage | getActiveTransactionByMerchant | yes | `getActiveTransactionByMerchant(merchantId: number, scope: ActiveTransactionScope): Promise<Transaction \| undefined>` |
 | IStorage | getTransactionByNfcSession | no | `getTransactionByNfcSession(nfcSessionId: string): Promise<Transaction \| undefined>` |

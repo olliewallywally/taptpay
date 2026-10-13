@@ -10,14 +10,14 @@ afterEach(() => jest.restoreAllMocks());
 test.each([
   ['void','voidJobInvoiceForMerchant'],
   ['mark-paid-external','markJobInvoicePaidExternalForMerchant'],
-] as const)('%s reports recorded provider activity without mutation or receipt',async(action,method)=>{
+] as const)('%s reports a card payment already taken without mutation or receipt (OI-1)',async(action,method)=>{
   const {app}=await createTestApp();const owner=await createOwnerPrincipal();
   const fake=fakeTrades();seedTrades(fake,owner.merchantId);
-  jest.spyOn(storage,method).mockResolvedValue({kind:'conflict',reason:'payment-active'});
+  jest.spyOn(storage,method).mockResolvedValue({kind:'conflict',reason:'payment-captured'});
   const before=JSON.stringify([...fake.invoices]),effects=observeRefusalEffects();
   try {
     const response=await request(app).post(`/api/trades/invoices/${INVOICE}/${action}`).set(signedIn(owner)).send({externalPaymentReference:null});
-    expect(response.status).toBe(409);expect(response.body).toEqual({message:'Payment is in progress or a share is already paid',code:'PAYMENT_ACTIVE'});
+    expect(response.status).toBe(409);expect(response.body).toEqual({message:'A card payment has already been taken on this invoice',code:'PAYMENT_CAPTURED'});
     expect(JSON.stringify([...fake.invoices])).toBe(before);expect(fake.events).toEqual([]);expect(fake.writes).toEqual([]);
     expect(delivery.sendTradePaymentInvoiceForMerchant).not.toHaveBeenCalled();effects.assertNone();
   } finally {effects.restore();}

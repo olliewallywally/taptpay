@@ -75,14 +75,10 @@ it("after a failed session creation's lease runs out, the next payer opens a new
   expect((await storage.getPaymentAttempt(attempt.id))?.state).toBe("abandoned");
 });
 
-it("the owner cannot cancel while that attempt's lease is live, and can once it has run out", async () => {
+// Owner decision OI-1 (2026-10-13) goes further than B-1: the owner need not wait for the lease.
+it("the owner can cancel at once; the unsent attempt is closed so its session can never be served", async () => {
   const { app, owner, sale, attempt } = await saleWithFailedSessionCreation();
 
-  const live = await request(app).post(`/api/transactions/${sale.id}/cancel`).set(signedIn(owner));
-  expect(live.status).toBe(409);
-  expect(live.body.code).toBe("PAYMENT_ACTIVE");
-
-  expireLease(attempt.id);
   const cancelled = await request(app).post(`/api/transactions/${sale.id}/cancel`).set(signedIn(owner));
 
   expect(cancelled.status).toBe(200);
@@ -139,15 +135,16 @@ describe("PaymentAttemptService with MemStorage", () => {
     })).resolves.toMatchObject({ kind: "expired", attempt: { state: "abandoned", processorSessionId: null } });
   });
 
-  test("an attempt carrying R3 send intent stays held for claims and cancellation", async () => {
+  test("an attempt carrying R3 send intent stays held for claims, and a cancel leaves it able to settle", async () => {
     const { transaction, attempt } = await claimedWithExpectedValues();
     (repo as any).paymentAttempts.get(attempt.id).sendStartedAt = new Date(now);
     now = new Date("2026-10-13T10:05:00.001Z");
 
     await expect(service.claim({ transactionId: transaction.id, shareIndex: 0, idempotencyKey: KEY_TWO }))
       .resolves.toMatchObject({ kind: "expired", attempt: { id: attempt.id, state: "claiming" } });
+    // OI-1: the cancel goes ahead, but leaves an attempt that may have reached Windcave able to settle.
     await expect(repo.cancelTransactionForMerchant(transaction.id, 11, now))
-      .resolves.toMatchObject({ kind: "conflict", reason: "payment-active" });
+      .resolves.toMatchObject({ kind: "cancelled" });
     expect((await repo.getPaymentAttempt(attempt.id))?.state).toBe("claiming");
   });
 });

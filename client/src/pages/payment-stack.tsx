@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MerchantGate } from "@/components/merchant-gate";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { cancelRefusalMessage } from "@/lib/cancel-refusal";
 import { Clock, Loader2, Plus, Copy, X, ChevronRight, Layers, ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
 import type { Transaction } from "@shared/schema";
@@ -75,8 +76,13 @@ function PaymentStackPage({ merchantId }: { merchantId: number }) {
       toast({ title: "Transaction cancelled" });
       setExpandedId(null);
     },
-    onError: () => {
-      toast({ title: "Failed to cancel", variant: "destructive" });
+    onError: (error: Error) => {
+      const refusal = cancelRefusalMessage(error);
+      if (refusal) {
+        queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "transactions"] });
+        queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "active-transaction"] });
+      }
+      toast({ title: "Failed to cancel", description: refusal ?? undefined, variant: "destructive" });
     },
   });
 

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getCurrentMerchantId } from "@/lib/auth";
 import { apiRequest, isBillingCardRequired } from "@/lib/queryClient";
+import { cancelRefusalMessage } from "@/lib/cancel-refusal";
 import { useToast } from "@/hooks/use-toast";
 import {
   DesktopPageScaffold,
@@ -386,7 +387,14 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
       toast({ title: "Transaction cancelled" });
       setExpandedId(null);
     },
-    onError: () => toast({ title: "Failed to cancel", variant: "destructive" }),
+    onError: (error: Error) => {
+      const refusal = cancelRefusalMessage(error);
+      if (refusal) {
+        queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "transactions"] });
+        queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "active-transaction"] });
+      }
+      toast({ title: "Failed to cancel", description: refusal ?? undefined, variant: "destructive" });
+    },
   });
 
   /* ── derived ── */

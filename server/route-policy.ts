@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 332b01537506d5b15120eee1213217e6ddeca5b4 on 2026-10-13.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 9888af20a2fd70df04f7a8b6f866fec15add6554 on 2026-10-13.
  *
  * 194 registrations (81 GET, 81 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -634,7 +634,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       capabilityGates: ["isWindcaveConfigured"],
       rateLimits: ["paymentTokenRateLimiter.allow","requirePaymentTokenRateLimit"],
       idempotency: ["claim","claimFinalization"],
-      helpers: ["broadcastToStone","cacheTokenAttemptSession","expectedForTokenAttempt","persistTokenOutcome","reconcileExpiredTokenAttempt","reconciliationCode","recordTokenReconciliation","requirePaymentTokenRateLimit","setPaymentTokenHeaders","tokenAttemptOutcome"],
+      helpers: ["broadcastToStone","cacheTokenAttemptSession","expectedForTokenAttempt","persistTokenOutcome","reconcileExpiredTokenAttempt","reconciliationCode","recordTokenReconciliation","recordedExpectedOutcome","requirePaymentTokenRateLimit","setPaymentTokenHeaders","tokenAttemptOutcome"],
     },
   },
   "POST /api/pay/t/:token/hosted-fields-complete": {
@@ -652,7 +652,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       capabilityGates: ["isWindcaveConfigured"],
       rateLimits: ["paymentTokenRateLimiter.allow","requirePaymentTokenRateLimit"],
       idempotency: ["claimFinalization"],
-      helpers: ["broadcastToStone","expectedForTokenAttempt","persistTokenOutcome","reconciliationCode","recordTokenReconciliation","requirePaymentTokenRateLimit","setPaymentTokenHeaders","tokenAttemptOutcome"],
+      helpers: ["broadcastToStone","expectedForTokenAttempt","persistTokenOutcome","reconciliationCode","recordTokenReconciliation","recordedExpectedOutcome","requirePaymentTokenRateLimit","setPaymentTokenHeaders","tokenAttemptOutcome"],
     },
   },
   "POST /api/pay/t/:token/googlepay-complete": {
@@ -670,7 +670,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       capabilityGates: ["isWindcaveConfigured"],
       rateLimits: ["paymentTokenRateLimiter.allow","requirePaymentTokenRateLimit"],
       idempotency: ["claimFinalization"],
-      helpers: ["broadcastToStone","expectedForTokenAttempt","persistTokenOutcome","reconciliationCode","recordTokenReconciliation","requirePaymentTokenRateLimit","setPaymentTokenHeaders","tokenAttemptOutcome"],
+      helpers: ["broadcastToStone","expectedForTokenAttempt","persistTokenOutcome","reconciliationCode","recordTokenReconciliation","recordedExpectedOutcome","requirePaymentTokenRateLimit","setPaymentTokenHeaders","tokenAttemptOutcome"],
     },
   },
   "GET /api/pay/return/:state": {
@@ -688,7 +688,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       capabilityGates: ["isWindcaveConfigured"],
       rateLimits: ["paymentTokenRateLimiter.allow","requirePaymentTokenRateLimit"],
       idempotency: ["claimFinalization"],
-      helpers: ["broadcastToStone","expectedForTokenAttempt","persistTokenOutcome","reconcileTokenReturnState","reconciliationCode","recordTokenReconciliation","requirePaymentTokenRateLimit","setPaymentTokenHeaders","tokenAttemptOutcome"],
+      helpers: ["broadcastToStone","expectedForTokenAttempt","persistTokenOutcome","reconcileTokenReturnState","reconciliationCode","recordTokenReconciliation","recordedExpectedOutcome","requirePaymentTokenRateLimit","setPaymentTokenHeaders","tokenAttemptOutcome"],
     },
   },
   "ALL /api/pay/notification/:state": {
@@ -707,7 +707,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       capabilityGates: ["isWindcaveConfigured"],
       rateLimits: ["paymentTokenRateLimiter.allow","requirePaymentTokenRateLimit"],
       idempotency: ["claimFinalization"],
-      helpers: ["broadcastToStone","expectedForTokenAttempt","persistTokenOutcome","reconcileTokenReturnState","reconciliationCode","recordTokenReconciliation","requirePaymentTokenRateLimit","setPaymentTokenHeaders"],
+      helpers: ["broadcastToStone","expectedForTokenAttempt","persistTokenOutcome","reconcileTokenReturnState","reconciliationCode","recordTokenReconciliation","recordedExpectedOutcome","requirePaymentTokenRateLimit","setPaymentTokenHeaders"],
     },
   },
   "GET /api/merchants/:id/active-transaction": {
@@ -820,11 +820,13 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       middleware: ["authenticateToken"],
       params: ["id: strictPositiveIntegerParam"],
       authChecks: ["checkMerchantOwnership","compares req.user?.role === \"admin\""],
-      storageMethods: ["cancelTransactionForMerchant","getTransaction","getTransactionForMerchant"],
-      sideEffects: ["live update: sseBroker.broadcast"],
+      storageMethods: ["cancelTransactionForMerchant","getRetailCancellationContextForMerchant","getTransaction","getTransactionForMerchant"],
+      sideEffects: ["live update: sseBroker.broadcast","provider: queryWindcaveSession","push: sendPushToMerchant"],
       statuses: [200,400,401,403,404,409,500,503],
       dtos: ["ownerTransactionDto"],
-      helpers: ["broadcastToStone"],
+      capabilityGates: ["isWindcaveConfigured"],
+      idempotency: ["claimFinalization"],
+      helpers: ["broadcastToStone","numberedSaleExpectedFrom","persistTokenOutcome","reconciliationCode","recordTokenReconciliation","recordedExpectedOutcome"],
     },
   },
   "GET /api/nfc/capabilities": {
@@ -848,7 +850,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       authChecks: ["compares stone.merchantId !== transaction.merchantId","compares transaction.merchantId !== requestMerchantId","isTokenAddressedTransaction"],
       storageMethods: ["getMerchant","getNextPendingSplit","getTaptStone","getTransaction","updateTransactionWindcaveSession"],
       sideEffects: ["provider: createWindcaveSession"],
-      statuses: [200,400,403,404,409,429,500,503],
+      statuses: [200,400,403,404,409,410,429,500,503],
       errorTextInResponse: ["validation.error.errors"],
       capabilityGates: ["isWindcaveConfigured"],
       rateLimits: ["checkRateLimit"],
@@ -877,7 +879,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       sideEffects: ["live update: sseBroker.broadcast","provider: queryWindcaveSession","push: sendPushToMerchant"],
       statuses: [200,400,403,404,500,503],
       capabilityGates: ["isWindcaveConfigured"],
-      helpers: ["broadcastToStone","expectedForNumberedSale","finaliseHostedPayment"],
+      helpers: ["broadcastToStone","expectedForNumberedSale","finaliseHostedPayment","numberedSaleExpectedFrom"],
     },
   },
   "POST /api/transactions/:id/googlepay-complete": {
@@ -893,7 +895,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       sideEffects: ["live update: sseBroker.broadcast","provider: queryWindcaveSession","provider: submitGooglePayToken","push: sendPushToMerchant"],
       statuses: [200,400,403,404,500,503],
       capabilityGates: ["isWindcaveConfigured"],
-      helpers: ["broadcastToStone","expectedForNumberedSale","finaliseHostedPayment"],
+      helpers: ["broadcastToStone","expectedForNumberedSale","finaliseHostedPayment","numberedSaleExpectedFrom"],
     },
   },
   "GET /api/transactions/:id": {
@@ -1220,7 +1222,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       sideEffects: ["live update: sseBroker.broadcast","provider: queryWindcaveSession","push: sendPushToMerchant"],
       statuses: [200],
       capabilityGates: ["isWindcaveConfigured"],
-      helpers: ["broadcastToStone","expectedForNumberedSale"],
+      helpers: ["broadcastToStone","expectedForNumberedSale","numberedSaleExpectedFrom"],
     },
   },
   "GET /api/windcave/callback": {
@@ -1235,7 +1237,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       sideEffects: ["live update: sseBroker.broadcast","provider: queryWindcaveSession","push: sendPushToMerchant"],
       statuses: [302,400],
       capabilityGates: ["isWindcaveConfigured"],
-      helpers: ["broadcastToStone","expectedForNumberedSale"],
+      helpers: ["broadcastToStone","expectedForNumberedSale","numberedSaleExpectedFrom"],
     },
   },
   "GET /api/admin/analytics": {
@@ -2194,8 +2196,11 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       middleware: ["authenticateToken"],
       params: ["id: strictUuidParam"],
-      storageMethods: ["getInvoiceRentRequestForMerchant","voidInvoiceRentRequestForMerchant"],
+      storageMethods: ["getInvoiceRentRequestForMerchant","getOpenInvoiceSessionsForMerchant","voidInvoiceRentRequestForMerchant"],
+      sideEffects: ["provider: queryWindcaveSession"],
       statuses: [200,400,401,403,404,409,500,503],
+      capabilityGates: ["isWindcaveConfigured"],
+      helpers: ["invoiceCaptured","invoiceExpectation","invoicePaidJustNow"],
     },
   },
   "POST /api/property/invoices/:id/mark-paid-external": {
@@ -2207,9 +2212,12 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       middleware: ["authenticateToken"],
       params: ["id: strictUuidParam"],
       body: ["schema: markInvoicePaidExternalSchema"],
-      storageMethods: ["getInvoiceRentRequestForMerchant","markInvoiceRentRequestPaidExternalForMerchant"],
+      storageMethods: ["getInvoiceRentRequestForMerchant","getOpenInvoiceSessionsForMerchant","markInvoiceRentRequestPaidExternalForMerchant"],
+      sideEffects: ["provider: queryWindcaveSession"],
       statuses: [200,400,401,403,404,409,500,503],
       errorTextInResponse: ["err.errors"],
+      capabilityGates: ["isWindcaveConfigured"],
+      helpers: ["invoiceCaptured","invoiceExpectation","invoicePaidJustNow"],
     },
   },
   "GET /api/checkout/resolve/:token": {
@@ -2286,7 +2294,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       statuses: [200,400,403,404,500,503],
       capabilityGates: ["isWindcaveConfigured"],
       idempotency: ["atomicClaimJobSplitShare","atomicClaimSplitShare"],
-      helpers: ["expectedForCheckoutInvoice","finalizeCheckoutInvoice","finalizeRentInvoice","finalizeTradeInvoice","recordUncountedShare","sendRentGstInvoices","splitSessionOpenedFor"],
+      helpers: ["closedReason","expectedForCheckoutInvoice","finalizeCheckoutInvoice","finalizeRentInvoice","finalizeTradeInvoice","invoiceExpectation","recordUncountedShare","sendRentGstInvoices","splitSessionOpenedFor"],
     },
   },
   "POST /api/checkout/:token/googlepay-complete": {
@@ -2300,10 +2308,10 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       authChecks: ["getCheckoutInvoiceByToken"],
       storageMethods: ["atomicClaimJobSplitShare","atomicClaimSplitShare","createJobEvent","getInvoiceRentRequest","getInvoiceRentRequestByToken","getInvoiceSplitSession","getJobInvoice","getJobInvoiceByToken","getMerchant","getPaidInvoiceSplitPayerEmails","getTenantProfile","logTransactionEvent","markInvoiceSplitSessionPaid","updateInvoiceRentRequest","updateJobInvoice"],
       sideEffects: ["email/SMS: sendTradePaymentInvoice","email: sendGstInvoices","provider: queryWindcaveSession","provider: submitGooglePayToken"],
-      statuses: [200,400,403,404,500,503],
+      statuses: [200,400,403,404,409,500,503],
       capabilityGates: ["isWindcaveConfigured"],
       idempotency: ["atomicClaimJobSplitShare","atomicClaimSplitShare"],
-      helpers: ["expectedForCheckoutInvoice","finalizeCheckoutInvoice","finalizeRentInvoice","finalizeTradeInvoice","recordUncountedShare","sendRentGstInvoices","splitSessionOpenedFor"],
+      helpers: ["closedReason","expectedForCheckoutInvoice","finalizeCheckoutInvoice","finalizeRentInvoice","finalizeTradeInvoice","invoiceExpectation","recordUncountedShare","sendRentGstInvoices","splitSessionOpenedFor"],
     },
   },
   "GET /api/checkout/callback": {
@@ -2319,7 +2327,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       statuses: [302],
       capabilityGates: ["isWindcaveConfigured"],
       idempotency: ["atomicClaimJobSplitShare","atomicClaimSplitShare"],
-      helpers: ["expectedForCheckoutInvoice","finalizeCheckoutInvoice","finalizeRentInvoice","finalizeTradeInvoice","recordUncountedShare","sendRentGstInvoices"],
+      helpers: ["closedReason","expectedForCheckoutInvoice","finalizeCheckoutInvoice","finalizeRentInvoice","finalizeTradeInvoice","invoiceExpectation","recordUncountedShare","sendRentGstInvoices"],
     },
   },
   "ALL /api/windcave/rent-notification": {
@@ -2336,7 +2344,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       statuses: [200],
       capabilityGates: ["isWindcaveConfigured"],
       idempotency: ["atomicClaimSplitShare"],
-      helpers: ["expectedForCheckoutInvoice","finalizeRentInvoice","recordUncountedShare","sendRentGstInvoices"],
+      helpers: ["closedReason","expectedForCheckoutInvoice","finalizeRentInvoice","invoiceExpectation","recordUncountedShare","sendRentGstInvoices"],
     },
   },
   "ALL /api/windcave/trades-notification": {
@@ -2353,7 +2361,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       statuses: [200],
       capabilityGates: ["isWindcaveConfigured"],
       idempotency: ["atomicClaimJobSplitShare","atomicClaimSplitShare"],
-      helpers: ["expectedForCheckoutInvoice","finalizeCheckoutInvoice","finalizeRentInvoice","finalizeTradeInvoice","recordUncountedShare","sendRentGstInvoices"],
+      helpers: ["closedReason","expectedForCheckoutInvoice","finalizeCheckoutInvoice","finalizeRentInvoice","finalizeTradeInvoice","invoiceExpectation","recordUncountedShare","sendRentGstInvoices"],
     },
   },
   "POST /api/webhooks/whatsapp": {
@@ -2680,10 +2688,12 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       middleware: ["authenticateToken"],
       params: ["id: strictUuidParam"],
       body: ["schema: markJobPaidExternalSchema"],
-      storageMethods: ["getJobInvoiceForMerchant","markJobInvoicePaidExternalForMerchant"],
-      sideEffects: ["email: sendTradePaymentInvoiceForMerchant"],
+      storageMethods: ["getJobInvoiceForMerchant","getOpenInvoiceSessionsForMerchant","markJobInvoicePaidExternalForMerchant"],
+      sideEffects: ["email: sendTradePaymentInvoiceForMerchant","provider: queryWindcaveSession"],
       statuses: [200,400,401,403,404,409,500,503],
       errorTextInResponse: ["parsed.error.errors"],
+      capabilityGates: ["isWindcaveConfigured"],
+      helpers: ["invoiceCaptured","invoiceExpectation","invoicePaidJustNow"],
     },
   },
   "POST /api/trades/invoices/:id/complete": {
@@ -2706,8 +2716,11 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       middleware: ["authenticateToken"],
       params: ["id: strictUuidParam"],
-      storageMethods: ["getJobInvoiceForMerchant","voidJobInvoiceForMerchant"],
+      storageMethods: ["getJobInvoiceForMerchant","getOpenInvoiceSessionsForMerchant","voidJobInvoiceForMerchant"],
+      sideEffects: ["provider: queryWindcaveSession"],
       statuses: [200,400,401,403,404,409,500,503],
+      capabilityGates: ["isWindcaveConfigured"],
+      helpers: ["invoiceCaptured","invoiceExpectation","invoicePaidJustNow"],
     },
   },
   "GET /api/trades/schedules": {

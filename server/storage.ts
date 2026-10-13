@@ -73,7 +73,7 @@ export type PropertyScheduleMutationResult =
 export type PropertyInvoiceMutationResult =
   | { kind: "ok"; invoice: typeof invoicesRentRequests.$inferSelect }
   | { kind: "not-found" }
-  | { kind: "conflict"; reason: "paid" | "voided" | "payment-active" };
+  | { kind: "conflict"; reason: "paid" | "voided" | "payment-captured" };
 
 export type PropertyInvoiceInput = Pick<typeof invoicesRentRequests.$inferInsert,
   "amountCents" | "deliveryChannel" | "dueAt" | "splitEnabled" | "kind" | "chargeType" | "description" | "documentUrl" | "documentName">;
@@ -109,7 +109,7 @@ function clientProfileChanges(data: ClientProfileChanges): ClientProfileChanges 
 export type JobInvoiceMutationResult =
   | { kind: "ok"; invoice: typeof jobInvoices.$inferSelect }
   | { kind: "not-found" }
-  | { kind: "conflict"; reason: "paid" | "voided" | "deposit" | "unpaid" | "payment-active" };
+  | { kind: "conflict"; reason: "paid" | "voided" | "deposit" | "unpaid" | "payment-captured" };
 export type TradesQuoteDeliverySnapshot = {
   quote: typeof quotes.$inferSelect;
   client: typeof clientProfiles.$inferSelect;
@@ -194,10 +194,18 @@ function scopedTransactionInput(merchantId: number, input: TransactionStorageInp
   return { ...data, merchantId };
 }
 
+/** What the merchant's cancel needs to ask Windcave about, read for one business (OI-1). */
+export interface RetailCancellationContext {
+  transaction: Transaction;
+  captured: boolean;
+  openAttempts: PaymentAttempt[];
+  nextPendingSplit: SplitPayment | null;
+}
+
 export type TransactionCancellationResult =
   | { kind: "cancelled"; transaction: Transaction }
   | { kind: "not-found" }
-  | { kind: "conflict"; status: string; reason?: "payment-active" };
+  | { kind: "conflict"; status: string; reason?: "payment-captured" };
 
 export class PushSessionEndedError extends Error {
   constructor() { super("The session registering this device has ended"); }
@@ -732,49 +740,44 @@ function paymentAttemptLeaseExpired(attempt: PaymentAttempt, now: Date): boolean
 }
 
 /** R2 records an attempt's expected values before it asks Windcave for a session, and
- * serves the session's links only after attaching it. A claim whose lease ran out with
- * no session attached and no R3 send intent therefore never reached a payer: nothing
- * can be charged through it, so it is abandoned rather than held (merge of R2 and R3). */
-function paymentAttemptReleasable(attempt: PaymentAttempt, now: Date): boolean {
-  return attempt.state === "claiming" && !attempt.processorSessionId && !attempt.sendStartedAt &&
-    paymentAttemptLeaseExpired(attempt, now);
+ * serves the session's links only after attaching it; attach refuses an abandoned attempt.
+ * A claim with no session attached and no R3 send intent has therefore reached no payer:
+ * nothing can be charged through it. The merchant's cancel abandons it at once (OI-1). */
+function paymentAttemptUnsent(attempt: PaymentAttempt): boolean {
+  return attempt.state === "claiming" && !attempt.processorSessionId && !attempt.sendStartedAt;
 }
 
-/** Caller holds the aggregate row lock. This must be a separate statement after
- * acquiring that lock: a correlated projection in the locking SELECT could use
- * a snapshot from before a competing attempt creator committed. */
-async function retailMoneyChangeBlocked(tx: any, row: Transaction, releasable: string[] = []): Promise<boolean> {
+/** Owner decision OI-1 (2026-10-13): an attempt to pay no longer refuses a cancel; money
+ * already taken does, and a refund is the way back. Caller holds the aggregate row lock.
+ * This must be a separate statement after acquiring that lock: a correlated projection in
+ * the locking SELECT could use a snapshot from before a competing writer committed. */
+async function retailMoneyCaptured(tx: any, row: Transaction): Promise<boolean> {
   // Explicit identifiers keep the outer correlation qualified when Drizzle
-  // optimizes a single-table projection; an inner attempt's `id` is a UUID.
+  // optimizes a single-table projection.
   const aggregateId = sql`${sql.identifier("transactions")}.${sql.identifier("id")}`;
-  const [activity] = await tx.select({ blocked: sql<boolean>`(
-    ${transactions.windcaveSessionId} is not null or ${transactions.windcaveTransactionId} is not null
+  const [activity] = await tx.select({ captured: sql<boolean>`(
+    ${transactions.windcaveTransactionId} is not null
     or coalesce(${transactions.completedSplits}, 0) > 0
     or exists (select 1 from split_payments s where s.transaction_id = ${aggregateId}
       and (s.status in ('processing', 'completed') or s.windcave_transaction_id is not null or s.paid_at is not null))
-    or exists (select 1 from payment_attempts a where a.transaction_id = ${aggregateId}
-      and (a.state not in ('declined', 'cancelled', 'abandoned')
-        or (a.state = 'abandoned' and (a.processor_session_id is not null
-          or a.send_started_at is not null)))${releasable.length
-        ? sql` and a.id not in (${sql.join(releasable.map(id => sql`${id}`), sql`, `)})` : sql``})
+    or exists (select 1 from payment_attempts a where a.transaction_id = ${aggregateId} and a.state = 'approved')
   )` }).from(transactions).where(and(eq(transactions.id, row.id), eq(transactions.merchantId, row.merchantId!))).limit(1);
-  return !activity || !!activity.blocked;
+  return !activity || !!activity.captured;
 }
 
-async function invoiceMoneyChangeBlocked(tx: any, vertical: "property" | "trades", id: string, merchantId: number): Promise<boolean> {
+/** Owner decision OI-1 (2026-10-13): an attempt to pay no longer refuses a void or an external
+ * payment; a card payment already taken does (a refund is the way back). Caller holds the lock. */
+async function invoicePaymentCaptured(tx: any, vertical: "property" | "trades", id: string, merchantId: number): Promise<boolean> {
   const table = vertical === "property" ? invoicesRentRequests : jobInvoices;
   const aggregateId = sql`${sql.identifier(vertical === "property" ? "invoices_rent_requests" : "job_invoices")}.${sql.identifier("id")}`;
   const invoiceColumn = sql.raw(vertical === "property" ? "rent_invoice_id" : "job_invoice_id");
-  const [activity] = await tx.select({ blocked: sql<boolean>`(
-    ${table.windcaveSessionId} is not null or ${table.windcaveTransactionId} is not null
+  const [activity] = await tx.select({ captured: sql<boolean>`(
+    ${table.windcaveTransactionId} is not null
     or coalesce(${table.splitPaidCount}, 0) > 0 or coalesce(cardinality(${table.splitPaidSessions}), 0) > 0
-    or exists (select 1 from invoice_split_sessions s where s.${invoiceColumn} = ${aggregateId})
-    or exists (select 1 from invoice_payment_attempts a where a.${invoiceColumn} = ${aggregateId}
-      and (a.state not in ('declined', 'cancelled', 'abandoned')
-        or (a.state = 'abandoned' and (a.send_started_at is not null
-          or exists (select 1 from payment_session_bindings b where b.invoice_attempt_id = a.id)))))
+    or exists (select 1 from invoice_split_sessions s where s.${invoiceColumn} = ${aggregateId} and s.paid_at is not null)
+    or exists (select 1 from invoice_payment_attempts a where a.${invoiceColumn} = ${aggregateId} and a.state = 'approved')
   )` }).from(table).where(and(eq(table.id, id), eq(table.merchantId, merchantId))).limit(1);
-  return !activity || !!activity.blocked;
+  return !activity || !!activity.captured;
 }
 
 async function withMemLock<T>(
@@ -911,6 +914,8 @@ export interface IStorage extends PaymentAttemptRepository {
   getTransactionForMerchant(id: number, merchantId: number): Promise<Transaction | undefined>;
   /** Recheck tenant and pending/processing state at the write boundary. */
   cancelTransactionForMerchant(id: number, merchantId: number, now?: Date): Promise<TransactionCancellationResult>;
+  getRetailCancellationContextForMerchant(id: number, merchantId: number): Promise<RetailCancellationContext | undefined>;
+  getOpenInvoiceSessionsForMerchant(vertical: "property" | "trades", invoiceId: string, merchantId: number): Promise<Array<{ sessionId: string; amountCents: number }>>;
   getTransactionByPaymentTokenHash(paymentTokenHash: string): Promise<Transaction | undefined>;
   /**
    * Find the merchant's newest active transaction within an explicit scope: a
@@ -1949,21 +1954,40 @@ export class MemStorage implements IStorage {
       return { kind: "conflict", status: row.status };
     }
     const attempts = Array.from(this.paymentAttempts.values()).filter(a => a.transactionId === id);
-    const releasable = attempts.filter(a => paymentAttemptReleasable(a, now));
-    if (row.windcaveSessionId || row.windcaveTransactionId || (row.completedSplits ?? 0) > 0 ||
-      attempts.some(a => !releasable.includes(a) &&
-        (!['declined', 'cancelled', 'abandoned'].includes(a.state) ||
-          (a.state === 'abandoned' && (a.processorSessionId || a.sendStartedAt)))) ||
-      Array.from(this.splitPayments.values()).some(s => s.transactionId === id &&
-        (['processing', 'completed'].includes(s.status) || s.windcaveTransactionId || s.paidAt))) {
-      return { kind: "conflict", status: row.status, reason: "payment-active" };
+    if (this.retailMoneyCaptured(row)) {
+      return { kind: "conflict", status: row.status, reason: "payment-captured" };
     }
-    for (const attempt of releasable) {
+    // OI-1: a window that may still be paid stays able to settle; an unsent claim is closed.
+    for (const attempt of attempts.filter(paymentAttemptUnsent)) {
       this.paymentAttempts.set(attempt.id, { ...attempt, state: "abandoned", updatedAt: now });
     }
     const transaction = { ...row, status: "cancelled" };
     this.transactions.set(id, transaction);
     return { kind: "cancelled", transaction };
+  }
+
+  private retailMoneyCaptured(row: Transaction): boolean {
+    return !!row.windcaveTransactionId || (row.completedSplits ?? 0) > 0 ||
+      Array.from(this.paymentAttempts.values()).some(a => a.transactionId === row.id && a.state === "approved") ||
+      Array.from(this.splitPayments.values()).some(s => s.transactionId === row.id &&
+        (["processing", "completed"].includes(s.status) || s.windcaveTransactionId || s.paidAt));
+  }
+
+  // Invoices are DB-only, as every other invoice management method here.
+  async getOpenInvoiceSessionsForMerchant(_vertical: "property" | "trades", _invoiceId: string, _merchantId: number): Promise<Array<{ sessionId: string; amountCents: number }>> {
+    return [];
+  }
+
+  async getRetailCancellationContextForMerchant(id: number, merchantId: number): Promise<RetailCancellationContext | undefined> {
+    if (!isManagementTenantId(merchantId)) return undefined;
+    const transaction = this.transactions.get(id);
+    if (!transaction || transaction.merchantId !== merchantId) return undefined;
+    const openAttempts = Array.from(this.paymentAttempts.values()).filter(a => a.transactionId === id &&
+      (a.state === "ready" || a.state === "finalizing") && a.processorSessionId);
+    const nextPendingSplit = Array.from(this.splitPayments.values())
+      .filter(s => s.transactionId === id && s.status === "pending")
+      .sort((a, b) => a.splitIndex - b.splitIndex)[0] ?? null;
+    return { transaction, captured: this.retailMoneyCaptured(transaction), openAttempts, nextPendingSplit };
   }
 
   async getTransactionByPaymentTokenHash(
@@ -2029,7 +2053,7 @@ export class MemStorage implements IStorage {
         // claim this payment target. Abandoning it here could leave an HPP/card
         // session chargeable while a replacement session is created. So must one
         // carrying R3 send intent. Expected values alone do not hold it: see
-        // paymentAttemptReleasable.
+        // paymentAttemptUnsent.
         if (active.processorSessionId || active.sendStartedAt) {
           return { kind: "expired", attempt: active };
         }
@@ -2325,7 +2349,8 @@ export class MemStorage implements IStorage {
           return { kind: "conflict", attempt };
         }
         if (
-          !["pending", "processing"].includes(transaction.status) ||
+          // OI-1: a payment completing after the merchant cancelled is recorded, never lost.
+          !["pending", "processing", "cancelled"].includes(transaction.status) ||
           (splitPayment && !["pending", "processing"].includes(splitPayment.status))
         ) {
           return { kind: "conflict", attempt };
@@ -2361,13 +2386,15 @@ export class MemStorage implements IStorage {
           : transaction.completedSplits ?? 0;
         const allSplitsComplete = updatedSplit !== null &&
           completedSplits >= (transaction.totalSplits ?? 1);
+        // A cancelled sale stays cancelled unless this payment completes it (OI-1).
+        const wasCancelled = transaction.status === "cancelled";
         const transactionStatus = updatedSplit
           ? input.outcome === "approved" && allSplitsComplete
             ? "completed"
-            : "pending"
+            : wasCancelled ? "cancelled" : "pending"
           : input.outcome === "approved"
             ? "completed"
-            : input.outcome === "cancelled" ? "cancelled" : "failed";
+            : wasCancelled || input.outcome === "cancelled" ? "cancelled" : "failed";
         const updatedTransaction: Transaction = {
           ...transaction,
           status: transactionStatus,
@@ -2655,6 +2682,8 @@ export class MemStorage implements IStorage {
   async updateTransactionStatus(id: number, status: string, windcaveTransactionId?: string): Promise<Transaction | undefined> {
     const transaction = this.transactions.get(id);
     if (!transaction) return undefined;
+    // OI-1: "processing" and "failed" describe an open sale; a cancelled one is not reopened.
+    if ((status === "processing" || status === "failed") && !["pending", "processing"].includes(transaction.status)) return undefined;
     const now = new Date();
     const updatedTransaction = {
       ...transaction,
@@ -2707,6 +2736,8 @@ export class MemStorage implements IStorage {
   async updateTransactionWindcaveSession(id: number, sessionId: string, sessionState: string, xId: string): Promise<Transaction | undefined> {
     const transaction = this.transactions.get(id);
     if (!transaction) return undefined;
+    // OI-1: a session is bound only to a sale that is still open.
+    if (!["pending", "processing"].includes(transaction.status)) return undefined;
     const updated = { ...transaction, windcaveSessionId: sessionId, windcaveSessionState: sessionState, windcaveXId: xId };
     this.transactions.set(id, updated);
     return updated;
@@ -2841,7 +2872,9 @@ export class MemStorage implements IStorage {
         const updatedTransaction = {
           ...transaction,
           completedSplits: completedSplits,
-          status: completedSplits >= (transaction.totalSplits ?? 1) ? "completed" : "pending",
+          // OI-1: a share paid after the merchant cancelled is recorded; the sale stays cancelled.
+          status: completedSplits >= (transaction.totalSplits ?? 1) ? "completed"
+            : transaction.status === "cancelled" ? "cancelled" : "pending",
           completedAt:
             completedSplits >= (transaction.totalSplits ?? 1)
               ? transaction.completedAt ?? now
@@ -5511,7 +5544,7 @@ export class DatabaseStorage implements IStorage {
       if (row.status !== "pending" && row.status !== "processing") {
         return { kind: "conflict", status: row.status };
       }
-      // An expired claim that never reached a payer is released with the sale (paymentAttemptReleasable).
+      // A claim that never reached a payer is closed with the sale (paymentAttemptUnsent, OI-1).
       // Locked in the parent's order (transaction, then attempts), as a claim locks them, and
       // scoped through the business's own parent row like every other query here (R1-T7 S2a).
       const ownParent = sql`exists (select 1 from ${transactions} where ${transactions.id} = ${id}
@@ -5519,10 +5552,9 @@ export class DatabaseStorage implements IStorage {
       const releasable = (await tx.select().from(paymentAttempts).where(and(
         ownParent, eq(paymentAttempts.state, "claiming"),
         isNull(paymentAttempts.processorSessionId), isNull(paymentAttempts.sendStartedAt),
-      )).for("update")).filter((attempt: PaymentAttempt) => paymentAttemptReleasable(attempt, now))
-        .map((attempt: PaymentAttempt) => attempt.id);
-      if (await retailMoneyChangeBlocked(tx, row, releasable)) {
-        return { kind: "conflict", status: row.status, reason: "payment-active" };
+      )).for("update")).filter(paymentAttemptUnsent).map((attempt: PaymentAttempt) => attempt.id);
+      if (await retailMoneyCaptured(tx, row)) {
+        return { kind: "conflict", status: row.status, reason: "payment-captured" };
       }
       if (releasable.length > 0) {
         await tx.update(paymentAttempts).set({ state: "abandoned", updatedAt: now })
@@ -5534,6 +5566,48 @@ export class DatabaseStorage implements IStorage {
           inArray(transactions.status, ["pending", "processing"]),
         )).returning();
       return transaction ? { kind: "cancelled", transaction } : { kind: "not-found" };
+    });
+  }
+
+  /** OI-1: the payment windows on one business's invoice that may still be paid: its unpaid
+   * split shares' sessions (0030), or a single invoice's pinned session. */
+  async getOpenInvoiceSessionsForMerchant(vertical: "property" | "trades", invoiceId: string, merchantId: number): Promise<Array<{ sessionId: string; amountCents: number }>> {
+    if (!isManagementTenantId(merchantId) || !isUuid(invoiceId)) return [];
+    if (!this.db) throw new Error('Database not available');
+    const table = vertical === "property" ? invoicesRentRequests : jobInvoices;
+    const [invoice] = await this.db.select({
+      windcaveSessionId: table.windcaveSessionId, amountCents: table.amountCents,
+      splitEnabled: table.splitEnabled, splitCount: table.splitCount,
+    }).from(table).where(and(eq(table.id, invoiceId), eq(table.merchantId, merchantId))).limit(1);
+    if (!invoice) return [];
+    if (invoice.splitEnabled && invoice.splitCount && invoice.splitCount > 1) {
+      const column = vertical === "property" ? invoiceSplitSessions.rentInvoiceId : invoiceSplitSessions.jobInvoiceId;
+      const rows = await this.db.select({ sessionId: invoiceSplitSessions.windcaveSessionId, amountCents: invoiceSplitSessions.amountCents })
+        .from(invoiceSplitSessions).where(and(eq(column, invoiceId), isNull(invoiceSplitSessions.paidAt),
+          sql`exists (select 1 from ${table} where ${table.id} = ${invoiceId} and ${table.merchantId} = ${merchantId})`));
+      return rows;
+    }
+    return invoice.windcaveSessionId ? [{ sessionId: invoice.windcaveSessionId, amountCents: invoice.amountCents }] : [];
+  }
+
+  async getRetailCancellationContextForMerchant(id: number, merchantId: number): Promise<RetailCancellationContext | undefined> {
+    if (!isManagementTenantId(merchantId)) return undefined;
+    if (!this.db) throw new Error('Database not available');
+    // Plain reads: the cancel itself re-checks captured money under the parent lock.
+    return this.db.transaction(async (tx: any): Promise<RetailCancellationContext | undefined> => {
+      const [transaction] = await tx.select().from(transactions)
+        .where(and(eq(transactions.id, id), eq(transactions.merchantId, merchantId))).limit(1);
+      if (!transaction) return undefined;
+      const ownParent = (column: any) => sql`exists (select 1 from ${transactions} where ${transactions.id} = ${id}
+        and ${transactions.merchantId} = ${merchantId} and ${transactions.id} = ${column})`;
+      const openAttempts = await tx.select().from(paymentAttempts).where(and(
+        ownParent(paymentAttempts.transactionId), inArray(paymentAttempts.state, ["ready", "finalizing"]),
+        isNotNull(paymentAttempts.processorSessionId),
+      ));
+      const [nextPendingSplit] = await tx.select().from(splitPayments).where(and(
+        ownParent(splitPayments.transactionId), eq(splitPayments.status, "pending"),
+      )).orderBy(asc(splitPayments.splitIndex)).limit(1);
+      return { transaction, captured: await retailMoneyCaptured(tx, transaction), openAttempts, nextPendingSplit: nextPendingSplit ?? null };
     });
   }
 
@@ -5624,7 +5698,7 @@ export class DatabaseStorage implements IStorage {
         // terminalizes that exact session. This transaction lock prevents a
         // conflicting key from creating a second chargeable session meanwhile.
         // R3 send intent holds it too; expected values alone do not (see
-        // paymentAttemptReleasable).
+        // paymentAttemptUnsent).
         if (active.processorSessionId || active.sendStartedAt) {
           return { kind: "expired", attempt: active };
         }
@@ -6064,7 +6138,8 @@ export class DatabaseStorage implements IStorage {
         return { kind: "conflict", attempt };
       }
       if (
-        !["pending", "processing"].includes(transaction.status) ||
+        // OI-1: a payment completing after the merchant cancelled is recorded, never lost.
+        !["pending", "processing", "cancelled"].includes(transaction.status) ||
         (splitPayment && !["pending", "processing"].includes(splitPayment.status))
       ) {
         return { kind: "conflict", attempt };
@@ -6114,13 +6189,15 @@ export class DatabaseStorage implements IStorage {
         : transaction.completedSplits ?? 0;
       const allSplitsComplete = updatedSplit !== null &&
         completedSplits >= (transaction.totalSplits ?? 1);
+      // A cancelled sale stays cancelled unless this payment completes it (OI-1).
+      const wasCancelled = transaction.status === "cancelled";
       const transactionStatus = updatedSplit
         ? input.outcome === "approved" && allSplitsComplete
           ? "completed"
-          : "pending"
+          : wasCancelled ? "cancelled" : "pending"
         : input.outcome === "approved"
           ? "completed"
-          : input.outcome === "cancelled" ? "cancelled" : "failed";
+          : wasCancelled || input.outcome === "cancelled" ? "cancelled" : "failed";
       const updatedTransactionRows = await tx
         .update(transactions)
         .set({
@@ -6395,10 +6472,13 @@ export class DatabaseStorage implements IStorage {
       updateData.windcaveTransactionId = windcaveTransactionId;
     }
     
+    // OI-1: "processing" and "failed" describe an open sale; a cancelled one is not reopened.
+    const open = status === "processing" || status === "failed"
+      ? inArray(transactions.status, ["pending", "processing"]) : undefined;
     const result = await this.db
       .update(transactions)
       .set(updateData)
-      .where(eq(transactions.id, id))
+      .where(open ? and(eq(transactions.id, id), open) : eq(transactions.id, id))
       .returning();
     return result[0];
   }
@@ -6459,7 +6539,8 @@ export class DatabaseStorage implements IStorage {
     const result = await this.db
       .update(transactions)
       .set({ windcaveSessionId: sessionId, windcaveSessionState: sessionState, windcaveXId: xId })
-      .where(eq(transactions.id, id))
+      // OI-1: a session is bound only to a sale that is still open.
+      .where(and(eq(transactions.id, id), inArray(transactions.status, ["pending", "processing"])))
       .returning();
     return result[0];
   }
@@ -7324,7 +7405,9 @@ export class DatabaseStorage implements IStorage {
           .where(eq(transactions.id, updatedSplit.transactionId!));
         
         if (transaction) {
-          const finalStatus = completedSplits >= (transaction.totalSplits ?? 1) ? "completed" : "pending";
+          // OI-1: a share paid after the merchant cancelled is recorded; the sale stays cancelled.
+          const finalStatus = completedSplits >= (transaction.totalSplits ?? 1) ? "completed"
+            : transaction.status === "cancelled" ? "cancelled" : "pending";
           
           // Update the main transaction
           await this.db!
@@ -9230,8 +9313,8 @@ export class DatabaseStorage implements IStorage {
       if (!invoice) return { kind: "not-found" };
       if (invoice.status === "paid" || invoice.status === "paid_external") return { kind: "conflict", reason: "paid" };
       if (operation !== "void" && invoice.status === "voided") return { kind: "conflict", reason: "voided" };
-      if ((operation === "void" || operation === "paid-external") && await invoiceMoneyChangeBlocked(tx, "property", id, merchantId)) {
-        return { kind: "conflict", reason: "payment-active" };
+      if ((operation === "void" || operation === "paid-external") && await invoicePaymentCaptured(tx, "property", id, merchantId)) {
+        return { kind: "conflict", reason: "payment-captured" };
       }
       // Issued invoices stay payable when the profile is archived (owner decision
       // 2026-09-27). Only ownership and current invoice state gate this write.
@@ -9663,8 +9746,8 @@ export class DatabaseStorage implements IStorage {
         if (operation !== "void" && invoice.status === "voided") return { kind: "conflict", reason: "voided" };
         if (paid) return { kind: "conflict", reason: "paid" };
       }
-      if ((operation === "void" || operation === "paid-external") && await invoiceMoneyChangeBlocked(tx, "trades", id, merchantId)) {
-        return { kind: "conflict", reason: "payment-active" };
+      if ((operation === "void" || operation === "paid-external") && await invoicePaymentCaptured(tx, "trades", id, merchantId)) {
+        return { kind: "conflict", reason: "payment-captured" };
       }
       const now = new Date();
       const patch = operation === "void"

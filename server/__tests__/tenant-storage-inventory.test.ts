@@ -208,7 +208,9 @@ test("trades invoice state changes, the signed-in quote PDF and the receipt requ
   for (const name of ["getJobInvoiceDeliveryForMerchant", "recordJobInvoiceReceiptForMerchant"]) {
     expect(contract.find(method => method.name === name)?.requiredTenant).toBe(true);
   }
-  expect(facts.get("POST /api/trades/invoices/:id/mark-paid-external")?.sideEffects).toEqual(["email: sendTradePaymentInvoiceForMerchant"]);
+  // OI-1 (2026-10-13): the open payment windows are asked of the provider before the change.
+  expect([...(facts.get("POST /api/trades/invoices/:id/mark-paid-external")?.sideEffects ?? [])].sort())
+    .toEqual(["email: sendTradePaymentInvoiceForMerchant", "provider: queryWindcaveSession"]);
 });
 
 test("trades quote, invoice and balance creation and their delivery require merchant scope", () => {

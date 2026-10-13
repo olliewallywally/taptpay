@@ -12,6 +12,9 @@ export const retailTransactionGraph=graph(['pending','processing','completed','f
   approve:{from:['pending','processing'],to:'completed',actors:['processor'],effects:['usage_once',...moneyEffects]},
   decline:{from:['pending','processing'],to:'failed',actors:['processor'],effects:moneyEffects},
   cancel:{from:['pending','processing'],to:'cancelled',actors:['merchant','processor'],effects:moneyEffects},
+  // Owner decision OI-1 (2026-10-13): a payment that completes after the merchant cancelled is
+  // recorded, never lost. Only the verified processor outcome may take this edge.
+  approveAfterCancel:{from:['cancelled'],to:'completed',actors:['processor'],effects:['usage_once',...moneyEffects]},
   partialRefund:{from:['completed','partially_refunded'],to:'partially_refunded',actors:['processor'],effects:moneyEffects},
   fullRefund:{from:['completed','partially_refunded'],to:'refunded',actors:['processor'],effects:moneyEffects},
 });
@@ -28,6 +31,8 @@ export const paymentAttemptGraph=graph(['claiming','ready','finalizing','approve
   decline:{from:['finalizing'],to:'declined',actors:['processor'],effects:moneyEffects},
   cancel:{from:['finalizing'],to:'cancelled',actors:['processor'],effects:moneyEffects},
   abandonUnsent:{from:['claiming'],to:'abandoned',actors:['system'],effects:['expired_unattached_lease_only']},
+  // OI-1: the merchant's cancel closes a claim with no session and no send intent (it reached no payer).
+  abandonUnsentOnCancel:{from:['claiming'],to:'abandoned',actors:['merchant'],effects:['unattached_unsent_only']},
 });
 export const payableInvoiceStates=['pending_dispatch','dispatched','dispatch_failed','sent','viewed','overdue'] as const;
 const invoiceRules={

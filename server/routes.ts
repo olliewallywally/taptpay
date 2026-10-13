@@ -2110,6 +2110,48 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // A null answer means the payment cannot be verified; the caller leaves it
   // reconcilable and queryWindcaveSession never asks the provider.
 
+  /** The values a retail attempt recorded before its session opened (R2-T4), or null for an
+   * attempt claimed before migration 0034. Pure: a merchant-scoped route can use it (OI-1). */
+  function recordedExpectedOutcome(
+    attempt: {
+      expectedAmountCents?: number | null;
+      expectedCurrency?: string | null;
+      expectedMerchantReference?: string | null;
+      providerEnvironment?: "uat" | "production" | null;
+    },
+    sessionId: string,
+  ): WindcaveExpectedOutcome | null {
+    if (
+      attempt.expectedAmountCents == null || !attempt.expectedCurrency ||
+      !attempt.expectedMerchantReference || !attempt.providerEnvironment
+    ) return null;
+    return {
+      sessionId,
+      amountCents: attempt.expectedAmountCents,
+      currency: attempt.expectedCurrency,
+      merchantReference: attempt.expectedMerchantReference,
+      providerEnvironment: attempt.providerEnvironment,
+    };
+  }
+
+  /** A numbered sale's expected values from its price or the share being paid. Pure (OI-1). */
+  function numberedSaleExpectedFrom(
+    transaction: { id: number; price: string; isSplit?: boolean | null },
+    split: { id: number; amount: string } | null,
+    sessionId: string,
+  ): WindcaveExpectedOutcome | null {
+    if (transaction.isSplit && !split) return null;
+    const cents = parseCentsExact(split ? split.amount : transaction.price);
+    if (!cents.ok) return null;
+    return {
+      sessionId,
+      amountCents: cents.cents,
+      currency: "NZD",
+      merchantReference: split ? `SPLIT_${split.id}_TXN_${transaction.id}` : `TXN_${transaction.id}`,
+      providerEnvironment: currentProviderEnvironment(),
+    };
+  }
+
   /** A retail token attempt: its stored expected values (R2-T4), or, for an attempt
    * claimed before migration 0034, the values its session was opened with. */
   async function expectedForTokenAttempt(
@@ -2124,18 +2166,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     },
     sessionId: string,
   ): Promise<WindcaveExpectedOutcome | null> {
-    if (
-      attempt.expectedAmountCents != null && attempt.expectedCurrency &&
-      attempt.expectedMerchantReference && attempt.providerEnvironment
-    ) {
-      return {
-        sessionId,
-        amountCents: attempt.expectedAmountCents,
-        currency: attempt.expectedCurrency,
-        merchantReference: attempt.expectedMerchantReference,
-        providerEnvironment: attempt.providerEnvironment,
-      };
-    }
+    const recorded = recordedExpectedOutcome(attempt, sessionId);
+    if (recorded) return recorded;
     const transaction = await storage.getTransaction(attempt.transactionId);
     if (!transaction) return null;
     let amount: string = transaction.price;
@@ -2163,16 +2195,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     sessionId: string,
   ): Promise<WindcaveExpectedOutcome | null> {
     const split = transaction.isSplit ? await storage.getNextPendingSplit(transaction.id) : null;
-    if (transaction.isSplit && !split) return null;
-    const cents = parseCentsExact(split ? split.amount : transaction.price);
-    if (!cents.ok) return null;
-    return {
-      sessionId,
-      amountCents: cents.cents,
-      currency: "NZD",
-      merchantReference: split ? `SPLIT_${split.id}_TXN_${transaction.id}` : `TXN_${transaction.id}`,
-      providerEnvironment: currentProviderEnvironment(),
-    };
+    return numberedSaleExpectedFrom(transaction, split, sessionId);
   }
 
   /** A property/trades invoice: the amount recorded with a split share's session
@@ -2191,14 +2214,42 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!opened || !forThisInvoice) return null;
       amountCents = opened.amountCents;
     }
+    return invoiceExpectation(invoice.checkoutVertical === "trades" ? "trades" : "property", invoice.id, sessionId, amountCents);
+  }
+
+  /** An invoice session's expected values from its recorded amount. Pure, so a merchant-scoped
+   * route can use it without the split-session lookup above (OI-1). */
+  function invoiceExpectation(vertical: "property" | "trades", invoiceId: string, sessionId: string, amountCents: number): WindcaveExpectedOutcome | null {
     if (!Number.isSafeInteger(amountCents) || amountCents < 0) return null;
     return {
       sessionId,
       amountCents,
       currency: "NZD",
-      merchantReference: (invoice.checkoutVertical === "trades" ? "JOB-" : "RENT-") + invoice.id.slice(0, 8).toUpperCase(),
+      merchantReference: (vertical === "trades" ? "JOB-" : "RENT-") + invoiceId.slice(0, 8).toUpperCase(),
       providerEnvironment: currentProviderEnvironment(),
     };
+  }
+
+  // ── Owner decision OI-1 (2026-10-13): voiding or marking an invoice paid after an attempt ──
+  const INVOICE_PAYMENT_CAPTURED = { code: "PAYMENT_CAPTURED", message: "A card payment has already been taken on this invoice" };
+  const INVOICE_JUST_PAID = { code: "PAYMENT_COMPLETED", message: "This invoice has just been paid" };
+
+  /** Money already taken on the invoice, as its row records it. */
+  function invoiceCaptured(invoice: { windcaveTransactionId?: string | null; splitPaidCount?: number | null; splitPaidSessions?: string[] | null }): boolean {
+    return !!invoice.windcaveTransactionId || (invoice.splitPaidCount ?? 0) > 0 || (invoice.splitPaidSessions?.length ?? 0) > 0;
+  }
+
+  /** Asks Windcave once about each of the invoice's windows that may still be paid, in parallel and
+   * outside any lock. True when one is verified paid: the change is then refused, and that payment is
+   * recorded by its own completion path, which records it even after a void (finalize* below). */
+  async function invoicePaidJustNow(vertical: "property" | "trades", invoiceId: string, merchantId: number): Promise<boolean> {
+    if (!isWindcaveConfigured()) return false;
+    const sessions = await storage.getOpenInvoiceSessionsForMerchant(vertical, invoiceId, merchantId);
+    const results = await Promise.all(sessions.map(({ sessionId, amountCents }) => {
+      const expected = invoiceExpectation(vertical, invoiceId, sessionId, amountCents);
+      return expected ? queryWindcaveSession(sessionId, expected, { singleAttempt: true }) : null;
+    }));
+    return results.some((result) => !!(result?.success && result.approved && result.windcaveTransactionId));
   }
 
   /** R2-T6 (plan §9.4): a retail provider query's outcome as a sanitized code. */
@@ -2463,8 +2514,14 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         returnState,
       };
       cacheTokenAttemptSession(attached.attempt.id, cached);
-      if (!transaction.isSplit) {
-        await storage.updateTransactionStatus(transaction.id, "processing");
+      // OI-1: the merchant may cancel while this session was being attached. Its links are
+      // then not served; the attempt stays able to settle anything that reaches it anyway.
+      const stillOpen = transaction.isSplit
+        ? (await storage.getTransaction(transaction.id))?.status === "pending"
+        : !!(await storage.updateTransactionStatus(transaction.id, "processing"));
+      if (!stillOpen) {
+        tokenAttemptSessionCache.delete(attached.attempt.id);
+        return res.status(410).json({ message: "Payment link is closed" });
       }
 
       return res.json({
@@ -3322,15 +3379,74 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(400).json({ message: `Cannot cancel transaction with status: ${transaction.status}` });
       }
 
+      // Owner decision OI-1 (2026-10-13): a sale can be cancelled after someone has tried to pay.
+      // Money already taken still refuses it (a refund is the way back). A payment window that
+      // may still be paid is checked with Windcave first, outside any database lock: paid means
+      // the payment is recorded and the cancel refused; declined is closed after the cancel;
+      // "cannot say" cancels anyway and leaves the window able to settle, so nothing is lost.
+      const captured = { code: "PAYMENT_CAPTURED", message: "A payment has already been taken on this sale. Refund it instead of cancelling." };
+      const context = await storage.getRetailCancellationContextForMerchant(transactionId, transaction.merchantId!);
+      if (!context) return res.status(404).json({ message: "Transaction not found" });
+      if (context.captured) return res.status(409).json(captured);
+      const declined: Array<{ attemptId: string; sessionId: string }> = [];
+      let paidJustNow = false;
+      if (isWindcaveConfigured()) {
+        for (const attempt of context.openAttempts) {
+          const sessionId = attempt.processorSessionId!;
+          const expected = recordedExpectedOutcome(attempt, sessionId);
+          if (!expected) continue;
+          const result = await queryWindcaveSession(sessionId, expected, { singleAttempt: true });
+          await recordTokenReconciliation(attempt.id, result);
+          if (!result.success) continue;
+          if (!result.approved) { declined.push({ attemptId: attempt.id, sessionId }); continue; }
+          if (!result.windcaveTransactionId) continue;
+          const claim = await paymentAttempts.claimFinalization(attempt.id, sessionId);
+          if (claim.kind === "claimed" || claim.kind === "reused") {
+            await persistTokenOutcome({
+              attempt: claim.attempt, sessionId, outcome: "approved",
+              processorTransactionId: result.windcaveTransactionId, paymentMethod: "card",
+            });
+          }
+          paidJustNow = true;
+        }
+        // A numbered (board) sale's own session, recorded on the sale by /pay. Its payment is
+        // recorded by the board's notification and callback, as always; here it only refuses.
+        const sale = context.transaction;
+        if (!sale.paymentTokenHash && sale.windcaveSessionId && sale.windcaveSessionState === "pending") {
+          const expected = numberedSaleExpectedFrom(sale, context.nextPendingSplit, sale.windcaveSessionId);
+          const result = expected
+            ? await queryWindcaveSession(sale.windcaveSessionId, expected, { singleAttempt: true })
+            : null;
+          if (result?.success && result.approved) paidJustNow = true;
+        }
+      }
+      if (paidJustNow) return res.status(409).json({
+        code: "PAYMENT_COMPLETED",
+        message: context.transaction.isSplit ? "A share of this sale has just been paid" : "This sale has just been paid",
+      });
+
       const cancellation = await storage.cancelTransactionForMerchant(transactionId, transaction.merchantId!);
       if (cancellation.kind === "not-found") {
         return res.status(404).json({ message: "Transaction not found" });
       }
       if (cancellation.kind === "conflict") {
-        if (cancellation.reason === "payment-active") return res.status(409).json({
-          message: "Payment is in progress or a share is already paid", code: "PAYMENT_ACTIVE",
-        });
+        if (cancellation.reason === "payment-captured") return res.status(409).json(captured);
+        if (cancellation.status === "completed") {
+          return res.status(409).json({ code: "PAYMENT_COMPLETED", message: "This sale has just been paid" });
+        }
         return res.status(400).json({ message: `Cannot cancel transaction with status: ${cancellation.status}` });
+      }
+      // A verified decline is closed only now, so an unsplit sale stays cancelled rather than failed.
+      for (const { attemptId, sessionId } of declined) {
+        try {
+          const claim = await paymentAttempts.claimFinalization(attemptId, sessionId);
+          if (claim.kind === "claimed" || claim.kind === "reused") {
+            await paymentAttempts.finalize({ attemptId, processorSessionId: sessionId, processorTransactionId: null, outcome: "declined", receiptShare: null });
+            tokenAttemptSessionCache.delete(attemptId);
+          }
+        } catch {
+          console.error("A declined payment attempt was not closed after its sale was cancelled");
+        }
       }
       const updatedTransaction = cancellation.transaction;
       
@@ -3455,6 +3571,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         console.warn(`IDEMPOTENCY: Payment already processing for transaction ${transactionId} from IP ${clientIp}`);
         return res.status(409).json({ message: "Payment is already being processed", idempotent: true });
       }
+
+      // OI-1: a cancelled (or refunded) sale opens no payment session.
+      if (transaction.status !== "pending") {
+        return res.status(410).json({ message: "This sale is no longer payable" });
+      }
       
       // AUDIT: Log payment attempt
       console.log(`Payment initiated for transaction ${transactionId}, merchant ${transaction.merchantId}, stone ${transaction.taptStoneId || 'none'}, IP ${clientIp}`);
@@ -3515,8 +3636,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(503).json({ message: 'Payment outcome is still being reconciled' });
       }
 
-      // Save session tracking info to the transaction
-      await storage.updateTransactionWindcaveSession(transactionId, sessionResult.sessionId!, 'pending', xId);
+      // Save session tracking info to the transaction. OI-1: a sale cancelled meanwhile binds
+      // no session, and its links are not served.
+      if (!(await storage.updateTransactionWindcaveSession(transactionId, sessionResult.sessionId!, 'pending', xId))) {
+        return res.status(410).json({ message: "This sale is no longer payable" });
+      }
 
       // Cache the Windcave AJAX URLs server-side — never send these back to the client
       // so the client cannot supply an attacker-controlled URL to our payment endpoints.
@@ -7394,6 +7518,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // already-finalized invoices (paid/paid_external/voided) are left untouched.
   // For split invoices each call counts one share (deduped by sessionId); the
   // invoice only flips to paid once every share is in.
+  /** Why an approved split share was not counted: the invoice's state when it arrived. */
+  function closedReason(status: string | undefined): string {
+    return status === "voided" ? "invoice voided" : status === "paid_external" ? "invoice paid externally" : "every share already paid";
+  }
+
   async function finalizeRentInvoice(invoiceId: string, approved: boolean, windcaveTransactionId?: string, sessionId?: string): Promise<any> {
     const inv = await storage.getInvoiceRentRequest(invoiceId);
     if (!inv) return null;
@@ -7406,12 +7535,32 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       await storage.logTransactionEvent({
         merchantId: inv.merchantId, tenantProfileId: inv.tenantProfileId, invoiceId,
         eventType: "Split_Share_Unrecorded",
-        payload: { channel: "card", reason: "every share already paid", windcaveTransactionId: windcaveTransactionId ?? null },
+        payload: { channel: "card", reason: closedReason(current?.status), windcaveTransactionId: windcaveTransactionId ?? null },
       });
     };
-    if (["paid", "paid_external", "voided"].includes(inv.status)) { // already settled
+    if (inv.status === "paid") { // already settled
       await recordUncountedShare(inv);
       return inv;
+    }
+    // OI-1 (2026-10-13): a payment completing after the merchant voided the invoice, or marked it paid
+    // another way, is recorded, never lost. A voided invoice becomes paid (the screens hide voided ones);
+    // one paid another way keeps that status and is flagged as paid twice, with a refund due.
+    if (inv.status === "voided" || inv.status === "paid_external") {
+      const isSplit = !!(inv.splitEnabled && inv.splitCount && inv.splitCount > 1);
+      if (!approved) return inv;
+      if (isSplit || !windcaveTransactionId) { await recordUncountedShare(inv); return inv; }
+      if (inv.windcaveTransactionId === windcaveTransactionId) return inv;
+      const voided = inv.status === "voided";
+      const updated = await storage.updateInvoiceRentRequest(invoiceId, voided
+        ? { status: "paid", paidAt: new Date(), windcaveTransactionId }
+        : { windcaveTransactionId });
+      await storage.logTransactionEvent({
+        merchantId: inv.merchantId, tenantProfileId: inv.tenantProfileId, invoiceId,
+        eventType: voided ? "Payment_Received_After_Void" : "Payment_Received_After_External",
+        payload: { channel: "card", amountCents: inv.amountCents, windcaveTransactionId, refundDue: !voided },
+      });
+      if (voided) await sendRentGstInvoices(updated);
+      return updated;
     }
 
     if (!approved) {
@@ -7532,11 +7681,37 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     const recordUncountedShare = async (current: any) => {
       if (!approved || !sessionId || !(invoice.splitEnabled && invoice.splitCount && invoice.splitCount > 1)) return;
       if ((current?.splitPaidSessions ?? []).includes(sessionId)) return;
-      await storage.createJobEvent({ merchantId: invoice.merchantId, clientProfileId: invoice.clientProfileId, jobInvoiceId: invoice.id, eventType: "split_share_unrecorded", payload: { channel: "card", reason: "every share already paid", windcaveTransactionId: windcaveTransactionId ?? null } });
+      await storage.createJobEvent({ merchantId: invoice.merchantId, clientProfileId: invoice.clientProfileId, jobInvoiceId: invoice.id, eventType: "split_share_unrecorded", payload: { channel: "card", reason: closedReason(current?.status), windcaveTransactionId: windcaveTransactionId ?? null } });
     };
-    if (["paid", "paid_external", "voided"].includes(invoice.status)) {
+    if (invoice.status === "paid") {
       await recordUncountedShare(invoice);
       return invoice;
+    }
+    // OI-1 (2026-10-13): as for rent, a payment after a void or an external payment is recorded.
+    if (invoice.status === "voided" || invoice.status === "paid_external") {
+      const isSplit = !!(invoice.splitEnabled && invoice.splitCount && invoice.splitCount > 1);
+      if (!approved) return invoice;
+      if (isSplit || !windcaveTransactionId) { await recordUncountedShare(invoice); return invoice; }
+      if (invoice.windcaveTransactionId === windcaveTransactionId) return invoice;
+      const closedAs = invoice.status;
+      let voided = closedAs === "voided";
+      let updated: any;
+      try {
+        updated = await storage.updateJobInvoice(invoiceId, voided
+          ? { status: "paid", paidAt: new Date(), windcaveTransactionId }
+          : { windcaveTransactionId });
+      } catch (error: any) {
+        // A schedule may have issued a replacement for the voided invoice (job_invoices_schedule_due_uq
+        // ignores voided rows): keep it voided, but record the payment on it for a refund.
+        if (!voided || error?.code !== "23505") throw error;
+        voided = false;
+        updated = await storage.updateJobInvoice(invoiceId, { windcaveTransactionId });
+      }
+      await storage.createJobEvent({ merchantId: invoice.merchantId, clientProfileId: invoice.clientProfileId, jobInvoiceId: invoice.id,
+        eventType: closedAs === "voided" ? "payment_received_after_void" : "payment_received_after_external",
+        payload: { channel: "card", amountCents: invoice.amountCents, windcaveTransactionId, refundDue: !voided } });
+      if (voided) await sendTradePaymentInvoice(updated);
+      return updated;
     }
     if (!approved) {
       await storage.createJobEvent({ merchantId: invoice.merchantId, clientProfileId: invoice.clientProfileId, jobInvoiceId: invoice.id, eventType: "payment_declined", payload: { channel: "card" } });
@@ -7926,11 +8101,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const invoice = await storage.getInvoiceRentRequestForMerchant(id, merchantId);
       if (!invoice) return res.status(404).json({ message: "Invoice not found" });
       if (["paid", "paid_external"].includes(invoice.status)) return res.status(409).json({ message: "Cannot void a paid invoice" }); // P2.2 (R1-T3): was 400
+      if (invoiceCaptured(invoice)) return res.status(409).json(INVOICE_PAYMENT_CAPTURED);
+      if (await invoicePaidJustNow("property", id, merchantId)) return res.status(409).json(INVOICE_JUST_PAID);
       const result = await storage.voidInvoiceRentRequestForMerchant(id, merchantId);
       if (result.kind === "not-found") return res.status(404).json({ message: "Invoice not found" });
-      if (result.kind === "conflict" && result.reason === "payment-active") return res.status(409).json({
-        message: "Payment is in progress or a share is already paid", code: "PAYMENT_ACTIVE",
-      });
+      if (result.kind === "conflict" && result.reason === "payment-captured") return res.status(409).json(INVOICE_PAYMENT_CAPTURED);
       if (result.kind === "conflict") return res.status(409).json({ message: "Cannot void a paid invoice" });
       res.json(result.invoice);
     } catch (err) { console.error("[PROP_INVOICE_VOID]", err); res.status(500).json({ message: "Failed to void invoice" }); }
@@ -7948,11 +8123,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (invoice.status === "voided") return res.status(409).json({ message: "This invoice was voided" });
       if (invoice.status === "paid" || invoice.status === "paid_external") return res.status(409).json({ message: "Invoice is already paid" }); // P2.2 (R1-T3): was 400
       const { externalPaymentReference } = markInvoicePaidExternalSchema.parse(req.body);
+      if (invoiceCaptured(invoice)) return res.status(409).json(INVOICE_PAYMENT_CAPTURED);
+      if (await invoicePaidJustNow("property", id, merchantId)) return res.status(409).json(INVOICE_JUST_PAID);
       const result = await storage.markInvoiceRentRequestPaidExternalForMerchant(id, merchantId, externalPaymentReference);
       if (result.kind === "not-found") return res.status(404).json({ message: "Invoice not found" });
-      if (result.kind === "conflict" && result.reason === "payment-active") return res.status(409).json({
-        message: "Payment is in progress or a share is already paid", code: "PAYMENT_ACTIVE",
-      });
+      if (result.kind === "conflict" && result.reason === "payment-captured") return res.status(409).json(INVOICE_PAYMENT_CAPTURED);
       if (result.kind === "conflict") return res.status(409).json({ message: result.reason === "voided" ? "This invoice was voided" : "Invoice is already paid" });
       res.json(result.invoice);
     } catch (err) {
@@ -8242,6 +8417,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         console.error(`[checkout-gpay] sessionId mismatch for invoice ${invoice.id}`);
         return res.status(403).json({ message: "Session ID mismatch" });
       }
+      // OI-1: a voided or otherwise paid invoice takes no new payment; the payer's token is not submitted.
+      if (["paid", "paid_external", "voided"].includes(invoice.status)) {
+        return res.status(409).json({ message: "Invoice is not payable" });
+      }
 
       if (!isWindcaveConfigured()) {
         return res.status(503).json({ code: "PAYMENT_PROVIDER_UNAVAILABLE", message: "Payment outcome is unavailable" });
@@ -8279,8 +8458,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!invoice) return res.redirect("/");
       const back = `/r/${token}`;
 
-      // Already settled, or tenant cancelled (no charge) — just show the page
-      if (["paid", "paid_external", "voided"].includes(invoice.status)) return res.redirect(back);
+      // Already paid, or tenant cancelled (no charge) — just show the page. A voided invoice, or one
+      // paid another way, is still asked: a payment after either is recorded (OI-1).
+      if (invoice.status === "paid") return res.redirect(back);
       if (result === "cancelled") return res.redirect(back);
 
       const sessionId = invoice.windcaveSessionId;
@@ -8309,7 +8489,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         if (opened?.rentInvoiceId) invoice = await storage.getInvoiceRentRequest(opened.rentInvoiceId);
       }
       if (!invoice) { console.warn("[RENT_NOTIF] No invoice holds the notified session"); return; }
-      if (["paid", "paid_external", "voided"].includes(invoice.status)) return; // already settled
+      if (invoice.status === "paid") return; // already settled; a voided or externally paid one is still asked (OI-1)
       if (!isWindcaveConfigured()) return;
       const queryResult = await queryWindcaveSession(sessionId, await expectedForCheckoutInvoice({ ...invoice, checkoutVertical: "property" }, sessionId));
       if (!queryResult.success) { console.error(`[RENT_NOTIF] The session query failed for invoice ${invoice.id}:`, queryResult.error); return; }
@@ -8331,7 +8511,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         if (opened?.jobInvoiceId) stored = await storage.getJobInvoice(opened.jobInvoiceId);
       }
       if (!stored) { console.warn("[TRADES_NOTIF] No invoice holds the notified session"); return; }
-      if (["paid", "paid_external", "voided"].includes(stored.status)) return;
+      if (stored.status === "paid") return; // a voided or externally paid one is still asked (OI-1)
       if (!isWindcaveConfigured()) return;
       const invoice = { ...stored, checkoutVertical: "trades" as const };
       const queryResult = await queryWindcaveSession(sessionId, await expectedForCheckoutInvoice(invoice, sessionId));
@@ -8962,12 +9142,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (inv.status === "paid" || inv.status === "paid_external") return res.status(409).json({ message: "This invoice is already paid" });
       const parsed = markJobPaidExternalSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
+      if (invoiceCaptured(inv)) return res.status(409).json(INVOICE_PAYMENT_CAPTURED);
+      if (await invoicePaidJustNow("trades", id, merchantId)) return res.status(409).json(INVOICE_JUST_PAID);
       // Storage rechecks the business and the invoice's state at the write, and saves the history with it.
       const result = await storage.markJobInvoicePaidExternalForMerchant(id, merchantId, parsed.data.externalPaymentReference);
       if (result.kind === "not-found") return res.status(404).json({ message: "Not found" });
-      if (result.kind === "conflict" && result.reason === "payment-active") return res.status(409).json({
-        message: "Payment is in progress or a share is already paid", code: "PAYMENT_ACTIVE",
-      });
+      if (result.kind === "conflict" && result.reason === "payment-captured") return res.status(409).json(INVOICE_PAYMENT_CAPTURED);
       if (result.kind === "conflict") return res.status(409).json({ message: result.reason === "voided" ? "This invoice was voided" : "This invoice is already paid" });
       await sendTradePaymentInvoiceForMerchant(id, merchantId);
       res.json(result.invoice);
@@ -9003,13 +9183,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!inv) return res.status(404).json({ message: "Not found" });
       // A paid invoice stays paid (C10 batch 6d): the screens offer cancelling only an unpaid one.
       if (inv.status === "paid" || inv.status === "paid_external") return res.status(409).json({ message: "This invoice is paid" });
+      if (invoiceCaptured(inv)) return res.status(409).json(INVOICE_PAYMENT_CAPTURED);
+      if (await invoicePaidJustNow("trades", id, merchantId)) return res.status(409).json(INVOICE_JUST_PAID);
       // The client's history shows the cancellation, as a rent invoice's does (owner decision
       // 2026-09-27): storage saves it with the change.
       const result = await storage.voidJobInvoiceForMerchant(id, merchantId);
       if (result.kind === "not-found") return res.status(404).json({ message: "Not found" });
-      if (result.kind === "conflict" && result.reason === "payment-active") return res.status(409).json({
-        message: "Payment is in progress or a share is already paid", code: "PAYMENT_ACTIVE",
-      });
+      if (result.kind === "conflict" && result.reason === "payment-captured") return res.status(409).json(INVOICE_PAYMENT_CAPTURED);
       if (result.kind === "conflict") return res.status(409).json({ message: "This invoice is paid" });
       res.json(result.invoice);
     } catch (err) { console.error("[TRADES_INVOICES_VOID]", err); res.status(500).json({ message: "Failed to void invoice" }); }

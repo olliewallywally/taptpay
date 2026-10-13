@@ -235,7 +235,7 @@ const RENT_INVOICE_ROW =
 const RENT_DELIVERY =
   "sends the tenant the payment link by the invoice's channel: WhatsApp or SMS when chosen, configured and the tenant has a phone, otherwise email (resendInvoiceEmailForMerchant, then deliverInvoice with captured owned contact, server/property-cron.ts); no DB locks over providers; an uncertain send or refused/failed post-send record is reconciliation-required 503";
 const paidElsewhereFinding = (action: string) =>
-  `${action} while the tenant is paying: the provider's completion then finds the invoice settled (finalizeRentInvoice), so a single payment's charge is recorded nowhere; a split share's is logged (Split_Share_Unrecorded). R3 (payment attempts).`;
+  `${action} while the tenant is paying (allowed since OI-1, 2026-10-13): a single payment completing afterwards is recorded by finalizeRentInvoice (a voided invoice becomes paid, Payment_Received_After_Void; one paid another way keeps its status, Payment_Received_After_External with a refund due); a split share's is logged for a refund (Split_Share_Unrecorded, with the invoice's state as its reason). Only the latest single-invoice session is pinned, so a payment through an earlier wallet session is still found by no lookup (pre-existing).`;
 
 // ── The trades routes (batch 6d) ──
 const TRADES_ADMIN = adminRefused(ADMIN_403);
@@ -257,7 +257,7 @@ const tradesDelivery = (what: string) =>
   `sends the client ${what} by its channel: WhatsApp or SMS when chosen, configured and the client has a phone, otherwise email (server/trades-delivery.ts)`;
 const INVOICE_DELIVERY_REASON = "deliveryReason (a fixed code: not_found, not_payable, missing_data, send_failed or no_deliverable)";
 const tradesPaidElsewhereFinding = (action: string) =>
-  `${action} while the client is paying: the provider's completion then finds the invoice settled (finalizeTradeInvoice), so a single payment's charge is recorded nowhere; a split share's is logged (split_share_unrecorded). R3 (payment attempts).`;
+  `${action} while the client is paying (allowed since OI-1, 2026-10-13): a single payment completing afterwards is recorded by finalizeTradeInvoice (a voided invoice becomes paid, payment_received_after_void, or stays voided with the payment and a refund due when a schedule has replaced it; one paid another way keeps its status, payment_received_after_external with a refund due); a split share's is logged for a refund (split_share_unrecorded, with the invoice's state as its reason). Only the latest single-invoice session is pinned, so a payment through an earlier wallet session is still found by no lookup (pre-existing).`;
 const archivedStillFinding = (what: string) =>
   `An archived client can still be ${what} here; no screen offers it (the pickers list only current clients). Only a recurring invoice is refused for one (owner decision 2026-09-27).`;
 
@@ -3036,10 +3036,10 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       },
     ],
     input: "id: strictPositiveIntegerParam (400 otherwise)",
-    capability: null,
+    capability: "isWindcaveConfigured(): unconfigured, the cancel asks the provider nothing and leaves open attempts untouched",
     entitlement: null,
-    idempotency: "cancels a pending or processing sale under the parent row lock, then separately rechecks recorded attempts and split shares with a fresh statement snapshot. Live/expired or possibly accepted attempts, legacy sessions and captured/processing shares hold cancellation (409 PAYMENT_ACTIVE); any other aggregate state is 400 (so again is 400). Only a persisted cancellation broadcasts. Durable cancellation command/audit/outbox remains R3 work; legacy provider sends before attachment still require initiation convergence",
-    sideEffects: "a live update to the business, and to the board's page for a board sale (sseBroker, via broadcastToStone)",
+    idempotency: "owner decision OI-1 (2026-10-13): an attempt to pay never refuses the cancel; money already taken does (a provider transaction, a paid or processing share, an approved attempt: 409 PAYMENT_CAPTURED, read through getRetailCancellationContextForMerchant before any provider call and rechecked under the parent row lock). Each open attempt (ready/finalizing with a session) is asked once, without retries and outside any lock, through queryWindcaveSession with its recorded expected values; a verified approval is claimed (claimFinalization) and settled through persistTokenOutcome and the cancel answers 409 PAYMENT_COMPLETED; a verified decline is finalized declined only after the cancel commits, so the sale stays cancelled; anything else cancels and leaves the attempt able to settle, and finalize records a later payment on the cancelled sale. A board sale's own pending session is asked the same way and only refuses; its payment is recorded by its notification/callback. Unsent claims are abandoned with the sale. A sale no longer pending/processing is 400 (so again is 400)",
+    sideEffects: "provider: queryWindcaveSession (one exchange); a payment found settled sends the business a payment push (sendPushToMerchant, via persistTokenOutcome); a live update to the business, and to the board's page for a board sale (sseBroker, via broadcastToStone)",
     successDto: "ownerTransactionDto with the board's addresses for a board sale",
     errorDisclosure: ["fixed"],
     findings: [ADMIN_MONEY],
@@ -3391,16 +3391,15 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${propertyRecord("invoice", "getInvoiceRentRequestForMerchant")}, including current parent ownership, rechecked under parent-then-child locks; ${PROPERTY_ADMIN}` },
     ],
     input: propertyId("id"),
-    capability: null,
+    capability: "isWindcaveConfigured(): unconfigured, the open windows are not asked and the change goes ahead on the stored state",
     entitlement: null,
     idempotency:
-      "voidInvoiceRentRequestForMerchant checks the current locked status and commits the scoped invoice update and history together; a paid or externally paid one is 409 'Cannot void a paid invoice' (400 until 2026-09-27, P2.2). Recorded live/expired attempts, legacy sessions and paid split shares refuse with 409 PAYMENT_ACTIVE. A voided one is voided again, with a new time, and logged again. Ownership refusal changes nothing; history failure rolls back the write. Legacy initiation before attachment still requires R3 convergence",
-    sideEffects: null,
+      "voidInvoiceRentRequestForMerchant checks the current locked status and commits the scoped invoice update and history together; a paid or externally paid one is 409 'Cannot void a paid invoice' (400 until 2026-09-27, P2.2). OI-1 (2026-10-13): a card payment already taken (a provider transaction, a paid share or split session, an approved attempt) refuses with 409 PAYMENT_CAPTURED before any provider call, and again under the locks; each window that may still be paid (its unpaid split sessions, or the pinned session: getOpenInvoiceSessionsForMerchant) is asked once, in parallel and outside any lock, and a verified payment refuses with 409 PAYMENT_COMPLETED, left for its completion path to record; otherwise the change goes ahead, and a payment completing later is recorded (see findings). A voided one is voided again, with a new time, and logged again. Ownership refusal changes nothing; history failure rolls back the write",
+    sideEffects: "provider: queryWindcaveSession, once per open window",
     successDto: `the invoice afterwards, ${RENT_INVOICE_ROW}`,
     errorDisclosure: ["fixed"],
     findings: [
       paidElsewhereFinding("Voiding"),
-      "A split invoice with shares already paid can be voided: those shares stay collected, with nothing but their events to show for them (R3/R4, refunds).",
       PROPERTY_TEAM,
     ],
   },
@@ -3415,10 +3414,10 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       },
     ],
     input: `${propertyId("id")}; body: markInvoicePaidExternalSchema (an optional reference of at most 200 characters, null or empty for none: both screens send null when no reference is typed, which was refused until 2026-09-27, batch 6d; 400 with the issues)`,
-    capability: null,
+    capability: "isWindcaveConfigured(): unconfigured, the open windows are not asked and the change goes ahead on the stored state",
     entitlement: null,
-    idempotency: "markInvoiceRentRequestPaidExternalForMerchant checks the current locked status and commits the scoped external-payment record and history together; a paid or externally paid one is 409 'Invoice is already paid' (400 until 2026-09-27, P2.2), and a voided one stays voided. Recorded live/expired attempts, legacy sessions and paid split shares refuse with 409 PAYMENT_ACTIVE. Issued invoices remain payable after profile archival. Ownership refusal changes nothing; history failure rolls back the write. Legacy initiation before attachment still requires R3 convergence",
-    sideEffects: null,
+    idempotency: "markInvoiceRentRequestPaidExternalForMerchant checks the current locked status and commits the scoped external-payment record and history together; a paid or externally paid one is 409 'Invoice is already paid' (400 until 2026-09-27, P2.2), and a voided one stays voided. OI-1 (2026-10-13): a card payment already taken (a provider transaction, a paid share or split session, an approved attempt) refuses with 409 PAYMENT_CAPTURED before any provider call, and again under the locks; each window that may still be paid (its unpaid split sessions, or the pinned session: getOpenInvoiceSessionsForMerchant) is asked once, in parallel and outside any lock, and a verified payment refuses with 409 PAYMENT_COMPLETED, left for its completion path to record; otherwise the change goes ahead, and a payment completing later is recorded (see findings). Issued invoices remain payable after profile archival. Ownership refusal changes nothing; history failure rolls back the write",
+    sideEffects: "provider: queryWindcaveSession, once per open window",
     successDto: `the invoice afterwards, ${RENT_INVOICE_ROW}`,
     errorDisclosure: ["input-issues"],
     findings: [
@@ -3731,11 +3730,11 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       },
     ],
     input: `${tradesId("id")}; body: markJobPaidExternalSchema (an optional reference of at most 200 characters, null or empty for none: every screen sends null when no reference is typed, and the desktop always does, which was refused until 2026-09-27; 400 with the first issue)`,
-    capability: null,
+    capability: "isWindcaveConfigured(): unconfigured, the open windows are not asked and the change goes ahead on the stored state",
     entitlement: null,
     idempotency:
-      "markJobInvoicePaidExternalForMerchant marks the owned invoice paid outside TaptPay with the reference and the time, and saves its paid_external event in the same transaction; a voided or paid one is 409 (since 2026-09-27: each call marked it again and emailed the client another receipt). Recorded live/expired attempts, legacy sessions and paid split shares refuse with 409 PAYMENT_ACTIVE. A row moved or settled after the lookup is 404 or 409 with nothing written or sent. Legacy initiation before attachment still requires R3 convergence",
-    sideEffects: "emails the client a receipt for the invoice, with the business's GST number (sendTradePaymentInvoiceForMerchant: the invoice read in one statement with its owned client, and logged only while both are still the business's); nothing when the client has no email",
+      "markJobInvoicePaidExternalForMerchant marks the owned invoice paid outside TaptPay with the reference and the time, and saves its paid_external event in the same transaction; a voided or paid one is 409 (since 2026-09-27: each call marked it again and emailed the client another receipt). OI-1 (2026-10-13): a card payment already taken (a provider transaction, a paid share or split session, an approved attempt) refuses with 409 PAYMENT_CAPTURED before any provider call, and again under the locks; each window that may still be paid (its unpaid split sessions, or the pinned session: getOpenInvoiceSessionsForMerchant) is asked once, in parallel and outside any lock, and a verified payment refuses with 409 PAYMENT_COMPLETED, left for its completion path to record; otherwise the change goes ahead, and a payment completing later is recorded (see findings). A row moved or settled after the lookup is 404 or 409 with nothing written or sent",
+    sideEffects: "provider: queryWindcaveSession, once per open window; emails the client a receipt for the invoice, with the business's GST number (sendTradePaymentInvoiceForMerchant: the invoice read in one statement with its owned client, and logged only while both are still the business's); nothing when the client has no email",
     successDto: `the invoice afterwards, ${JOB_INVOICE_ROW}`,
     errorDisclosure: ["input-issues"],
     findings: [tradesPaidElsewhereFinding("Marking an invoice paid outside TaptPay"), TRADES_TEAM],
@@ -3765,16 +3764,15 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       },
     ],
     input: tradesId("id"),
-    capability: null,
+    capability: "isWindcaveConfigured(): unconfigured, the open windows are not asked and the change goes ahead on the stored state",
     entitlement: null,
     idempotency:
-      "voidJobInvoiceForMerchant voids the owned invoice with the time and saves invoice_voided in the client's history in the same transaction (logged since 2026-09-27). Recorded live/expired attempts, legacy sessions and paid split shares refuse with 409 PAYMENT_ACTIVE. A voided one is voided again, with a new time, and logged again; a row moved or paid after the lookup is 404 or 409 with nothing written. Legacy initiation before attachment still requires R3 convergence",
-    sideEffects: null,
+      "voidJobInvoiceForMerchant voids the owned invoice with the time and saves invoice_voided in the client's history in the same transaction (logged since 2026-09-27). OI-1 (2026-10-13): a card payment already taken (a provider transaction, a paid share or split session, an approved attempt) refuses with 409 PAYMENT_CAPTURED before any provider call, and again under the locks; each window that may still be paid (its unpaid split sessions, or the pinned session: getOpenInvoiceSessionsForMerchant) is asked once, in parallel and outside any lock, and a verified payment refuses with 409 PAYMENT_COMPLETED, left for its completion path to record; otherwise the change goes ahead, and a payment completing later is recorded (see findings). A voided one is voided again, with a new time, and logged again; a row moved or paid after the lookup is 404 or 409 with nothing written",
+    sideEffects: "provider: queryWindcaveSession, once per open window",
     successDto: `the invoice afterwards, ${JOB_INVOICE_ROW}`,
     errorDisclosure: ["fixed"],
     findings: [
       tradesPaidElsewhereFinding("Voiding"),
-      "A split invoice with shares already paid can be voided: those shares stay collected, with nothing but their events to show for them (R3/R4, refunds).",
       TRADES_TEAM,
     ],
   },

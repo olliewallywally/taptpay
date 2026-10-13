@@ -101,6 +101,26 @@ export interface RefundResult {
 // server/windcave-client.ts). These wrappers keep the return shapes the routes use
 // today; the routes move onto typed outcomes and the shared verifier in R2-T5.
 let sessionClient: WindcaveClient | undefined;
+let singleAttemptClient: WindcaveClient | undefined;
+
+/** One exchange, no retries: for a merchant waiting on a decision (OI-1's cancel check).
+ * "Cannot say yet" is a safe answer there, so a slow provider costs one timeout, not minutes. */
+function singleAttemptSessionClient(): WindcaveClient {
+  return singleAttemptClient ??= createWindcaveClient({
+    config: {
+      mode: config.paymentMode,
+      endpoint: config.windcave.endpoint || "",
+      username: config.windcave.username || "",
+      apiKey: config.windcave.apiKey || "",
+      publicOrigin: config.publicOrigin,
+    },
+    transport: (url, init) => fetch(url, init),
+    wait: delay,
+    clock: () => new Date(),
+    audit: logAudit,
+    retryLimit: 0,
+  });
+}
 
 function defaultSessionClient(): WindcaveClient {
   return sessionClient ??= createWindcaveClient({
@@ -196,13 +216,14 @@ export function currentProviderEnvironment(): "uat" | "production" {
 export async function queryWindcaveSession(
   sessionId: string,
   expected: WindcaveExpectedOutcome | null,
+  options: { singleAttempt?: boolean } = {},
 ): Promise<QuerySessionResult> {
   if (!expected) return { success: false, error: "unverifiable:no_expected" };
   if (expected.sessionId !== sessionId) {
     writeSecurityAuditEvent("PROVIDER_OUTCOME_MISMATCH", { field: "session" });
     return { success: false, error: "integrity_mismatch:session" };
   }
-  const outcome = await defaultSessionClient().querySession(sessionId);
+  const outcome = await (options.singleAttempt ? singleAttemptSessionClient() : defaultSessionClient()).querySession(sessionId);
   if (outcome.kind === "pending") return { success: false, error: "Session still processing after max retries" };
   if (outcome.kind !== "reply") return { success: false, error: legacyFailure(outcome) };
 

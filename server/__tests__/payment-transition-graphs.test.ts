@@ -16,6 +16,13 @@ describe('domain transition authority and terminality',()=>{
     expect(evaluateTransition(propertyInvoiceGraph,'voided','approve','processor')).toEqual({kind:'conflict'});
     expect(evaluateTransition(retailTransactionGraph,'cancelled','approve','processor')).toEqual({kind:'conflict'});
   });
+  // OI-1 (2026-10-13): only a verified processor outcome may complete a cancelled sale, never a merchant.
+  test('a payment completing after a cancel is recorded by the processor edge only',()=>{
+    expect(evaluateTransition(retailTransactionGraph,'cancelled','approveAfterCancel','processor')).toEqual({kind:'claimed'});
+    expect(evaluateTransition(retailTransactionGraph,'cancelled','approveAfterCancel','merchant')).toEqual({kind:'conflict'});
+    for(const state of ['ready','finalizing']) expect(evaluateTransition(paymentAttemptGraph,state,'abandonUnsentOnCancel','merchant')).toEqual({kind:'conflict'});
+    expect(evaluateTransition(paymentAttemptGraph,'claiming','abandonUnsentOnCancel','merchant')).toEqual({kind:'claimed'});
+  });
   test('ready or finalizing attempt cannot be abandoned by lease expiry',()=>{
     for(const state of ['ready','finalizing']) expect(evaluateTransition(paymentAttemptGraph,state,'abandonUnsent','system')).toEqual({kind:'conflict'});
     expect(evaluateTransition(paymentAttemptGraph,'claiming','abandonUnsent','system')).toEqual({kind:'claimed'});
