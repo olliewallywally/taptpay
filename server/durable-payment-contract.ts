@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import type { MismatchField } from "./windcave-verify";
 
 export type ProviderOutcome = "approved" | "declined" | "cancelled";
 export type AttemptState = "claiming" | "ready" | "finalizing" | ProviderOutcome | "abandoned";
@@ -24,9 +25,11 @@ export type SessionBinding = ProviderExpectation & (
  * No adapter from the old success/approved booleans is permitted. */
 export type ProviderQueryResult =
   | { kind: "pending" | "unknown" | "unavailable" }
-  | { kind: "mismatch" }
+  | { kind: "mismatch"; field: MismatchField }
+  // transactionCount is information only (owner decision OI-2, 2026-10-13): R2's verifier
+  // decides whether a session with several card attempts is one unambiguous outcome.
   | (ProviderExpectation & { kind: "verified"; outcome: ProviderOutcome;
-      transactionId: string; transactionCount: 1; paymentMethod?: string });
+      transactionId: string; transactionCount: number; paymentMethod?: string });
 export type VerifiedOutcome = Extract<ProviderQueryResult, { kind: "verified" }>;
 export interface ReconciliationProvider {
   query(expected: Readonly<ProviderExpectation>): Promise<ProviderQueryResult>;
@@ -47,6 +50,8 @@ export interface ReconciliationRepository {
   finalize(binding: SessionBinding, outcome: VerifiedOutcome, claim: InboxClaim, now: Date): Promise<SettlementResult>;
   finishInbox(claim: InboxClaim, result: { status: "retry" | "complete" | "dead_letter";
     code?: ReconciliationError; transactionId?: string; nextAttemptAt?: Date }, now: Date): Promise<boolean>;
+  /** R2-T6's sanitized reconciliation code on a retail attempt (H-3). Invoice attempts have no column. */
+  recordReconciliation?(binding: SessionBinding, code: string, now: Date): Promise<void>;
 }
 
 export function requestFingerprint(input: Record<string, unknown>): string {

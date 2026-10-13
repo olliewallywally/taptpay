@@ -1,9 +1,17 @@
 import type { ProviderExpectation, ProviderQueryResult, ReconciliationProvider, ReconciliationRepository,
   ReconciliationError, InboxClaim } from "./durable-payment-contract";
 import { isSessionId, isUuid } from "./durable-payment-contract";
+import type { MismatchField } from "./windcave-verify";
+import { writeSecurityAuditEvent } from "./security-audit-log";
+
+const EVIDENCE_FIELDS: ReadonlyArray<[keyof ProviderExpectation, MismatchField]> = [
+  ["sessionId", "session"], ["processorXId", "session"], ["amountCents", "amount"], ["currency", "currency"],
+  ["reference", "reference"], ["environment", "environment"], ["providerAccount", "account"],
+];
 
 export function evidenceMatchesExpectation(expected: ProviderExpectation, result: ProviderQueryResult): boolean {
-  return result?.kind === "verified" && result.transactionCount === 1 && isSessionId(result.transactionId) &&
+  return result?.kind === "verified" && Number.isSafeInteger(result.transactionCount) && result.transactionCount >= 1 &&
+    isSessionId(result.transactionId) &&
     Number.isSafeInteger(result.amountCents) && result.amountCents>0 && result.amountCents<=9999999999 &&
     (result.paymentMethod===undefined || (typeof result.paymentMethod==='string' && result.paymentMethod.length>0 && result.paymentMethod.length<=100)) &&
     ["approved", "declined", "cancelled"].includes(result.outcome) &&
@@ -11,11 +19,22 @@ export function evidenceMatchesExpectation(expected: ProviderExpectation, result
       expected[key as keyof ProviderExpectation] !== undefined && expected[key as keyof ProviderExpectation] === result[key as keyof ProviderExpectation]);
 }
 
+/** The sanitized field a provider mismatch is reported under (R2-T6): never a value. */
+function mismatchField(expected: ProviderExpectation, result: ProviderQueryResult): MismatchField | "evidence" {
+  if (result?.kind === "mismatch") return result.field;
+  if (result?.kind === "verified") {
+    for (const [key, field] of EVIDENCE_FIELDS) if (expected[key] !== result[key]) return field;
+  }
+  // Verified evidence the worker's own re-check refuses for no field (format or count): an adapter fault.
+  return "evidence";
+}
+
 /** Explicitly invoked by the eventual R2-integrated runtime. No background timer
  * or default provider is created by importing this module. */
 export class PaymentReconciliationWorker {
   constructor(private readonly repository: ReconciliationRepository, private readonly provider: ReconciliationProvider,
-    private readonly clock = () => new Date(), private readonly random = Math.random) {}
+    private readonly clock = () => new Date(), private readonly random = Math.random,
+    private readonly audit: (event: string, details: Record<string, unknown>) => void = writeSecurityAuditEvent) {}
 
   async runOne(owner: string): Promise<boolean> {
     if (!isUuid(owner)) throw new Error("invalid_worker_owner");
@@ -30,6 +49,11 @@ export class PaymentReconciliationWorker {
         await this.retry(claim, `provider_${result.kind}`); return true;
       }
       if (result.kind !== "verified" || !evidenceMatchesExpectation(expected, result)) {
+        // H-3: R2-T6's signals on the worker path too: one sanitized event and, for a retail
+        // attempt, its last reconciliation code. Best effort: neither can turn this into a retry.
+        const field = mismatchField(expected, result);
+        try { this.audit("PROVIDER_OUTCOME_MISMATCH", { field }); } catch { /* the dead-letter still records it */ }
+        await this.repository.recordReconciliation?.(expected, `integrity_mismatch:${field}`, this.clock()).catch(() => undefined);
         await this.repository.finishInbox(claim, { status: "dead_letter", code: "integrity_mismatch" }, this.clock());
         return true;
       }

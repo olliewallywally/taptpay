@@ -38,7 +38,14 @@ const terminal = (state: string) => ["approved","declined","cancelled"].includes
  * No ambient connection is imported and no service starts on construction. */
 export class DurablePaymentStorage implements ReconciliationRepository, PaymentOutboxRepository {
   constructor(private readonly pool: PaymentSqlPool,
-    private readonly retailFinalizer?: (binding: SessionBinding, outcome: VerifiedOutcome, claim: InboxClaim, now: Date) => Promise<SettlementResult>) {}
+    private readonly retailFinalizer?: (binding: SessionBinding, outcome: VerifiedOutcome, claim: InboxClaim, now: Date) => Promise<SettlementResult>,
+    private readonly retailRecorder?: (binding: SessionBinding, code: string) => Promise<unknown>) {}
+
+  /** H-3: a retail attempt's sanitized reconciliation code goes through R2's service (Option A).
+   * Invoice attempts have no such column (0036), so nothing is written for them. */
+  async recordReconciliation(binding: SessionBinding, code: string, _now: Date): Promise<void> {
+    if (binding.paymentAttemptId && this.retailRecorder) await this.retailRecorder(binding, code);
+  }
 
   private async transaction<T>(work: (client: PaymentSqlClient) => Promise<T>): Promise<T> {
     const client = await this.pool.connect();
