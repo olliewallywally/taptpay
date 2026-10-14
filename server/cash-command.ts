@@ -5,7 +5,7 @@ export interface CashCommandInput {
   actor:{userId:number;role:'owner'|'member'|'admin';requestId?:string};
 }
 export type CashCommandResult={kind:'recorded'|'reused';transaction:Transaction;eventId:string}
-  |{kind:'conflict'}|{kind:'not-found'};
+  |{kind:'conflict';transaction:Transaction}|{kind:'not-found'};
 export class CashCommandInputError extends Error {constructor(){super('invalid_cash_command');}}
 export function canonicalCashCommand(input:CashCommandInput) {
   const parsed=cashSaleRequestSchema.safeParse({merchantId:input.merchantId,itemName:input.itemName,price:input.price,stoneId:input.stoneId});

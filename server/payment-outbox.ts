@@ -1,7 +1,8 @@
 export interface OutboxClaim {
   id:string;eventId:string;channel:'merchant_payment_update'|'payer_receipt';owner:string;
   attemptCount:number;leaseExpiresAt:Date;
-  eventSource?:'provider_settlement'|'transaction_event';
+  /** Required: a claim that names no source is refused, never treated as a provider settlement. */
+  eventSource:'provider_settlement'|'transaction_event';
 }
 export interface PaymentOutboxRepository {
   claimOutbox(owner:string,now:Date):Promise<OutboxClaim|undefined>;
@@ -19,7 +20,7 @@ export class PaymentOutboxWorker {
     const claim=await this.repository.claimOutbox(owner,this.clock());
     if(!claim) return false;
     try {
-      await this.receiver.deliver({deliveryKey:claim.id,eventId:claim.eventId,eventSource:claim.eventSource??'provider_settlement',channel:claim.channel});
+      await this.receiver.deliver({deliveryKey:claim.id,eventId:claim.eventId,eventSource:claim.eventSource,channel:claim.channel});
       await this.repository.finishOutbox(claim,'complete',this.clock());
     } catch {
       const now=this.clock();

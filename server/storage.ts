@@ -2195,7 +2195,9 @@ export class MemStorage implements IStorage {
 
       // As the PostgreSQL twin: a pre-set X-ID refuses another; R3 send intent is not abandoned.
       if (attempt.processorXId !== null && attempt.processorXId !== input.processorXId) return { kind: "conflict", attempt };
-      if (paymentAttemptLeaseExpired(attempt, input.now) && !attempt.sendStartedAt) {
+      // Only an unattached claim is abandoned at its lease's end: a second attach of an attempt whose
+      // session was already served must never strand that session.
+      if (paymentAttemptLeaseExpired(attempt, input.now) && attempt.state === "claiming" && !attempt.processorSessionId && !attempt.sendStartedAt) {
         const abandoned: PaymentAttempt = {
           ...attempt,
           state: "abandoned",
@@ -2491,7 +2493,7 @@ export class MemStorage implements IStorage {
     return withMemLock(this.paymentAttemptLocks,`cash:${command.merchantId}:${command.idempotencyKey}`,async()=>{
       const existing=await this.getCashSaleByKeyForMerchant(command.merchantId,command.idempotencyKey);
       if(existing) {
-        if(existing.cashRequestFingerprint!==command.fingerprint) return {kind:'conflict'};
+        if(existing.cashRequestFingerprint!==command.fingerprint) return {kind:'conflict',transaction:existing};
         const event=Array.from(this.cashAuditEvents.values()).find(event=>event.transactionId===existing.id);
         if(!event) throw new Error('cash_audit_missing');
         return {kind:'reused',transaction:existing,eventId:event.id};
@@ -3130,6 +3132,8 @@ export class MemStorage implements IStorage {
     }
     // Match the upload FK: reject before deleting any child records.
     if ([...this.uploadedFileBlobs.values()].some((file) => file.merchantId === id)) return false;
+    // Match the cash event FK (0038): a recorded cash sale's audit is never orphaned.
+    if ([...this.cashAuditEvents.values()].some((event) => event.merchantId === id)) return false;
 
     // Delete all transactions associated with this merchant
     const transactionsToDelete: number[] = [];
@@ -5883,8 +5887,9 @@ export class DatabaseStorage implements IStorage {
       if (!attempt) return { kind: "not-found" };
 
       if (attempt.processorXId !== null && attempt.processorXId !== input.processorXId) return { kind: "conflict", attempt };
-      // A session returned after the lease ran out is never served (R2): its links reach no payer.
-      if (paymentAttemptLeaseExpired(attempt, input.now) && !attempt.sendStartedAt) {
+      // A session returned after the lease ran out is never served (R2): its links reach no payer. Only an
+      // unattached claim is abandoned: a second attach of an already-served session must never strand it.
+      if (paymentAttemptLeaseExpired(attempt, input.now) && attempt.state === "claiming" && !attempt.processorSessionId && !attempt.sendStartedAt) {
         const rows = await tx
           .update(paymentAttempts)
           .set({ state: "abandoned", updatedAt: input.now })
@@ -6394,7 +6399,7 @@ export class DatabaseStorage implements IStorage {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(${0x43415348},hashtext(${`${command.merchantId}:${command.idempotencyKey}`}))`);
       const scoped=new DatabaseStorage(tx),existing=await scoped.getCashSaleByKeyForMerchant(command.merchantId,command.idempotencyKey);
       if(existing) {
-        if(existing.cashRequestFingerprint!==command.fingerprint) return {kind:'conflict'};
+        if(existing.cashRequestFingerprint!==command.fingerprint) return {kind:'conflict',transaction:existing};
         const [event]=await tx.select({id:transactionEvents.id}).from(transactionEvents).where(and(
           eq(transactionEvents.transactionId,existing.id),eq(transactionEvents.merchantId,command.merchantId),eq(transactionEvents.eventType,'Cash_Recorded'))).limit(1);
         if(!event) throw new Error('cash_audit_missing');

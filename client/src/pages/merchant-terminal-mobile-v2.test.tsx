@@ -478,6 +478,37 @@ describe("a cash sale on the phone", () => {
     expect(sessionStorage.getItem('taptpay:cash-command:v1:1')).toContain(cashKeys[0]!);
   });
 
+  // A saved command whose sale was recorded but whose answer was lost: the next sale with other details
+  // is told which sale is already recorded, and the key is released so it can be recorded.
+  it('a conflict names the sale already recorded and releases the saved command', async () => {
+    cashHandler = () => jsonResponse({ code: 'IDEMPOTENCY_CONFLICT', message: 'Cash retry details differ from the original sale',
+      transaction: { id: 76, merchantId: 1, itemName: 'scone', price: '3.20', paymentMethod: 'cash', status: 'completed' } }, 409);
+    renderTerminal();
+    await screen.findByTestId('retail-terminal-view-stub');
+    fireEvent.click(screen.getByText('record cash sale'));
+    await waitFor(() => expect(mockCashOutcomes).toEqual(['rejected']));
+    expect(sessionStorage.getItem('taptpay:cash-command:v1:1')).toBeNull();
+    expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
+      description: 'An earlier cash sale (scone, $3.20) was already recorded. Record this sale again to save it.',
+    }));
+    cashHandler = body => jsonResponse({ transaction: { id: 78, merchantId: 1, itemName: body.itemName, price: body.price, paymentMethod: 'cash', status: 'completed' } });
+    fireEvent.click(screen.getByText('record cash sale'));
+    await waitFor(() => expect(mockCashOutcomes).toEqual(['rejected', 'resolved']));
+    expect(cashKeys[1]).not.toBe(cashKeys[0]);
+  });
+
+  it('a replayed answer says the sale was already recorded, so a second identical sale is never swallowed silently', async () => {
+    cashHandler = body => jsonResponse({ transaction: { id: 77, merchantId: 1, itemName: body.itemName, price: body.price, paymentMethod: 'cash', status: 'completed' }, replayed: true });
+    renderTerminal();
+    await screen.findByTestId('retail-terminal-view-stub');
+    fireEvent.click(screen.getByText('record cash sale'));
+    await waitFor(() => expect(mockCashOutcomes).toEqual(['resolved']));
+    expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
+      title: 'Already recorded', description: 'This cash sale was recorded earlier. Record it again for a new sale.',
+    }));
+    expect(sessionStorage.getItem('taptpay:cash-command:v1:1')).toBeNull();
+  });
+
   it("refused for billing: the banner alone says so, and the success screen is not shown", async () => {
     cashHandler = () => jsonResponse({
       code: "BILLING_CARD_REQUIRED",

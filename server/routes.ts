@@ -2385,6 +2385,21 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(409).json({ message: "This payment share is no longer payable" });
       }
       if (claim.kind === "expired") {
+        // This key's own attempt ended before any session was served: it reached no payer and nothing
+        // can be charged through it. The key can never claim again (abandoned is final, and the key is
+        // unique per share), so say so; the page starts a new attempt under a new key. An attempt with a
+        // session or R3 send intent may still be paid and is reconciled as before.
+        if (
+          claim.attempt.state === "abandoned" &&
+          claim.attempt.idempotencyKey === validation.data.idempotencyKey &&
+          !claim.attempt.processorSessionId &&
+          !claim.attempt.sendStartedAt
+        ) {
+          return res.status(409).json({
+            code: "PAYMENT_ATTEMPT_EXPIRED",
+            message: "This payment attempt ended before any payment was taken. Please try again.",
+          });
+        }
         const reconciled = await reconcileExpiredTokenAttempt(claim.attempt);
         if (reconciled.kind === "terminal") {
           return res.json({
@@ -3092,13 +3107,17 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const commandInput={...validation.data,idempotencyKey,actor:{userId:req.user!.id,role:req.user!.role as 'owner'|'member'|'admin',
         ...(typeof requestId==='string' && /^[A-Za-z0-9._:-]{1,100}$/.test(requestId)?{requestId}:{})}};
       const command=canonicalCashCommand(commandInput);
+      // A conflict names the sale this key already recorded, and a reuse says it is one, so the terminal can
+      // tell the merchant (never the key or fingerprint: ownerTransactionDto is an allowlist).
+      const conflict=(recorded:any)=>res.status(409).json({code:'IDEMPOTENCY_CONFLICT',message:'Cash retry details differ from the original sale',
+        transaction:ownerTransactionDto(recorded)});
       const existing=await storage.getCashSaleByKeyForMerchant(merchantId,idempotencyKey);
       if(existing) {
-        if(existing.cashRequestFingerprint!==command.fingerprint) return res.status(409).json({code:'IDEMPOTENCY_CONFLICT',message:'Cash retry details differ from the original sale'});
+        if(existing.cashRequestFingerprint!==command.fingerprint) return conflict(existing);
         const persisted=await storage.recordCashSaleForMerchant(merchantId,commandInput,{allowCreate:false});
-        if(persisted.kind==='conflict') return res.status(409).json({code:'IDEMPOTENCY_CONFLICT',message:'Cash retry details differ from the original sale'});
+        if(persisted.kind==='conflict') return conflict(persisted.transaction);
         if(persisted.kind==='not-found') return res.status(503).json({message:'Cash sale is being checked. Retry with the same request'});
-        return res.json({transaction:ownerTransactionDto(persisted.transaction)});
+        return res.json({transaction:ownerTransactionDto(persisted.transaction),replayed:true});
       }
       if (!(await requireBillingCard(merchantId, res))) return;
       if (stoneId != null) {
@@ -3108,10 +3127,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         }
       }
       const result=await storage.recordCashSaleForMerchant(merchantId,commandInput);
-      if(result.kind==='conflict') return res.status(409).json({code:'IDEMPOTENCY_CONFLICT',message:'Cash retry details differ from the original sale'});
+      if(result.kind==='conflict') return conflict(result.transaction);
       if(result.kind==='not-found') return res.status(503).json({message:'Cash sale is being checked. Retry with the same request'});
       const transaction=result.transaction;
-      if(result.kind==='reused') return res.json({transaction:ownerTransactionDto(transaction)});
+      if(result.kind==='reused') return res.json({transaction:ownerTransactionDto(transaction),replayed:true});
       // Temporary first-commit compatibility delivery, keyed to the persisted
       // event. The durable manual event remains queued for receiver cutover.
       // Broadcast completion to SSE clients
@@ -3131,7 +3150,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     } catch (error) {
       if (error instanceof TransactionCreationScopeError) return res.status(400).json({ message: "Selected payment board is unavailable" });
       if(error instanceof CashCommandInputError) return res.status(400).json({message:"Invalid cash sale"});
-      console.error("[CASH_COMMAND_FAILED]");
+      // A class only, never a value: a lock timeout (55P03), an integrity refusal (23xxx) or a missing audit row.
+      const code=typeof (error as any)?.code==='string' && /^[0-9A-Z]{5}$/.test((error as any).code) ? (error as any).code : undefined;
+      console.error("[CASH_COMMAND_FAILED]",code ?? ((error as Error)?.message==='cash_audit_missing' ? 'cash_audit_missing' : 'unclassified'));
       res.status(500).json({ message: "Failed to record cash sale" });
     }
   });

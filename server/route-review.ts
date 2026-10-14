@@ -663,7 +663,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       "isWindcaveConfigured() (503 PAYMENT_PROVIDER_UNAVAILABLE) and PAYMENT_RETURN_STATE_SECRET (503 PAYMENT_RETURN_STATE_UNAVAILABLE)",
     entitlement: null,
     idempotency:
-      "per sale share and idempotency key: paymentAttempts.claim keeps one active attempt; the same key resumes its attempt and session, another key while one is active is 409, and concurrent creation of one attempt's session is coalesced in this process",
+      "per sale share and idempotency key: paymentAttempts.claim keeps one active attempt; the same key resumes its attempt and session, another key while one is active is 409, and concurrent creation of one attempt's session is coalesced in this process. The same key after its own attempt ended unsent (abandoned with no session and no send intent) is 409 PAYMENT_ATTEMPT_EXPIRED, since that key can never claim again and the page replaces it once; an expired attempt that holds a session or send intent is reconciled first (503 while it cannot be). A sale cancelled while its session was attached is 410 with no links (OI-1)",
     sideEffects:
       "creates a payment session with the provider (createWindcaveSession); an expired attempt is first reconciled by querying the provider, which can settle it (live update and push to the business)",
     successDto:
@@ -2990,9 +2990,9 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       "body: cashSaleRequestSchema, strict: the business, item name and price by the rules creating a sale uses, and an optional board (400 with the issues). Idempotency-Key header must be a UUID (400 IDEMPOTENCY_KEY_REQUIRED otherwise)",
     capability: null,
     entitlement: "paid access for new records (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise); an authenticated matching committed retry returns its audited record with no new action",
-    idempotency: "merchant-scoped UUID, database unique key and exact request fingerprint; changed money/item/board conflicts (409 IDEMPOTENCY_CONFLICT). Cash row, Cash_Recorded audit and manual-source outbox commit atomically. Same-key replay reuses the first record/event, with no usage increment or repeated communication. Generic constructors cannot mint cash keys",
+    idempotency: "merchant-scoped UUID, database unique key and exact request fingerprint; changed money/item/board conflicts (409 IDEMPOTENCY_CONFLICT). Cash row, Cash_Recorded audit and manual-source outbox commit atomically. Same-key replay reuses the first record/event, with no usage increment or repeated communication, and says so (replayed: true); a conflict names the sale the key already recorded (its ownerTransactionDto, never the key or fingerprint), so the terminal can tell the merchant and release its key. Generic constructors cannot mint cash keys",
     sideEffects: "atomic manual audit/outbox, distinct from provider settlement; temporary first-commit SSE/push compatibility delivery only. Shared keyed receiver cutover remains required before R3 exit",
-    successDto: "{ transaction: ownerTransactionDto }",
+    successDto: "{ transaction: ownerTransactionDto, replayed?: true }; a 409 conflict carries { code, message, transaction: ownerTransactionDto }",
     errorDisclosure: ["input-issues"],
     findings: [ADMIN_MONEY],
   },

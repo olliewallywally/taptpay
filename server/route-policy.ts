@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 9888af20a2fd70df04f7a8b6f866fec15add6554 on 2026-10-13.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 4168b2be32bf64831409c50a8270dda14e006662 on 2026-10-14.
  *
  * 194 registrations (81 GET, 81 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -760,7 +760,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       dtos: ["ownerTransactionDto"],
       errorTextInResponse: ["validation.error.errors"],
       entitlementGates: ["BILLING_CARD_REQUIRED","billingCardIsReady","requireBillingCard"],
-      helpers: ["broadcastToStone","requireBillingCard"],
+      helpers: ["broadcastToStone","conflict","requireBillingCard"],
     },
   },
   "POST /api/transactions/tap-to-pay": {

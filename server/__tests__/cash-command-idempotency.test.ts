@@ -17,13 +17,19 @@ async function setup() {
 test('a lost-response retry reuses the recorded cash sale and communicates nothing again',async()=>{
   const {send}=await setup();const key=randomUUID(),first=await send(key);expect(first.status).toBe(200);
   const before=storageSnapshot(),effects=observeRefusalEffects();
-  try {const retry=await send(key);expect(retry.status).toBe(200);expect(retry.body).toEqual(first.body);expect(storageSnapshot()).toBe(before);effects.assertNone();}
+  try {const retry=await send(key);expect(retry.status).toBe(200);expect(retry.body).toEqual({...first.body,replayed:true});expect(first.body.replayed).toBeUndefined();expect(storageSnapshot()).toBe(before);effects.assertNone();}
   finally {effects.restore();}
 });
 test('same key with changed money conflicts without mutation or communication',async()=>{
   const {send}=await setup();const key=randomUUID();expect((await send(key)).status).toBe(200);
   const before=storageSnapshot(),effects=observeRefusalEffects();
-  try {const changed=await send(key,{price:'10.02'});expect(changed.status).toBe(409);expect(changed.body.code).toBe('IDEMPOTENCY_CONFLICT');expect(storageSnapshot()).toBe(before);effects.assertNone();}
+  try {
+    const changed=await send(key,{price:'10.02'});expect(changed.status).toBe(409);expect(changed.body.code).toBe('IDEMPOTENCY_CONFLICT');
+    // The conflict names the sale already recorded, so the terminal can say which; never its key or fingerprint.
+    expect(changed.body.transaction).toMatchObject({paymentMethod:'cash',price:'10.01'});
+    expect(changed.body.transaction).not.toHaveProperty('cashIdempotencyKey');expect(changed.body.transaction).not.toHaveProperty('cashRequestFingerprint');
+    expect(storageSnapshot()).toBe(before);effects.assertNone();
+  }
   finally {effects.restore();}
 });
 test('concurrent copies of one command create one completed manual record',async()=>{
@@ -45,4 +51,12 @@ test('the cash recorder refuses an input naming another business, writing nothin
   const before=storageSnapshot();
   await expect(storage.recordCashSaleForMerchant(owner.merchantId,input)).rejects.toThrow();
   expect(storageSnapshot()).toBe(before);
+});
+// In memory as in PostgreSQL (whose event foreign key refuses it): a business with a cash sale is not deleted,
+// and its audit and outbox entries are never orphaned.
+test('a business with a recorded cash sale is not deleted',async()=>{
+  const owner=await createOwnerPrincipal();
+  await storage.recordCashSaleForMerchant(owner.merchantId,{merchantId:owner.merchantId,itemName:'Synthetic cash',price:'10.01',idempotencyKey:randomUUID(),actor:{userId:1,role:'owner'}});
+  expect(await storage.deleteMerchant(owner.merchantId)).toBe(false);
+  expect(await storage.getMerchant(owner.merchantId)).toBeDefined();
 });

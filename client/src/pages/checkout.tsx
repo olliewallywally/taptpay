@@ -27,6 +27,8 @@ import {
   type CheckoutRouteKind,
   type CheckoutSource,
   type PaymentCheckoutSource,
+  isPaymentAttemptExpired,
+  replaceExpiredPaymentIdempotencyKey,
 } from "@/lib/payment-addressing";
 import { checkoutBusiness } from "@/lib/checkout-business";
 import { CHECKOUT_RESOLVE_KEY, QUOTE_TOKEN_KEY, TRANSACTIONS_KEY, apiPath } from "@shared/api-path";
@@ -388,6 +390,20 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
     return body;
   };
 
+  // A retail token's same-key request after its attempt ended unsent is 409 PAYMENT_ATTEMPT_EXPIRED:
+  // that key can never open a session again, so it is replaced and the request made once more.
+  // Nothing else rotates the key (it rotates otherwise only after a reconciled outcome).
+  const requestSession = async (): Promise<Response> => {
+    const body = buildSessionBody();
+    try {
+      return await apiRequest("POST", sessionEndpoint, body);
+    } catch (error) {
+      if (!isRetailToken || !activeSource || !isPaymentAttemptExpired(error)) throw error;
+      replaceExpiredPaymentIdempotencyKey(activeSource, tokenShareIndex, body.idempotencyKey);
+      return apiRequest("POST", sessionEndpoint, buildSessionBody());
+    }
+  };
+
   // Post-success navigation. Retail → receipt page; invoice → stay on the branded
   // success screen and refresh split progress (each payer pays on their own link).
   const navigateAfterSuccess = (result: any) => {
@@ -496,7 +512,7 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
 
     (async () => {
       try {
-        const res = await apiRequest("POST", sessionEndpoint, buildSessionBody());
+        const res = await requestSession();
         if (!cancelled && res.ok) {
           const data = hydrateSession(await res.json());
           if (data.ajaxSubmitApplePayUrl) {
@@ -528,7 +544,7 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
 
     (async () => {
       try {
-        const res = await apiRequest("POST", sessionEndpoint, buildSessionBody());
+        const res = await requestSession();
         if (!cancelled && res.ok) {
           const data = hydrateSession(await res.json());
           if (data?.sessionId) {
@@ -953,7 +969,7 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
   async function createSession() {
     if (!payId || !transaction || !tokenCanCreateSession) return null;
     try {
-      const res = await apiRequest("POST", sessionEndpoint, buildSessionBody());
+      const res = await requestSession();
       if (!res.ok) return null;
       const data = hydrateSession(await res.json());
       if (isRetailToken && ["approved", "declined", "cancelled"].includes(data?.attemptState)) {
