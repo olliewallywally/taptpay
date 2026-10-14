@@ -24,7 +24,8 @@ done; R4-T2 refund schema designed, not yet approved.**
     and answered).
   - Pass 5, the independent reread, stopped at a session limit and is owed.
   - The migration (0039) and its PostgreSQL verifier are drafted, not committed.
-- **Results:** at the commit; see §27.
+- **Results:** full suites on `555686d8`: server 212/5,060 and client 130/1,480, all pass.
+  PostgreSQL: R3 50/50, R2-T4 12/12, R2-T7 7/7.
 - **No new migration;** 0034–0038 are unchanged.
 
 Prior continuation **2026-10-13 — R2 and R3 merged on `ccr-e07e3100-0wm8kr`; two merge

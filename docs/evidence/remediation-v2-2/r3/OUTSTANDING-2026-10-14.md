@@ -223,6 +223,6 @@ payment Windcave verifies at that moment (R-3a for board sales, I-1 for invoices
   - R3 durability 50/50 (5 checks new, including the share race that failed before its fix);
   - R2-T4 12/12;
   - R2-T7 7/7.
-- **Not run since the review fixes:** the full server and client suites. They run after this
-  commit; the ledger records the outcome.
+- **Full suites on `555686d8` (after the review fixes):** server 212 files and 5,060 tests,
+  client 130 files and 1,480 tests, all pass.
 - **Nothing** was applied to a shared database, deployed or sent to a provider.
