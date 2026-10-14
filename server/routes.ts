@@ -1,3 +1,14 @@
+import {SubscriptionCommandConflict} from './subscription-command';
+import {getPaymentRuntime} from './payment-runtime-default';
+import {createDurablePaymentNotificationHandlers} from './durable-payment-notification';
+import {extractWindcaveNotificationSession} from './payment-notification-paths';
+import {createRetailCheckoutHandlers} from './payment-checkout-handlers';
+import {createInvoiceCheckoutHandlers} from './invoice-checkout-handlers';
+import type {ConfiguredPaymentRuntime} from './payment-runtime';
+import {reconcileRetainedPaymentsBeforeManualCommand} from './payment-manual-reconciliation';
+import {getSubscriptionPaymentRuntime,type SubscriptionPaymentRuntime} from './subscription-payment-runtime';
+import type {PaymentCommandActor} from './payment-command';
+import type {IStorage} from './storage';
 import {isUuid} from './durable-payment-contract';
 import {canonicalCashCommand,CashCommandInputError} from './cash-command';
 import type { Express } from "express";
@@ -12,12 +23,11 @@ import {
   SubscriptionBillingBusyError,
   TaptStoneCapacityError,
   TaptStoneConflictError,
-  subscriptionCardSessionState,
   type JobBalanceCreationResult, type TradesClientRef,
 } from "./storage";
 import { TUTORIAL_PAGE_KEYS, isTutorialPageKey } from "@shared/tutorial";
 import { inviteTeamMemberSchema, acceptInviteSchema, retailTransactionCreateRequestSchema, cashSaleRequestSchema, updateMerchantDetailsSchema, updateThemeSchema, updateDailyGoalSchema, forgotPasswordSchema, resetPasswordSchema, changePasswordSchema, newPasswordSchema, createRefundSchema, insertRefundSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, merchantOnboardingSchema, pushNotificationPreferencesSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createClientProfileSchema, updateClientProfileSchema, createQuoteSchema, acceptQuoteSchema, createJobInvoiceSchema, markJobPaidExternalSchema, sendJobBalanceSchema, createJobScheduleSchema, updateJobScheduleSchema, updateTradeReminderSettingsSchema, updateTradeGstSettingsSchema } from "@shared/schema";
-import { isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, getWindcaveEnv, submitGooglePayToken, createAttendedSession, submitTapToPayToken, createCardStorageSession, queryStoredCardSession, chargeStoredCard, currentProviderEnvironment, type WindcaveExpectedOutcome } from "./windcave";
+import { isWindcaveConfigured, createWindcaveRefund, getWindcaveEnv, createAttendedSession, submitTapToPayToken } from "./windcave";
 import { authenticateUser, checkPasswordEvenly, passwordCheckBudget, authenticateToken, createUser, loginForUserId, sessionLoginForUserRow, isAccountOwner, requestPasswordReset, resetPassword, validateResetToken, type AuthenticatedRequest, logSecurityEvent, syncVerifiedMerchants, startBusinessSession, startAdminSession, endAuthSession, endLoginSessions, csrfTokenForRequest, clearSessionCookie, hasSessionCookie, readBusinessSession, respondAuthBackendUnavailable, isStreamSessionActive, liveBusinessSessionLogin } from "./auth";
 import {
   HANDOFF_CODE_TTL_MS, clearSignInCookie, googleVerifiedEmail, handoffCodeHash, newHandoffCode, readCookie,
@@ -27,7 +37,6 @@ import { type SignInRealm, type TooManyWhat, boardPrintBucket, confirmEmailBucke
 import { BOARD_PRINT_JSON_LIMIT, boardPrintRequestSchema, decodeBoardPrintPdf } from "./board-print";
 import { clientAddressForLimits, limitAddress } from "./client-address";
 import { tapToPayAmountSchema, tapToPayRequestSchema } from "./tap-to-pay-request";
-import { parseCentsExact } from "./windcave-query";
 import { ACCOUNT_EMAIL_REPLY_FLOOR_MS, SIGN_UP_REPLY_FLOOR_MS, replyNoSoonerThan, replyStart } from "./even-reply";
 import { deviceKnowsEmail, markSignInDevice, readSignInDevice, signInBucketFor, signInDeviceCookie, type SignInDevice } from "./sign-in-device";
 import { generateReceiptPdf } from "./pdf-generator";
@@ -55,7 +64,7 @@ import {
 } from "./apple-sign-in";
 import { INVOICE_DOCUMENT_EXTENSIONS } from "./invoice-document-security";
 import { resendTradeInvoice, resendTradeInvoiceForMerchant, sendTradePaymentInvoice, sendTradePaymentInvoiceForMerchant, sendTradeQuoteForMerchant } from "./trades-delivery";
-import { QUOTE_ACCEPTANCE_UNAVAILABLE, tellBusinessQuoteAcceptanceBlocked } from "./quote-acceptance-notice";
+import { QUOTE_ACCEPTANCE_UNAVAILABLE } from "./quote-acceptance-notice";
 import { sendGstInvoices, extractEmails } from "./gst-invoice";
 import {
   BILLING_CARD_REQUIRED,
@@ -92,12 +101,12 @@ import {
   PaymentCredentialCollisionError,
 } from "./retail-transaction-service";
 import {
-  createPaymentReturnState,
   paymentTokenRateLimiter,
   resolvePaymentToken,
   type PaymentTokenEndpointFamily,
 } from "./payment-token";
 import { apiV1CreateTransactionSchema } from "./api-v1-contracts";
+import {CreationCommandConflict,CreationCredentialUnavailable} from './payment-creation-command';
 import {
   PaymentAttemptInputError,
   PaymentAttemptService,
@@ -151,82 +160,25 @@ async function requireBillingCard(merchantId: number, res: any): Promise<boolean
 }
 
 type StoredCardChargeRequest = {
+  subscriptionId:number;merchantId:number;targetPlanId?:'solo'|'team'|'crew';
   idempotencyKey: string;
   cardId: string;
   amountCents: number;
   reference: string;
 };
 
-async function executeStoredCardCharge(request: StoredCardChargeRequest) {
-  const outcome = await chargeStoredCard(
-    request.idempotencyKey,
-    request.cardId,
-    (request.amountCents / 100).toFixed(2),
-    request.reference,
-  );
-  if (!outcome.success) {
-    // Windcave already records a redacted audit event. Keep provider/transport
-    // detail out of storage result messages that could later reach an API.
-    return { success: false as const, error: "Stored-card charge could not be confirmed" };
-  }
-  return {
-    success: true as const,
-    approved: outcome.approved === true,
-    windcaveTransactionId: outcome.windcaveTransactionId,
-    declineReason: outcome.declineReason,
-  };
-}
-
-function safeBillingCardCallbackResult(value: unknown) {
-  return value === "approved" || value === "declined" || value === "cancelled"
-    ? value
-    : "unknown";
-}
-
 // Server-side cache of Windcave AJAX submit URLs per transaction.
 // Populated at session creation; consumed once at payment completion.
 // Prevents SSRF by never accepting these URLs from client bodies.
-const sessionAjaxUrlCache = new Map<number, {
-  ajaxSubmitCardUrl?: string;
-  ajaxSubmitApplePayUrl?: string;
-  ajaxSubmitGooglePayUrl?: string;
-}>();
+
 
 // Token attempts are addressed by their durable attempt UUID, never by a
 // transaction ID. Gateway submission URLs are process-local capabilities; the
 // durable session/X-ID and outcome live in payment_attempts.
-const tokenAttemptSessionCache = new Map<string, {
-  hppUrl?: string;
-  ajaxSubmitCardUrl?: string;
-  ajaxSubmitApplePayUrl?: string;
-  ajaxSubmitGooglePayUrl?: string;
-  // Kept only in this bounded process-local retry cache. Durable storage holds
-  // solely the hash; eviction/restart makes this unavailable rather than
-  // persisting bearer plaintext.
-  returnState?: string;
-}>();
-const tokenAttemptSessionCreation = new Map<string, Promise<void>>();
-
-function cacheTokenAttemptSession(
-  attemptId: string,
-  value: NonNullable<ReturnType<typeof tokenAttemptSessionCache.get>>,
-) {
-  tokenAttemptSessionCache.set(attemptId, value);
-  const timer = setTimeout(() => {
-    if (tokenAttemptSessionCache.get(attemptId) === value) {
-      tokenAttemptSessionCache.delete(attemptId);
-    }
-  }, 30 * 60 * 1000);
-  timer.unref?.();
-}
 
 // Same as sessionAjaxUrlCache but for the property rent/charge checkout, which is
 // keyed by the invoice's public token rather than a numeric transaction id.
-const invoiceAjaxUrlCache = new Map<string, {
-  ajaxSubmitCardUrl?: string;
-  ajaxSubmitApplePayUrl?: string;
-  ajaxSubmitGooglePayUrl?: string;
-}>();
+
 
 // Validate that a URL belongs to a known Windcave domain before using it with auth headers.
 
@@ -279,16 +231,16 @@ function checkRateLimit(ip: string): boolean {
   const key = limitAddress(ip) ?? 'unknown';
   const now = Date.now();
   const record = rateLimitMap.get(key);
-  
+
   if (!record || now > record.resetTime) {
     rateLimitMap.set(key, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
     return true;
   }
-  
+
   if (record.count >= MAX_REQUESTS_PER_WINDOW) {
     return false;
   }
-  
+
   record.count++;
   return true;
 }
@@ -448,7 +400,8 @@ function escHtml(s: string | null | undefined): string {
     .replace(/'/g, '&#x27;');
 }
 
-export async function registerRoutes(app: Express): Promise<Server> {
+const defaultRouteStorage=storage;
+export async function registerRoutes(app: Express,options:{storage?:IStorage;paymentRuntime?:ConfiguredPaymentRuntime;subscriptionPayments?:SubscriptionPaymentRuntime}={}): Promise<Server> {
   // Express 4 drops an async handler's rejection on the floor — nothing calls
   // next(err), so the request is never answered and the client hangs forever.
   // This patches the registration methods themselves, so every route below is
@@ -461,7 +414,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // visitor's own forwarded headers change nothing.
   if (config.trustProxyHops) app.set("trust proxy", config.trustProxyHops);
 
-  const paymentAttempts = new PaymentAttemptService(storage);
+  const storage=options.storage??defaultRouteStorage;
+  const paymentRuntime=options.paymentRuntime??getPaymentRuntime();
+  const subscriptionPayments=options.subscriptionPayments??getSubscriptionPaymentRuntime(paymentRuntime?.repository);
+  async function executeStoredCardCharge(request:StoredCardChargeRequest,actor?:PaymentCommandActor){
+    if(!subscriptionPayments)return {success:false as const,error:'Billing reconciliation is unavailable'};
+    const subscription=await storage.getSubscription(request.merchantId);
+    if(!subscription||subscription.id!==request.subscriptionId)return {success:false as const,error:'Subscription not found'};
+    const result=await subscriptionPayments.billing.charge({...request,actor,kind:request.targetPlanId?'upgrade':'activation',planId:request.targetPlanId??subscription.planId as 'solo'|'team'|'crew'});
+    if(!['approved','declined'].includes(result.kind)||!result.applied)return {success:false as const,error:'Billing outcome is still being confirmed'};
+    return {success:true as const,approved:result.kind==='approved',durableApplied:true};
+  }
+  function commandActor(req:AuthenticatedRequest,res:express.Response) {
+    const requestId=res.getHeader('X-Request-Id');
+    return {userId:req.user!.id,role:req.user!.role as 'owner'|'member'|'admin',
+      ...(typeof requestId==='string' && /^[A-Za-z0-9._:-]{1,100}$/.test(requestId)?{requestId}:{})};
+  }
+  async function reconcileBeforeManualChange(domain:'retail'|'property'|'trades',aggregateId:number|string,merchantId:number) {
+    await reconcileRetainedPaymentsBeforeManualCommand(paymentRuntime,{domain,aggregateId,merchantId});
+  }
+  const paymentAttempts = new PaymentAttemptService(storage,paymentRuntime?.clock);
+  const retailCheckoutHandlers=createRetailCheckoutHandlers({storage,attempts:paymentAttempts,runtime:paymentRuntime,
+    baseUrl:getBaseUrl,checkRateLimit:(req,res,family)=>{
+      if(req.params.id!==undefined && !checkRateLimit(req.ip || 'unknown')){
+        res.status(429).json({message:'Too many requests. Please try again later.'});return false;
+      }
+      return requirePaymentTokenRateLimit(req,res,family);
+    }});
+  const invoiceCheckoutHandlers=createInvoiceCheckoutHandlers({runtime:paymentRuntime,getCheckoutInvoiceByToken,
+    customerEmail:async invoice=>{const party=await getCheckoutParty(invoice);if(!party)throw new Error('invoice_party_unavailable');return party.email??'payer@taptpay.co.nz';},
+    baseUrl:getBaseUrl,checkRateLimit:tokenRateLimit});
+  const durableNotificationHandlers=createDurablePaymentNotificationHandlers({receive:async(sessionId,kind)=>{
+    if(!paymentRuntime)throw new Error('durable_receipt_unavailable');
+    return paymentRuntime.repository.receive(sessionId,kind);
+  }},extractWindcaveNotificationSession,{allowGet:true});
 
   app.get("/robots.txt", (_req, res) => {
     res.type("text/plain").send(
@@ -581,7 +567,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
     return next();
   };
-  
+
   // P2.2 (R1-T3): the platform admin passes authenticateToken with no business (merchant 0), so a route
   // serving a business's own logins refuses it as an authenticated principal without the tenant: 403.
   // It was 400 or 401, route by route.
@@ -1275,7 +1261,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         userId: user.userId ?? user.id,
         sessionVersion: user.sessionVersion ?? 0,
       });
-      
+
       res.set("Cache-Control", "no-store");
       res.json({
         csrfToken: session.csrfToken,
@@ -1316,9 +1302,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return refuseTooManyAttempts(res, slot.retryAfterMs, "password-reset");
       }
       const baseUrl = getBaseUrl(req);
-      
+
       await requestPasswordReset(email, baseUrl);
-      
+
       // The same answer, after the same wait, whether or not the address has a login
       // (owner decision 2026-09-23): only a login's request saves a link and sends
       // an email, and the reply must not show that it took longer.
@@ -1345,7 +1331,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       const { token, password } = validation.data;
       const reset = await resetPassword(token, password);
-      
+
       if (!reset) {
         return res.status(400).json({ message: "Invalid or expired reset token" });
       }
@@ -1367,7 +1353,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         ).catch((error) => console.error("[RESET_THROTTLE_FORGET]", error));
         markSignInDevice(res, merchantDeviceCookie, readSignInDevice(req, merchantDeviceCookie), login.email);
       }
-      
+
       res.json({ message: "Password has been successfully reset" });
     } catch (error) {
       console.error("Password reset error:", error);
@@ -1431,7 +1417,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         logSecurityEvent('ADMIN_LOGIN_SLOWED', { email, ip: clientIp });
         return refuseTooManyAttempts(res, slot.retryAfterMs, "sign-in");
       }
-      
+
       // Check for admin credentials
       const adminEmail = config.admin.email;
       const adminPasswordHash = config.admin.passwordHash;
@@ -1480,7 +1466,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       // R1-T4 phase E3: the admin signs in by its own HttpOnly cookie.
       const session = await startAdminSession(req, res);
-      
+
       res.set("Cache-Control", "no-store");
       return res.json({
         csrfToken: session.csrfToken,
@@ -1790,7 +1776,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (merchantId === null) return res.status(400).json({ message: "Invalid id" });
       const stoneId = strictPositiveIntegerParam(req.params.stoneId);
       if (stoneId === null) return res.status(400).json({ message: "Invalid id" });
-      
+
       // Verify stone exists and belongs to merchant
       const stone = await storage.getTaptStone(stoneId);
       if (!stone || stone.merchantId !== merchantId) {
@@ -1806,11 +1792,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       res.setHeader('Content-Type', 'image/png');
       res.setHeader('Cache-Control', 'public, max-age=2592000'); // Cache for 30 days - QR never changes per stone
       res.setHeader('ETag', `"stone-qr-v2-${stoneId}"`); // v2 = cyan transparent style
-      
+
       if (isDownload) {
         res.setHeader('Content-Disposition', `attachment; filename="tapt-payment-qr-merchant-${merchantId}-stone-${stoneId}.png"`);
       }
-      
+
       // Generate QR code with current payment URL for this stone
       const currentPaymentUrl = generateStonePaymentUrl(merchantId, stoneId, req);
       const qrBuffer = await QRCode.toBuffer(currentPaymentUrl, {
@@ -1823,7 +1809,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         },
         errorCorrectionLevel: 'L',
       });
-      
+
       res.send(qrBuffer);
     } catch (error) {
       console.error("Stone QR code generation error:", error);
@@ -1972,10 +1958,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(404).json({ message: "Payment link not found" });
       }
 
-      broadcastToStone(updated.merchantId!, updated.taptStoneId, {
-        type: "transaction_updated",
-        transaction: updated,
-      });
       return res.json(tokenPaymentDto(updated, merchant));
     } catch (error) {
       if (error instanceof BillSplitConflictError) {
@@ -2101,723 +2083,19 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  const tokenSessionRequestSchema = z.object({
-    idempotencyKey: z.string().uuid(),
-    amount: z.string().regex(/^\d+(\.\d{1,2})?$/).optional(),
-  }).strict();
+  // All payment callbacks reconcile through the durable inbox and shared worker.
+  app.post("/api/pay/t/:token/session",retailCheckoutHandlers.session(true));
 
-  // ── R2-T5 (plan §9.5): what each flow's provider outcome must match ──────────
-  // A null answer means the payment cannot be verified; the caller leaves it
-  // reconcilable and queryWindcaveSession never asks the provider.
+  app.post("/api/pay/t/:token/hosted-fields-complete",retailCheckoutHandlers.complete(true));
 
-  /** A retail token attempt: its stored expected values (R2-T4), or, for an attempt
-   * claimed before migration 0034, the values its session was opened with. */
-  async function expectedForTokenAttempt(
-    attempt: {
-      id: string;
-      transactionId: number;
-      shareIndex: number;
-      expectedAmountCents?: number | null;
-      expectedCurrency?: string | null;
-      expectedMerchantReference?: string | null;
-      providerEnvironment?: "uat" | "production" | null;
-    },
-    sessionId: string,
-  ): Promise<WindcaveExpectedOutcome | null> {
-    if (
-      attempt.expectedAmountCents != null && attempt.expectedCurrency &&
-      attempt.expectedMerchantReference && attempt.providerEnvironment
-    ) {
-      return {
-        sessionId,
-        amountCents: attempt.expectedAmountCents,
-        currency: attempt.expectedCurrency,
-        merchantReference: attempt.expectedMerchantReference,
-        providerEnvironment: attempt.providerEnvironment,
-      };
-    }
-    const transaction = await storage.getTransaction(attempt.transactionId);
-    if (!transaction) return null;
-    let amount: string = transaction.price;
-    if (attempt.shareIndex > 0) {
-      const splits = await storage.getSplitPaymentsByTransaction(transaction.id);
-      const share = splits.find((split: { splitIndex: number }) => split.splitIndex === attempt.shareIndex);
-      if (!share) return null;
-      amount = share.amount;
-    }
-    const cents = parseCentsExact(amount);
-    if (!cents.ok) return null;
-    return {
-      sessionId,
-      amountCents: cents.cents,
-      currency: "NZD",
-      merchantReference: `TAPT_${attempt.id}`,
-      providerEnvironment: currentProviderEnvironment(),
-    };
-  }
-
-  /** A numbered sale: its price, or the split the next payment pays, with the
-   * reference /api/transactions/:id/pay sends (TXN_<sale> / SPLIT_<split>_TXN_<sale>). */
-  async function expectedForNumberedSale(
-    transaction: { id: number; price: string; isSplit?: boolean | null },
-    sessionId: string,
-  ): Promise<WindcaveExpectedOutcome | null> {
-    const split = transaction.isSplit ? await storage.getNextPendingSplit(transaction.id) : null;
-    if (transaction.isSplit && !split) return null;
-    const cents = parseCentsExact(split ? split.amount : transaction.price);
-    if (!cents.ok) return null;
-    return {
-      sessionId,
-      amountCents: cents.cents,
-      currency: "NZD",
-      merchantReference: split ? `SPLIT_${split.id}_TXN_${transaction.id}` : `TXN_${transaction.id}`,
-      providerEnvironment: currentProviderEnvironment(),
-    };
-  }
-
-  /** A property/trades invoice: the amount recorded with a split share's session
-   * (0030), or the invoice amount, with the reference /api/checkout/:token/session sends. */
-  async function expectedForCheckoutInvoice(
-    invoice: { id: string; amountCents: number; checkoutVertical?: "property" | "trades"; splitEnabled?: boolean | null; splitCount?: number | null },
-    sessionId: string,
-  ): Promise<WindcaveExpectedOutcome | null> {
-    const isSplit = !!(invoice.splitEnabled && invoice.splitCount && invoice.splitCount > 1);
-    let amountCents = invoice.amountCents;
-    if (isSplit) {
-      const opened = await storage.getInvoiceSplitSession(sessionId);
-      const forThisInvoice = opened && (invoice.checkoutVertical === "trades"
-        ? opened.jobInvoiceId === invoice.id
-        : opened.rentInvoiceId === invoice.id);
-      if (!opened || !forThisInvoice) return null;
-      amountCents = opened.amountCents;
-    }
-    if (!Number.isSafeInteger(amountCents) || amountCents < 0) return null;
-    return {
-      sessionId,
-      amountCents,
-      currency: "NZD",
-      merchantReference: (invoice.checkoutVertical === "trades" ? "JOB-" : "RENT-") + invoice.id.slice(0, 8).toUpperCase(),
-      providerEnvironment: currentProviderEnvironment(),
-    };
-  }
-
-  /** R2-T6 (plan §9.4): a retail provider query's outcome as a sanitized code. */
-  function reconciliationCode(result: { success: boolean; approved?: boolean; windcaveTransactionId?: string; error?: string }): string {
-    if (result.success && result.approved && !result.windcaveTransactionId) return "approved_without_transaction_id";
-    if (result.success) return result.approved ? "approved" : "declined";
-    // The wrapper's failures are already fixed strings (R2-T6, RF-6); reduce them to a code.
-    const code = String(result.error ?? "unknown").toLowerCase().replace(/[^a-z0-9_:]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 64);
-    return /^[a-z]/.test(code) ? code : "unknown";
-  }
-
-  /** Leaves the query's outcome on the attempt; failing to record never blocks a payment. */
-  async function recordTokenReconciliation(
-    attemptId: string,
-    result: { success: boolean; approved?: boolean; windcaveTransactionId?: string; error?: string },
-  ) {
-    try {
-      await paymentAttempts.recordReconciliation({ attemptId, code: reconciliationCode(result) });
-    } catch {
-      console.error("Token payment reconciliation code was not recorded");
-    }
-  }
-
-  function tokenAttemptOutcome(attempt: { state: string; receiptShare: number | null }) {
-    const outcome = ["approved", "declined", "cancelled"].includes(attempt.state)
-      ? attempt.state as "approved" | "declined" | "cancelled"
-      : "pending" as const;
-    return {
-      approved: outcome === "approved",
-      outcome,
-      receiptShare: attempt.receiptShare ?? null,
-    };
-  }
-
-  async function reconcileExpiredTokenAttempt(attempt: {
-    id: string;
-    shareIndex: number;
-    processorSessionId: string | null;
-  }) {
-    if (!attempt.processorSessionId) return { kind: "pending" as const };
-    const claim = await paymentAttempts.claimFinalization(
-      attempt.id,
-      attempt.processorSessionId,
-    );
-    if (claim.kind === "terminal") {
-      return { kind: "terminal" as const, attempt: claim.attempt };
-    }
-    if (claim.kind === "not-found" || claim.kind === "conflict") {
-      return { kind: "pending" as const };
-    }
-
-    if (!isWindcaveConfigured()) return { kind: "pending" as const };
-    const result = await queryWindcaveSession(
-      attempt.processorSessionId,
-      await expectedForTokenAttempt(claim.attempt, attempt.processorSessionId),
-    );
-    await recordTokenReconciliation(claim.attempt.id, result);
-    if (!result.success || (result.approved && !result.windcaveTransactionId)) {
-      return { kind: "pending" as const };
-    }
-    const settled = await persistTokenOutcome({
-      attempt: claim.attempt,
-      sessionId: attempt.processorSessionId,
-      outcome: result.approved ? "approved" : "declined",
-      processorTransactionId: result.windcaveTransactionId,
-      paymentMethod: "card",
-    });
-    if (settled.kind === "conflict" || settled.kind === "not-found") {
-      return { kind: "pending" as const };
-    }
-    return { kind: "terminal" as const, attempt: settled.attempt };
-  }
-
-  app.post("/api/pay/t/:token/session", async (req, res) => {
-    setPaymentTokenHeaders(res);
-    if (!requirePaymentTokenRateLimit(req, res, "session")) return;
-    const validation = tokenSessionRequestSchema.safeParse(req.body);
-    if (!validation.success) {
-      return res.status(400).json({ message: "Invalid payment session request" });
-    }
-
-    try {
-      const transaction = await resolvePaymentToken(storage, req.params.token);
-      if (!transaction) {
-        return res.status(404).json({ message: "Payment link not found" });
-      }
-      if (["failed", "cancelled"].includes(transaction.status)) {
-        return res.status(410).json({ message: "Payment link is closed" });
-      }
-      if (["completed", "partially_refunded", "refunded"].includes(transaction.status)) {
-        return res.status(409).json({ message: "Payment is already complete" });
-      }
-
-      const split = transaction.isSplit
-        ? await storage.getNextPendingSplit(transaction.id)
-        : null;
-      if (transaction.isSplit && !split) {
-        return res.status(409).json({ message: "All payment shares are complete" });
-      }
-      const shareIndex = split ? split.splitIndex : 0;
-      const paymentAmount = split ? split.amount : transaction.price;
-      if (
-        validation.data.amount !== undefined &&
-        Number(validation.data.amount).toFixed(2) !== Number(paymentAmount).toFixed(2)
-      ) {
-        return res.status(400).json({ message: "Payment amount does not match the outstanding share" });
-      }
-
-      // A processing transaction may only resume the exact durable attempt.
-      if (transaction.status === "processing") {
-        const existing = await paymentAttempts.getAttemptByTransactionShareKey({
-          transactionId: transaction.id,
-          shareIndex,
-          idempotencyKey: validation.data.idempotencyKey,
-        });
-        if (!existing) {
-          return res.status(409).json({ message: "A payment is already being processed" });
-        }
-      }
-
-      const claim = await paymentAttempts.claim({
-        transactionId: transaction.id,
-        shareIndex,
-        idempotencyKey: validation.data.idempotencyKey,
-      });
-      if (claim.kind === "transaction-not-found") {
-        return res.status(404).json({ message: "Payment link not found" });
-      }
-      if (claim.kind === "conflict") {
-        return res.status(409).json({ message: "Another payment attempt is already active" });
-      }
-      if (claim.kind === "target-conflict") {
-        return res.status(409).json({ message: "This payment share is no longer payable" });
-      }
-      if (claim.kind === "expired") {
-        const reconciled = await reconcileExpiredTokenAttempt(claim.attempt);
-        if (reconciled.kind === "terminal") {
-          return res.json({
-            ...tokenAttemptOutcome(reconciled.attempt),
-            attemptState: reconciled.attempt.state,
-            shareIndex: reconciled.attempt.shareIndex,
-          });
-        }
-        return res.status(503).json({
-          message: "The previous payment outcome is still being reconciled",
-        });
-      }
-      if (claim.kind === "terminal") {
-        return res.json({
-          ...tokenAttemptOutcome(claim.attempt),
-          attemptState: claim.attempt.state,
-          shareIndex: claim.attempt.shareIndex,
-        });
-      }
-      if (claim.attempt.state === "finalizing") {
-        return res.status(409).json({ message: "Payment finalization is in progress" });
-      }
-      if (claim.attempt.state === "ready" && claim.attempt.processorSessionId) {
-        const cached = tokenAttemptSessionCache.get(claim.attempt.id) ?? {};
-        return res.json({
-          sessionId: claim.attempt.processorSessionId,
-          ...cached,
-          attemptState: "ready",
-          shareIndex: claim.attempt.shareIndex,
-        });
-      }
-
-      const existingCreation = tokenAttemptSessionCreation.get(claim.attempt.id);
-      if (existingCreation) {
-        await existingCreation;
-        const coalesced = await paymentAttempts.getAttempt(claim.attempt.id);
-        if (coalesced?.state === "ready" && coalesced.processorSessionId) {
-          return res.json({
-            sessionId: coalesced.processorSessionId,
-            ...(tokenAttemptSessionCache.get(coalesced.id) ?? {}),
-            attemptState: "ready",
-            shareIndex: coalesced.shareIndex,
-          });
-        }
-        return res.status(503).json({ message: "Payment session is still being created" });
-      }
-
-      let releaseCreation!: () => void;
-      const creationLatch = new Promise<void>((resolve) => {
-        releaseCreation = resolve;
-      });
-      tokenAttemptSessionCreation.set(claim.attempt.id, creationLatch);
-      try {
-      if (!config.paymentReturnStateSecret) {
-        return res.status(503).json({
-          code: "PAYMENT_RETURN_STATE_UNAVAILABLE",
-          message: "Payment initiation is temporarily unavailable",
-        });
-      }
-      const returnState = createPaymentReturnState(
-        claim.attempt.id,
-        config.paymentReturnStateSecret,
-      ).rawToken;
-      const baseUrl = getBaseUrl(req);
-      const xId = claim.attempt.id.replace(/-/g, "").slice(0, 16);
-      const merchantReference = `TAPT_${claim.attempt.id}`;
-      const merchant = transaction.merchantId
-        ? await storage.getMerchant(transaction.merchantId)
-        : undefined;
-      if (!merchant) {
-        return res.status(404).json({ message: "Payment link not found" });
-      }
-
-      if (!isWindcaveConfigured()) {
-        return res.status(503).json({
-          code: "PAYMENT_PROVIDER_UNAVAILABLE",
-          message: "Payment gateway unavailable. Please try again.",
-        });
-      }
-      // R2-T4 (plan §9.4): fix what Windcave must confirm before the session exists.
-      const expectedCents = parseCentsExact(paymentAmount);
-      if (!expectedCents.ok) {
-        return res.status(409).json({ message: "Payment amount cannot be verified" });
-      }
-      const expected = await paymentAttempts.recordExpectedValues({
-        attemptId: claim.attempt.id,
-        amountCents: expectedCents.cents,
-        currency: "NZD",
-        merchantReference,
-        providerEnvironment: config.paymentMode === "production" ? "production" : "uat",
-      });
-      if (expected.kind !== "recorded" && expected.kind !== "reused") {
-        return res.status(409).json({ message: "Payment session could not be prepared" });
-      }
-      const sessionResult = await createWindcaveSession(
-          xId,
-          paymentAmount,
-          merchantReference,
-          merchant.email || "customer@taptpay.co.nz",
-          baseUrl,
-          transaction.id,
-          0,
-          {
-            callbackBase: `${baseUrl}/api/pay/return/${returnState}?source=hpp`,
-            notificationUrl: `${baseUrl}/api/pay/notification/${returnState}`,
-          },
-        );
-      if (!sessionResult.success || !sessionResult.sessionId) {
-        return res.status(503).json({ message: "Payment gateway unavailable. Please try again." });
-      }
-
-      const attached = await paymentAttempts.attachSession({
-        attemptId: claim.attempt.id,
-        processorSessionId: sessionResult.sessionId,
-        processorXId: xId,
-        rawReturnState: returnState,
-      });
-      if (attached.kind !== "attached" && attached.kind !== "reused") {
-        return res.status(409).json({ message: "Payment session could not be attached" });
-      }
-
-      const cached = {
-        hppUrl: sessionResult.hppUrl,
-        ajaxSubmitCardUrl: sessionResult.ajaxSubmitCardUrl,
-        ajaxSubmitApplePayUrl: sessionResult.ajaxSubmitApplePayUrl,
-        ajaxSubmitGooglePayUrl: sessionResult.ajaxSubmitGooglePayUrl,
-        returnState,
-      };
-      cacheTokenAttemptSession(attached.attempt.id, cached);
-      if (!transaction.isSplit) {
-        await storage.updateTransactionStatus(transaction.id, "processing");
-      }
-
-      return res.json({
-        sessionId: sessionResult.sessionId,
-        ...cached,
-        attemptState: "ready",
-        shareIndex: attached.attempt.shareIndex,
-      });
-      } finally {
-        releaseCreation();
-        if (tokenAttemptSessionCreation.get(claim.attempt.id) === creationLatch) {
-          tokenAttemptSessionCreation.delete(claim.attempt.id);
-        }
-      }
-    } catch (error) {
-      if (error instanceof PaymentAttemptInputError) {
-        return res.status(400).json({ message: "Invalid payment session request" });
-      }
-      console.error("Token payment session creation failed");
-      return res.status(500).json({ message: "Failed to create payment session" });
-    }
-  });
-
-  const tokenCompletionBaseSchema = z.object({
-    idempotencyKey: z.string().uuid(),
-    sessionId: z.string().trim().min(1).max(512),
-    shareIndex: z.number().int().min(0).max(10),
-  });
-
-  async function prepareTokenCompletion(
-    rawToken: string,
-    input: { idempotencyKey: string; sessionId: string; shareIndex: number },
-  ) {
-    const transaction = await resolvePaymentToken(storage, rawToken);
-    if (!transaction) return { kind: "not-found" as const };
-    if (
-      (transaction.isSplit && input.shareIndex === 0) ||
-      (!transaction.isSplit && input.shareIndex !== 0)
-    ) {
-      return { kind: "conflict" as const };
-    }
-    const attempt = await paymentAttempts.getAttemptByTransactionShareKey({
-      transactionId: transaction.id,
-      shareIndex: input.shareIndex,
-      idempotencyKey: input.idempotencyKey,
-    });
-    if (!attempt || attempt.processorSessionId !== input.sessionId) {
-      return { kind: "not-found" as const };
-    }
-    const claim = await paymentAttempts.claimFinalization(attempt.id, input.sessionId);
-    if (claim.kind === "not-found" || claim.kind === "conflict") {
-      return { kind: "conflict" as const };
-    }
-    if (claim.kind === "terminal") {
-      return { kind: "terminal" as const, attempt: claim.attempt };
-    }
-    return {
-      kind: "ready" as const,
-      transaction,
-      attempt: claim.attempt,
-      firstFinalizer: claim.kind === "claimed",
-    };
-  }
-
-  async function persistTokenOutcome(input: {
-    attempt: { id: string; shareIndex: number };
-    sessionId: string;
-    outcome: "approved" | "declined" | "cancelled";
-    processorTransactionId?: string;
-    paymentMethod: string;
-  }) {
-    const approved = input.outcome === "approved";
-    const receiptShare = approved && input.attempt.shareIndex > 0
-      ? input.attempt.shareIndex
-      : null;
-    const settled = await paymentAttempts.finalize({
-      attemptId: input.attempt.id,
-      processorSessionId: input.sessionId,
-      processorTransactionId: input.processorTransactionId ?? null,
-      paymentMethod: input.paymentMethod,
-      outcome: input.outcome,
-      receiptShare,
-    });
-    if (settled.kind === "conflict" || settled.kind === "not-found") return settled;
-
-    tokenAttemptSessionCache.delete(input.attempt.id);
-    if (settled.kind === "finalized") {
-      const transaction = settled.transaction;
-      broadcastToStone(transaction.merchantId!, transaction.taptStoneId, {
-        type: "transaction_updated",
-        transaction,
-      });
-      if (transaction.merchantId) {
-        const allDone = transaction.isSplit &&
-          (transaction.completedSplits ?? 0) >= (transaction.totalSplits ?? 1);
-        const message = transaction.isSplit && approved
-          ? allDone
-            ? `Split bill fully paid — ${transaction.totalSplits} payments received`
-            : `Split payment ${transaction.completedSplits} of ${transaction.totalSplits} received`
-          : transaction.itemName;
-        sendPushToMerchant(
-          transaction.merchantId,
-          approved
-            ? {
-                type: "payment_received",
-                itemName: message,
-                amount: transaction.price,
-                transactionId: transaction.id,
-              }
-            : {
-                type: "payment_failed",
-                reason: input.outcome === "cancelled" ? "cancelled" : "failed",
-                itemName: message,
-                amount: transaction.price,
-                transactionId: transaction.id,
-              },
-        ).catch(() => {});
-      }
-    }
-    return settled;
-  }
-
-  app.post("/api/pay/t/:token/hosted-fields-complete", async (req, res) => {
-    setPaymentTokenHeaders(res);
-    if (!requirePaymentTokenRateLimit(req, res, "completion")) return;
-    const validation = tokenCompletionBaseSchema.extend({
-      paymentMethod: z.enum(["card", "apple_pay"]).optional().default("card"),
-    }).strict().safeParse(req.body);
-    if (!validation.success) {
-      return res.status(400).json({ message: "Invalid payment completion request" });
-    }
-
-    try {
-      const prepared = await prepareTokenCompletion(req.params.token, validation.data);
-      if (prepared.kind === "not-found") {
-        return res.status(404).json({ message: "Payment link or session not found" });
-      }
-      if (prepared.kind === "conflict") {
-        return res.status(409).json({ message: "Payment session cannot be finalized" });
-      }
-      if (prepared.kind === "terminal") {
-        return res.json(tokenAttemptOutcome(prepared.attempt));
-      }
-
-      if (!isWindcaveConfigured()) {
-        return res.status(503).json({ message: "Payment outcome is still being reconciled" });
-      }
-      const queryResult = await queryWindcaveSession(
-        validation.data.sessionId,
-        await expectedForTokenAttempt(prepared.attempt, validation.data.sessionId),
-      );
-      await recordTokenReconciliation(prepared.attempt.id, queryResult);
-      if (!queryResult.success) {
-        return res.status(503).json({ message: "Payment outcome is still being reconciled" });
-      }
-      if (queryResult.approved && !queryResult.windcaveTransactionId) {
-        return res.status(503).json({ message: "Approved payment is missing its processor reference" });
-      }
-      const settled = await persistTokenOutcome({
-        attempt: prepared.attempt,
-        sessionId: validation.data.sessionId,
-        outcome: queryResult.approved === true ? "approved" : "declined",
-        processorTransactionId: queryResult.windcaveTransactionId,
-        paymentMethod: validation.data.paymentMethod,
-      });
-      if (settled.kind === "conflict" || settled.kind === "not-found") {
-        return res.status(409).json({ message: "Payment outcome conflicts with the stored attempt" });
-      }
-      return res.json(tokenAttemptOutcome(settled.attempt));
-    } catch (error) {
-      if (error instanceof PaymentAttemptInputError) {
-        return res.status(400).json({ message: "Invalid payment completion request" });
-      }
-      console.error("Token hosted-fields completion failed");
-      return res.status(500).json({ message: "Failed to finalize payment" });
-    }
-  });
-
-  app.post("/api/pay/t/:token/googlepay-complete", async (req, res) => {
-    setPaymentTokenHeaders(res);
-    if (!requirePaymentTokenRateLimit(req, res, "completion")) return;
-    const validation = tokenCompletionBaseSchema.extend({
-      googlePayToken: z.record(z.unknown()).optional(),
-    }).strict().safeParse(req.body);
-    if (!validation.success) {
-      return res.status(400).json({ message: "Invalid Google Pay completion request" });
-    }
-
-    try {
-      const prepared = await prepareTokenCompletion(req.params.token, validation.data);
-      if (prepared.kind === "not-found") {
-        return res.status(404).json({ message: "Payment link or session not found" });
-      }
-      if (prepared.kind === "conflict") {
-        return res.status(409).json({ message: "Payment session cannot be finalized" });
-      }
-      if (prepared.kind === "terminal") {
-        return res.json(tokenAttemptOutcome(prepared.attempt));
-      }
-
-      if (!isWindcaveConfigured()) {
-        return res.status(503).json({ message: "Payment outcome is still being reconciled" });
-      }
-      {
-        const cached = tokenAttemptSessionCache.get(prepared.attempt.id);
-        const ajaxUrl = prepared.firstFinalizer
-          ? cached?.ajaxSubmitGooglePayUrl
-          : undefined;
-        // A replay never resubmits the wallet token, so recovery cannot double charge.
-        if (ajaxUrl && validation.data.googlePayToken) {
-          await submitGooglePayToken(ajaxUrl, validation.data.googlePayToken);
-        }
-      }
-      // R2-T5 (RF-1): submitting the token never decides the outcome; the verified
-      // session query does, whatever the wallet submission answered.
-      const queryResult = await queryWindcaveSession(
-        validation.data.sessionId,
-        await expectedForTokenAttempt(prepared.attempt, validation.data.sessionId),
-      );
-      await recordTokenReconciliation(prepared.attempt.id, queryResult);
-      if (!queryResult.success) {
-        return res.status(503).json({ message: "Payment outcome is still being reconciled" });
-      }
-      if (queryResult.approved && !queryResult.windcaveTransactionId) {
-        return res.status(503).json({ message: "Approved payment is missing its processor reference" });
-      }
-      const settled = await persistTokenOutcome({
-        attempt: prepared.attempt,
-        sessionId: validation.data.sessionId,
-        outcome: queryResult.approved === true ? "approved" : "declined",
-        processorTransactionId: queryResult.windcaveTransactionId,
-        paymentMethod: "google_pay",
-      });
-      if (settled.kind === "conflict" || settled.kind === "not-found") {
-        return res.status(409).json({ message: "Payment outcome conflicts with the stored attempt" });
-      }
-      return res.json(tokenAttemptOutcome(settled.attempt));
-    } catch (error) {
-      if (error instanceof PaymentAttemptInputError) {
-        return res.status(400).json({ message: "Invalid Google Pay completion request" });
-      }
-      console.error("Token Google Pay completion failed");
-      return res.status(500).json({ message: "Failed to finalize Google Pay payment" });
-    }
-  });
-
-  async function reconcileTokenReturnState(
-    rawState: string,
-    resultHint: string | undefined,
-  ) {
-    const resolved = await paymentAttempts.resolveReturnState(rawState);
-    if (resolved.kind !== "resolved") return resolved;
-    const attempt = resolved.attempt;
-    if (["approved", "declined", "cancelled"].includes(attempt.state)) {
-      return { kind: "terminal" as const, attempt };
-    }
-    if (!attempt.processorSessionId) {
-      return { kind: "pending" as const, attempt };
-    }
-
-    const claim = await paymentAttempts.claimFinalization(
-      attempt.id,
-      attempt.processorSessionId,
-    );
-    if (claim.kind === "terminal") {
-      return { kind: "terminal" as const, attempt: claim.attempt };
-    }
-    if (claim.kind === "not-found" || claim.kind === "conflict") {
-      return { kind: "pending" as const, attempt };
-    }
-
-    if (!isWindcaveConfigured()) return { kind: "pending" as const, attempt: claim.attempt };
-    const queryResult = await queryWindcaveSession(
-      attempt.processorSessionId,
-      await expectedForTokenAttempt(claim.attempt, attempt.processorSessionId),
-    );
-    await recordTokenReconciliation(claim.attempt.id, queryResult);
-    if (!queryResult.success) {
-      return { kind: "pending" as const, attempt: claim.attempt };
-    }
-    if (queryResult.approved && !queryResult.windcaveTransactionId) {
-      return { kind: "pending" as const, attempt: claim.attempt };
-    }
-
-    // R2-T5: the provider's verified answer decides; the browser's `result` is a hint
-    // and no longer chooses between "cancelled" and "declined".
-    void resultHint;
-    const outcome = queryResult.approved ? "approved" as const : "declined" as const;
-    const settled = await persistTokenOutcome({
-      attempt: claim.attempt,
-      sessionId: attempt.processorSessionId,
-      outcome,
-      processorTransactionId: queryResult.windcaveTransactionId,
-      paymentMethod: "card",
-    });
-    if (settled.kind === "conflict" || settled.kind === "not-found") {
-      return { kind: "pending" as const, attempt: claim.attempt };
-    }
-    return { kind: "terminal" as const, attempt: settled.attempt };
-  }
+  app.post("/api/pay/t/:token/googlepay-complete",retailCheckoutHandlers.complete(true,true));
 
   // Windcave browser return and narrow client resolver share one state-addressed
   // endpoint. A processor return is always replaced by a token-preserving client
   // route; a plain GET reveals only outcome + transaction-local receipt share.
-  app.get("/api/pay/return/:state", async (req, res) => {
-    setPaymentTokenHeaders(res);
-    if (!requirePaymentTokenRateLimit(req, res, "resolve")) return;
-    const resultHint = typeof req.query.result === "string" ? req.query.result : undefined;
-    const isProcessorReturn = req.query.source === "hpp" || resultHint !== undefined;
-    try {
-      if (isProcessorReturn) {
-        await reconcileTokenReturnState(
-          req.params.state,
-          resultHint,
-        );
-        return res.redirect(303, `/pay/return/${encodeURIComponent(req.params.state)}`);
-      }
+  app.get("/api/pay/return/:state",retailCheckoutHandlers.returnState);
 
-      const resolved = await paymentAttempts.resolveReturnState(req.params.state);
-      if (resolved.kind === "not-found") {
-        return res.status(404).json({ message: "Payment return not found" });
-      }
-      if (resolved.kind === "expired") {
-        return res.status(410).json({ message: "Payment return has expired" });
-      }
-      const outcome = tokenAttemptOutcome(resolved.attempt);
-      return res.json({
-        outcome: outcome.outcome,
-        receiptShare: outcome.receiptShare,
-      });
-    } catch (error) {
-      console.error("Token payment return resolution failed");
-      return isProcessorReturn
-        ? res.redirect(303, `/pay/return/${encodeURIComponent(req.params.state)}`)
-        : res.status(500).json({ message: "Failed to resolve payment return" });
-    }
-  });
-
-  app.all("/api/pay/notification/:state", async (req, res) => {
-    setPaymentTokenHeaders(res);
-    if (!requirePaymentTokenRateLimit(req, res, "completion")) return;
-    // Acknowledge promptly; durable CAS makes notification/browser/direct races
-    // converge on the same one-time ledger finalization.
-    res.status(200).send("OK");
-    try {
-      const resultHint = typeof req.query.result === "string"
-        ? req.query.result
-        : typeof req.body?.result === "string" ? req.body.result : undefined;
-      await reconcileTokenReturnState(req.params.state, resultHint);
-    } catch (error) {
-      console.error("Token payment notification reconciliation failed");
-    }
-  });
+  app.all("/api/pay/notification/:state",...durableNotificationHandlers);
 
   // Get active transaction for merchant - ultra-fast optimized
   app.get("/api/merchants/:id/active-transaction", async (req, res) => {
@@ -2890,14 +2168,14 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       console.warn(`SECURITY: Rate limit exceeded for IP ${clientIp} on active-transaction endpoint`);
       return res.status(429).json({ message: "Too many requests. Please try again later." });
     }
-    
+
     // Ultra-fast headers for immediate response
     res.set(noStore);
-    
+
     try {
       // AUDIT: Log access to payment page
       console.log(`Active transaction requested: merchant ${merchantId}, stone ${stoneId}, IP ${clientIp}`);
-      
+
       // SECURITY: verify the board belongs to this merchant
       // Another business's board is answered as a missing one (R1-T3, P2.2's tenant-safe 404), as the
       // board's stream and brand answer; it was 403. So is a board the business has removed: its page no
@@ -2912,22 +2190,22 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!transaction || transaction.merchantId !== merchantId) {
         return res.json(null);
       }
-      
+
       // SECURITY: verify the transaction is for that board
       if (transaction.taptStoneId !== stoneId) {
         return res.json(null); // Return null instead of wrong stone's transaction
       }
-      
+
       // Add payment URL and QR code URL using transaction's stone ID
       const paymentUrl = generatePaymentUrl(merchantId, transaction.taptStoneId, req);
       const qrCodeUrl = generateQrCodeUrl(merchantId, transaction.taptStoneId, req);
-      
+
       const transactionWithUrls = {
         ...transaction,
         paymentUrl,
         qrCodeUrl,
       };
-      
+
       res.json(publicTransactionDto(transactionWithUrls));
     } catch (error) {
       res.status(500).json({ message: "Failed to get active transaction" });
@@ -2945,7 +2223,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!checkMerchantOwnership(req, validation.data.merchantId)) {
         return res.status(403).json({ message: "Access denied" });
       }
-      if (!(await requireBillingCard(validation.data.merchantId, res))) return;
+      const creationKey=req.get('Idempotency-Key');if(!isUuid(creationKey))return res.status(400).json({code:'IDEMPOTENCY_KEY_REQUIRED',message:'A creation request key is required'});
+      const priorCreation=await storage.getCreationCommandForMerchant(validation.data.merchantId,creationKey);
+      if (!priorCreation&&!(await requireBillingCard(validation.data.merchantId, res))) return;
 
       const selectedStoneId = validation.data.selectedStoneId ?? null;
       // A sale without a payment board always has its own private link (owner decision
@@ -2969,7 +2249,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(400).json({ message: "Per-payment links cannot use a payment board" });
       }
 
-      const { transaction, rawToken } = await createRetailTransaction({ createTransaction: input => storage.createTransactionForMerchant(validation.data.merchantId, input) }, {
+      const creationIntent={key:creationKey,actor:commandActor(req,res)};
+      const { transaction, rawToken } = await createRetailTransaction({ createTransaction: input => storage.createTransactionForMerchant(validation.data.merchantId, input,creationIntent) }, {
         merchantId: validation.data.merchantId,
         itemName: validation.data.itemName,
         price: validation.data.price,
@@ -2977,37 +2258,28 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         paymentMethod: "qr_code",
         splitEnabled: validation.data.splitEnabled,
         taptStoneId: selectedStoneId,
-      }, linkMode);
+      }, linkMode,{creationKey,returnStateSecret:config.paymentReturnStateSecret});
 
-      // The bearer token is disclosed exactly once, in this authenticated create
-      // response. A board sale keeps its board's stable shared URL.
+      // The same authenticated creation intent returns its original credential.
+      // Only its digest is stored. A board sale keeps its stable shared URL.
       const saleUrls = rawToken
         ? {
             paymentUrl: `${getBaseUrl(req)}/pay/t/${rawToken}`,
             qrCodeUrl: `${getBaseUrl(req)}/api/pay/t/${rawToken}/qr`,
           }
         : boardSaleUrls(transaction.merchantId!, transaction.taptStoneId, req);
-      
+
       // Add URLs to transaction object
       const transactionWithUrls = {
         ...transaction,
         ...saleUrls,
       };
-      
-      broadcastToStone(transaction.merchantId!, transaction.taptStoneId, { 
-        type: 'transaction_updated', 
-        transaction: transactionWithUrls 
-      });
 
-      sendPushToMerchant(transaction.merchantId!, {
-        type: "transaction_created",
-        itemName: transaction.itemName,
-        amount: transaction.price,
-        transactionId: transaction.id,
-      }).catch(() => {});
+      // The atomic creation event owns publication and replay protection.
 
       res.json(ownerTransactionDto(transactionWithUrls));
     } catch (error) {
+      if(error instanceof CreationCommandConflict||error instanceof CreationCredentialUnavailable)return res.status(409).json({code:error.code,message:'The original creation request needs recovery. Keep the same request.'});
       if (error instanceof TransactionCreationScopeError) return res.status(400).json({ message: "Selected payment board is unavailable" });
       if (error instanceof PaymentCredentialCollisionError) {
         return res.status(503).json({ message: "Could not create a payment link. Please try again." });
@@ -3037,11 +2309,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const command=canonicalCashCommand(commandInput);
       const existing=await storage.getCashSaleByKeyForMerchant(merchantId,idempotencyKey);
       if(existing) {
-        if(existing.cashRequestFingerprint!==command.fingerprint) return res.status(409).json({code:'IDEMPOTENCY_CONFLICT',message:'Cash retry details differ from the original sale'});
-        const persisted=await storage.recordCashSaleForMerchant(commandInput,{allowCreate:false});
-        if(persisted.kind==='conflict') return res.status(409).json({code:'IDEMPOTENCY_CONFLICT',message:'Cash retry details differ from the original sale'});
+        if(existing.cashRequestFingerprint!==command.fingerprint) return res.status(409).json({code:'IDEMPOTENCY_CONFLICT',message:'Cash retry details differ from the original sale',transaction:ownerTransactionDto(existing)});
+        const persisted=await storage.recordCashSaleForMerchant(merchantId,commandInput,{allowCreate:false});
+        if(persisted.kind==='conflict') return res.status(409).json({code:'IDEMPOTENCY_CONFLICT',message:'Cash retry details differ from the original sale',transaction:ownerTransactionDto(persisted.transaction)});
         if(persisted.kind==='not-found') return res.status(503).json({message:'Cash sale is being checked. Retry with the same request'});
-        return res.json({transaction:ownerTransactionDto(persisted.transaction)});
+        return res.json({transaction:ownerTransactionDto(persisted.transaction),replayed:true});
       }
       if (!(await requireBillingCard(merchantId, res))) return;
       if (stoneId != null) {
@@ -3050,26 +2322,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           return res.status(400).json({ message: "Selected payment board is unavailable" });
         }
       }
-      const result=await storage.recordCashSaleForMerchant(commandInput);
-      if(result.kind==='conflict') return res.status(409).json({code:'IDEMPOTENCY_CONFLICT',message:'Cash retry details differ from the original sale'});
+      const result=await storage.recordCashSaleForMerchant(merchantId,commandInput);
+      if(result.kind==='conflict') return res.status(409).json({code:'IDEMPOTENCY_CONFLICT',message:'Cash retry details differ from the original sale',transaction:ownerTransactionDto(result.transaction)});
       if(result.kind==='not-found') return res.status(503).json({message:'Cash sale is being checked. Retry with the same request'});
       const transaction=result.transaction;
-      if(result.kind==='reused') return res.json({transaction:ownerTransactionDto(transaction)});
-      // Temporary first-commit compatibility delivery, keyed to the persisted
-      // event. The durable manual event remains queued for receiver cutover.
-      // Broadcast completion to SSE clients
-      broadcastToStone(transaction.merchantId!, transaction.taptStoneId, {
-        type: 'transaction_updated',
-        transaction: { ...transaction, paymentMethod: 'cash' }, eventId:result.eventId,
-      });
-
-      sendPushToMerchant(transaction.merchantId!, {
-        type: "payment_received",
-        itemName: transaction.itemName,
-        amount: transaction.price,
-        transactionId: transaction.id,
-      }).catch(() => {});
-
+      if(result.kind==='reused') return res.json({transaction:ownerTransactionDto(transaction),replayed:true});
+      // The atomic cash event is published only by the durable receiver.
       res.json({ transaction: ownerTransactionDto(transaction) });
     } catch (error) {
       if (error instanceof TransactionCreationScopeError) return res.status(400).json({ message: "Selected payment board is unavailable" });
@@ -3245,7 +2503,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
 
       const updatedTransaction = await storage.createBillSplit(transactionId, totalSplits);
-      
+
       if (!updatedTransaction) {
         return res.status(404).json({ message: "Transaction not found" });
       }
@@ -3255,12 +2513,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         ...updatedTransaction,
         ...boardSaleUrls(updatedTransaction.merchantId!, updatedTransaction.taptStoneId, req),
       };
-
-      // Notify connected clients about the split
-      broadcastToStone(updatedTransaction.merchantId!, updatedTransaction.taptStoneId, { 
-        type: 'transaction_updated', 
-        transaction: transactionWithUrls 
-      });
 
       res.json(publicTransactionDto(transactionWithUrls));
     } catch (error) {
@@ -3317,12 +2569,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(404).json({ message: "Transaction not found" });
       }
 
-      // Only allow canceling pending or processing transactions
-      if (!['pending', 'processing'].includes(transaction.status)) {
-        return res.status(400).json({ message: `Cannot cancel transaction with status: ${transaction.status}` });
-      }
-
-      const cancellation = await storage.cancelTransactionForMerchant(transactionId, transaction.merchantId!);
+      await reconcileBeforeManualChange('retail',transactionId,transaction.merchantId!);
+      const cancellation = await storage.cancelTransactionForMerchant(transactionId, transaction.merchantId!,commandActor(req,res));
       if (cancellation.kind === "not-found") {
         return res.status(404).json({ message: "Transaction not found" });
       }
@@ -3333,19 +2581,14 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(400).json({ message: `Cannot cancel transaction with status: ${cancellation.status}` });
       }
       const updatedTransaction = cancellation.transaction;
-      
+
       // A board sale's board address; a no-board sale has none to give here.
       const transactionWithUrls = {
         ...updatedTransaction,
         ...boardSaleUrls(updatedTransaction.merchantId!, updatedTransaction.taptStoneId, req),
       };
 
-      // Notify connected clients about the cancellation
-      broadcastToStone(updatedTransaction.merchantId!, updatedTransaction.taptStoneId, {
-        type: 'transaction_update', 
-        transaction: transactionWithUrls 
-      });
-
+      // The committed cancellation event owns delivery and replay protection.
       res.json(ownerTransactionDto(transactionWithUrls));
     } catch (error) {
       console.error("Error canceling transaction:", error);
@@ -3378,241 +2621,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   });
 
   // Process payment — creates Windcave HPP session and returns redirect URL
-  app.post("/api/transactions/:id/pay", async (req, res) => {
-    try {
-      // SECURITY: Rate limiting for payment attempts
-      const clientIp = req.ip || 'unknown';
-      if (!checkRateLimit(clientIp)) {
-        console.warn(`SECURITY: Rate limit exceeded for IP ${clientIp} on payment endpoint`);
-        return res.status(429).json({ message: "Too many payment attempts. Please try again later." });
-      }
-      
-      // SECURITY: Validate request body schema
-      const paymentRequestSchema = z.object({
-        merchantId: z.number().int().positive().optional(),
-        stoneId: z.number().int().positive().optional().nullable(),
-        paymentMethod: z.string().optional(),
-        cardLast4: z.string().optional(),
-        amount: z.string().optional(),
-      });
-      
-      const validation = paymentRequestSchema.safeParse(req.body);
-      if (!validation.success) {
-        console.warn(`SECURITY: Invalid payment request body from IP ${clientIp}:`, validation.error.errors);
-        return res.status(400).json({ 
-          message: "Invalid payment request data",
-          errors: validation.error.errors 
-        });
-      }
-      
-      const transactionId = strictPositiveIntegerParam(req.params.id);
-      if (transactionId === null) return res.status(400).json({ message: "Invalid id" });
-      const { merchantId: requestMerchantId, stoneId: requestStoneId, amount: requestAmount } = validation.data;
-      
-      const transaction = await storage.getTransaction(transactionId);
-      
-      if (!transaction) {
-        console.warn(`SECURITY: Payment attempt for non-existent transaction ${transactionId} from IP ${clientIp}`);
-        return res.status(404).json({ message: "Transaction not found" });
-      }
-      if (isTokenAddressedTransaction(transaction)) {
-        return res.status(404).json({ message: "Transaction not found" });
-      }
-      
-      // SECURITY: Verify the transaction belongs to the claimed merchant
-      if (requestMerchantId && transaction.merchantId !== requestMerchantId) {
-        console.warn(`SECURITY: Cross-merchant payment attempt! Transaction ${transactionId} belongs to merchant ${transaction.merchantId} but request claimed merchant ${requestMerchantId}, IP ${clientIp}`);
-        return res.status(403).json({ message: "Transaction verification failed" });
-      }
-      
-      // SECURITY: Verify the transaction belongs to the claimed stone (if stone-specific)
-      if (requestStoneId !== undefined && transaction.taptStoneId !== requestStoneId) {
-        console.warn(`SECURITY: Cross-stone payment attempt! Transaction ${transactionId} belongs to stone ${transaction.taptStoneId} but request claimed stone ${requestStoneId}, IP ${clientIp}`);
-        return res.status(403).json({ message: "Transaction verification failed" });
-      }
-      
-      // SECURITY: If stone is specified in request, verify it exists and belongs to merchant
-      if (requestStoneId !== undefined && requestStoneId !== null) {
-        const stone = await storage.getTaptStone(requestStoneId);
-        if (!stone || stone.merchantId !== transaction.merchantId) {
-          console.warn(`SECURITY: Invalid stone ${requestStoneId} for merchant ${transaction.merchantId}, IP ${clientIp}`);
-          return res.status(403).json({ message: "Invalid stone verification" });
-        }
-      }
-      
-      // SECURITY + IDEMPOTENCY: Verify transaction is in a valid state for payment
-      if (transaction.status === "completed") {
-        console.warn(`SECURITY: Payment attempt on already completed transaction ${transactionId} from IP ${clientIp}`);
-        return res.status(409).json({ message: "Transaction already completed", idempotent: true });
-      }
-      
-      if (transaction.status === "failed") {
-        console.warn(`SECURITY: Payment attempt on failed transaction ${transactionId} from IP ${clientIp}`);
-        return res.status(400).json({ message: "Transaction has failed and cannot be paid" });
-      }
-
-      if (transaction.status === "processing") {
-        console.warn(`IDEMPOTENCY: Payment already processing for transaction ${transactionId} from IP ${clientIp}`);
-        return res.status(409).json({ message: "Payment is already being processed", idempotent: true });
-      }
-      
-      // AUDIT: Log payment attempt
-      console.log(`Payment initiated for transaction ${transactionId}, merchant ${transaction.merchantId}, stone ${transaction.taptStoneId || 'none'}, IP ${clientIp}`);
-
-      // Idempotency: if already approved, return success immediately
-      if (transaction.windcaveSessionState === 'approved') {
-        return res.json({ status: 'completed', message: 'Transaction already completed' });
-      }
-
-      // The customer pays exactly what is owed: the next share of a split bill, or
-      // the whole price (owner decision 2026-09-26), as a per-payment link's
-      // customer does. An amount that differs is refused before any provider
-      // session exists; it used to be charged, and its share counted as paid.
-      let paymentAmount = transaction.price;
-      let currentSplit: any = null;
-
-      if (transaction.isSplit) {
-        currentSplit = await storage.getNextPendingSplit(transactionId);
-        if (!currentSplit) {
-          return res.status(400).json({ message: "All splits have been paid" });
-        }
-        paymentAmount = currentSplit.amount;
-      }
-      if (
-        requestAmount !== undefined &&
-        Number(requestAmount).toFixed(2) !== Number(paymentAmount).toFixed(2)
-      ) {
-        return res.status(400).json({ message: "Payment amount does not match the outstanding share" });
-      }
-
-      // Build Windcave session
-      const baseUrl = getBaseUrl(req);
-      const xId = crypto.randomBytes(8).toString('hex');
-      const merchantReference = currentSplit
-        ? `SPLIT_${currentSplit.id}_TXN_${transactionId}`
-        : `TXN_${transactionId}`;
-
-      // Get customer email for 3D Secure (required by Windcave)
-      const merchant = await storage.getMerchant(transaction.merchantId!);
-      const customerEmail = merchant?.email || 'customer@taptpay.co.nz';
-
-      if (!isWindcaveConfigured()) {
-        return res.status(503).json({ code: "PAYMENT_PROVIDER_UNAVAILABLE", message: "Payment gateway unavailable. Please try again." });
-      }
-      const sessionResult = await createWindcaveSession(xId, paymentAmount, merchantReference, customerEmail, baseUrl, transactionId);
-
-      if (!sessionResult.success) {
-        console.error('Windcave session creation failed:', sessionResult.error);
-        return res.status(503).json({ message: 'Payment gateway unavailable. Please try again.' });
-      }
-
-      if (sessionResult.alreadyComplete) {
-        // Duplicate X-ID (a create retried after its reply was lost). R2-T5: the reply
-        // verifies nothing, so it settles nothing; it used to settle the sale from the
-        // reply's own claim. The session is recorded so the notification or callback
-        // settles it through a verified query.
-        await storage.updateTransactionWindcaveSession(transactionId, sessionResult.sessionId!, 'pending', xId);
-        return res.status(503).json({ message: 'Payment outcome is still being reconciled' });
-      }
-
-      // Save session tracking info to the transaction
-      await storage.updateTransactionWindcaveSession(transactionId, sessionResult.sessionId!, 'pending', xId);
-
-      // Cache the Windcave AJAX URLs server-side — never send these back to the client
-      // so the client cannot supply an attacker-controlled URL to our payment endpoints.
-      sessionAjaxUrlCache.set(transactionId, {
-        ajaxSubmitCardUrl: sessionResult.ajaxSubmitCardUrl,
-        ajaxSubmitApplePayUrl: sessionResult.ajaxSubmitApplePayUrl,
-        ajaxSubmitGooglePayUrl: sessionResult.ajaxSubmitGooglePayUrl,
-      });
-
-      return res.json({
-        sessionId: sessionResult.sessionId,
-        hppUrl: sessionResult.hppUrl,
-        ajaxSubmitCardUrl: sessionResult.ajaxSubmitCardUrl,
-        ajaxSubmitApplePayUrl: sessionResult.ajaxSubmitApplePayUrl,
-        ajaxSubmitGooglePayUrl: sessionResult.ajaxSubmitGooglePayUrl,
-      });
-    } catch (error) {
-      console.error("Payment processing error:", error);
-      res.status(500).json({ message: "Failed to process payment" });
-    }
-  });
+  app.post("/api/transactions/:id/pay",retailCheckoutHandlers.session(false));
 
   // ── Shared helper: finalise a payment (handles split + non-split) ──────────
-  async function finaliseHostedPayment(
-    transactionId: number,
-    approved: boolean,
-    windcaveTransactionId: string | undefined,
-    paymentMethod?: string
-  ): Promise<{ approved: boolean; redirectPath: string }> {
-    const transaction = await storage.getTransaction(transactionId);
-    if (!transaction) throw new Error(`Transaction ${transactionId} not found`);
 
-    const sessionState = approved ? "approved" : "declined";
-    await storage.updateTransactionSessionState(transactionId, sessionState);
-
-    if (paymentMethod && approved) {
-      await storage.updateTransactionPaymentMethod(transactionId, paymentMethod);
-    }
-
-    if (transaction.isSplit && approved) {
-      // Split payment: update the individual split record, not the whole transaction
-      const currentSplit = await storage.getNextPendingSplit(transactionId);
-      if (currentSplit) {
-        await storage.updateSplitPaymentStatus(currentSplit.id, "completed", windcaveTransactionId);
-        if (transaction.merchantId) {
-          await storage.incrementTransactionCount(transaction.merchantId);
-        }
-      }
-      const freshTxn = await storage.getTransaction(transactionId);
-      if (freshTxn) {
-        const allDone = (freshTxn.completedSplits ?? 0) >= (freshTxn.totalSplits ?? 1);
-        const pushMsg = allDone
-          ? `Split bill fully paid — ${freshTxn.totalSplits} payments received`
-          : `Split payment ${freshTxn.completedSplits} of ${freshTxn.totalSplits} received`;
-        broadcastToStone(freshTxn.merchantId!, freshTxn.taptStoneId, { type: "transaction_updated", transaction: freshTxn });
-        sendPushToMerchant(freshTxn.merchantId!, {
-          type: "payment_received",
-          itemName: pushMsg,
-          amount: freshTxn.price,
-          transactionId: freshTxn.id,
-        }).catch(() => {});
-        // Reset session state so next split can start a new session
-        await storage.updateTransactionSessionState(transactionId, "pending");
-        return { approved: true, redirectPath: `/receipt/${transactionId}` };
-      }
-    } else {
-      const finalStatus = approved ? "completed" : "failed";
-      const finalTxn = await storage.updateTransactionStatus(transactionId, finalStatus, windcaveTransactionId);
-      if (finalTxn && approved) {
-        if (transaction.merchantId) {
-          await storage.incrementTransactionCount(transaction.merchantId);
-        }
-        broadcastToStone(finalTxn.merchantId!, finalTxn.taptStoneId, { type: "transaction_updated", transaction: finalTxn });
-        sendPushToMerchant(finalTxn.merchantId!, {
-          type: "payment_received",
-          itemName: finalTxn.itemName,
-          amount: finalTxn.price,
-          transactionId: finalTxn.id,
-        }).catch(() => {});
-      } else if (finalTxn) {
-        broadcastToStone(finalTxn.merchantId!, finalTxn.taptStoneId, { type: "transaction_updated", transaction: finalTxn });
-        sendPushToMerchant(finalTxn.merchantId!, {
-          type: "payment_failed",
-          reason: "failed",
-          itemName: finalTxn.itemName,
-          amount: finalTxn.price,
-          transactionId: finalTxn.id,
-        }).catch(() => {});
-      }
-    }
-
-    return {
-      approved,
-      redirectPath: approved ? `/receipt/${transactionId}` : `/payment/result/${transactionId}?status=declined`,
-    };
-  }
 
   // ── Windcave environment info (for frontend Hosted Fields init) ─────────────
   app.get("/api/windcave/env", (_req, res) => {
@@ -3629,103 +2641,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   });
 
   // ── Hosted Fields completion — called by frontend after card/Apple Pay submit ─
-  app.post("/api/transactions/:id/hosted-fields-complete", async (req, res) => {
-    try {
-      const transactionId = strictPositiveIntegerParam(req.params.id);
-      if (transactionId === null) return res.status(400).json({ message: "Invalid id" });
-      const { sessionId, paymentMethod } = req.body as { sessionId?: string; paymentMethod?: string };
-
-      if (!sessionId) return res.status(400).json({ message: "sessionId required" });
-
-      const transaction = await storage.getTransaction(transactionId);
-      if (!transaction) return res.status(404).json({ message: "Transaction not found" });
-      if (isTokenAddressedTransaction(transaction)) {
-        return res.status(404).json({ message: "Transaction not found" });
-      }
-
-      // Validate the provided sessionId matches what we stored — prevents session
-      // swapping. Unconditional: a transaction with no session bound yet (still
-      // null, its state from creation until /pay runs) must reject every
-      // sessionId, not skip the check — see r1-t7-windcave-session-binding.test.ts.
-      if (!transaction.windcaveSessionId || transaction.windcaveSessionId !== sessionId) {
-        console.error(`[hosted-fields-complete] sessionId mismatch or not yet bound for txn ${transactionId}`);
-        return res.status(403).json({ message: "Session ID mismatch" });
-      }
-
-      if (!isWindcaveConfigured()) {
-        return res.status(503).json({ code: "PAYMENT_PROVIDER_UNAVAILABLE", message: "Payment outcome is unavailable" });
-      }
-      const queryResult = await queryWindcaveSession(sessionId, await expectedForNumberedSale(transaction, sessionId));
-      // R2-T5: only a verified approval or decline settles; anything else (a timeout,
-      // a session still open, a mismatch) used to be recorded here as a decline.
-      if (!queryResult.success || (queryResult.approved && !queryResult.windcaveTransactionId)) {
-        return res.status(503).json({ message: "Payment outcome is still being reconciled" });
-      }
-
-      const method = paymentMethod === "apple_pay" ? "apple_pay" : "card";
-      const result = await finaliseHostedPayment(transactionId, queryResult.approved === true, queryResult.windcaveTransactionId, method);
-      return res.json(result);
-    } catch (error) {
-      console.error("hosted-fields-complete error:", error);
-      res.status(500).json({ message: "Failed to finalise payment" });
-    }
-  });
+  app.post("/api/transactions/:id/hosted-fields-complete",retailCheckoutHandlers.complete(false));
 
   // ── Google Pay completion — backend submits token using server-side cached URL ─
-  app.post("/api/transactions/:id/googlepay-complete", async (req, res) => {
-    try {
-      const transactionId = strictPositiveIntegerParam(req.params.id);
-      if (transactionId === null) return res.status(400).json({ message: "Invalid id" });
-      // NOTE: Do NOT accept ajaxSubmitGooglePayUrl from the client — SSRF risk.
-      // Only googlePayToken comes from the client (the opaque token from Google's SDK).
-      const { sessionId, googlePayToken } = req.body as {
-        sessionId?: string;
-        googlePayToken?: object;
-      };
-
-      if (!sessionId) return res.status(400).json({ message: "sessionId required" });
-
-      const transaction = await storage.getTransaction(transactionId);
-      if (!transaction) return res.status(404).json({ message: "Transaction not found" });
-      if (isTokenAddressedTransaction(transaction)) {
-        return res.status(404).json({ message: "Transaction not found" });
-      }
-
-      // Validate sessionId belongs to this transaction. Unconditional: a
-      // transaction with no session bound yet (still null until /pay runs)
-      // must reject every sessionId, not skip the check — see
-      // r1-t7-windcave-session-binding.test.ts.
-      if (!transaction.windcaveSessionId || transaction.windcaveSessionId !== sessionId) {
-        console.error(`[googlepay-complete] sessionId mismatch or not yet bound for txn ${transactionId}`);
-        return res.status(403).json({ message: "Session ID mismatch" });
-      }
-
-      if (!isWindcaveConfigured()) {
-        return res.status(503).json({ code: "PAYMENT_PROVIDER_UNAVAILABLE", message: "Payment outcome is unavailable" });
-      }
-      // Look up the AJAX URL from server-side cache (set at session creation)
-      const cachedUrls = sessionAjaxUrlCache.get(transactionId);
-      const ajaxUrl = cachedUrls?.ajaxSubmitGooglePayUrl;
-      if (ajaxUrl && googlePayToken) {
-        await submitGooglePayToken(ajaxUrl, googlePayToken);
-      }
-      // Clear cache entry after use
-      sessionAjaxUrlCache.delete(transactionId);
-
-      // R2-T5 (RF-1): the wallet submission never decides the outcome; the verified
-      // session query does, and only a verified approval or decline settles.
-      const queryResult = await queryWindcaveSession(sessionId, await expectedForNumberedSale(transaction, sessionId));
-      if (!queryResult.success || (queryResult.approved && !queryResult.windcaveTransactionId)) {
-        return res.status(503).json({ message: "Payment outcome is still being reconciled" });
-      }
-
-      const result = await finaliseHostedPayment(transactionId, queryResult.approved === true, queryResult.windcaveTransactionId, "google_pay");
-      return res.json(result);
-    } catch (error) {
-      console.error("googlepay-complete error:", error);
-      res.status(500).json({ message: "Failed to finalise Google Pay payment" });
-    }
-  });
+  app.post("/api/transactions/:id/googlepay-complete",retailCheckoutHandlers.complete(false,true));
 
   // Get single transaction details
   app.get("/api/transactions/:id", async (req, res) => {
@@ -3733,7 +2652,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const transactionId = strictPositiveIntegerParam(req.params.id);
       if (transactionId === null) return res.status(400).json({ message: "Invalid id" });
       const transaction = await storage.getTransaction(transactionId);
-      
+
       if (!transaction) {
         return res.status(404).json({ message: "Transaction not found" });
       }
@@ -3762,7 +2681,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(400).json({ message: "Invalid splitId" });
       }
       const transaction = await storage.getTransaction(transactionId);
-      
+
       if (!transaction) {
         return res.status(404).json({ message: "Transaction not found" });
       }
@@ -3801,7 +2720,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       // Generate PDF receipt
       const pdf = await generateReceiptPdf(transaction, merchant, splitInfo);
-      
+
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename=receipt-${transaction.id}-${new Date().toISOString().split('T')[0]}.pdf`);
       res.send(pdf);
@@ -3874,27 +2793,27 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(403).json({ message: "Access denied" });
       }
       const { startDate, endDate } = req.query;
-      
+
       const start = startDate ? new Date(startDate as string) : undefined;
       const end = endDate ? new Date(endDate as string) : undefined;
-      
+
       // Get analytics and transactions for the report
       const analytics = await storage.getMerchantAnalyticsWithDateRange(merchantId, start, end);
       const transactions = await storage.getTransactionsByMerchantWithDateRange(merchantId, start, end);
       const merchant = await storage.getMerchant(merchantId);
-      
+
       if (!merchant) {
         return res.status(404).json({ message: "Merchant not found" });
       }
-      
+
       // Generate PDF report
       const pdf = await generateBusinessReportPdf(analytics, transactions, merchant);
-      
+
       // Set response headers for PDF download
       const dateRange = start || end ? 
         `_${start?.toISOString().split('T')[0] || 'beginning'}_to_${end?.toISOString().split('T')[0] || 'today'}` : 
         '_all_time';
-      
+
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename=tapt_business_report${dateRange}.pdf`);
       res.send(pdf);
@@ -4075,7 +2994,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(403).json({ message: "Access denied" });
       }
       const validation = updateMerchantDetailsSchema.safeParse(req.body);
-      
+
       if (!validation.success) {
         return res.status(400).json({ message: "Invalid merchant details", errors: validation.error.errors });
       }
@@ -4109,7 +3028,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(403).json({ message: "Only a TaptPay login can do this." });
       }
       const validation = changePasswordSchema.safeParse(req.body);
-      
+
       if (!validation.success) {
         return res.status(400).json({
           message: validation.error.issues[0]?.message ?? "Validation failed",
@@ -4198,7 +3117,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(403).json({ message: "Access denied" });
       }
       const validation = updateThemeSchema.safeParse(req.body);
-      
+
       if (!validation.success) {
         return res.status(400).json({ message: "Invalid theme selection", errors: validation.error.errors });
       }
@@ -4228,13 +3147,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
 
       const validation = updateDailyGoalSchema.safeParse(req.body);
-      
+
       if (!validation.success) {
         return res.status(400).json({ message: "Invalid daily goal", errors: validation.error.errors });
       }
 
       const updatedMerchant = await storage.updateMerchantSettings(merchantId, { kind: "daily-goal", dailyGoal: validation.data.dailyGoal });
-      
+
       if (!updatedMerchant) {
         return res.status(404).json({ message: "Merchant not found" });
       }
@@ -4251,7 +3170,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const merchantId = strictPositiveIntegerParam(req.params.id);
       if (merchantId === null) return res.status(400).json({ message: "Invalid id" });
-      
+
       // KYC, processor credentials and account details belong to the owner.
       if (!checkAccountOwnership(req, merchantId)) {
         return res.status(403).json({ message: "Unauthorized" });
@@ -4410,7 +3329,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       // Remove logo URL from database
       const updatedMerchant = await storage.updateMerchantLogoUrl(merchantId, null);
-      
+
       res.json({ message: "Logo deleted successfully" });
     } catch (error) {
       console.error("Logo deletion error:", error);
@@ -4434,7 +3353,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   });
 
   // Tapt Stone API routes
-  
+
   // Get all tapt stones for a merchant
   app.get("/api/merchants/:id/tapt-stones", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
@@ -4459,7 +3378,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!checkMerchantOwnership(req, merchantId)) {
         return res.status(403).json({ message: "Access denied" });
       }
-      
+
       // Check if merchant exists
       const merchant = await storage.getMerchant(merchantId);
       if (!merchant) {
@@ -4485,10 +3404,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const stoneId = Number(newStone.id); // Ensure it's a number
       const qrCodeUrl = generateQrCodeUrl(merchantId, stoneId);
       const paymentUrl = generatePaymentUrl(merchantId, stoneId);
-      
+
       // Update the stone with the URLs
       const updatedStone = await storage.updateTaptStoneUrlsForMerchant(newStone.id, merchantId, qrCodeUrl, paymentUrl);
-      
+
       res.json(updatedStone ?? newStone);
     } catch (error) {
       if (error instanceof TaptStoneCapacityError) {
@@ -4529,11 +3448,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
 
       const updatedStone = await storage.updateTaptStoneForMerchant(stoneId, merchantId, { name: name.trim() });
-      
+
       if (!updatedStone) {
         return res.status(404).json({ message: "Tapt stone not found" });
       }
-      
+
       res.json(updatedStone);
     } catch (error) {
       console.error("Error updating tapt stone:", error);
@@ -4580,299 +3499,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // (Removed GET /api/admin/subscription-revenue, owner decision 2026-09-26: no screen called it;
   // the overview gets the same figures from GET /api/admin/analytics.)
 
-  // Windcave notification — Windcave sends GET with ?sessionid=XXX in the URL (per pseudo code v1.5)
-  // Also handles POST for compatibility with other Windcave configurations
-  app.all("/api/windcave/notification", express.urlencoded({ extended: true }), express.json(), async (req, res) => {
-    // Always respond 200 quickly to stop Windcave retrying
-    res.status(200).send("OK");
-
-    try {
-      // Per Windcave pseudo code: sessionId is a URL query parameter (Request.Url.getParameter("sessionid"))
-      const sessionId = (req.query?.sessionid as string) || (req.query?.sessionId as string) || req.body?.sessionId || req.body?.sessionid;
-      // R2-T6 (RF-6): the provider's session ID, the raw query and the body are never
-      // logged; the internal sale ID is, once the session has found one.
-      if (!sessionId) {
-        console.warn('[WINDCAVE_NOTIF] A notification arrived without a session ID');
-        return;
-      }
-
-      const transaction = await storage.getTransactionByWindcaveSessionId(sessionId);
-      if (!transaction) {
-        console.warn('[WINDCAVE_NOTIF] No sale holds the notified session');
-        return;
-      }
-
-      // Only process if still pending (atomic state transition)
-      if (transaction.windcaveSessionState !== 'pending') {
-        console.log(`[WINDCAVE_NOTIF] Sale ${transaction.id} already processed (state: ${transaction.windcaveSessionState})`);
-        return;
-      }
-
-      // Without a configured provider there is nothing to reconcile against —
-      // do not even take the transient "processing" lock.
-      if (!isWindcaveConfigured()) {
-        console.log(`[WINDCAVE_NOTIF] Provider not configured, ignoring the notification for sale ${transaction.id}`);
-        return;
-      }
-
-      // Mark as processing to prevent concurrent handling
-      await storage.updateTransactionSessionState(transaction.id, 'processing');
-
-      let queryResult;
-      try {
-        queryResult = await queryWindcaveSession(sessionId, await expectedForNumberedSale(transaction, sessionId));
-      } catch (error) {
-        // Leaving 'processing' behind would make this session permanently
-        // unreconcilable: the guard above refuses anything not 'pending'.
-        console.error(`[WINDCAVE_NOTIF] The session query threw for sale ${transaction.id}:`, error);
-        await storage.updateTransactionSessionState(transaction.id, 'pending');
-        return;
-      }
-
-      // Same condition the token flows use: an approval with no processor
-      // transaction id is not a settlement we can record.
-      if (!queryResult.success || (queryResult.approved && !queryResult.windcaveTransactionId)) {
-        console.error(`[WINDCAVE_NOTIF] The session query was unusable for sale ${transaction.id}:`, queryResult.error);
-        await storage.updateTransactionSessionState(transaction.id, 'pending');
-        return;
-      }
-
-      const newSessionState = queryResult.approved ? 'approved' : 'declined';
-      await storage.updateTransactionSessionState(transaction.id, newSessionState);
-
-      let broadcastTxn: any = null;
-
-      if (transaction.isSplit && queryResult.approved) {
-        // Split payment: update the individual split record, not the whole transaction
-        const currentSplit = await storage.getNextPendingSplit(transaction.id);
-        if (currentSplit) {
-          await storage.updateSplitPaymentStatus(currentSplit.id, 'completed', queryResult.windcaveTransactionId);
-          if (transaction.merchantId) {
-            await storage.incrementTransactionCount(transaction.merchantId);
-          }
-        }
-        // Fetch the freshly updated transaction so completedSplits is correct
-        broadcastTxn = await storage.getTransaction(transaction.id);
-        if (broadcastTxn) {
-          const allDone = (broadcastTxn.completedSplits ?? 0) >= (broadcastTxn.totalSplits ?? 1);
-          const pushMsg = allDone
-            ? `Split bill fully paid — ${broadcastTxn.totalSplits} payments received`
-            : `Split payment ${broadcastTxn.completedSplits} of ${broadcastTxn.totalSplits} received`;
-          broadcastToStone(broadcastTxn.merchantId!, broadcastTxn.taptStoneId, { type: 'transaction_updated', transaction: broadcastTxn });
-          sendPushToMerchant(broadcastTxn.merchantId!, {
-            type: "payment_received",
-            itemName: pushMsg,
-            amount: broadcastTxn.price,
-            transactionId: broadcastTxn.id,
-          }).catch(() => {});
-        }
-      } else {
-        // Standard (non-split) transaction
-        const finalStatus = queryResult.approved ? 'completed' : 'failed';
-        const updatedTxn = await storage.updateTransactionStatus(transaction.id, finalStatus, queryResult.windcaveTransactionId);
-        if (updatedTxn && queryResult.approved) {
-          if (transaction.merchantId) {
-            await storage.incrementTransactionCount(transaction.merchantId);
-          }
-        }
-        broadcastTxn = updatedTxn;
-        if (broadcastTxn) {
-          broadcastToStone(broadcastTxn.merchantId!, broadcastTxn.taptStoneId, { type: 'transaction_updated', transaction: broadcastTxn });
-          sendPushToMerchant(broadcastTxn.merchantId!, queryResult.approved
-            ? {
-                type: "payment_received",
-                itemName: broadcastTxn.itemName,
-                amount: broadcastTxn.price,
-                transactionId: broadcastTxn.id,
-              }
-            : {
-                type: "payment_failed",
-                reason: "failed",
-                itemName: broadcastTxn.itemName,
-                amount: broadcastTxn.price,
-                transactionId: broadcastTxn.id,
-              }).catch(() => {});
-        }
-      }
-
-      console.log(`[WINDCAVE_NOTIF] Transaction ${transaction.id} processed (split=${transaction.isSplit})`);
-
-    } catch (error) {
-      console.error('[WINDCAVE_NOTIF] Error processing notification:', error);
-    }
-  });
+  // Provider hints are durably committed before ACK; only the shared worker settles.
+  app.all("/api/windcave/notification",...durableNotificationHandlers);
 
   // Windcave callback — customer browser redirected here after paying on HPP
-  app.get("/api/windcave/callback", async (req, res) => {
-    try {
-      // R0-T5: a browser-supplied "sim" parameter must never influence a real
-      // transaction's outcome — reject the whole request rather than merely
-      // ignoring the one parameter.
-      if (Object.keys(req.query).some((key) => key.toLowerCase() === "sim")) {
-        return res.status(400).json({ message: "Invalid request" });
-      }
-
-      const resultParam = req.query.result as string;
-
-      // Primary lookup: by transactionId (new approach — avoids Windcave {id} template issues)
-      const txnIdParam = req.query.transactionId as string;
-      // Fallback: by sessionId (legacy / simulation)
-      const sessionId = req.query.sessionid as string || req.query.sessionId as string;
-
-      // R2-T6 (RF-6): the browser's parameters (the provider's session ID among them) are
-      // never logged; the internal sale ID is, once found.
-
-      let transaction: any = null;
-
-      if (txnIdParam) {
-        // Strictly, as every other id: a malformed one finds nothing.
-        const txnId = strictPositiveIntegerQueryParam(txnIdParam);
-        transaction = txnId === null ? null : await storage.getTransaction(txnId);
-      } else if (sessionId) {
-        transaction = await storage.getTransactionByWindcaveSessionId(sessionId);
-      }
-
-      // A sale with its own link returns through /api/pay/return, never here: it is sent home as a
-      // missing one is (R1-T3, P2.2's tenant-safe answer), where a 404 told a caller counting through
-      // the numbers which ones were link sales.
-      if (!transaction || isTokenAddressedTransaction(transaction)) {
-        console.warn('[WINDCAVE_CALLBACK] No sale found for a browser return');
-        return res.redirect('/');
-      }
-
-      const txnId = transaction.id;
-
-      // An outcome the provider already settled is persisted truth, so reading
-      // it back stays correct even while the provider is disabled. These run
-      // before the gate below so a customer who genuinely paid still reaches
-      // their receipt rather than a permanent "pending".
-      if (transaction.windcaveSessionState === 'approved') {
-        return res.redirect(`/receipt/${txnId}`);
-      }
-      if (transaction.windcaveSessionState === 'declined') {
-        return res.redirect(`/payment/result/${txnId}?status=declined`);
-      }
-
-      // Without a real, configured provider there is nothing to reconcile
-      // against, so no browser-supplied signal — cancel, result or anything
-      // else — may finalize or otherwise mutate this transaction.
-      if (!isWindcaveConfigured()) {
-        return res.redirect(`/payment/result/${txnId}?status=pending`);
-      }
-
-      // A cancel signal comes from the browser. R2-T5: it may show the payer the
-      // cancelled page, but it never settles the sale; only a verified query (below,
-      // or the provider's notification) does. Previously it marked the sale failed,
-      // which a payer could do after paying.
-      if (resultParam === 'cancelled') {
-        const sessionMatches =
-          sessionId && transaction.windcaveSessionId && sessionId === transaction.windcaveSessionId;
-        return res.redirect(`/payment/result/${txnId}?status=${sessionMatches ? 'cancelled' : 'pending'}`);
-      }
-
-      // Notification hasn't arrived yet — query the persisted processor session.
-      // Never query a session the browser supplied but the server never persisted.
-      const sessionToQuery = transaction.windcaveSessionId;
-
-      if (!sessionToQuery) {
-        console.warn(`[WINDCAVE_CALLBACK] No persisted session to query for transaction ${txnId}`);
-        return res.redirect(`/payment/result/${txnId}?status=pending`);
-      }
-
-      await storage.updateTransactionSessionState(txnId, 'processing');
-
-      let queryResult;
-      try {
-        queryResult = await queryWindcaveSession(sessionToQuery, await expectedForNumberedSale(transaction, sessionToQuery));
-      } catch (error) {
-        // A throwing provider client must not strand the session in 'processing',
-        // where the notification handler refuses it forever as already-handled.
-        console.error(`[WINDCAVE_CALLBACK] The session query threw for sale ${txnId}:`, error);
-        await storage.updateTransactionSessionState(txnId, 'pending');
-        return res.redirect(`/payment/result/${txnId}?status=pending`);
-      }
-
-      // Same condition the token flows use: an approval with no processor
-      // transaction id is not a settlement we can record.
-      if (!queryResult.success || (queryResult.approved && !queryResult.windcaveTransactionId)) {
-        console.error(`[WINDCAVE_CALLBACK] The session query was unusable for sale ${txnId}:`, queryResult.error);
-        await storage.updateTransactionSessionState(txnId, 'pending');
-        return res.redirect(`/payment/result/${txnId}?status=pending`);
-      }
-
-      const newSessionState = queryResult.approved ? 'approved' : 'declined';
-      await storage.updateTransactionSessionState(txnId, newSessionState);
-
-      let broadcastTxn: any = null;
-
-      if (transaction.isSplit && queryResult.approved) {
-        // Split payment: update the individual split record, not the whole transaction status
-        const currentSplit = await storage.getNextPendingSplit(txnId);
-        if (currentSplit) {
-          await storage.updateSplitPaymentStatus(currentSplit.id, 'completed', queryResult.windcaveTransactionId);
-          if (transaction.merchantId) {
-            await storage.incrementTransactionCount(transaction.merchantId);
-          }
-        }
-        // Fetch the freshly updated transaction so completedSplits is correct
-        broadcastTxn = await storage.getTransaction(txnId);
-        if (broadcastTxn) {
-          const allDone = (broadcastTxn.completedSplits ?? 0) >= (broadcastTxn.totalSplits ?? 1);
-          const pushMsg = allDone
-            ? `Split bill fully paid — ${broadcastTxn.totalSplits} payments received`
-            : `Split payment ${broadcastTxn.completedSplits} of ${broadcastTxn.totalSplits} received`;
-          broadcastToStone(broadcastTxn.merchantId!, broadcastTxn.taptStoneId, { type: 'transaction_updated', transaction: broadcastTxn });
-          sendPushToMerchant(broadcastTxn.merchantId!, {
-            type: "payment_received",
-            itemName: pushMsg,
-            amount: broadcastTxn.price,
-            transactionId: broadcastTxn.id,
-          }).catch(() => {});
-        }
-
-        console.log(`[WINDCAVE_CALLBACK] Transaction ${txnId} split payment recorded`);
-
-        // Redirect to receipt for this individual payer
-        const splitReceiptId = currentSplit ? currentSplit.id : '';
-        return res.redirect(`/receipt/${txnId}?splitId=${splitReceiptId}`);
-      } else {
-        // Standard (non-split) or failed transaction
-        const finalStatus = queryResult.approved ? 'completed' : 'failed';
-        const updatedTxn = await storage.updateTransactionStatus(txnId, finalStatus, queryResult.windcaveTransactionId);
-        if (updatedTxn && queryResult.approved) {
-          if (transaction.merchantId) {
-            await storage.incrementTransactionCount(transaction.merchantId);
-          }
-        }
-        broadcastTxn = updatedTxn;
-        if (broadcastTxn) {
-          broadcastToStone(broadcastTxn.merchantId!, broadcastTxn.taptStoneId, { type: 'transaction_updated', transaction: broadcastTxn });
-          sendPushToMerchant(broadcastTxn.merchantId!, queryResult.approved
-            ? {
-                type: "payment_received",
-                itemName: broadcastTxn.itemName,
-                amount: broadcastTxn.price,
-                transactionId: broadcastTxn.id,
-              }
-            : {
-                type: "payment_failed",
-                reason: "failed",
-                itemName: broadcastTxn.itemName,
-                amount: broadcastTxn.price,
-                transactionId: broadcastTxn.id,
-              }).catch(() => {});
-        }
-
-        console.log(`[WINDCAVE_CALLBACK] Transaction ${txnId} → ${finalStatus}`);
-
-        if (queryResult.approved) return res.redirect(`/receipt/${txnId}`);
-        return res.redirect(`/payment/result/${txnId}?status=declined`);
-      }
-    } catch (error) {
-      console.error('[WINDCAVE_CALLBACK] Error:', error);
-      res.redirect('/');
-    }
-  });
+  app.get("/api/windcave/callback",retailCheckoutHandlers.numericReturn);
 
   // (Removed GET /api/windcave/status, owner decision 2026-09-26: nothing called it, and it
   // told anyone whether payments were on, the provider's endpoint and its setting names.)
@@ -4896,7 +3527,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         try {
           const analytics = await storage.getMerchantAnalytics(merchant.id);
           const transactions = await storage.getTransactionsByMerchant(merchant.id);
-          
+
           totalRevenue += analytics.totalRevenue || 0;
           totalTransactions += analytics.totalTransactions || 0;
           totalCompletedTransactions += analytics.completedTransactions || 0;
@@ -5220,7 +3851,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.post("/api/admin/resend-verification", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
     try {
       const { email } = req.body;
-      
+
       if (!email) {
         return res.status(400).json({ message: "Email is required" });
       }
@@ -5243,7 +3874,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const { sendMerchantVerificationEmail } = await import('./email-service-multi');
       const { getBaseUrl } = await import('./url-utils');
       const baseUrl = getBaseUrl(req);
-      
+
       const emailSent = await sendMerchantVerificationEmail(
         merchant.email,
         merchant.verificationToken,
@@ -5969,7 +4600,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // tombstone, which nothing called. Financial records are never bulk-deleted.)
 
   // ===== REFUND MANAGEMENT ROUTES =====
-  
+
   // Create a refund for a transaction
   app.post("/api/transactions/:transactionId/refunds", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
@@ -6121,7 +4752,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const transactionId = strictPositiveIntegerParam(req.params.transactionId);
       if (transactionId === null) return res.status(400).json({ message: "Invalid transactionId" });
       const merchantId = req.user?.merchantId;
-      
+
       if (!merchantId) {
         return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       }
@@ -6153,7 +4784,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const merchantId = strictPositiveIntegerParam(req.params.merchantId);
       if (merchantId === null) return res.status(400).json({ message: "Invalid id" });
       const userMerchantId = req.user?.merchantId;
-      
+
       // Verify access
       if (userMerchantId !== merchantId && req.user?.role !== 'admin') {
         return res.status(403).json({ message: "Access denied" });
@@ -6179,18 +4810,18 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // =============================================================================
   // STOCK MANAGEMENT ENDPOINTS
   // =============================================================================
-  
+
   // Get all stock items for a merchant
   app.get("/api/merchants/:merchantId/stock-items", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = strictPositiveIntegerParam(req.params.merchantId);
       if (merchantId === null) return res.status(400).json({ message: "Invalid id" });
-      
+
       // The business's logins, and the platform admin (C10 batch 6: the shared check, not a copy).
       if (!checkMerchantOwnership(req, merchantId)) {
         return res.status(403).json({ message: "Access denied" });
       }
-      
+
       const stockItems = await storage.getStockItemsByMerchant(merchantId);
       res.json(stockItems);
     } catch (error) {
@@ -6204,16 +4835,16 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const merchantId = strictPositiveIntegerParam(req.params.merchantId);
       if (merchantId === null) return res.status(400).json({ message: "Invalid id" });
-      
+
       // The business's logins, and the platform admin (C10 batch 6: the shared check, not a copy).
       if (!checkMerchantOwnership(req, merchantId)) {
         return res.status(403).json({ message: "Access denied" });
       }
-      
+
       const validatedData = createStockItemSchema.parse(req.body);
-      
+
       const stockItem = await storage.createStockItemForMerchant(merchantId, validatedData);
-      
+
       res.status(201).json(stockItem);
     } catch (error) {
       console.error("Error creating stock item:", error);
@@ -6231,7 +4862,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (merchantId === null) return res.status(400).json({ message: "Invalid id" });
       const itemId = strictPositiveIntegerParam(req.params.itemId);
       if (itemId === null) return res.status(400).json({ message: "Invalid id" });
-      
+
       // The business's logins, and the platform admin (C10 batch 6: the shared check, not a copy).
       if (!checkMerchantOwnership(req, merchantId)) {
         return res.status(403).json({ message: "Access denied" });
@@ -6246,11 +4877,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const validatedData = updateStockItemSchema.parse(req.body);
 
       const stockItem = await storage.updateStockItemForMerchant(itemId, merchantId, validatedData);
-      
+
       if (!stockItem) {
         return res.status(404).json({ message: "Stock item not found" });
       }
-      
+
       res.json(stockItem);
     } catch (error) {
       console.error("Error updating stock item:", error);
@@ -6268,7 +4899,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (merchantId === null) return res.status(400).json({ message: "Invalid id" });
       const itemId = strictPositiveIntegerParam(req.params.itemId);
       if (itemId === null) return res.status(400).json({ message: "Invalid id" });
-      
+
       // The business's logins, and the platform admin (C10 batch 6: the shared check, not a copy).
       if (!checkMerchantOwnership(req, merchantId)) {
         return res.status(403).json({ message: "Access denied" });
@@ -6281,11 +4912,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
 
       const success = await storage.deleteStockItemForMerchant(itemId, merchantId);
-      
+
       if (!success) {
         return res.status(404).json({ message: "Stock item not found" });
       }
-      
+
       res.json({ message: "Stock item deleted successfully" });
     } catch (error) {
       console.error("Error deleting stock item:", error);
@@ -6307,14 +4938,14 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       const apiKey = authHeader.substring(7);
       const keyData = await storage.getApiKeyByKey(apiKey);
-      
+
       if (!keyData || keyData.status !== 'active') {
         return res.status(401).json({ error: 'Invalid or revoked API key' });
       }
 
       // Update last used timestamp
       await storage.updateApiKeyLastUsed(keyData.id);
-      
+
       req.apiKey = keyData;
       next();
     } catch (error) {
@@ -6332,7 +4963,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // Create transaction via API
   app.post("/api/v1/transactions", requireEcommerceApi, authenticateApiKey, async (req: any, res) => {
     const startTime = Date.now();
-    
+
     try {
       // The key's permission first, then the body (P2.2's order: role before body).
       if (!req.apiKey.permissions.includes('create_transactions')) {
@@ -6356,14 +4987,20 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
       const { amount, currency, item_name, webhook_url } = validation.data;
 
-      if (!(await requireBillingCard(req.apiKey.merchantId, res))) return;
+      const creationKey=req.get('Idempotency-Key');if(!isUuid(creationKey))return res.status(400).json({code:'IDEMPOTENCY_KEY_REQUIRED',error:'A creation request key is required'});
+      // External webhook delivery is deferred by the plan's API phase; its old
+      // storage port was a stub. Refuse before creating a bill instead of claiming
+      // that an event was queued for a receiver that does not exist.
+      if(webhook_url||req.apiKey.webhookUrl)return res.status(503).json({code:'API_WEBHOOK_UNAVAILABLE',error:'Webhook delivery is not enabled'});
+      const priorCreation=await storage.getCreationCommandForMerchant(req.apiKey.merchantId,creationKey);
+      if (!priorCreation&&!(await requireBillingCard(req.apiKey.merchantId, res))) return;
       if (!config.features.newRetailPayments) {
         return res.status(503).json({ error: "Per-payment links are not enabled yet" });
       }
 
       // API-v1 sales are independently addressable. The raw credential is
       // returned once in this authenticated response and never enters storage.
-      const { transaction, rawToken } = await createRetailTransaction({ createTransaction: input => storage.createTransactionForMerchant(req.apiKey!.merchantId, input) }, {
+      const { transaction, rawToken } = await createRetailTransaction({ createTransaction: input => storage.createTransactionForMerchant(req.apiKey!.merchantId, input,{key:creationKey,actor:{service:'api_key',keyId:req.apiKey!.id},source:'api_v1'}) }, {
         merchantId: req.apiKey.merchantId,
         itemName: item_name,
         price: amount,
@@ -6371,7 +5008,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         paymentMethod: 'api',
         splitEnabled: false,
         taptStoneId: null,
-      }, "per_payment");
+      }, "per_payment",{creationKey,returnStateSecret:config.paymentReturnStateSecret});
       if (!rawToken) throw new Error("Per-payment transaction did not return a credential");
 
       const paymentUrl = `${getBaseUrl(req)}/pay/t/${rawToken}`;
@@ -6387,21 +5024,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         responseTime: Date.now() - startTime
       });
 
-      // Send webhook if configured
-      if (webhook_url || req.apiKey.webhookUrl) {
-        await storage.createWebhookDelivery({
-          apiKeyId: req.apiKey.id,
-          merchantId: req.apiKey.merchantId,
-          transactionId: transaction.id,
-          eventType: 'transaction.created',
-          webhookUrl: webhook_url || req.apiKey.webhookUrl,
-          payload: JSON.stringify({
-            event: 'transaction.created',
-            data: publicTransactionDto(transaction)
-          })
-        });
-      }
-
       res.json({
         id: transaction.id,
         amount: transaction.price,
@@ -6414,6 +5036,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       });
 
     } catch (error) {
+      if(error instanceof CreationCommandConflict||error instanceof CreationCredentialUnavailable)return res.status(409).json({code:error.code,error:'The original creation request needs recovery'});
       console.error("API transaction creation error:", error);
       const isCredentialCollision = error instanceof PaymentCredentialCollisionError;
       // Best-effort: the usual reason we are in here is that the database is
@@ -6448,7 +5071,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const transactionId = strictPositiveIntegerParam(req.params.id);
       if (transactionId === null) return res.status(400).json({ error: "Invalid id" });
-      
+
       // Check permissions
       if (!req.apiKey.permissions.includes('read_transactions')) {
         return res.status(403).json({ error: 'Insufficient permissions' });
@@ -6519,8 +5142,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // they only answered unavailable, and nothing called them. Customers pay with Apple Pay and Google
   // Pay through the checkout page's own routes.)
 
-
-
   // (Removed GET /api/payments/digital-wallet/config, owner decision 2026-09-26: nothing called
   // it, the wallet payment routes above are retired, and it guessed the device from the
   // User-Agent and gave out the platform's provider account id.)
@@ -6561,13 +5182,15 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(403).json({ message: "Only the account owner can change the plan" });
       }
 
+      const commandKey=req.get('Idempotency-Key');if(!isUuid(commandKey))return res.status(400).json({code:'IDEMPOTENCY_KEY_REQUIRED',message:'Refresh Billing before starting this request'});
+      const intent={key:commandKey,actor:commandActor(req,res)};
       const parsed = planIdSchema.safeParse(req.body?.planId);
       if (!parsed.success) {
         return res.status(400).json({ message: "Unknown plan" });
       }
 
       await storage.getOrCreateSubscription(merchantId);
-      const result = await storage.changeSubscriptionPlan(merchantId, parsed.data, executeStoredCardCharge);
+      const result = await storage.changeSubscriptionPlan(merchantId, parsed.data, subscriptionPayments?.billing.canInitiate()?request=>executeStoredCardCharge(request,commandActor(req,res)):undefined,intent);
 
       if (!result.ok) {
         if (result.reason === "too-many-seats") {
@@ -6610,6 +5233,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           : "Your new plan starts at the end of the current billing period.",
       });
     } catch (error) {
+      if(error instanceof SubscriptionCommandConflict)return res.status(409).json({code:error.code,message:"The original billing request has different details. Keep the original request."});
       console.error("Change plan error:", error);
       res.status(500).json({ message: "Failed to change plan" });
     }
@@ -6626,6 +5250,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(403).json({ message: "Only the account owner can cancel the subscription" });
       }
 
+      const commandKey=req.get('Idempotency-Key');if(!isUuid(commandKey))return res.status(400).json({code:'IDEMPOTENCY_KEY_REQUIRED',message:'Refresh Billing before starting this request'});
+      const intent={key:commandKey,actor:commandActor(req,res)};
       const { reason } = req.body;
 
       if (!reason || reason.trim().length === 0) {
@@ -6635,7 +5261,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       await storage.getOrCreateSubscription(merchantId);
       const cancellation = await storage.cancelSubscription(
         merchantId,
-        String(reason).slice(0, 500),
+        String(reason).slice(0, 500),intent,
       );
       if (!cancellation.ok) {
         if (cancellation.reason === "billing-busy") {
@@ -6653,6 +5279,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           : "Your subscription is cancelled. You can restart it from Billing at any time.",
       });
     } catch (error) {
+      if(error instanceof SubscriptionCommandConflict)return res.status(409).json({code:error.code,message:"The original billing request has different details. Keep the original request."});
       console.error("Cancel subscription error:", error);
       res.status(500).json({ message: "Failed to cancel subscription" });
     }
@@ -6667,7 +5294,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(403).json({ message: "Only the account owner can change the subscription" });
       }
 
-      const subscription = await storage.resumeSubscription(merchantId);
+      const commandKey=req.get('Idempotency-Key');if(!isUuid(commandKey))return res.status(400).json({code:'IDEMPOTENCY_KEY_REQUIRED',message:'Refresh Billing before starting this request'});
+      const intent={key:commandKey,actor:commandActor(req,res)};
+      const subscription = await storage.resumeSubscription(merchantId,intent);
       if (!subscription) {
         return res.status(409).json({ message: "This subscription does not have a cancellation that can be resumed." });
       }
@@ -6677,6 +5306,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         message: "Your subscription will renew as normal.",
       });
     } catch (error) {
+      if(error instanceof SubscriptionCommandConflict)return res.status(409).json({code:error.code,message:"The original billing request has different details. Keep the original request."});
       console.error("Resume subscription error:", error);
       res.status(500).json({ message: "Failed to resume subscription" });
     }
@@ -7015,7 +5645,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const limit = strictBoundedIntegerQueryParam(req.query.limit, { fallback: 50, min: 1, max: 100 });
       if (limit === null) return res.status(400).json({ message: "Invalid limit" });
       const history = await storage.getBillingHistory(merchantId, limit);
-      
+
       res.json({ history: history.map(billingHistoryDto) });
     } catch (error) {
       console.error("Get billing history error:", error);
@@ -7060,156 +5690,60 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  // Step 1: open a hosted Windcave page that captures and stores the card.
-  app.post("/api/billing/card/session", authenticateToken, async (req: AuthenticatedRequest, res) => {
-    try {
-      const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
-      if (!isAccountOwner(req.user)) {
-        return res.status(403).json({ message: "Only the account owner can change the payment method" });
-      }
-
-      const merchant = await storage.getMerchant(merchantId);
-      if (!merchant) return res.status(404).json({ message: "Merchant not found" });
-      if (!isWindcaveConfigured()) {
-        return res.status(503).json({ message: "Card storage is temporarily unavailable. Please try again later." });
-      }
-
-      await storage.getOrCreateSubscription(merchantId);
-
-      const xId = crypto.randomBytes(8).toString("hex");
-      const baseUrl = getBaseUrl(req);
-      const result = await createCardStorageSession(
-        xId,
-        `TAPTPAY-CARD-M${merchantId}-${Date.now()}`,
-        merchant.contactEmail || merchant.email,
-        `${baseUrl}/api/billing/card/callback?merchantId=${merchantId}`,
-        `${baseUrl}/api/billing/card/notification`,
-      );
-
-      if (!result.success || !result.sessionId || !result.hppUrl) {
-        console.error("Card storage session failed");
-        return res.status(502).json({ message: "Could not start card setup. Please try again." });
-      }
-
-      const bound = await storage.bindSubscriptionCardSession(merchantId, result.sessionId);
-      if (!bound) {
-        return res.status(500).json({ message: "Could not start card setup. Please try again." });
-      }
-
-      // The session id is the handle the client polls with; it is not a credential
-      // for anything other than reading back this one card-capture result.
-      res.json({ sessionId: result.sessionId, redirectUrl: result.hppUrl });
-    } catch (error) {
-      console.error("Create card session error:", error);
-      res.status(500).json({ message: "Failed to start card setup" });
-    }
+  // Subscription card setup: one persisted command before provider creation.
+  app.post("/api/billing/card/session", authenticateToken, async (req:AuthenticatedRequest,res)=>{
+    try{
+      const merchantId=req.user?.merchantId;if(!merchantId)return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
+      if(!isAccountOwner(req.user))return res.status(403).json({message:'Only the account owner can change the payment method'});
+      if(!subscriptionPayments?.card.canStart())return res.status(503).json({message:'Card storage is temporarily unavailable'});
+      const idempotencyKey=req.get('Idempotency-Key');if(!isUuid(idempotencyKey))return res.status(400).json({code:'IDEMPOTENCY_KEY_REQUIRED',message:'Refresh Settings before starting card setup'});
+      const merchant=await storage.getMerchant(merchantId);if(!merchant)return res.status(404).json({message:'Merchant not found'});
+      const subscription=await storage.getOrCreateSubscription(merchantId);
+      const result=await subscriptionPayments.card.start({subscriptionId:subscription.id,merchantId,idempotencyKey,
+        email:merchant.contactEmail||merchant.email,baseUrl:getBaseUrl(req),actor:commandActor(req,res)});
+      if(result.kind==='ready')return res.json({sessionId:result.sessionId,redirectUrl:result.redirectUrl});
+      if(result.kind==='processing'||result.kind==='terminal')return res.status(202).json({pending:true,sessionId:'sessionId' in result?result.sessionId:undefined,message:'Your original card setup is still being confirmed. Retry with the same request.'});
+      return res.status(result.kind==='conflict'?409:result.kind==='not-found'?404:503).json({message:'Card setup is unavailable or an earlier payment is being reconciled'});
+    }catch{console.error('[CARD_SETUP_UNAVAILABLE]');res.status(503).json({message:'Card setup could not be confirmed. Keep the original request.'});}
   });
 
-  // Step 2: read back the stored-card token once the shopper finishes.
-  app.post("/api/billing/card/confirm", authenticateToken, async (req: AuthenticatedRequest, res) => {
-    try {
-      const merchantId = req.user?.merchantId;
-      if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
-      if (!isAccountOwner(req.user)) {
-        return res.status(403).json({ message: "Only the account owner can change the payment method" });
-      }
-
-      const sessionId = typeof req.body?.sessionId === "string" ? req.body.sessionId.trim() : "";
-      if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$/.test(sessionId)) {
-        return res.status(400).json({ message: "A valid card setup session is required." });
-      }
-
-      const boundSubscription = await storage.getSubscription(merchantId);
-      const sessionState = subscriptionCardSessionState(boundSubscription, sessionId);
-      if (!boundSubscription || !sessionState) {
-        return res.status(403).json({ message: "This card setup session does not belong to your account." });
-      }
-      if (sessionState === "declined") {
-        return res.status(422).json({ message: "That card was declined. Please try another card." });
-      }
-      if (sessionState === "succeeded") {
-        const seatsInUse = await storage.countSeatsInUse(merchantId);
-        return res.json({
-          success: true,
-          ready: renewalPaymentMethodIsReady(boundSubscription),
-          charged: false,
-          card: {
-            last4: boundSubscription.cardLast4,
-            brand: boundSubscription.cardBrand,
-            expiry: boundSubscription.cardExpiry,
-          },
-          subscription: subscriptionDto(boundSubscription, seatsInUse),
-        });
-      }
-
-      const result = await queryStoredCardSession(sessionId);
-      if (!result.success) {
-        return res.status(502).json({ message: "Could not confirm the card. Please try again." });
-      }
-      if (!result.complete) {
-        return res.status(202).json({ pending: true });
-      }
-      if (!result.approved || !result.card) {
-        return res.status(422).json({ message: "That card could not be verified. Please try another card." });
-      }
-
-      const completion = await storage.completeSubscriptionCardSetup(merchantId, sessionId, {
-        windcaveCardId: result.card.cardId,
-        brand: result.card.brand,
-        last4: result.card.last4,
-        expiry: result.card.expiry,
-      }, executeStoredCardCharge);
-      if (!completion.ok) {
-        if (completion.reason === "session-mismatch") {
-          return res.status(403).json({ message: "This card setup session does not belong to your account." });
-        }
-        if (completion.reason === "billing-busy") {
-          return res.status(409).json({ message: "Billing is already in progress. Please try again shortly." });
-        }
-        if (completion.reason === "invalid-state") {
-          return res.status(409).json({ message: "Resolve the current subscription state before adding a card." });
-        }
-        if (completion.reason === "declined") {
-          return res.status(422).json({ message: "That card was declined. Please try another card." });
-        }
-        if (completion.reason === "charge-failed") {
-          return res.status(502).json({ message: "The card charge could not be confirmed. Please try again." });
-        }
-        if (completion.reason === "not-found") {
-          return res.status(404).json({ message: "Subscription not found" });
-        }
-        return res.status(500).json({ message: "The card could not be saved." });
-      }
-      const seatsInUse = await storage.countSeatsInUse(merchantId);
-
-      res.json({
-        success: true,
-        ready: renewalPaymentMethodIsReady(completion.subscription),
-        charged: completion.charged,
-        card: { last4: result.card.last4, brand: result.card.brand, expiry: result.card.expiry },
-        subscription: subscriptionDto(completion.subscription, seatsInUse),
-      });
-    } catch (error) {
-      console.error("Confirm billing card error:", error);
-      res.status(500).json({ message: "Failed to save card" });
-    }
+  app.post("/api/billing/card/confirm", authenticateToken, async(req:AuthenticatedRequest,res)=>{
+    try{
+      const merchantId=req.user?.merchantId;if(!merchantId)return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
+      if(!isAccountOwner(req.user))return res.status(403).json({message:'Only the account owner can change the payment method'});
+      const parsed=z.object({sessionId:z.string().refine(value=>/^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$/.test(value))}).strict().safeParse(req.body);
+      if(!parsed.success)return res.status(400).json({message:'A valid card setup session is required'});
+      if(!subscriptionPayments)return res.status(503).json({message:'Card confirmation is unavailable'});
+      const attempt=await subscriptionPayments.card.confirm(merchantId,parsed.data.sessionId);
+      if(!attempt)return res.status(403).json({message:'This card setup session does not belong to your account'});
+      if(attempt.payment_method_superseded)return res.status(409).json({code:'CARD_SETUP_SUPERSEDED',terminal:true,message:'The payment method has since changed. This setup will not be applied again.'});
+      if(attempt.activation_suppressed)return res.status(409).json({code:'CARD_SETUP_CANCELLED',terminal:true,message:'Your card was verified. The subscription remains cancelled and no new charge was started.'});
+      if(attempt.state==='declined'||attempt.activation_state==='declined')return res.status(422).json({message:'The payment method or subscription charge was declined. Please try another card.'});
+      if(attempt.state!=='approved'||(attempt.activation_state && !attempt.activation_applied_at))return res.status(202).json({pending:true});
+      const subscription=await storage.getSubscription(merchantId);if(!subscription)return res.status(404).json({message:'Subscription not found'});
+      // A verified card is independent from positive-money activation. With an
+      // unpaid subscription, never claim that saving the card established access.
+      if(!attempt.activation_state && attempt.activation_required!=='false' && !attempt.activation_satisfied && !billingCardIsReady(subscription))return res.status(202).json({pending:true});
+      const seatsInUse=await storage.countSeatsInUse(merchantId);
+      res.json({success:true,ready:renewalPaymentMethodIsReady(subscription),charged:attempt.activation_state==='approved',
+        card:{last4:subscription.cardLast4,brand:subscription.cardBrand,expiry:subscription.cardExpiry},subscription:subscriptionDto(subscription,seatsInUse)});
+    }catch{console.error('[CARD_CONFIRMATION_UNAVAILABLE]');res.status(503).json({message:'Card confirmation is still being checked'});}
   });
 
-  // Windcave posts here when a card-capture session settles. We do not trust its
-  // body: it is a nudge to re-read the session from Windcave, nothing more.
-  app.all("/api/billing/card/notification", async (_req, res) => {
-    res.sendStatus(200);
-  });
-
-  const billingCardCallback = (req: express.Request, res: express.Response) => {
-    const result = safeBillingCardCallbackResult(req.query.result ?? req.body?.result);
-    // The browser already holds its opaque session in sessionStorage. Never put
-    // that identifier into our URL, referrers, analytics or server access logs.
-    res.redirect(`/settings?section=billing&card=${result}`);
+  app.all("/api/billing/card/notification",...durableNotificationHandlers);
+  const billingCardCallback=async(req:express.Request,res:express.Response)=>{
+    res.set({'Cache-Control':'private, no-store','Referrer-Policy':'no-referrer'});
+    const state=typeof req.query.state==='string'?req.query.state:undefined;
+    if(!state||!subscriptionPayments)return res.status(409).json({message:'This card return needs reconciliation'});
+    try{
+      const attempt=await subscriptionPayments.card.resolveReturnState(state);
+      if(!attempt)return res.status(404).json({message:'Card return not found'});
+      if(attempt.session_id)await subscriptionPayments.card.confirm(attempt.merchant_id,attempt.session_id);
+      res.redirect(303,'/settings?section=billing&card=pending');
+    }catch{res.status(503).json({message:'Card return is still being confirmed'});}
   };
-  app.get("/api/billing/card/callback", billingCardCallback);
-  app.post("/api/billing/card/callback", billingCardCallback);
+  app.get("/api/billing/card/callback",billingCardCallback);
+  app.post("/api/billing/card/callback",billingCardCallback);
 
   // Remove the stored card.
   app.delete("/api/billing/card", authenticateToken, async (req: AuthenticatedRequest, res) => {
@@ -7220,9 +5754,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(403).json({ message: "Only the account owner can change the payment method" });
       }
 
-      await storage.removeSubscriptionCard(merchantId);
+      const commandKey=req.get('Idempotency-Key');if(!isUuid(commandKey))return res.status(400).json({code:'IDEMPOTENCY_KEY_REQUIRED',message:'Refresh Billing before starting this request'});
+      const intent={key:commandKey,actor:commandActor(req,res)};
+      await storage.removeSubscriptionCard(merchantId,intent);
       res.json({ success: true });
     } catch (error) {
+      if(error instanceof SubscriptionCommandConflict)return res.status(409).json({code:error.code,message:"The original billing request has different details. Keep the original request."});
       console.error("Remove billing card error:", error);
       if (error instanceof SubscriptionBillingBusyError) {
         return res.status(409).json({ message: "Billing is already in progress. Please try again shortly." });
@@ -7351,109 +5888,14 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
   // After a rent invoice is fully paid, email a GST tax invoice to the head
   // tenant plus any co-tenants / split-share payers we have addresses for.
-  async function sendRentGstInvoices(invoice: any): Promise<void> {
-    try {
-      const [merchant, tenant] = await Promise.all([
-        storage.getMerchant(invoice.merchantId),
-        storage.getTenantProfile(invoice.tenantProfileId),
-      ]);
-      if (!merchant || !tenant) return;
-      const recipients = Array.from(new Set(
-        [
-          tenant.email,
-          ...extractEmails(tenant.coTenantsText),
-          // Only payers whose share was paid, never every address typed (owner decision 2026-09-26).
-          ...(await storage.getPaidInvoiceSplitPayerEmails({ vertical: "property", invoiceId: invoice.id })),
-        ]
-          .filter(Boolean).map((e: string) => e.toLowerCase()),
-      ));
-      if (recipients.length === 0) return;
-      const sent = await sendGstInvoices({
-        recipients,
-        merchantName: merchant.businessName || merchant.name,
-        gstNumber: merchant.gstNumber,
-        tenantName: `${tenant.firstName} ${tenant.lastName}`,
-        propertyAddress: tenant.propertyAddress,
-        amountCents: invoice.amountCents,
-        paidAt: invoice.paidAt ? new Date(invoice.paidAt) : new Date(),
-        reference: `RENT-${invoice.id.slice(0, 8).toUpperCase()}`,
-      });
-      await storage.logTransactionEvent({
-        merchantId: invoice.merchantId, tenantProfileId: invoice.tenantProfileId, invoiceId: invoice.id,
-        eventType: "Gst_Invoice_Sent", payload: { recipients: recipients.length, sent },
-      });
-    } catch (err) { console.error("[GST_INVOICE]", err); }
-  }
+
 
   // Idempotently finalize a rent invoice from a Windcave payment outcome.
   // Safe to call from both the browser callback and the server notification —
   // already-finalized invoices (paid/paid_external/voided) are left untouched.
   // For split invoices each call counts one share (deduped by sessionId); the
   // invoice only flips to paid once every share is in.
-  async function finalizeRentInvoice(invoiceId: string, approved: boolean, windcaveTransactionId?: string, sessionId?: string): Promise<any> {
-    const inv = await storage.getInvoiceRentRequest(invoiceId);
-    if (!inv) return null;
-    // A split share's approved session that nothing counts (every share already paid, or the
-    // invoice settled): the payer was charged, so it is recorded for a refund (R3 automates
-    // this). A repeat of a session already counted is not.
-    const recordUncountedShare = async (current: any) => {
-      if (!approved || !sessionId || !(inv.splitEnabled && inv.splitCount && inv.splitCount > 1)) return;
-      if ((current?.splitPaidSessions ?? []).includes(sessionId)) return;
-      await storage.logTransactionEvent({
-        merchantId: inv.merchantId, tenantProfileId: inv.tenantProfileId, invoiceId,
-        eventType: "Split_Share_Unrecorded",
-        payload: { channel: "card", reason: "every share already paid", windcaveTransactionId: windcaveTransactionId ?? null },
-      });
-    };
-    if (["paid", "paid_external", "voided"].includes(inv.status)) { // already settled
-      await recordUncountedShare(inv);
-      return inv;
-    }
 
-    if (!approved) {
-      await storage.logTransactionEvent({
-        merchantId: inv.merchantId, tenantProfileId: inv.tenantProfileId, invoiceId,
-        eventType: "Payment_Declined", payload: { channel: "card" },
-      });
-      return inv;
-    }
-
-    // Split invoice — atomically claim this share (serialize concurrent payers at the
-    // DB level so each gets a unique slot; dedup prevents the same session counting twice).
-    if (inv.splitEnabled && inv.splitCount && inv.splitCount > 1) {
-      const dedupeKey = sessionId ?? crypto.randomUUID();
-      const claimed = await storage.atomicClaimSplitShare(invoiceId, dedupeKey);
-      if (!claimed) {
-        // Session already counted, or all shares claimed — return current state.
-        const current = await storage.getInvoiceRentRequest(invoiceId);
-        await recordUncountedShare(current);
-        return current;
-      }
-      if (sessionId) await storage.markInvoiceSplitSessionPaid(sessionId, new Date());
-      const fullyPaid = claimed.splitPaidCount >= inv.splitCount;
-      const statusUpdates: any = { windcaveTransactionId: windcaveTransactionId ?? inv.windcaveTransactionId };
-      if (fullyPaid) { statusUpdates.status = "paid"; statusUpdates.paidAt = new Date(); }
-      const updated = await storage.updateInvoiceRentRequest(invoiceId, statusUpdates);
-      await storage.logTransactionEvent({
-        merchantId: inv.merchantId, tenantProfileId: inv.tenantProfileId, invoiceId,
-        eventType: fullyPaid ? "Payment_Received" : "Split_Share_Paid",
-        payload: { share: claimed.splitPaidCount, of: inv.splitCount, channel: "card", windcaveTransactionId: windcaveTransactionId ?? null },
-      });
-      if (fullyPaid) await sendRentGstInvoices(updated);
-      return updated;
-    }
-
-    // Single payment.
-    const updated = await storage.updateInvoiceRentRequest(invoiceId, {
-      status: "paid", paidAt: new Date(), windcaveTransactionId: windcaveTransactionId ?? null,
-    });
-    await storage.logTransactionEvent({
-      merchantId: inv.merchantId, tenantProfileId: inv.tenantProfileId, invoiceId,
-      eventType: "Payment_Received", payload: { channel: "card", amountCents: inv.amountCents, windcaveTransactionId: windcaveTransactionId ?? null },
-    });
-    await sendRentGstInvoices(updated);
-    return updated;
-  }
 
   // ── Tenant Profiles ──────────────────────────────────────────────────────
 
@@ -7519,52 +5961,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     return invoice.checkoutVertical === "trades"
       ? storage.updateJobInvoice(invoice.id, updates)
       : storage.updateInvoiceRentRequest(invoice.id, updates);
-  }
-
-  async function finalizeTradeInvoice(invoiceId: string, approved: boolean, windcaveTransactionId?: string, sessionId?: string): Promise<any> {
-    const invoice = await storage.getJobInvoice(invoiceId);
-    if (!invoice) return null;
-    // As for rent: an approved split session nothing counts is recorded for a refund (R3).
-    const recordUncountedShare = async (current: any) => {
-      if (!approved || !sessionId || !(invoice.splitEnabled && invoice.splitCount && invoice.splitCount > 1)) return;
-      if ((current?.splitPaidSessions ?? []).includes(sessionId)) return;
-      await storage.createJobEvent({ merchantId: invoice.merchantId, clientProfileId: invoice.clientProfileId, jobInvoiceId: invoice.id, eventType: "split_share_unrecorded", payload: { channel: "card", reason: "every share already paid", windcaveTransactionId: windcaveTransactionId ?? null } });
-    };
-    if (["paid", "paid_external", "voided"].includes(invoice.status)) {
-      await recordUncountedShare(invoice);
-      return invoice;
-    }
-    if (!approved) {
-      await storage.createJobEvent({ merchantId: invoice.merchantId, clientProfileId: invoice.clientProfileId, jobInvoiceId: invoice.id, eventType: "payment_declined", payload: { channel: "card" } });
-      return invoice;
-    }
-    if (invoice.splitEnabled && invoice.splitCount && invoice.splitCount > 1) {
-      const claimed = await storage.atomicClaimJobSplitShare(invoiceId, sessionId ?? crypto.randomUUID());
-      if (!claimed) {
-        const current = await storage.getJobInvoice(invoiceId);
-        await recordUncountedShare(current);
-        return current;
-      }
-      if (sessionId) await storage.markInvoiceSplitSessionPaid(sessionId, new Date());
-      const fullyPaid = claimed.splitPaidCount >= invoice.splitCount;
-      const updated = await storage.updateJobInvoice(invoiceId, {
-        ...(fullyPaid ? { status: "paid", paidAt: new Date() } : {}),
-        windcaveTransactionId: windcaveTransactionId ?? invoice.windcaveTransactionId,
-      });
-      await storage.createJobEvent({ merchantId: invoice.merchantId, clientProfileId: invoice.clientProfileId, jobInvoiceId: invoice.id, eventType: fullyPaid ? "payment_received" : "split_share_paid", payload: { share: claimed.splitPaidCount, of: invoice.splitCount, channel: "card", windcaveTransactionId: windcaveTransactionId ?? null } });
-      if (fullyPaid) await sendTradePaymentInvoice(updated);
-      return updated;
-    }
-    const updated = await storage.updateJobInvoice(invoiceId, { status: "paid", paidAt: new Date(), windcaveTransactionId: windcaveTransactionId ?? null });
-    await storage.createJobEvent({ merchantId: invoice.merchantId, clientProfileId: invoice.clientProfileId, jobInvoiceId: invoice.id, eventType: "payment_received", payload: { channel: "card", amountCents: invoice.amountCents, windcaveTransactionId: windcaveTransactionId ?? null } });
-    await sendTradePaymentInvoice(updated);
-    return updated;
-  }
-
-  async function finalizeCheckoutInvoice(invoice: CheckoutInvoice, approved: boolean, windcaveTransactionId?: string, sessionId?: string): Promise<any> {
-    return invoice.checkoutVertical === "trades"
-      ? finalizeTradeInvoice(invoice.id, approved, windcaveTransactionId, sessionId)
-      : finalizeRentInvoice(invoice.id, approved, windcaveTransactionId, sessionId);
   }
 
   app.get("/api/property/tenants", authenticateToken, async (req: AuthenticatedRequest, res) => {
@@ -7871,21 +6267,27 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       // The body's rules first: the tenant was read from the raw body before them.
       const data = createAdHocInvoiceSchema.parse(req.body);
+      const creationKey=req.get('Idempotency-Key');if(!isUuid(creationKey))return res.status(400).json({code:'IDEMPOTENCY_KEY_REQUIRED',message:'A creation request key is required'});
+      const priorCreation=await storage.getCreationCommandForMerchant(merchantId,creationKey);
       const tenant = await storage.getTenantProfileForMerchant(data.tenantProfileId, merchantId);
       if (!tenant) return res.status(404).json({ message: "Tenant not found" });
-      if (!(await requireBillingCard(merchantId, res))) return;
+      if (!priorCreation&&!(await requireBillingCard(merchantId, res))) return;
       // Gap 13: an attached document must be this merchant's own upload.
-      if (!(await requireOwnedInvoiceDocument(merchantId, data.documentUrl, res))) return;
+      if (!priorCreation&&!(await requireOwnedInvoiceDocument(merchantId, data.documentUrl, res))) return;
       const baseUrl = getBaseUrl(req);
-      const result = await storage.createOrReuseInvoiceRentRequestForMerchant(data.tenantProfileId, merchantId, data);
+      const result = await storage.createOrReuseInvoiceRentRequestForMerchant(data.tenantProfileId, merchantId, data,{key:creationKey,actor:commandActor(req,res)});
       if (result.kind === "not-found") return res.status(404).json({ message: "Tenant not found" });
       if (result.kind === "invalid-document") return res.status(400).json({ message: "Invalid document attachment" });
-      const delivery = await resendInvoiceEmailForMerchant(result.invoice.id, merchantId, baseUrl);
+      if (result.kind === 'payment-active') return res.status(409).json({code:'PAYMENT_ACTIVE',message:'This invoice already has a payment attempt. Its amount cannot change.'});
+      const record=await storage.getCreationCommandForMerchant(merchantId,creationKey);
+      const confirmed=!!record&&!!(result.invoice.sentAt||result.invoice.dispatchedAt)&&new Date(result.invoice.sentAt||result.invoice.dispatchedAt!).getTime()>=record.createdAt.getTime();
+      const delivery = result.commandReused?{ok:confirmed,reason:confirmed?'reused':'processing'}:await resendInvoiceEmailForMerchant(result.invoice.id, merchantId, baseUrl);
       if (delivery.reason === "reconciliation_required") return res.status(503).json({ message: "Invoice delivery requires reconciliation", code: "PROPERTY_INVOICE_DELIVERY_RECONCILIATION_REQUIRED" });
       const fresh = await storage.getInvoiceRentRequestForMerchant(result.invoice.id, merchantId);
       if (!fresh) return res.status(404).json({ message: "Invoice not found" });
       res.status(result.reused ? 200 : 201).json({ ...fresh, resent: result.reused, delivered: delivery.ok, deliveryReason: delivery.reason });
     } catch (err) {
+      if(err instanceof CreationCommandConflict)return res.status(409).json({code:err.code,message:'The original creation details differ. Keep the original request.'});
       if (err instanceof z.ZodError) return res.status(400).json({ message: "Validation error", errors: err.errors });
       console.error("[PROP_INVOICE_CREATE]", err); res.status(500).json({ message: "Failed to create invoice" });
     }
@@ -7922,7 +6324,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const invoice = await storage.getInvoiceRentRequestForMerchant(id, merchantId);
       if (!invoice) return res.status(404).json({ message: "Invoice not found" });
       if (["paid", "paid_external"].includes(invoice.status)) return res.status(409).json({ message: "Cannot void a paid invoice" }); // P2.2 (R1-T3): was 400
-      const result = await storage.voidInvoiceRentRequestForMerchant(id, merchantId);
+      await reconcileBeforeManualChange('property',id,merchantId);
+      const result = await storage.voidInvoiceRentRequestForMerchant(id, merchantId,commandActor(req,res));
       if (result.kind === "not-found") return res.status(404).json({ message: "Invoice not found" });
       if (result.kind === "conflict" && result.reason === "payment-active") return res.status(409).json({
         message: "Payment is in progress or a share is already paid", code: "PAYMENT_ACTIVE",
@@ -7942,9 +6345,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!invoice) return res.status(404).json({ message: "Invoice not found" });
       // A voided invoice stays voided: the screens hide voided invoices.
       if (invoice.status === "voided") return res.status(409).json({ message: "This invoice was voided" });
-      if (invoice.status === "paid" || invoice.status === "paid_external") return res.status(409).json({ message: "Invoice is already paid" }); // P2.2 (R1-T3): was 400
+      if (invoice.status === "paid") return res.status(409).json({ message: "Invoice is already paid" });
       const { externalPaymentReference } = markInvoicePaidExternalSchema.parse(req.body);
-      const result = await storage.markInvoiceRentRequestPaidExternalForMerchant(id, merchantId, externalPaymentReference);
+      await reconcileBeforeManualChange('property',id,merchantId);
+      const result = await storage.markInvoiceRentRequestPaidExternalForMerchant(id, merchantId, externalPaymentReference,commandActor(req,res));
       if (result.kind === "not-found") return res.status(404).json({ message: "Invoice not found" });
       if (result.kind === "conflict" && result.reason === "payment-active") return res.status(409).json({
         message: "Payment is in progress or a share is already paid", code: "PAYMENT_ACTIVE",
@@ -8069,28 +6473,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   });
 
   // Tenant chooses how many flatmates to split the rent between (sets splitCount).
-  app.post("/api/checkout/:token/split", async (req, res) => {
-    try {
-      const { token } = req.params;
-      if (!tokenRateLimit(token)) return res.status(429).json({ message: "Too many requests" });
-      // A whole number of people from 2 to 12 and nothing else (plan §8.4), as the
-      // page sends it; parseInt had taken "3 people", "3" and 2.5.
-      const parsedCount = z.object({ count: z.number().int().min(2).max(12) }).strict().safeParse(req.body);
-      if (!parsedCount.success) return res.status(400).json({ message: "Choose between 2 and 12 people" });
-      const { count } = parsedCount.data;
-      const invoice = await getCheckoutInvoiceByToken(token);
-      if (!invoice) return res.status(404).json({ message: "Payment link not found" });
-      if (!invoice.splitEnabled) return res.status(400).json({ message: "Splitting is not enabled for this payment" });
-      if (["voided", "paid", "paid_external"].includes(invoice.status)) return res.status(409).json({ message: "Invoice is not payable" });
-      if ((invoice.splitPaidCount ?? 0) > 0) return res.status(409).json({ message: "A split is already in progress" });
-      // A share's amount is fixed when its session opens, so the count cannot change after one has.
-      if (await storage.invoiceHasSplitSessions(splitInvoiceRef(invoice))) {
-        return res.status(409).json({ message: "The split can't change once someone has started paying" });
-      }
-      await updateCheckoutInvoice(invoice, { splitCount: count });
-      res.json({ splitCount: count, splitPaidCount: 0, shareCents: Math.floor(invoice.amountCents / count) });
-    } catch (err) { console.error("[CHECKOUT_SPLIT]", err); res.status(500).json({ message: "Failed to set up split" }); }
-  });
+  app.post("/api/checkout/:token/split",invoiceCheckoutHandlers.split);
 
   // (Removed POST /api/checkout/pay, owner decision 2026-09-26: no page used it, and a
   // split share paid through it could never be recorded.)
@@ -8100,242 +6483,24 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // checkout page can take card / Apple Pay / Google Pay details in-page instead
   // of redirecting the payer out to the external Windcave HPP. The URLs are
   // cached server-side (never trusted from the client) and consumed at completion.
-  app.post("/api/checkout/:token/session", async (req, res) => {
-    try {
-      const { token } = req.params;
-      const { payerEmail } = req.body as { payerEmail?: string };
-      if (!tokenRateLimit(token)) return res.status(429).json({ message: "Too many requests" });
-      const invoice = await getCheckoutInvoiceByToken(token);
-      if (!invoice) return res.status(404).json({ message: "Payment link not found" });
-      if (["voided", "paid", "paid_external"].includes(invoice.status)) return res.status(409).json({ message: "Invoice is not payable" });
-      const [merchant, party] = await Promise.all([storage.getMerchant(invoice.merchantId), getCheckoutParty(invoice)]);
-      if (!merchant || !party) return res.status(500).json({ message: "Invoice data unavailable" });
-      const baseUrl = getBaseUrl(req);
+  app.post("/api/checkout/:token/session",invoiceCheckoutHandlers.session);
 
-      // Determine what to charge: the full amount, or one share of a split.
-      let chargeCents = invoice.amountCents;
-      const isSplit = invoice.splitEnabled && invoice.splitCount && invoice.splitCount > 1;
-      if (isSplit) {
-        const paid = invoice.splitPaidCount ?? 0;
-        if (paid >= invoice.splitCount!) return res.status(409).json({ message: "This split is already fully paid" });
-        const base = Math.floor(invoice.amountCents / invoice.splitCount!);
-        const isLastShare = paid === invoice.splitCount! - 1;
-        chargeCents = isLastShare ? invoice.amountCents - base * (invoice.splitCount! - 1) : base;
-      }
-      // The payer's email (for their GST copy) goes with their own session, recorded below.
-      const checkedEmail = z.string().trim().email().max(254).safeParse(payerEmail);
-      const splitPayerEmail = isSplit && checkedEmail.success ? checkedEmail.data.toLowerCase() : null;
+  // Card, Apple Pay and Google Pay all reconcile the exact durable invoice attempt.
+  app.post("/api/checkout/:token/hosted-fields-complete",invoiceCheckoutHandlers.complete());
 
-      const amountStr = (chargeCents / 100).toFixed(2);
-      const merchantRef = (invoice.checkoutVertical === "trades" ? "JOB-" : "RENT-") + invoice.id.slice(0, 8).toUpperCase();
-      const xId = crypto.randomBytes(16).toString("hex");
-      if (!isWindcaveConfigured()) {
-        return res.status(503).json({ code: "PAYMENT_PROVIDER_UNAVAILABLE", message: "Payment gateway unavailable. Please try again." });
-      }
-      const sessionResult: any = await createWindcaveSession(
-          xId, amountStr, merchantRef, party.email ?? "tenant@taptpay.co.nz", baseUrl, 0, 0,
-          { callbackBase: `${baseUrl}/api/checkout/callback?token=${token}`, notificationUrl: `${baseUrl}/api/windcave/${invoice.checkoutVertical === "trades" ? "trades" : "rent"}-notification` },
-        );
-      if (!sessionResult.success) return res.status(502).json({ message: "Payment gateway error. Please try again." });
-      // Pin single-payment invoices to their one Windcave session so a stale or
-      // foreign session can't finalize them. Split invoices legitimately create
-      // one session per payer (several per payer: the page readies Apple Pay and
-      // Google Pay sessions too), so each is recorded instead, with its amount and
-      // its payer's email; only a recorded session can pay a share (0030).
-      if (sessionResult.sessionId && !isSplit) await updateCheckoutInvoice(invoice, { windcaveSessionId: sessionResult.sessionId });
-      if (sessionResult.sessionId && isSplit) {
-        await storage.recordInvoiceSplitSession({
-          ...splitInvoiceRef(invoice),
-          sessionId: sessionResult.sessionId,
-          amountCents: chargeCents,
-          payerEmail: splitPayerEmail,
-        });
-      }
-
-      // Duplicate X-ID (a create retried after its reply was lost). R2-T5: the reply
-      // verifies nothing, so it settles nothing; the session recorded above is settled
-      // by the notification through a verified query.
-      if (sessionResult.alreadyComplete) {
-        return res.status(503).json({ message: "Payment outcome is still being reconciled" });
-      }
-
-      invoiceAjaxUrlCache.set(token, {
-        ajaxSubmitCardUrl: sessionResult.ajaxSubmitCardUrl,
-        ajaxSubmitApplePayUrl: sessionResult.ajaxSubmitApplePayUrl,
-        ajaxSubmitGooglePayUrl: sessionResult.ajaxSubmitGooglePayUrl,
-      });
-
-      return res.json({
-        sessionId: sessionResult.sessionId,
-        amountStr,
-        ajaxSubmitCardUrl: sessionResult.ajaxSubmitCardUrl,
-        ajaxSubmitApplePayUrl: sessionResult.ajaxSubmitApplePayUrl,
-        ajaxSubmitGooglePayUrl: sessionResult.ajaxSubmitGooglePayUrl,
-      });
-    } catch (err) { console.error("[CHECKOUT_SESSION]", err); res.status(500).json({ message: "Failed to initiate payment" }); }
-  });
-
-  // Card / Apple Pay completion for the invoice in-page flow. Mirrors
-  // /api/transactions/:id/hosted-fields-complete but finalizes via the
-  // invoice-aware, idempotent finalizeRentInvoice (handles splits + GST).
-  app.post("/api/checkout/:token/hosted-fields-complete", async (req, res) => {
-    try {
-      const { token } = req.params;
-      const { sessionId } = req.body as { sessionId?: string };
-      if (!sessionId) return res.status(400).json({ message: "sessionId required" });
-      const invoice = await getCheckoutInvoiceByToken(token);
-      if (!invoice) return res.status(404).json({ message: "Payment link not found" });
-      // A single payment completes only with the session pinned on the invoice, a split
-      // share only with a session recorded for this invoice when it was opened (0030).
-      // Both unconditional, as on the numbered routes (R1-T7): otherwise any approved
-      // session on the platform's provider account would pay it.
-      const isSplit = invoice.splitEnabled && invoice.splitCount && invoice.splitCount > 1;
-      const sessionOpenedForIt = isSplit
-        ? await splitSessionOpenedFor(invoice, sessionId)
-        : invoice.windcaveSessionId === sessionId;
-      if (!sessionOpenedForIt) {
-        console.error(`[checkout-complete] sessionId mismatch for invoice ${invoice.id}`);
-        return res.status(403).json({ message: "Session ID mismatch" });
-      }
-      if (!isWindcaveConfigured()) {
-        return res.status(503).json({ code: "PAYMENT_PROVIDER_UNAVAILABLE", message: "Payment outcome is unavailable" });
-      }
-      // R2-T5: settles only on an outcome verified against what this invoice expected;
-      // anything else (pending, unknown, mismatch) stays reconcilable, never a decline.
-      const queryResult = await queryWindcaveSession(sessionId, await expectedForCheckoutInvoice(invoice, sessionId));
-      invoiceAjaxUrlCache.delete(token);
-      if (!queryResult.success || (queryResult.approved && !queryResult.windcaveTransactionId)) {
-        return res.status(503).json({ message: "Payment outcome is still being reconciled" });
-      }
-      const updated = await finalizeCheckoutInvoice(invoice, queryResult.approved === true, queryResult.windcaveTransactionId, sessionId);
-      return res.json({
-        approved: queryResult.approved === true,
-        status: updated?.status,
-        splitCount: updated?.splitCount ?? null,
-        splitPaidCount: updated?.splitPaidCount ?? 0,
-      });
-    } catch (err) { console.error("[CHECKOUT_HF_COMPLETE]", err); res.status(500).json({ message: "Failed to finalise payment" }); }
-  });
-
-  // Google Pay completion for the invoice in-page flow. Mirrors
-  // /api/transactions/:id/googlepay-complete using the token-keyed AJAX cache.
-  app.post("/api/checkout/:token/googlepay-complete", async (req, res) => {
-    try {
-      const { token } = req.params;
-      const { sessionId, googlePayToken } = req.body as { sessionId?: string; googlePayToken?: object };
-      if (!sessionId) return res.status(400).json({ message: "sessionId required" });
-      const invoice = await getCheckoutInvoiceByToken(token);
-      if (!invoice) return res.status(404).json({ message: "Payment link not found" });
-      // A single payment completes only with the session pinned on the invoice, a split
-      // share only with a session recorded for this invoice when it was opened (0030).
-      // Both unconditional, as on the numbered routes (R1-T7): otherwise any approved
-      // session on the platform's provider account would pay it.
-      const isSplit = invoice.splitEnabled && invoice.splitCount && invoice.splitCount > 1;
-      const sessionOpenedForIt = isSplit
-        ? await splitSessionOpenedFor(invoice, sessionId)
-        : invoice.windcaveSessionId === sessionId;
-      if (!sessionOpenedForIt) {
-        console.error(`[checkout-gpay] sessionId mismatch for invoice ${invoice.id}`);
-        return res.status(403).json({ message: "Session ID mismatch" });
-      }
-
-      if (!isWindcaveConfigured()) {
-        return res.status(503).json({ code: "PAYMENT_PROVIDER_UNAVAILABLE", message: "Payment outcome is unavailable" });
-      }
-      const ajaxUrl = invoiceAjaxUrlCache.get(token)?.ajaxSubmitGooglePayUrl;
-      if (ajaxUrl && googlePayToken) await submitGooglePayToken(ajaxUrl, googlePayToken);
-      invoiceAjaxUrlCache.delete(token);
-      // R2-T5: the submit's own reply never settles; the verified session query does.
-      const queryResult = await queryWindcaveSession(sessionId, await expectedForCheckoutInvoice(invoice, sessionId));
-      if (!queryResult.success || (queryResult.approved && !queryResult.windcaveTransactionId)) {
-        return res.status(503).json({ message: "Payment outcome is still being reconciled" });
-      }
-      const approved = queryResult.approved === true;
-      const windcaveTransactionId = queryResult.windcaveTransactionId;
-
-      const updated = await finalizeCheckoutInvoice(invoice, approved, windcaveTransactionId, sessionId);
-      return res.json({
-        approved,
-        status: updated?.status,
-        splitCount: updated?.splitCount ?? null,
-        splitPaidCount: updated?.splitPaidCount ?? 0,
-      });
-    } catch (err) { console.error("[CHECKOUT_GPAY_COMPLETE]", err); res.status(500).json({ message: "Failed to finalise Google Pay payment" }); }
-  });
+  // Wallet submission has a durable once-only session command.
+  app.post("/api/checkout/:token/googlepay-complete",invoiceCheckoutHandlers.complete(true));
 
   // Browser return after the tenant pays on the Windcave HPP. Confirms the real
   // outcome by querying the session (never trusts the result param alone), then
   // redirects back to /r/:token which renders the paid/declined state.
-  app.get("/api/checkout/callback", async (req, res) => {
-    try {
-      const token = req.query.token as string;
-      const result = req.query.result as string;
-      if (!token) return res.redirect("/");
-      const invoice = await getCheckoutInvoiceByToken(token);
-      if (!invoice) return res.redirect("/");
-      const back = `/r/${token}`;
+  app.get("/api/checkout/callback",invoiceCheckoutHandlers.callback);
 
-      // Already settled, or tenant cancelled (no charge) — just show the page
-      if (["paid", "paid_external", "voided"].includes(invoice.status)) return res.redirect(back);
-      if (result === "cancelled") return res.redirect(back);
-
-      const sessionId = invoice.windcaveSessionId;
-      let queryResult: any;
-      if (!isWindcaveConfigured() || !sessionId) return res.redirect(back);
-      queryResult = await queryWindcaveSession(sessionId, await expectedForCheckoutInvoice(invoice, sessionId));
-      if (queryResult.success) {
-        await finalizeCheckoutInvoice(invoice, !!queryResult.approved, queryResult.windcaveTransactionId, sessionId);
-      }
-      return res.redirect(back);
-    } catch (err) { console.error("[CHECKOUT_CALLBACK]", err); return res.redirect("/"); }
-  });
-
-  // Server-to-server notification from Windcave for rent sessions. Looks up the
-  // invoice by session id and finalizes idempotently (the browser callback may
-  // have already done so).
-  app.all("/api/windcave/rent-notification", express.urlencoded({ extended: true }), express.json(), async (req, res) => {
-    res.status(200).send("OK"); // respond fast so Windcave stops retrying
-    try {
-      const sessionId = (req.query?.sessionid as string) || (req.query?.sessionId as string) || req.body?.sessionId || req.body?.sessionid;
-      if (!sessionId) { console.warn("[RENT_NOTIF] A notification arrived without a session ID"); return; }
-      let invoice = await storage.getInvoiceRentRequestByWindcaveSessionId(sessionId);
-      if (!invoice) {
-        // A split share's session is recorded, not pinned (0030).
-        const opened = await storage.getInvoiceSplitSession(sessionId);
-        if (opened?.rentInvoiceId) invoice = await storage.getInvoiceRentRequest(opened.rentInvoiceId);
-      }
-      if (!invoice) { console.warn("[RENT_NOTIF] No invoice holds the notified session"); return; }
-      if (["paid", "paid_external", "voided"].includes(invoice.status)) return; // already settled
-      if (!isWindcaveConfigured()) return;
-      const queryResult = await queryWindcaveSession(sessionId, await expectedForCheckoutInvoice({ ...invoice, checkoutVertical: "property" }, sessionId));
-      if (!queryResult.success) { console.error(`[RENT_NOTIF] The session query failed for invoice ${invoice.id}:`, queryResult.error); return; }
-      await finalizeRentInvoice(invoice.id, !!queryResult.approved, queryResult.windcaveTransactionId, sessionId);
-      console.log(`[RENT_NOTIF] invoice ${invoice.id} → ${queryResult.approved ? "paid" : "declined"}`);
-    } catch (err) { console.error("[RENT_NOTIF] Error:", err); }
-  });
+  // Commit notification hints before ACK; settlement belongs to the shared worker.
+  app.all("/api/windcave/rent-notification",...durableNotificationHandlers);
 
 
-  app.all("/api/windcave/trades-notification", express.urlencoded({ extended: true }), express.json(), async (req, res) => {
-    res.status(200).send("OK");
-    try {
-      const sessionId = (req.query?.sessionid as string) || (req.query?.sessionId as string) || req.body?.sessionId || req.body?.sessionid;
-      if (!sessionId) { console.warn("[TRADES_NOTIF] A notification arrived without a session ID"); return; }
-      let stored = await storage.getJobInvoiceByWindcaveSessionId(sessionId);
-      if (!stored) {
-        // A split share's session is recorded, not pinned (0030).
-        const opened = await storage.getInvoiceSplitSession(sessionId);
-        if (opened?.jobInvoiceId) stored = await storage.getJobInvoice(opened.jobInvoiceId);
-      }
-      if (!stored) { console.warn("[TRADES_NOTIF] No invoice holds the notified session"); return; }
-      if (["paid", "paid_external", "voided"].includes(stored.status)) return;
-      if (!isWindcaveConfigured()) return;
-      const invoice = { ...stored, checkoutVertical: "trades" as const };
-      const queryResult = await queryWindcaveSession(sessionId, await expectedForCheckoutInvoice(invoice, sessionId));
-      if (!queryResult.success) { console.error(`[TRADES_NOTIF] The session query failed for invoice ${invoice.id}:`, queryResult.error); return; }
-      await finalizeCheckoutInvoice(invoice, !!queryResult.approved, queryResult.windcaveTransactionId, sessionId);
-      console.log(`[TRADES_NOTIF] invoice ${invoice.id} -> ${queryResult.approved ? "paid" : "declined"}`);
-    } catch (err) { console.error("[TRADES_NOTIF] Error:", err); }
-  });
+  app.all("/api/windcave/trades-notification",...durableNotificationHandlers);
   // Evolution API webhook — receives delivery status updates for WhatsApp messages.
   // Matches each event's message ID back to the invoice that sent it, logs the
   // status, and stamps whatsappDeliveredAt on the first DELIVERY_ACK or READ event.
@@ -8748,12 +6913,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // set — the client must use this pre-mutation flag to decide whether to show
       // the "view quote" step (first open) or skip straight to "confirm" (revisit).
       const previouslyViewed = quote.status !== "sent";
-      if (!["accepted", "declined", "expired"].includes(quote.status) && quote.validUntil && new Date(quote.validUntil) < new Date()) {
-        quote = await storage.updateQuote(quote.id, { status: "expired" }) ?? quote;
-      } else if (quote.status === "sent") {
-        quote = await storage.updateQuote(quote.id, { status: "viewed", viewedAt: new Date() }) ?? quote;
-        await storage.createJobEvent({ merchantId: quote.merchantId, clientProfileId: quote.clientProfileId, quoteId: quote.id, eventType: "quote_viewed" });
-      }
+      quote=await storage.recordQuoteViewForMerchant(quote.id,quote.merchantId);
+      if(!quote)return res.status(404).json({message:'Quote not found'});
       const [client, merchant] = await Promise.all([
         storage.getClientProfile(quote.clientProfileId),
         storage.getMerchant(quote.merchantId),
@@ -8783,53 +6944,25 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     } catch (err) { console.error("[TRADES_QUOTES_TOKEN_GET]", err); res.status(500).json({ message: "Failed to fetch quote" }); }
   });
   // Customer-facing accept/decline (called from the public quote page, no auth — looked up by token)
-  app.post("/api/trades/quotes/token/:token/respond", async (req, res) => {
-    try {
-      const parsed = acceptQuoteSchema.safeParse(req.body);
-      if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
-      const quote = await storage.getQuoteByToken(req.params.token);
-      if (!quote) return res.status(404).json({ message: "Quote not found" });
-      if (quote.status === "accepted" || quote.status === "declined")
-        return res.status(409).json({ message: "Already responded" });
-      if (quote.status === "expired" || (quote.validUntil && new Date(quote.validUntil) < new Date())) {
-        if (quote.status !== "expired") await storage.updateQuote(quote.id, { status: "expired" });
-        return res.status(410).json({ message: "Quote has expired" });
-      }
-      if (!parsed.data.accept) {
-        const declined = await storage.updateQuote(quote.id, { status: "declined", declinedAt: new Date() });
-        await storage.createJobEvent({ merchantId: quote.merchantId, clientProfileId: quote.clientProfileId, quoteId: quote.id, eventType: "quote_declined" });
-        return res.json({ quote: declined, depositInvoice: null });
-      }
-      // Owner decision 2026-09-25 (2a, 2b): the business's billing message is not the
-      // customer's to read. The customer is told to contact the business, and the
-      // business is told by email that a customer was turned away.
-      if (!billingCardIsReady(await storage.getOrCreateSubscription(quote.merchantId))) {
-        await tellBusinessQuoteAcceptanceBlocked(quote, getBaseUrl(req));
-        return res.status(402).json(QUOTE_ACCEPTANCE_UNAVAILABLE);
-      }
-      const accepted = await storage.updateQuote(quote.id, { status: "accepted", acceptedAt: new Date() });
-      await storage.createJobEvent({ merchantId: quote.merchantId, clientProfileId: quote.clientProfileId, quoteId: quote.id, eventType: "quote_accepted" });
-      // Deposit enabled → auto-issue the deposit invoice so the checkout shows it immediately.
-      let depositInvoice = null;
-      const due = new Date(); due.setDate(due.getDate() + 7);
-      if (quote.depositEnabled && quote.depositCents && quote.depositCents > 0) {
-        depositInvoice = await storage.createJobInvoice({
-          merchantId: quote.merchantId, clientProfileId: quote.clientProfileId, quoteId: quote.id,
-          kind: "deposit", amountCents: quote.depositCents, token: generateInvoiceToken(),
-          deliveryChannel: quote.deliveryChannel, status: "pending_dispatch", dueAt: due,
-        });
-      } else {
-        // No deposit → issue the full balance straight away.
-        depositInvoice = await storage.createJobInvoice({
-          merchantId: quote.merchantId, clientProfileId: quote.clientProfileId, quoteId: quote.id,
-          kind: "full", amountCents: quote.totalCents, token: generateInvoiceToken(),
-          deliveryChannel: quote.deliveryChannel, status: "pending_dispatch", dueAt: due,
-        });
-      }
-      const delivery = depositInvoice ? await resendTradeInvoice(depositInvoice.id, getBaseUrl(req)) : null;
-      const paymentUrl = depositInvoice ? getBaseUrl(req) + "/r/" + depositInvoice.token : null;
-      res.json({ quote: accepted, depositInvoice: delivery?.invoice ?? depositInvoice, paymentUrl, delivered: delivery?.sent ?? false });
-    } catch (err) { console.error("[TRADES_QUOTES_TOKEN_RESPOND]", err); res.status(500).json({ message: "Failed to process quote response" }); }
+  app.post("/api/trades/quotes/token/:token/respond",async(req,res)=>{
+    try{
+      const parsed=acceptQuoteSchema.safeParse(req.body);if(!parsed.success)return res.status(400).json({message:parsed.error.errors[0].message});
+      const quote=await storage.getQuoteByToken(req.params.token);if(!quote)return res.status(404).json({message:'Quote not found'});
+      const allowAccept=parsed.data.accept?billingCardIsReady(await storage.getOrCreateSubscription(quote.merchantId)):false;
+      const result=await storage.respondToQuoteForMerchant(quote.id,quote.merchantId,parsed.data.accept,{allowAccept});
+      if(result.kind==='not-found')return res.status(404).json({message:'Quote not found'});
+      if(result.kind==='expired')return res.status(410).json({message:'Quote has expired'});
+      if(result.kind==='billing-required')return res.status(402).json(QUOTE_ACCEPTANCE_UNAVAILABLE);
+      if(result.kind==='conflict')return res.status(409).json({message:'This quote has already been responded to or cannot create a payment invoice'});
+      if(result.kind!=='ok')return res.status(409).json({message:'Quote response needs reconciliation'});
+      // Creation/response/audit/outbox is atomic. A lost browser response reuses
+      // that invoice and cannot send its original dispatch again.
+      if(result.invoice&&!result.reused)await resendTradeInvoiceForMerchant(result.invoice.id,quote.merchantId,getBaseUrl(req));
+      const invoice=result.invoice?await storage.getJobInvoiceForMerchant(result.invoice.id,quote.merchantId):null;
+      res.json({quote:{id:result.quote.id,status:result.quote.status,acceptedAt:result.quote.acceptedAt,declinedAt:result.quote.declinedAt},
+        depositInvoice:invoice?{id:invoice.id,token:invoice.token,kind:invoice.kind,amountCents:invoice.amountCents,status:invoice.status}:null,
+        paymentUrl:invoice?`${getBaseUrl(req)}/r/${invoice.token}`:null,delivered:!!invoice&&['sent','viewed','paid','paid_external'].includes(invoice.status)});
+    }catch{console.error('[QUOTE_RESPONSE_UNAVAILABLE]');res.status(503).json({message:'Quote response could not be confirmed. Retry the original choice.'});}
   });
 
   app.get("/api/trades/invoices", authenticateToken, async (req: AuthenticatedRequest, res) => {
@@ -8848,12 +6981,14 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const merchantId = req.user?.merchantId;
       if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
-      if (!(await requireBillingCard(merchantId, res))) return;
+      const creationKey=req.get('Idempotency-Key');if(!isUuid(creationKey))return res.status(400).json({code:'IDEMPOTENCY_KEY_REQUIRED',message:'A creation request key is required'});
+      const priorCreation=await storage.getCreationCommandForMerchant(merchantId,creationKey);
+      if (!priorCreation&&!(await requireBillingCard(merchantId, res))) return;
       const parsed = createJobInvoiceSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
       // Gap 13: an attached document must be this merchant's own upload. Checked
       // before anything is made, so a rejection writes nothing.
-      if (!(await requireOwnedInvoiceDocument(merchantId, parsed.data.documentUrl, res))) return;
+      if (!priorCreation&&!(await requireOwnedInvoiceDocument(merchantId, parsed.data.documentUrl, res))) return;
       let client: TradesClientRef;
       if (parsed.data.recipient) {
         // Quick invoice: no pre-existing client. Storage makes a HIDDEN 'prospect'
@@ -8892,19 +7027,21 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         scheduledSendAt: parsed.data.scheduledSendAt ?? null,
         splitEnabled: !!parsed.data.splitEnabled,
         documentUrl: parsed.data.documentUrl ?? null, documentName: parsed.data.documentName ?? null,
-      });
+      },{key:creationKey,actor:commandActor(req,res)});
       if (result.kind === "not-found") return res.status(404).json({ message: "Client not found" });
       if (result.kind === "quote-not-found") return res.status(404).json({ message: "Quote not found" });
       if (result.kind === "invalid-document") return res.status(400).json({ message: "Invalid document attachment" });
       const row = result.invoice;
       const shouldSendNow = !row.scheduledSendAt || new Date(row.scheduledSendAt) <= new Date();
-      const delivery = shouldSendNow ? await resendTradeInvoiceForMerchant(row.id, merchantId, getBaseUrl(req)) : { sent: false, reason: "scheduled" };
+      const record=await storage.getCreationCommandForMerchant(merchantId,creationKey),sentAt=row.sentAt||row.dispatchedAt;
+      const confirmed=!!record&&!!sentAt&&new Date(sentAt).getTime()>=record.createdAt.getTime();
+      const delivery = result.commandReused?{sent:confirmed,reason:confirmed?'reused':'processing'}:shouldSendNow ? await resendTradeInvoiceForMerchant(row.id, merchantId, getBaseUrl(req)) : { sent: false, reason: "scheduled" };
       if (delivery.reason === "reconciliation_required") return res.status(503).json(TRADES_INVOICE_RECONCILIATION);
       // The answer is read back through the business's scope, not from a row held across the send.
       const fresh = await storage.getJobInvoiceForMerchant(row.id, merchantId);
       if (!fresh) return res.status(404).json({ message: "Not found" });
       res.status(201).json({ ...fresh, delivered: delivery.sent, deliveryReason: delivery.reason });
-    } catch (err) { console.error("[TRADES_INVOICES_POST]", err); res.status(500).json({ message: "Failed to create invoice" }); }
+    } catch (err) {if(err instanceof CreationCommandConflict)return res.status(409).json({code:err.code,message:'The original creation details differ. Keep the original request.'}); console.error("[TRADES_INVOICES_POST]", err); res.status(500).json({ message: "Failed to create invoice" }); }
   });
   // (Removed POST /api/trades/invoices/:id/resend, owner decision 2026-09-27: no screen called it; the
   // cron sends an invoice that failed to go, and the reminders follow up.)
@@ -8930,13 +7067,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // already billed to the client on the quote and not voided (the deposit plus any other invoice,
       // so a balance never double-bills), and commits the one balance with its history: two sends
       // at the same moment make one (R1-T7 S4b2).
-      const result = await storage.createJobBalanceInvoiceForMerchant(id, merchantId, !!body.data.splitEnabled);
+      const result = await storage.createJobBalanceInvoiceForMerchant(id, merchantId, !!body.data.splitEnabled,commandActor(req,res));
       if (result.kind === "not-found") return res.status(404).json({ message: "Not found" });
       if (result.kind === "conflict") {
         const [status, message] = BALANCE_REFUSALS[result.reason];
         return res.status(status).json({ message });
       }
-      const delivery = await resendTradeInvoiceForMerchant(result.invoice.id, merchantId, getBaseUrl(req));
+      const delivery = result.reused?{sent:!!result.invoice.dispatchedAt,reason:result.invoice.dispatchedAt?'reused':'processing'}:await resendTradeInvoiceForMerchant(result.invoice.id, merchantId, getBaseUrl(req));
       if (delivery.reason === "reconciliation_required") return res.status(503).json(TRADES_INVOICE_RECONCILIATION);
       // The answer is read back through the business's scope, not from a row held across the send.
       const fresh = await storage.getJobInvoiceForMerchant(result.invoice.id, merchantId);
@@ -8955,17 +7092,19 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // A voided or paid invoice stays as it is (C10 batch 6d): the screens offer this only on an
       // unpaid one, and each call emailed the client another receipt.
       if (inv.status === "voided") return res.status(409).json({ message: "This invoice was voided" });
-      if (inv.status === "paid" || inv.status === "paid_external") return res.status(409).json({ message: "This invoice is already paid" });
+      if (inv.status === "paid") return res.status(409).json({ message: "This invoice is already paid" });
       const parsed = markJobPaidExternalSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
       // Storage rechecks the business and the invoice's state at the write, and saves the history with it.
-      const result = await storage.markJobInvoicePaidExternalForMerchant(id, merchantId, parsed.data.externalPaymentReference);
+      await reconcileBeforeManualChange('trades',id,merchantId);
+      const result = await storage.markJobInvoicePaidExternalForMerchant(id, merchantId, parsed.data.externalPaymentReference,commandActor(req,res));
       if (result.kind === "not-found") return res.status(404).json({ message: "Not found" });
       if (result.kind === "conflict" && result.reason === "payment-active") return res.status(409).json({
         message: "Payment is in progress or a share is already paid", code: "PAYMENT_ACTIVE",
       });
       if (result.kind === "conflict") return res.status(409).json({ message: result.reason === "voided" ? "This invoice was voided" : "This invoice is already paid" });
-      await sendTradePaymentInvoiceForMerchant(id, merchantId);
+      // Payer receipt is committed with the manual event and delivered by its
+      // outbox key, so a lost response/retry cannot send a second receipt.
       res.json(result.invoice);
     } catch (err) { console.error("[TRADES_INVOICES_MARK_PAID]", err); res.status(500).json({ message: "Failed to mark invoice paid" }); }
   });
@@ -9001,7 +7140,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (inv.status === "paid" || inv.status === "paid_external") return res.status(409).json({ message: "This invoice is paid" });
       // The client's history shows the cancellation, as a rent invoice's does (owner decision
       // 2026-09-27): storage saves it with the change.
-      const result = await storage.voidJobInvoiceForMerchant(id, merchantId);
+      await reconcileBeforeManualChange('trades',id,merchantId);
+      const result = await storage.voidJobInvoiceForMerchant(id, merchantId,commandActor(req,res));
       if (result.kind === "not-found") return res.status(404).json({ message: "Not found" });
       if (result.kind === "conflict" && result.reason === "payment-active") return res.status(409).json({
         message: "Payment is in progress or a share is already paid", code: "PAYMENT_ACTIVE",

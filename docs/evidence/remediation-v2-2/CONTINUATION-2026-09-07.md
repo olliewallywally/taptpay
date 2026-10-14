@@ -3032,3 +3032,29 @@ passed. 0038 is applied only on owned synthetic integrated databases. No shared
 migration or outbound activity. R3 remains open: compatibility cash delivery,
 other commands, active payment convergence and card/billing remain. Continue the
 phase after committing/pushing this checkpoint; do not stop here or claim exit.
+
+
+## 26. October 14 — R3 repository completion
+
+R3 active numeric/token/invoice callbacks and five FPRN registrations converge on
+shared verified durable attempts/finalizers. Amount-first invoice UX, concrete
+creation/manual/quote/balance/subscription commands, card/billing recovery and
+actual keyed receipt/delivery receivers are integrated. Final follow-up fixes
+cover cancellation/card races, paid-period/card supersession, cross-merchant
+billing keys, declined-money fields, cash replay/conflict, confirmed unsent expiry,
+finite worker caps and preserved quote notice content. Claude retains R4.
+
+Verification: complete 214 server-suite / 5020-test coverage using the full run
+plus explicit replacement of all failed and affected suites; 133 client suites /
+1504 tests; typecheck/build; 74/19/15/24/11 PostgreSQL durability/subscription/
+command/registered-HTTP/delivery checks. No skips. Both owned schemas match all
+49 migration files through 0047, immutable checksums and complete fingerprint;
+restored synthetic data retains 1000 invoices per vertical and 1000 quotes.
+
+See [final review and exact evidence](r3/R3-FINAL-REPOSITORY-REVIEW-2026-10-14.md)
+and [repository handoff](../../HANDOFF-2026-10-14-r3-repository-complete.md).
+The original full run was red and is preserved; the completed replacement run
+passes all 28 selected suites / 1591 tests. No full invocation is relabelled.
+Repository work is complete. Official R3 exit remains held for sanitized Windcave
+UAT and production-sized restored migration/preflight/timing sign-off. No shared
+migration, real outbound financial/delivery call, deployment or R5 work occurred.

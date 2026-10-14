@@ -31,6 +31,7 @@ type Subscriber = {
   authorize?: () => Promise<boolean>;
   /** This subscriber's checks and writes, one after another, so its events keep their order. */
   pending: Promise<void>;
+  seen: Set<string>;
   unsubscribe: () => void;
 };
 
@@ -52,6 +53,7 @@ function ownerRefundDto(refund: Record<string, any>) {
 
 function projectEvent(data: Record<string, any>, audience: SseAudience) {
   const projected: Record<string, unknown> = { type: data.type };
+  if(typeof data.eventId==='string')projected.eventId=data.eventId;
   const merchantAudience = audience.kind === "merchant";
 
   if (data.transaction) {
@@ -80,6 +82,7 @@ function isTarget(
   data: Record<string, any>,
 ) {
   if (audience.kind === "merchant") return true;
+  if(data.merchantOnly===true)return false;
   // Per-payment rows are bearer-addressed and must never enter an anonymous
   // stream, even though they are intentionally stoneless.
   if (data.transaction?.paymentTokenHash != null) return false;
@@ -92,7 +95,7 @@ export class SseBroker {
   subscribe(merchantId: number, audience: SseAudience, connection: SseWritable, authorize?: () => Promise<boolean>) {
     const merchantSubscribers = this.subscribers.get(merchantId) ?? new Set<Subscriber>();
     let timer: ReturnType<typeof setInterval> | undefined;
-    const subscriber: Subscriber = { audience, connection, authorize, pending: Promise.resolve(), unsubscribe: () => {
+    const subscriber: Subscriber = { audience, connection, authorize, pending: Promise.resolve(),seen:new Set(), unsubscribe: () => {
       if (timer) clearInterval(timer);
       timer = undefined;
       merchantSubscribers.delete(subscriber);
@@ -122,7 +125,7 @@ export class SseBroker {
    * A signed-in stream's next step: its sign-in is read again, and only then is the event written. A
    * sign-in that no longer stands, or a check that fails, closes the stream with nothing written.
    */
-  private deliver(subscriber: Subscriber, members: Set<Subscriber>, message?: string): Promise<void> {
+  private deliver(subscriber: Subscriber, members: Set<Subscriber>, message?: string,eventId?:string): Promise<void> {
     subscriber.pending = subscriber.pending.then(async () => {
       if (!members.has(subscriber)) return;
       try {
@@ -131,7 +134,11 @@ export class SseBroker {
           subscriber.connection.end?.();
           return;
         }
-        if (message && members.has(subscriber)) subscriber.connection.write(message);
+        if (message && members.has(subscriber)){
+          if(eventId&&subscriber.seen.has(eventId))return;
+          if(eventId){subscriber.seen.add(eventId);if(subscriber.seen.size>1000)subscriber.seen.delete(subscriber.seen.values().next().value!);}
+          subscriber.connection.write(message);
+        }
       } catch {
         subscriber.unsubscribe();
         try { subscriber.connection.end?.(); } catch { /* already closed */ }
@@ -148,9 +155,12 @@ export class SseBroker {
     const pending: Promise<void>[] = [];
     for (const subscriber of merchantSubscribers) {
       if (!isTarget(subscriber.audience, canonicalStoneId, data)) continue;
+      const eventId=typeof data.eventId==='string'?data.eventId:undefined;
+      if(eventId&&subscriber.seen.has(eventId))continue;
       const message = `data: ${JSON.stringify(projectEvent(data, subscriber.audience))}\n\n`;
-      if (subscriber.authorize) pending.push(this.deliver(subscriber, merchantSubscribers, message));
-      else subscriber.connection.write(message);
+      if (subscriber.authorize) pending.push(this.deliver(subscriber, merchantSubscribers, message,eventId));
+      else {if(eventId){subscriber.seen.add(eventId);if(subscriber.seen.size>1000)subscriber.seen.delete(subscriber.seen.values().next().value!);}
+        subscriber.connection.write(message);}
     }
     return Promise.all(pending);
   }

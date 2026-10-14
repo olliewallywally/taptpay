@@ -30,6 +30,7 @@ function serve(sale: Record<string, unknown>) {
   fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
     const url = String(input);
     if (url === "/api/transactions/5") return reply(sale);
+    if (url === '/api/pay/return/'+ 's'.repeat(43)) return reply({transactionId:5,outcome:'declined',receiptShare:null});
     return reply({});
   });
 }
@@ -74,7 +75,7 @@ describe("leaving a board sale's checkout", () => {
 describe("trying again from a declined board sale", () => {
   it("goes back to the board's page", async () => {
     serve({ ...boardSale, status: "failed" });
-    mockSearch = "status=declined";
+    mockSearch = 'state='+ 's'.repeat(43);
     renderPage(<PaymentResult />);
 
     await userEvent.click(await screen.findByTestId("button-try-again"));
@@ -84,7 +85,7 @@ describe("trying again from a declined board sale", () => {
 
   it("with no board, never offers the retired business-wide page", async () => {
     serve({ ...boardSale, taptStoneId: null, status: "failed" });
-    mockSearch = "status=declined";
+    mockSearch = 'state='+ 's'.repeat(43);
     renderPage(<PaymentResult />);
 
     await userEvent.click(await screen.findByTestId("button-try-again"));

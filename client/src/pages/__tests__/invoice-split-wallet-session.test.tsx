@@ -10,11 +10,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import Checkout from "@/pages/checkout";
+let mockSearch='';
 
 jest.mock("wouter", () => ({
   useParams: () => ({ token: "invoice-token" }),
   useLocation: () => ["/r/invoice-token", jest.fn()],
-  useSearch: () => "",
+  useSearch: () => mockSearch,
 }));
 
 jest.mock("@/hooks/use-toast", () => ({
@@ -35,6 +36,9 @@ let invoice: Record<string, unknown>;
 const sessionBodies: unknown[] = [];
 
 beforeEach(() => {
+  mockSearch='';
+  sessionStorage.clear();let n=0;
+  jest.spyOn(crypto,'randomUUID').mockImplementation(()=>`00000000-0000-4000-8000-${String(++n).padStart(12,'0')}`);
   sessionBodies.length = 0;
   invoice = {
     invoiceId: "inv-1",
@@ -65,7 +69,9 @@ beforeEach(() => {
       sessionBodies.push(init?.body ? JSON.parse(String(init.body)) : {});
       return reply({
         sessionId: `ready-${sessionBodies.length}`,
-        amountStr: "?",
+        amountStr: invoice.splitCount ? (100/Number(invoice.splitCount)).toFixed(2) : '100.00',
+        shareIndex:invoice.splitCount?1:0,
+        returnState:'s'.repeat(43),
         ajaxSubmitCardUrl: "https://uat.windcave.com/card",
         ajaxSubmitApplePayUrl: "https://uat.windcave.com/apple",
         ajaxSubmitGooglePayUrl: "https://uat.windcave.com/google",
@@ -76,6 +82,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  jest.restoreAllMocks();
   delete (window as any).ApplePaySession;
 });
 
@@ -87,14 +94,27 @@ function renderCheckout() {
   );
 }
 
-it("readies a new Apple Pay session for the share once the payer chooses to split", async () => {
+it("prepares one share session only after the payer chooses to split", async () => {
   renderCheckout();
-  // The page readies one for the whole invoice as it loads.
-  await waitFor(() => expect(sessionBodies).toHaveLength(1));
+  await screen.findByRole('button',{name:'Pay the full bill'});
+  expect(sessionBodies).toHaveLength(0);
 
   fireEvent.click(await screen.findByRole("button", { name: "Split the bill" }));
   fireEvent.click(await screen.findByRole("button", { name: "2" }));
 
-  // Once the invoice reads as split, the ready session is renewed for the share.
-  await waitFor(() => expect(sessionBodies).toHaveLength(2), { timeout: 4_000 });
+  await waitFor(() => expect(sessionBodies).toHaveLength(1), { timeout: 4_000 });
+  await screen.findByRole('button',{name:/pay.*apple/i});
+  expect(sessionBodies[0]).toMatchObject({reserveShare:true,idempotencyKey:expect.any(String)});
 }, 15_000);
+
+it('prepares the full bill after choosing it and keeps receipt email optional',async()=>{
+  renderCheckout();const button=await screen.findByRole('button',{name:'Pay the full bill'});
+  expect(sessionBodies).toHaveLength(0);fireEvent.click(button);
+  await waitFor(()=>expect(sessionBodies).toHaveLength(1));
+  expect(sessionBodies[0]).not.toHaveProperty('payerEmail');
+  await screen.findByRole('button',{name:/pay.*apple/i});
+});
+it('uses the invoice amount even when the URL contains a different amount',async()=>{
+  mockSearch='?amount=0.01';renderCheckout();await screen.findByRole('button',{name:'Pay the full bill'});
+  expect(screen.getByText('$100')).toBeInTheDocument();expect(screen.queryByText('$0.01')).not.toBeInTheDocument();
+});

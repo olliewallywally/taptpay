@@ -1,6 +1,7 @@
 import "./support/test-env";
 
 import request from "supertest";
+import {randomUUID} from "node:crypto";
 import { sseBroker } from "../sse-broker";
 import {
   signedIn, type SignedIn,
@@ -35,7 +36,7 @@ afterEach(() => {
 async function createSale(principal: SignedIn & { merchantId: number }, body: Record<string, unknown>) {
   const { app } = await createTestApp();
   return request(app)
-    .post("/api/transactions")
+    .post("/api/transactions").set("Idempotency-Key",randomUUID())
     .set(signedIn(principal))
     .send({ merchantId: principal.merchantId, itemName: "Flat white", price: "5.50", ...body });
 }

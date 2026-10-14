@@ -30,6 +30,7 @@ let events: number;
 const count = () => { events += 1; };
 beforeEach(() => {
   fetchMock.mockReset();
+  sessionStorage.clear();
   events = 0;
   window.addEventListener(BILLING_CARD_REQUIRED_EVENT, count);
 });
@@ -38,8 +39,8 @@ afterEach(() => window.removeEventListener(BILLING_CARD_REQUIRED_EVENT, count));
 describe("a 402 from a payment action", () => {
   it.each([
     ["apiRequest", () => apiRequest("POST", "/api/transactions", { price: "5.00" })],
-    ["tradesFetch", () => tradesFetch("/api/trades/invoices", { method: "POST" })],
-    ["propFetch", () => propFetch("/api/property/invoices", { method: "POST" })],
+    ["tradesFetch", () => tradesFetch("/api/trades/invoices", { method: "POST",body:JSON.stringify({amountCents:500}) })],
+    ["propFetch", () => propFetch("/api/property/invoices", { method: "POST",body:JSON.stringify({amountCents:500}) })],
   ])("%s raises the banner once and throws the one billing error", async (_helper, call) => {
     fetchMock.mockResolvedValue(answer(402, BILLING_402));
     const error = await call().then(() => null, (thrown: unknown) => thrown);
@@ -53,7 +54,7 @@ describe("a 402 from a payment action", () => {
     const error = await apiRequest("POST", "/api/transactions", {}).then(() => null, (thrown: unknown) => thrown);
     expect(isBillingCardRequired(error)).toBe(false);
     expect(events).toBe(0);
-    const response = await tradesFetch("/api/trades/invoices", { method: "POST" });
+    const response = await tradesFetch("/api/trades/invoices", { method: "POST",body:JSON.stringify({amountCents:500}) });
     expect(response.status).toBe(500); // the trades helper still returns other failures to its caller
     expect(events).toBe(0);
   });

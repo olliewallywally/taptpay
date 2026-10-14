@@ -19,6 +19,7 @@ export type SessionBinding = ProviderExpectation & (
   { invoiceAttemptId: string; paymentAttemptId?: never } |
   { paymentAttemptId: string; invoiceAttemptId?: never }
 );
+export type SessionRecoveryCandidate=SessionBinding;
 
 /** R2 adapter must query through its validated transport and verify every field.
  * No adapter from the old success/approved booleans is permitted. */
@@ -26,10 +27,13 @@ export type ProviderQueryResult =
   | { kind: "pending" | "unknown" | "unavailable" }
   | { kind: "mismatch" }
   | (ProviderExpectation & { kind: "verified"; outcome: ProviderOutcome;
-      transactionId: string; transactionCount: 1; paymentMethod?: string });
+      transactionId: string; transactionCount: number; paymentMethod?: string });
 export type VerifiedOutcome = Extract<ProviderQueryResult, { kind: "verified" }>;
 export interface ReconciliationProvider {
   query(expected: Readonly<ProviderExpectation>): Promise<ProviderQueryResult>;
+  /** Reference is only a locator hint. The candidate must come from pre-send
+   * local data and pass the full verifier before any attachment or settlement. */
+  discoverReference?(sessionId:string):Promise<string|undefined>;
 }
 export interface InboxClaim {
   id: string;
@@ -42,11 +46,13 @@ export interface InboxClaim {
 export type SettlementResult = { kind: "finalized" | "reused"; eventId?: string } |
   { kind: "conflict" | "not-found" | "lease-lost" | "adapter-unavailable" };
 export interface ReconciliationRepository {
-  claimInbox(owner: string, now: Date): Promise<InboxClaim | undefined>;
+  claimInbox(owner: string, now: Date, sessionId?:string): Promise<InboxClaim | undefined>;
   resolveSession(sessionId: string): Promise<SessionBinding | undefined>;
   finalize(binding: SessionBinding, outcome: VerifiedOutcome, claim: InboxClaim, now: Date): Promise<SettlementResult>;
   finishInbox(claim: InboxClaim, result: { status: "retry" | "complete" | "dead_letter";
     code?: ReconciliationError; transactionId?: string; nextAttemptAt?: Date }, now: Date): Promise<boolean>;
+  findUnboundSessionCandidate?(sessionId:string,reference:string):Promise<SessionRecoveryCandidate|undefined>;
+  attachRecoveredSession?(candidate:SessionRecoveryCandidate,evidence:VerifiedOutcome,now:Date):Promise<boolean>;
 }
 
 export function requestFingerprint(input: Record<string, unknown>): string {

@@ -116,7 +116,7 @@ export const UNKNOWN_LINK_ANSWER: Record<string, MatrixAnswer> = {
   "GET /api/auth/validate-reset-token/:token": 200,
   "POST /api/auth/confirm-email": 400,
   "POST /api/team/accept-invite": 400,
-  "GET /api/checkout/callback": 302,
+  "GET /api/checkout/callback": 404,
 };
 
 /**

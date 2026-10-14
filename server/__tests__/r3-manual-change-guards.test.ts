@@ -13,19 +13,22 @@ async function claimed(repo:MemStorage) {
   if(claim.kind!=='claimed') throw new Error('fixture_claim');
   return {transaction,attempt:claim.attempt};
 }
-test('owner cancellation cannot erase a live or expired unattached attempt',async()=>{
+test('owner cancellation preserves a live or expired unattached attempt and records one command',async()=>{
   const repo=new MemStorage();const {transaction,attempt}=await claimed(repo);
   for(const expires of [Date.now()+1000,Date.now()-1000]) {
     (repo as any).paymentAttempts.get(attempt.id).leaseExpiresAt=new Date(expires);
-    await expect(repo.cancelTransactionForMerchant(transaction.id,11)).resolves.toMatchObject({kind:'conflict',reason:'payment-active'});
-    expect((await repo.getTransaction(transaction.id))?.status).toBe('pending');
+    await expect(repo.cancelTransactionForMerchant(transaction.id,11,{userId:1,role:'owner'})).resolves.toMatchObject({kind:'cancelled'});
+    expect((await repo.getTransaction(transaction.id))?.status).toBe('cancelled');
+    expect((await repo.getPaymentAttempt(attempt.id))?.state).toBe('claiming');
   }
+  expect((repo as any).cashAuditEvents.size).toBe(1);
+  expect((repo as any).cashOutboxEntries.size).toBe(1);
 });
-test.each(['windcaveSessionId','windcaveTransactionId','completedSplits'] as const)('cancellation holds recorded %s',async field=>{
+test.each(['windcaveSessionId','windcaveTransactionId'] as const)('cancellation preserves recorded %s without assuming capture',async field=>{
   const repo=new MemStorage();const transaction=await repo.createTransaction({merchantId:11,itemName:'Synthetic',price:'10.00',status:'processing',paymentMethod:'qr_code',splitEnabled:false});
-  (repo as any).transactions.get(transaction.id)[field]=field==='completedSplits'?1:'synthetic-bound';
-  await expect(repo.cancelTransactionForMerchant(transaction.id,11)).resolves.toMatchObject({kind:'conflict',reason:'payment-active'});
-  expect((await repo.getTransaction(transaction.id))?.status).toBe('processing');
+  (repo as any).transactions.get(transaction.id)[field]='synthetic-bound';
+  await expect(repo.cancelTransactionForMerchant(transaction.id,11)).resolves.toMatchObject({kind:'cancelled'});
+  expect((await repo.getTransaction(transaction.id))?.[field]).toBe('synthetic-bound');
 });
 test('cancellation refuses a paid split row even when its aggregate counter is stale',async()=>{
   const repo=new MemStorage();const transaction=await repo.createTransaction({merchantId:11,itemName:'Synthetic',price:'10.00',status:'pending',paymentMethod:'qr_code',splitEnabled:false});
@@ -36,7 +39,9 @@ test('cancellation refuses a paid split row even when its aggregate counter is s
 test('active cancellation conflict is truthful and has no state/provider/message effects',async()=>{
   resetTestStorage();const {app}=await createTestApp();const owner=await createOwnerPrincipal();
   const transaction=await storage.createTransaction({merchantId:owner.merchantId,itemName:'Synthetic',price:'10.00',status:'pending',paymentMethod:'qr_code',splitEnabled:false});
-  const engine=new PaymentAttemptService(storage);await engine.claim({transactionId:transaction.id,shareIndex:0,idempotencyKey:randomUUID()});
+  const engine=new PaymentAttemptService(storage);const attempt=await engine.claim({transactionId:transaction.id,shareIndex:0,idempotencyKey:randomUUID()});
+  if(attempt.kind!=='claimed')throw new Error('fixture_claim');
+  (storage as any).paymentAttempts.get(attempt.attempt.id).state='approved';
   const before=storageSnapshot(),effects=observeRefusalEffects();
   try {
     const result=await request(app).post(`/api/transactions/${transaction.id}/cancel`).set(signedIn(owner));

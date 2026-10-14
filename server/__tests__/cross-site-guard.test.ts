@@ -164,8 +164,9 @@ describe("the named callbacks from other sites", () => {
       .type("form")
       .send({ result: "approved" });
 
-    expect(res.status).toBe(302);
-    expect(res.headers.location).toBe("/settings?section=billing&card=approved");
+    expect(res.status).toBe(409);
+    expect(res.headers.location).toBeUndefined();
+    expect(res.body.message).toBe("This card return needs reconciliation");
     expect(res.headers["access-control-allow-origin"]).toBeUndefined();
     expect(storageSnapshot()).toBe(before);
   });
@@ -181,6 +182,7 @@ describe("the named callbacks from other sites", () => {
     const { app } = await createTestApp();
 
     const res = await request(app).post("/api/billing/card/notification").send({ sessionId: "anything" });
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(503);
+    expect(res.headers["retry-after"]).toBe("5");
   });
 });

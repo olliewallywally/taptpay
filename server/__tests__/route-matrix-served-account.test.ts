@@ -1,3 +1,4 @@
+import {randomUUID as requestCommandKey} from 'node:crypto';
 import "./support/test-env";
 import "./support/push-test-env";
 import { APPLE_TEST_SERVICES_ID } from "./support/apple-sign-in-test-env";
@@ -17,7 +18,7 @@ import * as emailService from "../email-service-multi";
 import { subscriptionCardSessionState } from "../storage";
 import * as windcave from "../windcave";
 import { TUTORIAL_PAGE_KEYS } from "@shared/tutorial";
-import { VALID_PASSWORD, signedIn, resetTestStorage, storage, type Principal } from "./support/http-harness";
+import { VALID_PASSWORD, createTestApp, signedIn, resetTestStorage, storage, type Principal } from "./support/http-harness";
 import {
   CARD,
   as,
@@ -258,7 +259,7 @@ const RECIPES: Record<string, Recipe> = {
   },
   "PUT /api/subscription/plan": () => ({
     // Nothing paid yet (a new business), so the move is free and immediate.
-    req: { method: "put", path: "/api/subscription/plan", body: { planId: "crew" } }, status: 200,
+    req: { method: "put", path: "/api/subscription/plan", headers: {"Idempotency-Key":requestCommandKey()}, body: { planId: "crew" } }, status: 200,
     check: (res) => {
       expect(res.body).toMatchObject({ applied: "immediate", message: "Your new plan is active." });
       expect(res.body.subscription).toMatchObject({ planId: "crew" });
@@ -267,7 +268,7 @@ const RECIPES: Record<string, Recipe> = {
   "POST /api/subscription/cancel": async (ctx) => {
     await paidMonth(ctx);
     return {
-      req: { method: "post", path: "/api/subscription/cancel", body: { reason: "Too dear" } }, status: 200,
+      req: { method: "post", path: "/api/subscription/cancel", headers: {"Idempotency-Key":requestCommandKey()}, body: { reason: "Too dear" } }, status: 200,
       check: (res) => {
         // A paid month runs out first.
         expect(res.body.subscription).toMatchObject({ cancelAtPeriodEnd: true, status: "active" });
@@ -280,7 +281,7 @@ const RECIPES: Record<string, Recipe> = {
     const cancelled = await storage.cancelSubscription(ctx.merchantId, "Too dear");
     if (!cancelled.ok) throw new Error("fixture: cancel failed");
     return {
-      req: { method: "post", path: "/api/subscription/resume" }, status: 200,
+      req: { method: "post", path: "/api/subscription/resume",headers: {"Idempotency-Key":requestCommandKey()} }, status: 200,
       check: (res) => {
         expect(res.body.subscription).toMatchObject({ cancelAtPeriodEnd: false, status: "active" });
         expect(res.body.message).toBe("Your subscription will renew as normal.");
@@ -349,40 +350,36 @@ const RECIPES: Record<string, Recipe> = {
       check: (res) => expect(res.body).toEqual({ ready: true, card: { last4: CARD.last4, brand: CARD.brand, expiry: CARD.expiry } }),
     };
   },
-  "POST /api/billing/card/session": (ctx) => {
-    jest.spyOn(windcave, "isWindcaveConfigured").mockReturnValue(true);
-    jest.spyOn(windcave, "createCardStorageSession")
-      .mockResolvedValue({ success: true, sessionId: "matrix-card-session", hppUrl: "https://uat.windcave.com/hpp/matrix" } as any);
+  "POST /api/billing/card/session": async(ctx) => {
+    const key=requestCommandKey(),start=jest.fn(async()=>({kind:'ready',sessionId:'matrix-card-session',redirectUrl:'https://uat.windcave.com/pxmi3/matrix'}));
+    const configured=await createTestApp({subscriptionPayments:{card:{canStart:()=>true,start},billing:{canInitiate:()=>false}} as any});ctx.app=configured.app;
     return {
-      req: { method: "post", path: "/api/billing/card/session" }, status: 200,
-      check: async (res) => {
-        expect(res.body).toEqual({ sessionId: "matrix-card-session", redirectUrl: "https://uat.windcave.com/hpp/matrix" });
-        // The session is bound to this business: only it can read the result back.
-        expect(subscriptionCardSessionState(await storage.getSubscription(ctx.merchantId), "matrix-card-session")).toBe("pending");
+      req:{method:'post',path:'/api/billing/card/session',headers:{'Idempotency-Key':key}},status:200,
+      check:res=>{
+        expect(res.body).toEqual({sessionId:'matrix-card-session',redirectUrl:'https://uat.windcave.com/pxmi3/matrix'});
+        expect(start).toHaveBeenCalledWith(expect.objectContaining({merchantId:ctx.merchantId,idempotencyKey:key,actor:expect.objectContaining({userId:ctx.owner.user.id,role:'owner'})}));
+        expect(res.body).not.toHaveProperty('returnState');
       },
     };
   },
-  "POST /api/billing/card/confirm": async (ctx) => {
-    await storage.getOrCreateSubscription(ctx.merchantId);
-    await storage.bindSubscriptionCardSession(ctx.merchantId, "matrix-card-session");
-    jest.spyOn(windcave, "queryStoredCardSession")
-      .mockResolvedValue({ success: true, complete: true, approved: true, card: CARD } as any);
-    jest.spyOn(windcave, "chargeStoredCard")
-      .mockResolvedValue({ success: true, approved: true, windcaveTransactionId: "matrix-first-month" } as any);
+  "POST /api/billing/card/confirm": async(ctx) => {
+    await paidMonth(ctx);
+    const confirm=jest.fn(async()=>({state:'approved',activation_state:'approved',activation_applied_at:new Date()}));
+    const configured=await createTestApp({subscriptionPayments:{card:{confirm},billing:{canInitiate:()=>false}} as any});ctx.app=configured.app;
     return {
-      req: { method: "post", path: "/api/billing/card/confirm", body: { sessionId: "matrix-card-session" } }, status: 200,
-      check: (res) => {
-        expect(res.body).toMatchObject({
-          success: true, ready: true, charged: true, card: { last4: CARD.last4, brand: CARD.brand, expiry: CARD.expiry },
-        });
-        expect(res.body.subscription).toMatchObject({ status: "active" });
+      req:{method:'post',path:'/api/billing/card/confirm',body:{sessionId:'matrix-card-session'}},status:200,
+      check:res=>{
+        expect(confirm).toHaveBeenCalledWith(ctx.merchantId,'matrix-card-session');
+        expect(res.body).toMatchObject({success:true,ready:true,charged:true,card:{last4:CARD.last4,brand:CARD.brand,expiry:CARD.expiry}});
+        expect(res.body.subscription).toMatchObject({status:'active'});
+        expect(res.body.card).not.toHaveProperty('windcaveCardId');
       },
     };
   },
   "DELETE /api/billing/card": async (ctx) => {
     await paidMonth(ctx);
     return {
-      req: { method: "delete", path: "/api/billing/card" }, status: 200,
+      req: { method: "delete", path: "/api/billing/card",headers: {"Idempotency-Key":requestCommandKey()} }, status: 200,
       check: async (res) => {
         expect(res.body).toEqual({ success: true });
         expect((await as(ctx, ctx.owner).get("/api/billing/card")).body.card).toBeNull();

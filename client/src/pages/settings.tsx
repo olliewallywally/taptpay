@@ -1,3 +1,4 @@
+import {creationFetch} from '@/lib/creation-command';
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -13,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { MerchantGate } from "@/components/merchant-gate";
 import { apiErrorMessage } from "@/lib/api-error";
 import { apiRequest } from "@/lib/queryClient";
+import {billingCardCommandKey} from '@/lib/billing-card-command';
 import { isNativeApp } from "@/lib/native";
 import { usePushNotifications } from "@/hooks/use-push-notifications";
 import { useAppleConnection } from "@/hooks/use-apple-connection";
@@ -193,7 +195,7 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { confirmingCard } = useBillingCardReturn();
+  const { confirmingCard } = useBillingCardReturn(merchantId);
   const {
     restartTutorials,
     visitedPages: tutorialVisitedPages,
@@ -696,8 +698,9 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
   const handleStartCardSetup = async () => {
     setCardSaving(true);
     try {
-      const resp = await apiRequest(...apiTo("POST /api/billing/card/session"), {});
+      const resp = await apiRequest(...apiTo("POST /api/billing/card/session"), {},{idempotencyKey:billingCardCommandKey(merchantId)});
       const body = await resp.json().catch(() => ({}));
+      if(body?.pending){if(body.sessionId)sessionStorage.setItem(BILLING_CARD_SESSION_KEY,body.sessionId);throw new Error('Your original card setup is still being confirmed. Refresh shortly.');}
       if (!resp.ok || !body?.redirectUrl) {
         throw new Error(body?.message || 'Could not start card setup');
       }
@@ -713,7 +716,7 @@ function SettingsPage({ merchantId }: { merchantId: number }) {
   const handleRemoveCard = async () => {
     setCardRemoving(true);
     try {
-      const resp = await sessionFetch(apiPath("DELETE /api/billing/card"), {
+      const resp = await creationFetch(apiPath("DELETE /api/billing/card"), {
         method: 'DELETE',
       });
       const body = await resp.json().catch(() => ({}));

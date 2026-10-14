@@ -213,7 +213,7 @@ export function createWindcaveClient(deps: WindcaveClientDeps): WindcaveClient {
         }
         const selected = selectSessionLinks(links, config.mode);
         record("CREATE_SESSION_CREATED", { links: links.length, rejectedLinks: selected.rejected });
-        return { kind: "created", sessionId, links: selected.links, rejectedLinks: selected.rejected };
+        return { kind: "created", sessionId, links:body?.state==='complete'?{}:selected.links, rejectedLinks: selected.rejected };
       }
     },
 

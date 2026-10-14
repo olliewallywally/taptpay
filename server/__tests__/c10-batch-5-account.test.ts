@@ -2,6 +2,7 @@ import "./support/test-env";
 import "./support/push-test-env";
 
 import request from "supertest";
+import {randomUUID} from "node:crypto";
 import {
   signedIn, createMemberPrincipal, createOwnerPrincipal, createTestApp, resetTestStorage, storage, storageSnapshot,
 } from "./support/http-harness";
@@ -103,9 +104,9 @@ describe("only the account owner changes the plan (guards for isAccountOwner)", 
     const { app } = await createTestApp();
     const owner = await createOwnerPrincipal();
 
-    const cancelled = await request(app).post("/api/subscription/cancel").set(signedIn(owner)).send({ reason: "Too dear" });
+    const cancelled = await request(app).post("/api/subscription/cancel").set(signedIn(owner)).set("Idempotency-Key",randomUUID()).send({ reason: "Too dear" });
     expect(cancelled.status).toBe(200);
-    const resumed = await request(app).post("/api/subscription/resume").set(signedIn(owner)).send({});
+    const resumed = await request(app).post("/api/subscription/resume").set(signedIn(owner)).set("Idempotency-Key",randomUUID()).send({});
     expect([200, 409]).toContain(resumed.status);
     expect(resumed.status).not.toBe(403);
   });

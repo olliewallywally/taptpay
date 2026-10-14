@@ -18,8 +18,16 @@ test.each([
   const {provider}=setup(body({transactions:[{...transaction,...patch}]}));
   expect((await provider.query(expected)).kind).not.toBe('verified');
 });
-test('a complete session with one approval plus another decline stays ambiguous for R3',async()=>{
-  const {provider}=setup(body({transactions:[transaction,{...transaction,id:'transaction-B',authorised:false}]}));
+test('a declined card followed by one approval settles the exact approved transaction',async()=>{
+  const {provider}=setup(body({transactions:[{...transaction,id:'transaction-B',authorised:false},transaction]}));
+  expect(await provider.query(expected)).toEqual({...expected,kind:'verified',outcome:'approved',transactionId:'transaction-A',transactionCount:2});
+});
+test('two approvals still produce no settlement evidence',async()=>{
+  const {provider}=setup(body({transactions:[transaction,{...transaction,id:'transaction-B'}]}));
+  expect((await provider.query(expected)).kind).not.toBe('verified');
+});
+test('a mismatched decline cannot be ignored when another transaction approved',async()=>{
+  const {provider}=setup(body({transactions:[{...transaction,id:'transaction-B',authorised:false,amount:'10.00'},transaction]}));
   expect(await provider.query(expected)).toEqual({kind:'mismatch'});
 });
 test.each([{transactions:[]},{state:'init'},{transactions:[{authorised:true}]},{id:'other'}])('incomplete, missing or malformed replies do not settle: %p',async patch=>{

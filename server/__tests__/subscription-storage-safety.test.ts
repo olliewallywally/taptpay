@@ -1,3 +1,5 @@
+import "./support/test-env";
+import {DatabaseStorage} from "../storage";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -20,30 +22,19 @@ describe("subscription provider-call storage safety", () => {
     const prepare = body.indexOf("const prepared = await this.db.transaction");
     const preparedResult = body.indexOf('if (prepared.kind === "done")');
     const provider = body.indexOf("charge = await chargeUpgrade!");
-    const finalize = body.indexOf("return await this.db.transaction", provider);
+
 
     expect(prepare).toBeGreaterThan(-1);
     expect(preparedResult).toBeGreaterThan(prepare);
     expect(provider).toBeGreaterThan(preparedResult);
-    expect(finalize).toBeGreaterThan(provider);
+    expect(body).not.toContain(".insert(subscriptionBillingHistory)");
     expect(body.slice(prepare, provider)).toContain("billingClaimToken: claimToken");
   });
 
-  test("card activation charges between durable prepare and finalize transactions", () => {
-    const body = method("completeSubscriptionCardSetup", "removeSubscriptionCard");
-    const prepare = body.indexOf("const prepared = await this.db.transaction");
-    const preparedResult = body.indexOf('if (prepared.kind === "done")');
-    const provider = body.indexOf("outcome = await charge(");
-    const finalize = body.indexOf("return await this.db.transaction", provider);
-
-    expect(prepare).toBeGreaterThan(-1);
-    expect(preparedResult).toBeGreaterThan(prepare);
-    expect(provider).toBeGreaterThan(preparedResult);
-    expect(finalize).toBeGreaterThan(provider);
-    expect(body.slice(prepare, provider)).toContain("billingClaimToken: claimToken");
-    expect(body.slice(finalize)).toContain(
-      "eq(merchantSubscriptions.billingClaimToken, prepared.claimToken)",
-    );
+  test("the retired mutable-session DB port cannot charge or finalize a card",async()=>{
+    const transaction=jest.fn(),charge=jest.fn();const repository=new DatabaseStorage({transaction} as any);
+    const result=await repository.completeSubscriptionCardSetup(7,'opaque-session',{windcaveCardId:'opaque-card',brand:'Visa',last4:'1234',expiry:'12/40'},charge);
+    expect(result).toMatchObject({ok:false,reason:'invalid-state'});expect(charge).not.toHaveBeenCalled();expect(transaction).not.toHaveBeenCalled();
   });
 
   test("owner password dual-write commits in one database transaction", () => {

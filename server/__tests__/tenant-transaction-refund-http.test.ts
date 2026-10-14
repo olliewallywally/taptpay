@@ -44,8 +44,8 @@ test.each(["owner", "member", "admin"])("%s can cancel; merchants use no global 
   const effects = observeRefusalEffects();
   try {
     const retry = await request(app).post(`/api/transactions/${transaction.id}/cancel`).set(signedIn(caller));
-    expect(retry.status).toBe(400);
-    expect(retry.body).toEqual({ message: "Cannot cancel transaction with status: cancelled" });
+    expect(retry.status).toBe(200);
+    expect(retry.body).toEqual(res.body);
     expect(storageSnapshot()).toBe(before);
     effects.assertNone();
   } finally { effects.restore(); }

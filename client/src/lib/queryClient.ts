@@ -1,5 +1,6 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { sessionFetch } from "./session";
+import {creationFetch,isCreationRequest,isSubscriptionCommandRequest} from './creation-command';
 
 export const BILLING_CARD_REQUIRED_EVENT = "taptpay:billing-card-required";
 
@@ -60,7 +61,8 @@ export async function apiRequest(
     headers["Content-Type"] = "application/json";
   }
 
-  const res = await sessionFetch(url, {
+  const transport=isCreationRequest(url,method)||isSubscriptionCommandRequest(url,method)?creationFetch:sessionFetch;
+  const res = await transport(url, {
     method,
     headers,
     body: data ? JSON.stringify(data) : undefined,

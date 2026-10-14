@@ -994,11 +994,11 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
                   title={sendUnavailableHint}
                   onClick={() => sendInvoice.mutate()}
                 >
-                  {sendInvoice.isPending ? "sending…" : sentFlash ? "invoice sent ✓" : quickMode ? "send quick invoice" : "send invoice"}
+                  {sendInvoice.isPending ? "sending…" : sentFlash ? (sentInvoice?.delivered===true?"invoice sent ✓":"invoice created · delivery pending") : quickMode ? "send quick invoice" : "send invoice"}
                 </button>
                 {quickMode && sentInvoice?.clientProfileId && (
                   <div className="tt-quick-success" role="status">
-                    <span>invoice sent ✓</span>
+                    <span>{sentInvoice?.delivered===true?'invoice sent ✓':'invoice created · delivery pending'}</span>
                     <button type="button" disabled={promoteClient.isPending || promoteClient.isSuccess} onClick={() => promoteClient.mutate()}>
                       {promoteClient.isPending ? "saving…" : promoteClient.isSuccess ? "client saved ✓" : "add client"}
                     </button>

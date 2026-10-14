@@ -1,7 +1,7 @@
-import { DEFAULT_PLAN_ID, planAmountString, planFor, planForOrDefault, type PlanId } from "@shared/plans";
+import { DEFAULT_PLAN_ID, planFor, planForOrDefault, type PlanId } from "@shared/plans";
 import type { MerchantSubscription } from "@shared/schema";
-import { chargeStoredCard, isWindcaveConfigured } from "./windcave";
 import { addOneMonth } from "./storage";
+import { renewalPaymentMethodIsReady } from "./billing-card";
 
 /**
  * Dunning schedule, in days after the first failure, before a subscription is
@@ -83,24 +83,11 @@ export function decideBilling(
     }
   }
 
-  if (!subscription.windcaveCardId) {
+  if (!renewalPaymentMethodIsReady(subscription, now)) {
     return { action: "record_failure", reason: "No payment method on file" };
   }
 
   return { action: "charge" };
-}
-
-export interface SubscriptionChargeOutcome {
-  charged: boolean;
-  approved: boolean;
-  windcaveTransactionId?: string;
-  failureReason?: string;
-  /** Terminal for this period: stop retrying and suspend. */
-  exhausted?: boolean;
-  idempotencyKey?: string;
-  attemptNumber?: number;
-  amountCents?: number;
-  planId?: PlanId;
 }
 
 export function renewalPlan(subscription: MerchantSubscription) {
@@ -117,6 +104,7 @@ export function nextBillingPeriodStart(
   subscription: MerchantSubscription,
   now: Date,
 ): Date {
+  if(subscription.status==='cancelled')return now;
   if (
     subscription.status !== "cancelled"
     && subscription.lastBillingDate
@@ -131,61 +119,6 @@ export function nextBillingPeriodStart(
   return now;
 }
 
-
-/**
- * Charges one subscription period. Pure of storage: the caller persists the
- * outcome, which keeps the retry/suspend policy testable without a database.
- */
-export async function chargeSubscriptionPeriod(
-  subscription: MerchantSubscription,
-  now: Date,
-  periodStart: Date = nextBillingPeriodStart(subscription, now),
-): Promise<SubscriptionChargeOutcome> {
-  if (!subscription.windcaveCardId) {
-    return { charged: false, approved: false, failureReason: "No card on file" };
-  }
-  if (!isWindcaveConfigured()) {
-    return { charged: false, approved: false, failureReason: "Windcave is not configured" };
-  }
-
-  const plan = renewalPlan(subscription);
-  const amountCents = subscription.pendingPlanId
-    ? plan.priceCents
-    : (subscription.priceCents ?? plan.priceCents);
-  const attemptNumber = (subscription.failedPaymentCount ?? 0) + 1;
-  const idempotencyKey = billingIdempotencyKey(subscription.id, periodStart, attemptNumber);
-
-  const result = await chargeStoredCard(
-    idempotencyKey,
-    subscription.windcaveCardId,
-    planAmountString(amountCents),
-    billingReference(subscription.merchantId, plan.id, periodStart),
-  );
-
-  const metadata = { idempotencyKey, attemptNumber, amountCents, planId: plan.id };
-
-  if (!result.success) {
-    // A transport failure is not a decline — do not burn a dunning attempt on it.
-    return { charged: false, approved: false, failureReason: result.error, ...metadata };
-  }
-  if (!result.approved) {
-    const failures = (subscription.failedPaymentCount ?? 0) + 1;
-    return {
-      charged: true,
-      approved: false,
-      failureReason: result.declineReason ?? "Card declined",
-      exhausted: failures >= MAX_PAYMENT_ATTEMPTS,
-      windcaveTransactionId: result.windcaveTransactionId,
-      ...metadata,
-    };
-  }
-  return {
-    charged: true,
-    approved: true,
-    windcaveTransactionId: result.windcaveTransactionId,
-    ...metadata,
-  };
-}
 
 /** Column updates that advance a subscription into its next paid period. */
 export function nextPeriodUpdates(

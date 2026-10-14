@@ -12,7 +12,14 @@ export function createWindcaveReconciliationProvider(
   client:Pick<WindcaveClient,'querySession'>,
   context:Readonly<WindcaveVerificationContext>,
 ):ReconciliationProvider {
-  return {async query(expected) {
+  return {async discoverReference(sessionId){
+    const reply=await client.querySession(sessionId);if(reply.kind!=='reply')return undefined;
+    const observed=normalizeSessionQuery(reply.body,sessionId);
+    if(observed.kind!=='approved' && observed.kind!=='declined')return undefined;
+    const selected=observed.kind==='approved'?observed.transaction:observed.transactions[0];
+    if(selected?.type!=='purchase')return undefined;
+    return selected.merchantReference;
+  },async query(expected) {
     if(expected.environment!==context.providerEnvironment || expected.providerAccount!==context.accountUsername) return {kind:'mismatch'};
     const reply=await client.querySession(expected.sessionId);
     if(reply.kind==='pending') return {kind:'pending'};
@@ -24,14 +31,14 @@ export function createWindcaveReconciliationProvider(
     if(verified.kind==='pending') return {kind:'pending'};
     if(verified.kind==='mismatch') return {kind:'mismatch'};
     if(observed.kind==='approved' || observed.kind==='declined') {
-      if(observed.transactionCount!==1 || observed.transactions[0].type!=='purchase') return {kind:'mismatch'};
       if(verified.kind!=='approved' && verified.kind!=='declined') return {kind:'unknown'};
-      const transaction=observed.transactions[0];
+      const transaction=observed.kind==='approved'?observed.transaction:observed.transactions[0];
+      if(transaction?.type!=='purchase')return {kind:'mismatch'};
       if(!isSessionId(transaction.id)) return {kind:'mismatch'};
       return {kind:'verified',outcome:verified.kind,sessionId:observed.sessionId,
         processorXId:expected.processorXId,amountCents:transaction.amountCents,currency:transaction.currency,
         reference:transaction.merchantReference,environment:context.providerEnvironment,providerAccount:context.accountUsername,
-        transactionId:transaction.id,transactionCount:1};
+        transactionId:transaction.id,transactionCount:observed.transactionCount};
     }
     return {kind:'unknown'};
   }};

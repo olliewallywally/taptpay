@@ -17,6 +17,17 @@ export function cashCommandKey(draft:CashDraft,storage:StorageLike=window.sessio
   }
   const key=createOperationUuid();storage.setItem(slot,JSON.stringify({key}));return key;
 }
+/** The sale a refused cash command's key had already recorded (409 IDEMPOTENCY_CONFLICT), if the server named it. */
+export function cashCommandConflict(error:unknown):{itemName:string;price:string}|null {
+  const text=error instanceof Error?error.message:'';
+  const match=/^409: (.*)$/s.exec(text);if(!match)return null;
+  try {
+    const body=JSON.parse(match[1]);
+    if(body?.code!=='IDEMPOTENCY_CONFLICT')return null;
+    const sale=body.transaction;
+    return {itemName:typeof sale?.itemName==='string'?sale.itemName:'a sale',price:typeof sale?.price==='string'?sale.price:''};
+  } catch {return null;}
+}
 export function completeCashCommand(merchantId:number,key:string,storage:StorageLike=window.sessionStorage):void {
   const slot=`${prefix}${merchantId}`,value=storage.getItem(slot);if(value===null)return;
   try {if(JSON.parse(value).key===key)storage.removeItem(slot);} catch {/* preserve uncertainty */}

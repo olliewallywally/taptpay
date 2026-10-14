@@ -9,6 +9,15 @@ function response(status: number, body: unknown): Response {
 }
 
 describe("hosted billing-card confirmation", () => {
+  it.each(['CARD_SETUP_CANCELLED','CARD_SETUP_SUPERSEDED'])('releases scoped terminal setup %s, preserving other conflicts',async code=>{
+    for(const request of [async()=>response(409,{code,message:'Cancelled'}),async()=>{throw new Error(`409: ${JSON.stringify({code,message:'Cancelled'})}`);}]){
+      await expect(confirmBillingCardSession('session-42',{request})).resolves.toEqual({status:'failed',message:'Cancelled',retryable:false,terminal:true});
+    }
+    await expect(confirmBillingCardSession('session-42',{request:async()=>response(409,{code:'UNRESOLVED_PAYMENT',message:'Keep original request'})})).resolves.toEqual({status:'failed',message:'Keep original request',retryable:false});
+  });
+  it('does not represent an unstructured 200 response as a saved card',async()=>{
+    await expect(confirmBillingCardSession('session-42',{request:async()=>response(200,{message:'OK'})})).resolves.toEqual({status:'pending'});
+  });
   it("retries a pending Windcave session and then succeeds", async () => {
     const request = jest.fn()
       .mockResolvedValueOnce(response(202, { pending: true }))

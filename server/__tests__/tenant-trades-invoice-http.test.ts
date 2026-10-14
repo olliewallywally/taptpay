@@ -50,13 +50,13 @@ test.each([
   } finally { effects.restore(); }
 });
 
-test("external payment sends its receipt through the merchant-scoped service only", async () => {
+test("external payment records owned audit for durable receipt delivery without a direct bypass send", async () => {
   const { app } = await createTestApp(); const owner = await createOwnerPrincipal();
   const fake = fakeTrades(); seedTrades(fake, owner.merchantId);
   const res = await request(app).post(`/api/trades/invoices/${INVOICE}/mark-paid-external`).set(signedIn(owner)).send({ externalPaymentReference: "Cash" });
   expect(res.status).toBe(200);
   expect(res.body).toMatchObject({ id: INVOICE, status: "paid_external", externalPaymentReference: "Cash" });
-  expect((delivery as any).sendTradePaymentInvoiceForMerchant).toHaveBeenCalledWith(INVOICE, owner.merchantId);
+  expect((delivery as any).sendTradePaymentInvoiceForMerchant).not.toHaveBeenCalled();
   expect(delivery.sendTradePaymentInvoice).not.toHaveBeenCalled();
   expect(fake.events.map(row => row.eventType)).toEqual(["paid_external"]);
   expect(fake.events[0]).toMatchObject({ merchantId: owner.merchantId, clientProfileId: CLIENT, jobInvoiceId: INVOICE });

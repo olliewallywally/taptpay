@@ -77,6 +77,13 @@ const created = {
 };
 
 describe("createSession", () => {
+  it('keeps a completed creation identity without exposing another payment widget',async()=>{
+    const {client}=harness([reply(202,{...created,state:'complete'})]);
+    expect(await client.createSession(createRequest)).toMatchObject({kind:'created',sessionId:SESSION_ID,links:{}});
+    const {client:again}=harness([reply(202,{...created,state:'complete'})]);
+    const result=await again.createSession(createRequest);if(result.kind!=='created')throw Error('fixture');
+    expect(result.links.hpp).toBeUndefined();expect(result.links.ajaxSubmitCard).toBeUndefined();
+  });
   it("posts the purchase to the configured endpoint with the caller's X-ID and Basic auth", async () => {
     const { client, calls } = harness([reply(202, created)]);
 

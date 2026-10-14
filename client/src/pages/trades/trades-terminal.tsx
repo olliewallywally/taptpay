@@ -253,7 +253,7 @@ export default function TradesTerminal() {
   const invoiceMutation = useMutation({
     mutationFn: async ({ clientId, recipient, amountCents, channel, jobDetails, splitEnabled }: any) => {
       const due = new Date(); due.setDate(due.getDate() + 7);
-      const r = await fetch(apiPath("POST /api/trades/invoices"), {
+      const r = await tradesFetch(apiPath("POST /api/trades/invoices"), {
         method: 'POST', headers: { 'Content-Type': 'application/json', ...tradesHeaders() },
         body: JSON.stringify({
           // Quick invoice sends inline recipient details; the server creates a

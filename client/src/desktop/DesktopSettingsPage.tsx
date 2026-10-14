@@ -1,3 +1,4 @@
+import {creationFetch} from '@/lib/creation-command';
 /* Desktop/tablet settings — design screens 2e/3e/4e, which differ only in the
    left column's branding and the vertical highlighted in the switcher, so all
    three verticals render this one component. Every row drives the same endpoint
@@ -8,6 +9,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getCurrentMerchantId } from "@/lib/auth";
 import { apiErrorMessage } from "@/lib/api-error";
 import { apiRequest } from "@/lib/queryClient";
+import {billingCardCommandKey} from '@/lib/billing-card-command';
 import { useTutorial } from "@/features/tutorial/tutorial";
 import { useToast } from "@/hooks/use-toast";
 import { useAppleConnection } from "@/hooks/use-apple-connection";
@@ -167,7 +169,7 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const push = usePushNotifications();
-  const { confirmingCard } = useBillingCardReturn();
+  const { confirmingCard } = useBillingCardReturn(merchantId);
   const {
     restartTutorials,
     visitedPages: tutorialVisitedPages,
@@ -486,8 +488,9 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
   const startCardSetup = async () => {
     setCardBusy("save");
     try {
-      const res = await apiRequest(...apiTo("POST /api/billing/card/session"), {});
+      const res = await apiRequest(...apiTo("POST /api/billing/card/session"), {},{idempotencyKey:billingCardCommandKey(merchantId)});
       const body = await res.json().catch(() => ({}));
+      if(body?.pending){if(body.sessionId)sessionStorage.setItem(BILLING_CARD_SESSION_KEY,body.sessionId);throw new Error('Your original card setup is still being confirmed. Refresh shortly.');}
       if (!res.ok || !body?.redirectUrl) {
         throw new Error((body as { message?: string }).message || "Could not start card setup");
       }
@@ -502,7 +505,7 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
   const removeCard = async () => {
     setCardBusy("remove");
     try {
-      const res = await sessionFetch(apiPath("DELETE /api/billing/card"), {
+      const res = await creationFetch(apiPath("DELETE /api/billing/card"), {
         method: "DELETE",
       });
       const body = await res.json().catch(() => ({}));

@@ -1,4 +1,4 @@
-import type { PaymentAttemptService } from "./payment-attempt-service";
+import type { PaymentAttemptService,PaymentAttemptRepository } from "./payment-attempt-service";
 import type { SessionBinding, VerifiedOutcome, InboxClaim, SettlementResult } from "./durable-payment-contract";
 
 /** Calls the original retail finalizer; it verifies/fences and appends the outbox
@@ -14,5 +14,18 @@ export function createRetailReconciliationFinalizer(service: PaymentAttemptServi
       reconciliation:{claim,evidence}});
     if (result.kind==='conflict') return {kind:result.reason==='lease-lost' ? 'lease-lost' : 'conflict'};
     return result.kind==='not-found' ? {kind:'not-found'} : {kind:result.kind,eventId:result.eventId};
+  };
+}
+
+/** Preserve the pre-send hash and absolute lifetime through the original
+ * attachment method; provider response fields never populate expectations. */
+export function createRetailSessionRecoveryAttacher(repository:PaymentAttemptRepository){
+  return async(candidate:SessionBinding,now:Date):Promise<boolean>=>{
+    if(!candidate.paymentAttemptId)return false;
+    const attempt=await repository.getPaymentAttempt(candidate.paymentAttemptId);
+    if(!attempt || attempt.state!=='claiming' || !attempt.sendStartedAt || attempt.processorSessionId || attempt.processorXId!==candidate.processorXId)return false;
+    const result=await repository.attachPaymentAttemptSessionRecord({attemptId:attempt.id,processorSessionId:candidate.sessionId,
+      processorXId:candidate.processorXId,returnStateHash:attempt.returnStateHash,returnStateExpiresAt:attempt.returnStateExpiresAt,now});
+    return result.kind==='attached' || result.kind==='reused';
   };
 }

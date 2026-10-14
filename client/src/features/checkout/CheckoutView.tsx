@@ -63,6 +63,10 @@ export interface CheckoutPaymentViewProps {
   splitCount: number;
   splitPaid: number;
   payerEmail: string;
+  payerEmailFrozen?: boolean;
+  amountSelection?: boolean;
+  amountPreparing?: boolean;
+  onConfirmAmount?: () => void;
   inAppBrowser: boolean;
   inAppIOS: boolean;
   inAppAndroid: boolean;
@@ -150,6 +154,30 @@ export function CheckoutView(props: CheckoutViewProps) {
 
   const processing = props.status === "processing";
   const failed = props.status === "error";
+  if(props.isInvoice && props.amountSelection) return <div style={pageStyle} data-demo-id="checkout-payment"><div style={{width:'100%',maxWidth:380}}><div style={{...cardStyle,minHeight:600}}>
+    <CheckoutBrand customLogoUrl={props.customLogoUrl}/>
+    <div style={{flex:1,minHeight:20}}/>
+    <p style={labelStyle}>{props.splitActive?`${props.itemName} · your share`:props.itemName}</p>
+    <p style={amountStyle}>{props.amount}</p>
+    {props.subtitle && <p style={subtitleStyle}>{props.subtitle}</p>}
+    {props.invoiceDocumentAvailable && <button onClick={props.onViewInvoice} style={footerLinkStyle}>View invoice</button>}
+    <div style={{flex:1,minHeight:24}}/>
+    <label htmlFor="invoice-receipt-email" style={{...formLabelStyle,color:CT.SKY,width:'100%'}}>Email receipt (optional)</label>
+    <input id="invoice-receipt-email" type="email" autoComplete="email" value={props.payerEmail} readOnly={props.payerEmailFrozen} disabled={props.amountPreparing || props.splitBusy}
+      onChange={event=>props.onPayerEmailChange(event.target.value)} style={{width:'100%',boxSizing:'border-box',padding:'12px 14px',borderRadius:12,border:`1px solid ${CT.SKY}`,background:CT.PANEL,color:CT.INK,fontSize:'max(16px, var(--field-floor, 0px))',marginBottom:16}}/>
+    {props.errorMessage && <p role="alert" style={{color:CT.SKY,fontSize:14,marginBottom:12}}>{props.errorMessage}</p>}
+    {props.splitChoosing ? <div style={{width:'100%'}}>
+      <p style={{color:CT.SKY,fontWeight:700,marginBottom:12}}>How many people are splitting?</p>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(4, 1fr)',gap:8}}>{Array.from({length:11},(_,index)=>index+2).map(count=><button key={count} onClick={()=>props.onChooseSplit(count)} disabled={props.splitBusy || props.amountPreparing} style={{...outlineBtnStyle,padding:'12px 0',minHeight:44}}>{count}</button>)}</div>
+      <button onClick={props.onCancelSplit} disabled={props.splitBusy || props.amountPreparing} style={footerLinkStyle}>Back</button>
+    </div> : <>
+      <button onClick={props.onConfirmAmount} disabled={props.amountPreparing || props.splitBusy} style={{...payBtnStyle,width:'100%',minHeight:48}}>
+        {props.amountPreparing?'Preparing payment…':props.splitActive?'Continue with my share':'Pay the full bill'}
+      </button>
+      {!props.splitActive && props.splitEnabled && <button onClick={props.onStartSplit} disabled={props.amountPreparing || props.splitBusy} style={{...outlineBtnStyle,width:'100%',marginTop:12,minHeight:44}}>Split the bill</button>}
+    </>}
+    {(props.amountPreparing || props.splitBusy) && <p role="status" style={{color:CT.SKY,fontSize:14,marginTop:12}}>Preparing your payment options…</p>}
+  </div><SecureFooter/></div></div>;
   return <div style={pageStyle} data-demo-id="checkout-payment"><div style={{ width: "100%", maxWidth: 380 }}><div style={{ ...cardStyle, minHeight: 600 }}><CheckoutBrand customLogoUrl={props.customLogoUrl} />
     {failed ? <><div style={{ flex: 1 }} /><div style={{ textAlign: "center" }}><XCircle size={48} color={CT.RED} style={{ margin: "0 auto 16px" }} /><p style={{ color: CT.SKY, fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Payment failed</p><p style={{ color: CT.SKY_DIM, fontSize: 13 }}>{props.errorMessage || "Something went wrong."}</p></div><div style={{ flex: 1 }} /></> : <><div style={{ flex: 1, minHeight: 20 }} /><p style={labelStyle}>{props.splitActive ? `${props.itemName} · your share` : props.itemName}</p><p style={amountStyle}>{props.amount}</p>{props.subtitle && <p style={subtitleStyle}>{props.subtitle}</p>}
       {props.invoiceDocumentAvailable && <button onClick={props.onViewInvoice} style={{ ...viewInvoiceLinkStyle, background: "none", border: "none" }} data-demo-id="checkout-view-invoice"><svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 13h6M9 16.5h6"/></svg>View invoice</button>}

@@ -68,6 +68,10 @@ describe("plan catalogue", () => {
 });
 
 describe("billing period arithmetic", () => {
+  it('an explicitly restarted ended cancellation begins a fresh period',()=>{
+    const now=new Date('2026-10-13T00:00:00Z');
+    expect(nextBillingPeriodStart(subscription({status:'cancelled',nextBillingDate:new Date('2026-09-01T00:00:00Z')}),now)).toEqual(now);
+  });
   it("does not skip a month for end-of-month start dates", () => {
     // Plain setMonth(+1) turns 31 Jan into 3 Mar, permanently drifting billing.
     expect(addOneMonth(new Date("2026-01-31T12:30:00Z")).toISOString())
@@ -110,6 +114,11 @@ describe("decideBilling", () => {
 
   it("charges an active subscription once its billing date arrives", () => {
     expect(decideBilling(subscription(), due).action).toBe("charge");
+  });
+
+  it("records an expired renewal card without sending a purchase", () => {
+    expect(decideBilling(subscription({cardExpiry:"08/26"}), due).action).toBe("record_failure");
+    expect(decideBilling(subscription({cardExpiry:"09/26"}), due).action).toBe("charge");
   });
 
   it("does not charge before the billing date", () => {

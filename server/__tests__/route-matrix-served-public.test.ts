@@ -5,9 +5,11 @@ import "./support/push-test-env";
 import "./support/resend-capture-env";
 
 import fs from "fs";
+import crypto from "node:crypto";
 import path from "path";
 import QRCode from "qrcode";
 import request from "supertest";
+import {sseBroker} from "../sse-broker";
 
 type Sent = { to: string | string[]; subject: string; html?: string; text?: string };
 const mockSent: Sent[] = [];
@@ -26,7 +28,7 @@ import { config } from "../config";
 import { ownerTransactionDto, publicTransactionDto } from "../http-contracts";
 import { NO_BOARD_ADDRESS_RETIRED, noBoardAddressRetiredHtml } from "../no-board-address";
 import { getWindcaveEnv } from "../windcave";
-import { signedIn, resetTestStorage, storage } from "./support/http-harness";
+import { signedIn, resetTestStorage, storage,createTestApp } from "./support/http-harness";
 import {
   expectOwnServed,
   familyRows,
@@ -82,6 +84,14 @@ async function boardSale(ctx: ServedCtx, stoneId: number) {
 function qrTexts() {
   const toBuffer = jest.spyOn(QRCode, "toBuffer");
   return () => toBuffer.mock.calls.map((call) => call[0]);
+}
+
+async function cardReturn(ctx:ServedCtx,method:'get'|'post'){
+  const state='s'.repeat(43),card={resolveReturnState:jest.fn(async value=>value===state?{merchant_id:ctx.merchantId,session_id:'synthetic-card-session'}:undefined),confirm:jest.fn(async()=>({state:'approved'}))};
+  ctx.app=(await createTestApp({subscriptionPayments:{card,billing:{canInitiate:()=>false}} as any})).app;
+  return {req:{method,path:`/api/billing/card/callback?state=${state}&result=approved`,...(method==='post'?{body:{result:'declined'}}:{})},status:303,check:(res:request.Response)=>{
+    expect(res.headers.location).toBe('/settings?section=billing&card=pending');expect(card.confirm).toHaveBeenCalledWith(ctx.merchantId,'synthetic-card-session');expect(res.headers['cache-control']).toBe('private, no-store');
+  }};
 }
 
 const RECIPES: Record<string, OwnServedRecipe> = {
@@ -184,10 +194,13 @@ const RECIPES: Record<string, OwnServedRecipe> = {
         // A new sale on the board reaches the stream.
         await paidMonth(ctx);
         const created = await sendServed(ctx, ctx.owner, {
-          method: "post", path: "/api/transactions",
+          method: "post", path: "/api/transactions",headers:{"Idempotency-Key":crypto.randomUUID()},
           body: { merchantId: ctx.merchantId, itemName: "Board sale", price: "8.00", selectedStoneId: stoneId },
         });
         if (created.status !== 200) throw new Error(`fixture: sale failed ${created.status}`);
+        // Controller projection of an independently committed outbox event;
+        // actual SQL receiver publication/deduplication has separate PG proof.
+        await sseBroker.broadcast(ctx.merchantId,stoneId,{type:'transaction_updated',eventId:crypto.randomUUID(),transaction:created.body});
         await expect(res.nextEvent!()).resolves.toMatchObject({
           type: "transaction_updated", transaction: { id: created.body.id, itemName: "Board sale", taptStoneId: stoneId },
         });
@@ -225,14 +238,8 @@ const RECIPES: Record<string, OwnServedRecipe> = {
     check: (res) => expect(res.body).toEqual({ publicKey: process.env.VAPID_PUBLIC_KEY }),
   }),
   // The browser's return from adding a card: sent back to billing, with one of four results.
-  "GET /api/billing/card/callback": () => ({
-    req: get("/api/billing/card/callback?result=approved&sessionId=never-in-our-address"), status: 302,
-    check: (res) => expect(res.headers.location).toBe("/settings?section=billing&card=approved"),
-  }),
-  "POST /api/billing/card/callback": () => ({
-    req: { method: "post", path: "/api/billing/card/callback", body: { result: "declined" } }, status: 302,
-    check: (res) => expect(res.headers.location).toBe("/settings?section=billing&card=declined"),
-  }),
+  "GET /api/billing/card/callback":async(ctx)=>cardReturn(ctx,'get'),
+  "POST /api/billing/card/callback":async(ctx)=>cardReturn(ctx,'post'),
   // A business's logo, public for its board's page and receipts.
   "GET /uploads/:folder/:name": async (ctx) => {
     const uploaded = await request(ctx.app).post(`/api/merchants/${ctx.merchantId}/logo`).set(signedIn(ctx.owner))
@@ -285,8 +292,8 @@ const SERVED_BY: Record<string, OwnServedCaller[]> = {
   "GET /api/windcave/env": ANYONE,
   "GET /api/push/capabilities": ANYONE,
   "GET /api/push/vapid-key": ANYONE,
-  "GET /api/billing/card/callback": ANYONE,
-  "POST /api/billing/card/callback": ANYONE,
+  "GET /api/billing/card/callback": ["link-holder"],
+  "POST /api/billing/card/callback": ["link-holder"],
   "GET /uploads/:folder/:name": ANYONE,
   "POST /api/info-pack-leads": ANYONE,
 };

@@ -1,3 +1,4 @@
+import {randomUUID as requestCommandKey} from 'node:crypto';
 import "./support/test-env";
 import request from "supertest";
 import { createOwnerPrincipal, createTestApp, resetTestStorage, storage, signedIn } from "./support/http-harness";
@@ -38,7 +39,7 @@ test.each([
   jest.spyOn(storage, "getClientProfileForMerchant").mockImplementation(lookup);
   const effects = observeRefusalEffects();
   try {
-    const res = await request(app).post(path).set(signedIn(owner)).send(body());
+    const res = await request(app).post(path).set('Idempotency-Key',requestCommandKey()).set(signedIn(owner)).send(body());
     expect(res.status).toBe(404); expect(res.body).toEqual({ message: "Client not found" });
     expect(after).toBeDefined(); expect(snapshot()).toBe(after); expect(fake.writes).toEqual([]); effects.assertNone();
   } finally { effects.restore(); }
@@ -58,7 +59,7 @@ test.each(["moved to another business", "moved to another client"])("a deposit's
   spyIfPresent(storage, "getQuoteDeliveryForMerchant", async () => { const quote = race(); return { quote, client: { ...fake.clients.get(CLIENT) } }; });
   const effects = observeRefusalEffects();
   try {
-    const res = await request(app).post("/api/trades/invoices").set(signedIn(owner)).send({ ...INVOICE_BODY(), kind: "deposit", quoteId: QUOTE });
+    const res = await request(app).post("/api/trades/invoices").set('Idempotency-Key',requestCommandKey()).set(signedIn(owner)).send({ ...INVOICE_BODY(), kind: "deposit", quoteId: QUOTE });
     expect(res.status).toBe(404); expect(res.body).toEqual({ message: "Quote not found" });
     expect(after).toBeDefined(); expect(snapshot()).toBe(after); expect(fake.writes).toEqual([]); effects.assertNone();
   } finally { effects.restore(); }
@@ -102,7 +103,7 @@ test.each([
   try {
     const res = await request(app).post(`/api/trades/invoices/${INVOICE}/send-balance`).set(signedIn(owner)).send({ splitEnabled: true });
     expect(res.status).toBe(status); expect(res.body).toEqual({ message });
-    expect(create).toHaveBeenCalledWith(INVOICE, owner.merchantId, true);
+    expect(create).toHaveBeenCalledWith(INVOICE, owner.merchantId, true,expect.objectContaining({userId:owner.user.id,role:'owner'}));
     expect(fake.writes).toEqual([]); effects.assertNone();
   } finally { effects.restore(); }
 });
@@ -120,18 +121,19 @@ test("each create is one storage call that takes the business, and no global cre
   expect(fake.clients.get(MADE_CLIENT)).toMatchObject({ merchantId: owner.merchantId, status: "prospect", firstName: "Quinn" });
   expect((delivery as any).sendTradeQuoteForMerchant).toHaveBeenCalledWith(MADE_QUOTE, owner.merchantId, expect.any(String));
 
-  const quick = await request(app).post("/api/trades/invoices").set(signedIn(owner)).send({
+  const quick = await request(app).post("/api/trades/invoices").set('Idempotency-Key',requestCommandKey()).set(signedIn(owner)).send({
     recipient: { name: "Sam Smith", phone: "+64210000000", channel: "sms" }, amountCents: 12_000, deliveryChannel: "sms", dueAt: inDays(7).toISOString(), kind: "full", splitEnabled: true });
   expect(quick.status).toBe(201);
   expect((storage as any).createJobInvoiceForMerchant).toHaveBeenCalledWith(owner.merchantId,
     { prospect: { firstName: "Sam", lastName: "Smith", email: null, phone: "+64210000000", siteAddress: "", preferredChannel: "sms" } },
-    expect.objectContaining({ kind: "full", amountCents: 12_000, deliveryChannel: "sms", splitEnabled: true, quoteId: null }));
+    expect.objectContaining({ kind: "full", amountCents: 12_000, deliveryChannel: "sms", splitEnabled: true, quoteId: null }),
+    expect.objectContaining({key:expect.any(String),actor:expect.objectContaining({userId:owner.user.id,role:'owner'})}));
   expect((delivery as any).resendTradeInvoiceForMerchant).toHaveBeenCalledWith(MADE_INVOICE, owner.merchantId, expect.any(String));
 
   const balance = await request(app).post(`/api/trades/invoices/${INVOICE}/send-balance`).set(signedIn(owner)).send({ splitEnabled: true });
   expect(balance.status).toBe(201);
   expect(balance.body).toMatchObject({ id: MADE_INVOICE, kind: "balance", amountCents: 80_000, quoteId: QUOTE, splitEnabled: true, delivered: true });
-  expect((storage as any).createJobBalanceInvoiceForMerchant).toHaveBeenCalledWith(INVOICE, owner.merchantId, true);
+  expect((storage as any).createJobBalanceInvoiceForMerchant).toHaveBeenCalledWith(INVOICE, owner.merchantId, true,expect.objectContaining({userId:owner.user.id,role:'owner'}));
 
   expect(globalInvoice).not.toHaveBeenCalled(); expect(prospectAlone).not.toHaveBeenCalled();
   expect((storage as any).createQuote).toBeUndefined(); expect((delivery as any).sendTradeQuote).toBeUndefined();
@@ -141,7 +143,7 @@ test("each create is one storage call that takes the business, and no global cre
 
 test("an invoice with a later send date is made and not sent, as before", async () => {
   const { app, owner } = await arranged();
-  const res = await request(app).post("/api/trades/invoices").set(signedIn(owner)).send({ ...INVOICE_BODY(), scheduledSendAt: inDays(3).toISOString() });
+  const res = await request(app).post("/api/trades/invoices").set('Idempotency-Key',requestCommandKey()).set(signedIn(owner)).send({ ...INVOICE_BODY(), scheduledSendAt: inDays(3).toISOString() });
   expect(res.status).toBe(201);
   expect(res.body).toMatchObject({ id: MADE_INVOICE, status: "pending_dispatch", delivered: false, deliveryReason: "scheduled" });
   expect((delivery as any).resendTradeInvoiceForMerchant).not.toHaveBeenCalled();
@@ -166,7 +168,7 @@ test.each([
 ] as const)("%s create reports post-send uncertainty as 503 without a row", async (_label, path, body, sender, expected, state) => {
   const { app, owner } = await arranged(state);
   jest.spyOn(delivery as any, sender).mockResolvedValue({ sent: false, reason: "reconciliation_required" });
-  const res = await request(app).post(path).set(signedIn(owner)).send(body());
+  const res = await request(app).post(path).set('Idempotency-Key',requestCommandKey()).set(signedIn(owner)).send(body());
   expect(res.status).toBe(503); expect(res.body).toEqual(expected);
 });
 
@@ -180,6 +182,6 @@ test.each([
     fake[rows].get(args[0]).merchantId = other.merchantId;
     return { sent: false, reason: "not_found" };
   });
-  const res = await request(app).post(path).set(signedIn(owner)).send(body());
+  const res = await request(app).post(path).set('Idempotency-Key',requestCommandKey()).set(signedIn(owner)).send(body());
   expect(res.status).toBe(404); expect(res.body).toEqual({ message: "Not found" });
 });

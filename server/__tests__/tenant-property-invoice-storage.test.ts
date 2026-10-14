@@ -8,10 +8,11 @@ function capture(status = "dispatched", found = true) {
   const calls: any[] = [];
   const invoice = { id, merchantId: 11, tenantProfileId: parentId, status };
   const db: any = {
+    execute: async()=>({rows:[]}),
     transaction: async (run: any) => { calls.push({ kind: "transaction" }); return run(db); },
     select: () => ({ from: (table: any) => ({ where: (where: any) => {
       const call = { kind: "select", table, where, locked: false }; calls.push(call);
-      const result: any = Promise.resolve(found ? [table === tenantProfiles ? { id: parentId, merchantId: 11, status: "archived" } : invoice] : []);
+      const result: any = Promise.resolve(found ? [table === tenantProfiles ? { id: parentId, merchantId: 11, status: "archived" } : table===invoicesRentRequests?invoice:undefined].filter(Boolean) : []);
       result.limit = () => result; result.orderBy = () => result;
       result.for = () => { call.locked = true; return result; }; return result;
     } }) }),
@@ -19,7 +20,7 @@ function capture(status = "dispatched", found = true) {
       calls.push({ kind: "update", table, where, set });
       const result: any = Promise.resolve([{ ...invoice, ...set }]); result.returning = () => result; return result;
     } }) }),
-    insert: (table: any) => ({ values: (values: any) => { calls.push({ kind: "insert", table, values }); return Promise.resolve(); } }),
+    insert: (table: any) => ({ values: (values: any) => { calls.push({ kind: "insert", table, values }); const result:any=Promise.resolve([{id:values.id??id,...values}]);result.returning=()=>result;return result; } }),
   };
   return { storage: new DatabaseStorage(db) as any, calls };
 }
@@ -38,7 +39,7 @@ test("invoice reads and lists constrain invoice and current parent ownership", a
 });
 test.each(["voidInvoiceRentRequestForMerchant", "markInvoiceRentRequestPaidExternalForMerchant"])("%s locks parent then child and commits scoped state with history, including an archived parent", async name => {
   const { storage, calls } = capture();
-  expect((await storage[name](id, 11, "Synthetic reference")).kind).toBe("ok");
+  expect((await storage[name](id, 11,...(name.startsWith("void")?[]:["Synthetic reference"]))).kind).toBe("ok");
   expect(calls.filter(call => call.locked).map(call => call.table)).toEqual([tenantProfiles, invoicesRentRequests]);
   const update = calls.find(call => call.kind === "update");
   expect(query(update.where).params).toEqual([id, 11, parentId]);

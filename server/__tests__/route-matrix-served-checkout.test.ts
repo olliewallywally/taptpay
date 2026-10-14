@@ -1,45 +1,16 @@
-import "./support/test-env";
-
-// The provider is never reached (R1-T1): its sessions, their outcomes and Google Pay's submission are stubbed.
-jest.mock("../windcave", () => {
-  const actual = jest.requireActual("../windcave");
-  let sessions = 0;
-  return {
-    ...actual,
-    isWindcaveConfigured: () => true,
-    createWindcaveSession: jest.fn(async () => {
-      sessions += 1;
-      return {
-        success: true,
-        sessionId: `matrix-session-${sessions}`,
-        ajaxSubmitCardUrl: `https://uat.windcave.com/api/v1/sessions/matrix-${sessions}/card`,
-        ajaxSubmitApplePayUrl: `https://uat.windcave.com/api/v1/sessions/matrix-${sessions}/applepay`,
-        ajaxSubmitGooglePayUrl: `https://uat.windcave.com/api/v1/sessions/matrix-${sessions}/googlepay`,
-      };
-    }),
-    queryWindcaveSession: jest.fn(async (sessionId: string) => ({
-      success: true, approved: true, windcaveTransactionId: `provider-${sessionId}`,
-    })),
-    submitGooglePayToken: jest.fn(async () => ({ success: true, approved: true, windcaveTransactionId: "provider-google-pay" })),
-  };
-});
-// A paid rent invoice's GST invoice is emailed: caught here.
-jest.mock("../gst-invoice", () => ({
-  ...jest.requireActual("../gst-invoice"),
-  sendGstInvoices: jest.fn(async () => true),
-}));
+import "./support/durable-payments-env";
 
 import crypto from "crypto";
 import request from "supertest";
 import * as delivery from "../trades-delivery";
 import * as gst from "../gst-invoice";
 import * as windcave from "../windcave";
-import { resetTestStorage, storage } from "./support/http-harness";
+import { resetTestStorage, storage,createTestApp } from "./support/http-harness";
 import {
   expectOwnServed,
   familyRows,
   ownServedBy,
-  ownServedPairs,
+  ownServedPairs,paidMonth,
   type OwnServedCaller,
   type OwnServedRecipe,
   type ServedCtx,
@@ -70,9 +41,11 @@ const PDF = Buffer.concat([Buffer.from("%PDF-1.4\n"), Buffer.from("matrix checko
 
 let property: PropertyFake;
 let trades: TradesFake;
-const createSession = windcave.createWindcaveSession as jest.Mock;
-const submitGooglePay = windcave.submitGooglePayToken as jest.Mock;
-const sendGstInvoices = gst.sendGstInvoices as unknown as jest.Mock;
+import {syntheticInvoiceRuntime} from './support/invoice-runtime';
+let port:ReturnType<typeof syntheticInvoiceRuntime>;
+let apply:jest.Mock;
+let submitGooglePay:jest.SpyInstance;
+let sendGstInvoices:jest.SpyInstance;
 
 // The per-token rate limiter lives for the whole app, so every case has a token of its own.
 const newToken = () => crypto.randomBytes(20).toString("base64url");
@@ -82,7 +55,7 @@ const rent = () => property.invoices.get(INVOICE);
 const job = () => trades.invoices.get(JOB_INVOICE);
 
 /** The fakes, with the reads by link token the checkout and the quote link make. */
-function fakeRecords(ctx: ServedCtx) {
+async function fakeRecords(ctx: ServedCtx) {
   property = fakeProperty();
   trades = fakeTrades();
   seedTrades(trades, ctx.merchantId, { quote: { token: newToken(), status: "sent" }, invoice: { token: newToken() } });
@@ -94,20 +67,38 @@ function fakeRecords(ctx: ServedCtx) {
   jest.spyOn(storage, "updateQuote").mockImplementation(async (id: string, updates: any) => Object.assign(trades.quotes.get(id), updates));
   jest.spyOn(storage, "getJobInvoicesByQuote").mockImplementation(async (quoteId: string) =>
     [...trades.invoices.values()].filter((row) => row.quoteId === quoteId));
+  jest.spyOn(storage,'recordQuoteViewForMerchant').mockImplementation(async(id,merchantId)=>{
+    const quote=trades.quotes.get(id);if(quote?.merchantId!==merchantId)return undefined;
+    if(quote.status==='sent'){Object.assign(quote,{status:'viewed',viewedAt:new Date()});trades.events.push({eventType:'quote_viewed'});}return quote;
+  });
+  jest.spyOn(storage,'respondToQuoteForMerchant').mockImplementation(async(id,merchantId,accept)=>{
+    const quote=trades.quotes.get(id);if(quote?.merchantId!==merchantId)return {kind:'not-found'};
+    Object.assign(quote,{status:accept?'accepted':'declined',acceptedAt:new Date()});
+    const invoice={id:crypto.randomUUID(),merchantId,clientProfileId:quote.clientProfileId,quoteId:id,kind:'deposit',amountCents:20000,token:newToken(),status:'sent'};
+    trades.invoices.set(invoice.id,invoice);trades.events.push({eventType:'quote_accepted'});return {kind:'ok',quote,invoice,reused:false} as any;
+  });
+  apply=jest.fn(async(binding:any,evidence:any)=>{
+    if(evidence.outcome!=='approved')return;
+    const invoice=binding.jobInvoiceId?trades.invoices.get(binding.jobInvoiceId):property.invoices.get(binding.rentInvoiceId);
+    Object.assign(invoice,{status:'paid',windcaveTransactionId:evidence.transactionId});
+  });
+  port=syntheticInvoiceRuntime(async input=>(input.vertical==='property'?property.invoices:trades.invoices).get(input.invoiceId),apply);
+  ctx.app=(await createTestApp({paymentRuntime:port.runtime})).app;
+
 }
 
 /** A trades invoice whose payer has opened a session on the checkout page (the provider's addresses cached). */
-async function jobInPayment(ctx: ServedCtx) {
-  const token = job().token;
-  const opened = await request(ctx.app).post(`/api/checkout/${token}/session`).send({});
-  if (opened.status !== 200) throw new Error(`fixture: session failed ${opened.status}`);
-  return { token, sessionId: opened.body.sessionId as string };
+async function inPayment(ctx:ServedCtx,invoice:any){
+  const intent={idempotencyKey:crypto.randomUUID(),shareIndex:0};
+  const opened=await request(ctx.app).post(`/api/checkout/${invoice.token}/session`).send(intent);
+  expect(opened.status).toBe(200);port.setObservation('approved');
+  return {token:invoice.token,...intent,sessionId:opened.body.sessionId,returnState:opened.body.returnState};
 }
 
 const RECIPES: Record<string, OwnServedRecipe> = {
   // ── An invoice's checkout (rent here; the trades invoice pays by Google Pay below) ──
-  "GET /api/checkout/resolve/:token": (ctx) => {
-    fakeRecords(ctx);
+  "GET /api/checkout/resolve/:token": async (ctx) => {
+    await fakeRecords(ctx);
     return {
       req: get(`/api/checkout/resolve/${rent().token}`), status: 200,
       check: (res) => {
@@ -122,7 +113,7 @@ const RECIPES: Record<string, OwnServedRecipe> = {
     };
   },
   "GET /api/checkout/document/:token": async (ctx) => {
-    fakeRecords(ctx);
+    await fakeRecords(ctx);
     // Named as the upload route names an invoice document (upload-policy.ts).
     const name = `invoice-${Date.now()}-${crypto.randomBytes(8).toString("hex")}.pdf`;
     await storage.saveScannedUploadedFile(`invoices/${name}`, "application/pdf", PDF, ctx.merchantId, { scanner: "simulation" });
@@ -136,8 +127,8 @@ const RECIPES: Record<string, OwnServedRecipe> = {
       },
     };
   },
-  "POST /api/checkout/:token/split": (ctx) => {
-    fakeRecords(ctx);
+  "POST /api/checkout/:token/split": async (ctx) => {
+    await fakeRecords(ctx);
     Object.assign(rent(), { splitEnabled: true });
     return {
       req: post(`/api/checkout/${rent().token}/split`, { count: 4 }), status: 200,
@@ -147,68 +138,41 @@ const RECIPES: Record<string, OwnServedRecipe> = {
       },
     };
   },
-  "POST /api/checkout/:token/session": (ctx) => {
-    fakeRecords(ctx);
+  "POST /api/checkout/:token/session": async (ctx) => {
+    await fakeRecords(ctx);
     return {
-      req: post(`/api/checkout/${rent().token}/session`), status: 200,
-      check: (res) => {
-        expect(res.body).toMatchObject({ sessionId: expect.stringMatching(/^matrix-session-/), amountStr: "500.00" });
-        // The provider is asked for what is owed, with the rent's notification; the invoice is pinned to the session.
-        const [, amount, , email, , , , urls] = createSession.mock.calls[0];
-        expect([amount, email]).toEqual(["500.00", "tess@example.test"]);
-        expect(urls).toEqual({
-          callbackBase: `${ORIGIN}/api/checkout/callback?token=${rent().token}`,
-          notificationUrl: `${ORIGIN}/api/windcave/rent-notification`,
-        });
-        expect(rent().windcaveSessionId).toBe(res.body.sessionId);
+      req:post(`/api/checkout/${rent().token}/session`,{idempotencyKey:crypto.randomUUID(),shareIndex:0}),status:200,
+      check:res=>{
+        expect(res.body).toMatchObject({sessionId:expect.stringMatching(/^invoice-/),amountStr:'500.00',shareIndex:0});
+        expect(port.client.createSession.mock.calls[0][0]).toMatchObject({amount:'500.00',customerEmail:'tess@example.test',notificationUrl:`${ORIGIN}/api/windcave/rent-notification`,callbackBase:expect.stringContaining('&state=')});
+        expect(port.bindings.has(res.body.sessionId)).toBe(true);
       },
     };
   },
-  "POST /api/checkout/:token/hosted-fields-complete": (ctx) => {
-    fakeRecords(ctx);
-    Object.assign(rent(), { windcaveSessionId: "matrix-pinned-session" });
-    return {
-      req: post(`/api/checkout/${rent().token}/hosted-fields-complete`, { sessionId: "matrix-pinned-session" }), status: 200,
-      check: (res) => {
-        expect(res.body).toEqual({ approved: true, status: "paid", splitCount: null, splitPaidCount: 0 });
-        expect(rent()).toMatchObject({ status: "paid", windcaveTransactionId: "provider-matrix-pinned-session" });
-        expect(property.events.map((row) => row.eventType)).toContain("Payment_Received");
-        // The tenant's GST invoice.
-        expect(sendGstInvoices.mock.calls).toEqual([[expect.objectContaining({ recipients: ["tess@example.test"], amountCents: 50_000 })]]);
-      },
-    };
+  "POST /api/checkout/:token/hosted-fields-complete":async ctx=>{
+    await fakeRecords(ctx);const paying=await inPayment(ctx,rent());
+    return {req:post(`/api/checkout/${paying.token}/hosted-fields-complete`,{idempotencyKey:paying.idempotencyKey,shareIndex:0,sessionId:paying.sessionId}),status:200,check:res=>{
+      expect(res.body).toMatchObject({approved:true,outcome:'approved',receiptShare:null,splitCount:null,splitPaidCount:0});
+      expect(rent()).toMatchObject({status:'paid',windcaveTransactionId:`provider-${paying.sessionId}`});expect(apply).toHaveBeenCalledTimes(1);expect(sendGstInvoices).not.toHaveBeenCalled();
+    }};
   },
-  "POST /api/checkout/:token/googlepay-complete": async (ctx) => {
-    fakeRecords(ctx);
-    const paying = await jobInPayment(ctx);
-    return {
-      req: post(`/api/checkout/${paying.token}/googlepay-complete`, { sessionId: paying.sessionId, googlePayToken: { signature: "synthetic" } }),
-      status: 200,
-      check: () => {
-        // The wallet's token goes to the provider's own submit address for this session, and nowhere else.
-        expect(submitGooglePay.mock.calls).toEqual([[expect.stringMatching(/^https:\/\/uat\.windcave\.com\/.*\/googlepay$/), { signature: "synthetic" }]]);
-        // R2-T5: the verified session query settles it, never the submit's own reply.
-        expect(job()).toMatchObject({ status: "paid", windcaveTransactionId: expect.stringMatching(/^provider-matrix-session-\d+$/) });
-        // The client is sent the paid invoice.
-        expect(delivery.sendTradePaymentInvoice).toHaveBeenCalledWith(expect.objectContaining({ id: JOB_INVOICE, status: "paid" }));
-      },
-    };
+  "POST /api/checkout/:token/googlepay-complete":async ctx=>{
+    await fakeRecords(ctx);const paying=await inPayment(ctx,job());
+    const query=port.client.querySession.getMockImplementation()!;port.setObservation('pending');const pending=await query(paying.sessionId);port.setObservation('approved');port.client.querySession.mockResolvedValueOnce(pending);
+    return {req:post(`/api/checkout/${paying.token}/googlepay-complete`,{idempotencyKey:paying.idempotencyKey,shareIndex:0,sessionId:paying.sessionId,googlePayToken:{signature:'synthetic'}}),status:200,check:()=>{
+      expect(submitGooglePay).toHaveBeenCalledTimes(1);expect(submitGooglePay.mock.calls[0]).toEqual([`https://uat.windcave.com/mh/${paying.sessionId}-googlepay`,{signature:'synthetic'}]);
+      expect(job()).toMatchObject({status:'paid',windcaveTransactionId:`provider-${paying.sessionId}`});expect(apply).toHaveBeenCalledTimes(1);expect(delivery.sendTradePaymentInvoice).not.toHaveBeenCalled();
+    }};
   },
-  "GET /api/checkout/callback": (ctx) => {
-    fakeRecords(ctx);
-    Object.assign(rent(), { windcaveSessionId: "matrix-pinned-session" });
-    return {
-      // The provider sends the browser back: the outcome is read from the provider, then the invoice's page shown.
-      req: get(`/api/checkout/callback?token=${rent().token}&result=approved`), status: 302,
-      check: (res) => {
-        expect(res.headers.location).toBe(`/r/${rent().token}`);
-        expect(rent()).toMatchObject({ status: "paid", windcaveTransactionId: "provider-matrix-pinned-session" });
-      },
-    };
+  "GET /api/checkout/callback":async ctx=>{
+    await fakeRecords(ctx);const paying=await inPayment(ctx,rent());
+    return {req:get(`/api/checkout/callback?token=${paying.token}&state=${paying.returnState}&result=approved`),status:303,check:res=>{
+      expect(res.headers.location).toBe(`/r/${paying.token}?paymentState=${paying.returnState}`);expect(rent().status).toBe('paid');expect(apply).toHaveBeenCalledTimes(1);
+    }};
   },
   // ── The customer's quote ──
-  "GET /api/trades/quotes/token/:token": (ctx) => {
-    fakeRecords(ctx);
+  "GET /api/trades/quotes/token/:token": async (ctx) => {
+    await fakeRecords(ctx);
     const quote = trades.quotes.get(QUOTE);
     return {
       req: get(`/api/trades/quotes/token/${quote.token}`), status: 200,
@@ -227,8 +191,8 @@ const RECIPES: Record<string, OwnServedRecipe> = {
       },
     };
   },
-  "GET /api/trades/quotes/token/:token/pdf": (ctx) => {
-    fakeRecords(ctx);
+  "GET /api/trades/quotes/token/:token/pdf": async (ctx) => {
+    await fakeRecords(ctx);
     const quote = trades.quotes.get(QUOTE);
     return {
       req: { ...get(`/api/trades/quotes/token/${quote.token}/pdf`), binary: true }, status: 200,
@@ -239,8 +203,8 @@ const RECIPES: Record<string, OwnServedRecipe> = {
       },
     };
   },
-  "POST /api/trades/quotes/token/:token/respond": (ctx) => {
-    fakeRecords(ctx);
+  "POST /api/trades/quotes/token/:token/respond": async (ctx) => {
+    await fakeRecords(ctx);await paidMonth(ctx);
     const quote = trades.quotes.get(QUOTE);
     Object.assign(quote, { validUntil: inDays(14) });
     return {
@@ -255,7 +219,7 @@ const RECIPES: Record<string, OwnServedRecipe> = {
         });
         expect(quote).toMatchObject({ status: "accepted", acceptedAt: expect.any(Date) });
         expect(trades.events.map((row) => row.eventType)).toEqual(["quote_accepted"]);
-        expect(delivery.resendTradeInvoice).toHaveBeenCalledWith(deposit.id, ORIGIN);
+        expect(delivery.resendTradeInvoiceForMerchant).toHaveBeenCalledWith(deposit.id,ctx.merchantId, ORIGIN);
       },
     };
   },
@@ -273,9 +237,11 @@ const SERVED_BY: Record<string, OwnServedCaller[]> = Object.fromEntries(Object.k
 
 beforeEach(() => {
   resetTestStorage();
-  createSession.mockClear();
-  submitGooglePay.mockClear();
-  sendGstInvoices.mockClear();
+  jest.spyOn(delivery,'resendTradeInvoiceForMerchant').mockResolvedValue({delivered:true} as any);
+  submitGooglePay=jest.spyOn(windcave,"submitGooglePayToken").mockResolvedValue({approved:true} as any);
+  sendGstInvoices=jest.spyOn(gst,"sendGstInvoices").mockResolvedValue(0);
+  jest.spyOn(delivery,"sendTradePaymentInvoice").mockResolvedValue(true as any);
+
 });
 afterEach(() => jest.restoreAllMocks());
 

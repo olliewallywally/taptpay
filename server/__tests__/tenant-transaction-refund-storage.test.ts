@@ -1,5 +1,6 @@
 import "./support/test-env";
 
+import {transactions} from "@shared/schema";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { DatabaseStorage, MemStorage } from "../storage";
 
@@ -38,16 +39,20 @@ describe("R1-T7 S2a — transaction/refund storage", () => {
     const result = await storage.cancelTransactionForMerchant(row.id, 11);
     expect(result).toEqual({ kind: "cancelled", transaction: { ...row, status: "cancelled" } });
     expect(await storage.getTransaction(row.id)).toEqual({ ...row, status: "cancelled" });
-    expect(await storage.cancelTransactionForMerchant(row.id, 11)).toEqual({ kind: "conflict", status: "cancelled" });
+    expect(await storage.cancelTransactionForMerchant(row.id, 11)).toEqual({kind:"cancelled",transaction:{...row,status:"cancelled"},reused:true});
   });
 
-  test.each(["completed", "failed", "cancelled", "refunded", "partially_refunded"])("refuses %s unchanged", async (status) => {
+  test.each(["completed", "refunded", "partially_refunded"])("refuses %s unchanged", async (status) => {
     const storage = new MemStorage();
     const row = await sale(storage, 11, status);
     expect(await storage.cancelTransactionForMerchant(row.id, 11)).toEqual({ kind: "conflict", status });
     expect(await storage.getTransaction(row.id)).toEqual(row);
   });
 
+  test.each(['failed','cancelled'])('an unpaid %s sale records one cancellation and then reuses it',async status=>{
+    const store=new MemStorage(),row=await sale(store,11,status);
+    expect((await store.cancelTransactionForMerchant(row.id,11)).kind).toBe('cancelled');expect((await store.cancelTransactionForMerchant(row.id,11))).toMatchObject({kind:'cancelled',reused:true});
+  });
   test("foreign and missing cancellations are indistinguishable and change nothing", async () => {
     const storage = new MemStorage();
     const row = await sale(storage, 22);
@@ -69,19 +74,21 @@ describe("R1-T7 S2a — transaction/refund storage", () => {
 });
 
 function queryCapture(status = "pending") {
-  const calls: Array<{ kind: string; where: any; set?: any; locked?: string }> = [];
+  const calls: Array<{ kind: string; where: any; table?:any;set?: any; locked?: string }> = [];
   const row = { id: 71, merchantId: 29, status };
   const db: any = {
-    select: () => ({ from: () => ({ where: (predicate: any) => {
-      const call = { kind: "select", where: predicate, locked: undefined as string | undefined };
+    execute:async()=>({rows:[]}),
+    select: () => ({ from: (table:any) => ({ where: (predicate: any) => {
+      const call = { kind: "select", table,where: predicate, locked: undefined as string | undefined };
       calls.push(call);
-      const chain: any = Promise.resolve([row]);
-      chain.limit = () => chain;
+      const chain: any = Promise.resolve(table===transactions?[row]:[]);
+      chain.limit = () => chain;chain.orderBy=()=>chain;
       chain.for = (lock: string) => { call.locked = lock; return chain; };
       return chain;
     } }) }),
-    update: () => ({ set: (set: any) => ({ where: (predicate: any) => {
-      calls.push({ kind: "update", where: predicate, set });
+    insert:()=>({values:()=>({returning:async()=>[{id:"synthetic-event"}]})}),
+    update: (table:any) => ({ set: (set: any) => ({ where: (predicate: any) => {
+      calls.push({ kind: "update", table,where: predicate, set });
       return { returning: async () => [{ ...row, ...set }] };
     } }) }),
   };
@@ -116,17 +123,11 @@ describe("R1-T7 S2a — SQL boundaries", () => {
     const { storage, calls, db } = queryCapture();
     expect(await storage.cancelTransactionForMerchant(71, 29)).toMatchObject({ kind: "cancelled" });
     expect(db.transaction).toHaveBeenCalledTimes(1);
-    expect(calls).toHaveLength(3);
-    expect(calls[0].locked).toBe("update");
-    for (const call of calls) {
-      const query = new PgDialect().sqlToQuery(call.where);
-      expect(query.sql).toContain('"transactions"."id" = $1');
-      expect(query.sql).toContain('"transactions"."merchant_id" = $2');
-      expect(query.params.slice(0, 2)).toEqual([71, 29]);
-    }
-    expect(new PgDialect().sqlToQuery(calls[1].where).params).toEqual([71, 29]);
-    expect(new PgDialect().sqlToQuery(calls[2].where).params).toEqual([71, 29, "pending", "processing"]);
-    expect(calls[2].set).toEqual({ status: "cancelled" });
+    const parentCalls=calls.filter(call=>call.table===transactions);
+    expect(parentCalls.map(call=>call.kind)).toEqual(['select','select','update']);expect(parentCalls[0].locked).toBe('update');
+    for(const call of parentCalls){const query=new PgDialect().sqlToQuery(call.where);expect(query.sql).toContain('"transactions"."merchant_id"');expect(query.params.slice(0,2)).toEqual([71,29]);}
+    expect(new PgDialect().sqlToQuery(parentCalls[2].where).params).toEqual([71,29,'pending','processing','failed']);expect(parentCalls[2].set).toEqual({status:'cancelled'});
+
   });
 
   test("a completed locked row is never updated", async () => {

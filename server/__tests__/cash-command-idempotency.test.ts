@@ -17,13 +17,13 @@ async function setup() {
 test('a lost-response retry reuses the recorded cash sale and communicates nothing again',async()=>{
   const {send}=await setup();const key=randomUUID(),first=await send(key);expect(first.status).toBe(200);
   const before=storageSnapshot(),effects=observeRefusalEffects();
-  try {const retry=await send(key);expect(retry.status).toBe(200);expect(retry.body).toEqual(first.body);expect(storageSnapshot()).toBe(before);effects.assertNone();}
+  try {const retry=await send(key);expect(retry.status).toBe(200);expect(retry.body.transaction).toEqual(first.body.transaction);expect(retry.body.replayed).toBe(true);expect(storageSnapshot()).toBe(before);effects.assertNone();}
   finally {effects.restore();}
 });
 test('same key with changed money conflicts without mutation or communication',async()=>{
   const {send}=await setup();const key=randomUUID();expect((await send(key)).status).toBe(200);
   const before=storageSnapshot(),effects=observeRefusalEffects();
-  try {const changed=await send(key,{price:'10.02'});expect(changed.status).toBe(409);expect(changed.body.code).toBe('IDEMPOTENCY_CONFLICT');expect(storageSnapshot()).toBe(before);effects.assertNone();}
+  try {const changed=await send(key,{price:'10.02'});expect(changed.status).toBe(409);expect(changed.body.code).toBe('IDEMPOTENCY_CONFLICT');expect(changed.body.transaction).toMatchObject({price:'10.01',paymentMethod:'cash'});expect(changed.body.transaction).not.toHaveProperty('cashRequestFingerprint');expect(storageSnapshot()).toBe(before);effects.assertNone();}
   finally {effects.restore();}
 });
 test('concurrent copies of one command create one completed manual record',async()=>{

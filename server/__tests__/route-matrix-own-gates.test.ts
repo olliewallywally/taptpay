@@ -80,13 +80,16 @@ const UNKNOWN_LINK: Record<string, Request & { message?: RegExp; bodyEquals?: un
   "GET /api/checkout/resolve/:token": { method: "get", path: "/api/checkout/resolve/no-ones-checkout-token" },
   "GET /api/checkout/document/:token": { method: "get", path: "/api/checkout/document/no-ones-checkout-token" },
   "POST /api/checkout/:token/split": { method: "post", path: "/api/checkout/no-ones-checkout-token/split", body: { count: 2 } },
-  "POST /api/checkout/:token/session": { method: "post", path: "/api/checkout/no-ones-checkout-token/session", body: {} },
+  "POST /api/checkout/:token/session": { method: "post", path: "/api/checkout/no-ones-checkout-token/session", body: {idempotencyKey:ATTEMPT,shareIndex:0} },
   "POST /api/checkout/:token/hosted-fields-complete": {
-    method: "post", path: "/api/checkout/no-ones-checkout-token/hosted-fields-complete", body: { sessionId: "no-ones-session" },
+    method: "post", path: "/api/checkout/no-ones-checkout-token/hosted-fields-complete", body: COMPLETION,
   },
   "POST /api/checkout/:token/googlepay-complete": {
-    method: "post", path: "/api/checkout/no-ones-checkout-token/googlepay-complete", body: { sessionId: "no-ones-session", googlePayToken: "{}" },
+    method: "post", path: "/api/checkout/no-ones-checkout-token/googlepay-complete", body: {...COMPLETION,googlePayToken:{}},
   },
+  "GET /api/windcave/callback": {method:"get",path:"/api/windcave/callback?transactionId=999999&state=no-ones-state"},
+  "GET /api/billing/card/callback":{method:'get',path:'/api/billing/card/callback?state='+('x'.repeat(43))},
+  "POST /api/billing/card/callback":{method:'post',path:'/api/billing/card/callback?state='+('x'.repeat(43)),body:{result:'approved'}},
   "GET /api/checkout/callback": { method: "get", path: "/api/checkout/callback?token=no-ones-checkout-token" },
   "GET /api/trades/quotes/token/:token/pdf": { method: "get", path: "/api/trades/quotes/token/no-ones-quote-token/pdf" },
   "GET /api/trades/quotes/token/:token": { method: "get", path: "/api/trades/quotes/token/no-ones-quote-token" },
@@ -101,15 +104,14 @@ const NUMBERED: Record<string, Request> = {
   "GET /api/split-payments/:id": { method: "get", path: "/api/split-payments/{id}" },
   "POST /api/transactions/:id/pay": { method: "post", path: "/api/transactions/{id}/pay", body: {} },
   "POST /api/transactions/:id/hosted-fields-complete": {
-    method: "post", path: "/api/transactions/{id}/hosted-fields-complete", body: { sessionId: "no-ones-session" },
+    method: "post", path: "/api/transactions/{id}/hosted-fields-complete", body: COMPLETION,
   },
   "POST /api/transactions/:id/googlepay-complete": {
-    method: "post", path: "/api/transactions/{id}/googlepay-complete", body: { sessionId: "no-ones-session", googlePayToken: "{}" },
+    method: "post", path: "/api/transactions/{id}/googlepay-complete", body: {...COMPLETION,googlePayToken:{}},
   },
   "GET /api/transactions/:id": { method: "get", path: "/api/transactions/{id}" },
   "POST /api/transactions/:id/receipt-pdf": { method: "post", path: "/api/transactions/{id}/receipt-pdf", body: {} },
   "GET /api/transactions/:id/receipt-qr": { method: "get", path: "/api/transactions/{id}/receipt-qr" },
-  "GET /api/windcave/callback": { method: "get", path: "/api/windcave/callback?transactionId={id}&result=approved" },
 };
 
 const refusalsOf = (caller: MatrixCaller) =>
@@ -195,7 +197,8 @@ describe("R1-T3 — a link opens only its own resource: one that is no one's is 
     const req = UNKNOWN_LINK[key];
     const before = storageSnapshot();
     const effects = observeRefusalEffects();
-    const res = await send(app, req);
+    const testedApp=key.includes('/api/billing/card/callback')?(await createTestApp({subscriptionPayments:{card:{resolveReturnState:async()=>undefined}} as any})).app:app;
+    const res = await send(testedApp, req);
     expect(res.status).toBe(status);
     if (req.message) expect(JSON.stringify(res.body)).toMatch(req.message);
     if (req.bodyEquals) expect(res.body).toEqual(req.bodyEquals);
@@ -396,7 +399,8 @@ describe("R1-T3 — a provider's call naming what is no one's is acknowledged, a
   // state, a message) selects the resource, and the provider is then asked for the truth. One that is no
   // one's is acknowledged at once (200 "OK", so the provider stops retrying) and nothing is done.
   const NO_ONES: Record<string, Request> = {
-    "ALL /api/pay/notification/:state": { method: "get", path: "/api/pay/notification/no-ones-return-state" },
+    "ALL /api/pay/notification/:state": { method: "get", path: "/api/pay/notification/no-ones-return-state?sessionId=no-ones-session" },
+    "ALL /api/billing/card/notification": {method:"get",path:"/api/billing/card/notification?sessionId=no-ones-session"},
     "ALL /api/windcave/notification": { method: "get", path: "/api/windcave/notification?sessionid=no-ones-session" },
     "ALL /api/windcave/rent-notification": { method: "get", path: "/api/windcave/rent-notification?sessionid=no-ones-session" },
     "ALL /api/windcave/trades-notification": { method: "get", path: "/api/windcave/trades-notification?sessionid=no-ones-session" },
@@ -424,8 +428,9 @@ describe("R1-T3 — a provider's call naming what is no one's is acknowledged, a
     const before = storageSnapshot();
     const effects = observeRefusalEffects();
     const res = await send(app, NO_ONES[key]);
-    expect(res.status).toBe(status);
-    expect(res.text).toBe("OK");
+    // Without an authoritative inbox this harness must ask Windcave to retry.
+    expect(res.status).toBe(key.includes('webhooks/whatsapp')?status:503);
+    if(res.status===200)expect(res.text).toBe('OK');else expect(res.headers['retry-after']).toBeDefined();
     // The call is answered first and worked on after: let that work finish.
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(storageSnapshot()).toBe(before);

@@ -12,8 +12,9 @@ describe("R3 verified reconciliation boundary", () => {
     "%s mismatch cannot settle", (field) => {
       expect(evidenceMatchesExpectation(expected, { ...evidence, [field]: field === "amountCents" ? 1000 : "different" } as any)).toBe(false);
     });
-  test("multiple provider transactions and boolean-only approval cannot settle", () => {
-    expect(evidenceMatchesExpectation(expected, { ...evidence, transactionCount: 2 } as any)).toBe(false);
+  test("a verified retry history is accepted but invalid counts and boolean-only approval cannot settle", () => {
+    expect(evidenceMatchesExpectation(expected, { ...evidence, transactionCount: 2 } as any)).toBe(true);
+    for(const transactionCount of [0,-1,NaN,1.5])expect(evidenceMatchesExpectation(expected,{...evidence,transactionCount} as any)).toBe(false);
     expect(evidenceMatchesExpectation(expected, { success: true, approved: true } as any)).toBe(false);
   });
   test("exact split cents sum to the invoice, including small remainder shares", () => {
@@ -57,3 +58,12 @@ function fakeRepository() {
     finalize:jest.fn(async()=>({kind:"finalized"})),
     finishInbox:jest.fn(async()=>true)};
 }
+
+ test('repeated expired query leases cannot bypass the bounded attempt cap and signal only after commit',async()=>{
+   const repository=fakeRepository(),claim=await repository.claimInbox();repository.claimInbox.mockResolvedValue({...claim,attemptCount:21});
+   const query=jest.fn(async()=>({kind:'pending'} as const)),audit=jest.fn();
+   await new PaymentReconciliationWorker(repository as any,{query},()=>now,()=>0,undefined,audit).runOne(randomUUID());
+   expect(query).not.toHaveBeenCalled();expect(repository.finishInbox).toHaveBeenCalledWith(expect.anything(),expect.objectContaining({status:'dead_letter',code:'retry_exhausted'}),now);
+   expect(audit).toHaveBeenCalledWith('PAYMENT_RECONCILIATION_DEAD_LETTER',{code:'retry_exhausted'});
+   repository.finishInbox.mockResolvedValue(false);audit.mockClear();await new PaymentReconciliationWorker(repository as any,{query},()=>now,()=>0,undefined,audit).runOne(randomUUID());expect(audit).not.toHaveBeenCalled();
+ });

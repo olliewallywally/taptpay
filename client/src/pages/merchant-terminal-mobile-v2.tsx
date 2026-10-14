@@ -1,4 +1,4 @@
-import {cashCommandKey,completeCashCommand} from "@/lib/cash-command-key";
+import {cashCommandConflict,cashCommandKey,completeCashCommand} from "@/lib/cash-command-key";
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -496,8 +496,22 @@ export default function MerchantTerminalMobile() {
     try {
       const body={merchantId,itemName:draft.name,price:(draft.amount/100).toFixed(2)};
       const key=cashCommandKey(body);
-      const r = await apiRequest(...apiTo("POST /api/transactions/cash-sale"),body,{idempotencyKey:key});
-      const { transaction } = await r.json();
+      let r: Response;
+      try {
+        r = await apiRequest(...apiTo("POST /api/transactions/cash-sale"),body,{idempotencyKey:key});
+      } catch (error) {
+        // The saved command already recorded a different sale (its answer was lost). Say which, and
+        // release the command so this sale can be recorded: it never sticks in the tab.
+        const recorded=cashCommandConflict(error);
+        if(recorded) {
+          completeCashCommand(merchantId,key);
+          toast({ title: "Error", variant: "destructive",
+            description: `An earlier cash sale (${recorded.itemName}${recorded.price ? `, $${recorded.price}` : ""}) was already recorded. Record this sale again to save it.` });
+          throw Object.assign(new Error("Cash sale conflicts with one already recorded"), { handled: true });
+        }
+        throw error;
+      }
+      const { transaction, replayed } = await r.json();
       if(!Number.isSafeInteger(transaction?.id) || transaction.id<1 || transaction.merchantId!==merchantId || transaction.paymentMethod!=='cash')
         throw new Error('Cash sale confirmation is incomplete. Retry the same sale.');
       queryClient.setQueryData<any[]>(
@@ -510,7 +524,10 @@ export default function MerchantTerminalMobile() {
         url: `${window.location.origin}/receipt/${transaction.id}`,
       });
       completeCashCommand(merchantId,key);
+      // A replay is the earlier sale, not a new one: say so, so an identical second sale is never swallowed.
+      if (replayed === true) toast({ title: "Already recorded", description: "This cash sale was recorded earlier. Record it again for a new sale." });
     } catch (error) {
+      if ((error as any)?.handled) throw error;
       if (!isBillingCardRequired(error)) {
         toast({ title: "Error", description: apiErrorMessage(error, "Failed to record cash sale"), variant: "destructive" });
       }

@@ -69,7 +69,9 @@ global.fetch = jest.fn();
 // Mock crypto for secure random generation
 Object.defineProperty(global, 'crypto', {
   value: {
-    randomUUID: () => '00000000-0000-0000-0000-000000000000',
+    // Model secure UUID shape and distinct operations. The former all-zero
+    // placeholder is rejected by the actual server idempotency contract.
+    randomUUID: (()=>{let next=0;return()=>`00000000-0000-4000-8000-${String(++next).padStart(12,'0')}`;})(),
   },
 });
 

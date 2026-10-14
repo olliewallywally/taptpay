@@ -41,8 +41,9 @@ let cached: TestApp | null = null;
  * gives each test file its own registry, so this never leaks across files).
  * Use resetTestStorage() between tests instead of rebuilding the app.
  */
-export async function createTestApp(): Promise<TestApp> {
-  if (cached) return cached;
+export async function createTestApp(options:Parameters<typeof registerRoutes>[1]={}): Promise<TestApp> {
+  const custom=Object.keys(options).length>0;
+  if (cached&&!custom) return cached;
 
   if (typeof liveStorage.clearAllMerchants !== "function") {
     throw new Error(
@@ -53,11 +54,12 @@ export async function createTestApp(): Promise<TestApp> {
 
   const requestLog: string[] = [];
   const app = createApp({ writeRequestLog: (line) => requestLog.push(line) });
-  const httpServer = await registerRoutes(app);
+  const httpServer = await registerRoutes(app,options);
   app.use(createGlobalErrorHandler());
 
-  cached = { app, httpServer, requestLog };
-  return cached;
+  const result={ app, httpServer, requestLog };
+  if(!custom)cached=result;
+  return result;
 }
 
 /** Clears all merchant/user/transaction state between tests. Real reset, not a fresh app. */

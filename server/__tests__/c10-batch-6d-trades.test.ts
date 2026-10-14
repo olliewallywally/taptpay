@@ -1,3 +1,4 @@
+import {randomUUID as requestCommandKey} from 'node:crypto';
 import "./support/test-env";
 
 import request from "supertest";
@@ -222,7 +223,9 @@ describe("the trades screens' state rules hold on the server", () => {
     const paid = await request(app).post(`/api/trades/invoices/${INVOICE}/mark-paid-external`).set(signedIn(owner)).send({ externalPaymentReference: "Cash" });
     expect(paid.status).toBe(200);
     expect(fake.invoices.get(INVOICE)).toMatchObject({ status: "paid_external", externalPaymentReference: "Cash" });
-    expect(fake.writes.filter((name) => name === "sendTradePaymentInvoice")).toHaveLength(1);
+    // The atomic manual-payment storage port owns its event/outbox. HTTP must
+    // never independently repeat the receiver's email side effect.
+    expect(fake.writes.filter((name) => name === "sendTradePaymentInvoice")).toHaveLength(0);
     expect((await request(app).post(`/api/trades/invoices/${INVOICE}/complete`).set(signedIn(owner))).status).toBe(200);
 
     fake.invoices.set(INVOICE, { ...fake.invoices.get(INVOICE), status: "dispatched", completedAt: null });
@@ -237,14 +240,14 @@ describe("the trades screens' state rules hold on the server", () => {
  * server refused it (400), on both verticals.
  */
 describe("marking an invoice received without a reference, as the screens send it", () => {
-  it("trades: the screens' null reference is taken as none (200), and the receipt is emailed once", async () => {
+  it("trades: the screens' null reference is taken as none (200), with no independent route email", async () => {
     const { app, owner, fake } = await ownerWithTrades();
 
     const res = await request(app).post(`/api/trades/invoices/${INVOICE}/mark-paid-external`).set(signedIn(owner)).send({ externalPaymentReference: null });
 
     expect(res.status).toBe(200);
     expect(fake.invoices.get(INVOICE)).toMatchObject({ status: "paid_external", externalPaymentReference: null });
-    expect(fake.writes.filter((name) => name === "sendTradePaymentInvoice")).toHaveLength(1);
+    expect(fake.writes.filter((name) => name === "sendTradePaymentInvoice")).toHaveLength(0);
   });
 
   it("property: the screens' null reference is taken as none (200)", async () => {
@@ -262,7 +265,7 @@ describe("marking an invoice received without a reference, as the screens send i
     const res = await request(app).post(`/api/property/invoices/${RENT_INVOICE}/mark-paid-external`).set(signedIn(owner)).send({ externalPaymentReference: null });
 
     expect(res.status).toBe(200);
-    expect(update).toHaveBeenCalledWith(RENT_INVOICE, owner.merchantId, undefined);
+    expect(update).toHaveBeenCalledWith(RENT_INVOICE, owner.merchantId, undefined,expect.objectContaining({userId:owner.user.id,role:'owner'}));
     expect(res.body).toMatchObject({ status: "paid_external", externalPaymentReference: null });
   });
 
@@ -292,7 +295,7 @@ describe("the invoice create makes only what the screens send", () => {
   it.each([["balance"], ["recurring"]])("a %s invoice is refused (400): nothing is made or sent", async (kind) => {
     const { app, owner, fake } = await ownerWithTrades();
 
-    const res = await request(app).post("/api/trades/invoices").set(signedIn(owner)).send(invoice({ kind, quoteId: QUOTE }));
+    const res = await request(app).post("/api/trades/invoices").set('Idempotency-Key',requestCommandKey()).set(signedIn(owner)).send(invoice({ kind, quoteId: QUOTE }));
 
     expect(res.status).toBe(400);
     expect(fake.writes).toEqual([]);
@@ -305,7 +308,7 @@ describe("the invoice create makes only what the screens send", () => {
     fake.clients.set(OTHER_CLIENT, { ...fake.clients.get(CLIENT), id: OTHER_CLIENT, firstName: "Olive" });
     fake.quotes.set(THEIR_QUOTE, { ...fake.quotes.get(QUOTE), id: THEIR_QUOTE, clientProfileId: OTHER_CLIENT });
 
-    const res = await request(app).post("/api/trades/invoices").set(signedIn(owner))
+    const res = await request(app).post("/api/trades/invoices").set('Idempotency-Key',requestCommandKey()).set(signedIn(owner))
       .send(invoice({ kind: "deposit", amountCents: 20_000, quoteId: THEIR_QUOTE }));
 
     expect(res.status).toBe(404);
@@ -316,14 +319,14 @@ describe("the invoice create makes only what the screens send", () => {
   it("what the screens send is made: a full invoice, a quick invoice, and a deposit on the client's own quote", async () => {
     const { app, owner, fake } = await ownerWithTrades();
 
-    const full = await request(app).post("/api/trades/invoices").set(signedIn(owner)).send(invoice({ splitEnabled: false }));
+    const full = await request(app).post("/api/trades/invoices").set('Idempotency-Key',requestCommandKey()).set(signedIn(owner)).send(invoice({ splitEnabled: false }));
     expect(full.status).toBe(201);
-    const quick = await request(app).post("/api/trades/invoices").set(signedIn(owner)).send({
+    const quick = await request(app).post("/api/trades/invoices").set('Idempotency-Key',requestCommandKey()).set(signedIn(owner)).send({
       recipient: { name: "Quinn Quick", email: "quinn@example.test", channel: "email" },
       amountCents: 12_000, deliveryChannel: "email", dueAt: inDays(7).toISOString(), kind: "full", splitEnabled: true,
     });
     expect(quick.status).toBe(201);
-    const deposit = await request(app).post("/api/trades/invoices").set(signedIn(owner))
+    const deposit = await request(app).post("/api/trades/invoices").set('Idempotency-Key',requestCommandKey()).set(signedIn(owner))
       .send(invoice({ kind: "deposit", amountCents: 20_000, quoteId: QUOTE }));
     expect(deposit.status).toBe(201);
     expect(fake.invoices.get(deposit.body.id)).toMatchObject({ kind: "deposit", quoteId: QUOTE, clientProfileId: CLIENT });
@@ -399,7 +402,7 @@ describe("the trades GST settings are the owner's to change", () => {
     const fake = fakeTrades();
     seed(fake, owner.merchantId);
 
-    const made = await request(app).post("/api/trades/invoices").set(signedIn(member))
+    const made = await request(app).post("/api/trades/invoices").set('Idempotency-Key',requestCommandKey()).set(signedIn(member))
       .send({ clientProfileId: CLIENT, amountCents: 50_000, deliveryChannel: "email", dueAt: inDays(7).toISOString(), kind: "full" });
     expect(made.status).toBe(201);
     expect((await request(app).put(`/api/trades/schedules/${SCHEDULE}`).set(signedIn(member)).send({ status: "paused" })).status).toBe(200);

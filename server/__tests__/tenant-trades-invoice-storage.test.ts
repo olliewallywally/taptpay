@@ -9,10 +9,11 @@ function capture(row: Record<string, unknown> = {}, found = true) {
   const calls: any[] = [];
   const invoice = { id, merchantId: 11, clientProfileId: parentId, kind: "full", status: "dispatched", ...row };
   const db: any = {
+    execute: async()=>({rows:[]}),
     transaction: async (run: any) => { calls.push({ kind: "transaction" }); return run(db); },
     select: () => ({ from: (table: any) => {
       const call: any = { kind: "select", table, locked: false }; calls.push(call);
-      const result: any = Promise.resolve(found ? [table === clientProfiles ? { id: parentId, merchantId: 11, status: "archived" } : invoice] : []);
+      const result: any = Promise.resolve(found ? [table === clientProfiles ? { id: parentId, merchantId: 11, status: "archived" } : [jobInvoices,quotes].includes(table)?invoice:undefined].filter(Boolean) : []);
       result.innerJoin = (joined: any) => { call.joined = joined; return result; };
       result.where = (where: any) => { call.where = where; return result; };
       result.limit = () => result; result.orderBy = () => result;
@@ -23,7 +24,7 @@ function capture(row: Record<string, unknown> = {}, found = true) {
       calls.push({ kind: "update", table, where, set });
       const result: any = Promise.resolve([{ ...invoice, ...set }]); result.returning = () => result; return result;
     } }) }),
-    insert: (table: any) => ({ values: (values: any) => { calls.push({ kind: "insert", table, values }); return Promise.resolve(); } }),
+    insert: (table: any) => ({ values: (values: any) => { calls.push({ kind: "insert", table, values }); const result:any=Promise.resolve([{id:values.id??id,...values}]);result.returning=()=>result;return result; } }),
   };
   return { storage: new DatabaseStorage(db) as any, calls };
 }
@@ -62,7 +63,7 @@ test.each([["getQuoteDeliveryForMerchant", quotes, quoteId, "quotes"], ["getJobI
   });
 test.each(OPERATIONS)("%s locks parent then child and commits scoped state with history, including an archived parent", async (name, status, eventType) => {
   const { storage, calls } = capture({ status });
-  expect((await storage[name](id, 11, "Synthetic reference")).kind).toBe("ok");
+  expect((await storage[name](id, 11,...(name.startsWith("void")?[]:["Synthetic reference"]))).kind).toBe("ok");
   expect(calls[0].kind).toBe("transaction");
   expect(calls.filter(call => call.locked).map(call => call.table)).toEqual([clientProfiles, jobInvoices]);
   expect(query(calls.find(call => call.locked && call.table === clientProfiles).where).params).toEqual([parentId, 11]);
@@ -107,12 +108,12 @@ test.each([
   expect(await storage[name](id, 11)).toEqual(expected);
   expect(writes(calls)).toEqual([]);
 });
-test("a voided invoice is voided again and a completed job completed again, each logged again", async () => {
+test("a void without its original audit is held; a completed job retains its existing repeat contract", async () => {
   const voided = capture({ status: "voided", voidedAt: new Date(0) });
-  expect((await voided.storage.voidJobInvoiceForMerchant(id, 11)).kind).toBe("ok");
+  expect((await voided.storage.voidJobInvoiceForMerchant(id, 11)).kind).toBe("conflict");expect(writes(voided.calls)).toEqual([]);
   const completed = capture({ status: "paid", completedAt: new Date(0) });
   expect((await completed.storage.completeJobInvoiceForMerchant(id, 11)).kind).toBe("ok");
-  for (const { calls } of [voided, completed]) expect(writes(calls).map(call => call.kind)).toEqual(["update", "insert"]);
+  for (const { calls } of [completed]) expect(writes(calls).map(call => call.kind)).toEqual(["update", "insert"]);
 });
 test.each([[true, "invoice_email_sent"], [false, "invoice_email_failed"]] as const)("a receipt (sent %s) is logged only for the owned invoice of its captured owned client", async (sent, eventType) => {
   const { storage, calls } = capture({ status: "paid_external" });

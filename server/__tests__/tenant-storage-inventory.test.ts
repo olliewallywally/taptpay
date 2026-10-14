@@ -71,10 +71,12 @@ test("authenticated refunds use scoped writes and no retired global mutator", ()
 test("authenticated sale creation and disabled native writes have explicit tenant scope", () => {
   expect(storageContract().find(method => method.name === "associateTransactionWithStone")).toBeUndefined();
   const facts = currentRouteFacts();
-  for (const key of ["POST /api/transactions", "POST /api/transactions/cash-sale", "POST /api/v1/transactions", "POST /api/transactions/tap-to-pay"]) {
+  for (const key of ["POST /api/transactions", "POST /api/v1/transactions", "POST /api/transactions/tap-to-pay"]) {
     expect(facts.get(key)?.storageMethods).toContain("createTransactionForMerchant");
     expect(facts.get(key)?.storageMethods).not.toContain("createTransaction");
   }
+  expect(facts.get('POST /api/transactions/cash-sale')?.storageMethods).toContain('recordCashSaleForMerchant');
+  expect(facts.get('POST /api/transactions/cash-sale')?.storageMethods).not.toContain('createTransaction');
   const native = facts.get("POST /api/transactions/tap-to-pay")!.storageMethods;
   expect(native).toContain("getTransactionForMerchant");
   expect(native).not.toContain("getTransaction");
@@ -202,7 +204,9 @@ test("trades invoice state changes, the signed-in quote PDF and the receipt requ
   for (const name of ["getJobInvoiceDeliveryForMerchant", "recordJobInvoiceReceiptForMerchant"]) {
     expect(contract.find(method => method.name === name)?.requiredTenant).toBe(true);
   }
-  expect(facts.get("POST /api/trades/invoices/:id/mark-paid-external")?.sideEffects).toEqual(["email: sendTradePaymentInvoiceForMerchant"]);
+  // The scoped mutation records its audit and outbox atomically; the route must
+  // not independently send a receipt (receiver crash/retry is verified in R3 PG).
+  expect(facts.get("POST /api/trades/invoices/:id/mark-paid-external")?.sideEffects).toEqual([]);
 });
 
 test("trades quote, invoice and balance creation and their delivery require merchant scope", () => {

@@ -1,6 +1,7 @@
 import "./support/test-env";
 
 import request from "supertest";
+import {randomUUID} from "node:crypto";
 import { signedIn, type SignedIn, createOwnerPrincipal, createTestApp, resetTestStorage, storage } from "./support/http-harness";
 import * as billing from "../billing-card";
 import * as delivery from "../trades-delivery";
@@ -140,20 +141,20 @@ describe.each(ROUTES)("gap 13 — $label create validates an attached document",
     const owner = await callerWithTenant();
     const doc = await uploadDocument(app, owner);
 
-    const res = await request(app).post(route.path).set(signedIn(owner)).send(route.body(doc));
+    const res = await request(app).post(route.path).set(signedIn(owner)).set("Idempotency-Key",randomUUID()).send(route.body(doc));
 
     expect(res.status).toBe(201);
     const attached = expect.objectContaining({ documentUrl: doc.documentUrl, documentName: doc.documentName });
     if (route.path === "/api/property/invoices") {
-      expect(route.created()).toHaveBeenCalledWith(TENANT_ID, owner.merchantId, attached);
-    } else expect(route.created()).toHaveBeenCalledWith(owner.merchantId, { prospect: expect.any(Object) }, attached);
+      expect(route.created()).toHaveBeenCalledWith(TENANT_ID, owner.merchantId, attached,expect.objectContaining({key:expect.any(String),actor:expect.objectContaining({userId:owner.user.id})}));
+    } else expect(route.created()).toHaveBeenCalledWith(owner.merchantId, { prospect: expect.any(Object) }, attached,...(route.path==="/api/trades/invoices"?[expect.objectContaining({key:expect.any(String)})]:[]));
   });
 
   it("is unchanged when no document is attached", async () => {
     const { app } = await createTestApp();
     const owner = await callerWithTenant();
 
-    const res = await request(app).post(route.path).set(signedIn(owner)).send(route.body({}));
+    const res = await request(app).post(route.path).set(signedIn(owner)).set("Idempotency-Key",randomUUID()).send(route.body({}));
 
     expect(res.status).toBe(201);
     expect(route.created()).toHaveBeenCalledTimes(1);
@@ -165,7 +166,7 @@ describe.each(ROUTES)("gap 13 — $label create validates an attached document",
 
     const res = await request(app)
       .post(route.path)
-      .set(signedIn(owner))
+      .set(signedIn(owner)).set("Idempotency-Key",randomUUID())
       .send(route.body({ documentUrl: "", documentName: "" }));
 
     expect(res.status).toBe(201);
@@ -177,7 +178,7 @@ describe.each(ROUTES)("gap 13 — $label create validates an attached document",
     const other = await createOwnerPrincipal();
     const foreign = await uploadDocument(app, other);
 
-    const res = await request(app).post(route.path).set(signedIn(owner)).send(route.body(foreign));
+    const res = await request(app).post(route.path).set(signedIn(owner)).set("Idempotency-Key",randomUUID()).send(route.body(foreign));
 
     expect(res.status).toBe(400);
     expect(res.body.message).toBe("Invalid document attachment");
@@ -197,7 +198,7 @@ describe.each(ROUTES)("gap 13 — $label create validates an attached document",
 
     const res = await request(app)
       .post(route.path)
-      .set(signedIn(owner))
+      .set(signedIn(owner)).set("Idempotency-Key",randomUUID())
       .send(route.body({ documentUrl, documentName: "bill.pdf" }));
 
     expect(res.status).toBe(400);

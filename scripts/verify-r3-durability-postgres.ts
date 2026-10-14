@@ -9,7 +9,9 @@ import {DurablePaymentStorage,type PaymentSqlPool} from '../server/durable-payme
 import {PaymentReconciliationWorker} from '../server/payment-reconciliation';
 import {PaymentOutboxWorker} from '../server/payment-outbox';
 import {DurableInvoiceCheckout} from '../server/durable-invoice-checkout';
-import {createRetailReconciliationFinalizer} from '../server/retail-reconciliation-adapter';
+import {DurableRetailCheckout} from '../server/durable-retail-checkout';
+import {PaymentRuntime} from '../server/payment-runtime';
+import {createRetailReconciliationFinalizer,createRetailSessionRecoveryAttacher} from '../server/retail-reconciliation-adapter';
 import {createWindcaveReconciliationProvider} from '../server/windcave-reconciliation-provider';
 import type {SessionBinding,VerifiedOutcome} from '../server/durable-payment-contract';
 
@@ -27,7 +29,7 @@ let now=new Date(Date.now()+600000);
 const clock=()=>new Date(now);
 const original=new DatabaseStorage(drizzle(pool,{schema}) as any);
 const retail=new PaymentAttemptService(original,clock);
-const stores=pools.map(p=>new DurablePaymentStorage(p,createRetailReconciliationFinalizer(retail)));
+const stores=pools.map(p=>new DurablePaymentStorage(p,createRetailReconciliationFinalizer(retail),createRetailSessionRecoveryAttacher(original)));
 const [one,two]=stores;
 let merchant:number,otherMerchant:number,tenant:string,clientProfile:string;
 const failures:string[]=[];let passed=0;
@@ -72,6 +74,20 @@ try {
   tenant=(await pool.query("INSERT INTO tenant_profiles(merchant_id,first_name,last_name,property_address) VALUES ($1,'Test','Tenant','Synthetic') RETURNING id",[merchant])).rows[0].id;
   clientProfile=(await pool.query("INSERT INTO client_profiles(merchant_id,first_name,last_name,site_address) VALUES ($1,'Test','Client','Synthetic') RETURNING id",[merchant])).rows[0].id;
 
+  for(const split of [false,true])await check(`retail: ${split?'split':'full'} decline retains evidence without captured money or blocking cancellation`,async()=>{
+    const sale=await original.createTransaction({merchantId:merchant,itemName:'Declined synthetic',price:'10.01',status:'pending',paymentMethod:'qr_code',splitEnabled:split});
+    if(split)await original.createBillSplit(sale.id,2);
+    const claim=await retail.claim({transactionId:sale.id,merchantId:merchant,shareIndex:split?1:0,idempotencyKey:randomUUID()});assert.equal(claim.kind,'claimed');if(claim.kind!=='claimed')throw Error('fixture');
+    const expected=await one.prepareRetailExpectation({paymentAttemptId:claim.attempt.id,merchantId:merchant,currency:'NZD',environment:'uat',providerAccount:'synthetic-account'},now);assert.ok(expected);
+    const sessionId=`s-${randomUUID()}`;assert.equal((await retail.attachSession({attemptId:claim.attempt.id,processorSessionId:sessionId,processorXId:expected.processorXId,rawReturnState:randomBytes(32).toString('base64url')})).kind,'attached');
+    assert.equal(await one.bindRetailSession({...expected,paymentAttemptId:claim.attempt.id,sessionId},now),true);const binding=await one.resolveSession(sessionId);assert.ok(binding);
+    const proof=evidence(binding,'declined');await one.receive(sessionId,'fprn',now);await worker(one,proof).runOne(randomUUID());
+    assert.equal((await original.getTransaction(sale.id))!.windcaveTransactionId,null);
+    if(split)assert.equal((await original.getSplitPaymentsByTransaction(sale.id))[0].windcaveTransactionId,null);
+    assert.equal((await retail.getAttempt(claim.attempt.id))!.providerTransactionId,proof.transactionId);
+    assert.equal((await pool.query('SELECT provider_transaction_id FROM payment_session_bindings WHERE session_id=$1',[sessionId])).rows[0].provider_transaction_id,proof.transactionId);
+    assert.equal((await original.cancelTransactionForMerchant(sale.id,merchant)).kind,'cancelled');
+  });
   await check('two instances persist 32 duplicate receipts as one logical row',async()=>{
     const session=`s-${randomUUID()}`;
     const ids=await Promise.all(Array.from({length:32},(_,i)=>stores[i%2].receive(session,'fprn',now)));
@@ -79,10 +95,106 @@ try {
     const receipt=(await pool.query('SELECT * FROM payment_notification_inbox WHERE id=$1',[ids[0]])).rows[0];
     assert.equal(receipt.arrival_count,32);assert.equal(receipt.status,'pending');
   });
+  await check('retail: cancelling a pending provider attempt preserves a later verified payment',async()=>{
+    const sale=await original.createTransaction({merchantId:merchant,itemName:'Late captured synthetic',price:'10.01',status:'pending',paymentMethod:'qr_code',splitEnabled:false});
+    const claim=await retail.claim({transactionId:sale.id,merchantId:merchant,shareIndex:0,idempotencyKey:randomUUID()});assert.equal(claim.kind,'claimed');
+    if(claim.kind!=='claimed')throw new Error('fixture_claim');
+    const expected=await one.prepareRetailExpectation({paymentAttemptId:claim.attempt.id,merchantId:merchant,currency:'NZD',environment:'uat',providerAccount:'synthetic-account'},now);assert.ok(expected);
+    const sessionId=`s-${randomUUID()}`;assert.equal((await retail.attachSession({attemptId:claim.attempt.id,processorSessionId:sessionId,processorXId:expected.processorXId,rawReturnState:randomBytes(32).toString('base64url')})).kind,'attached');
+    assert.equal(await one.bindRetailSession({...expected,paymentAttemptId:claim.attempt.id,sessionId},now),true);
+    assert.equal((await original.cancelTransactionForMerchant(sale.id,merchant)).kind,'cancelled');
+    const binding=await one.resolveSession(sessionId);assert.ok(binding);const proof=evidence(binding);
+    await one.receive(sessionId,'fprn',now);await worker(one,proof).runOne(randomUUID());
+    assert.equal((await original.getTransaction(sale.id))?.status,'completed');
+    assert.equal((await pool.query('SELECT previous_aggregate_status FROM payment_settlement_events WHERE session_id=$1',[sessionId])).rows[0].previous_aggregate_status,'cancelled');
+    await two.receive(sessionId,'browser',now);await worker(two,proof).runOne(randomUUID());
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM payment_settlement_events WHERE session_id=$1',[sessionId])).rows[0].n,1);
+  });
+  for(const vertical of ['property','trades'] as const)await check(`${vertical}: void then late approval records real money once`,async()=>{
+    const pay=await opened(vertical);assert.equal((await one.changeInvoice({vertical,invoiceId:pay.input.invoiceId,merchantId:merchant,action:'void'},now)).kind,'claimed');
+    const proof=evidence(pay.binding);await one.receive(pay.sessionId,'fprn',now);await worker(one,proof).runOne(randomUUID());
+    assert.equal((await row(vertical,pay.input.invoiceId)).status,'paid');
+    assert.equal((await pool.query('SELECT previous_aggregate_status FROM payment_settlement_events WHERE session_id=$1',[pay.sessionId])).rows[0].previous_aggregate_status,'voided');
+  });
+  for(const vertical of ['property','trades'] as const) {
+    await check(`${vertical}: external record and late capture both survive without duplicate audit or money`,async()=>{
+      const pay=await opened(vertical);const method=vertical==='property'?'markInvoiceRentRequestPaidExternalForMerchant':'markJobInvoicePaidExternalForMerchant';
+      assert.equal((await original[method](pay.input.invoiceId,merchant,'synthetic bank transfer',{userId:1,role:'owner'})).kind,'ok');
+      const before=await row(vertical,pay.input.invoiceId),proof=evidence(pay.binding);
+      await one.receive(pay.sessionId,'fprn',now);await worker(one,proof).runOne(randomUUID());
+      const after=await row(vertical,pay.input.invoiceId);assert.equal(after.status,'paid_external');
+      assert.equal(after.external_payment_reference,'synthetic bank transfer');assert.equal(after.paid_at.toISOString(),before.paid_at.toISOString());
+      assert.equal(after.split_paid_count,before.split_paid_count);
+      await two.receive(pay.sessionId,'browser',now);await worker(two,proof).runOne(randomUUID());
+      assert.equal((await pool.query('SELECT count(*)::int AS n FROM payment_settlement_events WHERE session_id=$1',[pay.sessionId])).rows[0].n,1);
+      assert.equal((await pool.query('SELECT previous_aggregate_status FROM payment_settlement_events WHERE session_id=$1',[pay.sessionId])).rows[0].previous_aggregate_status,'paid_external');
+      assert.equal((await original[method](pay.input.invoiceId,merchant,'synthetic bank transfer')).kind,'ok');
+    });
+    await check(`${vertical}: partial late capture keeps the invoice voided and exact paid share count`,async()=>{
+      const pay=await opened(vertical,await invoice(vertical,1001,2),1);
+      assert.equal((await one.changeInvoice({vertical,invoiceId:pay.input.invoiceId,merchantId:merchant,action:'void'},now)).kind,'claimed');
+      const before=await row(vertical,pay.input.invoiceId),proof=evidence(pay.binding);
+      await one.receive(pay.sessionId,'fprn',now);await worker(one,proof).runOne(randomUUID());
+      const after=await row(vertical,pay.input.invoiceId);assert.equal(after.status,'voided');assert.equal(after.split_paid_count,1);
+      assert.equal(after.voided_at.toISOString(),before.voided_at.toISOString());
+      assert.equal(Number((await pool.query('SELECT amount_cents FROM payment_settlement_events WHERE session_id=$1',[pay.sessionId])).rows[0].amount_cents),501);
+      await two.receive(pay.sessionId,'browser',now);await worker(two,proof).runOne(randomUUID());
+      assert.equal((await row(vertical,pay.input.invoiceId)).split_paid_count,1);
+      assert.equal((await one.claimInvoice(claimInput(vertical,pay.input.invoiceId,2),now)).kind,'conflict');
+    });
+  }
+  for(const domain of ['retail','property','trades'] as const)for(const failure of ['audit','outbox'] as const) {
+    await check(`${domain}: manual command ${failure} failure rolls back state and audit/outbox`,async()=>{
+      const id=domain==='retail'?(await original.createTransaction({merchantId:merchant,itemName:'Synthetic rollback',price:'10.01',status:'pending',paymentMethod:'qr_code',splitEnabled:false})).id:await invoice(domain);
+      const eventTable=domain==='trades'?'job_events':'transaction_events',table=failure==='audit'?eventTable:'payment_delivery_outbox';
+      const condition=failure==='audit'?(domain==='retail'?"NEW.event_type='Transaction_Cancelled'":domain==='property'?"NEW.event_type='Invoice_Voided'":"NEW.event_type='invoice_voided'"):(domain==='trades'?'NEW.job_event_id IS NOT NULL':'NEW.transaction_event_id IS NOT NULL');
+      const run=()=>domain==='retail'?original.cancelTransactionForMerchant(Number(id),merchant):domain==='property'?original.voidInvoiceRentRequestForMerchant(String(id),merchant):original.voidJobInvoiceForMerchant(String(id),merchant);
+      await pool.query(`CREATE FUNCTION test_r3_manual_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF ${condition} THEN RAISE EXCEPTION 'synthetic manual rollback'; END IF; RETURN NEW; END $$`);
+      await pool.query(`CREATE TRIGGER test_r3_manual_failure BEFORE INSERT ON ${table} FOR EACH ROW EXECUTE FUNCTION test_r3_manual_failure()`);
+      try {
+        await assert.rejects(run());
+        const status=domain==='retail'?(await original.getTransaction(Number(id)))?.status:(await row(domain,String(id))).status;
+        assert.equal(status,domain==='retail'?'pending':domain==='property'?'dispatched':'sent');
+        const column=domain==='retail'?'transaction_id':domain==='property'?'invoice_id':'job_invoice_id';
+        assert.equal((await pool.query(`SELECT count(*)::int AS n FROM ${eventTable} WHERE ${column}=$1`,[id])).rows[0].n,0);
+      }finally{await pool.query(`DROP TRIGGER test_r3_manual_failure ON ${table}`);await pool.query('DROP FUNCTION test_r3_manual_failure()');}
+      assert.ok(['cancelled','ok'].includes((await run()).kind));
+    });
+  }
+  for(const vertical of ['property','trades'] as const)for(const result of ['approved','pending','unavailable'] as const) {
+    await check(`${vertical}: manual action queries the shared verifier outside locks (${result})`,async()=>{
+      const {reconcileRetainedPaymentsBeforeManualCommand}=await import('../server/payment-manual-reconciliation');
+      const pay=await opened(vertical),table=vertical==='property'?'invoices_rent_requests':'job_invoices';let queries=0;
+      const provider={query:async()=>{
+        queries++;const probe=await pools[1].connect();
+        try{await probe.query('BEGIN');await probe.query(`SELECT id FROM ${table} WHERE id=$1 FOR UPDATE NOWAIT`,[pay.input.invoiceId]);
+          await probe.query('SELECT id FROM invoice_payment_attempts WHERE id=$1 FOR UPDATE NOWAIT',[pay.attempt.id]);await probe.query('ROLLBACK');}
+        finally{await probe.query('ROLLBACK');probe.release();}
+        return result==='approved'?evidence(pay.binding):{kind:result as 'pending'|'unavailable'};
+      }};
+      const runtime=Object.assign(new PaymentRuntime(one,provider,clock),{repository:one,client:{} as any,context:{providerEnvironment:'uat' as const,accountUsername:'synthetic-account'}});
+      await reconcileRetainedPaymentsBeforeManualCommand(runtime,{domain:vertical,aggregateId:pay.input.invoiceId,merchantId:otherMerchant});assert.equal(queries,0);
+      await reconcileRetainedPaymentsBeforeManualCommand(runtime,{domain:vertical,aggregateId:pay.input.invoiceId,merchantId:merchant});assert.equal(queries,1);
+      const method=vertical==='property'?'voidInvoiceRentRequestForMerchant':'voidJobInvoiceForMerchant';
+      const command=await original[method](pay.input.invoiceId,merchant);
+      assert.equal(command.kind,result==='approved'?'conflict':'ok');
+      assert.equal((await row(vertical,pay.input.invoiceId)).status,result==='approved'?'paid':'voided');
+      assert.equal((await one.resolveSession(pay.sessionId))?.invoiceAttemptId,pay.attempt.id);
+    });
+  }
   await check('two competing workers claim a receipt only once',async()=>{
     await one.receive(`s-${randomUUID()}`,'fprn',now);
     const claims=await Promise.all(stores.map(s=>s.claimInbox(randomUUID(),now)));
     assert.equal(claims.filter(Boolean).length,1);
+  });
+  await check('property reuse cannot change an amount frozen by a provider attempt',async()=>{
+    const ownTenant=(await pool.query("INSERT INTO tenant_profiles(merchant_id,first_name,last_name,property_address) VALUES ($1,'Amount','Guard','Synthetic') RETURNING id",[merchant])).rows[0].id;
+    const id=(await pool.query("INSERT INTO invoices_rent_requests(merchant_id,tenant_profile_id,amount_cents,token,delivery_channel,due_at,status,kind) VALUES ($1,$2,1001,$3,'email',$4,'dispatched','rent') RETURNING id",[merchant,ownTenant,randomUUID(),now])).rows[0].id;
+    const pay=await opened('property',id);
+    const attempt=await one.getInvoiceAttemptByKey(pay.input);assert.ok(attempt);
+    const result=await original.createOrReuseInvoiceRentRequestForMerchant(ownTenant,merchant,{kind:'rent',amountCents:2002,deliveryChannel:'email',dueAt:now,splitEnabled:false});
+    assert.equal(result.kind,'payment-active');assert.equal((await row('property',id)).amount_cents,1001);
+    assert.equal((await one.getInvoiceAttemptByKey(pay.input))?.requestFingerprint,attempt.requestFingerprint);
   });
   await check('expired worker cannot finish or settle after a new owner takes its lease',async()=>{
     const pay=await opened('property');await one.receive(pay.sessionId,'fprn',now);
@@ -103,6 +215,17 @@ try {
     assert.equal(await two.finishInbox(fresh,{status:'retry',nextAttemptAt:now},now),true);
   });
   for(const vertical of ['property','trades'] as const) {
+    await check(`${vertical}: concurrent reservations allocate distinct exact shares and retries keep their assignment`,async()=>{
+      const id=await invoice(vertical,1001,3),inputs=Array.from({length:3},()=>({...claimInput(vertical,id,1),reserveShare:true}));
+      const claims=await Promise.all(inputs.map((input,index)=>stores[index%2].claimInvoice(input,now)));
+      assert.equal(claims.filter(claim=>claim.kind==='claimed').length,3);
+      const attempts=claims.map(claim=>{assert.ok('attempt' in claim);return claim.attempt;});
+      assert.equal(new Set(attempts.map(attempt=>attempt.shareIndex)).size,3);
+      assert.equal(attempts.reduce((total,attempt)=>total+attempt.amountCents,0),1001);
+      const replay=await two.claimInvoice({...inputs[0],shareIndex:3},now);assert.equal(replay.kind,'reused');
+      assert.ok('attempt' in replay);assert.equal(replay.attempt.id,attempts[0].id);assert.equal(replay.attempt.shareIndex,attempts[0].shareIndex);
+      assert.equal((await one.claimInvoice({...claimInput(vertical,id,1),reserveShare:true},now)).kind,'conflict');
+    });
     await check(`${vertical}: same key reuses; another key and tenant cannot claim same share`,async()=>{
       const id=await invoice(vertical);const input=claimInput(vertical,id);
       const results=await Promise.all(stores.map(s=>s.claimInvoice(input,now)));
@@ -231,12 +354,15 @@ try {
     assert.equal((await service.open(input)).kind,'processing');
     assert.equal((await service.open({...input,idempotencyKey:randomUUID()})).kind,'conflict');assert.equal(sends,1);
   });
-  await check('invoice manual-paid, void and split mutations are blocked by a live attempt',async()=>{
+  await check('invoice split stays frozen after a provider attempt; manual commands retain an unknown attempt',async()=>{
     const pay=await opened('property');
-    for(const action of ['manualPaid','void','split'] as const) assert.equal((await one.changeInvoice({...pay.input,action,splitCount:3},now)).kind,'conflict');
+    assert.equal((await one.changeInvoice({...pay.input,action:'split',splitCount:3},now)).kind,'conflict');
+    assert.equal((await one.changeInvoice({...pay.input,action:'void'},now)).kind,'claimed');
+    assert.equal((await one.resolveSession(pay.sessionId))?.invoiceAttemptId,pay.attempt.id);
     const id=await invoice('trades');
-    assert.equal((await two.changeInvoice({vertical:'trades',invoiceId:id,merchantId:merchant,action:'manualPaid'},now)).kind,'claimed');
-    assert.equal((await one.changeInvoice({vertical:'trades',invoiceId:id,merchantId:merchant,action:'manualPaid'},now)).kind,'terminal');
+    assert.equal((await two.changeInvoice({vertical:'trades',invoiceId:id,merchantId:merchant,action:'manualPaid',reference:'external synthetic'},now)).kind,'claimed');
+    assert.equal((await one.changeInvoice({vertical:'trades',invoiceId:id,merchantId:merchant,action:'manualPaid',reference:'external synthetic'},now)).kind,'terminal');
+    assert.equal((await one.changeInvoice({vertical:'trades',invoiceId:id,merchantId:merchant,action:'manualPaid',reference:'different'},now)).kind,'conflict');
     const count=(await pool.query('SELECT count(*)::int AS n FROM payment_settlement_events e JOIN payment_session_bindings b ON b.session_id=e.session_id JOIN invoice_payment_attempts a ON a.id=b.invoice_attempt_id WHERE a.job_invoice_id=$1',[id])).rows[0].n;
     assert.equal(count,0,'manual payment never claims provider approval');
   });
@@ -260,18 +386,19 @@ try {
     assert.equal((await pool.query('SELECT status FROM payment_notification_inbox WHERE session_id=$1',[pay.sessionId])).rows[0].status,'complete');
   });
   await check('outbox send/ack crash repeats the same delivery key for receiver deduplication',async()=>{
-    await pool.query('DELETE FROM payment_delivery_outbox');const pay=await opened('property');
+    const pay=await opened('property');
     await one.receive(pay.sessionId,'fprn',now);await worker(one,evidence(pay.binding)).runOne(randomUUID());
+    const eventId=(await pool.query('SELECT id FROM payment_settlement_events WHERE session_id=$1',[pay.sessionId])).rows[0].id;
     const seen=new Set<string>();let deliveries=0,fail=true;
     const receiver={deliver:async({deliveryKey}:{deliveryKey:string})=>{if(!seen.has(deliveryKey)){seen.add(deliveryKey);deliveries++;}}};
-    const repository={claimOutbox:one.claimOutbox.bind(one),finishOutbox:async(...args:Parameters<typeof one.finishOutbox>)=>{
+    const repository={claimOutbox:(owner:string,date:Date)=>one.claimOutbox(owner,date,eventId),finishOutbox:async(...args:Parameters<typeof one.finishOutbox>)=>{
       if(fail){fail=false;throw new Error('synthetic ack crash');}return one.finishOutbox(...args);}};
     await new PaymentOutboxWorker(repository,receiver,clock).runOne(randomUUID());
     now=new Date(now.getTime()+2000);
-    const consumers=stores.map(s=>new PaymentOutboxWorker(s,receiver,clock));
+    const consumers=stores.map(s=>new PaymentOutboxWorker({claimOutbox:(owner,date)=>s.claimOutbox(owner,date,eventId),finishOutbox:s.finishOutbox.bind(s)},receiver,clock));
     await Promise.all(consumers.map(w=>w.runOne(randomUUID())));
     assert.equal(deliveries,2,'one merchant update plus one payer receipt');
-    assert.equal((await pool.query("SELECT count(*)::int AS n FROM payment_delivery_outbox WHERE status='complete'")).rows[0].n,2);
+    assert.equal((await pool.query("SELECT count(*)::int AS n FROM payment_delivery_outbox WHERE event_id=$1 AND status='complete'",[eventId])).rows[0].n,2);
   });
   await check('existing raw invoice links survive bounded token hash backfill',async()=>{
     const ids=[await invoice('property'),await invoice('trades')];
@@ -290,12 +417,13 @@ try {
     assert.equal((await original.getJobInvoiceByToken(raws[1]))?.id,ids[1]);
   });
   await check('outbox reused worker ID rejects an old claim generation',async()=>{
-    await pool.query('DELETE FROM payment_delivery_outbox');const pay=await opened('property');
+    const pay=await opened('property');
     await one.receive(pay.sessionId,'fprn',now);await worker(one,evidence(pay.binding)).runOne(randomUUID());
-    const owner=randomUUID(),stale=await one.claimOutbox(owner,now);assert.ok(stale);
-    now=new Date(now.getTime()+60001);const fresh=await two.claimOutbox(owner,now);assert.ok(fresh);
+    const eventId=(await pool.query('SELECT id FROM payment_settlement_events WHERE session_id=$1',[pay.sessionId])).rows[0].id;
+    const owner=randomUUID(),stale=await one.claimOutbox(owner,now,eventId);assert.ok(stale);
+    now=new Date(now.getTime()+60001);const fresh=await two.claimOutbox(owner,now,eventId);assert.ok(fresh);
     // The other channel may sort first; claim again to locate the expired item.
-    const renewed=fresh.id===stale.id ? fresh : await two.claimOutbox(owner,now);assert.ok(renewed);assert.equal(renewed.id,stale.id);
+    const renewed=fresh.id===stale.id ? fresh : await two.claimOutbox(owner,now,eventId);assert.ok(renewed);assert.equal(renewed.id,stale.id);
     assert.equal(await one.finishOutbox(stale,'complete',now),false);
     assert.equal(await two.finishOutbox(renewed,'complete',now),true);
   });
@@ -374,73 +502,68 @@ try {
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM payment_settlement_events WHERE session_id=$1',[sessionId])).rows[0].n,1);
     await assert.rejects(pool.query('UPDATE payment_attempts SET share_index=1 WHERE id=$1',[claim.attempt.id]));
   });
-  await check('retail cancellation holds live, expired, possibly accepted, legacy and captured-share records',async()=>{
+  await check('retail cancellation retains unknown attempts and rejects captured shares',async()=>{
     const create=()=>original.createTransaction({merchantId:merchant,itemName:'Synthetic guard',price:'10.01',status:'pending',paymentMethod:'qr_code',splitEnabled:false});
     const clean=await create();assert.equal((await original.cancelTransactionForMerchant(clean.id,otherMerchant)).kind,'not-found');
     assert.equal((await original.cancelTransactionForMerchant(clean.id,merchant)).kind,'cancelled');
     const sale=await create(),claim=await retail.claim({transactionId:sale.id,shareIndex:0,idempotencyKey:randomUUID()});
     assert.equal(claim.kind,'claimed');if(claim.kind!=='claimed') throw new Error('fixture_claim');
-    assert.equal((await original.cancelTransactionForMerchant(sale.id,merchant)).kind,'conflict');
     await one.prepareRetailExpectation({paymentAttemptId:claim.attempt.id,merchantId:merchant,currency:'NZD',environment:'uat',providerAccount:'synthetic-account'},now);
     now=new Date(now.getTime()+300001);
-    assert.equal((await original.cancelTransactionForMerchant(sale.id,merchant)).kind,'conflict');
-    assert.equal((await original.getTransaction(sale.id))?.status,'pending');
-    for(const field of ['windcave_session_id','windcave_transaction_id','completed_splits']) {
-      const held=await create();await pool.query(`UPDATE transactions SET ${field}=$2 WHERE id=$1`,[held.id,field==='completed_splits'?1:`synthetic-${randomUUID()}`]);
-      assert.equal((await original.cancelTransactionForMerchant(held.id,merchant)).kind,'conflict');
-      assert.equal((await original.getTransaction(held.id))?.status,'pending');
-    }
+    assert.equal((await original.cancelTransactionForMerchant(sale.id,merchant)).kind,'cancelled');
+    assert.equal((await original.getPaymentAttempt(claim.attempt.id))?.state,'claiming');
+    assert.equal((await original.cancelTransactionForMerchant(sale.id,merchant)).kind,'cancelled');
+    const captured=await create();await pool.query('UPDATE transactions SET completed_splits=1 WHERE id=$1',[captured.id]);
+    assert.equal((await original.cancelTransactionForMerchant(captured.id,merchant)).kind,'conflict');
     const split=await create();await pool.query(`INSERT INTO split_payments(transaction_id,merchant_id,split_index,amount,status,windcave_transaction_id)
       VALUES ($1,$2,1,'5.01','completed',$3)`,[split.id,merchant,`synthetic-${randomUUID()}`]);
     assert.equal((await original.cancelTransactionForMerchant(split.id,merchant)).kind,'conflict');
     assert.equal((await original.getTransaction(split.id))?.status,'pending');
   });
-  await check('cancellation rechecks newly committed attempts after waiting for the parent lock',async()=>{
+  await check('cancellation rechecks newly captured money after waiting for the parent lock',async()=>{
     const sale=await original.createTransaction({merchantId:merchant,itemName:'Synthetic race',price:'10.01',status:'pending',paymentMethod:'qr_code',splitEnabled:false});
     const holder=await pool.connect();let cancellation:ReturnType<typeof original.cancelTransactionForMerchant>|undefined;
     try {
       await holder.query('BEGIN');await holder.query('SELECT id FROM transactions WHERE id=$1 FOR UPDATE',[sale.id]);
       cancellation=original.cancelTransactionForMerchant(sale.id,merchant);
-      const deadline=Date.now()+3000;let waiting=false;
+      const deadline=Date.now()+1500;let waiting=false;
       while(Date.now()<deadline) {
         waiting=(await pool.query("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND query LIKE '%transactions%') AS waiting")).rows[0].waiting;
         if(waiting) break;await new Promise(resolve=>setTimeout(resolve,10));
       }
       assert.ok(waiting,'cancellation must really wait on a competing transaction');
-      await holder.query(`INSERT INTO payment_attempts(transaction_id,share_index,idempotency_key,lease_expires_at)
-        VALUES ($1,0,$2,now()+interval '5 minutes')`,[sale.id,randomUUID()]);
+      await holder.query(`INSERT INTO split_payments(transaction_id,merchant_id,split_index,amount,status,windcave_transaction_id)
+        VALUES ($1,$2,1,'5.01','completed',$3)`,[sale.id,merchant,`synthetic-${randomUUID()}`]);
       await holder.query('COMMIT');assert.equal((await cancellation).kind,'conflict');
       assert.equal((await original.getTransaction(sale.id))?.status,'pending');
     } finally {await holder.query('ROLLBACK');holder.release();if(cancellation) await cancellation.catch(()=>undefined);}
   });
-  for(const vertical of ['property','trades'] as const) await check(`${vertical}: active void/manual-paid holds attempts, legacy sessions and partial payment`,async()=>{
+  for(const vertical of ['property','trades'] as const) await check(`${vertical}: manual commands keep attempts, commit one audited outbox and reject paid shares`,async()=>{
     const methods=vertical==='property' ? ['voidInvoiceRentRequestForMerchant','markInvoiceRentRequestPaidExternalForMerchant'] as const
       : ['voidJobInvoiceForMerchant','markJobInvoicePaidExternalForMerchant'] as const;
     const table=vertical==='property'?'invoices_rent_requests':'job_invoices',events=vertical==='property'?'transaction_events':'job_events';
-    const column=vertical==='property'?'invoice_id':'job_invoice_id';
+    const column=vertical==='property'?'invoice_id':'job_invoice_id',source=vertical==='property'?'transaction_event_id':'job_event_id';
     for(const method of methods) {
-      const clean=await invoice(vertical);assert.equal((await (original[method] as any)(clean,merchant)).kind,'ok');
       const held=await invoice(vertical),claim=await one.claimInvoice(claimInput(vertical,held),now);assert.equal(claim.kind,'claimed');
       if(claim.kind!=='claimed') throw new Error('fixture_claim');
-      for(const expired of [false,true]) {
-        if(expired) now=new Date(now.getTime()+300001);
-        assert.equal((await (original[method] as any)(held,merchant)).kind,'conflict');
-        assert.equal((await row(vertical,held)).status,vertical==='property'?'dispatched':'sent');
-      }
-      assert.equal((await pool.query(`SELECT count(*)::int AS n FROM ${events} WHERE ${column}=$1`,[held])).rows[0].n,0);
-      for(const field of ['windcave_session_id','windcave_transaction_id','split_paid_count']) {
-        const legacy=await invoice(vertical);await pool.query(`UPDATE ${table} SET ${field}=$2 WHERE id=$1`,[legacy,field==='split_paid_count'?1:`synthetic-${randomUUID()}`]);
-        assert.equal((await (original[method] as any)(legacy,merchant)).kind,'conflict');
-        assert.equal((await row(vertical,legacy)).status,vertical==='property'?'dispatched':'sent');
-      }
-      const legacy=await invoice(vertical);await original.recordInvoiceSplitSession({vertical,invoiceId:legacy,sessionId:`synthetic-${randomUUID()}`,amountCents:1001,payerEmail:null});
-      assert.equal((await (original[method] as any)(legacy,merchant)).kind,'conflict');
+      assert.equal((await (original[method] as any)(held,otherMerchant)).kind,'not-found');
+      const args=method.startsWith('mark')?[held,merchant,'synthetic external',{userId:1,role:'owner'}]:[held,merchant,{userId:1,role:'owner'}];
+      const result=await (original[method] as any)(...args);assert.equal(result.kind,'ok');
+      assert.equal((await (original[method] as any)(...args)).kind,'ok');
+      if(method.startsWith('mark'))assert.equal((await (original[method] as any)(held,merchant,'changed reference')).kind,'conflict');
+      const attempt=(await pool.query('SELECT state FROM invoice_payment_attempts WHERE id=$1',[claim.attempt.id])).rows[0];assert.equal(attempt.state,'claiming');
+      const recorded=(await pool.query(`SELECT * FROM ${events} WHERE ${column}=$1`,[held])).rows;assert.equal(recorded.length,1);
+      assert.equal(recorded[0].payload.actor.userId,1);assert.equal(recorded[0].payload.actor.role,'owner');
+      const outbox=(await pool.query(`SELECT count(*)::int AS n FROM payment_delivery_outbox WHERE ${source}=$1`,[recorded[0].id])).rows[0].n;
+      assert.equal(outbox,method.startsWith('mark')?2:1);
+      const captured=await invoice(vertical);await pool.query(`UPDATE ${table} SET split_paid_count=1 WHERE id=$1`,[captured]);
+      assert.equal((await (original[method] as any)(captured,merchant)).kind,'conflict');
     }
   });
   await check('two instances record one concurrent cash command, audit and manual outbox event',async()=>{
     const other=new DatabaseStorage(drizzle(pools[1],{schema}) as any),key=randomUUID();
     const input={merchantId:merchant,itemName:'Synthetic cash concurrency',price:'10.01',idempotencyKey:key,actor:{userId:1,role:'owner' as const}};
-    const results=await Promise.all(Array.from({length:12},(_,i)=>(i%2?other:original).recordCashSaleForMerchant(input)));
+    const results=await Promise.all(Array.from({length:12},(_,i)=>(i%2?other:original).recordCashSaleForMerchant(input.merchantId,input)));
     assert.equal(results.filter(r=>r.kind==='recorded').length,1);
     assert.equal(new Set(results.filter(r=>r.kind==='recorded'||r.kind==='reused').map(r=>r.transaction.id)).size,1);
     const sale=await original.getCashSaleByKeyForMerchant(merchant,key);assert.ok(sale);assert.equal(sale.paymentMethod,'cash');assert.equal(sale.windcaveTransactionId,null);
@@ -448,19 +571,19 @@ try {
     assert.equal(events.length,1);assert.equal(events[0].event_type,'Cash_Recorded');assert.equal(events[0].payload.source,'manual_cash');
     const outbox=(await pool.query('SELECT * FROM payment_delivery_outbox WHERE transaction_event_id=$1',[events[0].id])).rows;
     assert.equal(outbox.length,1);assert.equal(outbox[0].event_id,null);assert.equal(outbox[0].channel,'merchant_payment_update');
-    assert.equal((await original.recordCashSaleForMerchant({...input,price:'10.02'})).kind,'conflict');
-    assert.equal((await original.recordCashSaleForMerchant({...input,itemName:'different'})).kind,'conflict');
-    assert.equal((await original.recordCashSaleForMerchant(input)).kind,'reused');
+    assert.equal((await original.recordCashSaleForMerchant(input.merchantId,{...input,price:'10.02'})).kind,'conflict');
+    assert.equal((await original.recordCashSaleForMerchant(input.merchantId,{...input,itemName:'different'})).kind,'conflict');
+    assert.equal((await original.recordCashSaleForMerchant(input.merchantId,input)).kind,'reused');
     await assert.rejects(pool.query("UPDATE transactions SET price='10.02' WHERE id=$1",[sale.id]),{code:'23514'});
     await assert.rejects(pool.query('UPDATE transactions SET merchant_id=$2 WHERE id=$1',[sale.id,otherMerchant]),{code:'23514'});
   });
   await check('cash key scope, unchanged request and audited read-only replay cannot bypass new-record gating',async()=>{
     const key=randomUUID(),input={merchantId:merchant,itemName:'Synthetic cash scope',price:'0010.01',idempotencyKey:key,actor:{userId:1,role:'owner' as const}};
-    assert.equal((await original.recordCashSaleForMerchant(input,{allowCreate:false})).kind,'not-found');
-    assert.equal((await original.recordCashSaleForMerchant(input)).kind,'recorded');
-    const replay=await original.recordCashSaleForMerchant({...input,price:'10.01',idempotencyKey:key.toUpperCase()},{allowCreate:false});assert.equal(replay.kind,'reused');
+    assert.equal((await original.recordCashSaleForMerchant(input.merchantId,input,{allowCreate:false})).kind,'not-found');
+    assert.equal((await original.recordCashSaleForMerchant(input.merchantId,input)).kind,'recorded');
+    const replay=await original.recordCashSaleForMerchant(input.merchantId,{...input,price:'10.01',idempotencyKey:key.toUpperCase()},{allowCreate:false});assert.equal(replay.kind,'reused');
     assert.equal(await original.getCashSaleByKeyForMerchant(otherMerchant,key),undefined);
-    assert.equal((await original.recordCashSaleForMerchant({...input,merchantId:otherMerchant})).kind,'recorded');
+    assert.equal((await original.recordCashSaleForMerchant(otherMerchant,{...input,merchantId:otherMerchant})).kind,'recorded');
     assert.notEqual((await original.getCashSaleByKeyForMerchant(merchant,key))?.id,(await original.getCashSaleByKeyForMerchant(otherMerchant,key))?.id);
   });
   for(const failure of ['audit','outbox'] as const) await check(`cash ${failure} failure rolls back record and all local effects`,async()=>{
@@ -469,10 +592,127 @@ try {
     const condition=failure==='audit'?"NEW.event_type='Cash_Recorded'":'NEW.transaction_event_id IS NOT NULL';
     await pool.query(`CREATE FUNCTION test_r3_cash_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF ${condition} THEN RAISE EXCEPTION 'synthetic cash rollback'; END IF; RETURN NEW; END $$`);
     await pool.query(`CREATE TRIGGER test_r3_cash_failure BEFORE INSERT ON ${table} FOR EACH ROW EXECUTE FUNCTION test_r3_cash_failure()`);
-    try {await assert.rejects(original.recordCashSaleForMerchant(input));assert.equal(await original.getCashSaleByKeyForMerchant(merchant,key),undefined);}
+    try {await assert.rejects(original.recordCashSaleForMerchant(input.merchantId,input));assert.equal(await original.getCashSaleByKeyForMerchant(merchant,key),undefined);}
     finally {await pool.query(`DROP TRIGGER test_r3_cash_failure ON ${table}`);await pool.query('DROP FUNCTION test_r3_cash_failure()');}
-    const result=await original.recordCashSaleForMerchant(input);assert.equal(result.kind,'recorded');
+    const result=await original.recordCashSaleForMerchant(input.merchantId,input);assert.equal(result.kind,'recorded');
     if(result.kind==='recorded')assert.equal((await pool.query('SELECT count(*)::int AS n FROM transaction_events WHERE transaction_id=$1',[result.transaction.id])).rows[0].n,1);
+  });
+  await check('retail initiation persists identity and return state before transport across competing instances',async()=>{
+    const {createWindcaveClient}=await import('../server/windcave-client');
+    const {UAT_WINDCAVE_ENDPOINT}=await import('../server/config');
+    const sale=await original.createTransaction({merchantId:merchant,itemName:'Synthetic durable retail',price:'10.01',status:'pending',paymentMethod:'qr_code',splitEnabled:false});
+    const key=randomUUID(),sessionId=`s-${randomUUID()}`,context={providerEnvironment:'uat' as const,accountUsername:'synthetic-account'};
+    let sends=0;
+    const client=createWindcaveClient({config:{mode:'uat',endpoint:UAT_WINDCAVE_ENDPOINT,username:context.accountUsername,apiKey:'synthetic-test-only',publicOrigin:'https://harness.test'},
+      transport:async(_url,init)=>{
+        if(init.method==='POST') {
+          sends++;const attempt=(await pool.query('SELECT * FROM payment_attempts WHERE transaction_id=$1',[sale.id])).rows[0];
+          assert.equal(Number(attempt.expected_amount_cents),1001);assert.equal(attempt.expected_provider_account,context.accountUsername);
+          assert.ok(attempt.return_state_hash);assert.ok(attempt.send_started_at);assert.equal(attempt.processor_x_id,new Headers(init.headers).get('X-ID'));
+          return new Response(JSON.stringify({id:sessionId,links:[{rel:'hpp',href:`https://uat.windcave.com/pxmi3/${sessionId}`}]}),{status:202});
+        }
+        return new Response(JSON.stringify({id:sessionId,state:'processing',links:[]}),{status:200});
+      },wait:async()=>{},clock,audit:()=>undefined,retryLimit:0});
+    const coordinators=stores.map(store=>new DurableRetailCheckout(retail,store,client,context,'synthetic-return-state-secret',clock,()=>true));
+    const input={transactionId:sale.id,merchantId:merchant,shareIndex:0,idempotencyKey:key,customerEmail:'test@synthetic.test',
+      callbacks:(raw:string)=>({callbackBase:`https://harness.test/api/pay/return/${raw}?source=hpp`,notificationUrl:`https://harness.test/api/pay/notification/${raw}`})};
+    const results=await Promise.all(Array.from({length:12},(_,i)=>coordinators[i%2].open(input)));
+    assert.equal(sends,1);assert.equal(results.filter(result=>result.kind==='ready').length,1);
+    const ready=results.find(result=>result.kind==='ready');assert.ok(ready && ready.kind==='ready');
+    assert.equal((await retail.resolveReturnState(ready.returnState)).kind,'resolved');
+    assert.equal((await one.resolveSession(sessionId))?.paymentAttemptId,(await retail.getAttemptByTransactionShareKey(input))?.id);
+    await coordinators[0].open(input);assert.equal(sends,1);
+  });
+  await check('retail unknown acceptance holds its send identity after expiry and never blindly resends',async()=>{
+    const sale=await original.createTransaction({merchantId:merchant,itemName:'Synthetic unknown retail',price:'10.01',status:'pending',paymentMethod:'qr_code',splitEnabled:false});
+    let sends=0;const client={createSession:async()=>{sends++;return {kind:'unknown' as const,reason:'timeout' as const};},querySession:async()=>({kind:'pending' as const})};
+    const coordinator=new DurableRetailCheckout(retail,one,client,{providerEnvironment:'uat',accountUsername:'synthetic-account'},'synthetic-return-state-secret',clock,()=>true);
+    const input={transactionId:sale.id,merchantId:merchant,shareIndex:0,idempotencyKey:randomUUID(),customerEmail:'test@synthetic.test',callbacks:()=>({callbackBase:'https://harness.test/callback?source=hpp',notificationUrl:'https://harness.test/notification'})};
+    const result=await coordinator.open(input);assert.equal(result.kind,'processing');
+    if(result.kind!=='processing' || !result.returnState)throw new Error('fixture_processing');
+    assert.equal((await retail.resolveReturnState(result.returnState)).kind,'resolved');
+    now=new Date(now.getTime()+300001);await coordinator.open(input);await coordinator.open({...input,idempotencyKey:randomUUID()});
+    assert.equal(sends,1);assert.equal((await original.getTransaction(sale.id))?.status,'pending');
+  });
+  await check('browser reconciliation selects its exact receipt instead of unrelated earlier work',async()=>{
+    const unrelated=await opened('property'),target=await opened('trades');await one.receive(unrelated.sessionId,'fprn',now);
+    const provider={query:async(expected:any)=>({...expected,kind:'verified' as const,outcome:'approved' as const,transactionId:`tx-${randomUUID()}`,transactionCount:1 as const})};
+    const runtime=new PaymentRuntime(one,provider,clock);await runtime.reconcile(target.sessionId,'browser');
+    assert.equal((await row('trades',target.input.invoiceId)).status,'paid');assert.notEqual((await row('property',unrelated.input.invoiceId)).status,'paid');
+  });
+  await check('served retail completion, notification and browser return converge across two apps',async()=>{
+    const {createApp}=await import('../server/app');const {registerRoutes}=await import('../server/routes');const {default:request}=await import('supertest');
+    const {createWindcaveClient}=await import('../server/windcave-client');const {UAT_WINDCAVE_ENDPOINT}=await import('../server/config');
+    const sale=await original.createTransaction({merchantId:merchant,itemName:'Synthetic served retail',price:'10.01',status:'pending',paymentMethod:'qr_code',splitEnabled:false});
+    const key=randomUUID(),sessionId=`s-${randomUUID()}`,raw=randomBytes(32).toString('base64url');
+    const claim=await retail.claim({transactionId:sale.id,shareIndex:0,idempotencyKey:key});assert.equal(claim.kind,'claimed');if(claim.kind!=='claimed')throw new Error('fixture_claim');
+    const expected=await one.prepareRetailExpectation({paymentAttemptId:claim.attempt.id,merchantId:merchant,currency:'NZD',environment:'uat',providerAccount:'synthetic-account',rawReturnState:raw},now);assert.ok(expected);
+    assert.equal((await retail.attachSession({attemptId:claim.attempt.id,processorSessionId:sessionId,processorXId:expected.processorXId,rawReturnState:raw})).kind,'attached');
+    await one.resolveSession(sessionId);const providerTransaction=`tx-${randomUUID()}`;
+    const client=createWindcaveClient({config:{mode:'uat',endpoint:UAT_WINDCAVE_ENDPOINT,username:'synthetic-account',apiKey:'synthetic-test-only',publicOrigin:'https://harness.test'},
+      transport:async()=>new Response(JSON.stringify({id:sessionId,state:'complete',transactions:[{id:providerTransaction,authorised:true,type:'purchase',amount:'10.01',currency:'NZD',merchantReference:expected.reference,sessionId,username:'synthetic-account'}]}),{status:200}),wait:async()=>{},clock,audit:()=>undefined,retryLimit:0});
+    const context={providerEnvironment:'uat' as const,accountUsername:'synthetic-account'},provider=createWindcaveReconciliationProvider(client,context);
+    const apps=[];for(const repository of stores){const app=createApp({writeRequestLog:()=>{}});const runtime=Object.assign(new PaymentRuntime(repository,provider,clock),{repository,client,context});await registerRoutes(app,{storage:original,paymentRuntime:runtime});apps.push(app);}
+    const before=Number((await pool.query('SELECT total_lifetime_transactions FROM merchant_subscriptions WHERE merchant_id=$1',[merchant])).rows[0].total_lifetime_transactions);
+    const responses=await Promise.all([request(apps[0]).post(`/api/transactions/${sale.id}/hosted-fields-complete`).send({sessionId,idempotencyKey:key,shareIndex:0,paymentMethod:'card'}),
+      request(apps[1]).get('/api/windcave/notification').query({sessionid:sessionId}),
+      request(apps[1]).get('/api/windcave/callback').query({transactionId:sale.id,state:raw,result:'declined'}),
+      request(apps[0]).get(`/api/pay/return/${raw}`)]);
+    assert.equal(responses[1].status,200);assert.ok([200,202].includes(responses[0].status));assert.equal(responses[2].status,303);
+    await new PaymentRuntime(one,provider,clock).reconcile(sessionId,'poll');
+    const replay=await request(apps[1]).post(`/api/transactions/${sale.id}/hosted-fields-complete`).send({sessionId,idempotencyKey:key,shareIndex:0});
+    assert.equal(replay.status,200);assert.equal(replay.body.outcome,'approved');assert.equal((await original.getTransaction(sale.id))?.status,'completed');
+    assert.equal(Number((await pool.query('SELECT total_lifetime_transactions FROM merchant_subscriptions WHERE merchant_id=$1',[merchant])).rows[0].total_lifetime_transactions),before+1);
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM payment_settlement_events WHERE session_id=$1',[sessionId])).rows[0].n,1);
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM payment_delivery_outbox WHERE event_id=(SELECT id FROM payment_settlement_events WHERE session_id=$1)',[sessionId])).rows[0].n,2);
+  });
+  for(const vertical of ['property','trades'] as const)await check(`${vertical}: served completion cannot apply split A session to B`,async()=>{
+    const {createApp}=await import('../server/app');const {registerRoutes}=await import('../server/routes');const {default:request}=await import('supertest');
+    const pay=await opened(vertical,await invoice(vertical,1001,2),1),record=await row(vertical,pay.input.invoiceId),proof=evidence(pay.binding);
+    const provider={query:async()=>proof},context={providerEnvironment:'uat' as const,accountUsername:'synthetic-account'};
+    const client={createSession:async()=>({kind:'disabled' as const}),querySession:async()=>({kind:'pending' as const})};
+    const runtime=Object.assign(new PaymentRuntime(one,provider,clock),{repository:one,client,context});
+    const app=createApp({writeRequestLog:()=>{}});await registerRoutes(app,{storage:original,paymentRuntime:runtime});
+    const path=`/api/checkout/${record.token}/hosted-fields-complete`;
+    const wrong=await request(app).post(path).send({sessionId:pay.sessionId,idempotencyKey:pay.input.idempotencyKey,shareIndex:2});assert.equal(wrong.status,404);
+    assert.equal((await row(vertical,pay.input.invoiceId)).split_paid_count,0);
+    const correct=await request(app).post(path).send({sessionId:pay.sessionId,idempotencyKey:pay.input.idempotencyKey,shareIndex:1});assert.equal(correct.status,200);assert.equal(correct.body.outcome,'approved');
+    const replay=await request(app).post(path).send({sessionId:pay.sessionId,idempotencyKey:pay.input.idempotencyKey,shareIndex:1});assert.equal(replay.status,200);
+    assert.equal((await row(vertical,pay.input.invoiceId)).split_paid_count,1);
+  });
+  await check('wallet command is unique and immutable across competing instances without storing tokens',async()=>{
+    const pay=await opened('property');const results=await Promise.all(Array.from({length:16},(_,i)=>stores[i%2].claimWalletSubmission(pay.sessionId,now)));
+    assert.equal(results.filter(Boolean).length,1);
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM payment_wallet_submissions WHERE session_id=$1',[pay.sessionId])).rows[0].n,1);
+    await assert.rejects(pool.query("UPDATE payment_wallet_submissions SET payment_method='card' WHERE session_id=$1",[pay.sessionId]),{code:'23514'});
+  });
+  for(const vertical of ['retail','property','trades'] as const)await check(`${vertical}: FPRN recovers possible acceptance before session attachment from pre-send identity`,async()=>{
+    const {createWindcaveClient}=await import('../server/windcave-client');const {UAT_WINDCAVE_ENDPOINT}=await import('../server/config');
+    const sessionId=`s-${randomUUID()}`,transactionId=`tx-${randomUUID()}`,raw=randomBytes(32).toString('base64url');let reference:string,attemptId:string,parentId:number|string;
+    if(vertical==='retail'){
+      const sale=await original.createTransaction({merchantId:merchant,itemName:'Synthetic recovery',price:'10.01',status:'pending',paymentMethod:'qr_code',splitEnabled:false});parentId=sale.id;
+      const claim=await retail.claim({transactionId:sale.id,shareIndex:0,idempotencyKey:randomUUID()});assert.equal(claim.kind,'claimed');if(claim.kind!=='claimed')throw new Error('fixture_claim');attemptId=claim.attempt.id;
+      const expected=await one.prepareRetailExpectation({paymentAttemptId:attemptId,merchantId:merchant,currency:'NZD',environment:'uat',providerAccount:'synthetic-account',rawReturnState:raw},now);assert.ok(expected);reference=expected.reference;
+    }else{
+      parentId=await invoice(vertical);const claim=await one.claimInvoice(claimInput(vertical,parentId as string),now);assert.equal(claim.kind,'claimed');if(claim.kind!=='claimed')throw new Error('fixture_claim');attemptId=claim.attempt.id;reference=claim.attempt.reference;
+      assert.equal(await one.markInvoiceSendStarted(attemptId,now,raw),true);
+    }
+    now=new Date(now.getTime()+300001);
+    const client=createWindcaveClient({config:{mode:'uat',endpoint:UAT_WINDCAVE_ENDPOINT,username:'synthetic-account',apiKey:'synthetic-test-only',publicOrigin:'https://harness.test'},
+      transport:async(_url,init)=>{assert.equal(init.method,'GET');return new Response(JSON.stringify({id:sessionId,state:'complete',transactions:[{id:transactionId,authorised:true,type:'purchase',amount:'10.01',currency:'NZD',merchantReference:reference,sessionId,username:'synthetic-account'}]}),{status:200});},wait:async()=>{},clock,audit:()=>undefined,retryLimit:0});
+    const provider=createWindcaveReconciliationProvider(client,{providerEnvironment:'uat',accountUsername:'synthetic-account'});
+    await one.receive(sessionId,'fprn',now);await new PaymentReconciliationWorker(one,provider,clock).runOne(randomUUID());
+    const binding=await one.resolveSession(sessionId);assert.ok(binding);assert.equal(binding.paymentAttemptId??binding.invoiceAttemptId,attemptId);
+    assert.equal((await pool.query('SELECT outcome FROM payment_settlement_events WHERE session_id=$1',[sessionId])).rows[0]?.outcome,'approved');
+    assert.equal(vertical==='retail'?(await original.getTransaction(parentId as number))?.status:(await row(vertical,parentId as string)).status,vertical==='retail'?'completed':'paid');
+  });
+  await check('unbound provider reference cannot attach or settle when independently expected money differs',async()=>{
+    const id=await invoice('property'),claim=await one.claimInvoice(claimInput('property',id),now);assert.equal(claim.kind,'claimed');if(claim.kind!=='claimed')throw new Error('fixture_claim');
+    await one.markInvoiceSendStarted(claim.attempt.id,now,randomBytes(32).toString('base64url'));
+    const sessionId=`s-${randomUUID()}`,provider={discoverReference:async()=>claim.attempt.reference,query:async()=>({kind:'mismatch' as const})};
+    await one.receive(sessionId,'fprn',now);await new PaymentReconciliationWorker(one,provider,clock).runOne(randomUUID());
+    assert.equal(await one.resolveSession(sessionId),undefined);assert.equal((await row('property',id)).status,'dispatched');
+    assert.equal((await pool.query('SELECT status,last_error_code FROM payment_notification_inbox WHERE session_id=$1',[sessionId])).rows[0].status,'dead_letter');
   });
   assert.deepEqual(failures,[],`${failures.length} R3 verification checks failed`);
   console.log(`R3 PostgreSQL: ${passed} checks passed; synthetic only, no provider or production activity`);
