@@ -56,7 +56,7 @@ const COLUMNS_UNDECLARED_BY_DESIGN: Readonly<Record<string, string>> = {
 };
 
 /** Tables whose column-level parity is asserted. */
-const COLUMN_PARITY_TABLES = ["merchants", "invoices_rent_requests"] as const;
+const COLUMN_PARITY_TABLES = ["merchants", "invoices_rent_requests", "refunds"] as const;
 
 /** Strips `--` line comments and `/* *​/` block comments before scanning SQL. */
 function stripSqlComments(sql: string): string {

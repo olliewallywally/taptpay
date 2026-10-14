@@ -1,6 +1,25 @@
 # Full integration continuation audit — 2026-09-07
 
-Latest continuation **2026-10-14 — OI-1, OI-2 and the merge review's outstanding items
+Latest continuation **2026-10-14 — R4-T2 (refund operations schema, migration 0039)
+implemented as repository work.**
+[Evidence](r4/R4-T2-2026-10-14.md),
+[ADR rev. 3](../../decisions/2026-10-14-r4-t2-refund-operation-schema.md),
+[runbook](../../operations/runbook-2026-10-14-apply-0039-refund-operations.md).
+
+- **Reviews:** pass 4 refused revision 1 and pass 5 refused revision 2; pass 6 approved
+  revision 3, scoped, with five conditions, all met.
+- **Results:**
+  - PostgreSQL on fresh databases: R4-T2 28/28, R1 S2a 25/25 with 0039, R2-T4 12/12,
+    R2-T7 7/7, R3 50/50;
+  - refund and migration tests: 1,157 pass;
+  - typecheck clean.
+- **0039 is applied nowhere.** The owner applies it to the test database only, after
+  0034–0038, by the runbook.
+- **The refund flag stays off** until R4-T5's DTOs.
+- **Next:** R4-T3 (atomic local claim). It must follow the ADR's lock-order, send-intent and
+  lease rules.
+
+Prior continuation **2026-10-14 — OI-1, OI-2 and the merge review's outstanding items
 done; R4-T2 refund schema designed, not yet approved.**
 [Evidence](r3/OUTSTANDING-2026-10-14.md),
 [R4-T2 ADR](../../decisions/2026-10-14-r4-t2-refund-operation-schema.md),
@@ -3125,4 +3144,11 @@ and its fixes, the activation blockers left for Codex, and the owner and UAT que
 
 R4-T2 (refund schema) has its ADR and §21.1 passes 3–4. Pass 4 refused revision 1. Revision 2
 waits on pass 5 before any migration is committed.
+
+## 28. October 14 — R4-T2 refund operations schema (Claude)
+
+Migration 0039 and its Drizzle, MemStorage, contract and test changes, approved in pass 6
+after passes 4 and 5 refused earlier revisions. The record is
+[R4-T2-2026-10-14](r4/R4-T2-2026-10-14.md). The R4-T3/T4 rules are in the ADR. 0039 is
+applied nowhere, and the flag stays off.
 

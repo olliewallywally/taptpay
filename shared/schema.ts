@@ -394,6 +394,9 @@ export const paymentAttempts = pgTable("payment_attempts", {
 }));
 
 // Refunds table to track all refund activities
+export const refundOperationStates = ["requested", "submitted", "unknown", "succeeded", "failed", "cancelled"] as const;
+export type RefundOperationState = (typeof refundOperationStates)[number];
+
 export const refunds = pgTable("refunds", {
   id: serial("id").primaryKey(),
   transactionId: integer("transaction_id").references(() => transactions.id),
@@ -412,9 +415,47 @@ export const refunds = pgTable("refunds", {
   customerNotified: boolean("customer_notified").default(false),
   completedAt: timestamp("completed_at"),
   createdAt: timestamp("created_at").defaultNow(),
+  // R4-T2 (migration 0039; docs/decisions/2026-10-14-r4-t2-refund-operation-schema.md): a refund
+  // operation. `state` null marks a legacy row, which carries none of these fields. No new column
+  // has a default except the two below: a default would break the legacy-shape check.
+  operationId: uuid("operation_id").notNull().defaultRandom(),
+  state: text("state").$type<RefundOperationState>(),
+  idempotencyKey: uuid("idempotency_key"),
+  requestFingerprint: text("request_fingerprint"),
+  processorXId: text("processor_x_id"),
+  merchantReference: text("merchant_reference"),
+  originalProviderTransactionId: text("original_provider_transaction_id"),
+  originalShareIndex: integer("original_share_index"),
+  providerEnvironment: text("provider_environment").$type<PaymentProviderEnvironment>(),
+  amountCents: bigint("amount_cents", { mode: "number" }),
+  currency: text("currency"),
+  providerRefundTransactionId: text("provider_refund_transaction_id"),
+  leaseOwner: uuid("lease_owner"),
+  leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
+  attemptCount: integer("attempt_count").notNull().default(0),
+  nextReconciliationAt: timestamp("next_reconciliation_at", { withTimezone: true }),
+  lastErrorCode: text("last_error_code"),
+  initiatedByUserId: integer("initiated_by_user_id"),
+  reasonCode: text("reason_code"),
+  reasonText: text("reason_text"),
+  requestedAt: timestamp("requested_at", { withTimezone: true }),
+  submittedAt: timestamp("submitted_at", { withTimezone: true }),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }),
 }, (t) => ({
   transactionIdIdx: index("refunds_transaction_id_idx").on(t.transactionId),
   merchantIdIdx: index("refunds_merchant_id_idx").on(t.merchantId),
+  operationIdUnique: uniqueIndex("refunds_operation_id_uq").on(t.operationId),
+  merchantIdempotencyKeyUnique: uniqueIndex("refunds_merchant_idempotency_key_uq")
+    .on(t.merchantId, t.idempotencyKey).where(sql`${t.idempotencyKey} is not null`),
+  processorXIdUnique: uniqueIndex("refunds_processor_x_id_uq")
+    .on(t.processorXId).where(sql`${t.processorXId} is not null`),
+  providerRefundTransactionIdUnique: uniqueIndex("refunds_provider_refund_transaction_id_uq")
+    .on(t.providerRefundTransactionId).where(sql`${t.providerRefundTransactionId} is not null`),
+  liveTransactionIdx: index("refunds_live_transaction_idx")
+    .on(t.transactionId).where(sql`${t.state} in ('requested', 'submitted', 'unknown')`),
+  reconciliationDueIdx: index("refunds_reconciliation_due_idx")
+    .on(t.nextReconciliationAt).where(sql`${t.state} in ('requested', 'submitted', 'unknown')`),
 }));
 
 // Platform settlements - tracks money owed to merchants (Marketplace Model)
@@ -470,6 +511,13 @@ export const createBillSplitSchema = z.object({
 export const insertRefundSchema = createInsertSchema(refunds).omit({
   id: true,
   createdAt: true,
+  // R4-T2: operation fields are written only by R4-T3's atomic claim, never by a legacy insert.
+  operationId: true, state: true, idempotencyKey: true, requestFingerprint: true, processorXId: true,
+  merchantReference: true, originalProviderTransactionId: true, originalShareIndex: true,
+  providerEnvironment: true, amountCents: true, currency: true, providerRefundTransactionId: true,
+  leaseOwner: true, leaseExpiresAt: true, attemptCount: true, nextReconciliationAt: true,
+  lastErrorCode: true, initiatedByUserId: true, reasonCode: true, reasonText: true,
+  requestedAt: true, submittedAt: true, finishedAt: true, updatedAt: true,
 });
 
 export const createRefundSchema = z.object({

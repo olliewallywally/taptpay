@@ -10,7 +10,9 @@ Reviews:
   reread, refused it with five blockers;
 - [pass 5](../evidence/remediation-v2-2/r4/R4-review-pass-5-2026-10-14.md) confirmed pass 4's
   fixes and refused revision 2 on two new blockers (a split sale's capture, a null method);
-- this revision answers them, and goes to pass 6.
+- this revision answers them;
+- [pass 6](../evidence/remediation-v2-2/r4/R4-review-pass-6-2026-10-14.md) **approved**
+  revision 3, scoped (below), with five conditions met before the commit.
 
 This is the ADR that R4 review pass 1 listed under "Missing Steps": the refund state graph and
 how reservations are represented.
@@ -131,6 +133,11 @@ intent. So:
   meaning (open question). Otherwise a worker could release a refund the sender is about to
   make, and the merchant could refund twice.
 
+**Lock order (binding on R4-T3/T4).** Lock the sale FOR UPDATE before inserting,
+selecting FOR UPDATE or updating any of its operations. Locking a refund row first, or
+inserting first and then locking the sale, can deadlock against a writer using the other
+order.
+
 **One refund ID from pending to final.** The ID a pending (202) reply gives is the one kept,
 and it is written once. R4-T1/T4 must treat a final reply naming a different ID as a mismatch,
 which parks the operation. It must never write the new ID.
@@ -151,6 +158,16 @@ What the trigger enforces:
       that share, in the operation's environment.
 
     This replaces a foreign key (see the alternatives).
+
+    **What this check proves:**
+    - **Ownership, not capture validity.** A failed sale, or one cancelled under OI-1, can
+      carry a declined transaction's ID on its own row. R4-T3 must check, under the sale's
+      lock, that the sale or share is completed, and must take the environment from
+      configuration, never from the request.
+    - **The KEY SHARE lock depends on 0036.** It blocks an ownership move only because 0036's
+      `UNIQUE (id, merchant_id)` makes `merchant_id` a key column. `refunds`' existing foreign
+      key to `transactions` already takes the same lock, so the trigger's lock is a second
+      layer. Dropping that constraint must revisit this check.
 - **A legacy row never becomes an operation, and an operation never becomes legacy.** A
   legacy row's operation ID (its public ID) never changes.
 - **An operation is never deleted.** A live one is a reservation; a finished one is in the
@@ -262,6 +279,8 @@ remaining = captured cents of that capture
   - whether invoice refund-due cases and system-initiated refunds are in R4 (default: no;
     they would need `transaction_id` or the user to be optional);
   - whether clearing a finished refund's reason is acceptable (default: yes);
+  - whether the database should also enforce owner-only initiation (`role = 'owner'`). Today
+    it checks only that the user belongs to the business; R4-T3/T5 enforce owner-only;
   - a split sale cancelled and then paid late (OI-1) can hold a captured share while it stays
     `cancelled`. With split refunds disabled, R4 gives it no refund path.
 - **Windcave questions:**

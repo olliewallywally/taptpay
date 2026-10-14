@@ -78,6 +78,7 @@ const REAL_MIGRATIONS = [
   "0036_durable_payment_reconciliation.sql",
   "0037_retail_payment_canonical_integration.sql",
   "0038_cash_command_identity.sql",
+  "0039_refund_operations.sql",
 ];
 
 /** Migrations that own a `BEGIN;` / `COMMIT;` pair. */

@@ -2590,6 +2590,12 @@ export class MemStorage implements IStorage {
       id,
       createdAt: new Date(),
       completedAt: null,
+      // R4-T2: a legacy refund; operation fields are R4-T3's alone.
+      operationId: randomUUID(), state: null, idempotencyKey: null, requestFingerprint: null, processorXId: null,
+      merchantReference: null, originalProviderTransactionId: null, originalShareIndex: null, providerEnvironment: null,
+      amountCents: null, currency: null, providerRefundTransactionId: null, leaseOwner: null, leaseExpiresAt: null,
+      attemptCount: 0, nextReconciliationAt: null, lastErrorCode: null, initiatedByUserId: null, reasonCode: null,
+      reasonText: null, requestedAt: null, submittedAt: null, finishedAt: null, updatedAt: null,
     };
     this.refunds.set(id, refund);
     return refund;

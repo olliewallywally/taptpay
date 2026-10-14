@@ -74,7 +74,11 @@ R4-T2 onward may now start on this branch.
 `docs/evidence/remediation-v2-2/r3/OUTSTANDING-2026-10-14.md`. It has one owner question:
 recording a verified payment from a merchant route (R1-T7). R4-T2's ADR is
 `docs/decisions/2026-10-14-r4-t2-refund-operation-schema.md`, revision 2: pass 4 refused
-revision 1, and the pass-5 independent reread is owed before migration 0039 is committed.
+revision 1.
+**R4-T2 is implemented (2026-10-14):** migration 0039, approved in pass 6 after passes 4 and 5
+refused earlier revisions; read `docs/evidence/remediation-v2-2/r4/R4-T2-2026-10-14.md`. 0039 is
+applied nowhere (owner runbook `docs/operations/runbook-2026-10-14-apply-0039-refund-operations.md`).
+R4-T3 is next and must follow the ADR's lock-order, send-intent and lease rules.
 
 This program's established discipline: failing-tests-first; independently re-verify a prior
 pass's own claims before trusting them, the way every session in this program has had to;

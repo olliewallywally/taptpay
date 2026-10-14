@@ -32,7 +32,8 @@ before the send), B-4 (record-only balance, as a recorded decision), and pass 4'
    sender's POST lands. The ADR now has a binding lease rule, and a `submitted` row must have
    a lease (CHECK). A 404 is never "not processed" without Windcave's confirmation.
 3. **An attempt's capture is accepted in any state.** Now only an approved attempt, in the
-   operation's environment. Verifier case added.
+   operation's environment. (The declined-attempt case was added after pass 6; see the
+   correction under Missing Steps.)
 4. **The tenant check takes no lock.** The trigger now holds the sale with KEY SHARE until
    the insert commits.
 5. **DELETE is unguarded.** An operation is now never deleted; legacy rows still can be.
@@ -40,9 +41,12 @@ before the send), B-4 (record-only balance, as a recorded decision), and pass 4'
 
 ## Missing Steps (adopted)
 - The 0039 runbook with its count-only preflight.
-- Verifier cases: null method, a split capture as share 0, a non-approved attempt's capture,
-  a production attempt, DELETE, a legacy operation-ID change, a user of another business, a
-  submit without a lease.
+- Verifier cases: null method, a split capture as share 0, a production attempt, DELETE, a
+  legacy operation-ID change, a user of another business, a submit without a lease.
+
+  *Correction (pass 6):* this record first also listed a non-approved attempt's capture.
+  That case was not written until pass 6 found it missing, and the null-method case did not
+  show each layer. Both were added before the commit.
 - The migration header names every review.
 - `insertRefundSchema` omits the operation columns, with a unit test.
 - The initiating user must belong to the business (trigger).
