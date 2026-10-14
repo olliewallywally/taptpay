@@ -6,6 +6,13 @@
 [Codex's ADR](../../../decisions/2026-10-12-r2-r3-schema-integration.md) ·
 [owner runbook for the test database](../../../operations/runbook-2026-10-13-apply-0034-0038-test-database.md)
 
+**Follow-up 2026-10-14:**
+- OI-1 and OI-2 were decided by the owner and implemented.
+- H-1–H-3 were fixed, along with the missing steps that did not need a schema change.
+- See [OUTSTANDING-2026-10-14](OUTSTANDING-2026-10-14.md).
+- Correction to H-1 below: 0037's triggers do *not* refuse a first write of the account or
+  fingerprint after attachment; only a service check does (as "Missing steps" says).
+
 Reviewed: Codex's `fix/qwen-aligned-20261010` at `27d235b8` (four commits after R2's
 `14942392`: `9d52d8a5`, `f1e34585`, the integration merge `3e1bf582` and the cash commands in
 `27d235b8`). Merged into `ccr-e07e3100-0wm8kr` on top of `332b0153`, which carries the Option A
@@ -101,8 +108,9 @@ today.
 - **H-1. The R3 worker cannot reconcile a live retail payment.**
   - Binding recovery (`durable-payment-storage.ts` `resolveSession`) and the
     reconciliation finalize require `expected_provider_account` and `request_fingerprint`.
-  - Only `prepareRetailExpectation` writes those, and the live route never calls it. Once
-    an attempt is attached, 0037's triggers refuse to add them later.
+  - Only `prepareRetailExpectation` writes those, and the live route never calls it.
+    (Corrected 2026-10-14: 0037's triggers do not refuse adding them after attachment;
+    only `prepareRetailExpectation`'s own check does.)
   - So every live retail notification would be retried and then dead-lettered
     (`unbound_session`), and none would ever be settled by the worker.
   - Activation must first make the route record them through `PaymentAttemptService`, or
