@@ -3058,3 +3058,31 @@ passes all 28 selected suites / 1591 tests. No full invocation is relabelled.
 Repository work is complete. Official R3 exit remains held for sanitized Windcave
 UAT and production-sized restored migration/preflight/timing sign-off. No shared
 migration, real outbound financial/delivery call, deployment or R5 work occurred.
+
+## 27. October 14 — R5-T1 encryption reader foundation
+
+Owner instructed Codex to start R5 while Claude continues R4. Branch
+`remediation/r5-encryption-20261014` starts at completed R3 `3c98dfe9`. The
+bounded T1 scope implements authenticated AES-GCM/keyring/compatible bank-field
+readers, fail-closed configuration and named-target read-only/count-only preflight.
+No persistent writer, backfill, migration, collection path or refund change is
+activated. Default application behavior remains legacy; secrets stay in private
+server fields. R4 was observed at `8b7c300e`, not merged or represented as complete.
+
+Failing-first: eight configuration tests failed. Final verification: 9 server
+suites / 303 tests, 4 CLI safety tests, 34 existing credential/fingerprint safety
+tests and 13 actual owned PostgreSQL checks passed, with no skips. Typecheck,
+strict CLI/verifier typecheck and build pass. The PostgreSQL target is an owned
+copy of the preserved synthetic R3 restore; the verifier cleans only its fresh
+fixture IDs. No production count/backfill or retained-backup/key-removal proof is
+claimed; no full server/client rerun is claimed. Static CI checks are wired but
+remote CI execution is not claimed.
+
+See [T1 review](r5/R5-T1-REVIEW-2026-10-14.md),
+[frozen evidence](r5/R5-T1-VERIFICATION-2026-10-14.json) and
+[handoff / next task](../../HANDOFF-2026-10-14-r5-encryption-start.md).
+R5 remains open: T2 encrypted writers, T3 checkpointed/CAS backfill, T4 verified
+rotation/restore/contract, owner credential disposition and D8 retention/date,
+live-target evidence. R4 does not block T1 code/tests; future schema changes and
+combined rollout require canonical R3/R4 integration. No live payment/refund,
+provider/email/push, shared database mutation, deployment or main merge occurred.

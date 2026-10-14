@@ -1,5 +1,10 @@
 # Claude repository handoff
 
+**R5 started on `remediation/r5-encryption-20261014` (October 14).** Read
+`docs/HANDOFF-2026-10-14-r5-encryption-start.md` and its linked preflight/review before
+further R5 work. T1 is the reader/count-only foundation; encrypted writes and
+backfill remain. Claude owns R4. No deployment or official R3/R5 exit is implied.
+
 Before committing, pushing, or changing the current uncommitted merchant work, read:
 
 - replit.md

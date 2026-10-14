@@ -91,7 +91,7 @@ export const merchants = pgTable("merchants", {
   customLogoUrl: text("custom_logo_url"), // Custom merchant logo for customer payment page
   
   // Payment integration
-  windcaveApiKey: text("windcave_api_key"), // Encrypted Windcave API key
+  windcaveApiKey: text("windcave_api_key"), // Legacy unused credential; R5 disposition is owner-gated.
   windcaveMerchantId: text("windcave_merchant_id"), // Windcave-assigned merchant ID
   
   // Theme customization

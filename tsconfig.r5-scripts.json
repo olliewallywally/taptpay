@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "tsBuildInfoFile": "./node_modules/typescript/r5-scripts.tsbuildinfo"
+  },
+  "include": [
+    "scripts/r5-encryption-preflight.ts",
+    "scripts/r5-encryption-preflight.test.ts",
+    "scripts/verify-r5-reader-postgres.ts"
+  ]
+}

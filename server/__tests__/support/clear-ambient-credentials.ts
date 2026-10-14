@@ -21,6 +21,8 @@
  */
 
 export const PAIRED_CREDENTIAL_GROUPS: readonly (readonly string[])[] = [
+  // Local R5 keys must not enter synthetic fixtures or partially configure their reader.
+  ["DATA_ENCRYPTION_STAGE", "DATA_ENCRYPTION_ACTIVE_KEY_ID", "DATA_ENCRYPTION_KEYRING"],
   ["WINDCAVE_USERNAME", "WINDCAVE_API_KEY"],
   ["VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY"],
   ["APNS_KEY_P8", "APNS_KEY_ID", "APNS_TEAM_ID"],

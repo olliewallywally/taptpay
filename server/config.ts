@@ -1,4 +1,5 @@
 import { createPrivateKey, randomBytes } from "node:crypto";
+import { loadDataEncryption, EncryptionConfigurationError, type DataEncryption } from "./data-encryption";
 
 export type EnvironmentValidationMode = "audit" | "enforce";
 export type AppEnvironment = "development" | "test" | "staging" | "production";
@@ -58,6 +59,7 @@ export class ConfigValidationError extends Error {
 }
 
 export interface AppConfig {
+  readonly dataEncryption: DataEncryption;
   readonly envValidationMode: EnvironmentValidationMode;
   readonly appEnv: AppEnvironment;
   readonly isProduction: boolean;
@@ -259,6 +261,14 @@ function deepFreeze<T>(value: T): Readonly<T> {
 }
 
 export function loadConfig(env: EnvironmentSource): Readonly<AppConfig> {
+  // Encryption configuration cannot degrade to audit-only diagnostics: an
+  // unusable reader must not start against ciphertext written by a later release.
+  let dataEncryption: DataEncryption;
+  try { dataEncryption = loadDataEncryption(env); }
+  catch (error) {
+    if (error instanceof EncryptionConfigurationError) throw new ConfigValidationError(error.key, "encryption");
+    throw error;
+  }
   const validationRaw = nonempty(env, "ENV_VALIDATION_MODE")
     ?? (nonempty(env, "JEST_WORKER_ID") ? "audit" : undefined);
   if (!validationRaw) throw new ConfigValidationError("ENV_VALIDATION_MODE", "core");
@@ -603,6 +613,7 @@ export function loadConfig(env: EnvironmentSource): Readonly<AppConfig> {
     databaseTarget,
     databaseUrl,
     jwtSecret: jwtSecret ?? (localJwtSecret ??= randomBytes(32).toString("hex")),
+    dataEncryption,
     paymentReturnStateSecret,
     cronSecret,
     seedDemoData: rawBooleans.SEED_DEMO_DATA,

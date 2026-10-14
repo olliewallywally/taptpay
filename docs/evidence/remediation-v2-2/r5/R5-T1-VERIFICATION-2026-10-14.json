@@ -1,0 +1,165 @@
+{
+  "phase": "R5",
+  "slice": "T1: cipher, compatible reader, configuration and read-only preflight",
+  "repositorySliceComplete": true,
+  "phaseExitComplete": false,
+  "dateUTC": "2026-10-14",
+  "branch": "remediation/r5-encryption-20261014",
+  "baseCommit": "3c98dfe928bfc620d159935635c46735e2753041",
+  "candidateIdentity": "commit containing this frozen evidence and the R5-T1 handoff",
+  "observedR4Commit": "8b7c300eb852990bc22c869323b7f30cecd697d1",
+  "r4Merged": false,
+  "sourceSha256": {
+    "server/data-encryption.ts": "b6388fe6f1de1a13aefe2b823f1910b25d5a443597a744e9d13246f8fa6adb71",
+    "server/encryption-preflight.ts": "f3ee04ab68a051194ee064555020ba6bdd8269afb5cf06fdd6ccc26036a641c2",
+    "server/config.ts": "bf2f57f42be267789afc1012b6ca8db8023302061eb6610894da617edf3771db",
+    "server/__tests__/data-encryption.test.ts": "1a863a23a26b3428941353c3220a4e60e8112dce9e8fb1cbeb63e9ea1f1c5bfc",
+    "server/__tests__/encryption-preflight.test.ts": "a8e33eae5d418ea95bf4358e54061ac410fbf44e9a9ed56e31625d9f5c16e12d",
+    "server/__tests__/r5-encryption-config.test.ts": "671b1de4e33c06b9680322e0d2644754728f23f87b212d136b9a58336343d4fb",
+    "server/__tests__/support/clear-ambient-credentials.ts": "906da8e66793793e4bb8e02f4d38c8588d8529bce87dbbb11f875e120f67e628",
+    "scripts/r5-encryption-preflight.ts": "4f4485d0f57ab291c6f6fe5056be75a4427326bc54dc3424c52888102373deb7",
+    "scripts/r5-encryption-preflight.test.ts": "a7d02b041bb4ff2d84f33ff1f6f4125e52c51831c8027f6caaa782996eba0e09",
+    "scripts/verify-r5-reader-postgres.ts": "e5c729b18741e983fdcc98ec0c63d613e8bb92e69b596b12b6235991f8852c0d",
+    "shared/schema.ts": "af3cd7759641a1cffba59d0a036c3cc09cee9861df21bed472cd464e3176e158",
+    "package.json": "a242055a85b8961369705509082c459c2c30efcf14006233db661f2b62efd1ab",
+    "tsconfig.r5-scripts.json": "74eab19b71bdf0139bce2ecbd16133ca561dd7df505592dab24d802125a17807",
+    ".github/workflows/verify.yml": "4814fcc6d631e3f7bd9b216b759e2bccc5842ffd5f309dcae85e5f955e35688b",
+    "CLAUDE.md": "e3579fcbe869e8093e6c25eae7b3dcd7f460e11677749f87376e11e1148d9a1f",
+    "docs/HANDOFF-2026-10-14-r5-encryption-start.md": "fc91ae9807c6e8f86b03fd439e6f2c1ff2024526691744b62dd24e65756f6b95",
+    "docs/operations/r5-encryption-rollout.md": "52acbee5eabb8acc91357829d9844f1b7029c5142a605c8540750242ad6b2984",
+    "docs/evidence/remediation-v2-2/r5/R5-T1-PREFLIGHT-2026-10-14.md": "28d09b1409ed8a09a87316f96b0a8b764c50e6d0d4fafcccd103e7b34abf3f1f",
+    "docs/evidence/remediation-v2-2/r5/R5-T1-REVIEW-2026-10-14.md": "a99358198e66c3389babd8b193e0457cdafc28bcbc8791e1d30a66ba83a518f7",
+    "docs/evidence/remediation-v2-2/CONTINUATION-2026-09-07.md": "397d3e1bcbf616b99e54043ab9512dfa6eb793286cd5f78dcac82cc3400feae0"
+  },
+  "failingFirst": {
+    "configurationTestsFailed": 8,
+    "total": 8
+  },
+  "server": {
+    "method": "single completed scoped invocation",
+    "suites": 9,
+    "tests": 303,
+    "failed": 0,
+    "skipped": 0,
+    "files": [
+      {
+        "path": "server/__tests__/c10-batch-6-business.test.ts",
+        "tests": 44,
+        "status": "passed"
+      },
+      {
+        "path": "server/__tests__/r0-t5-callback-containment.test.ts",
+        "tests": 21,
+        "status": "passed"
+      },
+      {
+        "path": "server/__tests__/config-source-guard.test.ts",
+        "tests": 30,
+        "status": "passed"
+      },
+      {
+        "path": "server/__tests__/config.test.ts",
+        "tests": 105,
+        "status": "passed"
+      },
+      {
+        "path": "server/__tests__/encryption-preflight.test.ts",
+        "tests": 25,
+        "status": "passed"
+      },
+      {
+        "path": "server/__tests__/data-encryption.test.ts",
+        "tests": 57,
+        "status": "passed"
+      },
+      {
+        "path": "server/__tests__/phase0-contracts.test.ts",
+        "tests": 10,
+        "status": "passed"
+      },
+      {
+        "path": "server/__tests__/r5-encryption-config.test.ts",
+        "tests": 8,
+        "status": "passed"
+      },
+      {
+        "path": "server/__tests__/harness-live-provider-credentials.test.ts",
+        "tests": 3,
+        "status": "passed"
+      }
+    ]
+  },
+  "cliSafety": {
+    "tests": 4,
+    "failed": 0,
+    "skipped": 0
+  },
+  "existingCredentialAndFingerprintSafety": {
+    "tests": 34,
+    "failed": 0,
+    "skipped": 0
+  },
+  "actualPostgres": {
+    "checks": 13,
+    "host": "127.0.0.1",
+    "port": 55440,
+    "database": "r5_reader_20261014",
+    "source": "owned preserved synthetic R3 restore; source unchanged",
+    "proof": [
+      "mixed plaintext/null/active/old-key pages",
+      "actual read-only enforcement",
+      "reader restart/key rotation",
+      "row/column AAD swap refusal",
+      "typed Drizzle owner/admin/public DTO containment",
+      "real CLI exit 0 and unsafe-data exit 2",
+      "URI target mismatch refusal",
+      "corrupt ciphertext not overwritten",
+      "stored data unchanged by preflight",
+      "oversized text SQL guard",
+      "valid maximum-sized envelope"
+    ],
+    "cleanup": "only verifier-created synthetic merchant IDs deleted; restored rows preserved"
+  },
+  "checks": {
+    "applicationTypecheck": "passed",
+    "operatorScriptsStrictTypecheck": "passed",
+    "build": "passed",
+    "fullServerRun": "not run for T1",
+    "clientRun": "not run; no client source changed",
+    "remoteCI": "wired; not observed"
+  },
+  "commands": [
+    "npm run test:server -- --runTestsByPath server/__tests__/encryption-preflight.test.ts server/__tests__/data-encryption.test.ts server/__tests__/r5-encryption-config.test.ts server/__tests__/config.test.ts server/__tests__/config-source-guard.test.ts server/__tests__/harness-live-provider-credentials.test.ts server/__tests__/phase0-contracts.test.ts server/__tests__/c10-batch-6-business.test.ts server/__tests__/r0-t5-callback-containment.test.ts --json --outputFile=/tmp/taptpay-r5/terminal-results.json",
+    "npm run test:r5:cli",
+    "node --test scripts/count-merchant-credentials.test.mjs scripts/schema-fingerprint.test.mjs",
+    "node --import tsx scripts/verify-r5-reader-postgres.ts (owned R5_TEST_DATABASE_URL and test marker supplied securely)",
+    "npm run check",
+    "npm run check:r5",
+    "npm run build"
+  ],
+  "privateRawArtifactSha256": {
+    "terminal-results.json": "ef2bcf60f94ceda1a0d9521da8d15575798db2ccb7056703a964540415e207ea",
+    "config-before.json": "90cadb3d2ebfafa6de05db3e133caa328c9561c7fa1c8de42cc2b8b092cfb11d",
+    "postgres-frozen.log": "131637ad5d58697aa7642d466bd2a7517e835c367329357e97144c326f907d77",
+    "cli-repro.log": "9feb7fcbf5102f97ecd9b914d54fc2e5d436ec6f7dea1a15e497506452972c04",
+    "existing-safety.log": "bcfa452fab49b8e905e64d0da5b9808c97d79ba9ac29165284baf2e19e7b099c",
+    "typecheck-terminal.log": "0fedab01a35ca9fca53fe6fd66268f14af56d83677404c554d736f962da99fb3",
+    "cli-typecheck-repro.log": "74c9a58e31401b51f9ff8175574d1edecdda01c19af024e5609feb046c0c3b41",
+    "build-terminal.log": "c1040c78f94ae608d9cfc3c25c1c95953d5a68902c07c96e3f037f635b6e309b"
+  },
+  "migrationsAdded": [],
+  "persistentWriterChanged": false,
+  "liveDataBackfillExecuted": false,
+  "deployed": false,
+  "nextRepositoryTask": "R5-T2 / E2: reviewed encrypted-write integration with row-bound AAD and atomic writes",
+  "remaining": [
+    "T2 encrypted writers",
+    "T3 checkpointed, CAS-protected resumable backfill",
+    "T4 zero-plaintext verification, rotation, restore/decrypt and later contract release",
+    "owner unused merchant credential disposition",
+    "D8 retention/deletion decision and date",
+    "approved target/backups/key availability evidence",
+    "R4 canonical schema integration before combined rollout"
+  ],
+  "review": "separate proposal and implementation rereads by implementing agent; no external reviewer claimed"
+}

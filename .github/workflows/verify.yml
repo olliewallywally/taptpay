@@ -33,7 +33,7 @@ concurrency:
 
 jobs:
   static:
-    name: typecheck + client unit
+    name: typecheck + unit tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -44,12 +44,18 @@ jobs:
       - run: npm ci
       - name: tsc
         run: npm run check
+      - name: R5 operator scripts typecheck
+        run: npm run check:r5
+      - name: R5 cipher, configuration and read-only preflight (synthetic, no database)
+        run: npm run test:server -- --runTestsByPath server/__tests__/data-encryption.test.ts server/__tests__/r5-encryption-config.test.ts server/__tests__/encryption-preflight.test.ts
+      - name: R5 operator CLI safety (synthetic, no database)
+        run: npm run test:r5:cli
       - name: operator backup safety (synthetic subprocesses only)
         run: npm run test:backup:safety
       - name: schema fingerprint determinism (no database opened)
         run: npm run test:fingerprint
-      # test:client, not test — the server project needs a database, so it runs
-      # in browser-gates below where one exists.
+      # General server integration probes need the database below. The pure
+      # R5 reader checks above deliberately run without a database.
       - name: jest (client)
         run: npm run test:client
 
