@@ -16,7 +16,7 @@ describe("R5 encryption configuration refuses an unusable reader", () => {
       .toThrow(expect.objectContaining({ name: "ConfigValidationError", group: "encryption" }));
   });
 
-  test.each(["write", "contract", "TRUE", "", "read-compatible "])("unimplemented/invalid stage %p cannot activate writes", stage => {
+  test.each(["write", "contract ", "TRUE", "", "read-compatible "])("invalid stage %p cannot activate writes", stage => {
     expect(() => loadConfig({ ...base, DATA_ENCRYPTION_STAGE: stage }))
       .toThrow(expect.objectContaining({ name: "ConfigValidationError", key: "DATA_ENCRYPTION_STAGE" }));
   });

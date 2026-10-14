@@ -3086,3 +3086,33 @@ rotation/restore/contract, owner credential disposition and D8 retention/date,
 live-target evidence. R4 does not block T1 code/tests; future schema changes and
 combined rollout require canonical R3/R4 integration. No live payment/refund,
 provider/email/push, shared database mutation, deployment or main merge occurred.
+
+## 28. October 14 — R5 repository writers, workflows and encrypted recovery
+
+Codex completed R5 T2–T4 repository work on `remediation/r5-encryption-20261014`
+after T1 `5329bf77`: encrypted bank/active-card/payer-link writes, compatible named
+readers, explicit operator policies, count-only scans, locked/checkpointed/xmin-CAS
+backfills, sweep recovery, rotation and later reviewed contract. Original capability
+hashes/reminders/replay and stored-card billing digests remain unchanged.
+
+Full server 221 suites /5,151 tests and latest affected-source 10 suites /221 tests
+pass (overlapping counts, never summed), as do typechecks/build, 4 CLI, 8 PostgreSQL
+safety and 28 fingerprint tests. Two owned PostgreSQL proofs pass 21 checks each:
+concurrent/stale writers, audit rollback, locked-row recovery, restart, all 3,000
+restored links, billing/card callbacks/GET-only retries, rotation, strict current/
+older-key encrypted snapshot recovery and fail-closed key/context/hash guards.
+
+0048a/b/c applied only to owned synthetic targets/copies. Earlier SQL frozen.
+0048c fixes equivalent email-constraint catalog rendering exposed by actual
+logical restore; no validation is weakened. Fresh/populated/restore schema and
+actual CLI match complete fingerprint through 0048c, now referenced by CI.
+Owner app preserved; no provider/email/push transport, shared/live mutation,
+main merge or deployment. Remote CI is not claimed.
+
+See [final review](r5/R5-FINAL-REVIEW-2026-10-14.md),
+[receipt](r5/R5-T2-T4-VERIFICATION-2026-10-14.json),
+[handoff](../../HANDOFF-2026-10-14-r5-repository-complete.md) and
+[rollout](../../operations/r5-encryption-rollout.md).
+Official R5 exit stays open for unused credential choice, D8 date/backup controls,
+actual target backfill/zero-plaintext/restore and canonical R4 release integration;
+R3 provider UAT/production-sized migration rehearsal also remain release gates.

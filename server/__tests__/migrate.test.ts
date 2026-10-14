@@ -87,11 +87,14 @@ const REAL_MIGRATIONS = [
   "0045_provider_operation_keys.sql",
   "0046_payment_delivery_targets.sql",
   "0047_payment_creation_commands.sql",
+  "0048a_data_encryption_workflows.sql",
+  "0048b_active_secret_vault.sql",
+  "0048c_invoice_email_constraint_canonical.sql",
 ];
 
 /** Migrations that own a `BEGIN;` / `COMMIT;` pair. */
 const SELF_TRANSACTING = REAL_MIGRATIONS.filter(
-  (name) => Number.parseInt(name.slice(0, 4), 10) >= 7,
+  (name) => Number.parseInt(name.slice(0, 4), 10) >= 7 && !["0048a_data_encryption_workflows.sql","0048b_active_secret_vault.sql"].includes(name),
 );
 
 const MIGRATIONS_DIR = defaultMigrationsDir();

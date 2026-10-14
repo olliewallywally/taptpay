@@ -24,6 +24,7 @@ type Requirement = {
     | "verified_onboarding_complete";
   relationName: string;
   objectName: string;
+  definition?: string;
 };
 
 const r = (
@@ -619,6 +620,34 @@ export const BASELINE_EFFECT_REQUIREMENTS: readonly Requirement[] = [
   r("0047_payment_creation_commands.sql","constraint","subscription_payment_events","subscription_event_parent_fk"),
   r("0047_payment_creation_commands.sql","constraint","subscription_payment_events","subscription_manual_command_check"),
   r("0047_payment_creation_commands.sql","index","subscription_payment_events","subscription_event_command_uq"),
+  r("0048a_data_encryption_workflows.sql","table","data_encryption_control"),
+  r("0048a_data_encryption_workflows.sql","constraint","data_encryption_control","encryption_control_writer_check"),
+  r("0048a_data_encryption_workflows.sql","constraint","data_encryption_control","encryption_contract_review_check"),
+  r("0048a_data_encryption_workflows.sql","table","data_encryption_runs"),
+  r("0048a_data_encryption_workflows.sql","table","data_encryption_batches"),
+  r("0048a_data_encryption_workflows.sql","constraint","data_encryption_batches","encryption_batch_number_uq"),
+  r("0048a_data_encryption_workflows.sql","trigger","data_encryption_control","encryption_control_monotonic"),
+  r("0048a_data_encryption_workflows.sql","trigger","merchants","guard_encrypted_bank_writes"),
+  r("0048a_data_encryption_workflows.sql","trigger","data_encryption_batches","encryption_batch_immutable"),
+  r("0048a_data_encryption_workflows.sql","trigger","data_encryption_runs","encryption_run_identity"),
+  r("0048b_active_secret_vault.sql","column","data_encryption_control","active_secret_stage"),
+  r("0048b_active_secret_vault.sql","column","data_encryption_control","active_secret_review_reference"),
+  r("0048b_active_secret_vault.sql","constraint","data_encryption_control","active_secret_contract_review_check"),
+  r("0048b_active_secret_vault.sql","column","data_encryption_runs","scope"),
+  r("0048b_active_secret_vault.sql","column","data_encryption_runs","table_cursor"),
+  r("0048b_active_secret_vault.sql","column","data_encryption_runs","last_record_id"),
+  r("0048b_active_secret_vault.sql","trigger","data_encryption_control","encryption_active_control_monotonic"),
+  r("0048b_active_secret_vault.sql","trigger","data_encryption_runs","encryption_run_scope_identity"),
+  r("0048b_active_secret_vault.sql","trigger","merchant_subscriptions","guard_active_secret_writes"),
+  r("0048b_active_secret_vault.sql","trigger","invoices_rent_requests","guard_active_secret_writes"),
+  r("0048b_active_secret_vault.sql","trigger","job_invoices","guard_active_secret_writes"),
+  r("0048b_active_secret_vault.sql","trigger","quotes","guard_active_secret_writes"),
+  {
+    migration: "0048c_invoice_email_constraint_canonical.sql", kind: "constraint",
+    relationName: "invoice_payment_attempts", objectName: "invoice_attempt_payer_email_check",
+    // Presence alone would falsely baseline the old nested BETWEEN expression.
+    definition: "CHECK (((payer_email IS NULL) OR ((length(payer_email) >= 3) AND (length(payer_email) <= 254) AND (POSITION(('@'::text) IN (payer_email)) > 1))))",
+  },
 ];
 
 export const FIND_MISSING_BASELINE_EFFECTS_SQL = `
@@ -628,7 +657,8 @@ WITH requirements AS (
     migration text,
     kind text,
     "relationName" text,
-    "objectName" text
+    "objectName" text,
+    definition text
   )
 )
 SELECT migration, kind, "relationName", "objectName"
@@ -673,6 +703,7 @@ WHERE requirement.kind NOT IN ('verified_subscriptions_active', 'verified_onboar
     WHERE namespace_info.nspname = 'public'
       AND relation_info.relname = requirement."relationName"
       AND constraint_info.conname = requirement."objectName"
+      AND (requirement.definition IS NULL OR pg_get_constraintdef(constraint_info.oid) = requirement.definition)
   )
   ELSE false
 END

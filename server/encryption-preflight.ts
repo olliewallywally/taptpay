@@ -1,4 +1,4 @@
-import { DataEncryption, LEGACY_BANK_COLUMNS, MAX_ENCRYPTED_ENVELOPE_LENGTH, type EncryptionBucket, type LegacyBankColumn } from "./data-encryption";
+import { DataEncryption, LEGACY_BANK_COLUMNS, LEGACY_PROTECTED_COLUMNS, MAX_ENCRYPTED_ENVELOPE_LENGTH, type EncryptionBucket, type LegacyBankColumn, type LegacyProtectedColumn } from "./data-encryption";
 
 export interface PreflightTarget { readonly host: string; readonly port: number; readonly database: string }
 export interface PreflightClient {
@@ -35,10 +35,17 @@ export function assertPreflightTarget(expected: PreflightTarget, settings: Prefl
 // Fetch no unbounded text: an oversized stored value gets a separate invalid
 // flag, never a truncation that could be mistaken for null or valid plaintext.
 // The identifiers come only from the frozen server-side column list.
-export const BANK_PAGE_QUERY = `SELECT id, ${LEGACY_BANK_COLUMNS.map(column =>
+function pageQuery(columns: readonly LegacyProtectedColumn[], credentialPresence = false) {
+  return `SELECT id, xmin::text AS encryption_row_version, ${columns.map(column =>
   `CASE WHEN octet_length(${column}) > ${MAX_ENCRYPTED_ENVELOPE_LENGTH} THEN NULL ELSE ${column} END AS ${column},
    (octet_length(${column}) > ${MAX_ENCRYPTED_ENVELOPE_LENGTH}) AS ${column}_oversized`).join(", ")}
+  ${credentialPresence ? ", (windcave_api_key IS NOT NULL) AS credential_present" : ""}
   FROM public.merchants WHERE id > $1 ORDER BY id LIMIT $2`;
+}
+export const BANK_PAGE_QUERY = pageQuery(LEGACY_BANK_COLUMNS);
+export const ENCRYPT_CREDENTIAL_PAGE_QUERY = pageQuery(LEGACY_PROTECTED_COLUMNS);
+export const DELETE_CREDENTIAL_PAGE_QUERY = pageQuery(LEGACY_BANK_COLUMNS, true);
+export type CredentialPolicy = "unselected" | "delete" | "encrypt";
 
 // The unused credential must never leave PostgreSQL. It has a separate owner
 // disposition gate; inspecting/decrypting its values is outside this preflight.
@@ -57,19 +64,23 @@ export interface EncryptionPreflightReport {
   readonly credentialCounts: { withCredential: number; withNonemptyCredential: number };
   readonly fields: Record<LegacyBankColumn, EncryptionCounts>;
   readonly safeToBackfill: boolean;
+  readonly credentialEncryption?: EncryptionCounts;
 }
 
 /** No mutations, persistent values, row IDs or envelopes in the result. */
 export async function countLegacyBankData(
   client: PreflightClient, expected: PreflightTarget, settings: PreflightTarget,
-  reader: DataEncryption, batchSize = DEFAULT_PREFLIGHT_BATCH_SIZE,
+  reader: DataEncryption, batchSize = DEFAULT_PREFLIGHT_BATCH_SIZE, credentialPolicy: CredentialPolicy = "unselected",
 ): Promise<EncryptionPreflightReport> {
   assertPreflightTarget(expected, settings);
   if (!Number.isInteger(batchSize) || batchSize < 1 || batchSize > MAX_PREFLIGHT_BATCH_SIZE) fail("R5_PREFLIGHT_INVALID_ARGUMENTS");
-  if (reader.describe().stage !== "read-compatible") fail("R5_PREFLIGHT_READER_NOT_READY");
+  if (reader.describe().stage === "legacy") fail("R5_PREFLIGHT_READER_NOT_READY");
   const fields = Object.fromEntries(LEGACY_BANK_COLUMNS.map(column => [column,
     Object.fromEntries(buckets.map(bucket => [bucket, 0])),
   ])) as Record<LegacyBankColumn, EncryptionCounts>;
+  if (!["unselected", "delete", "encrypt"].includes(credentialPolicy)) fail("R5_PREFLIGHT_INVALID_ARGUMENTS");
+  const credentialEncryption = Object.fromEntries(buckets.map(bucket => [bucket, 0])) as EncryptionCounts;
+  const columns = credentialPolicy === "encrypt" ? LEGACY_PROTECTED_COLUMNS : LEGACY_BANK_COLUMNS;
   await client.query("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY");
   try {
     await client.query("SET LOCAL search_path = pg_catalog");
@@ -87,27 +98,29 @@ export async function countLegacyBankData(
     let lastId = 0;
     let merchants = 0;
     while (true) {
-      const { rows } = await client.query(BANK_PAGE_QUERY, [lastId, batchSize]);
+      const { rows } = await client.query(credentialPolicy === "encrypt" ? ENCRYPT_CREDENTIAL_PAGE_QUERY : BANK_PAGE_QUERY, [lastId, batchSize]);
       if (rows.length > batchSize) fail("R5_PREFLIGHT_INVALID_PAGE");
       for (const row of rows) {
         if (!Number.isSafeInteger(row.id) || row.id <= lastId) fail("R5_PREFLIGHT_INVALID_PAGE");
         lastId = row.id;
         merchants++;
-        for (const column of LEGACY_BANK_COLUMNS) {
+        for (const column of columns) {
           const bucket = row[`${column}_oversized`] === true ? "invalidValue" :
             reader.classify(row[column], { schema: "public", table: "merchants", rowId: row.id, column });
-          fields[column][bucket]++;
+          if (column === "windcave_api_key") credentialEncryption[bucket]++;
+          else fields[column][bucket]++;
         }
       }
       if (rows.length < batchSize) break;
     }
     if (merchants !== counts.merchants) fail("R5_PREFLIGHT_INCONSISTENT_COUNTS");
-    const safeToBackfill = Object.values(fields).every(count =>
+    const allCounts = [...Object.values(fields), ...(credentialPolicy === "encrypt" ? [credentialEncryption] : [])];
+    const safeToBackfill = allCounts.every(count =>
       count.unknownKey === 0 && count.malformedEnvelope === 0 && count.authenticationFailure === 0 &&
       count.unsupportedVersion === 0 && count.invalidValue === 0);
     return { merchants, credentialCounts: {
       withCredential: counts.with_credential, withNonemptyCredential: counts.with_nonempty_credential,
-    }, fields, safeToBackfill };
+    }, fields, safeToBackfill, ...(credentialPolicy === "encrypt" ? { credentialEncryption } : {}) };
   } finally {
     await client.query("ROLLBACK");
   }

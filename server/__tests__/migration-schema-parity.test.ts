@@ -68,7 +68,7 @@ function tablesCreatedByMigrations(): Set<string> {
   const names = new Set<string>();
   for (const filename of listMigrationFiles(dir)) {
     const sql = stripSqlComments(fs.readFileSync(path.join(dir, filename), "utf8"));
-    for (const match of sql.matchAll(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?"?([a-z_][a-z0-9_]*)"?/gi)) {
+    for (const match of sql.matchAll(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:"?public"?\s*\.\s*)?"?([a-z_][a-z0-9_]*)"?/gi)) {
       names.add(match[1].toLowerCase());
     }
   }
@@ -89,7 +89,7 @@ function columnsCreatedByMigrations(table: string): Set<string> {
   const dir = defaultMigrationsDir();
   const names = new Set<string>();
   const createRe = new RegExp(
-    `CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?"?${table}"?\\s*\\(([\\s\\S]*?)\\n\\s*\\);`,
+    `CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?(?:"?public"?\\s*\\.\\s*)?"?${table}"?\\s*\\(([\\s\\S]*?)\\n\\s*\\);`,
     "gi",
   );
 
@@ -108,7 +108,7 @@ function columnsCreatedByMigrations(table: string): Set<string> {
     // ALTER TABLE <table> ... ADD COLUMN [IF NOT EXISTS] <name>
     for (const statement of sql.split(/\bALTER\s+TABLE\b/i).slice(1)) {
       const body = statement.split(";")[0];
-      if (!new RegExp(`^\\s*"?${table}"?\\s`, "i").test(body)) continue;
+      if (!new RegExp(`^\\s*(?:"?public"?\\s*\\.\\s*)?"?${table}"?\\s`, "i").test(body)) continue;
       for (const match of body.matchAll(/\bADD\s+COLUMN\s+(?:IF\s+NOT\s+EXISTS\s+)?"?([a-z_][a-z0-9_]*)"?/gi)) {
         names.add(match[1].toLowerCase());
       }

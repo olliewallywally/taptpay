@@ -1,9 +1,12 @@
 import { hashBearerCredential } from "./payment-credential";
+import { DataEncryption, DataEncryptionError } from "./data-encryption";
+import { sealLegacyBankChanges, withoutLegacyBankFields } from "./legacy-bank-writes";
+import { openActiveSecret, openLinkRow, openSubscriptionRow, sealActiveSecret } from "./active-secret-vault";
 import { users, type User, type UserStatus, merchants, merchantTutorialProgress, transactions, uploadedFiles, uploadedFileScans, appleIdentities, type AppleIdentityRecord, merchantSettlements, refunds, splitPayments, paymentAttempts, PAYMENT_RETURN_STATE_MAX_AGE_MS, taptStones, stockItems, merchantSubscriptions, subscriptionBillingHistory, pushSubscriptions, pushNotificationDeliveries, normalizePushNotificationPreferences, DEFAULT_PUSH_NOTIFICATION_PREFERENCES, tenantProfiles, activeSchedules, invoicesRentRequests, transactionEvents, clientProfiles, quotes, jobInvoices, jobSchedules, jobEvents, type Merchant, type MerchantTutorialProgress, type Transaction, type SplitPayment, type PaymentAttempt, type InsertMerchant, type InsertTransaction, type CreateMerchant, type Refund, type InsertRefund, type TaptStone, type InsertTaptStone, type StockItem, type InsertStockItem, type MerchantSubscription, type SubscriptionBillingHistory, type PushSubscription, type PushNotificationPreferences, type PushNotificationEventType } from "@shared/schema";
 import { DEFAULT_PLAN_ID, isUpgrade, planFor, planForOrDefault, type PlanId } from "@shared/plans";
 import { paymentSessionBindings, paymentNotificationInbox, paymentSettlementEvents, paymentDeliveryOutbox } from "@shared/schema";
 import { evidenceMatchesExpectation } from "./payment-reconciliation";
-import { mintPublicLinkToken, hashPublicLinkTokenData } from "./public-link-token-compatibility";
+import { mintPublicLinkToken, hashPublicLinkTokenData, publicLinkTokenUpdates } from "./public-link-token-compatibility";
 import {canonicalCashCommand,type CashCommandInput,type CashCommandResult} from './cash-command';
 import {paymentCommand,type PaymentCommandActor} from './payment-command';
 import {subscriptionBillingAttempts,subscriptionCardAttempts} from '@shared/schema';
@@ -1493,7 +1496,7 @@ export class MemStorage implements IStorage {
   private authSessionRows = new Map<string, AuthSession>();
   private documentAccessAudit: Array<{ adminUserId: number; documentName: string }> = [];
 
-  constructor() {
+  constructor(private readonly encryption: DataEncryption = config.dataEncryption) {
     this.merchants = new Map();
     this.transactions = new Map();
     this.refunds = new Map();
@@ -1688,6 +1691,7 @@ export class MemStorage implements IStorage {
       createdAt: new Date(),
       updatedAt: new Date(),
     };
+    Object.assign(merchant, sealLegacyBankChanges(this.encryption, id, insertMerchant as any));
     this.merchants.set(id, merchant);
     return merchant;
   }
@@ -1730,6 +1734,7 @@ export class MemStorage implements IStorage {
       createdAt: new Date(),
       updatedAt: new Date(),
     };
+    Object.assign(merchant, sealLegacyBankChanges(this.encryption, id, merchantData));
     this.upsertMemOwner(merchant, passwordHash);
     this.merchants.set(id, merchant);
     this.ensureMemSubscription(id);
@@ -2887,6 +2892,7 @@ export class MemStorage implements IStorage {
   async updateMerchant(id: number, updates: Partial<Merchant>): Promise<Merchant | undefined> {
     const merchant = this.merchants.get(id);
     if (!merchant) return undefined;
+    if (updates.id !== undefined && updates.id !== id) throw new DataEncryptionError("ENCRYPTION_INVALID_CONTEXT");
 
     // R0-T5: no general update path may write a Windcave credential. R5 owns
     // historical values through its own reviewed path, not this one.
@@ -2894,6 +2900,7 @@ export class MemStorage implements IStorage {
     const updatedMerchant = {
       ...merchant,
       ...safeUpdates,
+      ...sealLegacyBankChanges(this.encryption, id, safeUpdates),
       updatedAt: new Date(),
     };
     this.merchants.set(id, updatedMerchant);
@@ -2995,10 +3002,7 @@ export class MemStorage implements IStorage {
     
     const updatedMerchant = {
       ...merchant,
-      bankName: bankDetails.bankName,
-      bankAccountNumber: bankDetails.bankAccountNumber,
-      bankBranch: bankDetails.bankBranch,
-      accountHolderName: bankDetails.accountHolderName,
+      ...sealLegacyBankChanges(this.encryption, id, bankDetails),
     };
     this.merchants.set(id, updatedMerchant);
     return updatedMerchant;
@@ -4291,7 +4295,7 @@ export class MemStorage implements IStorage {
           subscriptionId: subscription.id,
           merchantId,
           targetPlanId: plan.id,
-          cardId: subscription.windcaveCardId,
+          cardId: openActiveSecret("merchant_subscriptions", subscription.id, subscription.windcaveCardId, this.encryption)!,
           amountCents,
           idempotencyKey,
           reference: `TAPTPAY-UPGRADE-M${merchantId}-${plan.id.toUpperCase()}-${anchor}`,
@@ -4340,7 +4344,7 @@ export class MemStorage implements IStorage {
   ): Promise<MerchantSubscription> {
     const subscription = this.ensureMemSubscription(merchantId);
     Object.assign(subscription, {
-      windcaveCardId: card.windcaveCardId,
+      windcaveCardId: sealActiveSecret("merchant_subscriptions", subscription.id, card.windcaveCardId, this.encryption),
       cardBrand: card.brand,
       cardLast4: card.last4,
       cardExpiry: card.expiry,
@@ -4393,7 +4397,7 @@ export class MemStorage implements IStorage {
           && new Date(subscription.currentPeriodEnd).getTime() > now.getTime();
         if (paidPeriodIsCurrent) {
           Object.assign(subscription, {
-            windcaveCardId: card.windcaveCardId,
+            windcaveCardId: sealActiveSecret("merchant_subscriptions", subscription.id, card.windcaveCardId, this.encryption),
             cardBrand: card.brand,
             cardLast4: card.last4,
             cardExpiry: card.expiry,
@@ -4432,7 +4436,7 @@ export class MemStorage implements IStorage {
         && !!subscription.currentPeriodEnd
         && new Date(subscription.currentPeriodEnd).getTime() > now.getTime();
       const cardFields = {
-        windcaveCardId: card.windcaveCardId,
+        windcaveCardId: sealActiveSecret("merchant_subscriptions", subscription.id, card.windcaveCardId, this.encryption),
         cardBrand: card.brand,
         cardLast4: card.last4,
         cardExpiry: card.expiry,
@@ -5016,7 +5020,21 @@ export class MemStorage implements IStorage {
 
 // Database Storage Implementation
 export class DatabaseStorage implements IStorage {
-  constructor(private db = getDb()) {}
+  constructor(private db = getDb(), private readonly encryption: DataEncryption = config.dataEncryption) {}
+
+  private async insertMerchantBankData(tx: any, data: Record<string, any>): Promise<Merchant> {
+    if (!this.encryption.writesEncrypted()) {
+      const [row] = await tx.insert(merchants).values({ ...data, ...sealLegacyBankChanges(this.encryption, 1, data) }).returning();
+      return row;
+    }
+    // The caller's transaction commits no sensitive value until its row ID
+    // exists and the matching AAD-bound ciphertext has been filled.
+    const [row] = await tx.insert(merchants).values(withoutLegacyBankFields(data)).returning();
+    const changes = sealLegacyBankChanges(this.encryption, row.id, data);
+    if (Object.keys(changes).length === 0) return row;
+    const [sealed] = await tx.update(merchants).set(changes).where(eq(merchants.id, row.id)).returning();
+    return sealed;
+  }
 
   async getMerchant(merchantId: number): Promise<Merchant | undefined> {
     if (!this.db) throw new Error('Database not available');
@@ -5033,8 +5051,9 @@ export class DatabaseStorage implements IStorage {
 
   async createMerchant(insertMerchant: InsertMerchant): Promise<Merchant> {
     if (!this.db) throw new Error('Database not available');
-    const result = await this.db.insert(merchants).values(insertMerchant).returning();
-    return result[0];
+    const { windcaveApiKey: _rejected, ...safe } = insertMerchant as any;
+    if (this.encryption.writesEncrypted()) return this.db.transaction(tx => this.insertMerchantBankData(tx, safe));
+    return this.insertMerchantBankData(this.db, safe);
   }
 
   async createMerchantWithPassword(merchantData: any, passwordHash: string): Promise<Merchant> {
@@ -5154,8 +5173,7 @@ export class DatabaseStorage implements IStorage {
         status: 'verified',
         verificationToken: null,
       };
-      const result = await tx.insert(merchants).values(insertData).returning();
-      const inserted = result[0];
+      const inserted = await this.insertMerchantBankData(tx, insertData);
       const updated = await tx
         .update(merchants)
         .set({
@@ -5176,12 +5194,13 @@ export class DatabaseStorage implements IStorage {
 
   async updateMerchant(id: number, updates: Partial<Merchant>): Promise<Merchant | undefined> {
     if (!this.db) throw new Error('Database not available');
+    if (updates.id !== undefined && updates.id !== id) throw new DataEncryptionError("ENCRYPTION_INVALID_CONTEXT");
     // R0-T5: no general update path may write a Windcave credential. R5 owns
     // historical values through its own reviewed path, not this one.
     const { windcaveApiKey: _rejectedWindcaveApiKey, ...safeUpdates } = updates;
     const result = await this.db
       .update(merchants)
-      .set({ ...safeUpdates, updatedAt: new Date() })
+      .set({ ...safeUpdates, ...sealLegacyBankChanges(this.encryption, id, safeUpdates), updatedAt: new Date() })
       .where(eq(merchants.id, id))
       .returning();
     return result[0];
@@ -5295,9 +5314,11 @@ export class DatabaseStorage implements IStorage {
 
   async updateMerchantBankAccount(id: number, bankDetails: { bankName: string; bankAccountNumber: string; bankBranch: string; accountHolderName: string }): Promise<Merchant | undefined> {
     if (!this.db) throw new Error('Database not available');
+    const changes = sealLegacyBankChanges(this.encryption, id, bankDetails);
+    if (Object.keys(changes).length === 0) return this.getMerchant(id);
     const result = await this.db
       .update(merchants)
-      .set(bankDetails)
+      .set(changes)
       .where(eq(merchants.id, id))
       .returning();
     return result[0];
@@ -7790,7 +7811,7 @@ export class DatabaseStorage implements IStorage {
         .where(eq(merchantSubscriptions.merchantId, merchantId))
         .for("update")
         .limit(1);
-      const subscription = rows[0];
+      const subscription = openSubscriptionRow(rows[0], this.encryption);
       if (!subscription) {
         return {
           kind: "done" as const,
@@ -8046,12 +8067,12 @@ export class DatabaseStorage implements IStorage {
 
   async saveSubscriptionCard(merchantId: number, card: SubscriptionCardInput): Promise<MerchantSubscription> {
     if (!this.db) throw new Error('Database not available');
-    await this.getOrCreateSubscription(merchantId);
+    const subscription = await this.getOrCreateSubscription(merchantId);
     const now = new Date();
     const result = await this.db
       .update(merchantSubscriptions)
       .set({
-        windcaveCardId: card.windcaveCardId,
+        windcaveCardId: sealActiveSecret("merchant_subscriptions", subscription.id, card.windcaveCardId, this.encryption),
         cardBrand: card.brand,
         cardLast4: card.last4,
         cardExpiry: card.expiry,
@@ -8211,7 +8232,7 @@ export class DatabaseStorage implements IStorage {
           .returning();
         if (rows[0]) claimed.push(rows[0]);
       }
-      return claimed;
+      return claimed.map(row => openSubscriptionRow(row, this.encryption));
     });
   }
 
@@ -8850,7 +8871,7 @@ export class DatabaseStorage implements IStorage {
       eq(invoicesRentRequests.id, id), eq(invoicesRentRequests.merchantId, merchantId),
       sql`exists (select 1 from ${tenantProfiles} where ${tenantProfiles.id} = ${invoicesRentRequests.tenantProfileId} and ${tenantProfiles.merchantId} = ${merchantId})`,
     )).limit(1);
-    return row;
+    return openLinkRow("invoices_rent_requests", row, this.encryption);
   }
   private async mutatePropertyInvoiceForMerchant(id: string, merchantId: number, operation: "void" | "paid-external" | "resent", externalPaymentReference?: string,
     delivery?: { tenantProfileId: string; data: PropertyInvoiceDeliveryInput }, actor?: PaymentCommandActor): Promise<PropertyInvoiceMutationResult> {
@@ -8877,7 +8898,7 @@ export class DatabaseStorage implements IStorage {
         action:operation==='void'?'void':'manualPaid',...(operation==='paid-external'?{reference:externalPaymentReference}:{})},actor);
       if(command && ((operation==='void' && invoice.status==='voided') || (operation==='paid-external' && invoice.status==='paid_external'))) {
         const [prior]=await tx.select().from(transactionEvents).where(and(eq(transactionEvents.id,command.id),eq(transactionEvents.merchantId,merchantId))).limit(1);
-        if(prior && (prior.payload as any)?.requestFingerprint===command.fingerprint)return {kind:'ok',invoice};
+        if(prior && (prior.payload as any)?.requestFingerprint===command.fingerprint)return {kind:'ok',invoice: openLinkRow("invoices_rent_requests", invoice, this.encryption)};
         return {kind:'conflict',reason:operation==='void'?'voided':'paid'};
       }
       if (invoice.status === "paid" || invoice.status === "paid_external") return { kind: "conflict", reason: "paid" };
@@ -8904,7 +8925,7 @@ export class DatabaseStorage implements IStorage {
         await tx.insert(paymentDeliveryOutbox).values({transactionEventId:event.id,channel:'merchant_payment_update',nextAttemptAt:now});
         if(operation==='paid-external')await tx.insert(paymentDeliveryOutbox).values({transactionEventId:event.id,channel:'payer_receipt',nextAttemptAt:now});
       }
-      return { kind: "ok", invoice: updated };
+      return { kind: "ok", invoice: openLinkRow("invoices_rent_requests", updated, this.encryption) };
     });
   }
   async voidInvoiceRentRequestForMerchant(id: string, merchantId: number, actor?: PaymentCommandActor): Promise<PropertyInvoiceMutationResult> {
@@ -8923,7 +8944,7 @@ export class DatabaseStorage implements IStorage {
     const [row] = await db.select({ invoice: invoicesRentRequests, tenant: tenantProfiles }).from(invoicesRentRequests)
       .innerJoin(tenantProfiles, eq(tenantProfiles.id, invoicesRentRequests.tenantProfileId))
       .where(and(eq(invoicesRentRequests.id, id), eq(invoicesRentRequests.merchantId, merchantId), eq(tenantProfiles.merchantId, merchantId))).limit(1);
-    return row;
+    return row ? { ...row, invoice: openLinkRow("invoices_rent_requests", row.invoice, this.encryption) } : row;
   }
   async createOrReuseInvoiceRentRequestForMerchant(tenantProfileId: string, merchantId: number, data: PropertyInvoiceInput,intent?:CreationCommandIntent): Promise<PropertyInvoiceCreationResult> {
     if (!isManagementTenantId(merchantId)) return { kind: "not-found" };
@@ -8933,7 +8954,7 @@ export class DatabaseStorage implements IStorage {
       const command=intent?bindCreationCommand('property',merchantId,{...input,tenantProfileId},intent):undefined;
       if(command){const prior=await readCreationCommand(tx,command);if(prior){
         const [invoice]=await tx.select().from(invoicesRentRequests).where(and(eq(invoicesRentRequests.id,prior.rentInvoiceId!),eq(invoicesRentRequests.merchantId,merchantId),eq(invoicesRentRequests.tenantProfileId,tenantProfileId))).limit(1);
-        return invoice?{kind:'ok',invoice,reused:true,commandReused:true}:{kind:'not-found'};
+        return invoice?{kind:'ok',invoice:openLinkRow('invoices_rent_requests',invoice,this.encryption),reused:true,commandReused:true}:{kind:'not-found'};
       }}
       const [parent] = await tx.select().from(tenantProfiles).where(and(
         eq(tenantProfiles.id, tenantProfileId), eq(tenantProfiles.merchantId, merchantId),
@@ -8971,49 +8992,49 @@ export class DatabaseStorage implements IStorage {
             await tx.insert(transactionEvents).values({id:record.id,merchantId,tenantProfileId:parent.id,invoiceId:invoice.id,eventType:'Invoice_Request_Updated',
               payload:{source:'creation_command',requestFingerprint:command.fingerprint,actor:command.actor,amountCents:invoice.amountCents}});
             await tx.insert(paymentDeliveryOutbox).values({transactionEventId:record.id,channel:'merchant_payment_update',nextAttemptAt:new Date()});}
-          return { kind: "ok", invoice, reused: true,commandReused:false };
+          return { kind: "ok", invoice: openLinkRow("invoices_rent_requests", invoice, this.encryption), reused: true,commandReused:false };
         }
       }
       const [invoice] = await tx.insert(invoicesRentRequests).values({ ...input, merchantId, tenantProfileId: parent.id,
-        ...mintPublicLinkToken(), status: "pending_dispatch" }).returning();
+        ...mintPublicLinkToken("invoices_rent_requests", this.encryption), status: "pending_dispatch" }).returning();
       const record=command?await recordCreationCommand(tx,command,{rentInvoiceId:invoice.id}):undefined;
       await tx.insert(transactionEvents).values({ ...(record?{id:record.id}:{}),merchantId, tenantProfileId: parent.id, invoiceId: invoice.id,
         eventType: input.kind === "charge" ? "Charge_Created" : "Invoice_Generated",
         payload: { ...(command?{source:'creation_command',requestFingerprint:command.fingerprint,actor:command.actor}:{}),amountCents: invoice.amountCents, channel: invoice.deliveryChannel,
           ...(input.kind === "charge" ? { chargeType: input.chargeType, description: input.description } : {}) } });
       if(record)await tx.insert(paymentDeliveryOutbox).values({transactionEventId:record.id,channel:'merchant_payment_update',nextAttemptAt:new Date()});
-      return { kind: "ok", invoice, reused: false,commandReused:false };
+      return { kind: "ok", invoice: openLinkRow("invoices_rent_requests", invoice, this.encryption), reused: false,commandReused:false };
     });
   }
   async createInvoiceRentRequest(data: any): Promise<any> {
-    const db = getDb(); if (!db) throw new Error('No database');
+    const db = this.db; if (!db) throw new Error('No database');
     if (data.scheduleId && data.billingPeriodStart) {
       const existing = await db.select().from(invoicesRentRequests).where(and(eq(invoicesRentRequests.scheduleId, data.scheduleId), eq(invoicesRentRequests.billingPeriodStart, data.billingPeriodStart))).limit(1);
-      if (existing[0]) return existing[0];
+      if (existing[0]) return openLinkRow("invoices_rent_requests",existing[0],this.encryption);
     }
-    const [r] = await db.insert(invoicesRentRequests).values(hashPublicLinkTokenData(data)).returning(); return r;
+    const [r] = await db.insert(invoicesRentRequests).values(hashPublicLinkTokenData(data, "invoices_rent_requests", this.encryption)).returning(); return openLinkRow("invoices_rent_requests", r, this.encryption);
   }
   async getInvoiceRentRequest(id: string): Promise<any> {
-    const db = getDb(); if (!db) return undefined;
-    const [r] = await db.select().from(invoicesRentRequests).where(eq(invoicesRentRequests.id, id)).limit(1); return r;
+    const db = this.db; if (!db) return undefined;
+    const [r] = await db.select().from(invoicesRentRequests).where(eq(invoicesRentRequests.id, id)).limit(1); return openLinkRow("invoices_rent_requests", r, this.encryption);
   }
   async getInvoiceRentRequestByToken(token: string): Promise<any> {
     const db = this.db; if (!db) return undefined;
     try {
       const [hashed] = await db.select().from(invoicesRentRequests).where(eq(invoicesRentRequests.tokenHash, hashBearerCredential(token))).limit(1);
-      if (hashed) return hashed;
+      if (hashed) return openLinkRow("invoices_rent_requests", hashed, this.encryption);
       const [row] = await db.select().from(invoicesRentRequests).where(and(eq(invoicesRentRequests.token, token), isNull(invoicesRentRequests.tokenHash))).limit(1);
-      return row;
+      return openLinkRow("invoices_rent_requests", row, this.encryption);
     } catch (error) {
       if (isNeonEmptyResultError(error)) return undefined;
       throw error;
     }
   }
   async getInvoiceRentRequestByWindcaveSessionId(sessionId: string): Promise<any> {
-    const db = getDb(); if (!db) return undefined;
+    const db = this.db; if (!db) return undefined;
     try {
       const [row] = await db.select().from(invoicesRentRequests).where(eq(invoicesRentRequests.windcaveSessionId, sessionId)).limit(1);
-      return row;
+      return openLinkRow("invoices_rent_requests", row, this.encryption);
     } catch (error) {
       if (isNeonEmptyResultError(error)) return undefined;
       throw error;
@@ -9057,7 +9078,7 @@ export class DatabaseStorage implements IStorage {
     return rows.map((row) => row.payerEmail as string);
   }
   async atomicClaimSplitShare(invoiceId: string, sessionId: string): Promise<any | null> {
-    const db = getDb(); if (!db) return null;
+    const db = this.db; if (!db) return null;
     // Atomic increment + array-append with three guards: session not already counted,
     // paid count not yet at splitCount, and invoice not already settled.
     // Using SQL arithmetic ensures concurrent calls each get a unique slot.
@@ -9077,11 +9098,11 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .returning();
-    return updated ?? null;
+    return openLinkRow("invoices_rent_requests",updated,this.encryption) ?? null;
   }
   async getInvoiceRentRequestByWhatsappMessageId(messageId: string): Promise<any> {
-    const db = getDb(); if (!db) return undefined;
-    const [r] = await db.select().from(invoicesRentRequests).where(eq(invoicesRentRequests.whatsappMessageId, messageId)).limit(1); return r;
+    const db = this.db; if (!db) return undefined;
+    const [r] = await db.select().from(invoicesRentRequests).where(eq(invoicesRentRequests.whatsappMessageId, messageId)).limit(1); return openLinkRow("invoices_rent_requests", r, this.encryption);
   }
   async getInvoiceRentRequestsByMerchant(merchantId: number, opts: { status?: string; tenantProfileId?: string } = {}): Promise<any[]> {
     if (!isManagementTenantId(merchantId)) return [];
@@ -9090,24 +9111,24 @@ export class DatabaseStorage implements IStorage {
       sql`exists (select 1 from ${tenantProfiles} where ${tenantProfiles.id} = ${invoicesRentRequests.tenantProfileId} and ${tenantProfiles.merchantId} = ${merchantId})`];
     if (opts.status) conds.push(eq(invoicesRentRequests.status, opts.status));
     if (opts.tenantProfileId) conds.push(eq(invoicesRentRequests.tenantProfileId, opts.tenantProfileId));
-    return db.select().from(invoicesRentRequests).where(and(...conds)).orderBy(desc(invoicesRentRequests.createdAt));
+    return (await db.select().from(invoicesRentRequests).where(and(...conds)).orderBy(desc(invoicesRentRequests.createdAt))).map(row => openLinkRow("invoices_rent_requests", row, this.encryption));
   }
   async updateInvoiceRentRequest(id: string, updates: any): Promise<any> {
-    const db = getDb(); if (!db) return undefined;
-    const [r] = await db.update(invoicesRentRequests).set({ ...updates, updatedAt: new Date() }).where(eq(invoicesRentRequests.id, id)).returning(); return r;
+    const db = this.db; if (!db) return undefined;
+    const [r] = await db.update(invoicesRentRequests).set({ ...publicLinkTokenUpdates(id,updates,"invoices_rent_requests",this.encryption), updatedAt: new Date() }).where(eq(invoicesRentRequests.id, id)).returning(); return openLinkRow("invoices_rent_requests", r, this.encryption);
   }
   async getPendingDispatchInvoices(): Promise<any[]> {
-    const db = getDb(); if (!db) return [];
-    return db.select().from(invoicesRentRequests).where(eq(invoicesRentRequests.status, "pending_dispatch")).orderBy(invoicesRentRequests.createdAt);
+    const db = this.db; if (!db) return [];
+    return (await db.select().from(invoicesRentRequests).where(eq(invoicesRentRequests.status, "pending_dispatch")).orderBy(invoicesRentRequests.createdAt)).map(row => openLinkRow("invoices_rent_requests", row, this.encryption));
   }
   async getOverdueEligibleInvoices(now: Date): Promise<any[]> {
-    const db = getDb(); if (!db) return [];
-    return db.select().from(invoicesRentRequests).where(and(eq(invoicesRentRequests.status, "dispatched"), lte(invoicesRentRequests.dueAt, now)));
+    const db = this.db; if (!db) return [];
+    return (await db.select().from(invoicesRentRequests).where(and(eq(invoicesRentRequests.status, "dispatched"), lte(invoicesRentRequests.dueAt, now)))).map(row => openLinkRow("invoices_rent_requests", row, this.encryption));
   }
   async getReminderEligibleInvoices(): Promise<any[]> {
-    const db = getDb(); if (!db) return [];
+    const db = this.db; if (!db) return [];
     // Overdue, still unpaid — the reminder pass applies the per-merchant timing policy.
-    return db.select().from(invoicesRentRequests).where(eq(invoicesRentRequests.status, "overdue")).orderBy(invoicesRentRequests.dueAt);
+    return (await db.select().from(invoicesRentRequests).where(eq(invoicesRentRequests.status, "overdue")).orderBy(invoicesRentRequests.dueAt)).map(row => openLinkRow("invoices_rent_requests", row, this.encryption));
   }
   async logTransactionEvent(data: any): Promise<any> {
     const db = getDb(); if (!db) return {};
@@ -9225,9 +9246,9 @@ export class DatabaseStorage implements IStorage {
       if (!(await this.holdOwnedInvoiceDocument(tx, merchantId, input.documentUrl))) return { kind: "invalid-document" };
       if (!parent) parent = await this.insertTradesProspect(tx, merchantId, (client as { prospect: ClientProfileChanges }).prospect);
       const [quote] = await tx.insert(quotes).values({ ...input, merchantId, clientProfileId: parent.id,
-        ...mintPublicLinkToken(), status: "sent", sentAt: new Date() }).returning();
+        ...mintPublicLinkToken("quotes", this.encryption), status: "sent", sentAt: new Date() }).returning();
       await tx.insert(jobEvents).values({ merchantId, clientProfileId: parent.id, quoteId: quote.id, eventType: "quote_sent" });
-      return { kind: "ok", quote, client: parent };
+      return { kind: "ok", quote: openLinkRow("quotes", quote, this.encryption), client: parent };
     });
   }
   async respondToQuoteForMerchant(id:string,merchantId:number,accept:boolean,options:{allowAccept:boolean}):Promise<QuoteResponseResult>{
@@ -9245,7 +9266,7 @@ export class DatabaseStorage implements IStorage {
       if(prior){
         if((prior.payload as any)?.requestFingerprint!==command.fingerprint)return {kind:'conflict'};
         const [invoice]=prior.jobInvoiceId?await tx.select().from(jobInvoices).where(and(eq(jobInvoices.id,prior.jobInvoiceId),eq(jobInvoices.merchantId,merchantId),eq(jobInvoices.quoteId,id))).limit(1):[];
-        return {kind:'ok',quote,invoice:invoice??null,reused:true};
+        return {kind:'ok',quote: openLinkRow("quotes", quote, this.encryption),invoice: openLinkRow("job_invoices", invoice??null, this.encryption),reused:true};
       }
       if(['accepted','declined'].includes(quote.status))return {kind:'conflict'};
       const now=new Date();
@@ -9275,7 +9296,7 @@ export class DatabaseStorage implements IStorage {
         if(!Number.isSafeInteger(amountCents)||amountCents!<1||amountCents!>quote.totalCents)return {kind:'conflict'};
         const dueAt=new Date(now.getTime()+7*86400000);
         [invoice]=await tx.insert(jobInvoices).values({merchantId,clientProfileId:client.id,quoteId:id,kind:deposit?'deposit':'full',
-          amountCents,...mintPublicLinkToken(),deliveryChannel:quote.deliveryChannel,status:'pending_dispatch',dueAt}).returning();
+          amountCents,...mintPublicLinkToken("job_invoices", this.encryption),deliveryChannel:quote.deliveryChannel,status:'pending_dispatch',dueAt}).returning();
       }
       const [updated]=await tx.update(quotes).set({status:accept?'accepted':'declined',acceptedAt:accept?now:null,declinedAt:accept?null:now,updatedAt:now})
         .where(and(eq(quotes.id,id),inArray(quotes.status,['sent','viewed']))).returning();
@@ -9283,7 +9304,7 @@ export class DatabaseStorage implements IStorage {
       await tx.insert(jobEvents).values({id:command.id,merchantId,clientProfileId:client.id,quoteId:id,jobInvoiceId:invoice?.id??null,
         eventType:accept?'quote_accepted':'quote_declined',payload:{...command.payload,totalCents:quote.totalCents,invoiceAmountCents:invoice?.amountCents??null}});
       await tx.insert(paymentDeliveryOutbox).values({jobEventId:command.id,channel:'merchant_payment_update',nextAttemptAt:now});
-      return {kind:'ok',quote:updated,invoice,reused:false};
+      return {kind:'ok',quote: openLinkRow("quotes", updated, this.encryption),invoice: openLinkRow("job_invoices", invoice, this.encryption),reused:false};
     });
   }
   async recordQuoteViewForMerchant(id:string,merchantId:number):Promise<typeof quotes.$inferSelect|undefined>{
@@ -9294,14 +9315,14 @@ export class DatabaseStorage implements IStorage {
       const [locator]=await tx.select({clientProfileId:quotes.clientProfileId}).from(quotes).where(and(eq(quotes.id,id),eq(quotes.merchantId,merchantId))).limit(1);
       if(!locator)return undefined;const client=await this.lockOwnedTradesClient(tx,locator.clientProfileId,merchantId);if(!client)return undefined;
       const [quote]=await tx.select().from(quotes).where(and(eq(quotes.id,id),eq(quotes.merchantId,merchantId),eq(quotes.clientProfileId,client.id))).limit(1).for('update');
-      if(!quote||!['sent','viewed'].includes(quote.status))return quote;
+      if(!quote||!['sent','viewed'].includes(quote.status))return openLinkRow("quotes", quote, this.encryption);
       const now=new Date(),expired=quote.validUntil&&quote.validUntil<now;
-      if(!expired&&quote.status!=='sent')return quote;
+      if(!expired&&quote.status!=='sent')return openLinkRow("quotes", quote, this.encryption);
       const command=paymentCommand({domain:'trades',merchantId,aggregateId:id,action:expired?'quoteExpire':'quoteView'},{service:expired?'internal':'public_checkout'});
       const [updated]=await tx.update(quotes).set({status:expired?'expired':'viewed',...(!expired?{viewedAt:now}:{}),updatedAt:now}).where(eq(quotes.id,id)).returning();
       await tx.insert(jobEvents).values({id:command.id,merchantId,clientProfileId:client.id,quoteId:id,eventType:expired?'quote_expired':'quote_viewed',payload:command.payload});
       await tx.insert(paymentDeliveryOutbox).values({jobEventId:command.id,channel:'merchant_payment_update',nextAttemptAt:now});
-      return updated;
+      return openLinkRow("quotes", updated, this.encryption);
     });
   }
   async recordQuoteDeliveryForMerchant(id: string, merchantId: number, clientProfileId: string, record: TradesQuoteDeliveryRecord): Promise<boolean> {
@@ -9321,17 +9342,17 @@ export class DatabaseStorage implements IStorage {
     });
   }
   async getQuote(id: string): Promise<any> {
-    const db = getDb(); if (!db) return undefined;
+    const db = this.db; if (!db) return undefined;
     const [row] = await db.select().from(quotes).where(eq(quotes.id, id));
-    return row;
+    return openLinkRow("quotes", row, this.encryption);
   }
   async getQuoteByToken(token: string): Promise<any> {
     const db = this.db; if (!db) return undefined;
     try {
       const [hashed] = await db.select().from(quotes).where(eq(quotes.tokenHash, hashBearerCredential(token))).limit(1);
-      if (hashed) return hashed;
+      if (hashed) return openLinkRow("quotes", hashed, this.encryption);
       const [row] = await db.select().from(quotes).where(and(eq(quotes.token, token), isNull(quotes.tokenHash))).limit(1);
-      return row;
+      return openLinkRow("quotes", row, this.encryption);
     } catch (error) {
       if (isNeonEmptyResultError(error)) return undefined;
       throw error;
@@ -9343,7 +9364,7 @@ export class DatabaseStorage implements IStorage {
     const conds: any[] = [eq(quotes.merchantId, merchantId),
       sql`exists (select 1 from ${clientProfiles} where ${clientProfiles.id} = ${quotes.clientProfileId} and ${clientProfiles.merchantId} = ${merchantId})`];
     if (opts.status) conds.push(eq(quotes.status, opts.status));
-    return db.select().from(quotes).where(and(...conds)).orderBy(desc(quotes.createdAt));
+    return (await db.select().from(quotes).where(and(...conds)).orderBy(desc(quotes.createdAt))).map(row => openLinkRow("quotes", row, this.encryption));
   }
   async getQuoteDeliveryForMerchant(id: string, merchantId: number): Promise<TradesQuoteDeliverySnapshot | undefined> {
     if (!isManagementTenantId(merchantId)) return undefined;
@@ -9352,14 +9373,14 @@ export class DatabaseStorage implements IStorage {
     const [row] = await db.select({ quote: quotes, client: clientProfiles }).from(quotes)
       .innerJoin(clientProfiles, eq(clientProfiles.id, quotes.clientProfileId))
       .where(and(eq(quotes.id, id), eq(quotes.merchantId, merchantId), eq(clientProfiles.merchantId, merchantId))).limit(1);
-    return row;
+    return row ? { ...row, quote: openLinkRow("quotes", row.quote, this.encryption) } : row;
   }
   async updateQuote(id: string, updates: any): Promise<any> {
-    const db = getDb(); if (!db) return undefined;
+    const db = this.db; if (!db) return undefined;
     const [row] = await db.update(quotes)
-      .set({ ...updates, updatedAt: new Date() })
+      .set({ ...publicLinkTokenUpdates(id,updates,"quotes",this.encryption), updatedAt: new Date() })
       .where(eq(quotes.id, id)).returning();
-    return row;
+    return openLinkRow("quotes", row, this.encryption);
   }
 
   // ───────── Trades: job invoices ─────────
@@ -9370,7 +9391,7 @@ export class DatabaseStorage implements IStorage {
       eq(jobInvoices.id, id), eq(jobInvoices.merchantId, merchantId),
       sql`exists (select 1 from ${clientProfiles} where ${clientProfiles.id} = ${jobInvoices.clientProfileId} and ${clientProfiles.merchantId} = ${merchantId})`,
     )).limit(1);
-    return row;
+    return openLinkRow("job_invoices", row, this.encryption);
   }
   async getJobInvoiceDeliveryForMerchant(id: string, merchantId: number): Promise<TradesInvoiceDeliverySnapshot | undefined> {
     if (!isManagementTenantId(merchantId)) return undefined;
@@ -9379,7 +9400,7 @@ export class DatabaseStorage implements IStorage {
     const [row] = await db.select({ invoice: jobInvoices, client: clientProfiles }).from(jobInvoices)
       .innerJoin(clientProfiles, eq(clientProfiles.id, jobInvoices.clientProfileId))
       .where(and(eq(jobInvoices.id, id), eq(jobInvoices.merchantId, merchantId), eq(clientProfiles.merchantId, merchantId))).limit(1);
-    return row;
+    return row ? { ...row, invoice: openLinkRow("job_invoices", row.invoice, this.encryption) } : row;
   }
   private async mutateJobInvoiceForMerchant(id: string, merchantId: number, operation: "void" | "paid-external" | "complete" | "dispatched",
     externalPaymentReference?: string, delivery?: { clientProfileId: string; record: TradesInvoiceDeliveryRecord },actor?:PaymentCommandActor): Promise<JobInvoiceMutationResult> {
@@ -9405,7 +9426,7 @@ export class DatabaseStorage implements IStorage {
         action:operation==='void'?'void':'manualPaid',...(operation==='paid-external'?{reference:externalPaymentReference}:{})},actor):undefined;
       if(command && ((operation==='void' && invoice.status==='voided') || (operation==='paid-external' && invoice.status==='paid_external'))) {
         const [prior]=await tx.select().from(jobEvents).where(and(eq(jobEvents.id,command.id),eq(jobEvents.merchantId,merchantId))).limit(1);
-        if(prior && (prior.payload as any)?.requestFingerprint===command.fingerprint)return {kind:'ok',invoice};
+        if(prior && (prior.payload as any)?.requestFingerprint===command.fingerprint)return {kind:'ok',invoice: openLinkRow("job_invoices", invoice, this.encryption)};
         return {kind:'conflict',reason:operation==='void'?'voided':'paid'};
       }
       // An archived client's issued invoices stay manageable (owner decision
@@ -9442,7 +9463,7 @@ export class DatabaseStorage implements IStorage {
         await tx.insert(paymentDeliveryOutbox).values({jobEventId:event.id,channel:'merchant_payment_update',nextAttemptAt:now});
         if(operation==='paid-external')await tx.insert(paymentDeliveryOutbox).values({jobEventId:event.id,channel:'payer_receipt',nextAttemptAt:now});
       }
-      return { kind: "ok", invoice: updated };
+      return { kind: "ok", invoice: openLinkRow("job_invoices", updated, this.encryption) };
     });
   }
   async voidJobInvoiceForMerchant(id: string, merchantId: number, actor?:PaymentCommandActor): Promise<JobInvoiceMutationResult> {
@@ -9486,7 +9507,7 @@ export class DatabaseStorage implements IStorage {
         const [invoice]=await tx.select().from(jobInvoices).where(and(eq(jobInvoices.id,prior.jobInvoiceId!),eq(jobInvoices.merchantId,merchantId))).limit(1);
         if(!invoice)return {kind:'not-found'};
         const [parent]=await tx.select().from(clientProfiles).where(and(eq(clientProfiles.id,invoice.clientProfileId),eq(clientProfiles.merchantId,merchantId))).limit(1);
-        return parent?{kind:'ok',invoice,client:parent,commandReused:true}:{kind:'not-found'};
+        return parent?{kind:'ok',invoice:openLinkRow('job_invoices',invoice,this.encryption),client:parent,commandReused:true}:{kind:'not-found'};
       }}
       // As the quote create: every check first, the hidden prospect last.
       let parent = "clientProfileId" in client ? await this.lockOwnedTradesClient(tx, client.clientProfileId, merchantId) : undefined;
@@ -9502,12 +9523,12 @@ export class DatabaseStorage implements IStorage {
       if (!(await this.holdOwnedInvoiceDocument(tx, merchantId, input.documentUrl))) return { kind: "invalid-document" };
       if (!parent) parent = await this.insertTradesProspect(tx, merchantId, (client as { prospect: ClientProfileChanges }).prospect);
       const [invoice] = await tx.insert(jobInvoices).values({ ...input, merchantId, clientProfileId: parent.id,
-        ...mintPublicLinkToken(), status: "pending_dispatch" }).returning();
+        ...mintPublicLinkToken("job_invoices", this.encryption), status: "pending_dispatch" }).returning();
       const record=command?await recordCreationCommand(tx,command,{jobInvoiceId:invoice.id}):undefined;
       await tx.insert(jobEvents).values({...(record?{id:record.id}:{}),merchantId,clientProfileId:parent.id,jobInvoiceId:invoice.id,eventType:'invoice_sent',
         ...(command?{payload:{source:'creation_command',requestFingerprint:command.fingerprint,actor:command.actor,amountCents:invoice.amountCents}}:{})});
       if(record)await tx.insert(paymentDeliveryOutbox).values({jobEventId:record.id,channel:'merchant_payment_update',nextAttemptAt:new Date()});
-      return { kind: "ok", invoice, client: parent,commandReused:false };
+      return { kind: "ok", invoice: openLinkRow("job_invoices", invoice, this.encryption), client: parent,commandReused:false };
     });
   }
   async createJobBalanceInvoiceForMerchant(depositInvoiceId: string, merchantId: number, splitEnabled: boolean,actor:PaymentCommandActor={service:'internal'}): Promise<JobBalanceCreationResult> {
@@ -9540,57 +9561,57 @@ export class DatabaseStorage implements IStorage {
       const [prior]=await tx.select().from(jobEvents).where(and(eq(jobEvents.id,command.id),eq(jobEvents.merchantId,merchantId))).limit(1);
       const existing=onQuote.find((invoice:any)=>invoice.kind==='balance');
       if(prior){const invoice=existing??(await tx.select().from(jobInvoices).where(and(eq(jobInvoices.id,prior.jobInvoiceId!),eq(jobInvoices.merchantId,merchantId),eq(jobInvoices.clientProfileId,parent.id))).limit(1))[0];
-        return (prior.payload as any)?.requestFingerprint===command.fingerprint&&invoice?{kind:'ok',invoice,reused:true}:{kind:'conflict',reason:'exists'};}
+        return (prior.payload as any)?.requestFingerprint===command.fingerprint&&invoice?{kind:'ok',invoice:openLinkRow('job_invoices',invoice,this.encryption),reused:true}:{kind:'conflict',reason:'exists'};}
       if(existing)return {kind:'conflict',reason:'exists'};
       const alreadyBilled = onQuote.reduce((sum: number, invoice: any) => sum + (invoice.amountCents || 0), 0);
       const balanceCents = Math.max(quote.totalCents - alreadyBilled, 0);
       if (balanceCents <= 0) return { kind: "conflict", reason: "none-remaining" };
       const due = new Date(); due.setDate(due.getDate() + 7);
       const [invoice] = await tx.insert(jobInvoices).values({ merchantId, clientProfileId: parent.id, quoteId: deposit.quoteId,
-        kind: "balance", amountCents: balanceCents, ...mintPublicLinkToken(),
+        kind: "balance", amountCents: balanceCents, ...mintPublicLinkToken("job_invoices", this.encryption),
         deliveryChannel: deposit.deliveryChannel, status: "pending_dispatch", dueAt: due, splitEnabled: !!splitEnabled }).returning();
       await tx.insert(jobEvents).values({id:command.id,merchantId,clientProfileId:parent.id,quoteId:deposit.quoteId,jobInvoiceId:invoice.id,eventType:'balance_sent',payload:{...command.payload,amountCents:balanceCents}});
       await tx.insert(paymentDeliveryOutbox).values({jobEventId:command.id,channel:'merchant_payment_update',nextAttemptAt:new Date()});
-      return { kind: "ok", invoice,reused:false };
+      return { kind: "ok", invoice: openLinkRow("job_invoices", invoice, this.encryption),reused:false };
     });
   }
   async createJobInvoice(data: any): Promise<any> {
-    const db = getDb(); if (!db) throw new Error('No database');
-    const [row] = await db.insert(jobInvoices).values(hashPublicLinkTokenData(data)).returning();
-    return row;
+    const db = this.db; if (!db) throw new Error('No database');
+    const [row] = await db.insert(jobInvoices).values(hashPublicLinkTokenData(data, "job_invoices", this.encryption)).returning();
+    return openLinkRow("job_invoices", row, this.encryption);
   }
   async getJobInvoice(id: string): Promise<any> {
-    const db = getDb(); if (!db) return undefined;
+    const db = this.db; if (!db) return undefined;
     const [row] = await db.select().from(jobInvoices).where(eq(jobInvoices.id, id));
-    return row;
+    return openLinkRow("job_invoices", row, this.encryption);
   }
   async getJobInvoiceByToken(token: string): Promise<any> {
     const db = this.db; if (!db) return undefined;
     try {
       const [hashed] = await db.select().from(jobInvoices).where(eq(jobInvoices.tokenHash, hashBearerCredential(token))).limit(1);
-      if (hashed) return hashed;
+      if (hashed) return openLinkRow("job_invoices", hashed, this.encryption);
       const [row] = await db.select().from(jobInvoices).where(and(eq(jobInvoices.token, token), isNull(jobInvoices.tokenHash))).limit(1);
-      return row;
+      return openLinkRow("job_invoices", row, this.encryption);
     } catch (error) {
       if (isNeonEmptyResultError(error)) return undefined;
       throw error;
     }
   }
   async getJobInvoiceByWindcaveSessionId(sessionId: string): Promise<any> {
-    const db = getDb(); if (!db) return undefined;
+    const db = this.db; if (!db) return undefined;
     try {
       const [row] = await db.select().from(jobInvoices).where(eq(jobInvoices.windcaveSessionId, sessionId)).limit(1);
-      return row;
+      return openLinkRow("job_invoices", row, this.encryption);
     } catch (error) {
       if (isNeonEmptyResultError(error)) return undefined;
       throw error;
     }
   }
   async getJobInvoiceByWhatsappMessageId(messageId: string): Promise<any> {
-    const db = getDb(); if (!db) return undefined;
+    const db = this.db; if (!db) return undefined;
     try {
       const [row] = await db.select().from(jobInvoices).where(eq(jobInvoices.whatsappMessageId, messageId)).limit(1);
-      return row;
+      return openLinkRow("job_invoices", row, this.encryption);
     } catch (error) {
       if (isNeonEmptyResultError(error)) return undefined;
       throw error;
@@ -9603,29 +9624,29 @@ export class DatabaseStorage implements IStorage {
       sql`exists (select 1 from ${clientProfiles} where ${clientProfiles.id} = ${jobInvoices.clientProfileId} and ${clientProfiles.merchantId} = ${merchantId})`];
     if (opts.status) conds.push(eq(jobInvoices.status, opts.status));
     if (opts.clientProfileId) conds.push(eq(jobInvoices.clientProfileId, opts.clientProfileId));
-    return db.select().from(jobInvoices).where(and(...conds)).orderBy(desc(jobInvoices.createdAt));
+    return (await db.select().from(jobInvoices).where(and(...conds)).orderBy(desc(jobInvoices.createdAt))).map(row => openLinkRow("job_invoices", row, this.encryption));
   }
   async getJobInvoicesByQuote(quoteId: string): Promise<any[]> {
-    const db = getDb(); if (!db) return [];
-    return db.select().from(jobInvoices).where(eq(jobInvoices.quoteId, quoteId)).orderBy(desc(jobInvoices.createdAt));
+    const db = this.db; if (!db) return [];
+    return (await db.select().from(jobInvoices).where(eq(jobInvoices.quoteId, quoteId)).orderBy(desc(jobInvoices.createdAt))).map(row => openLinkRow("job_invoices", row, this.encryption));
   }
   async getJobInvoiceByScheduleAndDue(scheduleId: string, dueAt: Date): Promise<any> {
-    const db = getDb(); if (!db) return undefined;
+    const db = this.db; if (!db) return undefined;
     // Ignore voided rows so a cancelled duplicate never blocks regeneration —
     // matches the partial unique index (which also excludes voided).
     const [row] = await db.select().from(jobInvoices)
       .where(and(eq(jobInvoices.scheduleId, scheduleId), eq(jobInvoices.dueAt, dueAt), ne(jobInvoices.status, "voided"))).limit(1);
-    return row;
+    return openLinkRow("job_invoices", row, this.encryption);
   }
   async updateJobInvoice(id: string, updates: any): Promise<any> {
-    const db = getDb(); if (!db) return undefined;
+    const db = this.db; if (!db) return undefined;
     const [row] = await db.update(jobInvoices)
-      .set({ ...updates, updatedAt: new Date() })
+      .set({ ...publicLinkTokenUpdates(id,updates,"job_invoices",this.encryption), updatedAt: new Date() })
       .where(eq(jobInvoices.id, id)).returning();
-    return row;
+    return openLinkRow("job_invoices", row, this.encryption);
   }
   async atomicClaimJobSplitShare(invoiceId: string, sessionId: string): Promise<any | null> {
-    const db = getDb(); if (!db) return null;
+    const db = this.db; if (!db) return null;
     const [updated] = await db.update(jobInvoices)
       .set({
         splitPaidCount: sql`${jobInvoices.splitPaidCount} + 1`,
@@ -9639,24 +9660,24 @@ export class DatabaseStorage implements IStorage {
         sql`${jobInvoices.status} NOT IN ('paid', 'paid_external', 'voided')`,
       ))
       .returning();
-    return updated ?? null;
+    return openLinkRow("job_invoices",updated,this.encryption) ?? null;
   }
   async getPendingDispatchJobInvoices(): Promise<any[]> {
-    const db = getDb(); if (!db) return [];
-    return db.select().from(jobInvoices)
+    const db = this.db; if (!db) return [];
+    return (await db.select().from(jobInvoices)
       .where(inArray(jobInvoices.status, ["pending_dispatch", "dispatch_failed"]))
-      .orderBy(jobInvoices.createdAt);
+      .orderBy(jobInvoices.createdAt)).map(row => openLinkRow("job_invoices", row, this.encryption));
   }
   async getOverdueEligibleJobInvoices(now: Date): Promise<any[]> {
-    const db = getDb(); if (!db) return [];
-    return db.select().from(jobInvoices)
-      .where(and(inArray(jobInvoices.status, ["dispatched", "viewed", "dispatch_failed"]), lte(jobInvoices.dueAt, now)));
+    const db = this.db; if (!db) return [];
+    return (await db.select().from(jobInvoices)
+      .where(and(inArray(jobInvoices.status, ["dispatched", "viewed", "dispatch_failed"]), lte(jobInvoices.dueAt, now)))).map(row => openLinkRow("job_invoices", row, this.encryption));
   }
   async getReminderEligibleJobInvoices(): Promise<any[]> {
-    const db = getDb(); if (!db) return [];
-    return db.select().from(jobInvoices)
+    const db = this.db; if (!db) return [];
+    return (await db.select().from(jobInvoices)
       .where(eq(jobInvoices.status, "balance_due"))
-      .orderBy(jobInvoices.dueAt);
+      .orderBy(jobInvoices.dueAt)).map(row => openLinkRow("job_invoices", row, this.encryption));
   }
 
   // ───────── Trades: job schedules ─────────

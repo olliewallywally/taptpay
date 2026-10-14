@@ -30,7 +30,7 @@ export function getSubscriptionPaymentRuntime(inbox?:DurablePaymentStorage):Subs
   const billing=new DurableSubscriptionBilling(pool,{
     purchase:async(expected,persist)=>matches(expected)?chargeStoredCard(expected.processorXId,expected.cardId,(expected.amountCents/100).toFixed(2),expected.reference,{onPendingTransaction:persist}):{success:false},
     query:async expected=>matches(expected)?queryStoredCardCharge(expected.processorXId,expected.transactionId,(expected.amountCents/100).toFixed(2),expected.reference):{success:false},
-  },context,()=>new Date(),enabled);
+  },context,()=>new Date(),enabled,config.dataEncryption);
   const card=new DurableSubscriptionCard(pool,inbox??new DurablePaymentStorage(pool),{
     create:async(expected,input)=>{
       if(!matches(expected))return undefined;
@@ -57,7 +57,7 @@ export function getSubscriptionPaymentRuntime(inbox?:DurablePaymentStorage):Subs
       const references=transactions.map((entry:any)=>entry?.merchantReference);
       return references.every((reference:any)=>typeof reference==='string'&&reference===references[0]&&/^SC_[0-9a-f-]{36}$/.test(reference))?references[0]:undefined;
     },
-  },billing,context,config.paymentReturnStateSecret??'',()=>new Date(),enabled);
+  },billing,context,config.paymentReturnStateSecret??'',()=>new Date(),enabled,config.dataEncryption);
   return runtime={billing,card,context};
 }
 

@@ -153,7 +153,9 @@ jobs:
           # 2026-10-14: integrated R2/R3 migrations 0034–0047; complete
           # owned scratch/restored schemas match. The pre-expansion snapshot
           # independently reproduces the previous 0033 baseline above.
-          RECORDED: docs/evidence/remediation-v2-2/r3/R3-integrated-through-0047-fingerprint-2026-10-14.json
+          # R5 0048a–c: bank/active encryption policy, checkpoints and stable
+          # email constraint catalog text; fresh, populated and logical restore agree.
+          RECORDED: docs/evidence/remediation-v2-2/r5/R5-through-0048c-fingerprint-2026-10-14.json
         run: |
           node scripts/schema-fingerprint.mjs > "$RUNNER_TEMP/fingerprint.json"
           node -e "

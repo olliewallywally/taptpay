@@ -1,4 +1,6 @@
 import {createHash,randomUUID} from 'node:crypto';
+import {openActiveSecret,sealActiveSecret} from './active-secret-vault';
+import {loadDataEncryption,type DataEncryption} from './data-encryption';
 import {isSessionId,isUuid,requestFingerprint,type InboxClaim} from './durable-payment-contract';
 import {createPaymentReturnState} from './payment-token';
 import {hashBearerCredential} from './payment-credential';
@@ -31,7 +33,7 @@ export class DurableSubscriptionCard {
   constructor(private readonly pool:PaymentSqlPool,private readonly inbox:DurablePaymentStorage,
     private readonly provider:SubscriptionCardProvider,private readonly billing:DurableSubscriptionBilling,
     private readonly context:{environment:'uat'|'production';providerAccount:string},private readonly returnSecret:string,
-    private readonly clock=()=>new Date(),private readonly enabled=()=>false){}
+    private readonly clock=()=>new Date(),private readonly enabled=()=>false,private readonly encryption:DataEncryption=loadDataEncryption({})){}
   canStart():boolean{return this.enabled()&&!!this.returnSecret;}
   private async transaction<T>(work:(client:PaymentSqlClient)=>Promise<T>):Promise<T>{
     const client=await this.pool.connect();try{await client.query('BEGIN');await client.query("SET LOCAL lock_timeout='2s'");await client.query("SET LOCAL statement_timeout='5s'");
@@ -108,7 +110,7 @@ export class DurableSubscriptionCard {
       LEFT JOIN subscription_payment_events e ON e.card_attempt_id=a.id AND e.event_type='card_setup_started'
       LEFT JOIN subscription_payment_events approved ON approved.card_attempt_id=a.id AND approved.event_type='card_approved'
       LEFT JOIN subscription_billing_attempts b ON b.card_attempt_id=a.id AND b.kind='activation' WHERE a.session_id=$1 AND a.merchant_id=$2`,[sessionId,merchantId])).rows[0];
-      return row?{...row,payment_method_superseded:row.state==='approved'&&row.card_digest&&digest(row.current_card_id??'')!==row.card_digest&&(!row.activation_state||!!row.activation_applied_at),
+      return row?{...row,payment_method_superseded:row.state==='approved'&&row.card_digest&&digest(openActiveSecret('merchant_subscriptions',row.subscription_id,row.current_card_id,this.encryption)??'')!==row.card_digest&&(!row.activation_state||!!row.activation_applied_at),
         activation_suppressed:row.state==='approved'&&row.activation_required==='true'&&
         ((!row.activation_state&&!!activationCancelled(row))||(row.activation_state==='abandoned'&&row.activation_error==='cancelled_before_send'))}:undefined;});
   }
@@ -154,7 +156,7 @@ export class DurableSubscriptionCard {
         const card=observation.card;
         if(!card.cardId||card.cardId.length>1000||(card.last4!==null&&!/^\d{4}$/.test(card.last4))||(card.expiry!==null&&!/^(0[1-9]|1[0-2])\/\d{2}$/.test(card.expiry)))return false;
         await client.query(`UPDATE merchant_subscriptions SET windcave_card_id=$2,card_brand=$3,card_last4=$4,card_expiry=$5,windcave_billing_ref=$6,updated_at=$7 WHERE id=$1`,
-          [parent.id,card.cardId,card.brand,card.last4,card.expiry,`stored:${digest(claim.sessionId)}`,now]);
+          [parent.id,sealActiveSecret('merchant_subscriptions',parent.id,card.cardId,this.encryption),card.brand,card.last4,card.expiry,`stored:${digest(claim.sessionId)}`,now]);
         await client.query('UPDATE subscription_card_attempts SET card_digest=$2 WHERE id=$1',[attempt.id,digest(card.cardId)]);
       }
       await client.query('UPDATE payment_session_bindings SET provider_transaction_id=$2 WHERE session_id=$1 AND card_attempt_id=$3',[claim.sessionId,observation.transactionId,attempt.id]);
@@ -180,11 +182,12 @@ export class DurableSubscriptionCard {
     const source=await this.transaction(async client=>(await client.query("SELECT payload FROM subscription_payment_events WHERE card_attempt_id=$1 AND event_type='card_approved'",[cardAttemptId])).rows[0]?.payload);
     if(!source?.activationRequired)return {kind:'approved' as const,applied:true};
     if((await this.transaction(async client=>(await client.query("SELECT 1 FROM subscription_payment_events WHERE card_attempt_id=$1 AND event_type='activation_satisfied'",[cardAttemptId])).rows)).length)return {kind:'not-required' as const,applied:true};
-    if(digest(record.windcave_card_id??'')!==record.card_digest)return {kind:'conflict' as const};
+    const cardId=openActiveSecret('merchant_subscriptions',record.subscription_id,record.windcave_card_id,this.encryption);
+    if(digest(cardId??'')!==record.card_digest)return {kind:'conflict' as const};
     if(!record.billing_prepared&&activationCancelled(record))return {kind:'conflict' as const};
     const subscription=camel(record) as any,plan=renewalPlan(subscription);
     return this.billing.charge({subscriptionId:record.subscription_id,merchantId:record.merchant_id,kind:'activation',cardAttemptId,
-      cardId:record.windcave_card_id,amountCents:record.pending_plan_id?plan.priceCents:record.price_cents,planId:plan.id,
+      cardId:cardId!,amountCents:record.pending_plan_id?plan.priceCents:record.price_cents,planId:plan.id,
       idempotencyKey:`activate-${cardAttemptId}`,reference:`ACTIVATE-${cardAttemptId}`,actor:source.actor,allowRestart:record.started_status==='cancelled'});
   }
   /** Recovers a crash after card commit and before preparing its initial bill. */

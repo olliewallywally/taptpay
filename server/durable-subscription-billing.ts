@@ -6,6 +6,8 @@ import {isSessionId,isUuid,requestFingerprint} from './durable-payment-contract'
 import type {PaymentSqlPool,PaymentSqlClient} from './durable-payment-storage';
 import type {PaymentCommandActor} from './payment-command';
 import {renewalPaymentMethodIsReady} from './billing-card';
+import {openActiveSecret} from './active-secret-vault';
+import {loadDataEncryption,type DataEncryption} from './data-encryption';
 
 export interface SubscriptionBillingIntent {
   subscriptionId:number;merchantId:number;kind:'activation'|'renewal'|'upgrade';
@@ -31,7 +33,7 @@ const camel=(row:any)=>Object.fromEntries(Object.entries(row).map(([k,v])=>[k.re
 export class DurableSubscriptionBilling {
   constructor(private readonly pool:PaymentSqlPool,private readonly provider:SubscriptionBillingProvider,
     private readonly context:{environment:'uat'|'production';providerAccount:string},private readonly clock=()=>new Date(),
-    private readonly enabled=()=>false){}
+    private readonly enabled=()=>false,private readonly encryption:DataEncryption=loadDataEncryption({})){}
   canInitiate():boolean{return this.enabled();}
 
   private async transaction<T>(work:(client:PaymentSqlClient)=>Promise<T>):Promise<T>{
@@ -48,6 +50,7 @@ export class DurableSubscriptionBilling {
   }
 
   async charge(input:SubscriptionBillingIntent):Promise<DurableBillingResult>{
+    if(typeof input.cardId==='string'&&input.cardId.startsWith('enc:'))input={...input,cardId:openActiveSecret('merchant_subscriptions',input.subscriptionId,input.cardId,this.encryption)!};
     if(!Number.isSafeInteger(input.subscriptionId)||input.subscriptionId<1||!Number.isSafeInteger(input.merchantId)||input.merchantId<1||
       !['activation','renewal','upgrade'].includes(input.kind)||!['solo','team','crew'].includes(input.planId)||
       !Number.isSafeInteger(input.amountCents)||input.amountCents<1||input.amountCents>2147483647||
@@ -72,7 +75,7 @@ export class DurableSubscriptionBilling {
       if(!this.enabled())return {result:{kind:'processing'} as DurableBillingResult};
       if(input.kind==='renewal'&&(parent.cancel_at_period_end||parent.status==='cancelled'))return {result:{kind:'conflict'} as DurableBillingResult};
       if(input.kind==='activation'&&((parent.status==='cancelled'&&!input.allowRestart)||(parent.status!=='cancelled'&&parent.cancel_at_period_end)))return {result:{kind:'conflict'} as DurableBillingResult};
-      if(parent.windcave_card_id!==input.cardId)return {result:{kind:'conflict'} as DurableBillingResult};
+      if(openActiveSecret('merchant_subscriptions',parent.id,parent.windcave_card_id,this.encryption)!==input.cardId)return {result:{kind:'conflict'} as DurableBillingResult};
       if(input.cardAttemptId){const card=(await client.query(`SELECT a.id,a.created_at,e.payload->>'startedStatus' AS started_status FROM subscription_card_attempts a
         JOIN subscription_payment_events e ON e.card_attempt_id=a.id AND e.event_type='card_setup_started'
         WHERE a.id=$1 AND a.subscription_id=$2 AND a.merchant_id=$3 AND a.state='approved' AND a.card_digest=$4`,[input.cardAttemptId,parent.id,input.merchantId,digest(input.cardId)])).rows[0];
@@ -139,7 +142,7 @@ export class DurableSubscriptionBilling {
           await client.query("INSERT INTO payment_delivery_outbox(subscription_event_id,channel,next_attempt_at) VALUES($1,'merchant_payment_update',$2)",[event.id,now]);
           return {terminal:{kind:'conflict',attemptId:id} as DurableBillingResult};
         }
-        cardId??=parent.windcave_card_id;
+        cardId??=openActiveSecret('merchant_subscriptions',parent.id,parent.windcave_card_id,this.encryption)??undefined;
         if(!this.enabled()||!cardId||digest(cardId)!==row.card_digest||
           (row.kind==='renewal'&&(parent.cancel_at_period_end||parent.status==='cancelled'))||
           (row.kind==='activation'&&((parent.status==='cancelled'&&row.prior_status!=='cancelled')||
@@ -242,7 +245,7 @@ export class DurableSubscriptionBilling {
         amount_cents,reference,environment,provider_account,card_digest,plan_id,prior_plan_id,prior_status,price_cents,seat_limit,period_start,period_end,attempt_number,state,applied_at,created_at,updated_at,next_attempt_at,last_error_code)
         VALUES($1,$2,$3,'renewal',$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$7,$15,$16,$17,$18,'declined',$19,$19,$19,$19,'payment_method_missing')`,
         [id,parent.id,input.merchantId,input.idempotencyKey,requestFingerprint({subscriptionId:parent.id,idempotencyKey:input.idempotencyKey,source:'billing_policy',amountCents:amount,periodStart:start.toISOString()}),
-          id.replace(/-/g,'').slice(0,16),amount,input.reference,this.context.environment,this.context.providerAccount,digest(parent.windcave_card_id??''),input.planId,parent.plan_id,parent.status,parent.pending_plan_id?plan.seats:parent.seat_limit,start,end,attemptNumber,now]);
+          id.replace(/-/g,'').slice(0,16),amount,input.reference,this.context.environment,this.context.providerAccount,digest(openActiveSecret('merchant_subscriptions',parent.id,parent.windcave_card_id,this.encryption)??''),input.planId,parent.plan_id,parent.status,parent.pending_plan_id?plan.seats:parent.seat_limit,start,end,attemptNumber,now]);
       await client.query(`UPDATE merchant_subscriptions SET status=$2,failed_payment_count=$3,last_payment_failure_at=$4,last_payment_failure_reason='No payment method on file',
         billing_claim_token=NULL,billing_claimed_at=NULL,updated_at=$4 WHERE id=$1`,[parent.id,attemptNumber>=MAX_PAYMENT_ATTEMPTS?'suspended':'past_due',attemptNumber,now]);
       await client.query(`INSERT INTO subscription_billing_history(merchant_id,subscription_id,billing_type,amount,billing_period_start,billing_period_end,idempotency_key,attempt_number,status,description,failure_reason)

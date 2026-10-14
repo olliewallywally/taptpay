@@ -24,7 +24,7 @@ export function preflightConnectionSettings(env: Readonly<Record<string, string 
 export async function runPreflight(argv: readonly string[], env: Readonly<Record<string, string | undefined>>) {
   const expected = parsePreflightArguments(argv);
   const reader = loadDataEncryption(env);
-  if (reader.describe().stage !== "read-compatible") throw new Error("R5_PREFLIGHT_READER_NOT_READY");
+  if (reader.describe().stage === "legacy") throw new Error("R5_PREFLIGHT_READER_NOT_READY");
   const settings = preflightConnectionSettings(env);
   assertPreflightTarget(expected, settings); // Before constructing or connecting a client.
   const { default: pg } = await import("pg");

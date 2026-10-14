@@ -1,11 +1,13 @@
-import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import { TextDecoder } from "node:util";
 
 export const LEGACY_BANK_COLUMNS = Object.freeze([
   "bank_name", "bank_branch", "account_holder_name", "bank_account_number",
 ] as const);
 export type LegacyBankColumn = typeof LEGACY_BANK_COLUMNS[number];
-export type EncryptionStage = "legacy" | "read-compatible";
+export const LEGACY_PROTECTED_COLUMNS = Object.freeze([...LEGACY_BANK_COLUMNS, "windcave_api_key"] as const);
+export type LegacyProtectedColumn = typeof LEGACY_PROTECTED_COLUMNS[number];
+export type EncryptionStage = "legacy" | "read-compatible" | "encrypted-write" | "contract";
 export const MAX_ENCRYPTED_VALUE_BYTES = 1024 * 1024;
 const KEY_ID = /^[A-Za-z0-9_-]{1,64}$/;
 const BASE64URL = /^[A-Za-z0-9_-]*$/;
@@ -15,18 +17,19 @@ export type EncryptionErrorCode =
   | "ENCRYPTION_INVALID_CONTEXT" | "ENCRYPTION_INVALID_VALUE" | "ENCRYPTION_VALUE_TOO_LARGE"
   | "ENCRYPTION_MALFORMED_ENVELOPE" | "ENCRYPTION_UNSUPPORTED_VERSION"
   | "ENCRYPTION_UNKNOWN_KEY" | "ENCRYPTION_AUTHENTICATION_FAILED"
-  | "ENCRYPTION_READER_NOT_ENABLED" | "ENCRYPTION_KEY_NOT_CONFIGURED";
+  | "ENCRYPTION_READER_NOT_ENABLED" | "ENCRYPTION_KEY_NOT_CONFIGURED"
+  | "ENCRYPTION_PLAINTEXT_DISABLED" | "ENCRYPTION_ENVELOPE_AS_INPUT";
 
 export interface BankFieldContext {
   readonly schema: "public";
-  readonly table: "merchants";
-  readonly rowId: number;
-  readonly column: LegacyBankColumn;
+  readonly table: "merchants" | "merchant_subscriptions" | "invoices_rent_requests" | "job_invoices" | "quotes";
+  readonly rowId: number | string;
+  readonly column: LegacyProtectedColumn | "windcave_card_id" | "token";
 }
 export interface EncryptionDiagnostic {
   readonly code: EncryptionErrorCode;
-  readonly rowId?: number;
-  readonly field?: LegacyBankColumn;
+  readonly rowId?: number | string;
+  readonly field?: BankFieldContext["column"];
 }
 
 /** No value, envelope, key ID, crypto exception or cause is retained on errors. */
@@ -58,15 +61,18 @@ function decodeCanonical(value: string, bytes?: number): Buffer {
 }
 
 function contextIsValid(context: BankFieldContext): boolean {
-  return !!context && context.schema === "public" && context.table === "merchants" &&
-    Number.isSafeInteger(context.rowId) && context.rowId > 0 &&
-    LEGACY_BANK_COLUMNS.includes(context.column);
+  if (!context || context.schema !== "public") return false;
+  const numeric = typeof context.rowId === "number" && Number.isSafeInteger(context.rowId) && context.rowId > 0;
+  if (context.table === "merchants") return numeric && LEGACY_PROTECTED_COLUMNS.includes(context.column as LegacyProtectedColumn);
+  if (context.table === "merchant_subscriptions") return numeric && context.column === "windcave_card_id";
+  return ["invoices_rent_requests", "job_invoices", "quotes"].includes(context.table) && context.column === "token" &&
+    typeof context.rowId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(context.rowId);
 }
 
 function additionalData(context: BankFieldContext): Buffer {
   if (!contextIsValid(context)) throw new DataEncryptionError("ENCRYPTION_INVALID_CONTEXT");
   return Buffer.from(JSON.stringify([
-    "taptpay:data-encryption:v1", context.schema, context.table, String(context.rowId), context.column,
+    "taptpay:data-encryption:v1", context.schema, context.table, String(context.rowId).toLowerCase(), context.column,
   ]), "utf8");
 }
 
@@ -108,7 +114,7 @@ export class DataEncryption {
     keys: ReadonlyMap<string, Buffer>;
     observe?: (diagnostic: EncryptionDiagnostic) => void;
   }) {
-    if (options.stage !== "legacy" && options.stage !== "read-compatible") {
+    if (!["legacy", "read-compatible", "encrypted-write", "contract"].includes(options.stage)) {
       throw new EncryptionConfigurationError("DATA_ENCRYPTION_STAGE");
     }
     const keys = new Map<string, Buffer>();
@@ -123,7 +129,7 @@ export class DataEncryption {
     if (options.activeKeyId !== undefined && (!KEY_ID.test(options.activeKeyId) || !keys.has(options.activeKeyId))) {
       throw new EncryptionConfigurationError("DATA_ENCRYPTION_ACTIVE_KEY_ID");
     }
-    if ((keys.size > 0 && !options.activeKeyId) || (options.stage === "read-compatible" && keys.size === 0)) {
+    if ((keys.size > 0 && !options.activeKeyId) || (options.stage !== "legacy" && keys.size === 0)) {
       throw new EncryptionConfigurationError("DATA_ENCRYPTION_KEYRING");
     }
     this.#stage = options.stage;
@@ -138,6 +144,14 @@ export class DataEncryption {
   }
 
   toJSON() { return this.describe(); }
+
+  writesEncrypted(): boolean { return this.#stage === "encrypted-write" || this.#stage === "contract"; }
+
+  /** Nonsecret identity of the active label, not key material or a raw key ID. */
+  writerFingerprint(): string {
+    if (!this.#activeKeyId) throw new DataEncryptionError("ENCRYPTION_KEY_NOT_CONFIGURED");
+    return createHash("sha256").update(`taptpay:bank-writer:v1:${this.#activeKeyId}`).digest("hex");
+  }
 
   failureCounts(): Readonly<Partial<Record<EncryptionErrorCode, number>>> {
     return Object.freeze(Object.fromEntries(this.#failures));
@@ -178,9 +192,13 @@ export class DataEncryption {
       const aad = additionalData(context);
       if (value === null) return null;
       if (typeof value !== "string") throw new DataEncryptionError("ENCRYPTION_INVALID_VALUE");
-      if (!value.startsWith("enc:")) { valueBytes(value); return value; }
+      if (!value.startsWith("enc:")) {
+        valueBytes(value);
+        if (this.#stage === "contract") throw new DataEncryptionError("ENCRYPTION_PLAINTEXT_DISABLED");
+        return value;
+      }
       const parsed = parseEnvelope(value);
-      if (this.#stage !== "read-compatible") throw new DataEncryptionError("ENCRYPTION_READER_NOT_ENABLED");
+      if (this.#stage === "legacy") throw new DataEncryptionError("ENCRYPTION_READER_NOT_ENABLED");
       const key = this.#keys.get(parsed.keyId);
       if (!key) throw new DataEncryptionError("ENCRYPTION_UNKNOWN_KEY");
       try {
@@ -205,6 +223,7 @@ export class DataEncryption {
     } catch (error) {
       if (!(error instanceof DataEncryptionError)) throw error;
       switch (error.code) {
+        case "ENCRYPTION_PLAINTEXT_DISABLED": return "plaintext"; // Count it, never expose it.
         case "ENCRYPTION_UNKNOWN_KEY": return "unknownKey";
         case "ENCRYPTION_MALFORMED_ENVELOPE": return "malformedEnvelope";
         case "ENCRYPTION_AUTHENTICATION_FAILED": return "authenticationFailure";
@@ -219,7 +238,7 @@ export class DataEncryption {
 /** Injected environment snapshot: no module-level process or database access. */
 export function loadDataEncryption(env: Readonly<Record<string, string | undefined>>): DataEncryption {
   const rawStage = env.DATA_ENCRYPTION_STAGE ?? "legacy";
-  if (rawStage !== "legacy" && rawStage !== "read-compatible") {
+  if (rawStage !== "legacy" && rawStage !== "read-compatible" && rawStage !== "encrypted-write" && rawStage !== "contract") {
     throw new EncryptionConfigurationError("DATA_ENCRYPTION_STAGE");
   }
   const rawKeyring = env.DATA_ENCRYPTION_KEYRING;

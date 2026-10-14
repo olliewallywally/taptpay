@@ -1,0 +1,87 @@
+{
+  "dateUtc": "2026-10-14",
+  "branch": "remediation/r5-encryption-20261014",
+  "baseCommit": "5329bf778e6bd47b8cc4fe71e67b8e6a58ff978f",
+  "scope": "repository implementation and owned synthetic validation; no official live-target exit",
+  "fullServer": {
+    "suitesPassed": 221,
+    "testsPassed": 5151,
+    "failures": 0,
+    "skipped": 0,
+    "todos": 0,
+    "exitCode": 0
+  },
+  "latestAffectedSourceRerun": {
+    "suitesPassed": 10,
+    "testsPassed": 221,
+    "failures": 0,
+    "skipped": 0,
+    "exitCode": 0,
+    "overlapsFullServer": true
+  },
+  "postgresProofs": [
+    {
+      "checks": 21,
+      "credentialPolicyTested": "encrypt",
+      "initialFixtureCounts": {
+        "property": 0,
+        "trades": 0,
+        "quotes": 0
+      },
+      "liveProviderCalls": 0,
+      "sourceUnchanged": true,
+      "encryptedSnapshotRestore": true
+    },
+    {
+      "checks": 21,
+      "credentialPolicyTested": "delete",
+      "initialFixtureCounts": {
+        "property": 1000,
+        "trades": 1000,
+        "quotes": 1000
+      },
+      "liveProviderCalls": 0,
+      "sourceUnchanged": true,
+      "encryptedSnapshotRestore": true
+    }
+  ],
+  "otherChecks": {
+    "cliTestsPassed": 4,
+    "postgresSafetyTestsPassed": 8,
+    "fingerprintTestsPassed": 28,
+    "applicationTypecheck": "passed",
+    "operatorVerifierTypecheck": "passed",
+    "productionBuild": "passed",
+    "schemaFingerprintCliByteEquality": "passed"
+  },
+  "schemaDigest": "sha256:52146f2b73d10f75a1d3d612b8234499716ef485914466d71394b6c7c9c5cf66",
+  "sourceFilesFrozen": 34,
+  "sourceManifestSha256": "7359700a464b88934ab7e2b583b6b93895d4dbee26bb0e4b98f1eb9c5175b804",
+  "privateResultHashes": {
+    "final-server-results.json": "631a0a4fcf157892a416ba7288b1b77977fe41f76d7669c10ee9578bda19a8fc",
+    "final-focused-reviewed.json": "b82a6aa6f9883bde0b1ef4d3834f4eecdd2582e936b090d7114425fe7eeda585",
+    "workflow-scratch-final-reviewed.log": "f30c375462a44382ca25326e3772354101c4ae8853e1b87c378615904cd3a348",
+    "workflow-restored-final-reviewed.log": "0170f8f40aff2e5d32f727a848ff82680830b9c4353484675c7621bb022f98b2",
+    "final-reviewed-typecheck.log": "0fedab01a35ca9fca53fe6fd66268f14af56d83677404c554d736f962da99fb3",
+    "final-reviewed-cli-typecheck.log": "74c9a58e31401b51f9ff8175574d1edecdda01c19af024e5609feb046c0c3b41",
+    "final-reviewed-build.log": "918d56621274e9395c444d4428baaf5ccd6589a6c5cc470530a7a77fdd9ccea1",
+    "final-cli-safety.log": "581fec99d5662f2de2e4b1082287e4a18f75e8e7a5fb54a2fdaef22069acf02f",
+    "final-postgres-safety.log": "aecf986015cc93b7ee69c128b8e678558644cf753b22c58698c323da3f95f32f",
+    "final-fingerprint-safety.log": "0b5cbe225512f4ad920e630d7a42950ba916501b23dcf6e0aa1d228f8a24fa96",
+    "actual-final-fingerprint.json": "16567d51b4180da09111ed24c14d51b3e944b01e14815bd31d7e1349d6e2adb9",
+    "canonical-migrations-scratch.log": "41afee3bd5d3990ad7fad9f237e069b75ce6721f70e21d80ffd382516da307b2",
+    "canonical-migrations-restored.log": "1c3589ca5b23f13a4f415a73acc0ce19da636da2d36a2d10f02a1f20c6c8fcd1"
+  },
+  "liveProviderCalls": 0,
+  "sharedDatabaseMutations": 0,
+  "deployed": false,
+  "remoteCiClaimed": false,
+  "clientDeviceRerunClaimed": false,
+  "externalExitGates": [
+    "Owner unused merchant credential disposition and approved deletion date if retained",
+    "D8 bank retention/deletion date, backup access/retention and key availability",
+    "Actual approved live-target dry-run/backfill/zero-plaintext and restore proof",
+    "Canonical Claude R4 migration integration before combined release",
+    "R3 Windcave UAT and production-sized migration rehearsal"
+  ]
+}

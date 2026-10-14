@@ -1,4 +1,4 @@
-import { pgTable, text, serial, decimal, timestamp, boolean, integer, bigint, jsonb, uuid, uniqueIndex, index, customType, check, unique, foreignKey } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, decimal, timestamp, boolean, integer, bigint, jsonb, uuid, uniqueIndex, index, customType, check, unique, foreignKey, date } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -2175,3 +2175,36 @@ export const paymentCreationCommands=pgTable("payment_creation_commands",{
   fingerprintCheck:check("payment_creation_commands_request_fingerprint_check",sql`${t.requestFingerprint} ~ '^[0-9a-f]{64}$'`),
   sourceCheck:check("creation_command_source_check",sql`num_nonnulls(${t.transactionId},${t.rentInvoiceId},${t.jobInvoiceId})=1`),
 }));
+
+// R5 operator-only policy and count-only audit/checkpoints; no key or row value.
+export const dataEncryptionControl = pgTable("data_encryption_control", {
+  activeSecretStage: text("active_secret_stage").notNull().default("legacy"),
+  activeSecretReviewReference: text("active_secret_review_reference"),
+  id: integer("id").primaryKey(),
+  stage: text("stage").notNull().default("legacy"),
+  writerFingerprint: text("writer_fingerprint"),
+  reviewReference: text("review_reference"),
+  credentialPolicy: text("credential_policy").notNull().default("unselected"),
+  credentialReviewReference: text("credential_review_reference"),
+  credentialDeleteAfter: date("credential_delete_after"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+export const dataEncryptionRuns = pgTable("data_encryption_runs", {
+  scope: text("scope").notNull().default("bank"), tableCursor: integer("table_cursor").notNull().default(0), lastRecordId: text("last_record_id"),
+  id: uuid("id").primaryKey(), mode: text("mode").notNull(),
+  databaseName: text("database_name").notNull(), writerFingerprint: text("writer_fingerprint").notNull(),
+  credentialPolicy: text("credential_policy").notNull(), credentialReviewReference: text("credential_review_reference"),
+  credentialDeleteAfter: date("credential_delete_after"),
+  state: text("state").notNull().default("running"), lastMerchantId: integer("last_merchant_id").notNull().default(0),
+  sweepNumber: integer("sweep_number").notNull().default(0), batchNumber: integer("batch_number").notNull().default(0),
+  rowsScanned: bigint("rows_scanned", { mode: "bigint" }).notNull().default(0n),
+  rowsChanged: bigint("rows_changed", { mode: "bigint" }).notNull().default(0n),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+export const dataEncryptionBatches = pgTable("data_encryption_batches", {
+  id: uuid("id").primaryKey(), runId: uuid("run_id").notNull().references(() => dataEncryptionRuns.id),
+  batchNumber: integer("batch_number").notNull(), rowsScanned: integer("rows_scanned").notNull(),
+  rowsChanged: integer("rows_changed").notNull(), durationMs: integer("duration_ms").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, table => ({ batchNumberUnique: unique("encryption_batch_number_uq").on(table.runId, table.batchNumber) }));

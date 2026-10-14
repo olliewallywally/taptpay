@@ -1,9 +1,13 @@
 # Claude repository handoff
 
-**R5 started on `remediation/r5-encryption-20261014` (October 14).** Read
-`docs/HANDOFF-2026-10-14-r5-encryption-start.md` and its linked preflight/review before
-further R5 work. T1 is the reader/count-only foundation; encrypted writes and
-backfill remain. Claude owns R4. No deployment or official R3/R5 exit is implied.
+**R5 repository implementation completed on `remediation/r5-encryption-20261014`
+(October 14).** Read `docs/HANDOFF-2026-10-14-r5-repository-complete.md`, its frozen
+verification/source manifest and final review before further R5 or migration work.
+T1–T4 tooling covers bank data, active card credentials and recoverable payer links.
+0048a/b/c are frozen after owned synthetic application; shared/live policies are
+not activated. Claude owns R4; canonical R4 integration, owner retention/credential
+choices and real-target evidence remain. No deployment or official R3/R5 exit is
+implied. The earlier R5-start handoff is historical.
 
 Before committing, pushing, or changing the current uncommitted merchant work, read:
 
