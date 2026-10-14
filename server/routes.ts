@@ -2233,6 +2233,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // ── Owner decision OI-1 (2026-10-13): voiding or marking an invoice paid after an attempt ──
   const INVOICE_PAYMENT_CAPTURED = { code: "PAYMENT_CAPTURED", message: "A card payment has already been taken on this invoice" };
   const INVOICE_JUST_PAID = { code: "PAYMENT_COMPLETED", message: "This invoice has just been paid" };
+  const SALE_NOT_PAYABLE = { message: "This sale is no longer payable" };
 
   /** Money already taken on the invoice, as its row records it. */
   function invoiceCaptured(invoice: { windcaveTransactionId?: string | null; splitPaidCount?: number | null; splitPaidSessions?: string[] | null }): boolean {
@@ -2240,8 +2241,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   }
 
   /** Asks Windcave once about each of the invoice's windows that may still be paid, in parallel and
-   * outside any lock. True when one is verified paid: the change is then refused, and that payment is
-   * recorded by its own completion path, which records it even after a void (finalize* below). */
+   * outside any lock. True when one is verified paid: the change is then refused. Recording that
+   * payment here needs a business-scoped invoice finalizer (the completion paths' writers are
+   * unscoped, R1-T7); until then its completion paths record it (open item in
+   * OUTSTANDING-2026-10-14.md). */
   async function invoicePaidJustNow(vertical: "property" | "trades", invoiceId: string, merchantId: number): Promise<boolean> {
     if (!isWindcaveConfigured()) return false;
     const sessions = await storage.getOpenInvoiceSessionsForMerchant(vertical, invoiceId, merchantId);
@@ -2740,9 +2743,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!isWindcaveConfigured()) {
         return res.status(503).json({ message: "Payment outcome is still being reconciled" });
       }
+      // OI-1: TaptPay itself never sends a wallet charge for a cancelled sale. A payment that
+      // already reached Windcave is still asked about and recorded below.
+      const closed = (await storage.getTransaction(prepared.transaction.id))?.status === "cancelled";
       {
         const cached = tokenAttemptSessionCache.get(prepared.attempt.id);
-        const ajaxUrl = prepared.firstFinalizer
+        const ajaxUrl = prepared.firstFinalizer && !closed
           ? cached?.ajaxSubmitGooglePayUrl
           : undefined;
         // A replay never resubmits the wallet token, so recovery cannot double charge.
@@ -2757,6 +2763,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         await expectedForTokenAttempt(prepared.attempt, validation.data.sessionId),
       );
       await recordTokenReconciliation(prepared.attempt.id, queryResult);
+      if (closed && !(queryResult.success && queryResult.approved)) {
+        if (queryResult.success) {
+          await persistTokenOutcome({ attempt: prepared.attempt, sessionId: validation.data.sessionId, outcome: "declined",
+            processorTransactionId: queryResult.windcaveTransactionId, paymentMethod: "google_pay" });
+        }
+        return res.status(410).json(SALE_NOT_PAYABLE);
+      }
       if (!queryResult.success) {
         return res.status(503).json({ message: "Payment outcome is still being reconciled" });
       }
@@ -3403,13 +3416,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // Owner decision OI-1 (2026-10-13): a sale can be cancelled after someone has tried to pay.
       // Money already taken still refuses it (a refund is the way back). A payment window that
       // may still be paid is checked with Windcave first, outside any database lock: paid means
-      // the payment is recorded and the cancel refused; declined is closed after the cancel;
-      // "cannot say" cancels anyway and leaves the window able to settle, so nothing is lost.
+      // the payment is recorded and the cancel refused; declined or "cannot say" cancels anyway
+      // and leaves the window able to settle, so nothing is lost.
       const captured = { code: "PAYMENT_CAPTURED", message: "A payment has already been taken on this sale. Refund it instead of cancelling." };
       const context = await storage.getRetailCancellationContextForMerchant(transactionId, transaction.merchantId!);
       if (!context) return res.status(404).json({ message: "Transaction not found" });
       if (context.captured) return res.status(409).json(captured);
-      const declined: Array<{ attemptId: string; sessionId: string }> = [];
       let paidJustNow = false;
       if (isWindcaveConfigured()) {
         for (const attempt of context.openAttempts) {
@@ -3418,9 +3430,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           if (!expected) continue;
           const result = await queryWindcaveSession(sessionId, expected, { singleAttempt: true });
           await recordTokenReconciliation(attempt.id, result);
-          if (!result.success) continue;
-          if (!result.approved) { declined.push({ attemptId: attempt.id, sessionId }); continue; }
-          if (!result.windcaveTransactionId) continue;
+          // A decline, like "cannot say yet", leaves the window open: a second card in the same
+          // session (an open UAT question) must still settle after the cancel.
+          if (!result.success || !result.approved || !result.windcaveTransactionId) continue;
           const claim = await paymentAttempts.claimFinalization(attempt.id, sessionId);
           if (claim.kind === "claimed" || claim.kind === "reused") {
             await persistTokenOutcome({
@@ -3430,8 +3442,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           }
           paidJustNow = true;
         }
-        // A numbered (board) sale's own session, recorded on the sale by /pay. Its payment is
-        // recorded by the board's notification and callback, as always; here it only refuses.
+        // A numbered (board) sale's own session, recorded on the sale by /pay. A verified payment
+        // refuses the cancel. Recording it here needs a business-scoped board finalizer (the
+        // board's own writers are unscoped, R1-T7 S2a); until then the board's notification and
+        // callback record it (open item in OUTSTANDING-2026-10-14.md).
         const sale = context.transaction;
         if (!sale.paymentTokenHash && sale.windcaveSessionId && sale.windcaveSessionState === "pending") {
           const expected = numberedSaleExpectedFrom(sale, context.nextPendingSplit, sale.windcaveSessionId);
@@ -3456,18 +3470,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           return res.status(409).json({ code: "PAYMENT_COMPLETED", message: "This sale has just been paid" });
         }
         return res.status(400).json({ message: `Cannot cancel transaction with status: ${cancellation.status}` });
-      }
-      // A verified decline is closed only now, so an unsplit sale stays cancelled rather than failed.
-      for (const { attemptId, sessionId } of declined) {
-        try {
-          const claim = await paymentAttempts.claimFinalization(attemptId, sessionId);
-          if (claim.kind === "claimed" || claim.kind === "reused") {
-            await paymentAttempts.finalize({ attemptId, processorSessionId: sessionId, processorTransactionId: null, outcome: "declined", receiptShare: null });
-            tokenAttemptSessionCache.delete(attemptId);
-          }
-        } catch {
-          console.error("A declined payment attempt was not closed after its sale was cancelled");
-        }
       }
       const updatedTransaction = cancellation.transaction;
       
@@ -3595,7 +3597,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       // OI-1: a cancelled (or refunded) sale opens no payment session.
       if (transaction.status !== "pending") {
-        return res.status(410).json({ message: "This sale is no longer payable" });
+        return res.status(410).json(SALE_NOT_PAYABLE);
       }
       
       // AUDIT: Log payment attempt
@@ -3660,7 +3662,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // Save session tracking info to the transaction. OI-1: a sale cancelled meanwhile binds
       // no session, and its links are not served.
       if (!(await storage.updateTransactionWindcaveSession(transactionId, sessionResult.sessionId!, 'pending', xId))) {
-        return res.status(410).json({ message: "This sale is no longer payable" });
+        return res.status(410).json(SALE_NOT_PAYABLE);
       }
 
       // Cache the Windcave AJAX URLs server-side — never send these back to the client
@@ -3850,7 +3852,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
       // Look up the AJAX URL from server-side cache (set at session creation)
       const cachedUrls = sessionAjaxUrlCache.get(transactionId);
-      const ajaxUrl = cachedUrls?.ajaxSubmitGooglePayUrl;
+      // OI-1: TaptPay itself never sends a wallet charge for a cancelled sale.
+      const closed = transaction.status === "cancelled";
+      const ajaxUrl = closed ? undefined : cachedUrls?.ajaxSubmitGooglePayUrl;
       if (ajaxUrl && googlePayToken) {
         await submitGooglePayToken(ajaxUrl, googlePayToken);
       }
@@ -3860,6 +3864,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // R2-T5 (RF-1): the wallet submission never decides the outcome; the verified
       // session query does, and only a verified approval or decline settles.
       const queryResult = await queryWindcaveSession(sessionId, await expectedForNumberedSale(transaction, sessionId));
+      // A payment that already reached Windcave is still recorded; nothing else is taken.
+      if (closed && !(queryResult.success && queryResult.approved)) return res.status(410).json(SALE_NOT_PAYABLE);
       if (!queryResult.success || (queryResult.approved && !queryResult.windcaveTransactionId)) {
         return res.status(503).json({ message: "Payment outcome is still being reconciled" });
       }

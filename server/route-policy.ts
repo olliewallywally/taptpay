@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 4168b2be32bf64831409c50a8270dda14e006662 on 2026-10-14.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 021d3f05e60284c8aa56703f4657c2c9c07f3448 on 2026-10-14.
  *
  * 194 registrations (81 GET, 81 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -666,7 +666,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       authChecks: ["prepareTokenCompletion","resolvePaymentToken"],
       storageMethods: ["getSplitPaymentsByTransaction","getTransaction"],
       sideEffects: ["live update: sseBroker.broadcast","provider: queryWindcaveSession","provider: submitGooglePayToken","push: sendPushToMerchant"],
-      statuses: [200,400,404,409,429,500,503],
+      statuses: [200,400,404,409,410,429,500,503],
       capabilityGates: ["isWindcaveConfigured"],
       rateLimits: ["paymentTokenRateLimiter.allow","requirePaymentTokenRateLimit"],
       idempotency: ["claimFinalization"],
@@ -893,7 +893,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
       authChecks: ["isTokenAddressedTransaction"],
       storageMethods: ["getNextPendingSplit","getTransaction","incrementTransactionCount","updateSplitPaymentStatus","updateTransactionPaymentMethod","updateTransactionSessionState","updateTransactionStatus"],
       sideEffects: ["live update: sseBroker.broadcast","provider: queryWindcaveSession","provider: submitGooglePayToken","push: sendPushToMerchant"],
-      statuses: [200,400,403,404,500,503],
+      statuses: [200,400,403,404,410,500,503],
       capabilityGates: ["isWindcaveConfigured"],
       helpers: ["broadcastToStone","expectedForNumberedSale","finaliseHostedPayment","numberedSaleExpectedFrom"],
     },

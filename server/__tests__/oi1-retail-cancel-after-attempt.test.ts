@@ -15,6 +15,7 @@ jest.mock("../windcave", () => {
       return { success: true, sessionId: `retail-session-${sessions}`, hppUrl: `https://uat.windcave.com/hpp/retail-${sessions}` };
     }),
     queryWindcaveSession: jest.fn(async () => ({ success: false, error: "pending" })),
+    submitGooglePayToken: jest.fn(async () => ({ success: true })),
   };
 });
 
@@ -116,14 +117,19 @@ describe("cancelling a sale someone has tried to pay", () => {
     expect((await storage.getPaymentAttempt(attempt.id))?.state).toBe("approved");
   });
 
-  it("closes a verified decline and cancels the sale (it stays cancelled, not failed)", async () => {
-    const { cancel, sale, attempt } = await openedSale();
+  it("cancels after a verified decline but leaves the window open: a second card in the same session is still recorded", async () => {
+    const { app, cancel, sale, returnState, attempt } = await openedSale();
     query.mockResolvedValue({ success: true, approved: false });
 
     expect((await cancel()).status).toBe(200);
-
     expect((await storage.getTransaction(sale.id))?.status).toBe("cancelled");
-    expect((await storage.getPaymentAttempt(attempt.id))?.state).toBe("declined");
+    expect((await storage.getPaymentAttempt(attempt.id))?.state).toBe("ready");
+
+    // Whether Windcave lets the payer try another card after a decline is a UAT question;
+    // if it does, that approval must not be lost.
+    query.mockResolvedValue({ success: true, approved: true, windcaveTransactionId: "second-card" });
+    await request(app).get(`/api/pay/return/${returnState}`).query({ source: "hpp" });
+    expect(await storage.getTransaction(sale.id)).toMatchObject({ status: "completed", windcaveTransactionId: "second-card" });
   });
 
   it("cancels without asking when the provider is not configured, leaving the attempt untouched", async () => {
@@ -227,15 +233,25 @@ describe("a numbered (board) sale someone has tried to pay", () => {
     expect((await storage.getTransaction(sale.id))?.status).toBe("cancelled");
   });
 
-  it("refuses when Windcave says it was just paid, leaving the recording to the board's own notification", async () => {
+  it("refuses when Windcave says it was just paid (recording it here awaits a business-scoped board finalizer)", async () => {
     const { cancel, sale } = await boardSale();
     query.mockResolvedValue({ success: true, approved: true, windcaveTransactionId: "board-paid" });
     const refused = await cancel();
     expect(refused.status).toBe(409);
-    expect(refused.body.code).toBe("PAYMENT_COMPLETED");
+    expect(refused.body).toEqual({ code: "PAYMENT_COMPLETED", message: "This sale has just been paid" });
     expect((await storage.getTransaction(sale.id))?.status).toBe("pending");
   });
 
+  it("a session already marked approved counts as money taken", async () => {
+    const { sale, cancel } = await boardSale();
+    await storage.updateTransactionSessionState(sale.id, "approved");
+
+    const refused = await cancel();
+
+    expect(refused.status).toBe(409);
+    expect(refused.body.code).toBe("PAYMENT_CAPTURED");
+    expect((await storage.getTransaction(sale.id))?.status).toBe("pending");
+  });
   it("a cancelled board sale cannot open a new payment session", async () => {
     const { app, cancel, sale } = await boardSale();
     expect((await cancel()).status).toBe(200);
@@ -325,5 +341,61 @@ describe("storage after a cancel", () => {
     const [share] = await repo.getSplitPaymentsByTransaction(sale.id);
     await repo.updateSplitPaymentStatus(share.id, "completed", "legacy-share");
     expect((await repo.getTransaction(sale.id))?.status).toBe("cancelled");
+  });
+});
+
+describe("a cancelled sale takes no new wallet charge from TaptPay", () => {
+  const submit = windcave.submitGooglePayToken as jest.Mock;
+  const WALLET = "https://uat.windcave.com/api/v1/sessions/wallet/googlepay";
+  beforeEach(() => submit.mockClear());
+
+  it("a payment link's Google Pay completion is refused after the cancel, before the wallet token is sent", async () => {
+    const { app, link, sale, cancel } = await owned();
+    create.mockResolvedValueOnce({ success: true, sessionId: "wallet-session", hppUrl: "https://uat.windcave.com/hpp/w", ajaxSubmitGooglePayUrl: WALLET });
+    const idempotencyKey = crypto.randomUUID();
+    expect((await request(app).post(`/api/pay/t/${link.rawToken}/session`).send({ idempotencyKey })).status).toBe(200);
+    expect((await cancel()).status).toBe(200);
+
+    const completed = await request(app).post(`/api/pay/t/${link.rawToken}/googlepay-complete`)
+      .send({ idempotencyKey, sessionId: "wallet-session", shareIndex: 0, googlePayToken: { synthetic: true } });
+
+    expect(submit).not.toHaveBeenCalled();
+    expect(completed.status).toBe(410);
+    expect(completed.body).toEqual({ message: "This sale is no longer payable" });
+    expect((await storage.getTransaction(sale.id))?.status).toBe("cancelled");
+  });
+
+  it("a payment link's wallet payment that already reached Windcave is still recorded", async () => {
+    const { app, link, sale, cancel } = await owned();
+    create.mockResolvedValueOnce({ success: true, sessionId: "wallet-session", hppUrl: "https://uat.windcave.com/hpp/w", ajaxSubmitGooglePayUrl: WALLET });
+    const idempotencyKey = crypto.randomUUID();
+    await request(app).post(`/api/pay/t/${link.rawToken}/session`).send({ idempotencyKey });
+    expect((await cancel()).status).toBe(200);
+    query.mockResolvedValue({ success: true, approved: true, windcaveTransactionId: "wallet-late" });
+
+    const completed = await request(app).post(`/api/pay/t/${link.rawToken}/googlepay-complete`)
+      .send({ idempotencyKey, sessionId: "wallet-session", shareIndex: 0, googlePayToken: { synthetic: true } });
+
+    expect(submit).not.toHaveBeenCalled();
+    expect(completed.status).toBe(200);
+    expect(await storage.getTransaction(sale.id)).toMatchObject({ status: "completed", windcaveTransactionId: "wallet-late" });
+  });
+
+  it("a board sale's Google Pay completion is refused after the cancel, before the wallet token is sent", async () => {
+    const { app } = await createTestApp();
+    const owner = await createOwnerPrincipal();
+    const sale = await storage.createTransaction({
+      merchantId: owner.merchantId, itemName: "Board sale", price: "7.00", status: "pending", paymentMethod: "qr_code", splitEnabled: false,
+    } as any);
+    create.mockResolvedValueOnce({ success: true, sessionId: "board-wallet", hppUrl: "https://uat.windcave.com/hpp/b", ajaxSubmitGooglePayUrl: WALLET });
+    expect((await request(app).post(`/api/transactions/${sale.id}/pay`).send({})).status).toBe(200);
+    expect((await request(app).post(`/api/transactions/${sale.id}/cancel`).set(signedIn(owner))).status).toBe(200);
+
+    const completed = await request(app).post(`/api/transactions/${sale.id}/googlepay-complete`)
+      .send({ sessionId: "board-wallet", googlePayToken: { synthetic: true } });
+
+    expect(submit).not.toHaveBeenCalled();
+    expect(completed.status).toBe(410);
+    expect((await storage.getTransaction(sale.id))?.status).toBe("cancelled");
   });
 });

@@ -74,7 +74,7 @@ describe.each(CASES)("%s %s after someone tried to pay", (_name, action, status,
     }, { singleAttempt: true });
   });
 
-  it("refuses when Windcave says the invoice has just been paid, changing nothing", async () => {
+  it("refuses when Windcave says the invoice has just been paid, changing nothing (recording it here awaits a business-scoped finalizer)", async () => {
     const { app, owner: principal } = await owner();
     const fake = vertical.setup(principal.merchantId, { windcaveSessionId: "s-open" });
     openSessions([{ sessionId: "s-open", amountCents: 50_000 }]);
@@ -159,6 +159,21 @@ describe("a payment that completes after the invoice was closed is recorded, nev
     const event = await settled(() => fake.events.find(e => e.eventType === "payment_received_after_void"));
     expect(event.payload).toMatchObject({ windcaveTransactionId: "late-tx" });
     expect(fake.invoices.get(T_INVOICE)).toMatchObject({ status: "paid", windcaveTransactionId: "late-tx" });
+  });
+
+  it("trades: after a void whose schedule issued a replacement, the invoice stays voided and the payment is kept for a refund", async () => {
+    const { app, owner: principal } = await owner();
+    const fake = fakeTrades(); seedTrades(fake, principal.merchantId, { invoice: { status: "voided", windcaveSessionId: "s-late" } });
+    jest.spyOn(storage, "getJobInvoiceByWindcaveSessionId").mockResolvedValue(fake.invoices.get(T_INVOICE));
+    // The replacement holds the schedule's due slot, so marking this one paid is refused (23505).
+    (storage.updateJobInvoice as jest.Mock).mockImplementationOnce(async () => { throw Object.assign(new Error("duplicate"), { code: "23505" }); });
+    query.mockResolvedValue({ success: true, approved: true, windcaveTransactionId: "late-tx" });
+
+    await request(app).post("/api/windcave/trades-notification?sessionId=s-late");
+
+    const event = await settled(() => fake.events.find(e => e.eventType === "payment_received_after_void"));
+    expect(event.payload).toMatchObject({ windcaveTransactionId: "late-tx", refundDue: true });
+    expect(fake.invoices.get(T_INVOICE)).toMatchObject({ status: "voided", windcaveTransactionId: "late-tx" });
   });
 
   it("a decline after the invoice was closed writes nothing", async () => {

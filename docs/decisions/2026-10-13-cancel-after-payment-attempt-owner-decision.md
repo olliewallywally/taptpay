@@ -29,7 +29,9 @@ twice. They do not refuse the merchant because of an attempt.
      attempt's recorded expected values.
    - If Windcave says it was paid, the payment is recorded as paid and the cancel is
      refused: "This sale has just been paid."
-   - If it was declined or not paid, the attempt is closed and the cancel goes ahead.
+   - If it was declined, the cancel goes ahead and the attempt is left open, as in rule 3.
+     *Amended 2026-10-14 after review.* The first version closed it, which would lose a
+     second card paid in the same session. Whether Windcave allows that is a UAT question.
 3. **If Windcave can't say yet, the cancel still goes ahead** (the owner's decision). This
    covers the customer still being on the payment page, and Windcave not being reachable.
    The open attempt is left able to settle. If the customer then finishes paying, the

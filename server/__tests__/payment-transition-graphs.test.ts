@@ -17,6 +17,8 @@ describe('domain transition authority and terminality',()=>{
     expect(evaluateTransition(retailTransactionGraph,'cancelled','approve','processor')).toEqual({kind:'conflict'});
   });
   // OI-1 (2026-10-13): only a verified processor outcome may complete a cancelled sale, never a merchant.
+  // A specification of the reviewed graph: storage does not consult it; the behaviour itself is
+  // tested in oi1-retail-cancel-after-attempt.test.ts and the R3 PostgreSQL verifier.
   test('a payment completing after a cancel is recorded by the processor edge only',()=>{
     expect(evaluateTransition(retailTransactionGraph,'cancelled','approveAfterCancel','processor')).toEqual({kind:'claimed'});
     expect(evaluateTransition(retailTransactionGraph,'cancelled','approveAfterCancel','merchant')).toEqual({kind:'conflict'});

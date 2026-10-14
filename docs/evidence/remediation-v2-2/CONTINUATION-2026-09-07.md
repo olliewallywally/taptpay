@@ -1,6 +1,33 @@
 # Full integration continuation audit — 2026-09-07
 
-Latest continuation **2026-10-13 — R2 and R3 merged on `ccr-e07e3100-0wm8kr`; two merge
+Latest continuation **2026-10-14 — OI-1, OI-2 and the merge review's outstanding items
+done; R4-T2 refund schema designed, not yet approved.**
+[Evidence](r3/OUTSTANDING-2026-10-14.md),
+[R4-T2 ADR](../../decisions/2026-10-14-r4-t2-refund-operation-schema.md),
+[R4 pass 4](r4/R4-review-pass-4-2026-10-14.md).
+
+- **OI-1:** a merchant can cancel a sale, or void or mark paid an invoice, after someone has
+  tried to pay.
+  - Only money already taken refuses it.
+  - Windcave is asked first, outside any lock.
+  - A payment landing afterwards is recorded, never lost.
+- **OI-2:** sessions with more than one card attempt follow R2's verifier.
+- **H-1–H-3, D2, D4 fixed** (latent; the R3 worker stays unmounted). Also fixed: the
+  same-tab retry after an unsent attempt expires, and the cash terminal findings.
+- **Independent review:**
+  - Fixed: R-1, R-2, R-3b and T-3, plus the test gaps.
+  - **One owner question:** may a merchant route record a payment it finds verified, using
+    unscoped finalizers? R1-T7 forbids it today.
+  - Recorded, not fixed: low items I-2 to I-5.
+- **R4-T2:**
+  - The ADR is at revision 2, after pass 4 refused revision 1 (five blockers, all checked
+    and answered).
+  - Pass 5, the independent reread, stopped at a session limit and is owed.
+  - The migration (0039) and its PostgreSQL verifier are drafted, not committed.
+- **Results:** at the commit; see §27.
+- **No new migration;** 0034–0038 are unchanged.
+
+Prior continuation **2026-10-13 — R2 and R3 merged on `ccr-e07e3100-0wm8kr`; two merge
 fixes; owner runbook for the test database.**
 [Claude's independent review](r3/R2-R3-MERGE-REVIEW-2026-10-13.md),
 [runbook](../../operations/runbook-2026-10-13-apply-0034-0038-test-database.md).
@@ -3087,3 +3114,14 @@ attempt with expected values but no session was held forever) and B-2 (the cash 
 now names its business). It lists latent worker findings H-1–H-3, which must be fixed before
 activation, and owner items OI-1/OI-2. Full suites and PostgreSQL verifiers pass. The summary is
 at the top of this file.
+
+## 27. October 14 — OI-1/OI-2 and the outstanding merge items (Claude)
+
+The owner asked for cancel-after-attempt (OI-1) and multi-attempt sessions (OI-2) and the
+rest of the merge review's outstanding work. Commits from `9888af20` onward. The record is
+[OUTSTANDING-2026-10-14](r3/OUTSTANDING-2026-10-14.md): what changed, the independent review
+and its fixes, the activation blockers left for Codex, and the owner and UAT questions.
+
+R4-T2 (refund schema) has its ADR and §21.1 passes 3–4. Pass 4 refused revision 1. Revision 2
+waits on pass 5 before any migration is committed.
+

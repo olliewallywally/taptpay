@@ -572,6 +572,47 @@ try {
     await original.updateSplitPaymentStatus(share.id,'completed',`legacy-${randomUUID()}`);
     assert.equal((await original.getTransaction(sale.id))?.status,'cancelled');
   });
+  await check('OI-1: a legacy share completing while the cancel commits never reopens the sale',async()=>{
+    const sale=await original.createTransaction({merchantId:merchant,itemName:'Synthetic share race',price:'10.02',status:'pending',paymentMethod:'qr_code',splitEnabled:false});
+    await original.createBillSplit(sale.id,3);
+    const [share]=await original.getSplitPaymentsByTransaction(sale.id);
+    const holder=await pool.connect();let completing:Promise<unknown>|undefined;
+    try {
+      // The cancel holds the sale and has written 'cancelled', not yet committed; the share's
+      // writer reads the sale as pending and then waits for the row.
+      await holder.query('BEGIN');await holder.query('SELECT id FROM transactions WHERE id=$1 FOR UPDATE',[sale.id]);
+      await holder.query(`UPDATE transactions SET status='cancelled' WHERE id=$1`,[sale.id]);
+      completing=original.updateSplitPaymentStatus(share.id,'completed',`legacy-${randomUUID()}`);
+      const deadline=Date.now()+3000;let waiting=false;
+      while(Date.now()<deadline) {
+        waiting=(await pool.query("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND query LIKE '%transactions%') AS waiting")).rows[0].waiting;
+        if(waiting) break;await new Promise(resolve=>setTimeout(resolve,10));
+      }
+      assert.ok(waiting,'the share writer must really wait on the cancel');
+      await holder.query('COMMIT');await completing;
+      const after=await original.getTransaction(sale.id);
+      assert.equal(after?.status,'cancelled');assert.equal(after?.completedSplits,1);
+    } finally {await holder.query('ROLLBACK');holder.release();if(completing) await completing.catch(()=>undefined);}
+  });
+  await check('OI-1: an unsent claim committed while the cancel waits is abandoned with the sale',async()=>{
+    const sale=await original.createTransaction({merchantId:merchant,itemName:'Synthetic claim race',price:'10.01',status:'pending',paymentMethod:'qr_code',splitEnabled:false});
+    const holder=await pool.connect();let cancellation:ReturnType<typeof original.cancelTransactionForMerchant>|undefined;
+    try {
+      await holder.query('BEGIN');await holder.query('SELECT id FROM transactions WHERE id=$1 FOR UPDATE',[sale.id]);
+      cancellation=original.cancelTransactionForMerchant(sale.id,merchant);
+      const deadline=Date.now()+3000;let waiting=false;
+      while(Date.now()<deadline) {
+        waiting=(await pool.query("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND query LIKE '%transactions%') AS waiting")).rows[0].waiting;
+        if(waiting) break;await new Promise(resolve=>setTimeout(resolve,10));
+      }
+      assert.ok(waiting,'cancellation must really wait on a competing transaction');
+      const claim=(await holder.query(`INSERT INTO payment_attempts(transaction_id,share_index,idempotency_key,state,lease_expires_at,created_at,updated_at)
+        VALUES ($1,0,$2,'claiming',now()+interval '4 minutes',now(),now()) RETURNING id`,[sale.id,randomUUID()])).rows[0].id;
+      await holder.query('COMMIT');assert.equal((await cancellation).kind,'cancelled');
+      assert.equal((await pool.query('SELECT state FROM payment_attempts WHERE id=$1',[claim])).rows[0].state,'abandoned');
+      assert.equal((await original.getTransaction(sale.id))?.status,'cancelled');
+    } finally {await holder.query('ROLLBACK');holder.release();if(cancellation) await cancellation.catch(()=>undefined);}
+  });
   await check('cancellation rechecks newly committed attempts after waiting for the parent lock',async()=>{
     const sale=await original.createTransaction({merchantId:merchant,itemName:'Synthetic race',price:'10.01',status:'pending',paymentMethod:'qr_code',splitEnabled:false});
     const holder=await pool.connect();let cancellation:ReturnType<typeof original.cancelTransactionForMerchant>|undefined;
@@ -619,6 +660,42 @@ try {
       // The open windows a void asks Windcave about are this business's only.
       assert.deepEqual(await original.getOpenInvoiceSessionsForMerchant(vertical,opened,otherMerchant),[]);
     }
+  });
+  for(const vertical of ['property','trades'] as const) await check(`OI-1 ${vertical}: a void asks Windcave about exactly the open windows`,async()=>{
+    const table=vertical==='property'?'invoices_rent_requests':'job_invoices';
+    const split=await invoice(vertical,2002,2),open=`synthetic-${randomUUID()}`,paid=`synthetic-${randomUUID()}`;
+    await original.recordInvoiceSplitSession({vertical,invoiceId:split,sessionId:open,amountCents:1001,payerEmail:null});
+    await original.recordInvoiceSplitSession({vertical,invoiceId:split,sessionId:paid,amountCents:1001,payerEmail:null});
+    await original.markInvoiceSplitSessionPaid(paid,now);
+    assert.deepEqual(await original.getOpenInvoiceSessionsForMerchant(vertical,split,merchant),[{sessionId:open,amountCents:1001}]);
+    assert.deepEqual(await original.getOpenInvoiceSessionsForMerchant(vertical,split,otherMerchant),[]);
+    const single=await invoice(vertical),pinned=`synthetic-${randomUUID()}`;
+    await pool.query(`UPDATE ${table} SET windcave_session_id=$2 WHERE id=$1`,[single,pinned]);
+    assert.deepEqual(await original.getOpenInvoiceSessionsForMerchant(vertical,single,merchant),[{sessionId:pinned,amountCents:1001}]);
+    assert.deepEqual(await original.getOpenInvoiceSessionsForMerchant(vertical,single,otherMerchant),[]);
+  });
+  await check('OI-1: the cancel route reads exactly the open attempts and money taken, for its own business',async()=>{
+    const sale=await original.createTransaction({merchantId:merchant,itemName:'Synthetic context',price:'10.01',status:'pending',paymentMethod:'qr_code',splitEnabled:false});
+    const unsent=await retail.claim({transactionId:sale.id,shareIndex:0,idempotencyKey:randomUUID()});
+    assert.equal(unsent.kind,'claimed');if(unsent.kind!=='claimed') throw new Error('fixture_claim');
+    let context=await original.getRetailCancellationContextForMerchant(sale.id,merchant);
+    assert.deepEqual({open:context?.openAttempts.length,captured:context?.captured},{open:0,captured:false});
+    await retail.recordExpectedValues({attemptId:unsent.attempt.id,amountCents:1001,currency:'NZD',merchantReference:`TAPT_${unsent.attempt.id}`,providerEnvironment:'uat'});
+    const sessionId=`s-${randomUUID()}`;
+    assert.equal((await retail.attachSession({attemptId:unsent.attempt.id,processorSessionId:sessionId,processorXId:randomBytes(8).toString('hex')})).kind,'attached');
+    context=await original.getRetailCancellationContextForMerchant(sale.id,merchant);
+    assert.deepEqual(context?.openAttempts.map(a=>[a.id,a.processorSessionId]),[[unsent.attempt.id,sessionId]]);
+    assert.equal(await original.getRetailCancellationContextForMerchant(sale.id,otherMerchant),undefined);
+    await pool.query('UPDATE transactions SET completed_splits=1 WHERE id=$1',[sale.id]);
+    assert.equal((await original.getRetailCancellationContextForMerchant(sale.id,merchant))?.captured,true);
+    await pool.query('UPDATE transactions SET completed_splits=0, windcave_session_state=$2 WHERE id=$1',[sale.id,'approved']);
+    assert.equal((await original.getRetailCancellationContextForMerchant(sale.id,merchant))?.captured,true);
+  });
+  await check('OI-1: an approval after the cancel completes an unsplit board sale through the status writer',async()=>{
+    const sale=await original.createTransaction({merchantId:merchant,itemName:'Synthetic board late',price:'10.01',status:'pending',paymentMethod:'qr_code',splitEnabled:false});
+    assert.equal((await original.cancelTransactionForMerchant(sale.id,merchant)).kind,'cancelled');
+    const done=await original.updateTransactionStatus(sale.id,'completed',`late-${randomUUID()}`);
+    assert.equal(done?.status,'completed');
   });
   await check('two instances record one concurrent cash command, audit and manual outbox event',async()=>{
     const other=new DatabaseStorage(drizzle(pools[1],{schema}) as any),key=randomUUID();

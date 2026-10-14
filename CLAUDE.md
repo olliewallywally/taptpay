@@ -70,6 +70,12 @@ OI-2 are owner decisions. The owner applies 0034–0038 to the test database by
 `docs/operations/runbook-2026-10-13-apply-0034-0038-test-database.md`, with the app stopped.
 R4-T2 onward may now start on this branch.
 
+**2026-10-14:** OI-1/OI-2 and the merge review's outstanding items are done; read
+`docs/evidence/remediation-v2-2/r3/OUTSTANDING-2026-10-14.md`. It has one owner question:
+recording a verified payment from a merchant route (R1-T7). R4-T2's ADR is
+`docs/decisions/2026-10-14-r4-t2-refund-operation-schema.md`, revision 2: pass 4 refused
+revision 1, and the pass-5 independent reread is owed before migration 0039 is committed.
+
 This program's established discipline: failing-tests-first; independently re-verify a prior
 pass's own claims before trusting them, the way every session in this program has had to;
 escalate product/security tradeoffs to the owner rather than deciding them unilaterally; record

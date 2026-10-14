@@ -758,6 +758,7 @@ async function retailMoneyCaptured(tx: any, row: Transaction): Promise<boolean> 
   const [activity] = await tx.select({ captured: sql<boolean>`(
     ${transactions.windcaveTransactionId} is not null
     or coalesce(${transactions.completedSplits}, 0) > 0
+    or ${transactions.windcaveSessionState} = 'approved'
     or exists (select 1 from split_payments s where s.transaction_id = ${aggregateId}
       and (s.status in ('processing', 'completed') or s.windcave_transaction_id is not null or s.paid_at is not null))
     or exists (select 1 from payment_attempts a where a.transaction_id = ${aggregateId} and a.state = 'approved')
@@ -1967,7 +1968,8 @@ export class MemStorage implements IStorage {
   }
 
   private retailMoneyCaptured(row: Transaction): boolean {
-    return !!row.windcaveTransactionId || (row.completedSplits ?? 0) > 0 ||
+    // A board session the notification marked approved took money even if its record failed.
+    return !!row.windcaveTransactionId || (row.completedSplits ?? 0) > 0 || row.windcaveSessionState === "approved" ||
       Array.from(this.paymentAttempts.values()).some(a => a.transactionId === row.id && a.state === "approved") ||
       Array.from(this.splitPayments.values()).some(s => s.transactionId === row.id &&
         (["processing", "completed"].includes(s.status) || s.windcaveTransactionId || s.paidAt));
@@ -7433,17 +7435,17 @@ export class DatabaseStorage implements IStorage {
           .where(eq(transactions.id, updatedSplit.transactionId!));
         
         if (transaction) {
+          const allPaid = completedSplits >= (transaction.totalSplits ?? 1);
           // OI-1: a share paid after the merchant cancelled is recorded; the sale stays cancelled.
-          const finalStatus = completedSplits >= (transaction.totalSplits ?? 1) ? "completed"
-            : transaction.status === "cancelled" ? "cancelled" : "pending";
-          
-          // Update the main transaction
+          // The status is decided from the row this UPDATE writes, not from the read above: a
+          // cancel committing in between is seen here, so it is never reopened.
           await this.db!
             .update(transactions)
             .set({
               completedSplits: completedSplits,
-              status: finalStatus,
-              ...(finalStatus === "completed"
+              status: allPaid ? "completed"
+                : sql`CASE WHEN ${transactions.status} = 'cancelled' THEN 'cancelled' ELSE 'pending' END`,
+              ...(allPaid
                 ? { completedAt: sql`coalesce(${transactions.completedAt}, ${now})` }
                 : {}),
             })

@@ -27,9 +27,8 @@ How it was mapped: seven read-only readers, one per item (two stopped at a sessi
   - **Verified paid:** the payment is recorded through the normal finalizer (with the
     merchant's push) and the cancel is refused: 409 `PAYMENT_COMPLETED`, "This sale has just
     been paid".
-  - **Verified declined:** the attempt is closed after the cancel commits, so the sale stays
-    cancelled rather than failed.
-  - **Can't say yet:** the sale is cancelled and the attempt is left able to settle.
+  - **Verified declined, or can't say yet:** the sale is cancelled and the attempt is left
+    able to settle, so a second card paid in the same session is still recorded.
 - **Unsent claims** (no session, no send intent) are abandoned with the sale.
 - **A payment completing after the cancel is recorded, never lost.**
   - Finalize now accepts a cancelled sale. An unsplit sale becomes completed. A split share is
@@ -135,6 +134,71 @@ notification receiver is mounted.
   on sessions, and its finalize refuses closed invoices. Align it with OI-1.
 - **FPRN delivery method** (GET or POST): needs UAT. Mount the receiver behind a rate limit.
 
+## Independent review (2026-10-14) and what changed
+
+Six read-only reviewers, one per area, each finding re-checked by a skeptic. Two agents stopped
+at a session limit: the tests skeptic and the completeness critic. This session checked the
+tests reviewer's findings directly instead.
+
+**Fixed, failing tests first:**
+
+- **R-1 (medium):** the legacy split writer (PostgreSQL) could reopen a sale the merchant had
+  just cancelled. It read the sale unlocked and wrote "pending" after the cancel committed. The
+  status is now decided by the UPDATE from the row it writes. A new PostgreSQL race check
+  failed before the fix.
+- **R-2 (medium):** both retail Google Pay completions still sent a wallet charge for a
+  cancelled sale. Now TaptPay sends no wallet token for a cancelled sale. A payment that already
+  reached Windcave is still asked about and recorded; anything else gets 410.
+- **R-3b (low):** a board session the notification marked `approved`, whose record then failed,
+  now counts as money taken.
+- **T-3 (medium):** a verified decline closed the attempt at cancel time. A second card in the
+  same session would then have been lost. The attempt is now left open, as for "can't say yet".
+  The owner decision's implementation note is amended and dated.
+- **Test gaps closed:**
+  - PostgreSQL checks: the open invoice windows a void asks about, the cancel route's
+    context, an unsent claim committed during the cancel's wait, and an approval after a cancel
+    through the status writer;
+  - an HTTP test of the trades replacement (23505) late payment;
+  - the graph test is labelled a specification.
+- **The R1 refund test** expected 400 for a sale paid during the cancel. It now asserts OI-1's
+  409 `PAYMENT_COMPLETED` and its body. This is the full suite's one failure, found after the
+  first push.
+
+**Open, for the owner (one question):** should a merchant's cancel, void or mark-paid record a
+payment Windcave verifies at that moment (R-3a for board sales, I-1 for invoices)?
+
+- **Today:** it refuses with "just been paid" and leaves the recording to the completion paths.
+  But the notification answers Windcave before it queries, and the payer's tab may be gone, so
+  if those fail nothing records it. This was already true before OI-1 (the change was then
+  refused outright).
+- **Why it was not fixed here:** recording it from the merchant route needs the completion
+  paths' finalizers, which write by ID without naming the business. R1-T7 forbids that on a
+  merchant route.
+  - The write was gated by a business-scoped read, so no cross-business write was possible.
+  - It was implemented, then reverted: relaxing R1's rule is the owner's call.
+- **Proposal:** business-scoped board and invoice finalizers (`…ForMerchant`) that the
+  merchant routes can call.
+- **Also found:** the route-fact extractor does not trace a helper called from a helper. The
+  invoice version passed the R1 inventory unseen; the board version was caught. This is an R1
+  tooling gap to fix.
+
+**Recorded, not fixed (low; no money is lost; cost greater than benefit now):**
+
+- **I-2:** a checkout session created while a void commits can still be pinned. A payment
+  through it is recorded by the closed-invoice branch.
+- **I-3:** a single-payment finalize can overwrite a just-committed `paid_external` with `paid`
+  (a millisecond window). The `Payment_External` event remains.
+- **I-4:** two completion paths racing on a closed invoice can each log the late-payment event
+  and send the email. A closed split share is logged once per path.
+
+  Each fix is a conditional write in storage. Proposed for R4-T5, where refund-due events
+  become operations.
+- **I-5:** a manually re-issued replacement for a voided invoice is not detected. The late
+  payment makes the invoice paid without flagging a refund. This is an owner question: should
+  a payment after a void always flag a refund?
+- **R3, refuted as unreachable:** R3's invoice finalize refuses a closed invoice, and adoption
+  queues no outbox. Neither can run today, and both are already on the activation list above.
+
 ## Owner / provider questions
 
 - **UAT (carried from OI-1):** can a payer try another card in the same session after a decline?
@@ -146,4 +210,19 @@ notification receiver is mounted.
 
 ## Results
 
-Filled in on commit; see the ledger entry for this date.
+- **Full suites after the first push:**
+  - server 211 of 212 files and 5,054 of 5,055 tests pass; the one failure was the R1 refund
+    test, now fixed;
+  - client 130 files and 1,480 tests, all pass.
+- **After the review fixes:**
+  - the affected server groups (oi1, tenant, r2-t5, r3, cash, checkout, token, invoice,
+    r1-t7, route, payment, windcave, http-params): 92 files and 3,006 tests, all pass;
+  - typecheck clean.
+- **PostgreSQL 16 on fresh local databases:**
+  - 0023–0038 rehearsal applied;
+  - R3 durability 50/50 (5 checks new, including the share race that failed before its fix);
+  - R2-T4 12/12;
+  - R2-T7 7/7.
+- **Not run since the review fixes:** the full server and client suites. They run after this
+  commit; the ledger records the outcome.
+- **Nothing** was applied to a shared database, deployed or sent to a provider.

@@ -71,7 +71,13 @@ test.each(["ownership", "completed"])("cancellation refuses a concurrent %s chan
   try {
     const res = await request(app).post(`/api/transactions/${transaction.id}/cancel`).set(signedIn(owner));
     expect(afterChange).toBeDefined();
-    expect(res.status).toBe(change === "ownership" ? 404 : 400);
+    // OI-1 (docs/decisions/2026-10-13-cancel-after-payment-attempt-owner-decision.md): a sale paid
+    // while the cancel ran is reported as just paid.
+    if (change === "ownership") expect(res.status).toBe(404);
+    else {
+      expect(res.status).toBe(409);
+      expect(res.body).toEqual({ code: "PAYMENT_COMPLETED", message: "This sale has just been paid" });
+    }
     expect(storageSnapshot()).toBe(afterChange);
     effects.assertNone();
   } finally { effects.restore(); }
