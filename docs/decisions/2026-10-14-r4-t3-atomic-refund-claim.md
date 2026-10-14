@@ -362,8 +362,13 @@ Every settle also sets `updated_at = now()`.
   Until then, one live refund per sale can block a sale's refunds; the flag is off.
 
 **Also adopted from pass 3:**
-- **Owner-only means `role === 'owner'`.** `isAccountOwner` also admits `merchant` and
-  `admin`; plan §11.1 needs a separate audited policy for an admin path.
+- **Owner-only means the owner roles, never `admin`.** `isAccountOwner` admits `owner`,
+  `merchant` and `admin`. `merchant` is the business owner's own login role: `createUser`
+  defaults to it. So the route accepts `owner` and `merchant` and refuses `admin` (403),
+  because plan §11.1 needs a separate audited policy for an admin path.
+
+  *Corrected during implementation:* pass 3 wrote `role === 'owner'`, which would have
+  refused every owner whose login role is `merchant`.
 - **Audit:**
   - the send intent and a takeover each append an event (`Refund_Submitted`, with a takeover
     flag);

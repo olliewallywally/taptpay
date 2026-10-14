@@ -1,10 +1,10 @@
 # R1-T7 tenant/storage execution inventory
 
-Generated from working-tree sources on base `021d3f05e60284c8aa56703f4657c2c9c07f3448`; the phase evidence names the final commit.
+Generated from working-tree sources on base `b08d39e62b306416c9045b2c413acd544b6c2d98`; the phase evidence names the final commit.
 
 Registrations: **194**; registrations with session/admin authentication: **122**;
 registrations calling checkMerchantOwnership: **25**.
-IStorage: **262** declared methods;
+IStorage: **265** declared methods;
 PaymentAttemptRepository: **10** inherited methods.
 
 Classifications come from the reviewed per-route branches, including mixed public/signed-in routes.
@@ -283,6 +283,9 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | IStorage | updateRefundStatusForMerchant | yes | `updateRefundStatusForMerchant(id: number, merchantId: number, status: "failed" \| "completed", windcaveRefundId?: string): Promise<Refund \| undefined>` |
 | IStorage | reserveRefundAmountForMerchant | yes | `reserveRefundAmountForMerchant(id: number, merchantId: number, refundAmount: number): Promise<Transaction \| null>` |
 | IStorage | releaseRefundAmountForMerchant | yes | `releaseRefundAmountForMerchant(id: number, merchantId: number, refundAmount: number): Promise<boolean>` |
+| IStorage | claimRefundOperationForMerchant | yes | `claimRefundOperationForMerchant(merchantId: number, input: RefundClaimInput): Promise<RefundClaimResult>` |
+| IStorage | markRefundSubmittedForMerchant | yes | `markRefundSubmittedForMerchant(operationId: string, merchantId: number, requester: string, environment: PaymentProviderEnvironment): Promise<RefundSubmitResult>` |
+| IStorage | settleRefundOperationForMerchant | yes | `settleRefundOperationForMerchant(operationId: string, merchantId: number, leaseOwner: string, outcome: RefundCallOutcome): Promise<RefundSettleResult>` |
 | IStorage | createTaptStone | no | `createTaptStone(data: InsertTaptStone): Promise<TaptStone>` |
 | IStorage | createNextTaptStone | yes | `createNextTaptStone(merchantId: number, name?: string): Promise<TaptStone>` |
 | IStorage | getTaptStone | no | `getTaptStone(id: number): Promise<TaptStone \| undefined>` |

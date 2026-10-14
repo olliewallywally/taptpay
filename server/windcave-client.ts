@@ -115,7 +115,9 @@ export interface WindcaveClient {
 
 const DEFAULT_RETRY_LIMIT = 5;
 const DEFAULT_RETRY_DELAY_MS = 5000;
-const DEFAULT_TIMEOUT_MS = 15000;
+/** One provider request's timeout. R4-T3's refund lease is derived from it. */
+export const WINDCAVE_REQUEST_TIMEOUT_MS = 15000;
+const DEFAULT_TIMEOUT_MS = WINDCAVE_REQUEST_TIMEOUT_MS;
 const DEFAULT_REFUND_POLL_LIMIT = 3;
 // A provider transaction ID is one opaque path segment.
 const TRANSACTION_TOKEN = /^[A-Za-z0-9_-]{1,64}$/;

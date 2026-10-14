@@ -72,7 +72,9 @@ function capture() {
     transaction: async (run: any) => run(db),
     select: () => ({ from: (table: any) => ({ where: (where: any) => {
       calls.push({ kind: "select", where });
-      const result: any = Promise.resolve([new PgDialect().sqlToQuery(where).sql.includes('"refunds"') ? refund : parent]);
+      const text = new PgDialect().sqlToQuery(where).sql;
+      // R4-T3: the legacy writers first ask whether the sale has any refund operation; here it has none.
+      const result: any = Promise.resolve(text.includes('"refunds"."state" is not null') ? [] : [text.includes('"refunds"') ? refund : parent]);
       result.limit = () => result;
       result.for = (lock: string) => { calls[calls.length - 1].lock = lock; return result; };
       return result;

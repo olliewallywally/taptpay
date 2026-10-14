@@ -6,6 +6,8 @@ import { evidenceMatchesExpectation } from "./payment-reconciliation";
 import { mintPublicLinkToken, hashPublicLinkTokenData } from "./public-link-token-compatibility";
 import {canonicalCashCommand,type CashCommandInput,type CashCommandResult} from './cash-command';
 import {isUuid} from './durable-payment-contract';
+import { LIVE_REFUND_STATES, PROVIDER_TOKEN, REFUND_LEASE_MS, REFUND_RECHECK_MS, REFUND_STATEMENT_TIMEOUT_MS, refundFingerprint, refundSettlePlan, type RefundCallOutcome, type RefundSettlePlan } from "./refund-operation-rules";
+import type { PaymentProviderEnvironment } from "@shared/schema";
 import { decideBilling, failedPaymentUpdates, immediatePlanUpdates, MAX_PAYMENT_ATTEMPTS, nextBillingPeriodStart, nextPeriodUpdates, proratedUpgradeCents, queuedPlanUpdates, renewalPlan } from "./subscription-billing";
 import { getDb, isDatabaseConnected } from "./database";
 import { config } from "./config";
@@ -201,6 +203,36 @@ export interface RetailCancellationContext {
   openAttempts: PaymentAttempt[];
   nextPendingSplit: SplitPayment | null;
 }
+
+/** R4-T3 (docs/decisions/2026-10-14-r4-t3-atomic-refund-claim.md): one refund request, as claimed. */
+export type RefundClaimInput = {
+  merchantId: number; userId: number; transactionId: number; idempotencyKey: string; amountCents: number; reasonText: string;
+};
+export type RefundNotRefundableReason = "status" | "split" | "capture_missing" | "capture_invalid";
+export type RefundClaimResult =
+  | { kind: "claimed"; operation: Refund; leaseOwner: string }
+  | { kind: "reused"; operation: Refund }
+  | { kind: "conflict"; operation: Refund }
+  | { kind: "not-found" }
+  | { kind: "not-refundable"; reason: RefundNotRefundableReason }
+  | { kind: "in-progress" }
+  | { kind: "insufficient"; remainingCents: number };
+export type RefundSubmitResult =
+  | { kind: "submitted"; operation: Refund }
+  | { kind: "not-sent"; operation: Refund }
+  | { kind: "not-found" };
+export type RefundSettleResult =
+  | { kind: "settled"; operation: Refund; transaction: Transaction | undefined }
+  | { kind: "unchanged"; operation: Refund }
+  | { kind: "not-found" };
+
+/** Exact cents of a stored decimal amount ("20", "20.5", "20.50"); null when it is not one. */
+export function decimalToCents(value: string | null | undefined): number | null {
+  const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(String(value ?? "0").trim());
+  if (!match) return null;
+  return Number(match[1]) * 100 + Number((match[2] ?? "").padEnd(2, "0") || "0");
+}
+const centsToDecimal = (cents: number) => `${Math.trunc(cents / 100)}.${String(cents % 100).padStart(2, "0")}`;
 
 export type TransactionCancellationResult =
   | { kind: "cancelled"; transaction: Transaction }
@@ -962,6 +994,12 @@ export interface IStorage extends PaymentAttemptRepository {
   /** Legacy balance reservation; R4 must add durable operation/idempotency before enablement. */
   reserveRefundAmountForMerchant(id: number, merchantId: number, refundAmount: number): Promise<Transaction | null>;
   releaseRefundAmountForMerchant(id: number, merchantId: number, refundAmount: number): Promise<boolean>;
+  /** R4-T3: one transaction claims a refund operation, reserving its cents (ADR §2). */
+  claimRefundOperationForMerchant(merchantId: number, input: RefundClaimInput): Promise<RefundClaimResult>;
+  /** R4-T3: the send intent, committed before any provider call; anything but `submitted` means do not send (ADR §3). */
+  markRefundSubmittedForMerchant(operationId: string, merchantId: number, requester: string, environment: PaymentProviderEnvironment): Promise<RefundSubmitResult>;
+  /** R4-T3: settles one synchronous outcome for the lease holder (ADR §5). */
+  settleRefundOperationForMerchant(operationId: string, merchantId: number, leaseOwner: string, outcome: RefundCallOutcome): Promise<RefundSettleResult>;
 
   // Tapt Stone operations
   createTaptStone(data: InsertTaptStone): Promise<TaptStone>;
@@ -1490,6 +1528,11 @@ export class MemStorage implements IStorage {
   private authThrottleRows = new Map<string, AuthThrottleRow>();
   private invoiceSplitSessionRows = new Map<string, InvoiceSplitSession>();
   private cashAuditEvents=new Map<string,{id:string;merchantId:number;transactionId:number;eventType:string;payload:unknown}>();
+  // R4-T3: refund operations' audit events and locks: a key lock, then a sale lock, as PostgreSQL's
+  // advisory lock then FOR UPDATE. withMemLock is not re-entrant: nothing inside the claim retakes them.
+  private refundAuditEvents: Array<{ id: string; merchantId: number; transactionId: number; operationId: string; eventType: string; payload: Record<string, unknown> }> = [];
+  private refundKeyLocks = new Map<string, Promise<void>>();
+  private refundSaleLocks = new Map<string, Promise<void>>();
   private cashOutboxEntries=new Map<string,{id:string;eventId:string;eventSource:string;status:string}>();
   private authSessionRows = new Map<string, AuthSession>();
   private documentAccessAudit: Array<{ adminUserId: number; documentName: string }> = [];
@@ -2629,7 +2672,7 @@ export class MemStorage implements IStorage {
   async updateRefundStatusForMerchant(id: number, merchantId: number, status: "failed" | "completed", windcaveRefundId?: string): Promise<Refund | undefined> {
     if (!isManagementTenantId(merchantId)) return undefined;
     const refund = this.refunds.get(id);
-    if (!refund || refund.merchantId !== merchantId || refund.transactionId === null
+    if (!refund || refund.merchantId !== merchantId || refund.transactionId === null || refund.state != null
       || this.transactions.get(refund.transactionId)?.merchantId !== merchantId) return undefined;
     const updated = { ...refund, status, windcaveRefundId: windcaveRefundId || refund.windcaveRefundId,
       completedAt: status === "completed" ? new Date() : refund.completedAt };
@@ -2637,42 +2680,177 @@ export class MemStorage implements IStorage {
     return updated;
   }
 
+  /** R4-T3 (B-1): the legacy writers never touch a sale that has any refund operation. */
+  private memSaleHasRefundOperation(transactionId: number): boolean {
+    return Array.from(this.refunds.values()).some(r => r.transactionId === transactionId && r.state !== null);
+  }
+
   async reserveRefundAmountForMerchant(id: number, merchantId: number, refundAmount: number): Promise<Transaction | null> {
     if (!isManagementTenantId(merchantId)) return null;
-    const transaction = this.transactions.get(id);
-    if (!transaction || transaction.merchantId !== merchantId) return null;
-    if (transaction.status !== "completed" && transaction.status !== "partially_refunded") return null;
-    const prevRefunded = parseFloat(transaction.totalRefunded || "0");
-    const price = parseFloat(transaction.price);
-    // Guard against over-refund (epsilon for float noise on 2dp money).
-    if (refundAmount > price - prevRefunded + 1e-9) return null;
-    const newTotalRefunded = prevRefunded + refundAmount;
-    const newRefundableAmount = Math.max(0, price - newTotalRefunded);
-    const updated = {
-      ...transaction,
-      totalRefunded: newTotalRefunded.toFixed(2),
-      refundableAmount: newRefundableAmount.toFixed(2),
-      status: newRefundableAmount <= 0 ? "refunded" : "partially_refunded",
-    };
-    this.transactions.set(id, updated);
-    return updated;
+    return withMemLock(this.refundSaleLocks, String(id), async () => {
+      const transaction = this.transactions.get(id);
+      if (!transaction || transaction.merchantId !== merchantId) return null;
+      if (this.memSaleHasRefundOperation(id)) return null;
+      if (transaction.status !== "completed" && transaction.status !== "partially_refunded") return null;
+      const prevRefunded = parseFloat(transaction.totalRefunded || "0");
+      const price = parseFloat(transaction.price);
+      // Guard against over-refund (epsilon for float noise on 2dp money).
+      if (refundAmount > price - prevRefunded + 1e-9) return null;
+      const newTotalRefunded = prevRefunded + refundAmount;
+      const newRefundableAmount = Math.max(0, price - newTotalRefunded);
+      const updated = {
+        ...transaction,
+        totalRefunded: newTotalRefunded.toFixed(2),
+        refundableAmount: newRefundableAmount.toFixed(2),
+        status: newRefundableAmount <= 0 ? "refunded" : "partially_refunded",
+      };
+      this.transactions.set(id, updated);
+      return updated;
+    });
   }
 
   async releaseRefundAmountForMerchant(id: number, merchantId: number, refundAmount: number): Promise<boolean> {
     if (!isManagementTenantId(merchantId)) return false;
-    const transaction = this.transactions.get(id);
-    if (!transaction || transaction.merchantId !== merchantId) return false;
-    const prevRefunded = parseFloat(transaction.totalRefunded || "0");
-    const price = parseFloat(transaction.price);
-    const newTotalRefunded = Math.max(0, prevRefunded - refundAmount);
-    const newRefundableAmount = Math.max(0, price - newTotalRefunded);
-    this.transactions.set(id, {
-      ...transaction,
-      totalRefunded: newTotalRefunded.toFixed(2),
-      refundableAmount: newRefundableAmount.toFixed(2),
-      status: newTotalRefunded <= 0 ? "completed" : "partially_refunded",
+    return withMemLock(this.refundSaleLocks, String(id), async () => {
+      const transaction = this.transactions.get(id);
+      if (!transaction || transaction.merchantId !== merchantId) return false;
+      if (this.memSaleHasRefundOperation(id)) return false;
+      const prevRefunded = parseFloat(transaction.totalRefunded || "0");
+      const price = parseFloat(transaction.price);
+      const newTotalRefunded = Math.max(0, prevRefunded - refundAmount);
+      const newRefundableAmount = Math.max(0, price - newTotalRefunded);
+      this.transactions.set(id, {
+        ...transaction,
+        totalRefunded: newTotalRefunded.toFixed(2),
+        refundableAmount: newRefundableAmount.toFixed(2),
+        status: newTotalRefunded <= 0 ? "completed" : "partially_refunded",
+      });
+      return true;
     });
-    return true;
+  }
+
+  /** Test-only reads: the refund audit trail of one operation, and a sale's remaining cents. */
+  getRefundAuditEventsForTest(operationId: string) {
+    return this.refundAuditEvents.filter(event => event.operationId === operationId);
+  }
+  remainingRefundableCentsForTest(transactionId: number): number | null {
+    const sale = this.transactions.get(transactionId);
+    return sale ? this.memRemainingRefundableCents(sale) : null;
+  }
+  private memRemainingRefundableCents(sale: Transaction): number | null {
+    const price = decimalToCents(sale.price), refunded = decimalToCents(sale.totalRefunded ?? "0");
+    if (price === null || refunded === null) return null;
+    const live = Array.from(this.refunds.values())
+      .filter(r => r.transactionId === sale.id && r.state !== null && LIVE_REFUND_STATES.includes(r.state))
+      .reduce((sum, r) => sum + (r.amountCents ?? 0), 0);
+    return price - refunded - live;
+  }
+  private memRefundEvent(op: Refund, eventType: string, payload: Record<string, unknown>) {
+    this.refundAuditEvents.push({ id: randomUUID(), merchantId: op.merchantId!, transactionId: op.transactionId!, operationId: op.operationId, eventType,
+      payload: { operationId: op.operationId, ...payload } });
+  }
+
+  async claimRefundOperationForMerchant(merchantId: number, input: RefundClaimInput): Promise<RefundClaimResult> {
+    const { transactionId, userId, amountCents } = input;
+    if (!isManagementTenantId(merchantId) || input.merchantId !== merchantId || !isUuid(input.idempotencyKey) || !Number.isSafeInteger(amountCents) || amountCents <= 0) {
+      return { kind: "not-found" };
+    }
+    const key = input.idempotencyKey.toLowerCase();
+    const fingerprint = refundFingerprint({ merchantId, transactionId, amountCents, currency: "NZD", method: "original_payment_method" });
+    return withMemLock(this.refundKeyLocks, `${merchantId}:${key}`, async () => {
+      const existing = Array.from(this.refunds.values()).find(r => r.state !== null && r.merchantId === merchantId && r.idempotencyKey === key);
+      if (existing) return existing.requestFingerprint === fingerprint ? { kind: "reused", operation: existing } : { kind: "conflict", operation: existing };
+      return withMemLock(this.refundSaleLocks, String(transactionId), async (): Promise<RefundClaimResult> => {
+        const sale = this.transactions.get(transactionId);
+        if (!sale || sale.merchantId !== merchantId) return { kind: "not-found" };
+        if (this.users.get(userId)?.merchantId !== merchantId) return { kind: "not-found" };
+        if (sale.status !== "completed" && sale.status !== "partially_refunded") return { kind: "not-refundable", reason: "status" };
+        if (sale.isSplit) return { kind: "not-refundable", reason: "split" };
+        if (!sale.windcaveTransactionId) return { kind: "not-refundable", reason: "capture_missing" };
+        if (!PROVIDER_TOKEN.test(sale.windcaveTransactionId)) return { kind: "not-refundable", reason: "capture_invalid" };
+        if (Array.from(this.refunds.values()).some(r => r.transactionId === transactionId && r.state !== null && LIVE_REFUND_STATES.includes(r.state))) {
+          return { kind: "in-progress" };
+        }
+        const remaining = this.memRemainingRefundableCents(sale);
+        if (remaining === null) return { kind: "not-refundable", reason: "status" };
+        if (amountCents > remaining) return { kind: "insufficient", remainingCents: Math.max(0, remaining) };
+        const now = new Date(), leaseOwner = randomUUID(), operationId = randomUUID();
+        const lease = new Date(now.getTime() + REFUND_LEASE_MS);
+        const operation: Refund = {
+          id: this.currentRefundId++, transactionId, merchantId, refundAmount: centsToDecimal(amountCents), refundReason: null,
+          refundMethod: "original_payment_method", status: "pending", windcaveRefundId: null, windcaveFeeRefunded: "0.00",
+          platformFeeRefunded: "0.00", initiatedBy: null, customerNotified: false, completedAt: null, createdAt: now,
+          operationId, state: "requested", idempotencyKey: key, requestFingerprint: fingerprint,
+          processorXId: randomBytes(16).toString("hex"), merchantReference: `TAPTR_${operationId.replace(/-/g, "")}`,
+          originalProviderTransactionId: sale.windcaveTransactionId, originalShareIndex: 0,
+          providerEnvironment: config.paymentMode === "production" ? "production" : "uat",
+          amountCents, currency: "NZD", providerRefundTransactionId: null, leaseOwner, leaseExpiresAt: lease, attemptCount: 0,
+          nextReconciliationAt: lease, lastErrorCode: null, initiatedByUserId: userId, reasonCode: null, reasonText: input.reasonText,
+          requestedAt: now, submittedAt: null, finishedAt: null, updatedAt: now,
+        };
+        this.refunds.set(operation.id, operation);
+        this.memRefundEvent(operation, "Refund_Requested", { amountCents, userId });
+        return { kind: "claimed", operation, leaseOwner };
+      });
+    });
+  }
+
+  private memRefundOperation(operationId: string, merchantId: number): Refund | undefined {
+    if (!isManagementTenantId(merchantId)) return undefined;
+    return Array.from(this.refunds.values()).find(r => r.operationId === operationId && r.merchantId === merchantId && r.state !== null);
+  }
+
+  async markRefundSubmittedForMerchant(operationId: string, merchantId: number, requester: string, environment: PaymentProviderEnvironment): Promise<RefundSubmitResult> {
+    const found = this.memRefundOperation(operationId, merchantId);
+    if (!found) return { kind: "not-found" };
+    return withMemLock(this.refundSaleLocks, String(found.transactionId), async (): Promise<RefundSubmitResult> => {
+      const current = this.refunds.get(found.id)!;
+      const now = new Date();
+      const takeover = current.leaseOwner !== requester;
+      if (current.state !== "requested" || current.providerEnvironment !== environment
+        || (takeover && !(current.leaseExpiresAt && current.leaseExpiresAt.getTime() < now.getTime()))) {
+        return { kind: "not-sent", operation: current };
+      }
+      const lease = new Date(now.getTime() + REFUND_LEASE_MS);
+      const operation: Refund = { ...current, state: "submitted", status: "processing", submittedAt: now, attemptCount: current.attemptCount + 1,
+        leaseOwner: requester, leaseExpiresAt: lease, nextReconciliationAt: lease, updatedAt: now };
+      this.refunds.set(current.id, operation);
+      this.memRefundEvent(operation, "Refund_Submitted", { attempt: operation.attemptCount, takeover });
+      return { kind: "submitted", operation };
+    });
+  }
+
+  async settleRefundOperationForMerchant(operationId: string, merchantId: number, leaseOwner: string, outcome: RefundCallOutcome): Promise<RefundSettleResult> {
+    const found = this.memRefundOperation(operationId, merchantId);
+    if (!found) return { kind: "not-found" };
+    return withMemLock(this.refundSaleLocks, String(found.transactionId), async (): Promise<RefundSettleResult> => {
+      const current = this.refunds.get(found.id)!;
+      if (current.state !== "submitted" || current.leaseOwner !== leaseOwner) return { kind: "unchanged", operation: current };
+      let plan: RefundSettlePlan = refundSettlePlan(outcome, current.originalProviderTransactionId!);
+      if (plan.refundId && Array.from(this.refunds.values()).some(r => r.id !== current.id && r.providerRefundTransactionId === plan.refundId)) {
+        plan = { state: "unknown", refundId: null, parked: true, errorCode: "provider_refund_id_invalid" };
+      }
+      const now = new Date();
+      const operation: Refund = {
+        ...current, state: plan.state, lastErrorCode: plan.errorCode, providerRefundTransactionId: plan.refundId, updatedAt: now,
+        leaseOwner: null, leaseExpiresAt: null,
+        status: plan.state === "succeeded" ? "completed" : plan.state === "failed" ? "failed" : "processing",
+        finishedAt: plan.state === "unknown" ? null : now,
+        nextReconciliationAt: plan.state === "unknown" && !plan.parked ? new Date(now.getTime() + REFUND_RECHECK_MS) : null,
+      };
+      this.refunds.set(current.id, operation);
+      let transaction = this.transactions.get(current.transactionId!);
+      if (plan.state === "succeeded" && transaction) {
+        const price = decimalToCents(transaction.price) ?? 0;
+        const refunded = (decimalToCents(transaction.totalRefunded ?? "0") ?? 0) + current.amountCents!;
+        transaction = { ...transaction, totalRefunded: centsToDecimal(refunded), refundableAmount: centsToDecimal(Math.max(0, price - refunded)),
+          status: refunded >= price ? "refunded" : "partially_refunded" };
+        this.transactions.set(transaction.id, transaction);
+      }
+      this.memRefundEvent(operation, plan.state === "succeeded" ? "Refund_Succeeded" : plan.state === "failed" ? "Refund_Failed" : "Refund_Unknown",
+        { code: plan.errorCode, parked: plan.parked });
+      return { kind: "settled", operation, transaction };
+    });
   }
 
   async updateTransactionStatusForMerchant(id: number, merchantId: number, status: string, windcaveTransactionId?: string): Promise<Transaction | undefined> {
@@ -6839,7 +7017,8 @@ export class DatabaseStorage implements IStorage {
     return this.db.transaction(async (tx: any) => {
       const [refund] = await tx.select().from(refunds)
         .where(and(eq(refunds.id, id), eq(refunds.merchantId, merchantId))).limit(1);
-      if (!refund || refund.transactionId === null) return undefined;
+      // R4-T3 (B-1): an operation row is never written by the legacy path.
+      if (!refund || refund.transactionId === null || refund.state != null) return undefined;
       // Parent first: same lock ordering as finalization/creation, protecting current ownership.
       const [parent] = await tx.select().from(transactions)
         .where(and(eq(transactions.id, refund.transactionId), eq(transactions.merchantId, merchantId)))
@@ -6854,44 +7033,200 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
+  /** R4-T3 (B-1): the legacy writers never touch a sale that has any refund operation. The sale is
+   * locked first and checked in its own statement, so a claim that has just committed is seen. */
+  private async lockSaleWithoutRefundOperations(tx: any, id: number, merchantId: number): Promise<Transaction | null> {
+    const [sale] = await tx.select().from(transactions)
+      .where(and(eq(transactions.id, id), eq(transactions.merchantId, merchantId))).limit(1).for("update");
+    if (!sale) return null;
+    const [operation] = await tx.select({ id: refunds.id }).from(refunds)
+      .where(and(eq(refunds.transactionId, id), isNotNull(refunds.state))).limit(1);
+    return operation ? null : sale;
+  }
+
   async reserveRefundAmountForMerchant(id: number, merchantId: number, refundAmount: number): Promise<Transaction | null> {
     if (!isManagementTenantId(merchantId)) return null;
     if (!this.db) throw new Error('Database not available');
     const amt = refundAmount.toFixed(2);
-    // Single atomic UPDATE: increment totalRefunded, recompute refundableAmount and
-    // status, guarded by (a) refundable status and (b) the CURRENT remaining balance
-    // (price - already-refunded) being >= the requested amount. Concurrent/double
-    // refunds serialize on the row; the second sees a reduced balance and its WHERE
-    // fails, so 0 rows return -> caller treats it as a rejected reservation.
-    const result = await this.db
-      .update(transactions)
-      .set({
-        totalRefunded: sql`(COALESCE(${transactions.totalRefunded}, '0')::numeric + ${amt}::numeric)`,
-        refundableAmount: sql`GREATEST(0, ${transactions.price}::numeric - (COALESCE(${transactions.totalRefunded}, '0')::numeric + ${amt}::numeric))`,
-        status: sql`CASE WHEN ${transactions.price}::numeric - (COALESCE(${transactions.totalRefunded}, '0')::numeric + ${amt}::numeric) <= 0 THEN 'refunded' ELSE 'partially_refunded' END`,
-      })
-      .where(and(
-        eq(transactions.id, id), eq(transactions.merchantId, merchantId),
-        inArray(transactions.status, ['completed', 'partially_refunded']),
-        sql`(${transactions.price}::numeric - COALESCE(${transactions.totalRefunded}, '0')::numeric) >= ${amt}::numeric`,
-      ))
-      .returning();
-    return result[0] ?? null;
+    return this.db.transaction(async (tx: any) => {
+      if (!await this.lockSaleWithoutRefundOperations(tx, id, merchantId)) return null;
+      // Guarded by (a) refundable status and (b) the current remaining balance (price -
+      // already refunded) being at least the requested amount; 0 rows = rejected reservation.
+      const result = await tx
+        .update(transactions)
+        .set({
+          totalRefunded: sql`(COALESCE(${transactions.totalRefunded}, '0')::numeric + ${amt}::numeric)`,
+          refundableAmount: sql`GREATEST(0, ${transactions.price}::numeric - (COALESCE(${transactions.totalRefunded}, '0')::numeric + ${amt}::numeric))`,
+          status: sql`CASE WHEN ${transactions.price}::numeric - (COALESCE(${transactions.totalRefunded}, '0')::numeric + ${amt}::numeric) <= 0 THEN 'refunded' ELSE 'partially_refunded' END`,
+        })
+        .where(and(
+          eq(transactions.id, id), eq(transactions.merchantId, merchantId),
+          inArray(transactions.status, ['completed', 'partially_refunded']),
+          sql`(${transactions.price}::numeric - COALESCE(${transactions.totalRefunded}, '0')::numeric) >= ${amt}::numeric`,
+        ))
+        .returning();
+      return result[0] ?? null;
+    });
   }
 
   async releaseRefundAmountForMerchant(id: number, merchantId: number, refundAmount: number): Promise<boolean> {
     if (!isManagementTenantId(merchantId)) return false;
     if (!this.db) throw new Error('Database not available');
     const amt = refundAmount.toFixed(2);
-    const result = await this.db
-      .update(transactions)
-      .set({
-        totalRefunded: sql`GREATEST(0, COALESCE(${transactions.totalRefunded}, '0')::numeric - ${amt}::numeric)`,
-        refundableAmount: sql`LEAST(${transactions.price}::numeric, ${transactions.price}::numeric - GREATEST(0, COALESCE(${transactions.totalRefunded}, '0')::numeric - ${amt}::numeric))`,
-        status: sql`CASE WHEN GREATEST(0, COALESCE(${transactions.totalRefunded}, '0')::numeric - ${amt}::numeric) <= 0 THEN 'completed' ELSE 'partially_refunded' END`,
-      })
-      .where(and(eq(transactions.id, id), eq(transactions.merchantId, merchantId))).returning();
-    return result.length > 0;
+    return this.db.transaction(async (tx: any) => {
+      if (!await this.lockSaleWithoutRefundOperations(tx, id, merchantId)) return false;
+      const result = await tx
+        .update(transactions)
+        .set({
+          totalRefunded: sql`GREATEST(0, COALESCE(${transactions.totalRefunded}, '0')::numeric - ${amt}::numeric)`,
+          refundableAmount: sql`LEAST(${transactions.price}::numeric, ${transactions.price}::numeric - GREATEST(0, COALESCE(${transactions.totalRefunded}, '0')::numeric - ${amt}::numeric))`,
+          status: sql`CASE WHEN GREATEST(0, COALESCE(${transactions.totalRefunded}, '0')::numeric - ${amt}::numeric) <= 0 THEN 'completed' ELSE 'partially_refunded' END`,
+        })
+        .where(and(eq(transactions.id, id), eq(transactions.merchantId, merchantId))).returning();
+      return result.length > 0;
+    });
+  }
+
+  /** R4-T3: each claim, send intent and settle runs under bounded lock and statement waits. */
+  private async refundTransactionTimeouts(tx: any) {
+    await tx.execute(sql`SET LOCAL lock_timeout = '2s'`);
+    await tx.execute(sql.raw(`SET LOCAL statement_timeout = '${REFUND_STATEMENT_TIMEOUT_MS}ms'`));
+  }
+  private async refundEvent(tx: any, op: Refund, eventType: string, payload: Record<string, unknown>) {
+    await tx.insert(transactionEvents).values({ merchantId: op.merchantId, transactionId: op.transactionId, eventType,
+      payload: { operationId: op.operationId, ...payload } });
+  }
+
+  async claimRefundOperationForMerchant(merchantId: number, input: RefundClaimInput): Promise<RefundClaimResult> {
+    const { transactionId, userId, amountCents } = input;
+    if (!isManagementTenantId(merchantId) || input.merchantId !== merchantId || !isUuid(input.idempotencyKey) || !Number.isSafeInteger(amountCents) || amountCents <= 0) {
+      return { kind: "not-found" };
+    }
+    if (!this.db) throw new Error('Database not available');
+    const key = input.idempotencyKey.toLowerCase();
+    const fingerprint = refundFingerprint({ merchantId, transactionId, amountCents, currency: "NZD", method: "original_payment_method" });
+    return this.db.transaction(async (tx: any): Promise<RefundClaimResult> => {
+      await this.refundTransactionTimeouts(tx);
+      // ADR §2: only the claim takes this lock, first, and never while holding a row lock.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(${0x52464e44}, hashtext(${`${merchantId}:${key}`}))`);
+      const [existing] = await tx.select().from(refunds).where(and(eq(refunds.merchantId, merchantId),
+        eq(refunds.idempotencyKey, key), isNotNull(refunds.state))).limit(1);
+      if (existing) return existing.requestFingerprint === fingerprint ? { kind: "reused", operation: existing } : { kind: "conflict", operation: existing };
+      // Each read below is its own statement, after its lock (READ COMMITTED: a fresh snapshot).
+      const [sale] = await tx.select().from(transactions)
+        .where(and(eq(transactions.id, transactionId), eq(transactions.merchantId, merchantId))).limit(1).for("update");
+      if (!sale) return { kind: "not-found" };
+      const [member] = await tx.select({ id: users.id }).from(users).where(and(eq(users.id, userId), eq(users.merchantId, merchantId))).limit(1);
+      if (!member) return { kind: "not-found" };
+      if (sale.status !== "completed" && sale.status !== "partially_refunded") return { kind: "not-refundable", reason: "status" };
+      if (sale.isSplit) return { kind: "not-refundable", reason: "split" };
+      if (!sale.windcaveTransactionId) return { kind: "not-refundable", reason: "capture_missing" };
+      if (!PROVIDER_TOKEN.test(sale.windcaveTransactionId)) return { kind: "not-refundable", reason: "capture_invalid" };
+      const [live] = await tx.select({ id: refunds.id }).from(refunds)
+        .where(and(eq(refunds.transactionId, transactionId), inArray(refunds.state, [...LIVE_REFUND_STATES]))).limit(1);
+      if (live) return { kind: "in-progress" };
+      const [{ reserved }] = await tx.select({ reserved: sql<string>`coalesce(sum(${refunds.amountCents}), 0)::text` }).from(refunds)
+        .where(and(eq(refunds.transactionId, transactionId), inArray(refunds.state, [...LIVE_REFUND_STATES])));
+      const price = decimalToCents(sale.price), refunded = decimalToCents(sale.totalRefunded ?? "0");
+      if (price === null || refunded === null) return { kind: "not-refundable", reason: "status" };
+      const remaining = price - refunded - Number(reserved);
+      if (amountCents > remaining) return { kind: "insufficient", remainingCents: Math.max(0, remaining) };
+      // C-3: the operation's UUID is made here, so its reference is set in the same statement.
+      const operationId = randomUUID(), leaseOwner = randomUUID();
+      const lease = sql`now() + ${REFUND_LEASE_MS} * interval '1 millisecond'`;
+      const [operation] = await tx.insert(refunds).values({
+        transactionId, merchantId, refundAmount: centsToDecimal(amountCents), refundMethod: "original_payment_method", status: "pending",
+        operationId, state: "requested", idempotencyKey: key, requestFingerprint: fingerprint,
+        processorXId: randomBytes(16).toString("hex"), merchantReference: `TAPTR_${operationId.replace(/-/g, "")}`,
+        originalProviderTransactionId: sale.windcaveTransactionId, originalShareIndex: 0,
+        providerEnvironment: config.paymentMode === "production" ? "production" : "uat",
+        amountCents, currency: "NZD", leaseOwner, leaseExpiresAt: lease, attemptCount: 0, nextReconciliationAt: lease,
+        initiatedByUserId: userId, reasonText: input.reasonText, requestedAt: sql`now()`, updatedAt: sql`now()`,
+      }).returning();
+      await this.refundEvent(tx, operation, "Refund_Requested", { amountCents, userId });
+      return { kind: "claimed", operation, leaseOwner };
+    });
+  }
+
+  /** Lock order (R4-T2 ADR): the sale first, then the operation. */
+  private async lockRefundOperation(tx: any, operationId: string, merchantId: number): Promise<(Refund & { leaseExpired: boolean }) | undefined> {
+    const [found] = await tx.select({ id: refunds.id, transactionId: refunds.transactionId }).from(refunds)
+      .where(and(eq(refunds.operationId, operationId), eq(refunds.merchantId, merchantId), isNotNull(refunds.state))).limit(1);
+    if (!found) return undefined;
+    const [sale] = await tx.select({ id: transactions.id }).from(transactions)
+      .where(and(eq(transactions.id, found.transactionId), eq(transactions.merchantId, merchantId))).limit(1).for("update");
+    if (!sale) return undefined;
+    const [row] = await tx.select({ refund: refunds, leaseExpired: sql<boolean>`coalesce(${refunds.leaseExpiresAt} < now(), false)` })
+      .from(refunds).where(eq(refunds.id, found.id)).limit(1).for("update");
+    return row ? { ...row.refund, leaseExpired: row.leaseExpired } : undefined;
+  }
+
+  async markRefundSubmittedForMerchant(operationId: string, merchantId: number, requester: string, environment: PaymentProviderEnvironment): Promise<RefundSubmitResult> {
+    if (!isManagementTenantId(merchantId) || !isUuid(operationId) || !isUuid(requester)) return { kind: "not-found" };
+    if (!this.db) throw new Error('Database not available');
+    return this.db.transaction(async (tx: any): Promise<RefundSubmitResult> => {
+      await this.refundTransactionTimeouts(tx);
+      const locked = await this.lockRefundOperation(tx, operationId, merchantId);
+      if (!locked) return { kind: "not-found" };
+      const { leaseExpired, ...current } = locked;
+      const takeover = current.leaseOwner !== requester;
+      if (current.state !== "requested" || current.providerEnvironment !== environment || (takeover && !leaseExpired)) {
+        return { kind: "not-sent", operation: current };
+      }
+      const lease = sql`now() + ${REFUND_LEASE_MS} * interval '1 millisecond'`;
+      const [operation] = await tx.update(refunds).set({ state: "submitted", status: "processing", submittedAt: sql`now()`,
+        attemptCount: current.attemptCount + 1, leaseOwner: requester, leaseExpiresAt: lease, nextReconciliationAt: lease, updatedAt: sql`now()` })
+        .where(and(eq(refunds.id, current.id), eq(refunds.state, "requested"))).returning();
+      if (!operation) return { kind: "not-sent", operation: current };
+      await this.refundEvent(tx, operation, "Refund_Submitted", { attempt: operation.attemptCount, takeover });
+      return { kind: "submitted", operation };
+    });
+  }
+
+  async settleRefundOperationForMerchant(operationId: string, merchantId: number, leaseOwner: string, outcome: RefundCallOutcome): Promise<RefundSettleResult> {
+    if (!isManagementTenantId(merchantId) || !isUuid(operationId)) return { kind: "not-found" };
+    if (!this.db) throw new Error('Database not available');
+    return this.db.transaction(async (tx: any): Promise<RefundSettleResult> => {
+      await this.refundTransactionTimeouts(tx);
+      const locked = await this.lockRefundOperation(tx, operationId, merchantId);
+      if (!locked) return { kind: "not-found" };
+      const { leaseExpired: _expired, ...current } = locked;
+      if (current.state !== "submitted" || current.leaseOwner !== leaseOwner) return { kind: "unchanged", operation: current };
+      const plan = refundSettlePlan(outcome, current.originalProviderTransactionId!);
+      const write = (chosen: RefundSettlePlan) => ({
+        state: chosen.state, lastErrorCode: chosen.errorCode, providerRefundTransactionId: chosen.refundId, updatedAt: sql`now()`,
+        leaseOwner: null, leaseExpiresAt: null,
+        status: chosen.state === "succeeded" ? "completed" : chosen.state === "failed" ? "failed" : "processing",
+        finishedAt: chosen.state === "unknown" ? null : sql`now()`,
+        nextReconciliationAt: chosen.state === "unknown" && !chosen.parked ? sql`now() + ${REFUND_RECHECK_MS} * interval '1 millisecond'` : null,
+      });
+      let applied = plan, operation: Refund;
+      try {
+        // A savepoint: a refund ID another operation already holds (23505) parks this one.
+        [operation] = await tx.transaction(async (sp: any) => sp.update(refunds).set(write(plan)).where(eq(refunds.id, current.id)).returning());
+      } catch (error) {
+        if (!plan.refundId || !isPostgresUniqueViolation(error)) throw error;
+        applied = { state: "unknown", refundId: null, parked: true, errorCode: "provider_refund_id_invalid" };
+        [operation] = await tx.update(refunds).set(write(applied)).where(eq(refunds.id, current.id)).returning();
+      }
+      let transaction: Transaction | undefined;
+      if (applied.state === "succeeded") {
+        // Totals only after the operation's own update succeeded; the status is recomputed from them.
+        const amount = centsToDecimal(current.amountCents!);
+        const total = sql`(COALESCE(${transactions.totalRefunded}, '0')::numeric + ${amount}::numeric)`;
+        [transaction] = await tx.update(transactions).set({
+          totalRefunded: total,
+          refundableAmount: sql`GREATEST(0, ${transactions.price}::numeric - ${total})`,
+          status: sql`CASE WHEN ${total} >= ${transactions.price}::numeric THEN 'refunded' ELSE 'partially_refunded' END`,
+        }).where(and(eq(transactions.id, current.transactionId!), eq(transactions.merchantId, merchantId))).returning();
+      } else {
+        [transaction] = await tx.select().from(transactions)
+          .where(and(eq(transactions.id, current.transactionId!), eq(transactions.merchantId, merchantId))).limit(1);
+      }
+      await this.refundEvent(tx, operation, applied.state === "succeeded" ? "Refund_Succeeded" : applied.state === "failed" ? "Refund_Failed" : "Refund_Unknown",
+        { code: applied.errorCode, parked: applied.parked });
+      return { kind: "settled", operation, transaction };
+    });
   }
 
   // API Key operations - placeholder implementations
