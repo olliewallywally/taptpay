@@ -1,6 +1,6 @@
 # ADR — refund operations on `refunds` (R4-T2)
 
-Date: 2026-10-14 UTC. Proposed by: the R2/R4 session. Status: **proposed, revision 2**
+Date: 2026-10-14 UTC. Proposed by: the R2/R4 session. Status: **proposed, revision 3**
 (repository only; not applied to any shared database). Plan v2.2 §11.2–§11.4.
 
 Reviews:
@@ -8,7 +8,9 @@ Reviews:
   revision 1;
 - [pass 4](../evidence/remediation-v2-2/r4/R4-review-pass-4-2026-10-14.md), an independent
   reread, refused it with five blockers;
-- this revision answers them, and goes to pass 5.
+- [pass 5](../evidence/remediation-v2-2/r4/R4-review-pass-5-2026-10-14.md) confirmed pass 4's
+  fixes and refused revision 2 on two new blockers (a split sale's capture, a null method);
+- this revision answers them, and goes to pass 6.
 
 This is the ADR that R4 review pass 1 listed under "Missing Steps": the refund state graph and
 how reservations are represented.
@@ -49,7 +51,7 @@ renamed or retyped. Nothing about a legacy row changes, except that it gets an o
 | `attempt_count` | `integer` | `NOT NULL DEFAULT 0`, `>= 0`, never decreases |
 | `next_reconciliation_at` | `timestamptz` | when a worker should next look |
 | `last_error_code` | `text` | `^[a-z][a-z0-9_:]{0,63}$` (R2's sanitized code shape) |
-| `initiated_by_user_id` | `integer` | the principal. **No foreign key:** an audit record outlives a removed team member. |
+| `initiated_by_user_id` | `integer` | the principal. Checked at insert: a user of the operation's business. **No foreign key:** an audit record outlives the user's deletion (business deletion, a future admin path). |
 | `reason_code` | `text` | `^[a-z][a-z0-9_]{0,31}$`; the value list is R4-T5's |
 | `reason_text` | `text` | 1–500 characters |
 | `requested_at`, `submitted_at`, `finished_at`, `updated_at` | `timestamptz` | no defaults |
@@ -69,7 +71,8 @@ renamed or retyped. Nothing about a legacy row changes, except that it gets an o
   - set: `transaction_id`, `merchant_id`, the key, fingerprint, cents, currency, user,
     `requested_at` and `updated_at`;
   - `refund_amount * 100 = amount_cents`, an exact numeric comparison;
-  - `refund_method` is one of the three methods;
+  - `refund_method` is set and is one of the three methods (a null method would otherwise pass
+    every check by SQL's three-valued logic);
   - empty: the legacy columns the new ones replace (`windcave_refund_id`, `refund_reason`,
     `completed_at`).
 - **Legacy status follows the state,** so a reader not yet moved to R4-T5's DTOs tells the
@@ -93,7 +96,8 @@ renamed or retyped. Nothing about a legacy row changes, except that it gets an o
     absent on `requested` and `cancelled`.
   - **`next_reconciliation_at`:** required on `requested` and `submitted`. An `unknown` row
     with none is **parked for review**: it keeps its reservation and is never released
-    without confirmation.
+    without confirmation. R4-T4/T5 must surface parked rows to a reviewer.
+  - **A `submitted` row always has a lease** (see the lease rule below).
   - **The provider refund ID** may appear from `submitted` on, so a pending reply's ID is
     kept for polling. It is absent on `requested` and `cancelled`, and required on a
     provider `succeeded`.
@@ -118,18 +122,39 @@ intent. So:
 
 `cancelled` is reachable only from `requested`.
 
+**The lease rule (binding on R4-T3/T4).**
+- The writer commits `submitted` with a lease that covers the call, its timeout and its polls.
+- A refused or zero-row move to `submitted` means **do not send**.
+- A worker never finishes a `submitted` row under a live lease. It takes one over only after
+  the lease expires.
+- A provider 404 for the X-ID is never read as "not processed" unless Windcave confirms that
+  meaning (open question). Otherwise a worker could release a refund the sender is about to
+  make, and the merchant could refund twice.
+
+**One refund ID from pending to final.** The ID a pending (202) reply gives is the one kept,
+and it is written once. R4-T1/T4 must treat a final reply naming a different ID as a mismatch,
+which parks the operation. It must never write the new ID.
+
 What the trigger enforces:
 
 - **Insert:**
   - A provider operation starts `requested`, with no attempts, no submission and no refund ID.
   - A record-only operation starts `succeeded`.
   - Nothing can insert a provider success.
-  - **Tenant and capture check.** The sale must belong to the operation's business. A
-    provider operation's capture must be the sale's own provider transaction (share 0), its
-    share's (`split_payments`, by share index), or the provider transaction recorded on one
-    of the sale's payment attempts for that share. This replaces a foreign key (see the
-    alternatives).
-- **A legacy row never becomes an operation, and an operation never becomes legacy.**
+  - **Tenant, user and capture check.** The sale must belong to the operation's business,
+    and is held with KEY SHARE until the insert commits. The initiating user must belong to
+    the business. A provider operation's capture must be one of:
+    - an **unsplit** sale's own provider transaction (share 0; a split sale's own column
+      holds its last share's capture);
+    - its share's (`split_payments`, by share index);
+    - the provider transaction recorded on an **approved** payment attempt of the sale for
+      that share, in the operation's environment.
+
+    This replaces a foreign key (see the alternatives).
+- **A legacy row never becomes an operation, and an operation never becomes legacy.** A
+  legacy row's operation ID (its public ID) never changes.
+- **An operation is never deleted.** A live one is a reservation; a finished one is in the
+  totals. Legacy rows can still be deleted.
 - **Identity never changes:**
   - the operation ID, business, sale, key and fingerprint;
   - the X-ID, reference, original capture, share and environment;
@@ -144,7 +169,8 @@ What the trigger enforces:
 - **A terminal row is frozen,** except `customer_notified`, `updated_at` and clearing
   `reason_text`. The fee columns are set in the same update that finishes the operation.
 
-The trigger raises `23514` with fixed text and no identifiers, as 0038 does.
+The trigger raises `23514` with fixed text and no identifiers, as 0038 does. A refused
+transition names only the stored, already-checked state, never the writer's value.
 
 ### The balance (§11.3)
 
@@ -169,8 +195,9 @@ remaining = captured cents of that capture
   Each updates `total_refunded`, `refundable_amount` and the sale's status. A record-only
   refund therefore lowers what can still be refunded by card. The owner may revise this
   (question below).
-- **Legacy reservations.** R4-T3 stops calling `reserveRefundAmountForMerchant` and
-  `releaseRefundAmountForMerchant` for operations. They write the totals before the provider
+- **Legacy reservations.** R4-T3 retires or fences the legacy reserve and release path
+  **entirely**, not only for operations. `reserveRefundAmountForMerchant` checks
+  `price − total_refunded` and cannot see live operations. They write the totals before the provider
   is asked (RD-5). Legacy amounts already in `total_refunded` count as confirmed. That is
   conservative: it lowers the balance and never raises it. The runbook's preflight counts
   legacy `pending`/`processing` rows, which can never be reconciled.
@@ -222,6 +249,11 @@ remaining = captured cents of that capture
   accept what PostgreSQL refuses.
 - **R4-T4 needs another migration** for exactly-once audit and notification: an outbox
   channel for refunds and a unique event per operation. T2 does not claim them.
+- **The refund flag stays off until R4-T5's DTOs ship,** not only until R4-T3. The read
+  routes return raw `refunds` rows, members included. Once operation rows exist, that would
+  expose the X-ID, the original capture, the fingerprint, the lease, the reason and the
+  user.
+- **If an audit event copies `reason_text`,** clearing the reason must cover that copy.
 - **Owner questions** (none blocks T2):
   - split refunds;
   - the admin path;
@@ -229,11 +261,14 @@ remaining = captured cents of that capture
   - whether a manual or bank refund lowers the card balance (default: yes);
   - whether invoice refund-due cases and system-initiated refunds are in R4 (default: no;
     they would need `transaction_id` or the user to be optional);
-  - whether clearing a finished refund's reason is acceptable (default: yes).
+  - whether clearing a finished refund's reason is acceptable (default: yes);
+  - a split sale cancelled and then paid late (OI-1) can hold a captured share while it stays
+    `cancelled`. With split refunds disabled, R4 gives it no refund path.
 - **Windcave questions:**
   - Can a refund be queried by X-ID?
   - Does a 404 mean "not processed"?
   - Do refund and session X-IDs share a namespace?
+  - Are a 202 reply's `id`/`self` the same transaction the final reply names?
 
 ## Rollback
 
