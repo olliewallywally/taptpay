@@ -18,7 +18,10 @@ Reviews:
   revision 1 with two blockers;
 - [pass 2](../evidence/remediation-v2-2/r4/R4-T3-review-pass-2-2026-10-14.md) confirmed B-1 and
   refused revision 2 on N-1 (a key cleared on a refusal that says nothing about it);
-- this revision answers every finding, and goes to pass 3.
+- this revision answered every finding;
+- [pass 3](../evidence/remediation-v2-2/r4/R4-T3-review-pass-3-2026-10-14.md) **approved
+  revision 3** for repository implementation only, with conditions C-1 to C-6. They are
+  written in **§11 below**, which binds the implementation.
 
 **`FEATURE_REFUND_INITIATION` stays off** in every environment until R4-T4's worker exists:
 - configuration refuses it at startup outside tests (§9);
@@ -317,6 +320,70 @@ Every settle also sets `updated_at = now()`.
   still holds, operations pin their own capture, and settle recomputes the status from the
   totals.
 
+## 11. Conditions of approval (pass 3), binding
+
+- **C-1. Reply from the committed state.** The reply, broadcast and push are derived from
+  the state the transaction committed, never from the provider's outcome:
+  - `succeeded` → 200, with the push;
+  - `failed` → 422 `REFUND_NOT_MADE`;
+  - `unknown`, parked or scheduled → 202 `REFUND_BEING_CHECKED`;
+  - anything a settle did not change → the stored state's reply.
+
+  So a `declined` or `refunded` reply that the ID rules park always answers 202. A replay
+  causes no side effects: no event, broadcast or push (§11.4.8).
+- **C-2. A distinct code for this key's own operation in flight.** A reused `requested`
+  under another request's live lease answers 202 `REFUND_BEING_SENT`, with **no
+  `keyConsumed`**. The client keeps the key. `REFUND_IN_PROGRESS` with `keyConsumed: false`
+  is only ever another key's live operation.
+- **C-3. The operation UUID is generated before the insert** (`randomUUID()` in the app), so
+  `operation_id` and `merchant_reference` are set in the same statement. 0039 requires the
+  reference at insert and never lets it change.
+- **C-4. An error never sends and never fails.**
+  - Any error, or an unconfirmed commit, in `markRefundSubmittedForMerchant` means do not
+    send.
+  - An exception thrown by the provider call is settled as `unknown`, scheduled, or left
+    `submitted` if settle itself fails. It is never `failed`.
+  - The send intent checks the operation's `provider_environment` against
+    `currentProviderEnvironment()` and refuses to send on a mismatch (pass 3 H-5).
+- **C-5. Tests and affected files.** Every test in pass 3's list is added (below). The
+  affected files are extended with:
+  - `server/route-review.ts` (the refund route's review entry);
+  - the route-policy-review, api-route-contract and route-matrix tests;
+  - `tenant-refund-writes.test.ts`;
+  - `r2-t6-provider-log-guard.test.ts` (the no-poll client).
+- **C-6. R4-T4 exit criteria.** R4-T4 does not close until each of these has a defined,
+  tested exit:
+  - a stranded `requested` operation whose lease expired: the worker cancels it, because
+    it was never sent;
+  - a parked `unknown`: a reviewer action with its own transition and audit;
+  - an `unknown` without a refund ID: a query by X-ID if Windcave supports one. If not, an
+    owner decision on how the sale is released.
+
+  Until then, one live refund per sale can block a sale's refunds; the flag is off.
+
+**Also adopted from pass 3:**
+- **Owner-only means `role === 'owner'`.** `isAccountOwner` also admits `merchant` and
+  `admin`; plan §11.1 needs a separate audited policy for an admin path.
+- **Audit:**
+  - the send intent and a takeover each append an event (`Refund_Submitted`, with a takeover
+    flag);
+  - the reply's sale DTO is loaded scoped to the business.
+- **Client escape from a pinned dialog.** After showing the sale's refunds, the merchant can
+  discard the stored refund: the same path as `cash-command-key.ts`. A conflict that names a
+  terminal operation clears the key.
+- **The dialog shows** the sale's refunded total and any live refund (pass 3 H-4).
+- **MemStorage:**
+  - the fenced reserve and release take the same sale lock;
+  - the lock maps are named;
+  - no helper inside the claim retakes the sale lock (`withMemLock` is not re-entrant);
+  - keys are lowercased, as cash does.
+- **Timeouts:** submit and settle set `SET LOCAL` timeouts too, and the lease test includes
+  them.
+- **Every keyed operation writer takes the advisory lock,** R4-T5's record-only inserts
+  included.
+- **Rollback precondition:** no operation rows of any state, and the flag off. A rollback
+  removes the fences.
+
 ## Tests (failing first)
 
 **HTTP (MemStorage):**
@@ -360,6 +427,20 @@ Every settle also sets `updated_at = now()`.
   - `total_refunded` equals legacy confirmed plus succeeded operations;
   - the legacy fence;
   - the lease covers the worst case.
+
+**Pass 3 additions:**
+- the startup guard refuses the flag in development, staging and production;
+- the key is kept on 400, 401, 403 `CSRF_REJECTED`/`CROSS_SITE_REJECTED`, 409 `KEY_REUSED`
+  and 429;
+- `keyConsumed: false` appears on exactly the four claim refusals;
+- a same-key replay is answered before the in-progress check;
+- `REFUND_BEING_SENT`;
+- the reply and state for each ID-rule row;
+- the no-poll client never polls (no GET);
+- a null capture (a cash sale) is refused;
+- a direct storage test of the remaining-balance sum (the route's in-progress check refuses
+  first);
+- the concurrent at-remaining test expects `REFUND_IN_PROGRESS`.
 
 **Client:**
 - the key is made once per confirmed refund, kept on 5xx, 202 and network errors, and cleared
