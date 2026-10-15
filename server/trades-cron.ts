@@ -1,3 +1,4 @@
+import {cronCheckpoint,isCronStopped} from "./cron-checkpoint";
 import {logOperation,logCorrelation} from "./structured-log";
 import crypto from "crypto";
 import { storage } from "./storage";
@@ -11,6 +12,7 @@ export async function runTradesGeneratePass(now: Date = new Date()): Promise<{ g
   const schedules = await storage.getDueJobSchedules(now);
 
   for (const schedule of schedules) {
+    await cronCheckpoint();
     try {
       if (!billingCardIsReady(await storage.getSubscription(schedule.merchantId))) {
         result.skipped++;
@@ -72,6 +74,7 @@ export async function runTradesGeneratePass(now: Date = new Date()): Promise<{ g
         nextRunDate: followingRun,
       });
     } catch (error) {
+      if(isCronStopped(error))throw error;
       logOperation("error","TRADES_CRON_GENERATE",{correlation:logCorrelation(schedule.id)});
       result.errors++;
     }

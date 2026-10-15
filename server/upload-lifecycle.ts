@@ -1,3 +1,4 @@
+import {cronCheckpoint,isCronStopped} from "./cron-checkpoint";
 import {logOperation} from "./structured-log";
 /**
  * R1-T7 S6b: the two scheduled passes of the private upload lifecycle (owner decisions 2026-09-29,
@@ -47,12 +48,15 @@ export async function runUploadScanPass(): Promise<UploadScanReport> {
   if (!scanner) return { ...report, scannerAvailable: false };
 
   for (const document of await storage.listUnscannedInvoiceDocuments(UPLOAD_SCAN_BATCH)) {
+    await cronCheckpoint();
     let scan: ScanResult | null;
     try {
       scan = verdictOf(await scanner.scan(document.data));
-    } catch {
+    } catch(error) {
+      if(isCronStopped(error))throw error;
       scan = null;
     }
+    await cronCheckpoint();
     if (!scan) {
       // No verdict is neither clean nor infected. Stop: the scanner is most likely down, and the
       // next run starts again. Documents are taken in no fixed order, so one the scanner can never
@@ -85,6 +89,7 @@ export function unattachedUploadCutoff(now: Date): Date {
 
 export async function runUploadRetentionPass(now: Date): Promise<{ deleted: number; uploadedBefore: string }> {
   const cutoff = unattachedUploadCutoff(now);
+  await cronCheckpoint();
   const deleted = await storage.deleteUnattachedInvoiceDocuments(cutoff, UPLOAD_DELETE_BATCH);
   const report = { deleted, uploadedBefore: cutoff.toISOString() };
   // A count only: no business, name or address of what was removed.

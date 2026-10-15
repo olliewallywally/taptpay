@@ -109,15 +109,18 @@ describe("internal cron isolation and observability", () => {
 
   test("subscription billing starts independently and every module load is pass-isolated", () => {
     const cron = handler("post", "/api/internal/cron");
-    const subscriptionStart = cron.indexOf("const subscriptionBillingPromise = runPass(");
-    const propertyStart = cron.indexOf('const generate = await runPass("generate"');
+    const runner=fs.readFileSync(path.join(process.cwd(),'server/durable-cron.ts'),'utf8');
+    const subscriptionStart = cron.search(/name:\s*['"]subscriptionBilling['"]/);
+    const propertyStart = cron.search(/name:\s*['"]generate['"]/);
     expect(subscriptionStart).toBeGreaterThan(0);
     expect(propertyStart).toBeGreaterThan(subscriptionStart);
-    expect(cron).toContain('await import("./subscription-cron")');
-    expect(cron).toContain('await import("./property-cron")');
-    expect(cron).toContain('failedPasses.push(name)');
-    expect(cron).toContain("res.status(ok ? 200 : 207)");
-    expect(cron).toContain('failedPasses: ["cron"]');
+    expect(cron).toContain("await import('./subscription-cron')");
+    expect(cron).toContain("await import('./property-cron')");
+    const start=runner.search(/billingSettled\s*=\s*execute\(billing\)/),loop=runner.search(/for\s*\(const job of jobs\)/);
+    expect(start).toBeGreaterThan(0);expect(loop).toBeGreaterThan(start);
+    expect(runner).toContain('failed.add(job.name)');
+    expect(cron).toMatch(/res\.status\(result\.ok\s*\?\s*200\s*:\s*207\)/);
+    expect(cron).toMatch(/result\.kind\s*===\s*['"]unavailable['"]/);
   });
 });
 

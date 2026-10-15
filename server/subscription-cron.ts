@@ -1,3 +1,4 @@
+import {cronCheckpoint,isCronStopped} from "./cron-checkpoint";
 import {logOperation} from "./structured-log";
 import {storage as defaultStorage,type IStorage} from './storage';
 import {getSubscriptionPaymentRuntime} from './subscription-payment-runtime';
@@ -18,6 +19,7 @@ export async function runSubscriptionBillingPass(now=new Date(),options:{storage
   let due:Awaited<ReturnType<BillingStore['claimSubscriptionsDueForBilling']>>;
   try{due=await storage.claimSubscriptionsDueForBilling(now);}catch{logOperation("error","SUBSCRIPTION_CLAIM_UNAVAILABLE");result.errors++;return result;}
   for(const subscription of due){
+    await cronCheckpoint();
     const token=subscription.billingClaimToken;if(!token){result.errors++;continue;}
     try{
       const decision=decideBilling(subscription,now);if(decision.action==='skip'){result.skipped++;continue;}
@@ -28,7 +30,7 @@ export async function runSubscriptionBillingPass(now=new Date(),options:{storage
       const outcome=decision.action==='record_failure'?await billing.recordMissingPaymentMethod(intent):await billing.charge({...intent,cardId:subscription.windcaveCardId!});
       if(outcome.reused||!outcome.applied){if(outcome.kind==='processing')result.errors++;else result.skipped++;}
       else if(outcome.kind==='approved')result.charged++;else if(outcome.kind==='declined')result.failed++;else result.skipped++;
-    }catch{logOperation("error","SUBSCRIPTION_BILLING_UNCONFIRMED");result.errors++;}
+    }catch(error){if(isCronStopped(error))throw error;logOperation("error","SUBSCRIPTION_BILLING_UNCONFIRMED");result.errors++;}
     finally{await storage.releaseSubscriptionBillingClaim(subscription.id,token).catch(()=>{result.errors++;});}
   }
   return result;

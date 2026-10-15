@@ -1,3 +1,4 @@
+import {cronCheckpoint,isCronStopped,isCronContext} from "./cron-checkpoint";
 import {logOperation,logCorrelation} from "./structured-log";
 /**
  * property-cron.ts — automation engine for the property management vertical.
@@ -177,9 +178,12 @@ async function deliverInvoice(invoice: any, baseUrl: string, opts: { reminder?: 
       tenantName: tenant.firstName, merchantName, propertyAddress: tenant.propertyAddress,
       amountCents, dueAt: new Date(invoice.dueAt), paymentUrl, reminder: opts.reminder, splitNote: opts.splitNote, label,
     });
+    await cronCheckpoint();
     const result = await sendWhatsApp({ toPhone: tenant.phone, text });
+    await cronCheckpoint();
     if (result.ok) return { sent: true, channel: "whatsapp", messageId: result.messageId };
-    // else fall through to email fallback
+    if(isCronContext())return {sent:false,reason:"reconciliation_required"};
+    // Manual sends retain their existing fallback; cron uncertainty is held.
   }
 
   // SMS (when selected + available). Reuses the short, link-first WhatsApp copy.
@@ -188,9 +192,12 @@ async function deliverInvoice(invoice: any, baseUrl: string, opts: { reminder?: 
       tenantName: tenant.firstName, merchantName, propertyAddress: tenant.propertyAddress,
       amountCents, dueAt: new Date(invoice.dueAt), paymentUrl, reminder: opts.reminder, splitNote: opts.splitNote, label,
     });
+    await cronCheckpoint();
     const result = await sendSms({ toPhone: tenant.phone, text });
+    await cronCheckpoint();
     if (result.ok) return { sent: true, channel: "sms", messageId: result.messageId };
-    // else fall through to email fallback
+    if(isCronContext())return {sent:false,reason:"reconciliation_required"};
+    // Manual sends retain their existing fallback; cron uncertainty is held.
   }
 
   // Email (default + fallback)
@@ -199,8 +206,10 @@ async function deliverInvoice(invoice: any, baseUrl: string, opts: { reminder?: 
       tenantName: `${tenant.firstName} ${tenant.lastName}`, merchantName, propertyAddress: tenant.propertyAddress,
       amountCents, dueAt: new Date(invoice.dueAt), paymentUrl, reminder: opts.reminder, splitNote: opts.splitNote, payLabel: opts.payLabel, label,
     });
+    await cronCheckpoint();
     const ok = await sendEmail({ to: tenant.email, from: "noreply@taptpay.co.nz", subject: email.subject, html: email.html, text: email.text });
-    return { sent: ok, channel: "email", reason: ok ? undefined : "send_failed" };
+    await cronCheckpoint();
+    return { sent: ok, channel: "email", reason: ok ? undefined : isCronContext()?"reconciliation_required":"send_failed" };
   }
 
   return { sent: false, reason: "no_deliverable" };
@@ -259,6 +268,7 @@ export async function runGeneratePass(now: Date = new Date()): Promise<{ generat
   const dueSchedules = await storage.getDueActiveSchedules(now);
 
   for (const schedule of dueSchedules) {
+    await cronCheckpoint();
     try {
       if (!billingCardIsReady(await storage.getSubscription(schedule.merchantId))) {
         result.skipped++;
@@ -284,6 +294,7 @@ export async function runGeneratePass(now: Date = new Date()): Promise<{ generat
       });
       result.generated++;
     } catch (err) {
+      if(isCronStopped(err))throw err;
       logOperation("error","CRON_GENERATE",{correlation:logCorrelation(schedule.id)});
       result.errors++;
     }
@@ -293,17 +304,19 @@ export async function runGeneratePass(now: Date = new Date()): Promise<{ generat
 
 // ── Pass 2: dispatch pending invoices (channel-aware) ─────────────────────────
 
-export async function runDispatchPass(baseUrl: string): Promise<{ dispatched: number; failed: number; errors: number }> {
-  const result = { dispatched: 0, failed: 0, errors: 0 };
+export async function runDispatchPass(baseUrl: string): Promise<{ dispatched: number; failed: number; errors: number;uncertain?:number }> {
+  const result: {dispatched:number;failed:number;errors:number;uncertain?:number} = { dispatched: 0, failed: 0, errors: 0 };
   const invoices = await storage.getPendingDispatchInvoices();
 
   for (const invoice of invoices) {
+    await cronCheckpoint();
     try {
       if (!billingCardIsReady(await storage.getSubscription(invoice.merchantId))) {
         result.failed++;
         continue;
       }
       const delivery = await deliverInvoice(invoice, baseUrl);
+      if(delivery.reason==="reconciliation_required")result.uncertain=(result.uncertain??0)+1;
       // Missing merchant/tenant is transient (data may appear) — leave pending to retry.
       if (delivery.reason === "missing_data") { result.failed++; continue; }
       // No deliverable channel (no email, and no WhatsApp/phone) — can never be
@@ -330,6 +343,7 @@ export async function runDispatchPass(baseUrl: string): Promise<{ dispatched: nu
         result.dispatched++;
       } else { result.failed++; }
     } catch (err) {
+      if(isCronStopped(err))throw err;
       logOperation("error","CRON_DISPATCH",{correlation:logCorrelation(invoice.id)});
       result.errors++;
     }
@@ -344,6 +358,7 @@ export async function runOverduePass(now: Date = new Date()): Promise<{ markedOv
   const eligible = await storage.getOverdueEligibleInvoices(now);
 
   for (const invoice of eligible) {
+    await cronCheckpoint();
     try {
       await storage.updateInvoiceRentRequest(invoice.id, { status: "overdue" });
       await storage.logTransactionEvent({
@@ -353,6 +368,7 @@ export async function runOverduePass(now: Date = new Date()): Promise<{ markedOv
       });
       result.markedOverdue++;
     } catch (err) {
+      if(isCronStopped(err))throw err;
       logOperation("error","CRON_OVERDUE",{correlation:logCorrelation(invoice.id)});
       result.errors++;
     }
@@ -366,12 +382,13 @@ export async function runOverduePass(now: Date = new Date()): Promise<{ markedOv
 //   • subsequent reminders every `rentReminderIntervalDays`
 //   • stops after `rentReminderMaxCount` (0 = unlimited) or when paid/voided
 
-export async function runReminderPass(baseUrl: string, now: Date = new Date()): Promise<{ sent: number; skipped: number; errors: number }> {
-  const result = { sent: 0, skipped: 0, errors: 0 };
+export async function runReminderPass(baseUrl: string, now: Date = new Date()): Promise<{ sent: number; skipped: number; errors: number;uncertain?:number }> {
+  const result: {sent:number;skipped:number;errors:number;uncertain?:number} = { sent: 0, skipped: 0, errors: 0 };
   const invoices = await storage.getReminderEligibleInvoices();
   const merchantCache = new Map<number, any>();
 
   for (const invoice of invoices) {
+    await cronCheckpoint();
     try {
       let merchant = merchantCache.get(invoice.merchantId);
       if (!merchant) {
@@ -396,6 +413,7 @@ export async function runReminderPass(baseUrl: string, now: Date = new Date()): 
 
       // Chase only the outstanding amount on a partially-paid split.
       const delivery = await deliverInvoice(invoice, baseUrl, deliverOptsFor(invoice, true));
+      if(delivery.reason==="reconciliation_required")result.uncertain=(result.uncertain??0)+1;
       if (delivery.reason === "no_deliverable") { result.skipped++; continue; }
 
       if (delivery.sent) {
@@ -411,6 +429,7 @@ export async function runReminderPass(baseUrl: string, now: Date = new Date()): 
         result.sent++;
       } else { result.errors++; }
     } catch (err) {
+      if(isCronStopped(err))throw err;
       logOperation("error","CRON_REMINDER",{correlation:logCorrelation(invoice.id)});
       result.errors++;
     }

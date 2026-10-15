@@ -9,6 +9,9 @@
   "include": [
     "scripts/r6-entitlement-inventory.ts",
     "scripts/r6-entitlement-inventory.test.ts",
-    "scripts/verify-r6-entitlement-postgres.ts"
+    "scripts/r6-cron-resolve.ts",
+    "scripts/r6-cron-resolve.test.ts",
+    "scripts/verify-r6-entitlement-postgres.ts",
+    "scripts/verify-r6-cron-postgres.ts"
   ]
 }

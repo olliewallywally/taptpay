@@ -1,3 +1,5 @@
+import {MemoryCronRepository} from "./memory-cron";
+import {CronCoordinator} from "../../durable-cron";
 /**
  * R1-T1 — no-live-system HTTP test harness.
  *
@@ -35,6 +37,7 @@ export interface TestApp {
 }
 
 let cached: TestApp | null = null;
+const cronMemory=new MemoryCronRepository();
 
 /**
  * Builds the app once per test file (module-scope memoisation — Jest already
@@ -54,7 +57,7 @@ export async function createTestApp(options:Parameters<typeof registerRoutes>[1]
 
   const requestLog: string[] = [];
   const app = createApp({ writeRequestLog: (line) => requestLog.push(line) });
-  const httpServer = await registerRoutes(app,options);
+  const httpServer = await registerRoutes(app,{cron:new CronCoordinator(cronMemory),...options});
   app.use(createGlobalErrorHandler());
 
   const result={ app, httpServer, requestLog };
@@ -65,6 +68,7 @@ export async function createTestApp(options:Parameters<typeof registerRoutes>[1]
 /** Clears all merchant/user/transaction state between tests. Real reset, not a fresh app. */
 export function resetTestStorage(): void {
   liveStorage.clearAllMerchants?.();
+  cronMemory.reset();
   cached?.requestLog.splice(0);
 }
 

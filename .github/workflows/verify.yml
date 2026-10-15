@@ -56,6 +56,8 @@ jobs:
         run: npm run test:server -- --runTestsByPath server/__tests__/r6-structured-logging.test.ts server/__tests__/r6-entitlement-inventory.test.ts
       - name: R6 operator CLI safety (synthetic, no database)
         run: npm run test:r6:cli
+      - name: R6 durable cron and delivery fencing (synthetic, no database)
+        run: npm run test:server -- --runTestsByPath server/__tests__/durable-cron-contract.test.ts server/__tests__/durable-cron-runner.test.ts server/__tests__/cron-delivery-safety.test.ts server/__tests__/r6-cron-http.test.ts server/__tests__/r6-cron-no-secret.test.ts server/__tests__/r6-cron-job-context.test.ts
       - name: operator backup safety (synthetic subprocesses only)
         run: npm run test:backup:safety
       - name: schema fingerprint determinism (no database opened)
@@ -161,7 +163,8 @@ jobs:
           # independently reproduces the previous 0033 baseline above.
           # R5 0048a–c: bank/active encryption policy, checkpoints and stable
           # email constraint catalog text; fresh, populated and logical restore agree.
-          RECORDED: docs/evidence/remediation-v2-2/r5/R5-through-0048c-fingerprint-2026-10-14.json
+          # R6 0049a: durable cron runs/jobs, bounded metrics and immutable history.
+          RECORDED: docs/evidence/remediation-v2-2/r6/R6-through-0049a-fingerprint-2026-10-15.json
         run: |
           node scripts/schema-fingerprint.mjs > "$RUNNER_TEMP/fingerprint.json"
           node -e "

@@ -1,3 +1,4 @@
+import {cronCheckpoint,isCronStopped} from "./cron-checkpoint";
 import {logOperation} from "./structured-log";
 import { sendPushToMerchant, type PushDeliveryResult } from "./push";
 import { storage, type IStorage } from "./storage";
@@ -117,6 +118,7 @@ export async function runDailyPayoutNotificationPass(
   const result = { beforeCutoff: false, processed: 0, skipped: 0, failed: 0 };
 
   for (const summary of summaries) {
+    await cronCheckpoint();
     const claimToken = await dependencies.storage.claimPushNotificationDelivery(
       summary.merchantId,
       "daily_payout_summary",
@@ -129,12 +131,14 @@ export async function runDailyPayoutNotificationPass(
 
     let deliveryStatus: "processed" | "skipped" | "failed" = "failed";
     try {
+      await cronCheckpoint();
       const delivery: PushDeliveryResult = await dependencies.sendPush(summary.merchantId, {
         type: "daily_payout_summary",
         localDate: window.localDate,
         amount: summary.amount,
         paymentCount: summary.paymentCount,
       });
+      await cronCheckpoint();
       deliveryStatus = delivery.eligibleSubscriptions === 0
         ? "skipped"
         : delivery.delivered > 0
@@ -142,10 +146,12 @@ export async function runDailyPayoutNotificationPass(
           : "failed";
       result[deliveryStatus] += 1;
     } catch (error) {
+      if(isCronStopped(error))throw error;
       result.failed += 1;
       const message = error instanceof Error ? error.message : "unknown error";
       logOperation("error","DAILY_PUSH_MERCHANT_DELIVERY_FAILED",{payload:[`[DAILY_PUSH] merchant=${summary.merchantId} delivery failed: ${message}`]});
     } finally {
+      await cronCheckpoint();
       await dependencies.storage.completePushNotificationDelivery(
         summary.merchantId,
         "daily_payout_summary",

@@ -1,3 +1,4 @@
+import {cronCheckpoint,isCronStopped,isCronContext} from "./cron-checkpoint";
 import {logOperation,logCorrelation} from "./structured-log";
 import { storage } from './storage';
 import { sendEmail } from './email-service';
@@ -88,19 +89,26 @@ async function deliver(
   attachments: EmailAttachment[] = []
 ): Promise<DeliveryResult> {
   if (channel === 'whatsapp' && client.phone && isWhatsAppConfigured()) {
+    await cronCheckpoint();
     const result = await sendWhatsApp({
       toPhone: client.phone,
       text: copy.short,
     });
+    await cronCheckpoint();
     if (result.ok)
       return { sent: true, channel: 'whatsapp', messageId: result.messageId };
+    if(isCronContext())return {sent:false,reason:'reconciliation_required'};
   }
   if (channel === 'sms' && client.phone && isSmsConfigured()) {
+    await cronCheckpoint();
     const result = await sendSms({ toPhone: client.phone, text: copy.short });
+    await cronCheckpoint();
     if (result.ok)
       return { sent: true, channel: 'sms', messageId: result.messageId };
+    if(isCronContext())return {sent:false,reason:'reconciliation_required'};
   }
   if (client.email) {
+    await cronCheckpoint();
     const sent = await sendEmail({
       to: client.email,
       from: 'noreply@taptpay.co.nz',
@@ -109,7 +117,8 @@ async function deliver(
       text: copy.text,
       attachments,
     });
-    return { sent, channel: 'email', reason: sent ? undefined : 'send_failed' };
+    await cronCheckpoint();
+    return { sent, channel: 'email', reason: sent ? undefined : isCronContext()?'reconciliation_required':'send_failed' };
   }
   return { sent: false, reason: 'no_deliverable' };
 }
@@ -250,9 +259,10 @@ export async function resendTradeInvoice(
 
 export async function runTradesDispatchPass(
   baseUrl: string
-): Promise<{ dispatched: number; failed: number; errors: number }> {
-  const result = { dispatched: 0, failed: 0, errors: 0 };
+): Promise<{ dispatched: number; failed: number; errors: number;uncertain?:number }> {
+  const result: {dispatched:number;failed:number;errors:number;uncertain?:number} = { dispatched: 0, failed: 0, errors: 0 };
   for (const invoice of await storage.getPendingDispatchJobInvoices()) {
+    await cronCheckpoint();
     try {
       if (
         invoice.scheduledSendAt &&
@@ -260,6 +270,7 @@ export async function runTradesDispatchPass(
       )
         continue;
       const delivery = await resendTradeInvoice(invoice.id, baseUrl);
+      if(delivery.reason==='reconciliation_required')result.uncertain=(result.uncertain??0)+1;
       if (delivery.sent) result.dispatched++;
       else {
         result.failed++;
@@ -269,6 +280,7 @@ export async function runTradesDispatchPass(
           });
       }
     } catch (error) {
+      if(isCronStopped(error))throw error;
       logOperation("error","TRADES_DISPATCH",{correlation:logCorrelation(invoice.id)});
       result.errors++;
     }
@@ -281,6 +293,7 @@ export async function runTradesOverduePass(
 ): Promise<{ markedOverdue: number; errors: number }> {
   const result = { markedOverdue: 0, errors: 0 };
   for (const invoice of await storage.getOverdueEligibleJobInvoices(now)) {
+    await cronCheckpoint();
     try {
       await storage.updateJobInvoice(invoice.id, { status: 'balance_due' });
       await storage.createJobEvent({
@@ -292,6 +305,7 @@ export async function runTradesOverduePass(
       });
       result.markedOverdue++;
     } catch (error) {
+      if(isCronStopped(error))throw error;
       logOperation("error","TRADES_OVERDUE",{correlation:logCorrelation(invoice.id)});
       result.errors++;
     }
@@ -308,10 +322,11 @@ function addDays(value: Date | string, days: number): Date {
 export async function runTradesReminderPass(
   baseUrl: string,
   now: Date = new Date()
-): Promise<{ sent: number; skipped: number; errors: number }> {
-  const result = { sent: 0, skipped: 0, errors: 0 };
+): Promise<{ sent: number; skipped: number; errors: number;uncertain?:number }> {
+  const result: {sent:number;skipped:number;errors:number;uncertain?:number} = { sent: 0, skipped: 0, errors: 0 };
   const merchantCache = new Map<number, any>();
   for (const invoice of await storage.getReminderEligibleJobInvoices()) {
+    await cronCheckpoint();
     try {
       let merchant = merchantCache.get(invoice.merchantId);
       if (!merchant) {
@@ -338,6 +353,7 @@ export async function runTradesReminderPass(
         continue;
       }
       const delivery = await resendTradeInvoice(invoice.id, baseUrl, true);
+      if(delivery.reason==='reconciliation_required')result.uncertain=(result.uncertain??0)+1;
       if (!delivery.sent) {
         delivery.reason === 'no_deliverable'
           ? result.skipped++
@@ -350,6 +366,7 @@ export async function runTradesReminderPass(
       });
       result.sent++;
     } catch (error) {
+      if(isCronStopped(error))throw error;
       logOperation("error","TRADES_REMINDER",{correlation:logCorrelation(invoice.id)});
       result.errors++;
     }

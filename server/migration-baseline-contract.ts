@@ -648,6 +648,15 @@ export const BASELINE_EFFECT_REQUIREMENTS: readonly Requirement[] = [
     // Presence alone would falsely baseline the old nested BETWEEN expression.
     definition: "CHECK (((payer_email IS NULL) OR ((length(payer_email) >= 3) AND (length(payer_email) <= 254) AND (POSITION(('@'::text) IN (payer_email)) > 1))))",
   },
+  ...['cron_runs','cron_jobs'].map(table=>r('0049a_durable_cron.sql','table',table)),
+  ...['id','owner','scheduled_for','attempt','state','started_at','heartbeat_at','lease_expires_at','deadline_at','finished_at','duration_ms'].map(column=>r('0049a_durable_cron.sql','column','cron_runs',column)),
+  ...['id','run_id','name','state','started_at','finished_at','duration_ms','metrics','error_code','resolved_at','review_digest'].map(column=>r('0049a_durable_cron.sql','column','cron_jobs',column)),
+  ...['cron_run_slot_attempt_uq','cron_run_attempt_check','cron_run_state_check','cron_run_times_check','cron_run_finish_check'].map(name=>r('0049a_durable_cron.sql','constraint','cron_runs',name)),
+  ...['cron_jobs_run_id_fkey','cron_job_run_name_uq','cron_job_name_check','cron_job_state_check','cron_job_metrics_check','cron_job_error_check','cron_job_finish_check','cron_job_resolution_check'].map(name=>r('0049a_durable_cron.sql','constraint','cron_jobs',name)),
+  ...['cron_one_running_uq','cron_run_latest_idx','cron_run_success_idx'].map(name=>r('0049a_durable_cron.sql','index','cron_runs',name)),
+  ...['cron_job_active_name_uq','cron_job_run_idx','cron_job_held_idx'].map(name=>r('0049a_durable_cron.sql','index','cron_jobs',name)),
+  r('0049a_durable_cron.sql','function','','taptpay_cron_metrics_valid'),r('0049a_durable_cron.sql','function','','taptpay_cron_history_guard'),
+  r('0049a_durable_cron.sql','trigger','cron_runs','cron_run_history_guard'),r('0049a_durable_cron.sql','trigger','cron_jobs','cron_job_history_guard'),
 ];
 
 export const FIND_MISSING_BASELINE_EFFECTS_SQL = `

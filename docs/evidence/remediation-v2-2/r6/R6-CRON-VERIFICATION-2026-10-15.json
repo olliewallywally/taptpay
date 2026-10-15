@@ -1,0 +1,127 @@
+{
+  "date": "2026-10-15",
+  "branch": "remediation/r6-operations-20261015",
+  "base": "847b399a640810e32b8cec2e5a275be257329bf9",
+  "scope": "R6 durable cron repository step; R5 deferred closeout tracked",
+  "officialR6Exit": false,
+  "sourceManifest": "R6-CRON-source-sha256-2026-10-15.txt",
+  "sourceFiles": 31,
+  "ownerDecisions": [
+    "docs/decisions/2026-10-15-defer-r5-closeout-continue-r6.md",
+    "docs/decisions/2026-10-15-r6-uncertain-cron-jobs-held.md"
+  ],
+  "architecture": "Committed database leases and short transaction locks; parent row locked before job writes; no session/backend affinity or transaction held across providers",
+  "server": {
+    "mode": "complete-file union; later full suites replace earlier results; overlapping runs never added twice",
+    "expectedSuites": 229,
+    "coveredSuites": 229,
+    "passedTests": 5195,
+    "failedTests": 0,
+    "pendingTests": 0,
+    "missingSuites": 0,
+    "runs": [
+      {
+        "name": "full-other",
+        "sha256": "0b1602be2742b073c80696148241831527100c296ddf852294fcfb74b67860ca",
+        "success": false,
+        "suites": 228,
+        "passedTests": 5176,
+        "failedTests": 1,
+        "pendingTests": 0
+      },
+      {
+        "name": "final-focused",
+        "sha256": "30f4ea8e2b62e83a7dab72489ed38bb6d752d5800d23e18d933af738ea1aa811",
+        "success": true,
+        "suites": 13,
+        "passedTests": 117,
+        "failedTests": 0,
+        "pendingTests": 0
+      },
+      {
+        "name": "migrate-final",
+        "sha256": "160c99dcbd95a8c44767b27099d5587f9068dc64be2e2604b57f8928fc3e3272",
+        "success": true,
+        "suites": 1,
+        "passedTests": 74,
+        "failedTests": 0,
+        "pendingTests": 0
+      },
+      {
+        "name": "auth-throttle-final",
+        "sha256": "0346c5289e3db4cbb615cf7ede68ced77f84917e838135c1654ef5545f3591a2",
+        "success": true,
+        "suites": 1,
+        "passedTests": 18,
+        "failedTests": 0,
+        "pendingTests": 0
+      }
+    ]
+  },
+  "cli": {
+    "command": "npm run test:r6:cli",
+    "passed": 9,
+    "failed": 0,
+    "skipped": 0,
+    "logSha256": "944406f96015442fcaf5a614ff2a127b24b59f7e8b3b57d70642eeefe3d490fb"
+  },
+  "postgres": {
+    "checks": 15,
+    "providerCalls": 0,
+    "sharedDatabaseMutations": 0,
+    "transactionBackendSwitching": true,
+    "actualBackendDisconnect": true,
+    "oldOwnerFenced": true,
+    "crossSlotHolds": true,
+    "readOnlyOperatorPreview": true,
+    "guardedResolution": true,
+    "sourceCountsAndPoliciesPreserved": true,
+    "fingerprint": "sha256:7c427b93f2e0a4c8ca48271faabbe07d641ee8a211d519364d6d0ea8002d3888",
+    "logSha256": "435603e51c344a066c27c49727a9be54f63ff97b80a17f2eafc15bb095ad53d7",
+    "rehearsal": "Owned clones of independently reverified canonical R5 scratch/populated bases, forward0049a and strict populated logical restore; no complete historical replay or remote CI execution claimed"
+  },
+  "migration": {
+    "filename": "0049a_durable_cron.sql",
+    "sha256": "8b3aefa3997197b75345f726a9a05f62dcb0e8c5472c262f9326d81647760dfc",
+    "appliedTo": "owned local synthetic clones only; applied SQL frozen"
+  },
+  "checks": [
+    {
+      "command": "npm run check",
+      "outcome": "passed",
+      "logSha256": "0fedab01a35ca9fca53fe6fd66268f14af56d83677404c554d736f962da99fb3"
+    },
+    {
+      "command": "npm run check:r6",
+      "outcome": "passed",
+      "logSha256": "68e094c1b46c8639af0f6b631a06958347fba5f7c39058b48f157e9147147a36"
+    },
+    {
+      "command": "npm run build",
+      "outcome": "passed",
+      "logSha256": "b54596e030bd5976e48bf36dccc70f618c3e3146693ca34b91935e7a259edd40"
+    }
+  ],
+  "failureHistory": [
+    "Failing-first core loading, deadline and actual delivery tests preceded their fixes. A hung provider promise now interrupts orchestration without claiming its side effect was cancelled.",
+    "Actual PostgreSQL exposed an incorrect baseline FK name and independently evaluated skipped-job timestamps; source fixes preserve the frozen migration.",
+    "Pooling review replaced the initial session-affinity design. Final verifier changes real backend every transaction and rejects SQL outside transactions.",
+    "A synthetic historical fixture used independently evaluated clock expressions on an exact boundary; it now derives all timestamps from one captured instant. Production schema bytes stayed frozen.",
+    "One earlier verifier cleanup stalled on an untracked test connection; only exact owned PID667820 was SIGINTed after argv verification. Both test pools are tracked/closed. Owner app4196 preserved.",
+    "Completed broad server run had one failure: migration inventory omitted0049a. Full migration suite then passed74 tests with the new file included; no assertion or timeout was relaxed."
+  ],
+  "remaining": [
+    "R6 health/readiness and bounded full-server shutdown",
+    "Approved D9 provenance/shared gate and restored real-target before/after report",
+    "Actual provider UAT and professional release review",
+    "External scheduler and named alert recipient configuration",
+    "R4/canonical release integration and deferred R5 live-target/retention closeout"
+  ],
+  "notPerformed": [
+    "shared/live DDL/data changes",
+    "deployment or main/R4 merge",
+    "provider/card/message calls",
+    "remote CI run",
+    "new client/device regression run"
+  ]
+}

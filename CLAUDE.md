@@ -1,6 +1,8 @@
 # Claude repository handoff
 
 **R6 is in progress on `remediation/r6-operations-20261015`.** Read
+`docs/HANDOFF-2026-10-15-r6-cron-inflight.md` first for the verified durable-cron
+repository step and frozen0049a. Then read
 `docs/HANDOFF-2026-10-15-r6-inflight.md` for the verified first logging/inventory
 slice, pending D9 question and remaining cron/readiness work. It is
 not a phase-complete or deployment handoff. Preserve owner app PID4196.
@@ -13,6 +15,11 @@ T1–T4 tooling covers bank data, active card credentials and recoverable payer 
 not activated. Claude owns R4; canonical R4 integration, owner retention/credential
 choices and real-target evidence remain. No deployment or official R3/R5 exit is
 implied. The earlier R5-start handoff is historical.
+
+Owner deferred R5's remaining release closeout on October15 while R6 continues;
+track the open checks in `docs/operations/r5-deferred-closeout.md`. Deferred does
+not mean waived or deployed. Durable cron coordination/status is verified as a
+repository step; next R6 step: health/readiness and bounded full-server shutdown.
 
 Before committing, pushing, or changing the current uncommitted merchant work, read:
 

@@ -2208,3 +2208,101 @@ export const dataEncryptionBatches = pgTable("data_encryption_batches", {
   rowsChanged: integer("rows_changed").notNull(), durationMs: integer("duration_ms").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, table => ({ batchNumberUnique: unique("encryption_batch_number_uq").on(table.runId, table.batchNumber) }));
+
+export const cronRuns = pgTable(
+  "cron_runs",
+  {
+    id: uuid("id").primaryKey(),
+    owner: uuid("owner").notNull(),
+    scheduledFor: timestamp("scheduled_for", { withTimezone: true }).notNull(),
+    attempt: integer("attempt").notNull(),
+    state: text("state").notNull().default("running"),
+    startedAt: timestamp("started_at", { withTimezone: true })
+      .notNull()
+      .default(sql`clock_timestamp()`),
+    heartbeatAt: timestamp("heartbeat_at", { withTimezone: true })
+      .notNull()
+      .default(sql`clock_timestamp()`),
+    leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }).notNull(),
+    deadlineAt: timestamp("deadline_at", { withTimezone: true }).notNull(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    durationMs: bigint("duration_ms", { mode: "bigint" }),
+  },
+  (t) => ({
+    slotAttempt: unique("cron_run_slot_attempt_uq").on(t.scheduledFor, t.attempt),
+    oneRunning: uniqueIndex("cron_one_running_uq")
+      .on(t.state)
+      .where(sql`${t.state}='running'`),
+    latest: index("cron_run_latest_idx").on(t.startedAt.desc(), t.id),
+    success: index("cron_run_success_idx")
+      .on(t.finishedAt.desc())
+      .where(sql`${t.state}='succeeded'`),
+    attemptCheck: check("cron_run_attempt_check", sql`${t.attempt}>=1 AND ${t.attempt}<=1000`),
+    stateCheck: check(
+      "cron_run_state_check",
+      sql`${t.state} IN ('running','succeeded','failed','abandoned')`,
+    ),
+    timesCheck: check(
+      "cron_run_times_check",
+      sql`isfinite(${t.startedAt}) AND isfinite(${t.scheduledFor}) AND ${t.deadlineAt}>${t.startedAt} AND ${t.deadlineAt}<=${t.startedAt}+interval '240 seconds' AND ${t.leaseExpiresAt}>=${t.startedAt} AND ${t.leaseExpiresAt}<=${t.deadlineAt} AND ${t.heartbeatAt}>=${t.startedAt} AND ${t.heartbeatAt}<=${t.deadlineAt}`,
+    ),
+    finishCheck: check(
+      "cron_run_finish_check",
+      sql`(${t.state}='running' AND ${t.finishedAt} IS NULL AND ${t.durationMs} IS NULL) OR (${t.state}<>'running' AND ${t.finishedAt} IS NOT NULL AND ${t.finishedAt}>=${t.startedAt} AND ${t.durationMs} IS NOT NULL AND ${t.durationMs}>=0)`,
+    ),
+  }),
+);
+export const cronJobs = pgTable(
+  "cron_jobs",
+  {
+    id: uuid("id").primaryKey(),
+    runId: uuid("run_id").notNull(),
+    name: text("name").notNull(),
+    state: text("state").notNull().default("running"),
+    startedAt: timestamp("started_at", { withTimezone: true })
+      .notNull()
+      .default(sql`clock_timestamp()`),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    durationMs: bigint("duration_ms", { mode: "bigint" }),
+    metrics: jsonb("metrics").notNull().default({}),
+    errorCode: text("error_code"),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    reviewDigest: text("review_digest"),
+  },
+  (t) => ({
+    runForeign: foreignKey({
+      name: "cron_jobs_run_id_fkey",
+      columns: [t.runId],
+      foreignColumns: [cronRuns.id],
+    }),
+    runName: unique("cron_job_run_name_uq").on(t.runId, t.name),
+    active: uniqueIndex("cron_job_active_name_uq")
+      .on(t.name)
+      .where(sql`${t.state} IN ('running','held')`),
+    byRun: index("cron_job_run_idx").on(t.runId, t.startedAt, t.id),
+    held: index("cron_job_held_idx")
+      .on(t.startedAt)
+      .where(sql`${t.state}='held'`),
+    nameCheck: check(
+      "cron_job_name_check",
+      sql`${t.name} IN ('subscriptionBilling','generate','tradesGenerate','dispatch','tradesDispatch','overdue','tradesOverdue','reminders','tradesReminders','dailyPayoutNotifications','uploadScans','uploadRetention')`,
+    ),
+    stateCheck: check(
+      "cron_job_state_check",
+      sql`${t.state} IN ('running','succeeded','failed','held','skipped','resolved_complete','resolved_retry')`,
+    ),
+    metricsCheck: check("cron_job_metrics_check", sql`taptpay_cron_metrics_valid(${t.metrics})`),
+    errorCheck: check(
+      "cron_job_error_check",
+      sql`${t.errorCode} IS NULL OR ${t.errorCode} IN ('job_failed','lease_expired','ownership_lost','held_job','already_completed')`,
+    ),
+    finishCheck: check(
+      "cron_job_finish_check",
+      sql`isfinite(${t.startedAt}) AND ((${t.state}='running' AND ${t.finishedAt} IS NULL AND ${t.durationMs} IS NULL) OR (${t.state}<>'running' AND ${t.finishedAt} IS NOT NULL AND ${t.finishedAt}>=${t.startedAt} AND ${t.durationMs} IS NOT NULL AND ${t.durationMs}>=0))`,
+    ),
+    resolutionCheck: check(
+      "cron_job_resolution_check",
+      sql`(${t.state} IN ('resolved_complete','resolved_retry') AND ${t.resolvedAt} IS NOT NULL AND ${t.reviewDigest} IS NOT NULL AND ${t.reviewDigest} ~ '^[0-9a-f]{64}$') OR (${t.state} NOT IN ('resolved_complete','resolved_retry') AND ${t.resolvedAt} IS NULL AND ${t.reviewDigest} IS NULL)`,
+    ),
+  }),
+);

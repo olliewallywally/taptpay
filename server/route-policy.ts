@@ -2741,8 +2741,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     markers: ["authorizeCronRequest"],
     facts: {
       authChecks: ["authorizeCronRequest","constant-time comparison: crypto.timingSafeEqual"],
-      statuses: [200,207,401,409,500,503],
-      helpers: ["runPass"],
+      statuses: [200,207,401,409,503],
     },
   },
 };

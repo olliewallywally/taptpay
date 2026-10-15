@@ -1,6 +1,6 @@
+import type {CronCoordinator} from "./durable-cron";
+import {getCronCoordinator,closeCronCoordinator} from "./cron-runtime";
 import {logOperation} from "./structured-log";
-import {runWithOperationContext} from "./operation-context";
-import {safeErrorSummary} from "./log-redaction";
 import {SubscriptionCommandConflict} from './subscription-command';
 import {getPaymentRuntime} from './payment-runtime-default';
 import {createDurablePaymentNotificationHandlers} from './durable-payment-notification';
@@ -114,18 +114,6 @@ import {
   PaymentAttemptInputError,
   PaymentAttemptService,
 } from "./payment-attempt-service";
-
-// Guards against overlapping cron runs (see POST /api/internal/cron).
-let cronRunning = false;
-let cronStartedAt: string | null = null;
-let lastCronRun: {
-  startedAt: string;
-  finishedAt: string;
-  durationMs: number;
-  ok: boolean;
-  failedPasses: string[];
-  subscriptionBilling: unknown;
-} | null = null;
 
 function authorizeCronRequest(req: express.Request, res: express.Response): boolean {
   const cronSecret = config.cronSecret;
@@ -404,7 +392,7 @@ function escHtml(s: string | null | undefined): string {
 }
 
 const defaultRouteStorage=storage;
-export async function registerRoutes(app: Express,options:{storage?:IStorage;paymentRuntime?:ConfiguredPaymentRuntime;subscriptionPayments?:SubscriptionPaymentRuntime}={}): Promise<Server> {
+export async function registerRoutes(app: Express,options:{storage?:IStorage;paymentRuntime?:ConfiguredPaymentRuntime;subscriptionPayments?:SubscriptionPaymentRuntime;cron?:Pick<CronCoordinator,"run"|"status"|"stop">}={}): Promise<Server> {
   // Express 4 drops an async handler's rejection on the floor — nothing calls
   // next(err), so the request is never answered and the client hangs forever.
   // This patches the registration methods themselves, so every route below is
@@ -417,6 +405,7 @@ export async function registerRoutes(app: Express,options:{storage?:IStorage;pay
   // visitor's own forwarded headers change nothing.
   if (config.trustProxyHops) app.set("trust proxy", config.trustProxyHops);
 
+  const cron=options.cron??getCronCoordinator();
   const storage=options.storage??defaultRouteStorage;
   const paymentRuntime=options.paymentRuntime??getPaymentRuntime();
   const subscriptionPayments=options.subscriptionPayments??getSubscriptionPaymentRuntime(paymentRuntime?.repository);
@@ -7231,155 +7220,41 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
   // ── Cron endpoint ─────────────────────────────────────────────────────────
 
-  app.get("/api/internal/cron/status", (req, res) => {
+  app.get("/api/internal/cron/status", async (req, res) => {
     if (!authorizeCronRequest(req, res)) return;
-    res.json({
-      configured: true,
-      running: cronRunning,
-      startedAt: cronStartedAt,
-      lastRun: lastCronRun,
-    });
+    res.set("Cache-Control","no-store");
+    if(!cron)return res.status(503).json({message:"Durable cron coordination unavailable"});
+    try{return res.json(await cron.status());}
+    catch{logOperation('error','cron_status_unavailable');return res.status(503).json({message:"Cron status unavailable"});}
   });
 
   app.post("/api/internal/cron", async (req, res) => {
     if (!authorizeCronRequest(req, res)) return;
-    // Serialize cron runs. Overlapping invocations (scheduler double-fire, or a run
-    // that exceeds the schedule interval) would otherwise double-generate invoices
-    // and double-dispatch tenant emails, since generate/dispatch are fetch-then-write
-    // and advance nextRunDate non-atomically.
-    if (cronRunning) return res.status(409).json({ message: "A cron run is already in progress" });
-    cronRunning = true;
-    const started = new Date();
-    cronStartedAt = started.toISOString();
-    try {
-      const now = new Date();
-      const baseUrl = getBaseUrl(req);
-      const failedPasses: string[] = [];
-      const runPass = async <T>(name: string, task: () => Promise<T>): Promise<T | { error: string }> => {
-        return runWithOperationContext({jobId:crypto.randomUUID()},async()=>{
-        try {
-          return await task();
-        } catch (error) {
-          failedPasses.push(name);
-          logOperation('error','cron_pass_failed',{job:name,...safeErrorSummary(error)});
-          return { error: "Pass failed" };
-        }
-        });
-      };
-
-      // Subscription billing starts independently. A property/trades/push pass
-      // can fail without preventing renewals, and a slow provider call does not
-      // hold up the start of merchant invoice processing.
-      const subscriptionBillingPromise = runPass(
-        "subscriptionBilling",
-        async () => {
-          const { runSubscriptionBillingPass } = await import("./subscription-cron");
-          return runSubscriptionBillingPass(now);
-        },
-      );
-
-      // Keep the useful ordering within each vertical, but isolate failures so
-      // one subsystem (including its module load) cannot suppress every later pass.
-      const generate = await runPass("generate", async () => {
-        const { runGeneratePass } = await import("./property-cron");
-        return runGeneratePass(now);
-      });
-      const tradesGenerate = await runPass("tradesGenerate", async () => {
-        const { runTradesGeneratePass } = await import("./trades-cron");
-        return runTradesGeneratePass(now);
-      });
-      const dispatch = await runPass("dispatch", async () => {
-        const { runDispatchPass } = await import("./property-cron");
-        return runDispatchPass(baseUrl);
-      });
-      const tradesDispatch = await runPass("tradesDispatch", async () => {
-        const { runTradesDispatchPass } = await import("./trades-delivery");
-        return runTradesDispatchPass(baseUrl);
-      });
-      const overdue = await runPass("overdue", async () => {
-        const { runOverduePass } = await import("./property-cron");
-        return runOverduePass(now);
-      });
-      const tradesOverdue = await runPass("tradesOverdue", async () => {
-        const { runTradesOverduePass } = await import("./trades-delivery");
-        return runTradesOverduePass(now);
-      });
-      const reminders = await runPass("reminders", async () => {
-        const { runReminderPass } = await import("./property-cron");
-        return runReminderPass(baseUrl, now);
-      });
-      const tradesReminders = await runPass(
-        "tradesReminders",
-        async () => {
-          const { runTradesReminderPass } = await import("./trades-delivery");
-          return runTradesReminderPass(baseUrl, now);
-        },
-      );
-      const dailyPayoutNotifications = await runPass(
-        "dailyPayoutNotifications",
-        async () => {
-          const { runDailyPayoutNotificationPass } = await import("./daily-payout-notifications");
-          return runDailyPayoutNotificationPass(now);
-        },
-      );
-      // R1-T7 S6b: the private upload lifecycle, last so a slow scanner delays nothing else.
-      // Earlier documents get their verdict, then uploads no invoice uses are deleted at 12 months.
-      const uploadScans = await runPass("uploadScans", async () => {
-        const { runUploadScanPass } = await import("./upload-lifecycle");
-        return runUploadScanPass();
-      });
-      const uploadRetention = await runPass("uploadRetention", async () => {
-        const { runUploadRetentionPass } = await import("./upload-lifecycle");
-        return runUploadRetentionPass(now);
-      });
-      const subscriptionBilling = await subscriptionBillingPromise;
-      const finished = new Date();
-      const ok = failedPasses.length === 0;
-      lastCronRun = {
-        startedAt: started.toISOString(),
-        finishedAt: finished.toISOString(),
-        durationMs: finished.getTime() - started.getTime(),
-        ok,
-        failedPasses,
-        subscriptionBilling,
-      };
-      logOperation('info','cron_cycle_finished',{ok,durationMs:lastCronRun.durationMs,failed:failedPasses.length});
-      res.status(ok ? 200 : 207).json({
-        ok,
-        ranAt: now.toISOString(),
-        failedPasses,
-        generate,
-        tradesGenerate,
-        dispatch,
-        tradesDispatch,
-        overdue,
-        tradesOverdue,
-        reminders,
-        tradesReminders,
-        dailyPayoutNotifications,
-        uploadScans,
-        uploadRetention,
-        subscriptionBilling,
-      });
-    } catch (err) {
-      const finished = new Date();
-      lastCronRun = {
-        startedAt: started.toISOString(),
-        finishedAt: finished.toISOString(),
-        durationMs: finished.getTime() - started.getTime(),
-        ok: false,
-        failedPasses: ["cron"],
-        subscriptionBilling: null,
-      };
-      logOperation("error","CRON",{payload:["[CRON]",err]});
-      res.status(500).json({ message: "Cron run failed" });
-    }
-    finally {
-      cronRunning = false;
-      cronStartedAt = null;
-    }
+    res.set("Cache-Control","no-store");
+    if(!cron)return res.status(503).json({message:"Durable cron coordination unavailable"});
+    const now=new Date(),baseUrl=getBaseUrl(req);
+    try{
+      const result=await cron.run([
+        {name:'subscriptionBilling',run:async()=>{const {runSubscriptionBillingPass}=await import('./subscription-cron');return runSubscriptionBillingPass(now);}},
+        {name:'generate',run:async()=>{const {runGeneratePass}=await import('./property-cron');return runGeneratePass(now);}},
+        {name:'tradesGenerate',run:async()=>{const {runTradesGeneratePass}=await import('./trades-cron');return runTradesGeneratePass(now);}},
+        {name:'dispatch',run:async()=>{const {runDispatchPass}=await import('./property-cron');return runDispatchPass(baseUrl);}},
+        {name:'tradesDispatch',run:async()=>{const {runTradesDispatchPass}=await import('./trades-delivery');return runTradesDispatchPass(baseUrl);}},
+        {name:'overdue',run:async()=>{const {runOverduePass}=await import('./property-cron');return runOverduePass(now);}},
+        {name:'tradesOverdue',run:async()=>{const {runTradesOverduePass}=await import('./trades-delivery');return runTradesOverduePass(now);}},
+        {name:'reminders',run:async()=>{const {runReminderPass}=await import('./property-cron');return runReminderPass(baseUrl,now);}},
+        {name:'tradesReminders',run:async()=>{const {runTradesReminderPass}=await import('./trades-delivery');return runTradesReminderPass(baseUrl,now);}},
+        {name:'dailyPayoutNotifications',run:async()=>{const {runDailyPayoutNotificationPass}=await import('./daily-payout-notifications');return runDailyPayoutNotificationPass(now);}},
+        {name:'uploadScans',run:async()=>{const {runUploadScanPass}=await import('./upload-lifecycle');return runUploadScanPass();}},
+        {name:'uploadRetention',run:async()=>{const {runUploadRetentionPass}=await import('./upload-lifecycle');return runUploadRetentionPass(now);}},
+      ]);
+      if(result.kind==='busy')return res.status(409).json({message:"A cron run is already in progress"});
+      if(result.kind==='unavailable')return res.status(503).json({message:"Cron coordination unavailable"});
+      return res.status(result.ok?200:207).json({...result.jobs,ok:result.ok,runId:result.runId,ranAt:result.ranAt,failedPasses:result.failedPasses,duplicate:result.duplicate===true});
+    }catch{logOperation('error','cron_run_unavailable');return res.status(503).json({message:"Cron coordination unavailable"});}
   });
 
   const httpServer = createServer(app);
+  httpServer.once("close",()=>{cron?.stop();if(!options.cron)void closeCronCoordinator().catch(()=>undefined);});
   return httpServer;
 }
