@@ -3207,3 +3207,12 @@ with a failing test first:
 T-3's ADR revision 1 was refused in review pass 1. Record:
 [R3-OPEN-ITEMS-2026-10-15](r4/R3-OPEN-ITEMS-2026-10-15.md). Server 224/5,146. PostgreSQL:
 R3 91/15/11/24/20, cutover 5, R4-T2 28, R4-T3 14, S2a 25, R2-T4 12, R2-T7 7. Nothing deployed.
+
+## 32. October 15 — T-3 revision 2, interim guarantee (Claude)
+
+Review pass 1 refused the full decline supersession. Revision 2 adopts a narrower guarantee: a later
+approval in a session is never lost silently. The payer's handlers still reconcile a declined
+attempt. A decline-only session's receipt reopens on any arrival. An approval that cannot be
+recorded keeps its transaction ID and raises `PAYMENT_APPROVAL_NOT_RECORDED`. Full supersession is
+deferred to a new UAT checklist case or the owner's call. R3 durability 92 (the reopen check is
+mutation-checked); http 24, delivery 11, commands 15, subscriptions 20. Server 224/5,149.

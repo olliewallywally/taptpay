@@ -1,9 +1,38 @@
 # ADR — T-3: a later approval in a session supersedes its recorded decline (2026-10-15)
 
-Status: **revision 1 refused** by [review pass 1](../evidence/remediation-v2-2/r4/T3-review-pass-1-2026-10-15.md)
-(the 0044 transaction registry, handlers that skip declined attempts, and a live second attempt on
-the same share make it incomplete; two claims below are false). Revision 2 follows that review. Owner direction 2026-10-15: "fix the open stuff
-first" ([R3 integration §5](../evidence/remediation-v2-2/r4/R3-INTEGRATION-2026-10-14.md)).
+Status: **revision 2 — an interim guarantee is adopted; full supersession is deferred.**
+Revision 1 (below, unchanged) was refused by
+[review pass 1](../evidence/remediation-v2-2/r4/T3-review-pass-1-2026-10-15.md): the 0044
+transaction registry, handlers that skip declined attempts, and a possible live second attempt on
+the same share make it incomplete, and two of its claims are false. Owner direction 2026-10-15: "fix
+the open stuff first" ([R3 integration §5](../evidence/remediation-v2-2/r4/R3-INTEGRATION-2026-10-14.md)).
+
+## Revision 2 (2026-10-15)
+
+Full supersession needs every condition of review pass 1 (a 0044 registry change, deferred binding
+checks, a policy for a live or approved second attempt on the same share, handler and pre-change
+reconciliation changes, notification suppression, and keeping the declined card's ID). It matters
+only if Windcave reports a session `complete` after a decline and later approves another card in
+it. That is unknown, and it is now a case on the [UAT checklist](../operations/r3-uat-checklist.md).
+
+**Adopted now: a later approval is never lost silently.** Each part has a failing test first.
+
+1. The payer's return and completion handlers (retail and invoice) still ask Windcave when the
+   attempt is `declined`. They skip only `approved` and `cancelled`.
+2. A finished inbox receipt whose session has only a declined settlement is reopened by any new
+   arrival, whatever its age (D1's one-minute rule still applies to other finished receipts).
+3. An approval that cannot be recorded dead-letters as `settlement_conflict` with its provider
+   transaction ID kept on the inbox row (`observed_transaction_id`) and `settlement_conflict:approved`
+   on a retail attempt. It raises its own signal, `PAYMENT_APPROVAL_NOT_RECORDED {domain}`, after
+   commit. This covers both a later card in a declined session and a second payment for an
+   aggregate already paid, which also needs a refund.
+
+**Deferred:** revision 1's supersession, rewritten to meet review pass 1's conditions, if UAT shows
+the case occurs or the owner asks for it before UAT.
+
+---
+
+*The sections below are revision 1, kept as reviewed and refused.*
 
 ## Problem
 

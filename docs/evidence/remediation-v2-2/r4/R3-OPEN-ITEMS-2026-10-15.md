@@ -16,7 +16,7 @@ Windcave, nothing was deployed. Refunds stay off.
 | **0037, database** | Migration **0049** (applied nowhere): an attached or finished attempt cannot be given a provider account or fingerprint for the first time; send intent is compared with `created_at`/`lease_expires_at` in UTC, whatever the session time zone (a NZ-time session refused every retail checkout before). | PG ×2 (the time-zone check reproduced the 23514 first) |
 | **R-1** | The unused legacy split writer `updateSplitPaymentStatus` is deleted from both stores and `IStorage`. | existing tests adapted |
 | **R4 split refunds** | The legacy refund route refuses a split sale (409 `REFUND_SPLIT_SALE`) before any reservation or provider call; per-share refunds wait for R4. | HTTP |
-| **T-3** | [ADR](../../../decisions/2026-10-15-t3-decline-supersession.md) revision 1 was refused by [review pass 1](T3-review-pass-1-2026-10-15.md); handled in a separate commit. | — |
+| **T-3** | [ADR](../../../decisions/2026-10-15-t3-decline-supersession.md) revision 1 was refused by [review pass 1](T3-review-pass-1-2026-10-15.md). Revision 2 adopts a guarantee that a later approval is never lost silently: the payer's handlers still reconcile a declined attempt; a receipt whose session has only a decline reopens on any arrival; an approval that cannot be recorded keeps its transaction ID and raises `PAYMENT_APPROVAL_NOT_RECORDED`. Full supersession is deferred to the UAT answer (new checklist case) or the owner's call. | PG (mutation-checked), unit ×4 |
 
 ## Verification
 

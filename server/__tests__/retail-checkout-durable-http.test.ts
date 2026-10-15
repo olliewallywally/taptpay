@@ -51,6 +51,18 @@ describe.each([false,true])('actual durable retail HTTP contract, token=%s',toke
     const result=await request(f.app).post(`${f.root}/hosted-fields-complete`).send({...f.intent,sessionId:opened.body.sessionId});expect(result.status).toBe(202);
     expect((await f.storage.getTransaction(f.sale.id))?.status).toBe('pending');expect(f.port.counts().applications).toBe(0);
   });
+  // T-3 interim (docs/decisions/2026-10-15-t3-decline-supersession.md): a payer who returns after a
+  // recorded decline still makes the app ask Windcave, so a later card in the session is never silent.
+  test('a declined attempt is still reconciled when the payer completes or returns again',async()=>{
+    const f=await fixture(token),opened=await f.start();f.port.setObservation('declined');
+    const body={...f.intent,sessionId:opened.body.sessionId};
+    expect((await request(f.app).post(`${f.root}/hosted-fields-complete`).send(body)).body.outcome).toBe('declined');
+    const queried=f.port.client.querySession.mock.calls.length;f.port.setObservation('approved');
+    await request(f.app).post(`${f.root}/hosted-fields-complete`).send(body);
+    await request(f.app).get(`/api/pay/return/${opened.body.returnState}`);
+    expect(f.port.client.querySession.mock.calls.length).toBeGreaterThan(queried);
+    expect([...f.port.receipts.values()].some((row:any)=>row.status==='dead_letter' && row.code==='settlement_conflict')).toBe(true);
+  });
   test('browser approval text cannot turn a verified decline into approval',async()=>{
     const f=await fixture(token),opened=await f.start();f.port.setObservation('declined');
     await request(f.app).get(`/api/pay/return/${opened.body.returnState}`).query({source:'hpp',result:'approved'});

@@ -60,3 +60,17 @@ test("H-3: verified evidence the worker's own re-check refuses is reported under
   await new PaymentReconciliationWorker(repository as any, { query: async () => evidence } as any, () => now, () => 0, undefined, audit).runOne(randomUUID());
   expect(audit).toHaveBeenCalledWith("PROVIDER_OUTCOME_MISMATCH", { field: "amount" });
 });
+
+test("T-3 interim: an approval that cannot be recorded raises its own signal and keeps its transaction", async () => {
+  const claim = { id: randomUUID(), sessionId: expected.sessionId, owner: randomUUID(), attemptCount: 1, firstReceivedAt: now, leaseExpiresAt: new Date(now.getTime() + 60000) };
+  for (const outcome of ["approved", "declined"] as const) {
+    const repository = { claimInbox: jest.fn(async () => claim), resolveSession: jest.fn(async () => ({ ...expected, paymentAttemptId: randomUUID() })),
+      finalize: jest.fn(async () => ({ kind: "conflict" })), finishInbox: jest.fn(async () => true) };
+    const audit = jest.fn();
+    const evidence = { ...expected, kind: "verified", outcome, transactionId: "tx-second-card", transactionCount: 2 };
+    await new PaymentReconciliationWorker(repository as any, { query: async () => evidence } as any, () => now, () => 0, undefined, audit).runOne(randomUUID());
+    expect(repository.finishInbox).toHaveBeenCalledWith(claim, expect.objectContaining({ status: "dead_letter", code: "settlement_conflict", transactionId: "tx-second-card",
+      ...(outcome === "approved" ? { attemptCode: "settlement_conflict:approved" } : {}) }), now);
+    expect(audit.mock.calls.some(([action]) => action === "PAYMENT_APPROVAL_NOT_RECORDED")).toBe(outcome === "approved");
+  }
+});

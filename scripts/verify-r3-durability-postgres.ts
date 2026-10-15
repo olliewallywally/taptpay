@@ -860,6 +860,16 @@ try {
       await assert.rejects(zoned.query("UPDATE payment_attempts SET send_started_at=lease_expires_at AT TIME ZONE 'UTC'+interval '1 second' WHERE id=$1",[claim.attempt.id]),{code:'23514'});
     } finally {await zoned.end();}
   });
+  await check('T-3 interim: a second card\'s notification within a minute of a recorded decline is still processed and kept',async()=>{
+    const {sale,sessionId}=await retailSession();const binding=(await one.resolveSession(sessionId))!;
+    await one.receive(sessionId,'fprn',now);await worker(one,evidence(binding,'declined')).runOne(randomUUID());
+    assert.equal((await original.getTransaction(sale.id))?.status,'failed');
+    const approval={...evidence(binding,'approved'),transactionId:`tx-${randomUUID()}`};
+    await one.receive(sessionId,'fprn',now);await worker(one,approval).runOne(randomUUID());
+    const inbox=(await pool.query("SELECT status,last_error_code,observed_transaction_id FROM payment_notification_inbox WHERE session_id=$1 AND kind='fprn'",[sessionId])).rows[0];
+    assert.deepEqual(inbox,{status:'dead_letter',last_error_code:'settlement_conflict',observed_transaction_id:approval.transactionId});
+    assert.equal((await pool.query('SELECT last_reconciliation_code FROM payment_attempts WHERE transaction_id=$1',[sale.id])).rows[0].last_reconciliation_code,'settlement_conflict:approved');
+  });
   await check('unbound provider reference cannot attach or settle when independently expected money differs',async()=>{
     const id=await invoice('property'),claim=await one.claimInvoice(claimInput('property',id),now);assert.equal(claim.kind,'claimed');if(claim.kind!=='claimed')throw new Error('fixture_claim');
     await one.markInvoiceSendStarted(claim.attempt.id,now,randomBytes(32).toString('base64url'));

@@ -81,7 +81,8 @@ export function createInvoiceCheckoutHandlers(deps:{runtime?:ConfiguredPaymentRu
       let attempt=await runtime.repository.getInvoiceAttemptByKey(input);
       const binding=attempt?await runtime.repository.getInvoiceSession(attempt.id):undefined;
       if(!attempt || !binding || binding.sessionId!==parsed.data.sessionId){res.status(404).json({message:'Payment session not found'});return;}
-      if(!['approved','declined','cancelled'].includes(attempt.state)) {
+      // T-3 interim: a declined attempt is still reconciled, so a later card in its session is never silent.
+      if(!['approved','cancelled'].includes(attempt.state)) {
         if(wallet && parsed.data.googlePayToken && config.features.invoicePayments && ['uat','production'].includes(config.paymentMode)){
           const reply=await runtime.client.querySession(binding.sessionId);
           if(reply.kind==='reply' && normalizeSessionQuery(reply.body,binding.sessionId).kind==='pending') {

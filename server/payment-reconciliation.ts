@@ -74,7 +74,11 @@ export class PaymentReconciliationWorker {
       if (settlement.kind === "lease-lost") return true;
       if (settlement.kind === "adapter-unavailable") { await this.retry(claim, "provider_unavailable"); return true; }
       if (settlement.kind !== "finalized" && settlement.kind !== "reused") {
-        await this.deadLetter(claim,'settlement_conflict',result.transactionId);
+        // T-3 interim: an approval that cannot be recorded (a later card in a declined session, or a
+        // second payment for a paid sale) keeps its transaction ID in the inbox and raises its own signal.
+        const approved=result.outcome==='approved';
+        if(await this.deadLetter(claim,'settlement_conflict',result.transactionId,undefined,approved?'settlement_conflict:approved':undefined) && approved)
+          try{this.audit('PAYMENT_APPROVAL_NOT_RECORDED',{domain:expected.invoiceAttemptId?'invoice':'retail'});}catch{/* the inbox row keeps it */}
         return true;
       }
       await this.repository.finishInbox(claim, { status: "complete", transactionId: result.transactionId }, this.clock());

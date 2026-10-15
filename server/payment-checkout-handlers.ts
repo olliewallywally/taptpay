@@ -73,7 +73,8 @@ export function createRetailCheckoutHandlers(deps:{storage:IStorage;attempts:Pay
       const parsed=completeSchema.safeParse(req.body);if(!parsed.success){res.status(400).json({message:'Invalid payment completion request'});return;}
       const attempt=await attempts.getAttemptByTransactionShareKey({transactionId:sale.id,...parsed.data});
       if(!attempt || attempt.processorSessionId!==parsed.data.sessionId){res.status(404).json({message:'Payment session not found'});return;}
-      if(['approved','declined','cancelled'].includes(attempt.state)){res.json(outcome(attempt));return;}
+      // T-3 interim: a declined attempt is still reconciled, so a later card in its session is never silent.
+      if(['approved','cancelled'].includes(attempt.state) || (attempt.state==='declined' && !runtime)){res.json(outcome(attempt));return;}
       if(!runtime){processing(res);return;}
       // A submitted wallet token is not financial evidence. Wallet submission
       // is performed only by its durable once-only send command, then queried.
@@ -103,7 +104,7 @@ export function createRetailCheckoutHandlers(deps:{storage:IStorage;attempts:Pay
         const invoice=await runtime?.repository.resolveInvoiceReturnState(req.params.state,runtime.clock());
         if(invoice?.kind==='expired'){res.status(410).json({message:'Payment return has expired'});return;}
         if(invoice?.kind==='valid'){
-          if(invoice.sessionId && !['approved','declined','cancelled'].includes(invoice.attempt.state))await runtime!.reconcile(invoice.sessionId,'browser');
+          if(invoice.sessionId && !['approved','cancelled'].includes(invoice.attempt.state))await runtime!.reconcile(invoice.sessionId,'browser');
           const current=await runtime!.repository.resolveInvoiceReturnState(req.params.state,runtime!.clock());
           const attempt=current.kind==='valid'?current.attempt:invoice.attempt;
           res.json({...outcome({state:attempt.state,receiptShare:attempt.shareIndex||null}),invoiceId:attempt.rentInvoiceId??attempt.jobInvoiceId});return;
@@ -111,7 +112,7 @@ export function createRetailCheckoutHandlers(deps:{storage:IStorage;attempts:Pay
         res.status(404).json({message:'Payment return not found'});return;
       }
       if(resolved.kind==='expired'){res.status(410).json({message:'Payment return has expired'});return;}
-      if(runtime && resolved.attempt.processorSessionId && !['approved','declined','cancelled'].includes(resolved.attempt.state))
+      if(runtime && resolved.attempt.processorSessionId && !['approved','cancelled'].includes(resolved.attempt.state))
         await runtime.reconcile(resolved.attempt.processorSessionId,'browser');
       if(providerReturn){res.redirect(303,`/pay/return/${encodeURIComponent(req.params.state)}`);return;}
       const current=await attempts.getAttempt(resolved.attempt.id),sale=await storage.getTransaction(resolved.attempt.transactionId);

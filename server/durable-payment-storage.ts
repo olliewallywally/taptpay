@@ -376,7 +376,10 @@ export class DurablePaymentStorage implements ReconciliationRepository, PaymentO
   async receive(sessionId: string, kind: "fprn"|"browser"|"poll", now = new Date()): Promise<string> {
     const REOPENS=`((payment_notification_inbox.status='dead_letter' AND payment_notification_inbox.last_error_code IN
         ('retry_exhausted','unbound_session','provider_pending','provider_unknown','provider_unavailable','internal_error'))
-      OR (payment_notification_inbox.status='complete' AND payment_notification_inbox.completed_at<EXCLUDED.first_received_at-interval '1 minute'))`;
+      OR (payment_notification_inbox.status='complete' AND (payment_notification_inbox.completed_at<EXCLUDED.first_received_at-interval '1 minute'
+        -- T-3 interim: a session whose only settlement is a decline is always looked at again.
+        OR (EXISTS(SELECT 1 FROM payment_settlement_events e WHERE e.session_id=EXCLUDED.session_id)
+          AND NOT EXISTS(SELECT 1 FROM payment_settlement_events e WHERE e.session_id=EXCLUDED.session_id AND e.outcome<>'declined')))))`;
     if (!isSessionId(sessionId) || !["fprn","browser","poll"].includes(kind)) throw new Error("invalid_notification");
     return this.transaction(async(client)=>{
       const row=(await client.query(`INSERT INTO payment_notification_inbox(provider,kind,session_id,first_received_at,last_received_at,next_attempt_at)
