@@ -1,8 +1,8 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 27d235b8d5dc53e364875bf056e2ff76af786b3a on 2026-10-14.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ b7fa2de91b508eb624d2257eafc2dee7c53b1439 on 2026-10-15.
  *
- * 194 registrations (81 GET, 81 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
+ * 196 registrations (83 GET, 81 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
  * live count on every run rather than trusting this comment.
  *
@@ -80,6 +80,24 @@ export interface RoutePolicyEntry {
 }
 
 export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
+  "GET /healthz": {
+    method: "GET",
+    path: "/healthz",
+    principal: "public",
+    markers: [],
+    facts: {
+      statuses: [200],
+    },
+  },
+  "GET /readyz": {
+    method: "GET",
+    path: "/readyz",
+    principal: "public",
+    markers: [],
+    facts: {
+      statuses: [200,503],
+    },
+  },
   "GET /robots.txt": {
     method: "GET",
     path: "/robots.txt",

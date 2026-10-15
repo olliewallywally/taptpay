@@ -1,7 +1,9 @@
 # Claude repository handoff
 
 **R6 is in progress on `remediation/r6-operations-20261015`.** Read
-`docs/HANDOFF-2026-10-15-r6-cron-inflight.md` first for the verified durable-cron
+`docs/HANDOFF-2026-10-15-r6-readiness.md` first for the health/readiness and bounded
+shutdown follow-up, then
+`docs/HANDOFF-2026-10-15-r6-cron-inflight.md` for the verified durable-cron
 repository step and frozen0049a. Then read
 `docs/HANDOFF-2026-10-15-r6-inflight.md` for the verified first logging/inventory
 slice, pending D9 question and remaining cron/readiness work. It is
@@ -19,7 +21,9 @@ implied. The earlier R5-start handoff is historical.
 Owner deferred R5's remaining release closeout on October15 while R6 continues;
 track the open checks in `docs/operations/r5-deferred-closeout.md`. Deferred does
 not mean waived or deployed. Durable cron coordination/status is verified as a
-repository step; next R6 step: health/readiness and bounded full-server shutdown.
+repository step. Health/readiness and bounded full-server shutdown follow-up is
+recorded in the newest handoff; official R6 exit remains gated on D9, real-target
+entitlement evidence, actual UAT and external operations activation.
 
 Before committing, pushing, or changing the current uncommitted merchant work, read:
 

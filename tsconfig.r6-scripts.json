@@ -12,6 +12,7 @@
     "scripts/r6-cron-resolve.ts",
     "scripts/r6-cron-resolve.test.ts",
     "scripts/verify-r6-entitlement-postgres.ts",
-    "scripts/verify-r6-cron-postgres.ts"
+    "scripts/verify-r6-cron-postgres.ts",
+    "scripts/verify-r6-readiness-postgres.ts"
   ]
 }

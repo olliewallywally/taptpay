@@ -91,8 +91,10 @@ function isTarget(
 
 export class SseBroker {
   private subscribers = new Map<number, Set<Subscriber>>();
+  private draining = false;
 
   subscribe(merchantId: number, audience: SseAudience, connection: SseWritable, authorize?: () => Promise<boolean>) {
+    if(this.draining){connection.end?.();return ()=>{};}
     const merchantSubscribers = this.subscribers.get(merchantId) ?? new Set<Subscriber>();
     let timer: ReturnType<typeof setInterval> | undefined;
     const subscriber: Subscriber = { audience, connection, authorize, pending: Promise.resolve(),seen:new Set(), unsubscribe: () => {
@@ -223,6 +225,17 @@ export class SseBroker {
     let total = 0;
     for (const subscribers of this.subscribers.values()) total += subscribers.size;
     return total;
+  }
+
+  /** End sockets immediately, then await existing authorization tasks. No new streams. */
+  async drain() {
+    this.draining=true;
+    const pending:Promise<void>[]=[];
+    for(const members of Array.from(this.subscribers.values()))for(const subscriber of Array.from(members)){
+      pending.push(subscriber.pending);subscriber.unsubscribe();
+      try{subscriber.connection.end?.();}catch{/* Socket already closed. */}
+    }
+    await Promise.all(pending);
   }
 
   clear() {

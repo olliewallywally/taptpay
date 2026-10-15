@@ -172,7 +172,11 @@ describe("R1-T2 — every middleware registration has policy (C10)", () => {
   it("the app the server tests build runs exactly the policy's middleware, in order", async () => {
     const { app } = await createTestApp();
     const stack: any[] = (app as any)._router.stack;
-    const firstRoute = stack.findIndex((layer) => layer.route);
+    // Probes run before parsers/drain admission; ordinary business routes still
+    // begin only after the complete pipeline. Check exact order around both.
+    const probes=stack.filter(layer=>layer.route&&['/healthz','/readyz'].includes(layer.route.path));
+    expect(probes.map(layer=>layer.route.path)).toEqual(['/healthz','/readyz']);
+    const firstRoute = stack.findIndex((layer) => layer.route&&!['/healthz','/readyz'].includes(layer.route.path));
     let lastRoute = -1;
     stack.forEach((layer, index) => {
       if (layer.route) lastRoute = index;
@@ -180,13 +184,14 @@ describe("R1-T2 — every middleware registration has policy (C10)", () => {
 
     // Express's own two layers (query parsing, request initialisation) come
     // first; then server/app.ts's, then any in server/routes.ts.
-    const beforeRoutes = stack.slice(0, firstRoute).map((layer) => layer.name);
+    const beforeRoutes = stack.slice(0, firstRoute).filter(layer=>!layer.route).map((layer) => layer.name);
     const expectedBefore = [
       "query",
       "expressInit",
       ...HARNESS_FILES.flatMap((file) => MIDDLEWARE_POLICY[file].map((entry) => entry.runtimeName)),
     ];
     expect(beforeRoutes).toEqual(expectedBefore);
+    expect(stack.slice(0,stack.indexOf(probes[0])).filter(layer=>!layer.route).map(layer=>layer.name)).toEqual(['query','expressInit','<anonymous>','helmetMiddleware','compression']);
 
     const betweenRoutes = stack.slice(firstRoute, lastRoute + 1).filter((layer) => !layer.route);
     expect(betweenRoutes.map((layer) => layer.name)).toEqual([]);

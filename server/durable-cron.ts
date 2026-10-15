@@ -71,6 +71,7 @@ export interface CronJob {
 export class CronCoordinator {
   private stopped = false;
   private aborters = new Set<() => void>();
+  private active = new Set<Promise<unknown>>();
   constructor(
     readonly repository: CronRepository,
     private readonly heartbeatMs = CRON_HEARTBEAT_MS
@@ -89,7 +90,13 @@ export class CronCoordinator {
   status() {
     return this.repository.status();
   }
-  async run(
+  async drain() { await Promise.allSettled([...this.active]); }
+  run(jobs:readonly CronJob[]) {
+    const work=this.runCycle(jobs);this.active.add(work);
+    void work.finally(()=>this.active.delete(work)).catch(()=>undefined);
+    return work;
+  }
+  private async runCycle(
     jobs: readonly CronJob[]
   ): Promise<CronCompleted | { kind: 'busy' } | { kind: 'unavailable' }> {
     if (this.stopped) return { kind: 'unavailable' };

@@ -269,6 +269,18 @@ function tokenRate(family: string, perMinute: number): string {
 }
 
 export const ROUTE_REVIEW: Record<string, RouteReview> = {
+  "GET /healthz": {
+    branches:[{principal:"public",tenant:"none",tenantRule:"No tenant or data lookup."}],
+    input:"No input is used.",capability:null,entitlement:null,idempotency:"Read-only fixed process status.",sideEffects:null,
+    successDto:"Only {status:'ok'}, no-store; no database/provider dependency.",errorDisclosure:["fixed"],
+    controls:{authenticity:"Deliberately public minimal liveness.",replay:"Read-only fixed result.",rate:"none — no DB/provider work; infrastructure request limits apply."},
+  },
+  "GET /readyz": {
+    branches:[{principal:"public",tenant:"none",tenantRule:"No tenant or customer data."}],
+    input:"No input is used.",capability:null,entitlement:null,idempotency:"Read-only bounded single-flight DB check and cached schema/config/process state.",sideEffects:null,
+    successDto:"Only {status:'ready'} or fixed503 {status:'not_ready'}, no-store; no dependency diagnostics.",errorDisclosure:["fixed"],
+    controls:{authenticity:"Deliberately public minimal readiness.",replay:"Single-flight/cached DB probe; schema refresh is independent of requests.",rate:"none — at most one physical probe per instance, one-second outcome cache and finite timeout; infrastructure request limits also apply."},
+  },
   // ── Batch 1 (2026-09-26): provider callbacks, cron, the ecommerce API, billing callbacks ──
 
   "ALL /api/pay/notification/:state": {

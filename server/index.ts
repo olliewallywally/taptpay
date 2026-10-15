@@ -4,12 +4,19 @@ import { config } from "./config";
 import fs from "fs";
 import path from "path";
 import { spawnSync } from "child_process";
+import { createServer } from 'node:http';
 import { createApp } from "./app";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic } from "./vite";
 import { seedDatabase } from "./seed";
-import { isDatabaseConnected, getDb } from "./database";
-import { sql } from "drizzle-orm";
+import { isDatabaseConnected } from "./database";
+import {pool} from './db';
+import {createReadinessRuntime} from './readiness-runtime';
+import {RuntimeResources} from './server-shutdown';
+import {stopCronCoordinator,drainCronCoordinator,closeCronCoordinator} from './cron-runtime';
+import {sseBroker} from './sse-broker';
+import {startDrainingLoop,type StopWorker} from './draining-loop';
+import {HttpWorkTracker} from './http-work';
 import { 
   startServerWithPortManagement, 
   setupGracefulShutdown
@@ -24,9 +31,24 @@ const isProduction = config.isProduction;
 
 // Security headers, compression, bearer-page caching, body parsing and the
 // request log: the same app the server tests build (server/app.ts).
-const app = createApp({ writeRequestLog: line => console.log(line) });
+const readiness=createReadinessRuntime(config.databaseUrl);
+const httpWork=new HttpWorkTracker();
+const app = createApp({ writeRequestLog: line => console.log(line),health:readiness.health,work:httpWork });
+const server=createServer(app),resources=new RuntimeResources();
+resources.add({stop:()=>httpWork.stop(),drain:()=>httpWork.drain()});
+resources.add({stop:()=>readiness.schema.stop(),drain:()=>readiness.schema.drain(),close:readiness.close});
+resources.add({stop:stopCronCoordinator,drain:drainCronCoordinator,close:closeCronCoordinator});
+resources.add({close:async()=>{await pool?.end();}});
+let sseDrain:Promise<void>|undefined;
+resources.add({stop:()=>{sseDrain=sseBroker.drain();void sseDrain.catch(()=>undefined);},drain:async()=>{await sseDrain;}});
+const shutdown=setupGracefulShutdown(server,5000,{health:readiness.health,resources});
+function trackWorker(stop:StopWorker){resources.add({stop,drain:stop.drain});}
+let bootstrap:Promise<void>|undefined;
+// Startup can be inside a DB query or Vite initialization when a signal arrives.
+// Wait for that phase to return to its draining checkpoint before closing pools.
+resources.add({drain:async()=>{await bootstrap?.catch(()=>undefined);}});
 
-(async () => {
+bootstrap=(async () => {
   for (const diagnostic of config.diagnostics) {
     logOperation('warn',`config_${diagnostic.key}`);
   }
@@ -37,20 +59,20 @@ const app = createApp({ writeRequestLog: line => console.log(line) });
   // accepting any traffic. Fail fast in production; warn only in development.
   if (isDatabaseConnected()) {
     try {
-      const db = getDb();
-      await db!.execute(sql`SELECT 1`);
+      if(!await readiness.database())throw Error('database_unavailable');
       logOperation("info","DATABASE_CONNECTION_VERIFIED_LIVE_QUERY_SUCCEEDED",{payload:['✅ Database: connection verified (live query succeeded)']});
     } catch (error) {
       if (isProduction) {
         logOperation("error","FATAL_DATABASE_IS_UNREACHABLE_AFTER_CONNECTION_WAS_ESTABLISHED",{payload:['FATAL: Database is unreachable after connection was established:']});
         logOperation("error","RUNTIME_DIAGNOSTIC",{payload:[error]});
         logOperation("error","REFUSING_TO_START_MERCHANT_DATA_CANNOT_BE_READ_OR_WRITTEN",{payload:['Refusing to start — merchant data cannot be read or written.']});
-        process.exit(1);
+        throw Error('startup_database_unavailable');
       } else {
         logOperation("warn","DATABASE_LIVE_QUERY_CHECK_FAILED_CONTINUING_IN_DEV_MODE",{payload:['⚠️  Database live-query check failed (continuing in dev mode):',error]});
       }
     }
   }
+  if(readiness.health.draining)return;
 
   // Admin sign-in refuses everyone without ADMIN_PASSWORD_HASH: say so where it shows.
   if (config.admin.email && !config.admin.passwordHash) {
@@ -61,17 +83,18 @@ const app = createApp({ writeRequestLog: line => console.log(line) });
   // Production must never accept traffic against pending, drifted, orphaned,
   // or out-of-order schema history. Development reports the same issues loudly.
   try {
-    const { reportPendingMigrations } = await import("./migrate");
-    await reportPendingMigrations({ failOnIssues: isProduction,
-      log:()=>logOperation('warn','migration_gate_diagnostic') });
+    const schemaValid=await readiness.schema.refresh();
+    if(!schemaValid)throw Error('startup_schema_invalid');
   } catch (error) {
     if (isProduction) {
       logOperation("error","FATAL_DATABASE_MIGRATION_GATE_FAILED",{payload:["[FATAL] Database migration gate failed."]});
       logOperation("error","RUNTIME_DIAGNOSTIC",{payload:[error]});
-      process.exit(1);
+      throw Error('startup_schema_invalid');
     }
     logOperation('warn','migration_check_unavailable',safeErrorSummary(error));
   }
+  if(readiness.health.draining)return;
+  readiness.schema.start();
 
   // ── Schema push (drizzle-kit push) ───────────────────────────────────────
   // Never run schema sync as a normal app-start side effect. The trades branch
@@ -85,7 +108,7 @@ const app = createApp({ writeRequestLog: line => console.log(line) });
   // exactly what will be changed, or start with RUN_SCHEMA_PUSH=true.
   if (config.retiredRunMigrations) {
     logOperation("error","FATAL_RUN_MIGRATIONS_IS_RETIRED_RUN_NPM_RUN_DB_MIGRATE_AS_A_DELI",{payload:['[FATAL] RUN_MIGRATIONS is retired; run `npm run db:migrate` as a deliberate deploy step.']});
-    process.exit(1);
+    throw Error('retired_migration_startup_option');
   }
   const runSchemaPush = config.runSchemaPush;
   if (isDatabaseConnected() && runSchemaPush) {
@@ -116,27 +139,20 @@ const app = createApp({ writeRequestLog: line => console.log(line) });
     } catch (err) {
       logOperation('warn','schema_push_failed',safeErrorSummary(err));
     }
+    // A supervised development push must not retain a pre-push positive cache.
+    await readiness.schema.refresh();
   }
 
 
-  const server = await registerRoutes(app);
-  // Cash/manual command delivery also runs while provider querying is paused.
-  if(isDatabaseConnected()){
-    const delivery=createPaymentDeliveryRuntime();if(delivery)server.once('close',startPaymentDeliveryLoop(delivery));
-  }
-  // Reconciliation has its own reviewed switch; initiation switches are never
-  // consulted by the worker. Importing routes/tests starts no background work.
-  if(config.features.providerReconciliation && isDatabaseConnected() && config.windcave.username && config.windcave.apiKey){
-    const runtime=getPaymentRuntime();if(runtime){const stop=startPaymentReconciliationLoop(runtime);server.once('close',stop);}
-    const subscription=getSubscriptionPaymentRuntime(runtime?.repository);
-    if(subscription){const stop=startSubscriptionPaymentLoop(subscription);server.once('close',stop);}
-  }
+  await registerRoutes(app,{httpServer:server});
+  if(readiness.health.draining)return;
 
   // Demo data is an explicit development/test action. A requested seed failure
   // is fatal instead of being hidden behind a warning.
   if (config.seedDemoData) {
     await seedDatabase();
   }
+  if(readiness.health.draining)return;
 
   // Sync verified merchants to recreate auth users
   try {
@@ -145,6 +161,7 @@ const app = createApp({ writeRequestLog: line => console.log(line) });
   } catch (error) {
     logOperation('warn','verified_merchant_sync_failed',safeErrorSummary(error));
   }
+  if(readiness.health.draining)return;
 
 
   app.use(createGlobalErrorHandler());
@@ -210,10 +227,12 @@ const app = createApp({ writeRequestLog: line => console.log(line) });
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
   if (config.appEnv === "development") {
-    await setupVite(app, server);
+    const closeVite=await setupVite(app, server);
+    resources.add({close:closeVite});
   } else {
     serveStatic(app);
   }
+  if(readiness.health.draining)return;
 
   // ALWAYS serve the app on port 5000
   // this serves both the API and the client.
@@ -221,30 +240,38 @@ const app = createApp({ writeRequestLog: line => console.log(line) });
   const port = 5000;
   const host = "0.0.0.0";
 
-  // Setup graceful shutdown handling
-  setupGracefulShutdown(server, port);
-
   // Start server with port management
   const serverStarted = await startServerWithPortManagement(server, port, host);
   
   if (!serverStarted) {
     logOperation('error','server_port_conflict',{port});
-    process.exit(1);
+    throw Error('startup_bind_failed');
   }
+  if(readiness.health.draining)return;
+
+  // Start workers only after bootstrap. Every accepted task is tracked for drain.
+  if(isDatabaseConnected()){
+    const delivery=createPaymentDeliveryRuntime();if(delivery)trackWorker(startPaymentDeliveryLoop(delivery));
+  }
+  if(config.features.providerReconciliation && isDatabaseConnected() && config.windcave.username && config.windcave.apiKey){
+    const runtime=getPaymentRuntime();if(runtime)trackWorker(startPaymentReconciliationLoop(runtime));
+    const subscription=getSubscriptionPaymentRuntime(runtime?.repository);
+    if(subscription)trackWorker(startSubscriptionPaymentLoop(subscription));
+  }
+  readiness.health.completeBoot();
 
   logOperation('info','server_listening',{port});
 
   // Keep Neon database endpoint alive — ping every 4 minutes to prevent auto-suspension
   if (config.databaseUrl) {
-    const { neon } = await import("@neondatabase/serverless");
-    const keepAliveSql = neon(config.databaseUrl);
-    setInterval(async () => {
+    trackWorker(startDrainingLoop(async () => {
       try {
-        await keepAliveSql`SELECT 1`;
+        await pool?.query('SELECT 1');
       } catch {
         // Silently ignore — server continues regardless
       }
-    }, 4 * 60 * 1000);
+    }, 4 * 60 * 1000));
     logOperation('info','database_keepalive_started',{intervalMs:240000});
   }
 })();
+void bootstrap.catch(async()=>{logOperation('error','server_startup_failed');await shutdown.begin('STARTUP_FAILURE');});

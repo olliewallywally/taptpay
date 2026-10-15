@@ -1,5 +1,5 @@
 import type {CronCoordinator} from "./durable-cron";
-import {getCronCoordinator,closeCronCoordinator} from "./cron-runtime";
+import {getCronCoordinator} from "./cron-runtime";
 import {logOperation} from "./structured-log";
 import {SubscriptionCommandConflict} from './subscription-command';
 import {getPaymentRuntime} from './payment-runtime-default';
@@ -392,7 +392,7 @@ function escHtml(s: string | null | undefined): string {
 }
 
 const defaultRouteStorage=storage;
-export async function registerRoutes(app: Express,options:{storage?:IStorage;paymentRuntime?:ConfiguredPaymentRuntime;subscriptionPayments?:SubscriptionPaymentRuntime;cron?:Pick<CronCoordinator,"run"|"status"|"stop">}={}): Promise<Server> {
+export async function registerRoutes(app: Express,options:{storage?:IStorage;paymentRuntime?:ConfiguredPaymentRuntime;subscriptionPayments?:SubscriptionPaymentRuntime;cron?:Pick<CronCoordinator,"run"|"status"|"stop">;httpServer?:Server}={}): Promise<Server> {
   // Express 4 drops an async handler's rejection on the floor — nothing calls
   // next(err), so the request is never answered and the client hangs forever.
   // This patches the registration methods themselves, so every route below is
@@ -7254,7 +7254,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }catch{logOperation('error','cron_run_unavailable');return res.status(503).json({message:"Cron coordination unavailable"});}
   });
 
-  const httpServer = createServer(app);
-  httpServer.once("close",()=>{cron?.stop();if(!options.cron)void closeCronCoordinator().catch(()=>undefined);});
+  const httpServer = options.httpServer??createServer(app);
+  httpServer.once("close",()=>{cron?.stop();});
   return httpServer;
 }

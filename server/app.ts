@@ -6,6 +6,8 @@ import { createRequestLogger } from "./request-log";
 import { BOARD_PRINT_PATH } from "./board-print";
 import { crossSiteGuard } from "./cross-site";
 import {isDurablePaymentNotificationPath} from './payment-notification-paths';
+import { ApplicationHealth } from './application-health';
+import { HTTP_WORK,type HttpWorkTracker } from './http-work';
 
 /**
  * The HTTP pipeline every request passes through before the routes: security
@@ -18,7 +20,7 @@ import {isDurablePaymentNotificationPath} from './payment-notification-paths';
  * touches the database, loads Vite or starts a timer, and the log writer is
  * passed in so this module never imports Vite for it.
  */
-export function createApp(options: { writeRequestLog: (line: string) => void }): Express {
+export function createApp(options: { writeRequestLog: (line: string) => void; health?:ApplicationHealth;work?:HttpWorkTracker }): Express {
   const app = express();
 
   // Establish correlation/logging before parsers and security middleware can fail.
@@ -71,6 +73,20 @@ export function createApp(options: { writeRequestLog: (line: string) => void }):
       !String(res.getHeader("Content-Type") ?? "").startsWith("text/event-stream") &&
       compression.filter(req, res),
   }));
+
+  // Public probes contain no dependency details, credentials or catalog data.
+  // Keep them and the drain guard before parsers and business routes.
+  app.get('/healthz', (_req,res) => res.set('Cache-Control','no-store').json({status:'ok'}));
+  app.get('/readyz', async (_req,res) => {
+    const ready=options.health ? await options.health.ready() : false;
+    res.set('Cache-Control','no-store').status(ready?200:503).json({status:ready?'ready':'not_ready'});
+  });
+  app.use((req,res,next)=>{
+    if(options.work)Object.defineProperty(req,HTTP_WORK,{value:options.work});
+    if(options.health&&(options.health.draining||!options.health.booted)){
+      res.set({'Cache-Control':'no-store',Connection:'close','Retry-After':'5'}).status(503).json({status:'unavailable'});
+    }else next();
+  });
 
   // Bearer-addressed payment pages must not leak their URL through browser
   // referrers or shared caches. This runs before Vite/static fallback, so the HTML

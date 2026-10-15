@@ -224,13 +224,13 @@ export class DurableSubscriptionBilling {
       return {kind:outcome,attemptId:row.id,applied:!resolutionRequired,resolutionRequired};
     });
   }
-  async reconcileDue(limit=10):Promise<number>{
+  async reconcileDue(limit=10,canContinue=()=>true):Promise<number>{
     return runWithOperationContext({jobId:randomUUID()},async()=>{
     const rows=await this.transaction(async client=>(await client.query(`SELECT id FROM subscription_billing_attempts WHERE applied_at IS NULL AND state<>'abandoned'
       AND next_attempt_at<=$1 AND (lease_expires_at IS NULL OR lease_expires_at<=$1) AND reconciliation_count<20
       AND (send_started_at IS NULL OR provider_transaction_id IS NOT NULL)
       AND last_error_code IS DISTINCT FROM 'parent_resolution_required' ORDER BY next_attempt_at,id LIMIT $2`,[this.clock(),Math.max(1,Math.min(20,limit))])).rows);
-    for(const row of rows)await this.run(row.id);return rows.length;
+    let processed=0;for(const row of rows){if(!canContinue())break;await this.run(row.id);processed++;}return processed;
 
     });
   }

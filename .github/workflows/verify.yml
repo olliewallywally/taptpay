@@ -58,6 +58,8 @@ jobs:
         run: npm run test:r6:cli
       - name: R6 durable cron and delivery fencing (synthetic, no database)
         run: npm run test:server -- --runTestsByPath server/__tests__/durable-cron-contract.test.ts server/__tests__/durable-cron-runner.test.ts server/__tests__/cron-delivery-safety.test.ts server/__tests__/r6-cron-http.test.ts server/__tests__/r6-cron-no-secret.test.ts server/__tests__/r6-cron-job-context.test.ts
+      - name: R6 readiness and bounded shutdown (synthetic HTTP and child processes)
+        run: npm run test:server -- --runTestsByPath server/__tests__/r6-health.test.ts server/__tests__/r6-schema-readiness.test.ts server/__tests__/r6-readiness-bundle.test.ts server/__tests__/r6-worker-drain.test.ts server/__tests__/r6-shutdown.test.ts server/__tests__/r6-http-work.test.ts server/__tests__/async-route-guard.test.ts server/__tests__/security-audit-log.test.ts
       - name: operator backup safety (synthetic subprocesses only)
         run: npm run test:backup:safety
       - name: schema fingerprint determinism (no database opened)

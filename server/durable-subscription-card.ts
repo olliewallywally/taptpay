@@ -192,7 +192,7 @@ export class DurableSubscriptionCard {
       idempotencyKey:`activate-${cardAttemptId}`,reference:`ACTIVATE-${cardAttemptId}`,actor:source.actor,allowRestart:record.started_status==='cancelled'});
   }
   /** Recovers a crash after card commit and before preparing its initial bill. */
-  async recoverActivations(limit=10):Promise<number>{
+  async recoverActivations(limit=10,canContinue=()=>true):Promise<number>{
     return runWithOperationContext({jobId:randomUUID()},async()=>{
     const rows=await this.transaction(async client=>(await client.query(`SELECT a.id FROM subscription_card_attempts a JOIN merchant_subscriptions s ON s.id=a.subscription_id
       WHERE a.state='approved' AND a.applied_at IS NOT NULL
@@ -203,7 +203,7 @@ export class DurableSubscriptionCard {
       AND NOT EXISTS(SELECT 1 FROM subscription_payment_events resolved WHERE resolved.card_attempt_id=a.id AND resolved.event_type='activation_satisfied')
       AND NOT EXISTS(SELECT 1 FROM subscription_card_attempts newer WHERE newer.subscription_id=a.subscription_id AND newer.state='approved' AND newer.created_at>a.created_at)
       AND NOT EXISTS(SELECT 1 FROM subscription_billing_attempts b WHERE b.card_attempt_id=a.id) ORDER BY a.created_at LIMIT $1`,[Math.max(1,Math.min(20,limit))])).rows);
-    for(const row of rows)await this.activate(row.id);return rows.length;
+    let processed=0;for(const row of rows){if(!canContinue())break;await this.activate(row.id);processed++;}return processed;
 
     });
   }

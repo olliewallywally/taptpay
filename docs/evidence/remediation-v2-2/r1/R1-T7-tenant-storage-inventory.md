@@ -1,8 +1,8 @@
 # R1-T7 tenant/storage execution inventory
 
-Generated from working-tree sources on base `27d235b8d5dc53e364875bf056e2ff76af786b3a`; the phase evidence names the final commit.
+Generated from working-tree sources on base `b7fa2de91b508eb624d2257eafc2dee7c53b1439`; the phase evidence names the final commit.
 
-Registrations: **194**; registrations with session/admin authentication: **122**;
+Registrations: **196**; registrations with session/admin authentication: **122**;
 registrations calling checkMerchantOwnership: **25**.
 IStorage: **263** declared methods;
 PaymentAttemptRepository: **10** inherited methods.
@@ -109,8 +109,10 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | GET /api/v1/transactions/:id | API-key tenant (api-key/resource) | `getApiKeyByKey`, `getTransactionForMerchant`, `logApiRequest`, `updateApiKeyLastUsed` |
 | GET /api/windcave/callback | single-resource bearer (public-bearer/token) | `getSplitPaymentsByTransaction`, `getTransaction` |
 | GET /api/windcave/env | public (public/none) | — |
+| GET /healthz | public (public/none) | — |
 | GET /nfc/:merchantId | public (public/none) | — |
 | GET /nfc/:merchantId/stone/:stoneId | public (public/none) | — |
+| GET /readyz | public (public/none) | — |
 | GET /robots.txt | public (public/none) | — |
 | GET /sitemap.xml | public (public/none) | — |
 | GET /uploads/:folder/:name | public (public/none) | `getUploadedFile` |

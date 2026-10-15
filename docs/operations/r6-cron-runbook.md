@@ -5,8 +5,9 @@ scheduler activation. No scheduler or alert recipient was configured by this
 change. Owner approved uncertain-job holds on October15; see
 [decision](../decisions/2026-10-15-r6-uncertain-cron-jobs-held.md) and
 [design](r6-durable-cron-design.md). R5's [deferred closeout](r5-deferred-closeout.md),
-R4 integration, D9, real UAT and the remaining R6 readiness work remain release
-gates.
+R4 integration, D9, real UAT and external operations activation remain release
+gates. See [health/readiness and shutdown](r6-health-readiness-shutdown.md) for the
+repository follow-up and platform rollout checks.
 
 ## Deployment sequence
 
@@ -119,4 +120,6 @@ delivery. In-flight external effects remain possible after a timeout.
 
 Rollback must preserve history/holds and stop new coordinated work before changing
 code. Do not restart old uncoordinated cron while a run or uncertain effect exists.
-R6 health/readiness/bounded full-server shutdown is separate outstanding work.
+Health/readiness/bounded full-server shutdown is covered by the linked repository
+follow-up; platform termination/probe configuration and rolling-restart rehearsal
+still require release-operator evidence.

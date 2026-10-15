@@ -188,11 +188,11 @@ export class DurablePaymentDelivery implements IdempotentPaymentEventReceiver {
   }
   /** Each app instance observes the committed realtime feed independently of
    * the worker's distributed claim. A sliding window also catches late commits. */
-  async realtime(since:Date,seen:Set<string>):Promise<void>{
+  async realtime(since:Date,seen:Set<string>,canContinue=()=>true):Promise<void>{
     let offset=0;
-    for(let page=0;page<10;page++){
+    for(let page=0;page<10&&canContinue();page++){
       const rows=await this.transaction(async client=>(await client.query("SELECT * FROM payment_delivery_targets WHERE kind='sse' AND created_at>=$1 ORDER BY created_at,id LIMIT 500 OFFSET $2",[since,offset])).rows);
-      for(const row of rows){if(seen.has(row.id))continue;await this.ports.send(row,`taptpay-r3/${row.id}`);seen.add(row.id);}
+      for(const row of rows){if(!canContinue())return;if(seen.has(row.id))continue;await this.ports.send(row,`taptpay-r3/${row.id}`);seen.add(row.id);}
       if(rows.length<500)break;offset+=rows.length;
     }
     if(seen.size>10000)for(const id of [...seen].slice(0,seen.size-10000))seen.delete(id);

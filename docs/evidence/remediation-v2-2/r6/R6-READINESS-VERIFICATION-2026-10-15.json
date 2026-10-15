@@ -1,0 +1,2244 @@
+{
+  "date": "2026-10-15",
+  "branch": "remediation/r6-operations-20261015",
+  "base": "b7fa2de91b508eb624d2257eafc2dee7c53b1439",
+  "scope": "R6 plan13.4 health/readiness and bounded shutdown repository step",
+  "officialR6Exit": false,
+  "sourceManifest": "R6-READINESS-source-sha256-2026-10-15.txt",
+  "sourceManifestSha256": "b9fe965a8948d5d3b57930eed49be674156d4c0252b0d5d04dc429ce2fbae58c",
+  "sourceFiles": 39,
+  "server": {
+    "mode": "complete-file union, latest complete suite per file; overlapping results are never added twice",
+    "allSuitesStartedAfterFunctionalSourceFreeze": true,
+    "functionalSourceFreezeEpochMs": 1792054218443.927,
+    "postFreezeFormatting": {
+      "file": "scripts/schema-fingerprint-core.mjs",
+      "change": "Only one terminal separator blank line removed after functional source freeze",
+      "beforeSha256": "acaf750f99c7d393b5621890fc3f0932d0738e4fda2b45ec1788aa92fd529e8f",
+      "afterSha256": "ad80f0740ff3816c5f0f028351bbc76f054b99fed647ae99952535210c901f87",
+      "canonicalBodySha256": "dc527119392dec62b3480964fc03a61820b3e74e3154ef91b9ab32bcbb7cfbd4",
+      "serverBundleBeforeSha256": "f90c28174a3c3ba3e806e3af426ab42dbebe5f9fedeb4583bd44c38626076247",
+      "serverBundleAfterSha256": "f90c28174a3c3ba3e806e3af426ab42dbebe5f9fedeb4583bd44c38626076247",
+      "serverBundleByteIdentical": true
+    },
+    "expectedSuites": 235,
+    "coveredSuites": 235,
+    "passedTests": 5220,
+    "failedTests": 0,
+    "pendingTests": 0,
+    "missingSuites": 0,
+    "runs": [
+      {
+        "name": "final-focused",
+        "sha256": "fe38ab5756f164c3fe340150fb101043806e1bb25246d2c5028fd4d91dd6307d",
+        "success": true,
+        "suites": 10,
+        "passed": 74,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "auth-throttle-final",
+        "sha256": "ddc309246f7dd825a146fc4d5a1a2da11bc8189db58c639e46dd7c0c946f6d9e",
+        "success": true,
+        "suites": 1,
+        "passed": 18,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "inventory-final",
+        "sha256": "fb652051e8d308d73326c0f2709108014d8ceb96d110592782a26e1ddd01d2a1",
+        "success": false,
+        "suites": 3,
+        "passed": 1005,
+        "failed": 2,
+        "pending": 0
+      },
+      {
+        "name": "http-work-final",
+        "sha256": "27913fbbf6005dbf12c0ce7cfd407a21dfe2d5866825997d0601f2507b8fa75d",
+        "success": true,
+        "suites": 5,
+        "passed": 67,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "batch-01",
+        "sha256": "a0fb219ae086ab981cbe08a9f5ca587c7850727958db629bb3b0081135e6c388",
+        "success": false,
+        "suites": 6,
+        "passed": 300,
+        "failed": 1,
+        "pending": 0
+      },
+      {
+        "name": "batch-02",
+        "sha256": "8d55c836a1f252d2c46489a4a8eb89e8381d1da46db6258a6269d0f478763aab",
+        "success": true,
+        "suites": 6,
+        "passed": 244,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "batch-03",
+        "sha256": "5a02b1fa3016ed4d8c117d6d84e30a960c67a31960e6fbe191aaf6b1b0e274a5",
+        "success": true,
+        "suites": 6,
+        "passed": 295,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-001",
+        "sha256": "8a871da84e806aa7730711f7f4cafee9ebec3b1a0e86f7b8a0c07a13dc319a34",
+        "success": true,
+        "suites": 1,
+        "passed": 21,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-002",
+        "sha256": "c1f6117a3b7000ef27bfe333e68e9fcda23c5b23d72c268cbcf8bfe581543ede",
+        "success": true,
+        "suites": 1,
+        "passed": 9,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-003",
+        "sha256": "28c9e57cb08d46c582866d9dfabd3eaae51bc916c621f378a3a56bbbc97763a2",
+        "success": true,
+        "suites": 1,
+        "passed": 85,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-004",
+        "sha256": "6c7f3ffe83865fbf461b2e1e1ab4971b6e5c5b8a0ae13a169044222b9b7c59c3",
+        "success": true,
+        "suites": 1,
+        "passed": 33,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-005",
+        "sha256": "640b6371f768ea3dd535a5f228c69340096b169dea9dd7d25aafb81607173fc4",
+        "success": true,
+        "suites": 1,
+        "passed": 14,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-006",
+        "sha256": "6e7a12b157c3fef609af7e435ba6e0be4ece4122fa90786fce3e99bb9d0e9562",
+        "success": true,
+        "suites": 1,
+        "passed": 6,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-007",
+        "sha256": "5d54ffef68c0c1ac0d506e7975d620889dd5483945ece047bfe9b5380c773ab6",
+        "success": true,
+        "suites": 1,
+        "passed": 9,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-008",
+        "sha256": "913c86cefc7c6f3d4f2a5642d0f553d640b702d90fe6cd53acdcf0fe029f8605",
+        "success": true,
+        "suites": 1,
+        "passed": 6,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-009",
+        "sha256": "b16d0e60c832fccb23d4b96328a0568729bfa416e748fb83c28b9da00fc7bcdb",
+        "success": true,
+        "suites": 1,
+        "passed": 7,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-010",
+        "sha256": "14abf8a8e10c3cd858a83e2c01ddb465b554e4d3f70173e9eafb1b56e50f8316",
+        "success": true,
+        "suites": 1,
+        "passed": 43,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-011",
+        "sha256": "2cce50c6fa33181aaca0a71a80716c4e01d566c5c6a7a6ff0ddf1d93e57790a7",
+        "success": true,
+        "suites": 1,
+        "passed": 16,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-012",
+        "sha256": "e719caacac55dba3cccedae39e73b8a16b825877db1d3b9be9cdcfc5756d00ba",
+        "success": true,
+        "suites": 1,
+        "passed": 4,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-013",
+        "sha256": "d38f60275dc65f9651f571e04dbe4188ea6b08fae19b64e573a310c02412b71a",
+        "success": true,
+        "suites": 1,
+        "passed": 8,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-014",
+        "sha256": "70b3512fc46fb7e2e79412bb4a2926ad0625b2c3fd12a77a435948a3c58743ec",
+        "success": true,
+        "suites": 1,
+        "passed": 5,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-015",
+        "sha256": "58dea8e270a1b0a9ae7d222bab1beb8ffb761a940066a300980fc26bc98dc35b",
+        "success": true,
+        "suites": 1,
+        "passed": 15,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-016",
+        "sha256": "78af4c60726d44bd24e77927ab5d391b7544c1e4c8ae41c4e04d6008a97c1d99",
+        "success": true,
+        "suites": 1,
+        "passed": 6,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-017",
+        "sha256": "fa41e6e038a49e17bdb1c27d25218d8d8f07e6bde3d4fffe8e9dd096e7fd8cde",
+        "success": true,
+        "suites": 1,
+        "passed": 4,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-018",
+        "sha256": "89f401c60ff50fc5564606989482cacb4db12f22921bc321b2f1fa5bc473c912",
+        "success": true,
+        "suites": 1,
+        "passed": 25,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-019",
+        "sha256": "bac25ae5bdd1d3c83933464caa10005707fa08e6953d4ddd1df8deec05ae3cb1",
+        "success": true,
+        "suites": 1,
+        "passed": 4,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-020",
+        "sha256": "095c57db713f56879e665361a94550fa222d2f67e83b4df695684ca1bdba8a72",
+        "success": true,
+        "suites": 1,
+        "passed": 6,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-021",
+        "sha256": "288d12d72c3e5481933c55e78eb47336c1a2922c99ecc996fd163a10964d2da2",
+        "success": true,
+        "suites": 1,
+        "passed": 5,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-022",
+        "sha256": "59478c886611cf9c07a7242d8192962964c7aabbaf7fef804f22ecf5c0a1db66",
+        "success": true,
+        "suites": 1,
+        "passed": 6,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-023",
+        "sha256": "e0e69f3c488d2713efd7df78e73b5e71ada6ee188c513100a6642433738d0165",
+        "success": true,
+        "suites": 1,
+        "passed": 6,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-024",
+        "sha256": "778479814aa257c3c550b8fad0689a8814ed229bfe38a7fb6b0c65b530a52415",
+        "success": true,
+        "suites": 1,
+        "passed": 9,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-025",
+        "sha256": "a2a2a507e04fb3cbad4e8a6f1db711966aa2aebb708c76fa7c394cf26ed1096e",
+        "success": true,
+        "suites": 1,
+        "passed": 3,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-026",
+        "sha256": "c82fad1ff1a96f39fefe26e49086c9c3da9a1d0e981648bb7889e58b73a52c77",
+        "success": true,
+        "suites": 1,
+        "passed": 12,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-027",
+        "sha256": "d5c45b63e66f7c96effa4f519c0e5fae590d1db7f8c77c5d6dc015d394a6e16e",
+        "success": true,
+        "suites": 1,
+        "passed": 5,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-028",
+        "sha256": "c4ca81403c00ddfdd2e3fa6b088ae5a71a7395b734d86f93706f01ec07f10f0a",
+        "success": true,
+        "suites": 1,
+        "passed": 8,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-029",
+        "sha256": "f15efe1de677ce7d1a14fae905f213d03a52514f586555306556a86b75110ce4",
+        "success": true,
+        "suites": 1,
+        "passed": 2,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-030",
+        "sha256": "c26ce4439bd42c50661ff0e527c39c358e23fd7e2ff865bbe0df8ffe7afc7ce1",
+        "success": true,
+        "suites": 1,
+        "passed": 4,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-031",
+        "sha256": "8927b8d04f6047adb655f6b06e86bc356f6f5c2357125fb66ade8b8f10bcbd37",
+        "success": true,
+        "suites": 1,
+        "passed": 17,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-032",
+        "sha256": "f2d7d55c63ca6d7c43c969e5cbfb558719f2dd7493038f73e1121524b5eae64b",
+        "success": true,
+        "suites": 1,
+        "passed": 3,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-033",
+        "sha256": "8eeb99f71cf70acbfb17e209abaf2eae720c0087802e3d76fb5db5e50f315938",
+        "success": true,
+        "suites": 1,
+        "passed": 6,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-034",
+        "sha256": "2691a540b045a167964ff68ce024235b5937bf01bcd38d6e66bb8f097c466fd0",
+        "success": true,
+        "suites": 1,
+        "passed": 54,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-035",
+        "sha256": "43f13e8a6ed6776f189149d0fadf1ea40af38d9dc55954d9f9089a9826106287",
+        "success": true,
+        "suites": 1,
+        "passed": 2,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-036",
+        "sha256": "2f59208980470162460a94e33a40076270f7f4da5ff120065dae9edc881ca495",
+        "success": true,
+        "suites": 1,
+        "passed": 2,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-037",
+        "sha256": "51a7efd475b1efd3fe9c9cd54cbd2a36e06c3aeb236c616e344c7956ec6fc3a5",
+        "success": true,
+        "suites": 1,
+        "passed": 1,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-038",
+        "sha256": "1c05847dcfd8c90113ff9981e54f105d3233cf8ddfda0b477b2b180ff0c704fd",
+        "success": true,
+        "suites": 1,
+        "passed": 10,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-039",
+        "sha256": "3bd2d7a1da1707d7a0325823426758ac5c773afb261bcbba82d64a1e5df5d451",
+        "success": true,
+        "suites": 1,
+        "passed": 16,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-040",
+        "sha256": "af9c789642112bc16580b9b08f416a924c16bbbdc118d94afb8d61132b4acaf4",
+        "success": true,
+        "suites": 1,
+        "passed": 4,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-041",
+        "sha256": "75ece8fbff84b16ce704b41bbb7513a24d09d1cfcf10a533f070e2c529a4b884",
+        "success": true,
+        "suites": 1,
+        "passed": 3,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-042",
+        "sha256": "9636c5888649de01119b7da898fce0d172c88ce2b4a22ef0c4afd43dd9ace2fa",
+        "success": true,
+        "suites": 1,
+        "passed": 4,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-043",
+        "sha256": "c6d43ad423275ee279e47c4870399440f157bab40031cb39ccdc30d64f33d984",
+        "success": true,
+        "suites": 1,
+        "passed": 2,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-044",
+        "sha256": "71009de023b16981af894aa9e057f6dfac293b2d063496fb6a0462b9689f0e54",
+        "success": true,
+        "suites": 1,
+        "passed": 2,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-045",
+        "sha256": "622a043454bf21b0fecefc212ce4d778b3d99fa1931d0b71b609b3ffcc60863c",
+        "success": true,
+        "suites": 1,
+        "passed": 4,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-046",
+        "sha256": "617d0ada5c898ce460a9c8dcdbc5378998ddffaa503d18be387b0b75682065c5",
+        "success": true,
+        "suites": 1,
+        "passed": 12,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-047",
+        "sha256": "9b5f2d90a4dd6557ba58db124ffb618c05defce08d77d2ba2cf986df66de700e",
+        "success": true,
+        "suites": 1,
+        "passed": 4,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-048",
+        "sha256": "c35174ab3baae5c1899e04f33a292241e5eedef6c4acb8880fc6f4b9a0e60ddb",
+        "success": true,
+        "suites": 1,
+        "passed": 30,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-049",
+        "sha256": "109c2a12f3660a000b19fd3e950cef4e1c61712bab73d08a9b7be51812603dd3",
+        "success": true,
+        "suites": 1,
+        "passed": 33,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-050",
+        "sha256": "6d7e43b96d684f86bd5de780357463a043ac60788d3db3f327dea4df792d9a84",
+        "success": true,
+        "suites": 1,
+        "passed": 105,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-051",
+        "sha256": "22c28b10f46308e9362d976a7e82b98b7352952d6e33c3f763d052b91500512b",
+        "success": true,
+        "suites": 1,
+        "passed": 5,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-052",
+        "sha256": "1d593240467e573cd1d6983400846c4962f1adf218d90dd96f69dcdc84eb610d",
+        "success": true,
+        "suites": 1,
+        "passed": 2,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-053",
+        "sha256": "b3d9dbacb28a19b54ff459a81882d7fd37f7006ae4312fd5d3353cf5e1baaae1",
+        "success": true,
+        "suites": 1,
+        "passed": 16,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-054",
+        "sha256": "df3a613e23ba48cf962676b3e42bc024f08afac969eba86003b6edafb9e4a572",
+        "success": true,
+        "suites": 1,
+        "passed": 4,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-055",
+        "sha256": "b9fdfc36f9f44d4d5ba08b0aa96e582213ea3e89fd7a0cd9a101ae858480f8aa",
+        "success": true,
+        "suites": 1,
+        "passed": 4,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-056",
+        "sha256": "9f5edcbb510f438107b495eefccb53d9ea8647173f80fa9812ecc15b7f9c5866",
+        "success": true,
+        "suites": 1,
+        "passed": 68,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-057",
+        "sha256": "2dc280f586f0b15166d90d4be01ba519c2132a0a5f7df786f89cd496c7cd73a2",
+        "success": true,
+        "suites": 1,
+        "passed": 2,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-058",
+        "sha256": "49c8ae56e19c9778dd1d73f74ac3a4a6845652f4c8155e78449224af6646b1bb",
+        "success": true,
+        "suites": 1,
+        "passed": 26,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-059",
+        "sha256": "5b7bd115f4077b11b4cbb415cce7431eab1d85f079a50d869b733b556ff87dcc",
+        "success": true,
+        "suites": 1,
+        "passed": 9,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-060",
+        "sha256": "071f29f92bc861a25c78bcc88cba72dc3163681f58f69a8747b76384f62e5e94",
+        "success": true,
+        "suites": 1,
+        "passed": 15,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-061",
+        "sha256": "66371a632678957d005620470d5a40f6cb9971fa9c44cecb632aba8b58a69b16",
+        "success": true,
+        "suites": 1,
+        "passed": 6,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-062",
+        "sha256": "02eb70aee934dbd2c27fdaa5afe8c1cfc150d778ac6a45926a4cf7d07fd07ed1",
+        "success": true,
+        "suites": 1,
+        "passed": 49,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-063",
+        "sha256": "1268af733a2d5c687140fa9a6db3f974975e13d451c51da493d8e6fd221105bb",
+        "success": true,
+        "suites": 1,
+        "passed": 6,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-064",
+        "sha256": "94bfc296c8a9fbc053d0ad745198823a51fba2d3e10e52b6bec8113ee3719d38",
+        "success": true,
+        "suites": 1,
+        "passed": 14,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-065",
+        "sha256": "b8a990cea7e4e9681ab60981b74a77de228dcf86c7cc44d79cbb7293e3c99df5",
+        "success": true,
+        "suites": 1,
+        "passed": 10,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-066",
+        "sha256": "8d16b4571ac2273333f9b09d939e41b5e9d8972b4475ade840c68a613a585580",
+        "success": true,
+        "suites": 1,
+        "passed": 34,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-067",
+        "sha256": "6f8200574cfe004ee9584764f4ee9cb8efd3ac0c0e5493a43a032da03ae7cad0",
+        "success": true,
+        "suites": 1,
+        "passed": 45,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-068",
+        "sha256": "41d5c3fc19bfb429cfba9729cf4e090920524acd3663df82f2edd5b4e9a49367",
+        "success": true,
+        "suites": 1,
+        "passed": 21,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-069",
+        "sha256": "22906ac413628afa4a062a3543391fb38a713457bebb7bd4696da7ca168150f5",
+        "success": true,
+        "suites": 1,
+        "passed": 22,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-070",
+        "sha256": "fc499c81156ce4c52732f3a6a5550c70e92e7f00a64bae4c989be1f72363e3e2",
+        "success": true,
+        "suites": 1,
+        "passed": 16,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-071",
+        "sha256": "9b9c5e2303a955bbfc8ec6a84190a0d887d3b817330e6e94029ac1c8f0d9ef74",
+        "success": true,
+        "suites": 1,
+        "passed": 8,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-072",
+        "sha256": "f9b52dbfc238040002dd90209ccffc5043747544eeb372a669495913978f3bc8",
+        "success": true,
+        "suites": 1,
+        "passed": 7,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-073",
+        "sha256": "2b76c8307b0e11ba48c74ab497bfb09b76e56049f8bdb63815c4c2c7cce5c719",
+        "success": true,
+        "suites": 1,
+        "passed": 18,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-074",
+        "sha256": "ea6bd29ff7ff28bb6a17eb8aab481c0d4d465f5f260aa3e91410e086f04116e3",
+        "success": true,
+        "suites": 1,
+        "passed": 13,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-075",
+        "sha256": "7c0242b0994522dae34872cbbe226f54f60789acec7668b2310c2249e7153fc0",
+        "success": true,
+        "suites": 1,
+        "passed": 20,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-076",
+        "sha256": "dc1d4fae3f9b9936add1bb8af916bf14e25d35b95700d49001188be11dbe6435",
+        "success": true,
+        "suites": 1,
+        "passed": 1,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-077",
+        "sha256": "1bdaa3bbbb046b32464e37371ace7032dcbef066265c2a7e9c1aa67bde85785a",
+        "success": true,
+        "suites": 1,
+        "passed": 57,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-078",
+        "sha256": "9e211a36dc75cc2813043b202c7ef9af8dde46555d85023645a0b10c74f632f2",
+        "success": true,
+        "suites": 1,
+        "passed": 24,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-079",
+        "sha256": "a58ddbbd4fb1c18b2d9be7fb5ef5bfcb9831e3f2e9703d9ef989ff552f9dfaa1",
+        "success": true,
+        "suites": 1,
+        "passed": 17,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-080",
+        "sha256": "e2a985d311b672ebf2ceab4b78dfbfa3fee76651530816c050b23ca0b0397102",
+        "success": true,
+        "suites": 1,
+        "passed": 17,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-081",
+        "sha256": "27c623400c2afad7f11468134f0a36cfa1c06235911a9b1b75982c6e70dda902",
+        "success": true,
+        "suites": 1,
+        "passed": 2,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-082",
+        "sha256": "73971558d29d4bb7593faf54052108dfe0a20087ca196673b96554508b47729b",
+        "success": true,
+        "suites": 1,
+        "passed": 15,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-083",
+        "sha256": "aaf59490c377ffdb3202ba6e9e75aea8a8c1d30e5665ad8ed0448206e8d22df7",
+        "success": true,
+        "suites": 1,
+        "passed": 3,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-084",
+        "sha256": "741a47437fcf53f0e7aedacdb752cf0cfd649e36d6e517b6d85cddd18d261981",
+        "success": true,
+        "suites": 1,
+        "passed": 15,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-085",
+        "sha256": "9c5d281788d723f14d01f1b02894b2abf473d21af748ee6a55ca3408646ec216",
+        "success": true,
+        "suites": 1,
+        "passed": 4,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-086",
+        "sha256": "6ba6c767a4d8c2868755e5aecb8309f31c9116697472334d7c7a3c29b056a596",
+        "success": true,
+        "suites": 1,
+        "passed": 29,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-087",
+        "sha256": "9c2ee438dfed6fdd5d7bfe947942f5c39cb4a5cf33951a400adb0e7ab9970781",
+        "success": true,
+        "suites": 1,
+        "passed": 4,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-088",
+        "sha256": "2be83109fb6cb76e5e0b72f735806802a6cedc82c0b703c90f898d47e1f9ae33",
+        "success": true,
+        "suites": 1,
+        "passed": 83,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-089",
+        "sha256": "aa3fa35265d6a0794b2995413da27c9d0da17226361ca94298c6da980dcfbbd2",
+        "success": true,
+        "suites": 1,
+        "passed": 11,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-090",
+        "sha256": "18fb184b1cb1e3e3486f183844416968af1d43a559c30652dfd30e1cfd390e6b",
+        "success": true,
+        "suites": 1,
+        "passed": 32,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-091",
+        "sha256": "3408dc88bceff1b8d5e129d1986c5a8ea7748004ade93f23d2c4ea60bc319090",
+        "success": true,
+        "suites": 1,
+        "passed": 11,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-092",
+        "sha256": "08846753c16954f0ec9ab5d3651734ebc2a768b5784cc9e7f35d04397526f70c",
+        "success": true,
+        "suites": 1,
+        "passed": 11,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-093",
+        "sha256": "2ee5b94079247076a37642870c05f76a5ed1dc12ca9dd5df4dacbb764710b9c5",
+        "success": true,
+        "suites": 1,
+        "passed": 14,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-094",
+        "sha256": "e857053bf4d938410012713f6bb5b8f6881789f699fafd367c79bd01619d1607",
+        "success": true,
+        "suites": 1,
+        "passed": 30,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-095",
+        "sha256": "330c8d0e6f57206369b5ec43e50fd509c4c056e3ea4117d47c936eda60fce8b9",
+        "success": true,
+        "suites": 1,
+        "passed": 30,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-096",
+        "sha256": "227a54048700e0a8a7533ff40b17b2d2b12697044aca3e78137c95030a8a2e33",
+        "success": true,
+        "suites": 1,
+        "passed": 10,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-097",
+        "sha256": "6183897af94d1c07ae24c946454c952724ac8bf0a42aae8ddfb55f9a5eae37ec",
+        "success": true,
+        "suites": 1,
+        "passed": 25,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-098",
+        "sha256": "d13f9409ea035d8b94afbe7c3452e18376eebfd0a5cc1854760076b35700421d",
+        "success": true,
+        "suites": 1,
+        "passed": 45,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-099",
+        "sha256": "fe70ac2eafe1af8df89ab939878fc38f47cb9d3a445f8ffbc2e9c4bfbd683330",
+        "success": true,
+        "suites": 1,
+        "passed": 30,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-100",
+        "sha256": "993270d53fa373548ae7e8f5803b0964536dbcb080a0fa1f85c99380be86e7dd",
+        "success": true,
+        "suites": 1,
+        "passed": 7,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-101",
+        "sha256": "66e1a4466a20d31fd71d331bb333288483ed453f2bf2819d236f7ece2ee80f75",
+        "success": true,
+        "suites": 1,
+        "passed": 13,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-102",
+        "sha256": "b35d69fa2e1082c5c23b3a3a71c477b70caf2c09358cf826bc98d3bf36b71019",
+        "success": true,
+        "suites": 1,
+        "passed": 5,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-103",
+        "sha256": "089d51c96738f8374ff8a25944e893b41a431f4d32698a6846ef143938bdcabb",
+        "success": true,
+        "suites": 1,
+        "passed": 7,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-104",
+        "sha256": "7b54bf21e244b0695e1a721fa84074c618896a782196160e7bd0958e6fc3667e",
+        "success": true,
+        "suites": 1,
+        "passed": 10,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-105",
+        "sha256": "659c2840593d6f5de9825f4899e9632c1b0b401b461f7723520d6681a9e74bf7",
+        "success": true,
+        "suites": 1,
+        "passed": 16,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-106",
+        "sha256": "cb3570d74d87e58f76490de5eb1321a8ece45f399b4d1e1987f9007a62df2c60",
+        "success": true,
+        "suites": 1,
+        "passed": 28,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-107",
+        "sha256": "ca9dc186e05bfbf8a855cb878b20371c532835ac67f0d589b97fd32d03b5785d",
+        "success": true,
+        "suites": 1,
+        "passed": 2,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-108",
+        "sha256": "0c25c57dfa1fb894ebf5fe39f478e6eab0c22b964f3766f24f540d7fe0d0753d",
+        "success": true,
+        "suites": 1,
+        "passed": 15,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-109",
+        "sha256": "be2cec90e9a48272b727d61ed1ca1722e2c32f9c474c645798f473cb7f21d983",
+        "success": true,
+        "suites": 1,
+        "passed": 9,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-110",
+        "sha256": "84ce884bf4a79e258bdeb0e305e696cbba1560510779255bac9f4206a4a34a46",
+        "success": true,
+        "suites": 1,
+        "passed": 27,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-111",
+        "sha256": "44d985656baa1e1f4099472733e83172fcb91f8571c52531d96bd5237c531d02",
+        "success": true,
+        "suites": 1,
+        "passed": 8,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-112",
+        "sha256": "063416a1b57db790ecce59d8d35f613dbe706b0e2b0bb3b1bb438229bb8a381a",
+        "success": true,
+        "suites": 1,
+        "passed": 18,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-113",
+        "sha256": "2733d8b29eb5245a381b49b3054b1f2335185a29b1ddb4a100a2589e6ceeb131",
+        "success": true,
+        "suites": 1,
+        "passed": 25,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-114",
+        "sha256": "d52ad1799317ae60430eda37761e1030dc1f49562e3b8095c4bbf0bc9bea4cfd",
+        "success": true,
+        "suites": 1,
+        "passed": 5,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-115",
+        "sha256": "fdf1fc05aa192cb21e87102daa58c2be89e77645adf5d5f7c71fd3d456f1ffed",
+        "success": true,
+        "suites": 1,
+        "passed": 15,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-116",
+        "sha256": "79edb50fa61383e5e8346eee6c2a9a66a429c1263879ca6dd611beb4f2b70a09",
+        "success": true,
+        "suites": 1,
+        "passed": 4,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-117",
+        "sha256": "1a5776a2335edb5a17f8225ea676413b61dfff1903fde7fea8ae3d24be9789ff",
+        "success": true,
+        "suites": 1,
+        "passed": 5,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-118",
+        "sha256": "1f9dca1af9dee992d45156966f762b9ea57ae9db1555be2795478c21fee9100e",
+        "success": true,
+        "suites": 1,
+        "passed": 1,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-119",
+        "sha256": "bb14a582c8c5131d1f57321b1f6d94ab7e885b1cb436248665dbc023514efc80",
+        "success": true,
+        "suites": 1,
+        "passed": 2,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-120",
+        "sha256": "c63040198a0f5f3dc696df9cdc00ceaf820f86177b1693629dc3ae436becdf1f",
+        "success": true,
+        "suites": 1,
+        "passed": 1,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-121",
+        "sha256": "8363bd679fc8f03a0a2270f6744cc3bec08bc140f600975dd8212e836feed595",
+        "success": true,
+        "suites": 1,
+        "passed": 39,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-122",
+        "sha256": "b6d1145ce18868496f6544a84556186b84f64e5941c2ebae4a54e2da838849ef",
+        "success": true,
+        "suites": 1,
+        "passed": 6,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-123",
+        "sha256": "af2c1c94faa13f95dbd18486a01ad5cf066ac86efdf24a10e169169aa00a12d1",
+        "success": true,
+        "suites": 1,
+        "passed": 6,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-124",
+        "sha256": "ba0d889b9ef064c6a9e6340767a6e4ea7d8c4ebf42270a3fd82870106a247904",
+        "success": true,
+        "suites": 1,
+        "passed": 27,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-125",
+        "sha256": "1f9a09bc068ca1c7204ebd84c3725ab323888c37b1e22c65e9e426571082147b",
+        "success": true,
+        "suites": 1,
+        "passed": 5,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-126",
+        "sha256": "c4930495380dd96855dc54ac4699375e26723615fa27df364dcb78fc5e595c8a",
+        "success": true,
+        "suites": 1,
+        "passed": 9,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-127",
+        "sha256": "1b5a70f4c403a03134c89acd5003b8346ff39ac5d4d1b5f8f29b7204fe57df3a",
+        "success": true,
+        "suites": 1,
+        "passed": 2,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-128",
+        "sha256": "ecdcd001aaf36e181c80aff34571eb2ca7d29a501df6f73e0cc7cdd4efcd3adc",
+        "success": true,
+        "suites": 1,
+        "passed": 51,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-129",
+        "sha256": "fa3e3308890ba25ae0abdece6c4a344b5fa36dc7e72786ca00d3d979c6ccf16c",
+        "success": true,
+        "suites": 1,
+        "passed": 7,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-130",
+        "sha256": "8f057884f8704aaf0a8a29d86104202881c6f40cfb434d8c9776b9aaabf27431",
+        "success": true,
+        "suites": 1,
+        "passed": 31,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-131",
+        "sha256": "fe3e1ca43b06e75761464a1e480bca05c507f97acb6d7acfa0ae22d5b3ebd9b0",
+        "success": true,
+        "suites": 1,
+        "passed": 26,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-132",
+        "sha256": "d5665aa37feb3420a1b0491812b1212d1c8951a25b7e1dae4ce4c55f3af6556b",
+        "success": true,
+        "suites": 1,
+        "passed": 22,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-133",
+        "sha256": "11582156ccd4a50991f7f99d9c2e09b29b7818ca80da0968d24305362d53f324",
+        "success": true,
+        "suites": 1,
+        "passed": 9,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-134",
+        "sha256": "b5483d2d55431fbe009c058c00e8672ef4eeda1bbc8986ce4d1579d9a8e408e2",
+        "success": true,
+        "suites": 1,
+        "passed": 51,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-135",
+        "sha256": "0467b9cd9d0c2d8c53d2d6c993a2874a92a3185e2dc8f7691a6d3bcdbcf36701",
+        "success": true,
+        "suites": 1,
+        "passed": 4,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-136",
+        "sha256": "dbed43f84f22ff007adfcbc7c5f3c5fbe6e64bc589616c734e8f9a397dbef339",
+        "success": true,
+        "suites": 1,
+        "passed": 20,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-137",
+        "sha256": "817101e2a9b9682b551ae189d4324e80c693fde26650f13ce2ca79d9eeb60d13",
+        "success": true,
+        "suites": 1,
+        "passed": 7,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-138",
+        "sha256": "852b89346c428cf70aea04730fb866add1dcec204bf0ce4f4dbbffa9772f6447",
+        "success": true,
+        "suites": 1,
+        "passed": 3,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-139",
+        "sha256": "da8b584b41adab45a1f19cb1f4fe21ad0da6680204ee3c6acccfe893d0c59342",
+        "success": true,
+        "suites": 1,
+        "passed": 23,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-140",
+        "sha256": "1b80643f4e902873c904361d7045b48471839de3fa5b0885db57ecbd67f68081",
+        "success": true,
+        "suites": 1,
+        "passed": 19,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-141",
+        "sha256": "51de08b38aca5ed2aa4c7574245b7d44662fb5b3d7a959ec3b2b5311b61077cf",
+        "success": true,
+        "suites": 1,
+        "passed": 18,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-142",
+        "sha256": "53730bf2106d86dacf147209feac1456d7cfae2268b87ee74c5c113ed1d8a3ba",
+        "success": true,
+        "suites": 1,
+        "passed": 10,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-143",
+        "sha256": "dc340c1ac78be28be3568b4effd572ca22e6cc19338088beeb062c22ab694e02",
+        "success": true,
+        "suites": 1,
+        "passed": 8,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-144",
+        "sha256": "73c7e62e264254f3da6b880e69a9687e7e544283ff549114d208d7f965317bb3",
+        "success": true,
+        "suites": 1,
+        "passed": 16,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-145",
+        "sha256": "27bfefcaa3611cd69db22dd88720d4c466d06ce8afad8f8f7d268997e0965fe1",
+        "success": true,
+        "suites": 1,
+        "passed": 6,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-146",
+        "sha256": "45142d79434668c1c8bdec7314e1d7b69d340fefe474fac697dbf04ccb9a4547",
+        "success": true,
+        "suites": 1,
+        "passed": 17,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-147",
+        "sha256": "0dc94fe17419909e71730d3de721217cbfa56f01f7d100e6e47d84ccbe37b06a",
+        "success": true,
+        "suites": 1,
+        "passed": 49,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-148",
+        "sha256": "a35bec2fba214f427fac6dfd715bf28b614a5f914949b68b5241755c5b485bd6",
+        "success": true,
+        "suites": 1,
+        "passed": 14,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-149",
+        "sha256": "cf04d0b67e7fd16574db27c571a9c80c660998c447959d2a5eba45258d06dc6f",
+        "success": true,
+        "suites": 1,
+        "passed": 8,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-150",
+        "sha256": "adb23fa2631a5028931ea97099c7220408c94f29005c2e6b62120650aab5d307",
+        "success": true,
+        "suites": 1,
+        "passed": 3,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-151",
+        "sha256": "8843261c45d5ac43e9abb81aef581eec5f699e9866587a1ede5f07d1c26aa527",
+        "success": true,
+        "suites": 1,
+        "passed": 6,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-152",
+        "sha256": "1601b062d2f49e86862dc5720a6df9db8efe2917638c02a3f9870761a293b2cc",
+        "success": true,
+        "suites": 1,
+        "passed": 4,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-153",
+        "sha256": "355b3c35833b389ec33f01f3ed7d32e164f1e4c4ce0008d85860731dd20a472b",
+        "success": true,
+        "suites": 1,
+        "passed": 2,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-154",
+        "sha256": "bfbc6d609699e9c5d633ec21852b4e529871e88baf288e334c4eea1764b8c23e",
+        "success": true,
+        "suites": 1,
+        "passed": 4,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-155",
+        "sha256": "d5ea21e93e7310d1172e49faf3b2703a7f475946673dbfc7e3c28338bab99601",
+        "success": true,
+        "suites": 1,
+        "passed": 29,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-156",
+        "sha256": "799f7b30fbb970f81ac0571fdf44eb7cd445decaecaec6218135562e8e3a7f79",
+        "success": true,
+        "suites": 1,
+        "passed": 8,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-157",
+        "sha256": "e379476b6bee35080f6c8aea17eb952638794036517328ba8196ef1bad95b531",
+        "success": true,
+        "suites": 1,
+        "passed": 1,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-158",
+        "sha256": "41fa3a4a95f079573d771757311b7a588ec99e158c15f80ee95dee00babb6bfe",
+        "success": true,
+        "suites": 1,
+        "passed": 3,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-159",
+        "sha256": "ef3d7a2664b59bf81aadab190e48d879fb245714eec08a1ad50a0e96fcea82cc",
+        "success": true,
+        "suites": 1,
+        "passed": 1,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "fresh-160",
+        "sha256": "144ee0a44caa7109d0ae464d3c2c628572c48393e496bbba8af10a5ef6d67de6",
+        "success": true,
+        "suites": 1,
+        "passed": 7,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-001",
+        "sha256": "f81c176d2e02a9dd9fb30e08ac5cbc5ccbfcd88955e4148ca52be0d0003cd1be",
+        "success": true,
+        "suites": 1,
+        "passed": 958,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-002",
+        "sha256": "42956da5c301f9eb1a466c5ceacf7a7641bdb890c5cf94998afd9bfbf5da7ebc",
+        "success": true,
+        "suites": 1,
+        "passed": 43,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-003",
+        "sha256": "5d821e0f5622b1e70fd4e934fc372f7f459b9e801b1fa97161480c83296b3d7d",
+        "success": true,
+        "suites": 1,
+        "passed": 19,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-004",
+        "sha256": "f27468a53f9c0b5791e2b1967590db4b2054a17810a8c56df9f1c4a7374b9b7a",
+        "success": true,
+        "suites": 1,
+        "passed": 27,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-005",
+        "sha256": "97dac3ff8a3f339685ebd5ec7360aec7550b84766752ba286a6bf867fbb4e0ac",
+        "success": true,
+        "suites": 1,
+        "passed": 18,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-006",
+        "sha256": "9b64ab84542aaf05d807bb5cf6b91e5e09a8fd25a83b81554c44c94238bd7083",
+        "success": true,
+        "suites": 1,
+        "passed": 35,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-007",
+        "sha256": "ab512190a6e15394c2fdd9fde0c3b9938a577e39f3016968565dc5fea21bfcc0",
+        "success": true,
+        "suites": 1,
+        "passed": 19,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-008",
+        "sha256": "b1d3bf17bc37e07eeed167aa1f975dc59bf7f01130c17f1ebe46b91d619cd9dd",
+        "success": true,
+        "suites": 1,
+        "passed": 18,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-009",
+        "sha256": "8eb7b78e768a9e12dd7dba5b3caab5701541f2e615fe0b3a3ec4fc9bed1a586c",
+        "success": true,
+        "suites": 1,
+        "passed": 27,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-010",
+        "sha256": "0fbe55ea9cdc11f61dab82ee733feb4fcd7b46660b92f6b2eb76a36bea7c71b1",
+        "success": true,
+        "suites": 1,
+        "passed": 14,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-011",
+        "sha256": "1a00388d84f39460087732ef76ec76c197320c87ca46aac68f16194145ed3a40",
+        "success": true,
+        "suites": 1,
+        "passed": 6,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-012",
+        "sha256": "fde04dd1130cd405b2fcf1cd2406b1f78f646bdf8c19451020e15ee0e6ca1dc0",
+        "success": true,
+        "suites": 1,
+        "passed": 21,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-013",
+        "sha256": "e14dd61681e5d1cf68040ebde73d948d9957246195ab5a2380ad5fdaba119272",
+        "success": true,
+        "suites": 1,
+        "passed": 16,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-014",
+        "sha256": "24641f6c04a6c5d59de8502a798e2df932a7293ff629cd37a0f93aaed25ad52b",
+        "success": true,
+        "suites": 1,
+        "passed": 9,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-015",
+        "sha256": "a2402fb2b0327b71fb73a5232435c566d801f141a4e2657527a5a500fa01985c",
+        "success": true,
+        "suites": 1,
+        "passed": 11,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-016",
+        "sha256": "3ef781570f90e912cdce6dc56fdea53e4805fb9df658c1872441c9c7c38b2f18",
+        "success": true,
+        "suites": 1,
+        "passed": 10,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-017",
+        "sha256": "15f5327d5b07461bce628383ae26f3fa921c590df18012fb4e2793702f3121ef",
+        "success": true,
+        "suites": 1,
+        "passed": 8,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-018",
+        "sha256": "b5e326142c2efc72fdb51ffdcfc65f24eda681932f76ca9279c96c2426becc5d",
+        "success": true,
+        "suites": 1,
+        "passed": 13,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-019",
+        "sha256": "6bee4a10bcb36ecaf58ccd1703fec8fe3071fa5adc9926cca2f56b28b658926b",
+        "success": true,
+        "suites": 1,
+        "passed": 18,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-020",
+        "sha256": "1b15d48e6f405762fc551f61200884c698d809d0472e88dd2cc5ba5c67e0cebc",
+        "success": true,
+        "suites": 1,
+        "passed": 19,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-021",
+        "sha256": "7af9b190d0728565756124db995cbfd395df6cca585b6790c630075eb8774c00",
+        "success": true,
+        "suites": 1,
+        "passed": 18,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-022",
+        "sha256": "e2ebb6d4e453b321ad8553498cde956d9c8022571aa643f514a0375510b9616e",
+        "success": true,
+        "suites": 1,
+        "passed": 11,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-023",
+        "sha256": "e2ea7c37f7137933b791c69726f6e4409b45775be7b0d50f8e984a95db3d811c",
+        "success": true,
+        "suites": 1,
+        "passed": 18,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-024",
+        "sha256": "cacadca6737cb51aeed392975e4091b8f606164ac957413e20da28814189bee7",
+        "success": true,
+        "suites": 1,
+        "passed": 21,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-025",
+        "sha256": "639198bf4db12fc457d65641cb3fb4ce4558e812f232cc182761fc781ac7fcb4",
+        "success": true,
+        "suites": 1,
+        "passed": 8,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-026",
+        "sha256": "741f7f7f8e98f07cfba760f0c353a4fa92eb3c9db2c463decad1f52a11ac1983",
+        "success": true,
+        "suites": 1,
+        "passed": 12,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-027",
+        "sha256": "b4870aa0ce385a96007b45981244feff2044f8f675f7e533a4ca19fd02302cae",
+        "success": true,
+        "suites": 1,
+        "passed": 30,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-028",
+        "sha256": "ad177a1e197ce125c776b8dde8562903f8659696a139344146670662498e7c39",
+        "success": true,
+        "suites": 1,
+        "passed": 14,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-029",
+        "sha256": "6f4b9c79706f83387f5010ad8bccd1821b107e3499b4c6c0beed89773ec95844",
+        "success": true,
+        "suites": 1,
+        "passed": 9,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-030",
+        "sha256": "d975f31c5f449eb112bc3745078d451288ee1ed8a55b93bcf32ae900728672f6",
+        "success": true,
+        "suites": 1,
+        "passed": 172,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-031",
+        "sha256": "18eecc0a93cd447ba87b555b0a56d2422eb7c65798bbf5175e3cf6cd15ea231b",
+        "success": true,
+        "suites": 1,
+        "passed": 9,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-032",
+        "sha256": "25a484e98a5b355c0d9790e003decb15d52e1c3078ee69318be2c74d9a2f0c3f",
+        "success": true,
+        "suites": 1,
+        "passed": 8,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-033",
+        "sha256": "4215237a5067410b2e96be948218ede03aebfa0b36e9cc33c495df0dec0c546a",
+        "success": true,
+        "suites": 1,
+        "passed": 8,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-034",
+        "sha256": "b733001370cbc893a27187c8bc4e6f16517d6e9e5708079eca5244810c5ce51b",
+        "success": true,
+        "suites": 1,
+        "passed": 14,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-035",
+        "sha256": "b01ed08a4d942ec6115d7157e588776951c13eec2638c59bd03b841a0f030f86",
+        "success": true,
+        "suites": 1,
+        "passed": 32,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-036",
+        "sha256": "b017736548a718c83c58797cb4c0451ac0466eb20e0cbc06427c0747cf4c8169",
+        "success": true,
+        "suites": 1,
+        "passed": 12,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-037",
+        "sha256": "4b1d93374a9302dd77ddd1f88b7ce944365bb6c98180718256cb8de6ed233357",
+        "success": true,
+        "suites": 1,
+        "passed": 10,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-038",
+        "sha256": "0be33f9324362b7a87ff3bd026dda11e1c6b7d3f42375933364c16b7b1cbe292",
+        "success": true,
+        "suites": 1,
+        "passed": 6,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-039",
+        "sha256": "52744f990131d8b1d52b6efd009c35633914c9cbc4f2581c2fb7671c22b6c973",
+        "success": true,
+        "suites": 1,
+        "passed": 26,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-040",
+        "sha256": "1185a8e2d41879e76c002a75aa0a72012800269cbfb8d4e227055625721c5a9e",
+        "success": true,
+        "suites": 1,
+        "passed": 6,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-041",
+        "sha256": "8a5b75b2cccf4bd9d57b400f8c9da54e6823e5292b42fc8036a1989c9c2022f9",
+        "success": true,
+        "suites": 1,
+        "passed": 11,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-042",
+        "sha256": "5fa6a0c7c11c6eaafef925ca104cd7fbd3477a93d76eb35b7eff9344eb3157e8",
+        "success": true,
+        "suites": 1,
+        "passed": 10,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "isolated-043",
+        "sha256": "c37d284bcfe3c9eec56db521e32e0401b152c4a862254987128337c3f4fe6316",
+        "success": true,
+        "suites": 1,
+        "passed": 11,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "retry-001",
+        "sha256": "519fd5f3b7f9cd7ff11d9429e11aca0eb1b44d903b17437aab1c1374105b8eef",
+        "success": true,
+        "suites": 1,
+        "passed": 1,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "retry-002",
+        "sha256": "8a2821e782e64b4e7a2339bcc2c6e2323a8b51d9bcde72c106b0af8093fe73b5",
+        "success": true,
+        "suites": 1,
+        "passed": 6,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "retry-003",
+        "sha256": "bfe4c9c97cd779d9faf5ede7ede7231f32341dea8eb4b58670dc2362c2377138",
+        "success": true,
+        "suites": 1,
+        "passed": 23,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "retry-004",
+        "sha256": "ab402d669e7c7a3e034adc11d66cac244cd0893faaa4f8c1b6c5d86d3d4cbe87",
+        "success": true,
+        "suites": 1,
+        "passed": 9,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "retry-005",
+        "sha256": "1881bc12f15aa9225d7d00af71fd76c8fab5708bd027f8557f80fe76fb1834f9",
+        "success": true,
+        "suites": 1,
+        "passed": 2,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "retry-006",
+        "sha256": "b88b4a689f5eac4d18eee18ae8ff08270a83068ffb3ca8f7c7ddb0c11b707168",
+        "success": true,
+        "suites": 1,
+        "passed": 6,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "retry-007",
+        "sha256": "08bedfd65e951ee8801953662b86abb30d962529b7b1179a0bd504e7cbf39985",
+        "success": true,
+        "suites": 1,
+        "passed": 3,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "retry-008",
+        "sha256": "6f5b84922958a765395162893fe9919b632ab35355824a1a379a2e4bb5cdafac",
+        "success": true,
+        "suites": 1,
+        "passed": 3,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "retry-009",
+        "sha256": "b0df9b5bf80f6dad286a99b878bb002bc8f8f2f61951c2fb085130a9f3fd8b14",
+        "success": true,
+        "suites": 1,
+        "passed": 5,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "retry-010",
+        "sha256": "87b56aba4ad266538055c75f0bab7ec5df7b224bf34eb6b5ede2a72e504241d3",
+        "success": true,
+        "suites": 1,
+        "passed": 16,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "retry-011",
+        "sha256": "6ffa22d5f541db7217814b0e39aad2afc2706317f397f33e694e3d7787274b31",
+        "success": true,
+        "suites": 1,
+        "passed": 18,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "retry-012",
+        "sha256": "db1da8cc5ed268d6b5ce357596b250678cc7d0b1bdf84ea7804a5e3d0ec83d7f",
+        "success": true,
+        "suites": 1,
+        "passed": 21,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "retry-013",
+        "sha256": "93ef4373001de7c639419188b3ea0dcecbc192eb5774802c86aefc6402d6e29d",
+        "success": true,
+        "suites": 1,
+        "passed": 28,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "retry-014",
+        "sha256": "c0f2fa4dfc0a95aeb31986d218c48dbfdc48e45e4848ea94babb6e9e8efec90c",
+        "success": true,
+        "suites": 1,
+        "passed": 2,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "retry-015",
+        "sha256": "1398d7b8eb9f3c9d435c1b847b88cbe17fb74b11b91d4a67dbe9ce05f9b5166e",
+        "success": true,
+        "suites": 1,
+        "passed": 31,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "retry-016",
+        "sha256": "ce00c72797f998cdecad4c0752094f60c2e3a5b47fda6216cb2a95e2e43f78e6",
+        "success": true,
+        "suites": 1,
+        "passed": 74,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "retry-017",
+        "sha256": "55e941dad792cf3bed03386757419b140c76040aa2939b28211242561934e10d",
+        "success": true,
+        "suites": 1,
+        "passed": 50,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "retry-018",
+        "sha256": "0fc6ba21b0657424791cb0f74883f4d2c793b8e4ee650720a01ef103c6e50df9",
+        "success": true,
+        "suites": 1,
+        "passed": 7,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "retry-019",
+        "sha256": "1e0fa82855e07726bce8d5b9d81fb873291979f3c113c8af54e785f4b49e79f0",
+        "success": true,
+        "suites": 1,
+        "passed": 87,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "retry-020",
+        "sha256": "988ff8f92a6f84a50a57e75eaa3be9cab938f535308f8056ba0fd9de8b4a859f",
+        "success": true,
+        "suites": 1,
+        "passed": 40,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "retry-021",
+        "sha256": "a6314e33e607f4aa035980cc19249b49db084e90dcc8431c145d3e4e1b919f12",
+        "success": true,
+        "suites": 1,
+        "passed": 9,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "retry-022",
+        "sha256": "06dcbbd976ba4ad99a00e9a671147cbeb83d0cf29c7d252e065a610d0fa29bfb",
+        "success": true,
+        "suites": 1,
+        "passed": 12,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "retry-023",
+        "sha256": "4fd457cfedc73f1275b1b47f970b203c18c603cb20b574765df28a67e89e7958",
+        "success": true,
+        "suites": 1,
+        "passed": 44,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "retry-024",
+        "sha256": "a511379709f7bdc58bbb6f67dc1366fac2c248cc8cdf391f8d38e82a6de94186",
+        "success": true,
+        "suites": 1,
+        "passed": 69,
+        "failed": 0,
+        "pending": 0
+      },
+      {
+        "name": "retry-025",
+        "sha256": "3aa060421126877516cf1311a24360f390e83ec8fecf2dc9bfc58093238268eb",
+        "success": true,
+        "suites": 1,
+        "passed": 51,
+        "failed": 0,
+        "pending": 0
+      }
+    ]
+  },
+  "postgres": {
+    "readiness": {
+      "checks": 8,
+      "providerCalls": 0,
+      "sharedDatabaseMutations": 0,
+      "ownedTarget": "r6_ready_d5687d11e904",
+      "sourceUnchanged": true,
+      "fingerprint": "sha256:7c427b93f2e0a4c8ca48271faabbe07d641ee8a211d519364d6d0ea8002d3888",
+      "logSha256": "5e9fa63849c570a48fa4a4efdb0ee8131c679257e494fe982ee6534742d76645"
+    },
+    "durableCron": {
+      "checks": 15,
+      "providerCalls": 0,
+      "sharedDatabaseMutations": 0,
+      "fingerprint": "sha256:7c427b93f2e0a4c8ca48271faabbe07d641ee8a211d519364d6d0ea8002d3888",
+      "ownedTargets": [
+        "r6_cron_f1706ecb9239_fresh",
+        "r6_cron_f1706ecb9239_populated",
+        "r6_cron_f1706ecb9239_restored"
+      ],
+      "logSha256": "6c5d065f2d1f1b0ef38106aceffe5d339ef752eb5a233126f23f32454fd9f58c"
+    },
+    "method": "Explicit owned clones, canonical R5 base reverified, frozen49a forward application and complete effect-verified historical baseline only in readiness clone; no full historical replay/live ledger claim"
+  },
+  "standalone": {
+    "operatorCli": {
+      "passed": 9,
+      "logSha256": "95c4264b22af12519b89da6dce4687ad1a47934573242d2d45e4b44da01a88e3"
+    },
+    "canonicalFingerprint": {
+      "passed": 28,
+      "logSha256": "63d9c9850de569609915cacac8a8b1132dae3ac9d2dade3a4546282140f76de3",
+      "sqlAndFunctionBytesPreserved": true,
+      "pureBodySha256": "dc527119392dec62b3480964fc03a61820b3e74e3154ef91b9ab32bcbb7cfbd4",
+      "comparison": "Original terminal separator blank line omitted; all canonical SQL/function bytes retained"
+    }
+  },
+  "checks": [
+    {
+      "command": "npm run check",
+      "outcome": "passed",
+      "logSha256": "0fedab01a35ca9fca53fe6fd66268f14af56d83677404c554d736f962da99fb3"
+    },
+    {
+      "command": "npm run check:r6",
+      "outcome": "passed",
+      "logSha256": "68e094c1b46c8639af0f6b631a06958347fba5f7c39058b48f157e9147147a36"
+    },
+    {
+      "command": "npm run build (client/server before final server-only followups)",
+      "outcome": "passed",
+      "logSha256": "35e361e3c68ebd91d7931cda924f368c81dfe46db12945f5088ea814e10a5d61"
+    },
+    {
+      "command": "final esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+      "outcome": "passed",
+      "logSha256": "9da9e3532b2a2451f73b37722ac6e673dfc9b416947c35b0002021039aa654ec"
+    }
+  ],
+  "finalServerBundleSha256": "f90c28174a3c3ba3e806e3af426ab42dbebe5f9fedeb4583bd44c38626076247",
+  "migrations": {
+    "added": 0,
+    "edited": 0,
+    "frozen0049aSha256": "8b3aefa3997197b75345f726a9a05f62dcb0e8c5472c262f9326d81647760dfc",
+    "canonicalSchemaDigest": "sha256:7c427b93f2e0a4c8ca48271faabbe07d641ee8a211d519364d6d0ea8002d3888"
+  },
+  "failureHistory": [
+    "Missing-module failures preceded core implementation; no zero-test run is counted as a pass.",
+    "Initial hung-probe test needed to await actual physical completion; the bounded/single-flight assertions remain.",
+    "Real signal tests exposed post-response keep-alive sockets delaying closure; fixed without increasing deadlines.",
+    "New public probes required updated route/middleware/tenant inventories and actual served-public cases; exact security/parser order remains checked.",
+    "Initial native verifier supplied an unsupported log callback as a migration timeout override; normal validation refused it. Corrected invocation passes8 real checks.",
+    "Compiler failures in typed test adapters and a formatter-moved suppression were corrected without weakening runtime checks.",
+    "Bundled failing-first test reproduced exit1/FINGERPRINT_INVALID_CONNECTION from CLI entrypoint relocation. Exact pure-function/SQL extraction fixes it; canonical tests and real fingerprints remain unchanged.",
+    "HTTP failing-first tests reproduced pool cleanup overtaking a disconnected handler and late callback dispatch. Explicit per-app promise tracking and stopped destroyed-response admission fix them.",
+    "Long in-band run was interrupted after existing fixture timeouts. Completed fresh batches, isolated whole files and at most two fresh file processes provide final coverage. Whole failed files were rerun; no assertion or timeout was relaxed.",
+    "An initial private isolation planner accidentally included batch-plan.json; it failed before running tests and was corrected. No result is claimed for that failed planning attempt."
+  ],
+  "interruptedBroadLogSha256": "b70a9b29ce1ccaec400ab63a4b53a8f1207245cb854723e5b21262c55e0d2b67",
+  "notPerformed": [
+    "deployment/main or R4 merge",
+    "shared/live schema/data changes",
+    "provider/card/message calls",
+    "owner app4196 restart or signal",
+    "new client/device regression",
+    "external scheduler/monitor/probe/alert configuration",
+    "remote CI execution/sign-off"
+  ],
+  "remaining": [
+    "D9 entitlement/provenance and dunning approval/shared policy",
+    "restored real-target before/after entitlement report",
+    "actual Windcave UAT and professional release review",
+    "external scheduler/named alerts/platform probe and termination-grace configuration",
+    "rolling-restart and production-sized capacity rehearsal",
+    "canonical R4 integration and deferred R5 closeout"
+  ]
+}

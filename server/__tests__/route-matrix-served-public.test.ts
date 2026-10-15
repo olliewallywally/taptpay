@@ -95,6 +95,9 @@ async function cardReturn(ctx:ServedCtx,method:'get'|'post'){
 }
 
 const RECIPES: Record<string, OwnServedRecipe> = {
+  "GET /healthz":()=>({req:get('/healthz'),status:200,check:res=>{expect(res.body).toEqual({status:'ok'});expect(res.headers['cache-control']).toContain('no-store');}}),
+  // The harness has no DB or boot lifecycle; readiness must remain truthful.
+  "GET /readyz":()=>({req:get('/readyz'),status:503,check:res=>{expect(res.body).toEqual({status:'not_ready'});expect(res.headers['cache-control']).toContain('no-store');}}),
   // For crawlers, and Apple Pay's domain check.
   "GET /robots.txt": () => ({
     req: get("/robots.txt"), status: 200,
@@ -278,6 +281,8 @@ const SERVED = ownServedPairs(ROWS);
  */
 const ANYONE: OwnServedCaller[] = ["signed-out"];
 const SERVED_BY: Record<string, OwnServedCaller[]> = {
+  "GET /healthz":ANYONE,
+  "GET /readyz":ANYONE,
   "GET /robots.txt": ANYONE,
   "GET /sitemap.xml": ANYONE,
   "GET /.well-known/apple-developer-merchantid-domain-association": ANYONE,

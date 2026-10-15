@@ -138,7 +138,7 @@ export const SERVED_FAMILIES: Record<ServedFamily, { gate: MatrixGate; family: R
   "sign-in": { gate: "own", family: /^[A-Z]+ \/api\/(auth\/|admin\/auth\/login$|merchants\/signup$|team\/accept-invite$)/ },
   public: {
     gate: "own",
-    family: /^[A-Z]+ \/(robots\.txt|sitemap\.xml|\.well-known\/|nfc\/|uploads\/|api\/(merchants\/:id\/|nfc\/capabilities|windcave\/env|push\/(capabilities|vapid-key)|billing\/card\/callback|info-pack-leads))/,
+    family: /^[A-Z]+ \/(healthz$|readyz$|robots\.txt|sitemap\.xml|\.well-known\/|nfc\/|uploads\/|api\/(merchants\/:id\/|nfc\/capabilities|windcave\/env|push\/(capabilities|vapid-key)|billing\/card\/callback|info-pack-leads))/,
   },
   "retail-pay": { gate: "own", family: /^[A-Z]+ \/api\/(pay\/(t\/|return\/)|transactions\/:id|split-payments\/:id|windcave\/callback)/ },
   checkout: { gate: "own", family: /^[A-Z]+ \/api\/(checkout\/|trades\/quotes\/token\/)/ },

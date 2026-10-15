@@ -440,6 +440,8 @@ export function isNotificationWebhookRegistration(method: string, routePath: str
  * analysis passes independently recommended for this class of route.
  */
 export const PUBLIC_PATH_ALLOWLIST: Record<string, string> = {
+  "GET /healthz":"minimal dependency-free process liveness; no tenant or diagnostic data",
+  "GET /readyz":"minimal boot/config/DB/cached-schema readiness; no dependency details",
   // R3 retained factories: exact same public routes, with actual handler facts
   // followed across modules by route-facts.ts and reviewed in route-review.ts.
   "POST /api/pay/t/:token/session":"bearer token and durable retail attempt in server/payment-checkout-handlers.ts",

@@ -21,5 +21,8 @@ export function getCronCoordinator() {
 }
 export async function closeCronCoordinator() {
   coordinator?.stop();
+  await coordinator?.drain();
   await pool?.end();
 }
+export function stopCronCoordinator() { coordinator?.stop(); }
+export async function drainCronCoordinator() { await coordinator?.drain(); }

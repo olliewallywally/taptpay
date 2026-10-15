@@ -1,4 +1,5 @@
 import {logOperation} from "./structured-log";
+import {HTTP_WORK,HttpWorkTracker} from './http-work';
 /**
  * Router-level async safety net.
  *
@@ -136,11 +137,19 @@ export function wrapAsyncHandler<T extends AnyFunction>(handler: T): T {
   if (isMountableHandler(handler)) return handler;
 
   const guarded = function (this: unknown, ...args: unknown[]) {
+    const request=args[0];
+    const tracker=typeof request==='object'&&request!==null?Object.getOwnPropertyDescriptor(request,HTTP_WORK)?.value:undefined;
+    const work=tracker instanceof HttpWorkTracker?tracker:undefined;
+    // A callback may call next long after its client disconnected. During
+    // shutdown that must not initiate a new handler/provider command.
+    const response=args[1] as {destroyed?:boolean;writableEnded?:boolean}|undefined;
+    if(work?.draining&&(response?.destroyed||response?.writableEnded))return;
     // A synchronous throw is intentionally NOT caught here: Express's own
     // try/catch around the call already forwards it, and catching it would
     // change the error semantics of every sync handler in the app.
     const result = handler.apply(this, args);
     if (!isPromise(result)) return result;
+    work?.track(result);
 
     const next = args[2];
     if (typeof next !== "function") return result;

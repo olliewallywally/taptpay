@@ -1,4 +1,5 @@
 import {logOperation} from "./structured-log";
+import {startDrainingLoop,type StopWorker} from './draining-loop';
 import {randomUUID} from 'node:crypto';
 import {runWithOperationContext} from "./operation-context";
 import {config,PRODUCTION_WINDCAVE_ENDPOINT,UAT_WINDCAVE_ENDPOINT} from './config';
@@ -64,9 +65,9 @@ export function getSubscriptionPaymentRuntime(inbox?:DurablePaymentStorage):Subs
   return runtime={billing,card,context};
 }
 
-export function startSubscriptionPaymentLoop(service:SubscriptionPaymentRuntime,intervalMs=1000):()=>void {
-  let busy=false,stopped=false;
-  const tick=async()=>runWithOperationContext({jobId:randomUUID()},async()=>{if(busy||stopped)return;busy=true;try{await service.card.recoverActivations();await service.billing.reconcileDue();}
-    catch{logOperation("error","SUBSCRIPTION_RECONCILIATION_UNAVAILABLE");}finally{busy=false;}});
-  const timer=setInterval(()=>void tick(),intervalMs);timer.unref();return()=>{stopped=true;clearInterval(timer);};
+export function startSubscriptionPaymentLoop(service:SubscriptionPaymentRuntime,intervalMs=1000):StopWorker {
+  return startDrainingLoop(async canContinue=>runWithOperationContext({jobId:randomUUID()},async()=>{
+    try{await service.card.recoverActivations(10,canContinue);if(canContinue())await service.billing.reconcileDue(10,canContinue);}
+    catch{logOperation("error","SUBSCRIPTION_RECONCILIATION_UNAVAILABLE");}
+  }),intervalMs);
 }

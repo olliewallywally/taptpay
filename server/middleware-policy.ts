@@ -68,6 +68,14 @@ export const MIDDLEWARE_POLICY: Record<RegistrationFile, readonly MiddlewarePoli
       mounts: "inline function",
       when: "always",
       runtimeName: "<anonymous>",
+      purpose: "Reject new business requests while booting or draining, after public health/readiness probes.",
+      security: "Fixed no-store503 and Connection: close before body parsing or initiation. An explicit request-symbol tracker retains native handler promises after disconnect until bounded drain; late callbacks cannot dispatch a new handler on a destroyed response during drain. Tests without an injected lifecycle retain their explicit harness behavior.",
+    },
+    {
+      path: null,
+      mounts: "inline function",
+      when: "always",
+      runtimeName: "<anonymous>",
       purpose: "No caching and no referrer for bearer-addressed pages.",
       security:
         "/accept-invite, /pay|split|checkout|receipt/t/…, /pay/return/…, /r/…, /payment/result/… and /api/pay/t|return/… get " +
