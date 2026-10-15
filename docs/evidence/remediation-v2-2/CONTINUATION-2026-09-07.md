@@ -3216,3 +3216,19 @@ attempt. A decline-only session's receipt reopens on any arrival. An approval th
 recorded keeps its transaction ID and raises `PAYMENT_APPROVAL_NOT_RECORDED`. Full supersession is
 deferred to a new UAT checklist case or the owner's call. R3 durability 92 (the reopen check is
 mutation-checked); http 24, delivery 11, commands 15, subscriptions 20. Server 224/5,149.
+
+## 33. October 15 — T-3 full decline supersession (Claude)
+
+The owner decided to build T-3's full supersession now. ADR revision 3 was approved with
+conditions C1–C10 in review pass 2. The implementation was approved with conditions D1–D6 in
+pass 3, all resolved.
+
+Migration 0050 (applied nowhere) and both finalizers now record a later verified approval in a
+session that has a recorded decline. The decline is kept as its own event. Every other case stays
+a conflict with the `PAYMENT_APPROVAL_NOT_RECORDED` alert. 0049 was revised, before being applied
+anywhere, to keep 0037's constraint name. Owner runbook for 0049–0050:
+`docs/operations/runbook-2026-10-15-apply-0049-0050.md`.
+
+Record: [T3-2026-10-15](r4/T3-2026-10-15.md). Server 224/5,150, client 134/1,507. PostgreSQL:
+R3 114/15/11/24/20, cutover 5, T-3 upgrade 4, R4-T2 28, R4-T3 14, S2a 25, R2-T4 12, R2-T7 7.
+Nothing deployed. R4-T3 part 2 is next.

@@ -19,6 +19,11 @@ describe('domain transition authority and terminality',()=>{
     expect(evaluateTransition(propertyInvoiceGraph,'paid_external','additionalCapture','processor')).toEqual({kind:'claimed'});
     expect(evaluateTransition(propertyInvoiceGraph,'voided','approve','merchant')).toEqual({kind:'conflict'});
   });
+  test('T-3: only a processor supersedes a decline with an approval; nothing supersedes an approval or a cancellation',()=>{
+    expect(evaluateTransition(paymentAttemptGraph,'declined','supersedeDecline','processor')).toEqual({kind:'claimed'});
+    expect(evaluateTransition(paymentAttemptGraph,'declined','supersedeDecline','merchant')).toEqual({kind:'conflict'});
+    for(const state of ['approved','cancelled','ready','finalizing']) expect(evaluateTransition(paymentAttemptGraph,state,'supersedeDecline','processor').kind).not.toBe('claimed');
+  });
   test('ready or finalizing attempt cannot be abandoned by lease expiry',()=>{
     for(const state of ['ready','finalizing']) expect(evaluateTransition(paymentAttemptGraph,state,'abandonUnsent','system')).toEqual({kind:'conflict'});
     expect(evaluateTransition(paymentAttemptGraph,'claiming','abandonUnsent','system')).toEqual({kind:'claimed'});

@@ -1,9 +1,13 @@
 # ADR — T-3: a later approval in a session supersedes its recorded decline (2026-10-15)
 
-Status: **revision 3, proposed, under independent review (pass 2).** The owner decided on
-2026-10-15 to build full supersession now ([decision](2026-10-15-t3-build-full-supersession-owner-decision.md)).
-Revision 2's interim guarantee (below) stays as the safety net. Revision 1 (at the end, unchanged)
-was refused by [review pass 1](../evidence/remediation-v2-2/r4/T3-review-pass-1-2026-10-15.md).
+Status: **implemented** ([evidence](../evidence/remediation-v2-2/r4/T3-2026-10-15.md); implementation
+review [pass 3](../evidence/remediation-v2-2/r4/T3-review-pass-3-2026-10-15.md), conditions D1–D6 resolved).
+Revision 3 was **approved with conditions C1–C10** in
+[review pass 2](../evidence/remediation-v2-2/r4/T3-review-pass-2-2026-10-15.md). The conditions are
+part of this design; how each is met is under "Conditions" below. The owner decided on 2026-10-15
+to build full supersession now ([decision](2026-10-15-t3-build-full-supersession-owner-decision.md)).
+Revision 2's interim guarantee stays as the safety net. Revision 1 (at the end, unchanged) was refused
+by [review pass 1](../evidence/remediation-v2-2/r4/T3-review-pass-1-2026-10-15.md).
 
 ## Revision 3 (2026-10-15)
 
@@ -74,6 +78,25 @@ Each numbered rule answers review pass 1's condition of the same number.
    - a second decline is `reused`;
    - each forbidden database write refused directly;
    - pre-change reconcile includes a decline-only session.
+
+### Conditions from review pass 2
+
+- **C1** the approval's ID is looked up in `provider_transaction_claims` before any write; held by
+  anything but this session's own claims, the result is `conflict`.
+- **C2** 0050 backfills the event column from the binding and sets it NOT NULL; the deferred
+  `payment_binding_supersession_check` is specified as the review states.
+- **C3** the quiet decline is triggered by the target being paid and writes only B's attempt,
+  binding and event.
+- **C4/C5/C10** supersession is a compare-and-set from `declined`, only in the reconciliation
+  branch; the terminal guards act only on a state change and freeze `approved` and `cancelled`.
+- **C6** settlement events refuse UPDATE and DELETE.
+- **C7** live sessions first, then decline-only sessions.
+- **C8** both finalizers map the new constraint names to `conflict`; the worker's alert therefore
+  fires for any approval the database refuses.
+- **C9** the approved event names the decline it supersedes (`supersedes_event_id`). Its outbox
+  rows whose targets are not yet prepared are marked `complete`; rows whose targets are already
+  prepared (SSE included) are delivered, since a notice may already be on its way. The link on the
+  approved event is the recorded reason.
 
 ### Unchanged
 

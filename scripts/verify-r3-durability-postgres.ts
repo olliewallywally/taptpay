@@ -860,15 +860,226 @@ try {
       await assert.rejects(zoned.query("UPDATE payment_attempts SET send_started_at=lease_expires_at AT TIME ZONE 'UTC'+interval '1 second' WHERE id=$1",[claim.attempt.id]),{code:'23514'});
     } finally {await zoned.end();}
   });
-  await check('T-3 interim: a second card\'s notification within a minute of a recorded decline is still processed and kept',async()=>{
+  await check('T-3 interim: a second card\'s notification within a minute of a recorded decline is still processed and recorded',async()=>{
     const {sale,sessionId}=await retailSession();const binding=(await one.resolveSession(sessionId))!;
     await one.receive(sessionId,'fprn',now);await worker(one,evidence(binding,'declined')).runOne(randomUUID());
     assert.equal((await original.getTransaction(sale.id))?.status,'failed');
     const approval={...evidence(binding,'approved'),transactionId:`tx-${randomUUID()}`};
     await one.receive(sessionId,'fprn',now);await worker(one,approval).runOne(randomUUID());
+    // Since T-3's supersession (migration 0050) the approval is recorded, not only alerted.
     const inbox=(await pool.query("SELECT status,last_error_code,observed_transaction_id FROM payment_notification_inbox WHERE session_id=$1 AND kind='fprn'",[sessionId])).rows[0];
-    assert.deepEqual(inbox,{status:'dead_letter',last_error_code:'settlement_conflict',observed_transaction_id:approval.transactionId});
-    assert.equal((await pool.query('SELECT last_reconciliation_code FROM payment_attempts WHERE transaction_id=$1',[sale.id])).rows[0].last_reconciliation_code,'settlement_conflict:approved');
+    assert.deepEqual(inbox,{status:'complete',last_error_code:null,observed_transaction_id:approval.transactionId});
+    assert.equal((await original.getTransaction(sale.id))?.status,'completed');
+  });
+  // T-3 (docs/decisions/2026-10-15-t3-decline-supersession.md): a later verified approval in the same
+  // session supersedes the recorded decline; nothing else is superseded.
+  const retailBound=async(split=false)=>{
+    const sale=await original.createTransaction({merchantId:merchant,itemName:'T-3 synthetic',price:'10.00',status:'pending',paymentMethod:'qr_code',splitEnabled:false});
+    if(split)assert.ok(await original.createBillSplit(sale.id,2));
+    const claim=await retail.claim({transactionId:sale.id,merchantId:merchant,shareIndex:split?1:0,idempotencyKey:randomUUID()});assert.equal(claim.kind,'claimed');if(claim.kind!=='claimed')throw Error('fixture');
+    const expected=await one.prepareRetailExpectation({paymentAttemptId:claim.attempt.id,merchantId:merchant,currency:'NZD',environment:'uat',providerAccount:'synthetic-account'},now);assert.ok(expected);
+    const sessionId=`s-${randomUUID()}`;assert.equal((await retail.attachSession({attemptId:claim.attempt.id,processorSessionId:sessionId,processorXId:expected!.processorXId,rawReturnState:randomBytes(32).toString('base64url')})).kind,'attached');
+    assert.equal(await one.bindRetailSession({...expected!,paymentAttemptId:claim.attempt.id,sessionId},now),true);
+    const binding=await one.resolveSession(sessionId);assert.ok(binding);
+    return {sale,sessionId,binding:binding!,attemptId:claim.attempt.id};
+  };
+  const settle=async(sessionId:string,kind:'fprn'|'browser'|'poll',proof:VerifiedOutcome)=>{await one.receive(sessionId,kind,now);await worker(one,proof).runOne(randomUUID());
+    return (await pool.query('SELECT status,last_error_code FROM payment_notification_inbox WHERE session_id=$1 AND kind=$2',[sessionId,kind])).rows[0];};
+  const events=async(sessionId:string)=>(await pool.query(`SELECT e.outcome,(SELECT count(*)::int FROM payment_delivery_outbox o WHERE o.event_id=e.id) AS outbox
+    FROM payment_settlement_events e WHERE e.session_id=$1 ORDER BY e.created_at,e.outcome DESC`,[sessionId])).rows;
+  for(const split of [false,true])await check(`T-3: retail ${split?'split share':'sale'}: a later approval in the session supersedes its decline, once`,async()=>{
+    const {sale,sessionId,binding,attemptId}=await retailBound(split);
+    const usage=async()=>Number((await pool.query('SELECT total_lifetime_transactions FROM merchant_subscriptions WHERE merchant_id=$1',[merchant])).rows[0]?.total_lifetime_transactions??0);
+    assert.equal((await settle(sessionId,'fprn',evidence(binding,'declined'))).status,'complete');
+    const before=await usage();
+    const approval={...evidence(binding,'approved'),transactionId:`tx-${randomUUID()}`};
+    assert.deepEqual(await settle(sessionId,'browser',approval),{status:'complete',last_error_code:null});
+    const attempt=(await pool.query('SELECT state,provider_transaction_id FROM payment_attempts WHERE id=$1',[attemptId])).rows[0];
+    assert.deepEqual(attempt,{state:'approved',provider_transaction_id:approval.transactionId});
+    assert.equal((await pool.query('SELECT provider_transaction_id FROM payment_session_bindings WHERE session_id=$1',[sessionId])).rows[0].provider_transaction_id,approval.transactionId);
+    if(split){const share=(await pool.query('SELECT status,windcave_transaction_id FROM split_payments WHERE transaction_id=$1 AND split_index=1',[sale.id])).rows[0];
+      assert.deepEqual(share,{status:'completed',windcave_transaction_id:approval.transactionId});
+      assert.equal((await original.getTransaction(sale.id))?.completedSplits,1);}
+    else assert.equal((await original.getTransaction(sale.id))?.status,'completed');
+    assert.deepEqual(await events(sessionId),[{outcome:'declined',outbox:1},{outcome:'approved',outbox:2}]);
+    assert.equal(await usage(),before+1);
+    await one.receive(sessionId,'poll',now);await worker(one,approval).runOne(randomUUID());
+    assert.deepEqual(await events(sessionId),[{outcome:'declined',outbox:1},{outcome:'approved',outbox:2}],'a replayed approval is reused');
+    assert.equal(await usage(),before+1);
+  });
+  await check('T-3: a second decline in the session is reused, whichever declined card it names',async()=>{
+    const {sessionId,binding}=await retailBound();
+    await settle(sessionId,'fprn',evidence(binding,'declined'));
+    assert.deepEqual(await settle(sessionId,'browser',{...evidence(binding,'declined'),transactionId:`tx-${randomUUID()}`}),{status:'complete',last_error_code:null});
+    assert.deepEqual(await events(sessionId),[{outcome:'declined',outbox:1}]);
+  });
+  await check('T-3: an approval after another attempt paid the sale stays a reviewed conflict',async()=>{
+    const first=await retailBound();
+    await settle(first.sessionId,'fprn',evidence(first.binding,'declined'));
+    const claim=await retail.claim({transactionId:first.sale.id,merchantId:merchant,shareIndex:0,idempotencyKey:randomUUID()});assert.equal(claim.kind,'claimed');if(claim.kind!=='claimed')throw Error('fixture');
+    const expected=await one.prepareRetailExpectation({paymentAttemptId:claim.attempt.id,merchantId:merchant,currency:'NZD',environment:'uat',providerAccount:'synthetic-account'},now);assert.ok(expected);
+    const second=`s-${randomUUID()}`;assert.equal((await retail.attachSession({attemptId:claim.attempt.id,processorSessionId:second,processorXId:expected!.processorXId,rawReturnState:randomBytes(32).toString('base64url')})).kind,'attached');
+    assert.equal(await one.bindRetailSession({...expected!,paymentAttemptId:claim.attempt.id,sessionId:second},now),true);
+    await settle(second,'fprn',evidence((await one.resolveSession(second))!,'approved'));
+    assert.equal((await original.getTransaction(first.sale.id))?.status,'completed');
+    assert.deepEqual(await settle(first.sessionId,'browser',{...evidence(first.binding,'approved'),transactionId:`tx-${randomUUID()}`}),{status:'dead_letter',last_error_code:'settlement_conflict'});
+    assert.equal((await pool.query('SELECT state FROM payment_attempts WHERE id=$1',[first.attemptId])).rows[0].state,'declined');
+  });
+  for(const vertical of ['property','trades'] as const)await check(`T-3: ${vertical}: a later approval in the session supersedes its decline, once`,async()=>{
+    const pay=await opened(vertical);
+    assert.equal((await settle(pay.sessionId,'fprn',evidence(pay.binding,'declined'))).status,'complete');
+    assert.notEqual((await row(vertical,pay.input.invoiceId)).status,'paid');
+    const approval={...evidence(pay.binding,'approved'),transactionId:`tx-${randomUUID()}`};
+    assert.deepEqual(await settle(pay.sessionId,'browser',approval),{status:'complete',last_error_code:null});
+    assert.equal((await row(vertical,pay.input.invoiceId)).status,'paid');
+    assert.equal((await pool.query('SELECT state,outcome FROM invoice_payment_attempts WHERE id=$1',[pay.attempt.id])).rows[0].state,'approved');
+    assert.deepEqual(await events(pay.sessionId),[{outcome:'declined',outbox:1},{outcome:'approved',outbox:2}]);
+    await one.receive(pay.sessionId,'poll',now);await worker(one,approval).runOne(randomUUID());
+    assert.deepEqual(await events(pay.sessionId),[{outcome:'declined',outbox:1},{outcome:'approved',outbox:2}]);
+  });
+  await check('T-3: the database refuses every other supersession directly',async()=>{
+    const {sessionId,binding,attemptId}=await retailBound();
+    await settle(sessionId,'fprn',evidence(binding,'declined'));
+    await settle(sessionId,'browser',{...evidence(binding,'approved'),transactionId:`tx-${randomUUID()}`});
+    const ev=(await pool.query("SELECT merchant_id,amount_cents FROM payment_settlement_events WHERE session_id=$1 AND outcome='approved'",[sessionId])).rows[0];
+    // The ordering trigger refuses these before the unique indexes would.
+    await assert.rejects(pool.query(`INSERT INTO payment_settlement_events(session_id,merchant_id,outcome,amount_cents,created_at,provider_transaction_id) VALUES ($1,$2,'approved',$3,now(),$4)`,[sessionId,ev.merchant_id,ev.amount_cents,`tx-${randomUUID()}`]),{code:'23514'});
+    await assert.rejects(pool.query(`INSERT INTO payment_settlement_events(session_id,merchant_id,outcome,amount_cents,created_at,provider_transaction_id) VALUES ($1,$2,'cancelled',$3,now(),$4)`,[sessionId,ev.merchant_id,ev.amount_cents,`tx-${randomUUID()}`]),{code:'23514'});
+    // Refused by the registry (its one supersession claim is taken) or, failing that, at commit.
+    await assert.rejects(pool.query('UPDATE payment_session_bindings SET provider_transaction_id=$2 WHERE session_id=$1',[sessionId,`tx-${randomUUID()}`]),(error:any)=>['23505','23514'].includes(error.code));
+    await assert.rejects(pool.query('UPDATE payment_attempts SET provider_transaction_id=$2 WHERE id=$1',[attemptId,`tx-${randomUUID()}`]),{code:'23514'});
+    const lone=await retailBound();await settle(lone.sessionId,'fprn',evidence(lone.binding,'declined'));
+    await assert.rejects(pool.query('UPDATE payment_session_bindings SET provider_transaction_id=$2 WHERE session_id=$1',[lone.sessionId,`tx-${randomUUID()}`]),
+      (error:any)=>error.code==='23514' && error.constraint==='payment_binding_supersession_check','a binding change with no supersession is refused at commit');
+    const other=await retailBound();await settle(other.sessionId,'fprn',evidence(other.binding,'approved'));
+    const ev2=(await pool.query("SELECT merchant_id,amount_cents FROM payment_settlement_events WHERE session_id=$1",[other.sessionId])).rows[0];
+    await assert.rejects(pool.query(`INSERT INTO payment_settlement_events(session_id,merchant_id,outcome,amount_cents,created_at,provider_transaction_id) VALUES ($1,$2,'declined',$3,now(),$4)`,[other.sessionId,ev2.merchant_id,ev2.amount_cents,`tx-${randomUUID()}`]),{code:'23514'});
+    await assert.rejects(pool.query("UPDATE payment_attempts SET state='declined',outcome='declined' WHERE id=$1",[(await one.resolveSession(other.sessionId))!.paymentAttemptId]),{code:'23514'});
+  });
+  const bindNew=async(saleId:number,shareIndex=0)=>{
+    const claim=await retail.claim({transactionId:saleId,merchantId:merchant,shareIndex,idempotencyKey:randomUUID()});assert.equal(claim.kind,'claimed');if(claim.kind!=='claimed')throw Error('fixture');
+    const expected=await one.prepareRetailExpectation({paymentAttemptId:claim.attempt.id,merchantId:merchant,currency:'NZD',environment:'uat',providerAccount:'synthetic-account'},now);assert.ok(expected);
+    const sessionId=`s-${randomUUID()}`;assert.equal((await retail.attachSession({attemptId:claim.attempt.id,processorSessionId:sessionId,processorXId:expected!.processorXId,rawReturnState:randomBytes(32).toString('base64url')})).kind,'attached');
+    assert.equal(await one.bindRetailSession({...expected!,paymentAttemptId:claim.attempt.id,sessionId},now),true);
+    return {sessionId,binding:(await one.resolveSession(sessionId))!,attemptId:claim.attempt.id};
+  };
+  await check('T-3: the registry keeps both cards, each event keeps its card, and the decline is never announced after the receipt',async()=>{
+    const {sessionId,binding}=await retailBound();
+    const decline={...evidence(binding,'declined'),transactionId:`tx-${randomUUID()}`},approval={...evidence(binding,'approved'),transactionId:`tx-${randomUUID()}`};
+    await settle(sessionId,'fprn',decline);await settle(sessionId,'browser',approval);
+    const claims=(await pool.query('SELECT provider_transaction_id FROM provider_transaction_claims WHERE binding_session_id=$1 ORDER BY provider_transaction_id',[sessionId])).rows.map(r=>r.provider_transaction_id);
+    assert.deepEqual(claims,[decline.transactionId,approval.transactionId].sort());
+    assert.deepEqual((await pool.query('SELECT outcome,provider_transaction_id FROM payment_settlement_events WHERE session_id=$1 ORDER BY outcome DESC',[sessionId])).rows,
+      [{outcome:'declined',provider_transaction_id:decline.transactionId},{outcome:'approved',provider_transaction_id:approval.transactionId}]);
+    assert.equal((await pool.query("SELECT o.status FROM payment_delivery_outbox o JOIN payment_settlement_events e ON e.id=o.event_id WHERE e.session_id=$1 AND e.outcome='declined'",[sessionId])).rows[0].status,'complete');
+  });
+  await check('T-3: a stale decline after a supersession is reused',async()=>{
+    const {sessionId,binding,attemptId}=await retailBound();
+    await settle(sessionId,'fprn',evidence(binding,'declined'));await settle(sessionId,'browser',{...evidence(binding,'approved'),transactionId:`tx-${randomUUID()}`});
+    assert.deepEqual(await settle(sessionId,'poll',{...evidence(binding,'declined'),transactionId:`tx-${randomUUID()}`}),{status:'complete',last_error_code:null});
+    assert.equal((await pool.query('SELECT state FROM payment_attempts WHERE id=$1',[attemptId])).rows[0].state,'approved');
+  });
+  await check('T-3: with a second attempt live, A supersedes; B\'s later decline is recorded on B alone, quietly',async()=>{
+    const a=await retailBound();await settle(a.sessionId,'fprn',evidence(a.binding,'declined'));
+    const b=await bindNew(a.sale.id);
+    assert.deepEqual(await settle(a.sessionId,'browser',{...evidence(a.binding,'approved'),transactionId:`tx-${randomUUID()}`}),{status:'complete',last_error_code:null});
+    assert.equal((await original.getTransaction(a.sale.id))?.status,'completed');
+    assert.deepEqual(await settle(b.sessionId,'fprn',evidence(b.binding,'declined')),{status:'complete',last_error_code:null});
+    assert.equal((await pool.query('SELECT state FROM payment_attempts WHERE id=$1',[b.attemptId])).rows[0].state,'declined');
+    assert.equal((await original.getTransaction(a.sale.id))?.status,'completed');
+    assert.deepEqual(await events(b.sessionId),[{outcome:'declined',outbox:0}]);
+  });
+  for(const vertical of ['property','trades'] as const)await check(`T-3: ${vertical} split share: an approval after another attempt paid the share is a mapped conflict, never a throw`,async()=>{
+    const id=await invoice(vertical,1001,2);const a=await opened(vertical,id,1);
+    await settle(a.sessionId,'fprn',evidence(a.binding,'declined'));
+    const b=await opened(vertical,id,1);await settle(b.sessionId,'fprn',evidence(b.binding,'approved'));
+    assert.deepEqual(await settle(a.sessionId,'browser',{...evidence(a.binding,'approved'),transactionId:`tx-${randomUUID()}`}),{status:'dead_letter',last_error_code:'settlement_conflict'});
+    assert.equal((await row(vertical,id)).split_paid_count,1);
+  });
+  await check('T-3: a merchant\'s pre-change reconcile asks about a decline-only session',async()=>{
+    const {sale,sessionId,binding}=await retailBound();await settle(sessionId,'fprn',evidence(binding,'declined'));
+    assert.deepEqual(await one.pendingSessionsForMerchant({domain:'retail',aggregateId:sale.id,merchantId:merchant}),[sessionId]);
+    const pay=await opened('trades');await settle(pay.sessionId,'fprn',evidence(pay.binding,'declined'));
+    assert.deepEqual(await one.pendingSessionsForMerchant({domain:'trades',aggregateId:pay.input.invoiceId,merchantId:merchant}),[pay.sessionId]);
+  });
+  await check('T-3 C1: an approval whose transaction another session already holds is a mapped conflict',async()=>{
+    const a=await retailBound();await settle(a.sessionId,'fprn',evidence(a.binding,'declined'));
+    const other=await retailBound(),held=`tx-${randomUUID()}`;
+    await pool.query('INSERT INTO provider_transaction_claims(provider_transaction_id,binding_session_id) VALUES ($1,$2)',[held,other.sessionId]);
+    assert.deepEqual(await settle(a.sessionId,'browser',{...evidence(a.binding,'approved'),transactionId:held}),{status:'dead_letter',last_error_code:'settlement_conflict'});
+    assert.equal((await pool.query('SELECT state FROM payment_attempts WHERE id=$1',[a.attemptId])).rows[0].state,'declined');
+  });
+  await check('T-3 C3: on a split sale, B\'s decline after A\'s supersession leaves the paid share and the sale alone',async()=>{
+    const a=await retailBound(true);await settle(a.sessionId,'fprn',evidence(a.binding,'declined'));
+    const b=await bindNew(a.sale.id,1);
+    await settle(a.sessionId,'browser',{...evidence(a.binding,'approved'),transactionId:`tx-${randomUUID()}`});
+    const sale=await original.getTransaction(a.sale.id);
+    assert.deepEqual(await settle(b.sessionId,'fprn',evidence(b.binding,'declined')),{status:'complete',last_error_code:null});
+    assert.equal((await pool.query('SELECT status FROM split_payments WHERE transaction_id=$1 AND split_index=1',[a.sale.id])).rows[0].status,'completed');
+    const after=await original.getTransaction(a.sale.id);
+    assert.deepEqual({status:after?.status,completedSplits:after?.completedSplits,windcaveSessionId:after?.windcaveSessionId,windcaveXId:after?.windcaveXId},
+      {status:sale?.status,completedSplits:1,windcaveSessionId:sale?.windcaveSessionId,windcaveXId:sale?.windcaveXId});
+    assert.equal((await pool.query('SELECT state FROM payment_attempts WHERE id=$1',[b.attemptId])).rows[0].state,'declined');
+  });
+  await check('T-3 C5/C6: terminal attempts and settlement events cannot be rewritten',async()=>{
+    const {sessionId,binding,attemptId}=await retailBound();await settle(sessionId,'fprn',evidence(binding,'approved'));
+    await assert.rejects(pool.query("UPDATE payment_attempts SET state='declined',outcome='declined' WHERE id=$1",[attemptId]),{code:'23514'});
+    await pool.query("UPDATE payment_attempts SET last_reconciliation_code='complete' WHERE id=$1",[attemptId]);
+    const declined=await retailBound();await settle(declined.sessionId,'fprn',evidence(declined.binding,'declined'));
+    await assert.rejects(pool.query("UPDATE payment_attempts SET state='ready',outcome=NULL WHERE id=$1",[declined.attemptId]),{code:'23514'});
+    const pay=await opened('property');await settle(pay.sessionId,'fprn',evidence(pay.binding,'approved'));
+    await assert.rejects(pool.query("UPDATE invoice_payment_attempts SET state='declined',outcome='declined' WHERE id=$1",[pay.attempt.id]),{code:'23514'});
+    await assert.rejects(pool.query("UPDATE payment_settlement_events SET outcome='declined' WHERE session_id=$1",[sessionId]),{code:'23514'});
+    await assert.rejects(pool.query('DELETE FROM payment_settlement_events WHERE session_id=$1',[declined.sessionId]),{code:'23514'});
+  });
+  await check('T-3 C7: the pre-change reconcile always includes every live session',async()=>{
+    const first=await retailBound();await settle(first.sessionId,'fprn',evidence(first.binding,'declined'));
+    for(let i=0;i<13;i++){const next=await bindNew(first.sale.id);await settle(next.sessionId,'fprn',evidence(next.binding,'declined'));}
+    const live=await bindNew(first.sale.id);
+    const sessions=await one.pendingSessionsForMerchant({domain:'retail',aggregateId:first.sale.id,merchantId:merchant});
+    assert.ok(sessions.includes(live.sessionId));
+  });
+  // T-3 implementation review (pass 3), conditions D1-D4.
+  await check('T-3 D1: an approval naming the declined card\'s own transaction is a conflict, never a supersession',async()=>{
+    const {sessionId,binding,attemptId}=await retailBound();const decline={...evidence(binding,'declined'),transactionId:`tx-${randomUUID()}`};
+    await settle(sessionId,'fprn',decline);
+    assert.deepEqual(await settle(sessionId,'browser',{...evidence(binding,'approved'),transactionId:decline.transactionId}),{status:'dead_letter',last_error_code:'settlement_conflict'});
+    assert.equal((await pool.query('SELECT state FROM payment_attempts WHERE id=$1',[attemptId])).rows[0].state,'declined');
+    const pay=await opened('trades');const invoiceDecline={...evidence(pay.binding,'declined'),transactionId:`tx-${randomUUID()}`};
+    await settle(pay.sessionId,'fprn',invoiceDecline);
+    assert.deepEqual(await settle(pay.sessionId,'browser',{...evidence(pay.binding,'approved'),transactionId:invoiceDecline.transactionId}),{status:'dead_letter',last_error_code:'settlement_conflict'});
+  });
+  await check('T-3 D2: a superseded decline whose delivery was claimed but not prepared is never announced',async()=>{
+    const {DurablePaymentDelivery}=await import('../server/durable-payment-delivery');
+    const {sessionId,binding}=await retailBound();await settle(sessionId,'fprn',evidence(binding,'declined'));
+    const declined=(await pool.query("SELECT o.id AS outbox,e.id AS event FROM payment_delivery_outbox o JOIN payment_settlement_events e ON e.id=o.event_id WHERE e.session_id=$1",[sessionId])).rows[0];
+    await pool.query("UPDATE payment_delivery_outbox SET status='processing',lease_owner=gen_random_uuid(),lease_started_at=now(),lease_expires_at=now()+interval '30 seconds' WHERE id=$1",[declined.outbox]);
+    await settle(sessionId,'browser',{...evidence(binding,'approved'),transactionId:`tx-${randomUUID()}`});
+    const sent:any[]=[];const delivery=new DurablePaymentDelivery(pool,{ready:()=>true,send:async(target:any)=>{sent.push(target.kind);}},'synthetic@synthetic.test',clock);
+    await delivery.deliver({deliveryKey:declined.outbox,eventId:declined.event,eventSource:'provider_settlement',channel:'merchant_payment_update'});
+    assert.deepEqual(sent,[]);
+    assert.deepEqual((await pool.query('SELECT kind,target_key FROM payment_delivery_targets WHERE outbox_id=$1',[declined.outbox])).rows,[{kind:'skip',target_key:'superseded'}]);
+  });
+  await check('T-3 D3: an approval whose transaction another binding holds is a conflict with its alert, not a retry loop',async()=>{
+    const pay=await opened('property');const held=`tx-${randomUUID()}`;await settle(pay.sessionId,'fprn',{...evidence(pay.binding,'approved'),transactionId:held});
+    const {sessionId,binding}=await retailBound();
+    assert.deepEqual(await settle(sessionId,'fprn',{...evidence(binding,'approved'),transactionId:held}),{status:'dead_letter',last_error_code:'settlement_conflict'});
+  });
+  await check('T-3 D4: an invoice\'s second attempt declined after its share was paid is recorded on that attempt alone',async()=>{
+    const id=await invoice('property',1001,2);const a=await opened('property',id,1);await settle(a.sessionId,'fprn',evidence(a.binding,'declined'));
+    const b=await opened('property',id,1);
+    await settle(a.sessionId,'browser',{...evidence(a.binding,'approved'),transactionId:`tx-${randomUUID()}`});
+    const before=await row('property',id);
+    assert.deepEqual(await settle(b.sessionId,'fprn',evidence(b.binding,'declined')),{status:'complete',last_error_code:null});
+    const after=await row('property',id);
+    assert.deepEqual({status:after.status,paid:after.split_paid_count,sessions:after.split_paid_sessions},{status:before.status,paid:1,sessions:before.split_paid_sessions});
+    assert.equal((await pool.query('SELECT state FROM invoice_payment_attempts WHERE id=$1',[b.attempt.id])).rows[0].state,'declined');
+    assert.deepEqual(await events(b.sessionId),[{outcome:'declined',outbox:0}]);
+  });
+  await check('T-3 D4: a cancelled attempt is frozen',async()=>{
+    const {sessionId,binding,attemptId}=await retailBound();await settle(sessionId,'fprn',evidence(binding,'cancelled'));
+    assert.equal((await pool.query('SELECT state FROM payment_attempts WHERE id=$1',[attemptId])).rows[0].state,'cancelled');
+    await assert.rejects(pool.query("UPDATE payment_attempts SET state='approved',outcome='approved' WHERE id=$1",[attemptId]),{code:'23514'});
   });
   await check('unbound provider reference cannot attach or settle when independently expected money differs',async()=>{
     const id=await invoice('property'),claim=await one.claimInvoice(claimInput('property',id),now);assert.equal(claim.kind,'claimed');if(claim.kind!=='claimed')throw new Error('fixture_claim');

@@ -312,7 +312,7 @@ export const paymentAttempts = pgTable("payment_attempts", {
   r3TenantIdentity: unique("payment_attempts_id_transaction_uq").on(t.id, t.transactionId),
   accountFingerprintCheck: check("payment_attempts_account_fingerprint_check", sql`(${t.expectedProviderAccount} is null and ${t.requestFingerprint} is null) or (${t.expectedProviderAccount} is not null and length(${t.expectedProviderAccount}) between 1 and 200 and ${t.requestFingerprint} is not null and ${t.requestFingerprint} ~ '^[0-9a-f]{64}$' and ${t.expectedAmountCents} is not null)`),
   // Migration 0049: compared in UTC, whatever the session time zone (created_at and lease_expires_at are UTC wall time).
-  sendStartedCheck: check("payment_attempts_send_started_utc_check", sql`${t.sendStartedAt} is null or (${t.sendStartedAt} >= ${t.createdAt} at time zone 'UTC' and ${t.sendStartedAt} <= ${t.leaseExpiresAt} at time zone 'UTC')`),
+  sendStartedCheck: check("payment_attempts_send_started_check", sql`${t.sendStartedAt} is null or (${t.sendStartedAt} >= ${t.createdAt} at time zone 'UTC' and ${t.sendStartedAt} <= ${t.leaseExpiresAt} at time zone 'UTC')`),
   reconciliationCodeCheck: check("payment_attempts_reconciliation_code_check", sql`${t.lastReconciliationCode} is null or ${t.lastReconciliationCode} ~ '^[a-z][a-z0-9_:]{0,63}$'`),
   transactionIdx: index("payment_attempts_transaction_idx").on(t.transactionId),
   transactionShareKeyUnique: uniqueIndex("payment_attempts_transaction_share_key_uq")
@@ -1996,12 +1996,19 @@ export const paymentSettlementEvents = pgTable("payment_settlement_events", {
   outcome: text("outcome").notNull(),
   amountCents: bigint("amount_cents", { mode: "number" }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  // Migration 0050 (T-3): the card's provider transaction; an approval that supersedes a decline names it.
+  providerTransactionId: text("provider_transaction_id").notNull(),
+  supersedesEventId: uuid("supersedes_event_id"),
 }, (t) => ({
   constraint0: check("payment_settlement_events_outcome_check", sql.raw("((outcome = ANY (ARRAY['approved'::text, 'declined'::text, 'cancelled'::text])))")),
   constraint1: check("payment_settlement_events_amount_cents_check", sql.raw("((amount_cents > 0))")),
-  constraint3: unique("payment_settlement_events_session_id_key").on(t.sessionId),
+  constraint3: unique("payment_settlement_events_session_id_key").on(t.sessionId, t.outcome),
+  sessionFinal: uniqueIndex("payment_settlement_events_session_final_uq").on(t.sessionId).where(sql`outcome <> 'declined'`),
+  transactionCheck: check("payment_settlement_events_transaction_check", sql`length(${t.providerTransactionId}) between 1 and 200`),
+  supersedesCheck: check("payment_settlement_events_supersedes_check", sql`${t.supersedesEventId} is null or ${t.outcome} = 'approved'`),
   constraint4: foreignKey({ name: "payment_settlement_events_session_id_fkey", columns: [t.sessionId], foreignColumns: [paymentSessionBindings.sessionId] }),
   constraint5: foreignKey({ name: "payment_settlement_events_merchant_id_fkey", columns: [t.merchantId], foreignColumns: [merchants.id] }),
+  supersedesFk: foreignKey({ name: "payment_settlement_events_supersedes_event_id_fkey", columns: [t.supersedesEventId], foreignColumns: [t.id] }),
 }));
 
 // 0039: a pre-send marker makes Google Pay completion retries query-only.
@@ -2159,10 +2166,14 @@ export const subscriptionPaymentEvents = pgTable("subscription_payment_events", 
 // One provider identity belongs to one concrete binding or billing attempt.
 export const providerTransactionClaims = pgTable("provider_transaction_claims", {
   providerTransactionId:text("provider_transaction_id").primaryKey(),
-  bindingSessionId:text("binding_session_id").unique("provider_transaction_claims_binding_session_id_key"),
+  bindingSessionId:text("binding_session_id"),
   billingAttemptId:uuid("billing_attempt_id").unique("provider_transaction_claims_billing_attempt_id_key"),
   createdAt:timestamp("created_at",{withTimezone:true}).notNull().defaultNow(),
+  // Migration 0050 (T-3): one supersession claim per session besides its first claim.
+  supersession:boolean("supersession").notNull().default(false),
 },t=>({
+  bindingUnique:uniqueIndex("provider_transaction_claims_binding_uq").on(t.bindingSessionId,t.supersession).where(sql`binding_session_id is not null`),
+  supersessionCheck:check("provider_transaction_claim_supersession_check",sql`not ${t.supersession} or ${t.bindingSessionId} is not null`),
   bindingFk:foreignKey({name:"provider_transaction_claims_binding_session_id_fkey",columns:[t.bindingSessionId],foreignColumns:[paymentSessionBindings.sessionId]}),
   billingFk:foreignKey({name:"provider_transaction_claims_billing_attempt_id_fkey",columns:[t.billingAttemptId],foreignColumns:[subscriptionBillingAttempts.id]}),
   sourceCheck:check("provider_transaction_claim_source_check",sql`num_nonnulls(${t.bindingSessionId},${t.billingAttemptId})=1`),

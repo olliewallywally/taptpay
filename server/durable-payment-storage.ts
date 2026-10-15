@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { hashBearerCredential } from "./payment-credential";
-import { invoiceShareCents, requestFingerprint, isSessionId, isUuid } from "./durable-payment-contract";
+import { invoiceShareCents, requestFingerprint, isSessionId, isUuid, isPostgresConstraintViolationOn, SUPERSESSION_CONSTRAINTS } from "./durable-payment-contract";
 import type { AttemptState, ProviderExpectation, SessionBinding, VerifiedOutcome, InboxClaim,
   ReconciliationRepository, ReconciliationError, SettlementResult,SessionRecoveryCandidate } from "./durable-payment-contract";
 import { evidenceMatchesExpectation } from "./payment-reconciliation";
@@ -211,11 +211,16 @@ export class DurablePaymentStorage implements ReconciliationRepository, PaymentO
       const retail=input.domain==='retail',table=retail?'transactions':invoiceTable(input.domain as 'property'|'trades');
       const attempts=retail?'payment_attempts':'invoice_payment_attempts',column=retail?'transaction_id':invoiceColumn(input.domain as 'property'|'trades');
       const session=retail?'a.processor_session_id':'b.session_id';
-      const rows=(await client.query(`SELECT DISTINCT ${session} AS session_id FROM ${table} p JOIN ${attempts} a ON a.${column}=p.id
+      const query=(states:string,extra='')=>client.query(`SELECT DISTINCT ${session} AS session_id FROM ${table} p JOIN ${attempts} a ON a.${column}=p.id
         ${retail?'':'JOIN payment_session_bindings b ON b.invoice_attempt_id=a.id'}
-        WHERE p.id=$1 AND p.merchant_id=$2 AND a.state IN ('claiming','ready','finalizing') AND ${session} IS NOT NULL
-        ORDER BY session_id LIMIT 13`,[input.aggregateId,input.merchantId])).rows;
-      return rows.map(row=>row.session_id);
+        WHERE p.id=$1 AND p.merchant_id=$2 AND a.state IN (${states}) AND ${session} IS NOT NULL ${extra}
+        ORDER BY session_id LIMIT 13`,[input.aggregateId,input.merchantId]);
+      // C7: every live session first; then sessions whose only settlement is a decline (T-3 rule 3),
+      // in which a later card could still have been approved.
+      const live=(await query(`'claiming','ready','finalizing'`)).rows.map(row=>row.session_id);
+      const declined=(await query(`'declined'`,`AND NOT EXISTS(SELECT 1 FROM payment_settlement_events e WHERE e.session_id=${session} AND e.outcome<>'declined')`))
+        .rows.map(row=>row.session_id).filter(id=>!live.includes(id));
+      return [...live,...declined];
     });
   }
 
@@ -500,6 +505,16 @@ export class DurablePaymentStorage implements ReconciliationRepository, PaymentO
     // Retail must use the existing atomic finalizer with a same-transaction event
     // hook; absence of that adapter never falls back to a second retail engine.
     if (!binding.invoiceAttemptId) return this.retailFinalizer ? this.retailFinalizer(binding,outcome,claim,now) : {kind:"adapter-unavailable"};
+    // T-3 (C8): a rule the database enforces on a supersession, or a share another attempt paid, is a
+    // conflict, never an internal error, so the worker's alert fires.
+    try { return await this.finalizeInvoice(binding,outcome,claim,now); }
+    catch(error) {
+      if(isPostgresConstraintViolationOn(error,[...SUPERSESSION_CONSTRAINTS,'invoice_attempt_rent_paid_uq','invoice_attempt_job_paid_uq']))return {kind:"conflict"};
+      throw error;
+    }
+  }
+
+  private finalizeInvoice(binding: SessionBinding, outcome: VerifiedOutcome, claim: InboxClaim, now: Date): Promise<SettlementResult> {
     return this.transaction(async(client):Promise<SettlementResult>=>{
       if (!await this.fence(client,claim,now)) return {kind:"lease-lost"};
       const locator=(await client.query("SELECT rent_invoice_id,job_invoice_id FROM invoice_payment_attempts WHERE id=$1",[binding.invoiceAttemptId])).rows[0];
@@ -511,22 +526,57 @@ export class DurablePaymentStorage implements ReconciliationRepository, PaymentO
       const storedBinding=(await client.query("SELECT * FROM payment_session_bindings WHERE session_id=$1 FOR UPDATE",[binding.sessionId])).rows[0];
       if (!invoice || !attempt || !storedBinding || storedBinding.invoice_attempt_id!==attempt.id || attempt.merchant_id!==invoice.merchant_id ||
         !evidenceMatchesExpectation({...camelRow<ProviderExpectation>(attempt),sessionId:storedBinding.session_id},outcome)) return {kind:"conflict"};
-      if (terminal(attempt.state)) {
-        const event=(await client.query("SELECT id FROM payment_settlement_events WHERE session_id=$1",[binding.sessionId])).rows[0];
-        return attempt.state===outcome.outcome && storedBinding.provider_transaction_id===outcome.transactionId && event
-          ? {kind:"reused",eventId:event.id} : {kind:"conflict"};
+      // T-3 (docs/decisions/2026-10-15-t3-decline-supersession.md, revision 3).
+      const sessionEvents=(await client.query("SELECT id,outcome,provider_transaction_id FROM payment_settlement_events WHERE session_id=$1",[binding.sessionId])).rows;
+      const declinedEvent=sessionEvents.find((event:any)=>event.outcome==='declined'),finalEvent=sessionEvents.find((event:any)=>event.outcome!=='declined');
+      // Rule 4: a verified decline for an attempt already declined or approved changes nothing.
+      if (outcome.outcome==='declined' && ['declined','approved'].includes(attempt.state)) {
+        const own=attempt.state==='approved'?finalEvent:declinedEvent;return own?{kind:"reused",eventId:own.id}:{kind:"conflict"};
       }
-      if (!["ready","finalizing"].includes(attempt.state) ||
-        !([...payableInvoiceStates,'voided','paid_external'] as readonly string[]).includes(invoice.status)) return {kind:"conflict"};
+      let supersede:{declinedEventId:string}|undefined;
+      if (attempt.state==='declined' && outcome.outcome==='approved' && declinedEvent && !finalEvent &&
+        storedBinding.provider_transaction_id===declinedEvent.provider_transaction_id &&
+        // D1: the declined card's own transaction reported as approved is a conflict, not a supersession.
+        outcome.transactionId!==declinedEvent.provider_transaction_id) {
+        // C1: the approval's transaction is held by no other session or billing attempt.
+        const holder=(await client.query("SELECT binding_session_id FROM provider_transaction_claims WHERE provider_transaction_id=$1",[outcome.transactionId])).rows[0];
+        if (holder && holder.binding_session_id!==binding.sessionId) return {kind:"conflict"};
+        supersede={declinedEventId:declinedEvent.id};
+      }
+      if (terminal(attempt.state) && !supersede) {
+        const own=sessionEvents.find((event:any)=>event.outcome===outcome.outcome);
+        return attempt.state===outcome.outcome && storedBinding.provider_transaction_id===outcome.transactionId && own
+          ? {kind:"reused",eventId:own.id} : {kind:"conflict"};
+      }
+      if (!supersede && !["ready","finalizing"].includes(attempt.state)) return {kind:"conflict"};
+      const shareTaken=!!(await client.query(`SELECT 1 FROM invoice_payment_attempts WHERE ${column}=$1 AND share_index=$2 AND state='approved' AND id<>$3 LIMIT 1`,
+        [id,attempt.share_index,attempt.id])).rows[0];
+      // Rule 2 (C3): a second attempt's verified decline or cancellation, after its share or invoice was paid,
+      // is recorded on that attempt alone: no invoice write and no outbox row.
+      if (!supersede && outcome.outcome!=='approved' && (shareTaken || invoice.status==='paid')) {
+        const quiet=(await client.query(`UPDATE invoice_payment_attempts SET state=$2,outcome=$2,reconciled_at=$3,updated_at=$3
+          WHERE id=$1 AND state IN ('ready','finalizing') RETURNING id`,[attempt.id,outcome.outcome,now])).rows[0];
+        if (!quiet) throw new Error("invoice_attempt_compare_and_set_failed");
+        await client.query("UPDATE payment_session_bindings SET provider_transaction_id=$2 WHERE session_id=$1",[binding.sessionId,outcome.transactionId]);
+        const event=(await client.query(`INSERT INTO payment_settlement_events(session_id,merchant_id,outcome,amount_cents,created_at,previous_aggregate_status,provider_transaction_id)
+          VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,[binding.sessionId,attempt.merchant_id,outcome.outcome,attempt.amount_cents,now,invoice.status,outcome.transactionId])).rows[0];
+        return {kind:"finalized",eventId:event.id};
+      }
+      // An approval for a share or invoice another attempt already paid is a conflict before any write.
+      if (outcome.outcome==='approved' && shareTaken) return {kind:"conflict"};
+      if (!([...payableInvoiceStates,'voided','paid_external'] as readonly string[]).includes(invoice.status)) return {kind:"conflict"};
       const split=invoice.split_enabled && invoice.split_count>1;
       if (split ? attempt.share_index<1 || attempt.share_index>invoice.split_count ||
         attempt.amount_cents!==invoiceShareCents(invoice.amount_cents,invoice.split_count,attempt.share_index) :
         attempt.share_index!==0 || attempt.amount_cents!==invoice.amount_cents) return {kind:"conflict"};
       const collision=(await client.query("SELECT session_id FROM payment_session_bindings WHERE provider_transaction_id=$1 AND session_id<>$2",[outcome.transactionId,binding.sessionId])).rows[0];
       if (collision) return {kind:"conflict"};
-      await client.query("UPDATE invoice_payment_attempts SET state='finalizing',updated_at=$2 WHERE id=$1",[attempt.id,now]);
+      // C4: a supersession moves the attempt straight from declined, never through finalizing.
+      if (!supersede) await client.query("UPDATE invoice_payment_attempts SET state='finalizing',updated_at=$2 WHERE id=$1",[attempt.id,now]);
       await client.query("UPDATE payment_session_bindings SET provider_transaction_id=$2 WHERE session_id=$1",[binding.sessionId,outcome.transactionId]);
-      await client.query("UPDATE invoice_payment_attempts SET state=$2,outcome=$2,reconciled_at=$3,updated_at=$3 WHERE id=$1",[attempt.id,outcome.outcome,now]);
+      const finalized=(await client.query("UPDATE invoice_payment_attempts SET state=$2,outcome=$2,reconciled_at=$3,updated_at=$3 WHERE id=$1 AND state=$4 RETURNING id",
+        [attempt.id,outcome.outcome,now,supersede?'declined':'finalizing'])).rows[0];
+      if (!finalized) throw new Error("invoice_attempt_compare_and_set_failed");
       if (outcome.outcome==='approved') {
         const paid=(await client.query(`SELECT count(*)::int AS n FROM invoice_payment_attempts WHERE ${column}=$1 AND state='approved'`,[id])).rows[0].n;
         if (split && invoice.status!=='paid_external' && paid !== (invoice.split_paid_count??0)+1) throw new Error("inconsistent_paid_shares");
@@ -542,8 +592,11 @@ export class DurablePaymentStorage implements ReconciliationRepository, PaymentO
           split_paid_sessions=CASE WHEN $4 THEN array_append(COALESCE(split_paid_sessions,'{}'::text[]),$6) ELSE split_paid_sessions END,
           windcave_session_id=$6,windcave_transaction_id=$7,updated_at=$3 WHERE id=$1`,[id,complete && !replaced,now,split,paid,binding.sessionId,outcome.transactionId]);
       }
-      const event=(await client.query(`INSERT INTO payment_settlement_events(session_id,merchant_id,outcome,amount_cents,created_at,previous_aggregate_status)
-        VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,[binding.sessionId,attempt.merchant_id,outcome.outcome,attempt.amount_cents,now,invoice.status])).rows[0];
+      const event=(await client.query(`INSERT INTO payment_settlement_events(session_id,merchant_id,outcome,amount_cents,created_at,previous_aggregate_status,provider_transaction_id,supersedes_event_id)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,[binding.sessionId,attempt.merchant_id,outcome.outcome,attempt.amount_cents,now,invoice.status,outcome.transactionId,supersede?.declinedEventId??null])).rows[0];
+      // C9: the superseded decline is not announced after the receipt unless its delivery has started.
+      if (supersede) await client.query(`UPDATE payment_delivery_outbox SET status='complete',completed_at=$2
+        WHERE event_id=$1 AND status IN ('pending','retry') AND targets_prepared_at IS NULL`,[supersede.declinedEventId,now]);
       const payload=JSON.stringify({attemptId:attempt.id,outcome:outcome.outcome,shareIndex:attempt.share_index,amountCents:attempt.amount_cents,eventId:event.id});
       if (vertical==='property') await client.query(`INSERT INTO transaction_events(merchant_id,tenant_profile_id,invoice_id,event_type,payload,created_at)
         VALUES ($1,$2,$3,$4,$5::jsonb,$6)`,[invoice.merchant_id,invoice.tenant_profile_id,id,`payment_${outcome.outcome}`,payload,now]);

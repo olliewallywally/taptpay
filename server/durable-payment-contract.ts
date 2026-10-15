@@ -71,3 +71,24 @@ export function invoiceShareCents(total: number, count: number, share: number): 
 }
 export const isSessionId = (value: unknown): value is string => typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$/.test(value);
 export const isUuid = (value: unknown): value is string => typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+
+/** T-3 (migration 0050): the database rules a decline supersession meets. A violation is a conflict. */
+export const SUPERSESSION_CONSTRAINTS: readonly string[] = [
+  "provider_transaction_claims_binding_uq", "payment_binding_supersession_check", "payment_settlement_event_order_check",
+  "payment_settlement_events_session_id_key", "payment_settlement_events_session_final_uq",
+  "payment_attempt_terminal_state_check", "payment_attempt_transaction_supersession_check",
+  // D3: a provider transaction another binding or split share already holds.
+  "payment_session_bindings_provider_transaction_id_key", "split_payments_windcave_transaction_id_uq",
+];
+
+export function isPostgresConstraintViolationOn(error: unknown, constraints: readonly string[]): boolean {
+  const seen = new Set<object>();
+  let current = error;
+  while (current && typeof current === "object" && !seen.has(current)) {
+    const { code, constraint: name } = current as { code?: unknown; constraint?: unknown };
+    if ((code === "23505" || code === "23514") && typeof name === "string" && constraints.includes(name)) return true;
+    seen.add(current);
+    current = (current as { cause?: unknown }).cause;
+  }
+  return false;
+}

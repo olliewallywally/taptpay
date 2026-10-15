@@ -7,7 +7,7 @@ import { mintPublicLinkToken, hashPublicLinkTokenData } from "./public-link-toke
 import {canonicalCashCommand,type CashCommandInput,type CashCommandResult} from './cash-command';
 import {paymentCommand,type PaymentCommandActor} from './payment-command';
 import {subscriptionBillingAttempts,subscriptionCardAttempts} from '@shared/schema';
-import {isUuid} from './durable-payment-contract';
+import {isUuid,isPostgresConstraintViolationOn,SUPERSESSION_CONSTRAINTS} from './durable-payment-contract';
 import {bindCreationCommand,readCreationCommand,recordCreationCommand,CreationCommandConflict,type CreationCommandIntent} from './payment-creation-command';
 import {paymentCreationCommands} from '@shared/schema';
 import {bindSubscriptionCommand,readSubscriptionCommand,recordSubscriptionCommand,subscriptionExpiryKey,type BoundSubscriptionCommand,SubscriptionCommandConflict,type SubscriptionCommandIntent} from './subscription-command';
@@ -2328,6 +2328,8 @@ export class MemStorage implements IStorage {
       async () => {
         const attempt = this.paymentAttempts.get(input.attemptId);
         if (!attempt) return { kind: "not-found" };
+        // Reconciliation, and with it T-3's decline supersession, is PostgreSQL-only (it needs the inbox
+        // lease and the settlement events); MemStorage refuses it explicitly.
         if (input.reconciliation) return { kind: "conflict", attempt };
         const transaction = this.transactions.get(attempt.transactionId);
         if (!transaction) return { kind: "not-found" };
@@ -6129,8 +6131,10 @@ export class DatabaseStorage implements IStorage {
     try {
       return await this.finalizePaymentAttemptRecordInTransaction(input);
     } catch (error) {
-      // R2-T4: a concurrent finalization already recorded this provider transaction.
-      if (!isPostgresUniqueViolationOn(error, "payment_attempts_provider_transaction_id_uq")) throw error;
+      // R2-T4: a concurrent finalization already recorded this provider transaction. T-3 (C8): any
+      // supersession rule the database enforces is a conflict, so the worker's alert fires.
+      if (!isPostgresUniqueViolationOn(error, "payment_attempts_provider_transaction_id_uq") &&
+        !isPostgresConstraintViolationOn(error, SUPERSESSION_CONSTRAINTS)) throw error;
       const attempt = await this.getPaymentAttempt(input.attemptId);
       return attempt ? { kind: "conflict", attempt } : { kind: "not-found" };
     }
@@ -6211,6 +6215,8 @@ export class DatabaseStorage implements IStorage {
       }
 
       let reconciliationEventId: string | undefined;
+      // T-3 (docs/decisions/2026-10-15-t3-decline-supersession.md, revision 3): only in reconciliation (C10).
+      let supersede: { declinedEventId: string } | undefined;
       if (input.reconciliation) {
         const { claim, evidence } = input.reconciliation;
         const [lease] = await tx.select().from(paymentNotificationInbox).where(and(
@@ -6231,17 +6237,39 @@ export class DatabaseStorage implements IStorage {
           expected.processorXId !== attempt.processorXId ||
           binding.processorXId !== expected.processorXId || expected.amountCents !== moneyStringToCents(splitPayment?.amount ?? transaction.price) ||
           evidence.outcome !== input.outcome || evidence.transactionId !== input.processorTransactionId ||
-          !evidenceMatchesExpectation({ ...expected, sessionId: binding.sessionId, processorXId: binding.processorXId }, evidence) ||
-          (binding.providerTransactionId !== null && binding.providerTransactionId !== evidence.transactionId)) {
+          !evidenceMatchesExpectation({ ...expected, sessionId: binding.sessionId, processorXId: binding.processorXId }, evidence)) {
           return { kind: "conflict", attempt };
         }
-        const [event] = await tx.select({ id: paymentSettlementEvents.id }).from(paymentSettlementEvents)
-          .where(eq(paymentSettlementEvents.sessionId, binding.sessionId)).limit(1);
-        reconciliationEventId = event?.id;
-        if (paymentAttemptIsTerminal(attempt) && !reconciliationEventId) return { kind: "conflict", attempt };
+        const sessionEvents = await tx.select({ id: paymentSettlementEvents.id, outcome: paymentSettlementEvents.outcome,
+          providerTransactionId: paymentSettlementEvents.providerTransactionId }).from(paymentSettlementEvents)
+          .where(eq(paymentSettlementEvents.sessionId, binding.sessionId));
+        const declinedEvent = sessionEvents.find((event) => event.outcome === "declined");
+        const finalEvent = sessionEvents.find((event) => event.outcome !== "declined");
+        // Rule 4: a verified decline for an attempt already declined or approved changes nothing,
+        // whichever declined card it names.
+        if (input.outcome === "declined" && (attempt.state === "declined" || attempt.state === "approved")) {
+          const own = attempt.state === "approved" ? finalEvent : declinedEvent;
+          return own ? { kind: "reused", attempt, transaction, splitPayment, counterIncremented: false, eventId: own.id } : { kind: "conflict", attempt };
+        }
+        // Rule 0: a verified approval of the same session supersedes its recorded decline.
+        if (attempt.state === "declined" && input.outcome === "approved" && declinedEvent && !finalEvent &&
+          binding.providerTransactionId === declinedEvent.providerTransactionId && attempt.providerTransactionId === declinedEvent.providerTransactionId &&
+          // D1: the declined card's own transaction reported as approved is a conflict, not a supersession.
+          evidence.transactionId !== declinedEvent.providerTransactionId) {
+          // C1: the approval's transaction is held by no other session or billing attempt.
+          const held = await tx.execute(sql`SELECT binding_session_id FROM provider_transaction_claims WHERE provider_transaction_id=${evidence.transactionId}`);
+          const holder = (held as any).rows?.[0] ?? (held as any)[0];
+          if (holder && holder.binding_session_id !== binding.sessionId) return { kind: "conflict", attempt };
+          supersede = { declinedEventId: declinedEvent.id };
+        }
+        if (!supersede && binding.providerTransactionId !== null && binding.providerTransactionId !== evidence.transactionId) {
+          return { kind: "conflict", attempt };
+        }
+        reconciliationEventId = sessionEvents.find((event) => event.outcome === input.outcome)?.id;
+        if (paymentAttemptIsTerminal(attempt) && !supersede && !reconciliationEventId) return { kind: "conflict", attempt };
       }
 
-      if (paymentAttemptIsTerminal(attempt)) {
+      if (paymentAttemptIsTerminal(attempt) && !supersede) {
         return attempt.state === input.outcome &&
           attempt.outcome === input.outcome &&
           attempt.providerTransactionId === input.processorTransactionId &&
@@ -6256,8 +6284,26 @@ export class DatabaseStorage implements IStorage {
             }
           : { kind: "conflict", attempt };
       }
-      if (attempt.state !== "finalizing" && !(input.reconciliation && attempt.state === "ready")) {
+      if (!supersede && attempt.state !== "finalizing" && !(input.reconciliation && attempt.state === "ready")) {
         return { kind: "conflict", attempt };
+      }
+      // T-3 rule 2 (C3): a second attempt's verified decline or cancellation, after its target (the share,
+      // or the unsplit sale) was paid, is recorded on that attempt alone: no share, sale or outbox write.
+      const targetPaid = splitPayment ? splitPayment.status === "completed"
+        : ["completed", "partially_refunded", "refunded"].includes(transaction.status);
+      if (input.reconciliation && input.outcome !== "approved" && targetPaid) {
+        const { evidence } = input.reconciliation;
+        const [declined] = await tx.update(paymentAttempts).set({ state: input.outcome, outcome: input.outcome, receiptShare: null,
+          providerTransactionId: input.processorTransactionId, updatedAt: input.now })
+          .where(and(eq(paymentAttempts.id, attempt.id), inArray(paymentAttempts.state, ["ready", "finalizing"]),
+            eq(paymentAttempts.processorSessionId, input.processorSessionId))).returning();
+        if (!declined) throw new Error("Payment attempt finalization compare-and-set failed");
+        await tx.update(paymentSessionBindings).set({ providerTransactionId: evidence.transactionId })
+          .where(eq(paymentSessionBindings.sessionId, input.processorSessionId));
+        const [event] = await tx.insert(paymentSettlementEvents).values({ sessionId: input.processorSessionId,
+          merchantId: transaction.merchantId!, outcome: input.outcome, amountCents: evidence.amountCents,
+          providerTransactionId: evidence.transactionId, previousAggregateStatus: transaction.status, createdAt: input.now }).returning();
+        return { kind: "finalized", attempt: declined, transaction, splitPayment, counterIncremented: false, eventId: event.id };
       }
       if (
         !["pending", "processing","failed",...(input.reconciliation?['cancelled']:[])].includes(transaction.status) ||
@@ -6398,7 +6444,8 @@ export class DatabaseStorage implements IStorage {
         })
         .where(and(
           eq(paymentAttempts.id, attempt.id),
-          eq(paymentAttempts.state, "finalizing"),
+          // C4: a supersession moves the attempt straight from declined, never through finalizing.
+          eq(paymentAttempts.state, supersede ? "declined" : "finalizing"),
           eq(paymentAttempts.processorSessionId, input.processorSessionId),
         ))
         .returning();
@@ -6412,8 +6459,12 @@ export class DatabaseStorage implements IStorage {
           .where(eq(paymentSessionBindings.sessionId, input.processorSessionId));
         const [event] = await tx.insert(paymentSettlementEvents).values({ sessionId: input.processorSessionId,
           merchantId: transaction.merchantId!, outcome: input.outcome, amountCents: evidence.amountCents,
+          providerTransactionId: evidence.transactionId, supersedesEventId: supersede?.declinedEventId ?? null,
           previousAggregateStatus:transaction.status,createdAt: input.now }).returning();
         reconciliationEventId = event.id;
+        // C9: the superseded decline is not announced after the receipt unless its delivery has started.
+        if (supersede) await tx.execute(sql`UPDATE payment_delivery_outbox SET status='complete',completed_at=${input.now}
+          WHERE event_id=${supersede.declinedEventId} AND status IN ('pending','retry') AND targets_prepared_at IS NULL`);
         await tx.insert(paymentDeliveryOutbox).values({ eventId: event.id, channel: "merchant_payment_update", nextAttemptAt: input.now });
         if (input.outcome === "approved") await tx.insert(paymentDeliveryOutbox)
           .values({ eventId: event.id, channel: "payer_receipt", nextAttemptAt: input.now });

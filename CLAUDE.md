@@ -87,8 +87,10 @@ the owner (T-3 first). The refund schema is now migration 0048.
 **2026-10-15:** those open items are fixed except T-3 (read
 `docs/evidence/remediation-v2-2/r4/R3-OPEN-ITEMS-2026-10-15.md`; migration 0049 is applied nowhere;
 the owner runs `docs/operations/runbook-2026-10-15-r3-cutover.md` before R3 first boots on a used
-database). T-3's ADR, `docs/decisions/2026-10-15-t3-decline-supersession.md`, was refused in review
-pass 1.
+database). T-3 (a later approval in a declined session) is implemented by owner decision: read
+`docs/evidence/remediation-v2-2/r4/T3-2026-10-15.md`; migrations 0049–0050 are applied nowhere
+(owner runbook `docs/operations/runbook-2026-10-15-apply-0049-0050.md`, before the cutover gate).
+R4-T3 part 2 (the refund route) is next.
 
 This program's established discipline: failing-tests-first; independently re-verify a prior
 pass's own claims before trusting them, the way every session in this program has had to;

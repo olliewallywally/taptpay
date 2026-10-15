@@ -86,7 +86,7 @@ const REAL_MIGRATIONS = [
   "0044_subscription_identity_registry.sql",
   "0045_provider_operation_keys.sql",
   "0046_payment_delivery_targets.sql",
-  "0047_payment_creation_commands.sql",  "0048_refund_operations.sql",  "0049_retail_identity_hardening.sql",
+  "0047_payment_creation_commands.sql",  "0048_refund_operations.sql",  "0049_retail_identity_hardening.sql",  "0050_decline_supersession.sql",
 ];
 
 /** Migrations that own a `BEGIN;` / `COMMIT;` pair. */

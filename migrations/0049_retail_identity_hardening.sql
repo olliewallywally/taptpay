@@ -12,7 +12,7 @@ SET LOCAL statement_timeout = '60s';
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'taptpay_r3_retail_identity_written_once')
-    OR EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'payment_attempts_send_started_utc_check') THEN
+    OR EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'retail_identity_written_once') THEN
     RAISE EXCEPTION '0049 aborted: its objects already exist';
   END IF;
 END $$;
@@ -30,8 +30,10 @@ $$;
 CREATE TRIGGER retail_identity_written_once BEFORE UPDATE ON payment_attempts FOR EACH ROW
   EXECUTE FUNCTION taptpay_r3_retail_identity_written_once();
 
+-- Re-added under 0037's name, so 0037's baseline contract still finds it; 0049 itself is
+-- observable through its function and trigger, created in the same transaction.
 ALTER TABLE payment_attempts DROP CONSTRAINT payment_attempts_send_started_check;
-ALTER TABLE payment_attempts ADD CONSTRAINT payment_attempts_send_started_utc_check CHECK (
+ALTER TABLE payment_attempts ADD CONSTRAINT payment_attempts_send_started_check CHECK (
   send_started_at IS NULL OR (send_started_at >= created_at AT TIME ZONE 'UTC'
     AND send_started_at <= lease_expires_at AT TIME ZONE 'UTC')
 );

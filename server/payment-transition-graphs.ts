@@ -28,6 +28,8 @@ export const paymentAttemptGraph=graph(['claiming','ready','finalizing','approve
   decline:{from:['finalizing'],to:'declined',actors:['processor'],effects:moneyEffects},
   cancel:{from:['finalizing'],to:'cancelled',actors:['processor'],effects:moneyEffects},
   abandonUnsent:{from:['claiming'],to:'abandoned',actors:['system'],effects:['expired_unattached_lease_only']},
+  // T-3 (migration 0050): a verified approval of the same session supersedes its recorded decline.
+  supersedeDecline:{from:['declined'],to:'approved',actors:['processor'],effects:['verified_same_session','registry_supersession_claim',...moneyEffects]},
 });
 export const payableInvoiceStates=['pending_dispatch','dispatched','dispatch_failed','sent','viewed','overdue'] as const;
 const invoiceRules={

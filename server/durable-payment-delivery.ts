@@ -119,7 +119,18 @@ export class DurablePaymentDelivery implements IdempotentPaymentEventReceiver {
       const eventId=outbox?.event_id??outbox?.transaction_event_id??outbox?.job_event_id??outbox?.subscription_event_id;
       const source=outbox?.event_id?'provider_settlement':outbox?.transaction_event_id?'transaction_event':outbox?.job_event_id?'job_event':'subscription_event';
       if(!outbox||eventId!==input.eventId||source!==input.eventSource||outbox.channel!==input.channel)throw Error('delivery_identity_mismatch');
-      if(!outbox.targets_prepared_at){
+      // T-3 (D2): a decline that a later approval in its session superseded is never announced, even when its
+      // delivery was claimed before the supersession; the approval's own event carries the news.
+      const superseded=!outbox.targets_prepared_at && outbox.event_id &&
+        !!(await client.query('SELECT 1 FROM payment_settlement_events WHERE supersedes_event_id=$1',[outbox.event_id])).rows[0];
+      if(superseded){
+        const now=this.clock(),merchantId=(await client.query('SELECT merchant_id FROM payment_settlement_events WHERE id=$1',[outbox.event_id])).rows[0].merchant_id;
+        const payload={reason:'superseded'};
+        await client.query(`INSERT INTO payment_delivery_targets(outbox_id,merchant_id,kind,target_key,payload,payload_hash,state,completed_at,created_at,updated_at)
+          VALUES ($1,$2,'skip','superseded',$3::jsonb,$4,'complete',$5,$5,$5)`,[outbox.id,merchantId,JSON.stringify(payload),hash(JSON.stringify(payload)),now]);
+        await client.query('UPDATE payment_delivery_outbox SET targets_prepared_at=$2 WHERE id=$1',[outbox.id,now]);
+      }
+      if(!outbox.targets_prepared_at && !superseded){
         const {communication,parent,merchant,payerEmail,eventType}=await this.snapshot(client,outbox),rendered=renderPaymentCommunication(communication);
         const targets:{kind:DeliveryTarget['kind'];key:string;payload:any;pushId?:number}[]=[];
         if(input.channel==='payer_receipt'){

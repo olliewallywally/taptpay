@@ -1,7 +1,8 @@
 # Runbook — R3 cutover gate (2026-10-15)
 
 Run once on any database an earlier build has used (the test database first), **with the app
-stopped**, after the migrations through 0048 are applied and **before** the R3 build first boots.
+stopped**, after the migrations through 0050 are applied ([0049–0050 runbook](runbook-2026-10-15-apply-0049-0050.md))
+and **before** the R3 build first boots.
 Claude does not run this against a shared database. It prints counts only, never row values.
 
 Why ([R3 integration §5](../evidence/remediation-v2-2/r4/R3-INTEGRATION-2026-10-14.md)):
