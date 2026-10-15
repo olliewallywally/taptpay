@@ -75,10 +75,15 @@ R4-T2 onward may now start on this branch.
 recording a verified payment from a merchant route (R1-T7). R4-T2's ADR is
 `docs/decisions/2026-10-14-r4-t2-refund-operation-schema.md`, revision 2: pass 4 refused
 revision 1.
-**R4-T2 is implemented (2026-10-14):** migration 0039, approved in pass 6 after passes 4 and 5
-refused earlier revisions; read `docs/evidence/remediation-v2-2/r4/R4-T2-2026-10-14.md`. 0039 is
-applied nowhere (owner runbook `docs/operations/runbook-2026-10-14-apply-0039-refund-operations.md`).
-R4-T3 is next and must follow the ADR's lock-order, send-intent and lease rules.
+**R4-T2 is implemented (2026-10-14):** migration 0048 (written as 0039; renumbered after Codex's R3 0039–0047), approved in pass 6 after passes 4 and 5
+refused earlier revisions; read `docs/evidence/remediation-v2-2/r4/R4-T2-2026-10-14.md`. 0048 is
+applied nowhere (owner runbook `docs/operations/runbook-2026-10-14-apply-0048-refund-operations.md`).
+R4-T3 part 1 (claim, send intent and settle in both stores) is done; part 2, the route, is next
+and must follow the ADR's lock-order, send-intent and lease rules.
+**Codex's R3 (`3c98dfe9`) is integrated under R4 (2026-10-14):** read
+`docs/evidence/remediation-v2-2/r4/R3-INTEGRATION-2026-10-14.md` and Codex's
+`docs/HANDOFF-2026-10-14-r3-repository-complete.md`. Its §5 lists the open items for Codex and
+the owner (T-3 first). The refund schema is now migration 0048.
 
 This program's established discipline: failing-tests-first; independently re-verify a prior
 pass's own claims before trusting them, the way every session in this program has had to;

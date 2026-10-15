@@ -1,3 +1,4 @@
+import {randomUUID as requestCommandKey} from 'node:crypto';
 import "./support/test-env";
 
 import request from "supertest";
@@ -112,8 +113,8 @@ describe("another business's property record is not found, like a missing one", 
     seed(fake, owner.merchantId);
     const bill = (tenantProfileId: string) => ({ tenantProfileId, amountCents: 5_000, deliveryChannel: "email", dueAt: inDays(7).toISOString() });
 
-    const missing = await request(app).post("/api/property/invoices").set(signedIn(other)).send(bill(MISSING));
-    const theirs = await request(app).post("/api/property/invoices").set(signedIn(other)).send(bill(TENANT));
+    const missing = await request(app).post("/api/property/invoices").set('Idempotency-Key',requestCommandKey()).set(signedIn(other)).send(bill(MISSING));
+    const theirs = await request(app).post("/api/property/invoices").set('Idempotency-Key',requestCommandKey()).set(signedIn(other)).send(bill(TENANT));
 
     expect(missing.status).toBe(404);
     expect(theirs.status).toBe(404);
@@ -183,7 +184,7 @@ describe("property ids are read strictly", () => {
     const fake = fakeProperty();
     seed(fake, owner.merchantId);
 
-    const res = await request(app).post("/api/property/invoices").set(signedIn(owner))
+    const res = await request(app).post("/api/property/invoices").set('Idempotency-Key',requestCommandKey()).set(signedIn(owner))
       .send({ amountCents: 5_000, deliveryChannel: "email", dueAt: inDays(7).toISOString(), ...change });
 
     expect(res.status).toBe(400);

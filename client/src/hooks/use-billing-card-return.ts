@@ -2,16 +2,17 @@ import { useEffect, useLayoutEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { useToast } from "@/hooks/use-toast";
-import { apiErrorMessage, apiErrorStatus } from "@/lib/api-error";
+import { apiErrorCode, apiErrorMessage, apiErrorStatus } from "@/lib/api-error";
 import { apiRequest } from "@/lib/queryClient";
 import { apiPath, apiTo } from "@shared/api-path";
+import {releaseBillingCardCommand} from '@/lib/billing-card-command';
 
 export const BILLING_CARD_SESSION_KEY = "taptpay.cardSession";
 
 type ConfirmResult =
   | { status: "saved" }
   | { status: "pending" }
-  | { status: "failed"; message: string; retryable: boolean };
+  | { status: "failed"; message: string; retryable: boolean;terminal?:true };
 
 type ConfirmOptions = {
   attempts?: number;
@@ -48,6 +49,7 @@ export async function confirmBillingCardSession(
         status: "failed",
         message: apiErrorMessage(error, "Could not confirm the card"),
         retryable: status === null || status >= 500,
+        ...(status===422||(status===409&&['CARD_SETUP_CANCELLED','CARD_SETUP_SUPERSEDED'].includes(apiErrorCode(error)??''))?{terminal:true as const}:{}),
       };
     }
 
@@ -62,8 +64,10 @@ export async function confirmBillingCardSession(
         status: "failed",
         message: body?.message || "Could not confirm the card",
         retryable: response.status >= 500,
+        ...(response.status===422||(response.status===409&&['CARD_SETUP_CANCELLED','CARD_SETUP_SUPERSEDED'].includes(body?.code))?{terminal:true as const}:{}),
       };
     }
+    if(body?.success!==true)return {status:'pending'};
     return { status: "saved" };
   }
 
@@ -88,7 +92,7 @@ function scrubCardReturnQuery(): void {
 }
 
 /** Shared phone/tablet/desktop handler for the hosted Windcave return. */
-export function useBillingCardReturn(): { confirmingCard: boolean } {
+export function useBillingCardReturn(merchantId?:number|null): { confirmingCard: boolean } {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [cardReturn] = useState(readCardReturn);
@@ -104,16 +108,7 @@ export function useBillingCardReturn(): { confirmingCard: boolean } {
     const sessionId = sessionStorage.getItem(BILLING_CARD_SESSION_KEY);
     if (!cardReturn.present && !sessionId) return;
 
-    if (cardReturn.present && cardReturn.outcome !== "approved") {
-      sessionStorage.removeItem(BILLING_CARD_SESSION_KEY);
-      if (cardReturn.outcome === "declined") {
-        toast({ title: "That card was declined. Please try another.", variant: "destructive" });
-      } else if (cardReturn.outcome) {
-        toast({ title: "Card setup was not completed." });
-      }
-      return;
-    }
-
+    // Browser text never decides an outcome or releases an unresolved command.
     if (!sessionId) {
       toast({
         title: "Card setup session expired. Please start again.",
@@ -128,6 +123,7 @@ export function useBillingCardReturn(): { confirmingCard: boolean } {
       if (!active) return;
       if (result.status === "saved") {
         sessionStorage.removeItem(BILLING_CARD_SESSION_KEY);
+        releaseBillingCardCommand(merchantId);
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/billing/card")] }),
           queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/subscription")] }),
@@ -139,7 +135,7 @@ export function useBillingCardReturn(): { confirmingCard: boolean } {
         // Keep the session id: reloading Settings safely resumes confirmation.
         toast({ title: "Still confirming your card. Please refresh in a moment." });
       } else {
-        if (!result.retryable) sessionStorage.removeItem(BILLING_CARD_SESSION_KEY);
+        if(result.terminal){sessionStorage.removeItem(BILLING_CARD_SESSION_KEY);releaseBillingCardCommand(merchantId);}
         toast({ title: result.message, variant: "destructive" });
       }
     }).finally(() => {
@@ -152,7 +148,7 @@ export function useBillingCardReturn(): { confirmingCard: boolean } {
     // This is deliberately a one-shot return handler. Query invalidations do not
     // restart provider confirmation.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [merchantId]);
 
   return { confirmingCard };
 }

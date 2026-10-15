@@ -1,20 +1,21 @@
-# Runbook — apply migration 0039 (refund operations) to the test database (owner), 2026-10-14
+# Runbook — apply migration 0048 (refund operations) to the test database (owner), 2026-10-14
 
-For Oliver. Applies R4-T2's `0039_refund_operations.sql` to the **test/development**
+**Renumbered (2026-10-14):** this migration was written as `0039` and is now `0048_refund_operations.sql`. Codex's completed R3 uses 0039–0047, which R4 keeps unchanged ([R3 integration](../evidence/remediation-v2-2/r4/R3-INTEGRATION-2026-10-14.md)).
+
+For Oliver. Applies R4-T2's `0048_refund_operations.sql` to the **test/development**
 database only, never production. See the
 [ADR](../decisions/2026-10-14-r4-t2-refund-operation-schema.md). Claude cannot do this from
 its cloud session: the session has no database credentials, and the plan makes applying
 migrations to a shared database an owner step.
 
-**Do this only after the 0034–0038 runbook**
-([runbook-2026-10-13](runbook-2026-10-13-apply-0034-0038-test-database.md)) **has been
-completed on the same database.** Do not start until Claude says the branch is ready.
+**Do this only after 0034–0047 are applied** (the 0034–0038 runbook, then Codex's R3 release for 0039–0047;
+[runbook-2026-10-13](runbook-2026-10-13-apply-0034-0038-test-database.md)) on the same database. Do not start until Claude says the branch is ready.
 
 Read-only commands come first. Step 4 is the only one that changes the database. Everything
 runs from the TaptPay Replit shell, where `DATABASE_URL` is already set as a secret. Never
 paste a database URL or password into a chat, a command line or a file.
 
-## What 0039 does
+## What 0048 does
 
 - **Adds refund-operation columns, checks, one trigger and six indexes to `refunds`.**
   - No column is dropped or retyped.
@@ -49,7 +50,7 @@ npm run db:migrate:status -- $TARGET
 npm run db:release -- $TARGET --dry-run
 ```
 
-Expected: only `0039_refund_operations.sql` pending. Paste both outputs to Claude.
+Expected: only `0048_refund_operations.sql` pending (0034–0047 already applied). Paste both outputs to Claude.
 
 ## 3. Count-only preflight (read-only)
 
@@ -65,7 +66,7 @@ SELECT count(*) AS refunds_rows, pg_size_pretty(pg_total_relation_size('refunds'
 SELECT status, count(*) FROM refunds GROUP BY status ORDER BY status;
 
 -- Legacy refunds whose business does not match their sale (an R1 tenant defect;
--- 0039 leaves them alone, but each should be explained).
+-- 0048 leaves them alone, but each should be explained).
 SELECT count(*) AS mismatched FROM refunds r
  WHERE r.transaction_id IS NOT NULL AND r.merchant_id IS NOT NULL
    AND NOT EXISTS (SELECT 1 FROM transactions t WHERE t.id = r.transaction_id AND t.merchant_id = r.merchant_id);
@@ -85,7 +86,7 @@ SELECT count(*) AS completed_without_capture FROM transactions
  WHERE status = 'completed' AND is_split IS NOT TRUE AND windcave_transaction_id IS NULL
    AND coalesce(payment_method, '') <> 'cash';
 
--- The session time zone (the 0037 question; 0039's rules do not depend on it).
+-- The session time zone (the 0037 question; 0048's rules do not depend on it).
 SHOW TimeZone;
 ```
 
@@ -101,7 +102,7 @@ npm run db:release -- $TARGET
 npm run db:migrate:status -- $TARGET
 ```
 
-Expected: `0039_refund_operations.sql` applied, nothing pending. Start the app again.
+Expected: `0048_refund_operations.sql` applied, nothing pending. Start the app again.
 
 ## 5. If something goes wrong
 

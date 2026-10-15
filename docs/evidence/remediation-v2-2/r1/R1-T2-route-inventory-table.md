@@ -1,4 +1,4 @@
-# R1-T2 route inventory — generated 2026-10-14 @ `021d3f05e60284c8aa56703f4657c2c9c07f3448`
+# R1-T2 route inventory — generated 2026-10-14 @ `8b7c300eb852990bc22c869323b7f30cecd697d1`
 
 Regenerate with `npx tsx scripts/generate-route-policy.ts`. This table is
 evidence for the SHA named above, not a timeless constant — see
@@ -19,33 +19,36 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 
 ### Open findings
 
-- **ALL /api/windcave/notification:** pending → processing is a read then a write, not an atomic claim: two simultaneous notifications for one session can both query the provider and both settle it (a second count increment, a second push). Plan 22.7 / R3 (C20) owns the single atomic finaliser.
-- **ALL /api/windcave/notification:** Until R2-T6 (2026-10-12) it logged the raw query (with the provider's session id), and the query and body when no session id was found; it now logs fixed text and the internal sale id only (r2-t6-provider-log-guard.test.ts).
-- **POST /api/v1/transactions:** webhook_url from the caller is stored as a webhook delivery row. Nothing delivers those rows today; any future delivery worker must restrict destinations (server-side request forgery).
-- **POST /api/v1/transactions:** No rate limit and no idempotency key on an API that creates payment links (behind FEATURE_ECOMMERCE_API, off by default; plan 15.5 decides the API's future).
-- **ALL /api/windcave/rent-notification:** finalizeRentInvoice marks a single (unsplit) payment paid after a plain read: this notification and the browser's return arriving together can both record it, logging Payment_Received twice and sending the GST invoice twice. Plan 22.7 / R3 (C20).
-- **ALL /api/windcave/trades-notification:** finalizeTradeInvoice marks a single payment paid after a plain read: a notification and the browser's return arriving together can both record it and send the payment invoice twice. Plan 22.7 / R3 (C20).
+- **ALL /api/pay/notification/:state:** Historical sessions without exact pre-send expectations remain held for operational reconciliation. Real keyed delivery remains an R3 exit gate.
+- **ALL /api/windcave/notification:** Historical sessions without exact pre-send expectations remain held for operational reconciliation. Real keyed delivery remains an R3 exit gate.
+- **POST /api/v1/transactions:** Webhook requests are explicitly unavailable before creation; the later API phase must restrict destinations before enabling delivery.
+- **POST /api/v1/transactions:** Distributed rate limits remain with R6; FEATURE_ECOMMERCE_API remains off by default.
+- **ALL /api/billing/card/notification:** Historical sessions without exact pre-send expectations remain held for operational reconciliation. Real keyed delivery remains an R3 exit gate.
+- **ALL /api/windcave/rent-notification:** Historical sessions without exact pre-send expectations remain held for operational reconciliation. Real keyed delivery remains an R3 exit gate.
+- **ALL /api/windcave/trades-notification:** Historical sessions without exact pre-send expectations remain held for operational reconciliation. Real keyed delivery remains an R3 exit gate.
 - **POST /api/internal/cron:** Overlapping runs are refused only within one server process (the in-memory cronRunning flag): two instances can run the passes at once. Plan 13.3 (durable cron leases).
 - **GET /api/pay/t/:token/receipt:** share is parsed with Number(), which accepts forms such as 1e0, 0x1 and ' 1' that the plan's strict parser (§8.4) refuses; the same on the receipt, its PDF and its QR.
+- **POST /api/pay/t/:token/session:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
+- **POST /api/pay/t/:token/hosted-fields-complete:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
+- **POST /api/pay/t/:token/googlepay-complete:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
+- **GET /api/pay/return/:state:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
 - **POST /api/transactions/:id/split:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
 - **GET /api/split-payments/:id:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
-- **POST /api/transactions/:id/pay:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
-- **POST /api/transactions/:id/hosted-fields-complete:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
-- **POST /api/transactions/:id/hosted-fields-complete:** Gap 11 (known, escalated 2026-09-13): the finaliser re-settles on every call with the bound session (an unsplit sale is counted and pushed again). After a share it resets the session to pending; until R2-T5 one approved session could then complete the next share too, and now cannot, since the next share's reference differs from the one that session carries (r2-t5-split-share-replay.test.ts). Closed by moving onto the payment_attempts engine (C3).
-- **POST /api/transactions/:id/hosted-fields-complete:** A split share is marked paid without comparing what the provider charged with the share. Until 2026-09-26 the pay route let the customer choose the amount, so every share of a $100 sale could be paid with $0.01 and the sale showed fully paid (shown in the harness); the owner chose exact shares only, and the pay route now opens every session for exactly what is owed. Since R2-T5 the provider's amount, currency and reference are compared with the share's before it counts (the verified query). What remains is one session settling twice (gap 11's replay; the read-then-write settlement, R3/C20).
-- **POST /api/transactions/:id/googlepay-complete:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
-- **POST /api/transactions/:id/googlepay-complete:** Gap 11 (known, escalated 2026-09-13): the finaliser re-settles on every call with the bound session (an unsplit sale is counted and pushed again). After a share it resets the session to pending; until R2-T5 one approved session could then complete the next share too, and now cannot, since the next share's reference differs from the one that session carries (r2-t5-split-share-replay.test.ts). Closed by moving onto the payment_attempts engine (C3).
-- **POST /api/transactions/:id/googlepay-complete:** A split share is marked paid without comparing what the provider charged with the share. Until 2026-09-26 the pay route let the customer choose the amount, so every share of a $100 sale could be paid with $0.01 and the sale showed fully paid (shown in the harness); the owner chose exact shares only, and the pay route now opens every session for exactly what is owed. Since R2-T5 the provider's amount, currency and reference are compared with the share's before it counts (the verified query). What remains is one session settling twice (gap 11's replay; the read-then-write settlement, R3/C20).
+- **POST /api/transactions/:id/pay:** Numeric board-sale addressing remains publicly guessable; preserve the reviewed R1 scope and token-sale exclusion.
+- **POST /api/transactions/:id/pay:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
+- **POST /api/transactions/:id/hosted-fields-complete:** Numeric board-sale addressing remains publicly guessable; preserve the reviewed R1 scope and token-sale exclusion.
+- **POST /api/transactions/:id/hosted-fields-complete:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
+- **POST /api/transactions/:id/googlepay-complete:** Numeric board-sale addressing remains publicly guessable; preserve the reviewed R1 scope and token-sale exclusion.
+- **POST /api/transactions/:id/googlepay-complete:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
 - **GET /api/transactions/:id:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it. With no rate limit, counting through the numbers lists every such sale of every business: item, price, time, business and board, and, since the by-number business read was retired (2026-09-26), each selling business's receipt details, which moved here.
 - **POST /api/transactions/:id/receipt-pdf:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
 - **GET /api/transactions/:id/receipt-qr:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
-- **GET /api/windcave/callback:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
-- **GET /api/windcave/callback:** Settles by a read then a write, not a claim, racing the notification (plan 22.7 / R3, C20).
-- **POST /api/checkout/:token/split:** What a split share costs is fixed when its session is opened, from the share count and the shares paid at that moment: sessions opened at once are all charged the equal share, so up to one cent per share of the remainder can go uncharged. Since 2026-09-26 the count locks once any session is opened (0030), so a share opened at 1/12 can no longer count as 1/2. The remainder is R3's (payment attempts).
-- **POST /api/checkout/:token/session:** Every call opens another provider session and re-pins a single-payment invoice to it: a payment completed on an earlier session is then refused at completion (403) and missed by the notification, which finds invoices by their pinned session. The payer is charged and the invoice stays unpaid (R3: payment attempts).
-- **POST /api/checkout/:token/session:** What a split share costs is fixed when its session is opened, from the share count and the shares paid at that moment: sessions opened at once are all charged the equal share, so up to one cent per share of the remainder can go uncharged. Since 2026-09-26 the count locks once any session is opened (0030), so a share opened at 1/12 can no longer count as 1/2. The remainder is R3's (payment attempts).
-- **POST /api/checkout/:token/googlepay-complete:** The submit URLs are cached per link, not per session: when two payers of one split invoice open sessions, the first one's Google Pay payment goes to the second one's session, and both sessions are then counted as shares.
-- **GET /api/checkout/callback:** Settles by a read then a write, not a claim, racing the notification (R3 / C20).
+- **GET /api/windcave/callback:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
+- **POST /api/checkout/:token/split:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
+- **POST /api/checkout/:token/session:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
+- **POST /api/checkout/:token/hosted-fields-complete:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
+- **POST /api/checkout/:token/googlepay-complete:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
+- **GET /api/checkout/callback:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
 - **GET /api/trades/quotes/token/:token:** Returns the whole quote row, where the code's own comment asks for a narrow reply: with it the business's numeric id, the client profile id, the token, internal timestamps and documentUrl, a storage path (served to nobody since gap 13).
 - **POST /api/trades/quotes/token/:token/respond:** Two acceptances at once can both pass the status check, and each issues and sends an invoice (a read then a write; R3 / C20).
 - **POST /api/trades/quotes/token/:token/respond:** Returns the whole quote row, where the code's own comment asks for a narrow reply: with it the business's numeric id, the client profile id, the token, internal timestamps and documentUrl, a storage path (served to nobody since gap 13).
@@ -102,9 +105,10 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 - **POST /api/property/invoices/document:** The upload is read into memory up to 20 MB per request (invoiceDocUpload), by any login of the business.
 - **POST /api/property/invoices:** Sending rent to a tenant with a live rent invoice changes that invoice's amount, even with split shares paid or a payment session open: the shares paid were worked out on the old amount, and an open session charges the old one (R3: payment attempts).
 - **POST /api/property/invoices/:id/resend:** No limit on resending: each call is an email, SMS or WhatsApp message to the tenant, at the platform's cost (operations).
-- **POST /api/property/invoices/:id/void:** Voiding while the tenant is paying (allowed since OI-1, 2026-10-13): a single payment completing afterwards is recorded by finalizeRentInvoice (a voided invoice becomes paid, Payment_Received_After_Void; one paid another way keeps its status, Payment_Received_After_External with a refund due); a split share's is logged for a refund (Split_Share_Unrecorded, with the invoice's state as its reason). Only the latest single-invoice session is pinned, so a payment through an earlier wallet session is still found by no lookup (pre-existing).
+- **POST /api/property/invoices/:id/void:** Voiding while the tenant is paying: the provider's completion then finds the invoice settled (finalizeRentInvoice), so a single payment's charge is recorded nowhere; a split share's is logged (Split_Share_Unrecorded). R3 (payment attempts).
+- **POST /api/property/invoices/:id/void:** A split invoice with shares already paid can be voided: those shares stay collected, with nothing but their events to show for them (R3/R4, refunds).
 - **POST /api/property/invoices/:id/void:** Every login of the business, a teammate included, has every property action and setting (tenants, rent and bills, voiding, marking paid outside TaptPay, automations, the reminder settings): kept by the owner's decision (2026-09-27).
-- **POST /api/property/invoices/:id/mark-paid-external:** Marking an invoice paid outside TaptPay while the tenant is paying (allowed since OI-1, 2026-10-13): a single payment completing afterwards is recorded by finalizeRentInvoice (a voided invoice becomes paid, Payment_Received_After_Void; one paid another way keeps its status, Payment_Received_After_External with a refund due); a split share's is logged for a refund (Split_Share_Unrecorded, with the invoice's state as its reason). Only the latest single-invoice session is pinned, so a payment through an earlier wallet session is still found by no lookup (pre-existing).
+- **POST /api/property/invoices/:id/mark-paid-external:** Marking an invoice paid outside TaptPay while the tenant is paying: the provider's completion then finds the invoice settled (finalizeRentInvoice), so a single payment's charge is recorded nowhere; a split share's is logged (Split_Share_Unrecorded). R3 (payment attempts).
 - **POST /api/property/invoices/:id/mark-paid-external:** Every login of the business, a teammate included, has every property action and setting (tenants, rent and bills, voiding, marking paid outside TaptPay, automations, the reminder settings): kept by the owner's decision (2026-09-27).
 - **PUT /api/property/reminder-settings:** Every login of the business, a teammate included, has every property action and setting (tenants, rent and bills, voiding, marking paid outside TaptPay, automations, the reminder settings): kept by the owner's decision (2026-09-27).
 - **PUT /api/trades/reminder-settings:** Every login of the business, a teammate included, has every trades action and setting but GST (clients, quotes, invoices, cancelling one, marking one paid outside TaptPay, recurring invoices, the reminder switch), as every trades screen offers them; in property the owner kept the same (2026-09-27, batch 6c answer 2).
@@ -113,9 +117,10 @@ A reviewed route's principal below is the review's; a pending one's is the heuri
 - **POST /api/trades/invoices:** An archived client can still be invoiced here; no screen offers it (the pickers list only current clients). Only a recurring invoice is refused for one (owner decision 2026-09-27).
 - **POST /api/trades/invoices:** A deposit's amount is the one typed, not checked against the deposit its quote worked out.
 - **POST /api/trades/invoices/:id/send-balance:** A customer's acceptance of the quote makes its deposit or full invoice without the client's lock (the public lane), so one landing beside a balance send is not counted in that balance (R3).
-- **POST /api/trades/invoices/:id/mark-paid-external:** Marking an invoice paid outside TaptPay while the client is paying (allowed since OI-1, 2026-10-13): a single payment completing afterwards is recorded by finalizeTradeInvoice (a voided invoice becomes paid, payment_received_after_void, or stays voided with the payment and a refund due when a schedule has replaced it; one paid another way keeps its status, payment_received_after_external with a refund due); a split share's is logged for a refund (split_share_unrecorded, with the invoice's state as its reason). Only the latest single-invoice session is pinned, so a payment through an earlier wallet session is still found by no lookup (pre-existing).
+- **POST /api/trades/invoices/:id/mark-paid-external:** Marking an invoice paid outside TaptPay while the client is paying: the provider's completion then finds the invoice settled (finalizeTradeInvoice), so a single payment's charge is recorded nowhere; a split share's is logged (split_share_unrecorded). R3 (payment attempts).
 - **POST /api/trades/invoices/:id/mark-paid-external:** Every login of the business, a teammate included, has every trades action and setting but GST (clients, quotes, invoices, cancelling one, marking one paid outside TaptPay, recurring invoices, the reminder switch), as every trades screen offers them; in property the owner kept the same (2026-09-27, batch 6c answer 2).
-- **POST /api/trades/invoices/:id/void:** Voiding while the client is paying (allowed since OI-1, 2026-10-13): a single payment completing afterwards is recorded by finalizeTradeInvoice (a voided invoice becomes paid, payment_received_after_void, or stays voided with the payment and a refund due when a schedule has replaced it; one paid another way keeps its status, payment_received_after_external with a refund due); a split share's is logged for a refund (split_share_unrecorded, with the invoice's state as its reason). Only the latest single-invoice session is pinned, so a payment through an earlier wallet session is still found by no lookup (pre-existing).
+- **POST /api/trades/invoices/:id/void:** Voiding while the client is paying: the provider's completion then finds the invoice settled (finalizeTradeInvoice), so a single payment's charge is recorded nowhere; a split share's is logged (split_share_unrecorded). R3 (payment attempts).
+- **POST /api/trades/invoices/:id/void:** A split invoice with shares already paid can be voided: those shares stay collected, with nothing but their events to show for them (R3/R4, refunds).
 - **POST /api/trades/invoices/:id/void:** Every login of the business, a teammate included, has every trades action and setting but GST (clients, quotes, invoices, cancelling one, marking one paid outside TaptPay, recurring invoices, the reminder switch), as every trades screen offers them; in property the owner kept the same (2026-09-27, batch 6c answer 2).
 
 ## The role and tenant matrix (R1-T3)
@@ -167,200 +172,200 @@ address's success is its notice (410), which it gives everyone.
 
 | Method | Path | Line | Principal | Markers | Served | Refused (P2.2) |
 |---|---|---:|---|---|---|---|
-| GET | `/robots.txt` | 466 | public | — | `signed-out` | — |
-| GET | `/nfc/:merchantId/stone/:stoneId` | 485 | public | generatePaymentUrl( | `signed-out` | — |
-| GET | `/nfc/:merchantId` | 499 | public | — | `signed-out` | — |
-| GET | `/.well-known/apple-developer-merchantid-domain-association` | 506 | public | — | `signed-out` | — |
-| GET | `/sitemap.xml` | 521 | public | authenticateToken, checkMerchantOwnership, checkAccountOwnership, isAccountOwner, req.user?.role !== "admin", req.user.role === 'admin', authenticateAdmin | `signed-out` | — |
-| GET | `/api/auth/google` | 609 | public | — | `signed-out` | — |
-| GET | `/api/auth/google/callback` | 630 | public | — | `signed-out` | — |
-| POST | `/api/auth/google/session` | 785 | public-bearer | — | `link-holder` | 401: `unknown-link` |
-| GET | `/api/auth/apple` | 824 | public | — | `signed-out` | — |
-| GET | `/api/auth/apple/available` | 837 | public | — | `signed-out` | — |
-| POST | `/api/auth/apple/callback` | 842 | public | — | `signed-out` | — |
-| POST | `/api/auth/apple/session` | 951 | public-bearer | — | `link-holder` | 401: `unknown-link` |
-| GET | `/api/auth/apple/connection` | 984 | merchant | authenticateToken | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
-| POST | `/api/auth/apple/connect` | 999 | merchant | authenticateToken | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
-| POST | `/api/auth/apple/disconnect` | 1026 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
-| POST | `/api/auth/sign-out-everywhere` | 1166 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| POST | `/api/auth/logout` | 1193 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| POST | `/api/auth/login` | 1234 | public | — | `signed-out` | — |
-| POST | `/api/auth/forgot-password` | 1296 | public | requestPasswordReset( | `signed-out` | — |
-| POST | `/api/auth/reset-password` | 1336 | public-bearer | resetPassword( | `link-holder` | 400: `unknown-link` |
-| GET | `/api/auth/validate-reset-token/:token` | 1378 | public-bearer | validateResetToken( | `link-holder` | 200: `unknown-link` |
-| GET | `/api/admin/request-origin` | 1397 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
-| POST | `/api/admin/auth/login` | 1417 | public | — | `signed-out` | — |
-| GET | `/api/auth/me` | 1536 | merchant | authenticateToken | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token` |
-| GET | `/api/auth/session` | 1550 | public | — | `signed-out` | — |
-| GET | `/api/tutorial/state` | 1569 | merchant | authenticateToken, req.user?.role === "admin" | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| PATCH | `/api/tutorial/pages/:pageKey` | 1599 | merchant | authenticateToken, req.user?.role === "admin" | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| POST | `/api/tutorial/restart` | 1636 | merchant | authenticateToken, req.user?.role === "admin" | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| POST | `/api/merchants/:id/onboarding` | 1657 | merchant | authenticateToken, checkAccountOwnership | `owner`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `other-owner` |
-| GET | `/api/admin/auth/me` | 1749 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
-| POST | `/api/admin/auth/logout` | 1764 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
-| GET | `/api/merchants/:id/qr` | 1780 | public | — | `signed-out` | — |
-| GET | `/api/merchants/:id/stone/:stoneId/qr` | 1787 | public | — | `signed-out` | 404: `unknown-board` |
-| GET | `/api/merchants/:id/stone/:stoneId/brand` | 1840 | public | publicBoardBrandDto( | `signed-out` | 404: `unknown-board`, `removed-board` |
-| GET | `/api/merchants/:id/profile` | 1862 | merchant | authenticateToken, checkMerchantOwnership, isAccountOwner | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
-| GET | `/api/pay/t/:token` | 1884 | public-bearer | resolvePaymentToken( | `link-holder` | 404: `unknown-link` |
-| GET | `/api/pay/t/:token/qr` | 1911 | public-bearer | resolvePaymentToken( | `link-holder` | 404: `unknown-link` |
-| POST | `/api/pay/t/:token/split` | 1939 | public-bearer | resolvePaymentToken(, loadTokenReceipt( | `link-holder` | 404: `unknown-link` |
-| GET | `/api/pay/t/:token/receipt` | 2036 | public-bearer | loadTokenReceipt( | `link-holder` | 404: `unknown-link` |
-| POST | `/api/pay/t/:token/receipt-pdf` | 2049 | public-bearer | loadTokenReceipt( | `link-holder` | 404: `unknown-link` |
-| GET | `/api/pay/t/:token/receipt-qr` | 2079 | public-bearer | loadTokenReceipt( | `link-holder` | 404: `unknown-link` |
-| POST | `/api/pay/t/:token/session` | 2329 | public-bearer | resolvePaymentToken(, prepareTokenCompletion( | `link-holder` | 404: `unknown-link` |
-| POST | `/api/pay/t/:token/hosted-fields-complete` | 2665 | public-bearer | prepareTokenCompletion( | `link-holder` | 404: `unknown-link` |
-| POST | `/api/pay/t/:token/googlepay-complete` | 2721 | public-bearer | prepareTokenCompletion(, paymentAttempts.resolveReturnState( | `link-holder` | 404: `unknown-link` |
-| GET | `/api/pay/return/:state` | 2857 | public-bearer | paymentAttempts.resolveReturnState( | `link-holder` | 404: `unknown-link` |
-| ALL | `/api/pay/notification/:state` | 2891 | provider | — | `provider` | 200: `unknown-reference` |
-| GET | `/api/merchants/:id/active-transaction` | 2908 | merchant / public | authenticateToken, checkMerchantOwnership, publicTransactionDto(, generatePaymentUrl( | `signed-out`, `owner`, `member`, `platform-admin` | 401: `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner`; 404: `unknown-board`, `removed-board` |
-| POST | `/api/transactions` | 3023 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
-| POST | `/api/transactions/cash-sale` | 3105 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
-| POST | `/api/transactions/tap-to-pay` | 3180 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
-| POST | `/api/transactions/:id/split` | 3316 | public | isTokenAddressedTransaction(, publicTransactionDto( | `signed-out` | 404: `sale-with-its-own-link` |
-| GET | `/api/split-payments/:id` | 3370 | public | isTokenAddressedTransaction( | `signed-out` | 404: `sale-with-its-own-link` |
-| POST | `/api/transactions/:id/cancel` | 3389 | merchant | authenticateToken, checkMerchantOwnership, req.user?.role === "admin" | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 404: `other-owner` |
-| GET | `/api/nfc/capabilities` | 3506 | public | — | `signed-out` | — |
-| POST | `/api/transactions/:id/pay` | 3520 | public | isTokenAddressedTransaction( | `signed-out` | 404: `sale-with-its-own-link` |
-| GET | `/api/windcave/env` | 3765 | public | — | `signed-out` | — |
-| POST | `/api/transactions/:id/hosted-fields-complete` | 3779 | public | isTokenAddressedTransaction( | `signed-out` | 404: `sale-with-its-own-link` |
-| POST | `/api/transactions/:id/googlepay-complete` | 3822 | public | isTokenAddressedTransaction( | `signed-out` | 404: `sale-with-its-own-link` |
-| GET | `/api/transactions/:id` | 3882 | public | isTokenAddressedTransaction(, publicTransactionDto( | `signed-out` | 404: `sale-with-its-own-link` |
-| POST | `/api/transactions/:id/receipt-pdf` | 3905 | public | isTokenAddressedTransaction( | `signed-out` | 404: `sale-with-its-own-link` |
-| GET | `/api/transactions/:id/receipt-qr` | 3966 | public | isTokenAddressedTransaction( | `signed-out` | 404: `sale-with-its-own-link` |
-| GET | `/api/merchants/:id/export/pdf` | 4020 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
-| POST | `/api/admin/merchants/:id/verify` | 4060 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
-| POST | `/api/admin/merchants/:id/set-active` | 4111 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
-| GET | `/api/admin/merchants/:id/transactions` | 4134 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
-| PATCH | `/api/admin/merchants/:id/windcave-merchant-id` | 4147 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
-| POST | `/api/admin/merchants/:id/activate` | 4163 | platform-admin | authenticateAdmin, storage.verifyMerchant( | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
-| PUT | `/api/merchants/:id/details` | 4221 | merchant | authenticateToken, checkAccountOwnership | `owner`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `other-owner` |
-| PUT | `/api/merchants/:id/change-password` | 4247 | merchant | authenticateToken, checkMerchantOwnership, req.user?.role === "admin" | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner`, `platform-admin` |
-| PUT | `/api/merchants/:id/theme` | 4342 | merchant | authenticateToken, checkAccountOwnership | `owner`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `other-owner` |
-| PUT | `/api/merchants/:id/daily-goal` | 4370 | merchant | authenticateToken, checkAccountOwnership | `owner`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `other-owner` |
-| PUT | `/api/merchants/:id` | 4401 | merchant | authenticateToken, checkAccountOwnership | `owner`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `other-owner` |
-| POST | `/api/merchants/:id/logo` | 4475 | merchant | authenticateToken, checkAccountOwnership | `owner`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `other-owner` |
-| DELETE | `/api/merchants/:id/logo` | 4530 | merchant | authenticateToken, checkAccountOwnership | `owner`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `other-owner` |
-| GET | `/api/merchants/:id/transactions` | 4573 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
-| GET | `/api/merchants/:id/tapt-stones` | 4590 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
-| POST | `/api/merchants/:id/tapt-stones` | 4606 | merchant | authenticateToken, checkMerchantOwnership, generatePaymentUrl( | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
-| PUT | `/api/merchants/:merchantId/tapt-stones/:stoneId` | 4657 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
-| DELETE | `/api/merchants/:merchantId/tapt-stones/:stoneId` | 4696 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
-| ALL | `/api/windcave/notification` | 4736 | provider | — | `provider` | 200: `unknown-reference` |
-| GET | `/api/windcave/callback` | 4857 | public | isTokenAddressedTransaction( | `signed-out` | 302: `sale-with-its-own-link` |
-| GET | `/api/admin/analytics` | 5032 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
-| GET | `/api/admin/revenue-over-time` | 5113 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
-| GET | `/api/admin/payment-method-breakdown` | 5149 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
-| GET | `/api/admin/ga4-detailed` | 5186 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
-| GET | `/api/admin/ga4-metrics` | 5251 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
-| GET | `/api/admin/merchants` | 5338 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
-| GET | `/api/admin/merchants/:id` | 5348 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
-| POST | `/api/admin/resend-verification` | 5371 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
-| GET | `/api/admin/email-status` | 5431 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
-| POST | `/api/auth/confirm-email` | 5468 | public-bearer | getMerchantByToken( | `link-holder` | 400: `unknown-link` |
-| POST | `/api/auth/resend-confirmation` | 5595 | public | — | `signed-out` | — |
-| POST | `/api/info-pack-leads` | 5625 | public | — | `signed-out` | — |
-| POST | `/api/merchants/signup` | 5678 | public | — | `signed-out` | — |
-| GET | `/api/merchants/:id/events` | 5789 | merchant / public | authenticateToken, checkMerchantOwnership | `signed-out`, `owner`, `member`, `platform-admin` | 401: `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner`; 404: `unknown-board`, `removed-board` |
-| GET | `/api/push/capabilities` | 5875 | public | — | `signed-out` | — |
-| GET | `/api/push/vapid-key` | 5899 | public | — | `signed-out` | — |
-| POST | `/api/push/subscribe` | 5909 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| POST | `/api/push/unsubscribe` | 5955 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| POST | `/api/push/native-subscribe` | 5982 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| POST | `/api/push/native-unsubscribe` | 6020 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| GET | `/api/push/status` | 6053 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| GET | `/api/push/preferences` | 6078 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| PUT | `/api/push/preferences` | 6093 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| POST | `/api/transactions/:transactionId/refunds` | 6125 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin`; 404: `other-owner` |
-| GET | `/api/transactions/:transactionId/refunds` | 6274 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| GET | `/api/merchants/:merchantId/refunds` | 6306 | merchant | authenticateToken | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
-| GET | `/api/merchants/:merchantId/stock-items` | 6339 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
-| POST | `/api/merchants/:merchantId/stock-items` | 6358 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
-| PUT | `/api/merchants/:merchantId/stock-items/:itemId` | 6383 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
-| DELETE | `/api/merchants/:merchantId/stock-items/:itemId` | 6420 | merchant | authenticateToken, authenticateApiKey, requireEcommerceApi, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
-| POST | `/api/v1/transactions` | 6488 | api-key | authenticateApiKey, requireEcommerceApi, publicTransactionDto( | `api-key` | 401: `no-key`, `unknown-key`; 403: `key-without-permission` |
-| GET | `/api/v1/transactions/:id` | 6600 | api-key | authenticateApiKey, requireEcommerceApi | `api-key` | 401: `no-key`, `unknown-key`; 403: `key-without-permission` |
-| GET | `/api/subscription` | 6688 | merchant | authenticateToken, isAccountOwner | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| PUT | `/api/subscription/plan` | 6711 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
-| POST | `/api/subscription/cancel` | 6774 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
-| POST | `/api/subscription/resume` | 6817 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
-| GET | `/api/team` | 6848 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
-| POST | `/api/team/invite` | 6869 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
-| POST | `/api/team/:userId/resend` | 6930 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin`; 404: `other-owner` |
-| DELETE | `/api/team/:userId/invite` | 7012 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin`; 404: `other-owner` |
-| PUT | `/api/team/:userId/status` | 7032 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin`; 404: `other-owner` |
-| DELETE | `/api/team/:userId` | 7083 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin`; 404: `other-owner` |
-| POST | `/api/team/accept-invite` | 7124 | public-bearer | getUserByInviteToken( | `link-holder` | 400: `unknown-link` |
-| GET | `/api/subscription/billing-history` | 7160 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
-| GET | `/api/billing/card` | 7190 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
-| POST | `/api/billing/card/session` | 7219 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
-| POST | `/api/billing/card/confirm` | 7265 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
-| ALL | `/api/billing/card/notification` | 7356 | provider | billingCardCallback | `provider` | — |
-| GET | `/api/billing/card/callback` | 7366 | public | billingCardCallback | `signed-out` | — |
-| POST | `/api/billing/card/callback` | 7367 | public | billingCardCallback | `signed-out` | — |
-| DELETE | `/api/billing/card` | 7370 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
-| POST | `/api/board-builder/submit` | 7395 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| GET | `/uploads/:folder/:name` | 7460 | public | getCheckoutInvoiceByToken( | `signed-out` | — |
-| GET | `/api/property/tenants` | 7776 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| POST | `/api/property/tenants` | 7787 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| GET | `/api/property/tenants/:id` | 7804 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| PUT | `/api/property/tenants/:id` | 7816 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| POST | `/api/property/tenants/:id/archive` | 7834 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| POST | `/api/property/tenants/:id/unarchive` | 7848 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| GET | `/api/property/tenants/:id/events` | 7862 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| GET | `/api/property/schedules` | 7879 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| POST | `/api/property/tenants/:tenantId/schedules` | 7890 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| PUT | `/api/property/schedules/:id` | 7912 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| DELETE | `/api/property/schedules/:id` | 7934 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| GET | `/api/property/invoices` | 7950 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| POST | `/api/property/invoices/document` | 7981 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| GET | `/api/invoice-documents/:name` | 8044 | merchant / platform-admin | authenticateToken | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 404: `other-owner` |
-| POST | `/api/property/invoices` | 8074 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| POST | `/api/property/invoices/:id/resend` | 8100 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| POST | `/api/property/invoices/:id/void` | 8122 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| POST | `/api/property/invoices/:id/mark-paid-external` | 8141 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| GET | `/api/checkout/resolve/:token` | 8168 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 404: `unknown-link` |
-| GET | `/api/checkout/document/:token` | 8254 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 404: `unknown-link` |
-| POST | `/api/checkout/:token/split` | 8278 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 404: `unknown-link` |
-| POST | `/api/checkout/:token/session` | 8309 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 404: `unknown-link` |
-| POST | `/api/checkout/:token/hosted-fields-complete` | 8387 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 404: `unknown-link` |
-| POST | `/api/checkout/:token/googlepay-complete` | 8428 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 404: `unknown-link` |
-| GET | `/api/checkout/callback` | 8479 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 302: `unknown-link` |
-| ALL | `/api/windcave/rent-notification` | 8507 | provider | — | `provider` | 200: `unknown-reference` |
-| ALL | `/api/windcave/trades-notification` | 8529 | provider | — | `provider` | 200: `unknown-reference` |
-| POST | `/api/webhooks/whatsapp` | 8554 | provider | req.headers["apikey"] | `provider` | 200: `wrong-webhook-key`, `unknown-reference` |
-| GET | `/api/property/reminder-settings` | 8604 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| PUT | `/api/property/reminder-settings` | 8614 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| GET | `/api/trades/reminder-settings` | 8650 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| PUT | `/api/trades/reminder-settings` | 8660 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| GET | `/api/trades/gst-settings` | 8673 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| PUT | `/api/trades/gst-settings` | 8689 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
-| GET | `/api/trades/clients` | 8709 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| POST | `/api/trades/clients` | 8717 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| GET | `/api/trades/clients/:id` | 8729 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| PUT | `/api/trades/clients/:id` | 8740 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| POST | `/api/trades/clients/:id/archive` | 8755 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| POST | `/api/trades/clients/:id/unarchive` | 8768 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| POST | `/api/trades/clients/:id/promote` | 8783 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| GET | `/api/trades/clients/:id/events` | 8798 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| GET | `/api/trades/quotes` | 8810 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| POST | `/api/trades/quotes` | 8819 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| GET | `/api/trades/quotes/:id/pdf` | 8913 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| GET | `/api/trades/quotes/token/:token/pdf` | 8931 | public-bearer | getQuoteByToken( | `link-holder` | 404: `unknown-link` |
-| GET | `/api/trades/quotes/token/:token` | 8952 | public-bearer | getQuoteByToken( | `link-holder` | 404: `unknown-link` |
-| POST | `/api/trades/quotes/token/:token/respond` | 8997 | public-bearer | getQuoteByToken( | `link-holder` | 404: `unknown-link` |
-| GET | `/api/trades/invoices` | 9046 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| POST | `/api/trades/invoices` | 9058 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| POST | `/api/trades/invoices/:id/send-balance` | 9123 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| POST | `/api/trades/invoices/:id/mark-paid-external` | 9158 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| POST | `/api/trades/invoices/:id/complete` | 9183 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| POST | `/api/trades/invoices/:id/void` | 9203 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| GET | `/api/trades/schedules` | 9225 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
-| POST | `/api/trades/schedules` | 9232 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| PUT | `/api/trades/schedules/:id` | 9261 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| DELETE | `/api/trades/schedules/:id` | 9285 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
-| GET | `/api/internal/cron/status` | 9302 | cron | authorizeCronRequest | `scheduler` | 401: `no-secret`, `wrong-secret` |
-| POST | `/api/internal/cron` | 9312 | cron | authorizeCronRequest | `scheduler` | 401: `no-secret`, `wrong-secret` |
+| GET | `/robots.txt` | 452 | public | — | `signed-out` | — |
+| GET | `/nfc/:merchantId/stone/:stoneId` | 471 | public | generatePaymentUrl( | `signed-out` | — |
+| GET | `/nfc/:merchantId` | 485 | public | — | `signed-out` | — |
+| GET | `/.well-known/apple-developer-merchantid-domain-association` | 492 | public | — | `signed-out` | — |
+| GET | `/sitemap.xml` | 507 | public | authenticateToken, checkMerchantOwnership, checkAccountOwnership, isAccountOwner, req.user?.role !== "admin", req.user.role === 'admin', authenticateAdmin | `signed-out` | — |
+| GET | `/api/auth/google` | 595 | public | — | `signed-out` | — |
+| GET | `/api/auth/google/callback` | 616 | public | — | `signed-out` | — |
+| POST | `/api/auth/google/session` | 771 | public-bearer | — | `link-holder` | 401: `unknown-link` |
+| GET | `/api/auth/apple` | 810 | public | — | `signed-out` | — |
+| GET | `/api/auth/apple/available` | 823 | public | — | `signed-out` | — |
+| POST | `/api/auth/apple/callback` | 828 | public | — | `signed-out` | — |
+| POST | `/api/auth/apple/session` | 937 | public-bearer | — | `link-holder` | 401: `unknown-link` |
+| GET | `/api/auth/apple/connection` | 970 | merchant | authenticateToken | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
+| POST | `/api/auth/apple/connect` | 985 | merchant | authenticateToken | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
+| POST | `/api/auth/apple/disconnect` | 1012 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
+| POST | `/api/auth/sign-out-everywhere` | 1152 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| POST | `/api/auth/logout` | 1179 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| POST | `/api/auth/login` | 1220 | public | — | `signed-out` | — |
+| POST | `/api/auth/forgot-password` | 1282 | public | requestPasswordReset( | `signed-out` | — |
+| POST | `/api/auth/reset-password` | 1322 | public-bearer | resetPassword( | `link-holder` | 400: `unknown-link` |
+| GET | `/api/auth/validate-reset-token/:token` | 1364 | public-bearer | validateResetToken( | `link-holder` | 200: `unknown-link` |
+| GET | `/api/admin/request-origin` | 1383 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
+| POST | `/api/admin/auth/login` | 1403 | public | — | `signed-out` | — |
+| GET | `/api/auth/me` | 1522 | merchant | authenticateToken | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token` |
+| GET | `/api/auth/session` | 1536 | public | — | `signed-out` | — |
+| GET | `/api/tutorial/state` | 1555 | merchant | authenticateToken, req.user?.role === "admin" | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| PATCH | `/api/tutorial/pages/:pageKey` | 1585 | merchant | authenticateToken, req.user?.role === "admin" | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| POST | `/api/tutorial/restart` | 1622 | merchant | authenticateToken, req.user?.role === "admin" | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| POST | `/api/merchants/:id/onboarding` | 1643 | merchant | authenticateToken, checkAccountOwnership | `owner`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `other-owner` |
+| GET | `/api/admin/auth/me` | 1735 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
+| POST | `/api/admin/auth/logout` | 1750 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
+| GET | `/api/merchants/:id/qr` | 1766 | public | — | `signed-out` | — |
+| GET | `/api/merchants/:id/stone/:stoneId/qr` | 1773 | public | — | `signed-out` | 404: `unknown-board` |
+| GET | `/api/merchants/:id/stone/:stoneId/brand` | 1826 | public | publicBoardBrandDto( | `signed-out` | 404: `unknown-board`, `removed-board` |
+| GET | `/api/merchants/:id/profile` | 1848 | merchant | authenticateToken, checkMerchantOwnership, isAccountOwner | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
+| GET | `/api/pay/t/:token` | 1870 | public-bearer | resolvePaymentToken( | `link-holder` | 404: `unknown-link` |
+| GET | `/api/pay/t/:token/qr` | 1897 | public-bearer | resolvePaymentToken( | `link-holder` | 404: `unknown-link` |
+| POST | `/api/pay/t/:token/split` | 1925 | public-bearer | resolvePaymentToken(, loadTokenReceipt( | `link-holder` | 404: `unknown-link` |
+| GET | `/api/pay/t/:token/receipt` | 2018 | public-bearer | loadTokenReceipt( | `link-holder` | 404: `unknown-link` |
+| POST | `/api/pay/t/:token/receipt-pdf` | 2031 | public-bearer | loadTokenReceipt( | `link-holder` | 404: `unknown-link` |
+| GET | `/api/pay/t/:token/receipt-qr` | 2061 | public-bearer | loadTokenReceipt( | `link-holder` | 404: `unknown-link` |
+| POST | `/api/pay/t/:token/session` | 2087 | public-bearer | — | `link-holder` | 404: `unknown-link` |
+| POST | `/api/pay/t/:token/hosted-fields-complete` | 2089 | public-bearer | — | `link-holder` | 404: `unknown-link` |
+| POST | `/api/pay/t/:token/googlepay-complete` | 2091 | public-bearer | — | `link-holder` | 404: `unknown-link` |
+| GET | `/api/pay/return/:state` | 2096 | public-bearer | — | `link-holder` | 404: `unknown-link` |
+| ALL | `/api/pay/notification/:state` | 2098 | provider | — | `provider` | 200: `unknown-reference` |
+| GET | `/api/merchants/:id/active-transaction` | 2101 | merchant / public | authenticateToken, checkMerchantOwnership, publicTransactionDto(, generatePaymentUrl( | `signed-out`, `owner`, `member`, `platform-admin` | 401: `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner`; 404: `unknown-board`, `removed-board` |
+| POST | `/api/transactions` | 2216 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
+| POST | `/api/transactions/cash-sale` | 2292 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
+| POST | `/api/transactions/tap-to-pay` | 2349 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
+| POST | `/api/transactions/:id/split` | 2485 | public | isTokenAddressedTransaction(, publicTransactionDto( | `signed-out` | 404: `sale-with-its-own-link` |
+| GET | `/api/split-payments/:id` | 2533 | public | isTokenAddressedTransaction( | `signed-out` | 404: `sale-with-its-own-link` |
+| POST | `/api/transactions/:id/cancel` | 2552 | merchant | authenticateToken, checkMerchantOwnership, req.user?.role === "admin" | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 404: `other-owner` |
+| GET | `/api/nfc/capabilities` | 2616 | public | — | `signed-out` | — |
+| POST | `/api/transactions/:id/pay` | 2630 | public | — | `signed-out` | 404: `sale-with-its-own-link` |
+| GET | `/api/windcave/env` | 2636 | public | — | `signed-out` | — |
+| POST | `/api/transactions/:id/hosted-fields-complete` | 2650 | public | — | `signed-out` | 404: `sale-with-its-own-link` |
+| POST | `/api/transactions/:id/googlepay-complete` | 2653 | public | — | `signed-out` | 404: `sale-with-its-own-link` |
+| GET | `/api/transactions/:id` | 2656 | public | isTokenAddressedTransaction(, publicTransactionDto( | `signed-out` | 404: `sale-with-its-own-link` |
+| POST | `/api/transactions/:id/receipt-pdf` | 2679 | public | isTokenAddressedTransaction( | `signed-out` | 404: `sale-with-its-own-link` |
+| GET | `/api/transactions/:id/receipt-qr` | 2740 | public | isTokenAddressedTransaction( | `signed-out` | 404: `sale-with-its-own-link` |
+| GET | `/api/merchants/:id/export/pdf` | 2794 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
+| POST | `/api/admin/merchants/:id/verify` | 2834 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
+| POST | `/api/admin/merchants/:id/set-active` | 2885 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
+| GET | `/api/admin/merchants/:id/transactions` | 2908 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
+| PATCH | `/api/admin/merchants/:id/windcave-merchant-id` | 2921 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
+| POST | `/api/admin/merchants/:id/activate` | 2937 | platform-admin | authenticateAdmin, storage.verifyMerchant( | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
+| PUT | `/api/merchants/:id/details` | 2995 | merchant | authenticateToken, checkAccountOwnership | `owner`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `other-owner` |
+| PUT | `/api/merchants/:id/change-password` | 3021 | merchant | authenticateToken, checkMerchantOwnership, req.user?.role === "admin" | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner`, `platform-admin` |
+| PUT | `/api/merchants/:id/theme` | 3116 | merchant | authenticateToken, checkAccountOwnership | `owner`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `other-owner` |
+| PUT | `/api/merchants/:id/daily-goal` | 3144 | merchant | authenticateToken, checkAccountOwnership | `owner`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `other-owner` |
+| PUT | `/api/merchants/:id` | 3175 | merchant | authenticateToken, checkAccountOwnership | `owner`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `other-owner` |
+| POST | `/api/merchants/:id/logo` | 3249 | merchant | authenticateToken, checkAccountOwnership | `owner`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `other-owner` |
+| DELETE | `/api/merchants/:id/logo` | 3304 | merchant | authenticateToken, checkAccountOwnership | `owner`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `other-owner` |
+| GET | `/api/merchants/:id/transactions` | 3347 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
+| GET | `/api/merchants/:id/tapt-stones` | 3364 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
+| POST | `/api/merchants/:id/tapt-stones` | 3380 | merchant | authenticateToken, checkMerchantOwnership, generatePaymentUrl( | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
+| PUT | `/api/merchants/:merchantId/tapt-stones/:stoneId` | 3431 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
+| DELETE | `/api/merchants/:merchantId/tapt-stones/:stoneId` | 3470 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
+| ALL | `/api/windcave/notification` | 3509 | provider | — | `provider` | 200: `unknown-reference` |
+| GET | `/api/windcave/callback` | 3512 | public-bearer | — | `link-holder` | 404: `unknown-link` |
+| GET | `/api/admin/analytics` | 3518 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
+| GET | `/api/admin/revenue-over-time` | 3599 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
+| GET | `/api/admin/payment-method-breakdown` | 3635 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
+| GET | `/api/admin/ga4-detailed` | 3672 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
+| GET | `/api/admin/ga4-metrics` | 3737 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
+| GET | `/api/admin/merchants` | 3824 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
+| GET | `/api/admin/merchants/:id` | 3834 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
+| POST | `/api/admin/resend-verification` | 3857 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
+| GET | `/api/admin/email-status` | 3917 | platform-admin | authenticateAdmin | `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `owner`, `member`, `link-as-sign-in`, `old-token`, `old-admin-token` |
+| POST | `/api/auth/confirm-email` | 3954 | public-bearer | getMerchantByToken( | `link-holder` | 400: `unknown-link` |
+| POST | `/api/auth/resend-confirmation` | 4081 | public | — | `signed-out` | — |
+| POST | `/api/info-pack-leads` | 4111 | public | — | `signed-out` | — |
+| POST | `/api/merchants/signup` | 4164 | public | — | `signed-out` | — |
+| GET | `/api/merchants/:id/events` | 4275 | merchant / public | authenticateToken, checkMerchantOwnership | `signed-out`, `owner`, `member`, `platform-admin` | 401: `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`; 403: `other-owner`; 404: `unknown-board`, `removed-board` |
+| GET | `/api/push/capabilities` | 4361 | public | — | `signed-out` | — |
+| GET | `/api/push/vapid-key` | 4385 | public | — | `signed-out` | — |
+| POST | `/api/push/subscribe` | 4395 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| POST | `/api/push/unsubscribe` | 4441 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| POST | `/api/push/native-subscribe` | 4468 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| POST | `/api/push/native-unsubscribe` | 4506 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| GET | `/api/push/status` | 4539 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| GET | `/api/push/preferences` | 4564 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| PUT | `/api/push/preferences` | 4579 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| POST | `/api/transactions/:transactionId/refunds` | 4611 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin`; 404: `other-owner` |
+| GET | `/api/transactions/:transactionId/refunds` | 4760 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/merchants/:merchantId/refunds` | 4792 | merchant | authenticateToken | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
+| GET | `/api/merchants/:merchantId/stock-items` | 4825 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
+| POST | `/api/merchants/:merchantId/stock-items` | 4844 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
+| PUT | `/api/merchants/:merchantId/stock-items/:itemId` | 4869 | merchant | authenticateToken, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
+| DELETE | `/api/merchants/:merchantId/stock-items/:itemId` | 4906 | merchant | authenticateToken, authenticateApiKey, requireEcommerceApi, checkMerchantOwnership | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `other-owner` |
+| POST | `/api/v1/transactions` | 4974 | api-key | authenticateApiKey, requireEcommerceApi | `api-key` | 401: `no-key`, `unknown-key`; 403: `key-without-permission` |
+| GET | `/api/v1/transactions/:id` | 5078 | api-key | authenticateApiKey, requireEcommerceApi | `api-key` | 401: `no-key`, `unknown-key`; 403: `key-without-permission` |
+| GET | `/api/subscription` | 5164 | merchant | authenticateToken, isAccountOwner | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| PUT | `/api/subscription/plan` | 5187 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
+| POST | `/api/subscription/cancel` | 5253 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
+| POST | `/api/subscription/resume` | 5299 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
+| GET | `/api/team` | 5333 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
+| POST | `/api/team/invite` | 5354 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
+| POST | `/api/team/:userId/resend` | 5415 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin`; 404: `other-owner` |
+| DELETE | `/api/team/:userId/invite` | 5497 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin`; 404: `other-owner` |
+| PUT | `/api/team/:userId/status` | 5517 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin`; 404: `other-owner` |
+| DELETE | `/api/team/:userId` | 5568 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin`; 404: `other-owner` |
+| POST | `/api/team/accept-invite` | 5609 | public-bearer | getUserByInviteToken( | `link-holder` | 400: `unknown-link` |
+| GET | `/api/subscription/billing-history` | 5645 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
+| GET | `/api/billing/card` | 5675 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
+| POST | `/api/billing/card/session` | 5704 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
+| POST | `/api/billing/card/confirm` | 5720 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
+| ALL | `/api/billing/card/notification` | 5743 | provider | billingCardCallback | `provider` | 200: `unknown-reference` |
+| GET | `/api/billing/card/callback` | 5755 | public-bearer | billingCardCallback | `link-holder` | 404: `unknown-link` |
+| POST | `/api/billing/card/callback` | 5756 | public-bearer | billingCardCallback | `link-holder` | 404: `unknown-link` |
+| DELETE | `/api/billing/card` | 5759 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
+| POST | `/api/board-builder/submit` | 5787 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| GET | `/uploads/:folder/:name` | 5852 | public | getCheckoutInvoiceByToken( | `signed-out` | — |
+| GET | `/api/property/tenants` | 5976 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| POST | `/api/property/tenants` | 5987 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| GET | `/api/property/tenants/:id` | 6004 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| PUT | `/api/property/tenants/:id` | 6016 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/property/tenants/:id/archive` | 6034 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/property/tenants/:id/unarchive` | 6048 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/property/tenants/:id/events` | 6062 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/property/schedules` | 6079 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| POST | `/api/property/tenants/:tenantId/schedules` | 6090 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| PUT | `/api/property/schedules/:id` | 6112 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| DELETE | `/api/property/schedules/:id` | 6134 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/property/invoices` | 6150 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| POST | `/api/property/invoices/document` | 6181 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| GET | `/api/invoice-documents/:name` | 6244 | merchant / platform-admin | authenticateToken | `owner`, `member`, `platform-admin` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 404: `other-owner` |
+| POST | `/api/property/invoices` | 6274 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/property/invoices/:id/resend` | 6306 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/property/invoices/:id/void` | 6328 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/property/invoices/:id/mark-paid-external` | 6348 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/checkout/resolve/:token` | 6376 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 404: `unknown-link` |
+| GET | `/api/checkout/document/:token` | 6462 | public-bearer | getCheckoutInvoiceByToken( | `link-holder` | 404: `unknown-link` |
+| POST | `/api/checkout/:token/split` | 6486 | public-bearer | — | `link-holder` | 404: `unknown-link` |
+| POST | `/api/checkout/:token/session` | 6496 | public-bearer | — | `link-holder` | 404: `unknown-link` |
+| POST | `/api/checkout/:token/hosted-fields-complete` | 6499 | public-bearer | — | `link-holder` | 404: `unknown-link` |
+| POST | `/api/checkout/:token/googlepay-complete` | 6502 | public-bearer | — | `link-holder` | 404: `unknown-link` |
+| GET | `/api/checkout/callback` | 6507 | public-bearer | — | `link-holder` | 404: `unknown-link` |
+| ALL | `/api/windcave/rent-notification` | 6510 | provider | — | `provider` | 200: `unknown-reference` |
+| ALL | `/api/windcave/trades-notification` | 6513 | provider | — | `provider` | 200: `unknown-reference` |
+| POST | `/api/webhooks/whatsapp` | 6518 | provider | req.headers["apikey"] | `provider` | 200: `wrong-webhook-key`, `unknown-reference` |
+| GET | `/api/property/reminder-settings` | 6568 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| PUT | `/api/property/reminder-settings` | 6578 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| GET | `/api/trades/reminder-settings` | 6614 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| PUT | `/api/trades/reminder-settings` | 6624 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| GET | `/api/trades/gst-settings` | 6637 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| PUT | `/api/trades/gst-settings` | 6653 | merchant | authenticateToken, isAccountOwner | `owner` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `member`, `platform-admin` |
+| GET | `/api/trades/clients` | 6673 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| POST | `/api/trades/clients` | 6681 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| GET | `/api/trades/clients/:id` | 6693 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| PUT | `/api/trades/clients/:id` | 6704 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/trades/clients/:id/archive` | 6719 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/trades/clients/:id/unarchive` | 6732 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/trades/clients/:id/promote` | 6747 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/trades/clients/:id/events` | 6762 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/trades/quotes` | 6774 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| POST | `/api/trades/quotes` | 6783 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/trades/quotes/:id/pdf` | 6877 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/trades/quotes/token/:token/pdf` | 6895 | public-bearer | getQuoteByToken( | `link-holder` | 404: `unknown-link` |
+| GET | `/api/trades/quotes/token/:token` | 6916 | public-bearer | getQuoteByToken( | `link-holder` | 404: `unknown-link` |
+| POST | `/api/trades/quotes/token/:token/respond` | 6957 | public-bearer | getQuoteByToken( | `link-holder` | 404: `unknown-link` |
+| GET | `/api/trades/invoices` | 6978 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| POST | `/api/trades/invoices` | 6990 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/trades/invoices/:id/send-balance` | 7059 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/trades/invoices/:id/mark-paid-external` | 7094 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/trades/invoices/:id/complete` | 7121 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| POST | `/api/trades/invoices/:id/void` | 7141 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/trades/schedules` | 7164 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin` |
+| POST | `/api/trades/schedules` | 7171 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| PUT | `/api/trades/schedules/:id` | 7200 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| DELETE | `/api/trades/schedules/:id` | 7224 | merchant | authenticateToken | `owner`, `member` | 401: `signed-out`, `invalid-session`, `disabled-login`, `suspended-business`, `link-as-sign-in`, `old-token`, `old-admin-token`; 403: `platform-admin`; 404: `other-owner` |
+| GET | `/api/internal/cron/status` | 7241 | cron | authorizeCronRequest | `scheduler` | 401: `no-secret`, `wrong-secret` |
+| POST | `/api/internal/cron` | 7251 | cron | authorizeCronRequest | `scheduler` | 401: `no-secret`, `wrong-secret` |
 
 ## Per-route facts
 
@@ -1066,19 +1071,18 @@ Reviewed policy:
 - body: `schema: z.object({ totalSplits: z.number().int().min(2).max(10), }).strict()`
 - authChecks: `resolvePaymentToken`
 - storageMethods: `createBillSplit`, `getMerchant`
-- sideEffects: `live update: sseBroker.broadcast`
 - statuses: `200`, `400`, `404`, `409`, `429`, `500`
 - dtos: `tokenPaymentDto`
 - errorTextInResponse: `error.message`
 - rateLimits: `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
-- helpers: `broadcastToStone`, `requirePaymentTokenRateLimit`, `setPaymentTokenHeaders`
+- helpers: `requirePaymentTokenRateLimit`, `setPaymentTokenHeaders`
 
 Reviewed policy:
 
 - **Who:** public-bearer. **Tenant (token):** the link's token (43 base64url characters) selects the one sale it was made for: only its hash is looked up (resolvePaymentToken); an unknown or malformed token is 404
 - **Input:** token: matched against PAYMENT_TOKEN_PATTERN, then only its hash is looked up; body: { totalSplits: a whole number from 2 to 10 }, nothing else (strict)
 - **Idempotency:** only while the sale is pending and the business allowed splitting; storage.createBillSplit sets it up atomically and a sale already split is refused (BillSplitConflictError, 409)
-- **Side effects:** a live update to the business's screens (broadcastToStone)
+- **Side effects:** Concrete scoped mutation, immutable command/audit and keyed outbox in server/storage.ts; no route-local financial publication.
 - **Success:** tokenPaymentDto of the split sale; no split-payment id is returned
 - **Error disclosure:** domain-errors
 - **Authenticity:** holding the sale's link: its token is the credential for that one sale and for nothing else
@@ -1152,134 +1156,125 @@ Reviewed policy:
 
 ### POST `/api/pay/t/:token/session`
 
-- params: `token: raw`
-- body: `schema: tokenSessionRequestSchema`
-- authChecks: `resolvePaymentToken`
-- storageMethods: `getMerchant`, `getNextPendingSplit`, `getSplitPaymentsByTransaction`, `getTransaction`, `updateTransactionStatus`
-- sideEffects: `live update: sseBroker.broadcast`, `provider: createWindcaveSession`, `provider: queryWindcaveSession`, `push: sendPushToMerchant`
-- statuses: `200`, `400`, `404`, `409`, `410`, `429`, `500`, `503`
-- capabilityGates: `isWindcaveConfigured`
-- rateLimits: `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
-- idempotency: `claim`, `claimFinalization`
-- helpers: `broadcastToStone`, `cacheTokenAttemptSession`, `expectedForTokenAttempt`, `persistTokenOutcome`, `reconcileExpiredTokenAttempt`, `reconciliationCode`, `recordTokenReconciliation`, `recordedExpectedOutcome`, `requirePaymentTokenRateLimit`, `setPaymentTokenHeaders`, `tokenAttemptOutcome`
+- params: `id: checked`, `id: strictPositiveIntegerParam`, `token: raw`
+- body: `schema: sessionSchema`
+- authChecks: `compares input.merchantId!==sale.merchantId`, `resolvePaymentToken`
+- storageMethods: `getMerchant`, `getSplitPaymentsByTransaction`, `getTaptStoneForMerchant`, `getTransaction`
+- sideEffects: `provider through durable attempt coordinator: checkout.open`
+- statuses: `200`, `202`, `400`, `403`, `404`, `409`, `410`, `429`, `503`
+- capabilityGates: `config.features.newRetailPayments`
+- rateLimits: `checkRateLimit`, `deps.checkRateLimit`, `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
+- helpers: `checkRateLimit`, `find`, `requirePaymentTokenRateLimit`, `server/payment-checkout-handlers.ts:session`
 
 Reviewed policy:
 
-- **Who:** public-bearer. **Tenant (token):** the link's token (43 base64url characters) selects the one sale it was made for: only its hash is looked up (resolvePaymentToken); an unknown or malformed token is 404
-- **Input:** token: matched against PAYMENT_TOKEN_PATTERN, then only its hash is looked up; body: tokenSessionRequestSchema, strict (idempotencyKey: a UUID; amount: optional, and must equal what is owed)
-- **Capability gate:** isWindcaveConfigured() (503 PAYMENT_PROVIDER_UNAVAILABLE) and PAYMENT_RETURN_STATE_SECRET (503 PAYMENT_RETURN_STATE_UNAVAILABLE)
-- **Idempotency:** per sale share and idempotency key: paymentAttempts.claim keeps one active attempt; the same key resumes its attempt and session, another key while one is active is 409, and concurrent creation of one attempt's session is coalesced in this process. The same key after its own attempt ended unsent (abandoned with no session and no send intent) is 409 PAYMENT_ATTEMPT_EXPIRED, since that key can never claim again and the page replaces it once; an expired attempt that holds a session or send intent is reconciled first (503 while it cannot be). A sale cancelled while its session was attached is 410 with no links (OI-1)
-- **Side effects:** creates a payment session with the provider (createWindcaveSession); an expired attempt is first reconciled by querying the provider, which can settle it (live update and push to the business)
-- **Success:** the provider session id, its hosted-page and submit URLs, attemptState and shareIndex; or, for a settled attempt, its outcome
+- **Who:** public-bearer. **Tenant (token):** the original resource locator is retained; the request is then held to the exact tenant, aggregate, UUID key, immutable share and provider-session binding
+- **Input:** token/id locates the original public resource (numeric id parsed strictly). Strict body: UUID idempotencyKey, integer shareIndex (retail 0..10; invoice 0..12). Sessions accept exact optional amount/merchantId/stoneId, or validated invoice payerEmail. Completion requires exact sessionId; optional supported paymentMethod or Google Pay payload. No client-supplied provider URLs.
+- **Capability gate:** newRetailPayments/invoicePayments and UAT/production mode gate new creation; off means no new provider request
+- **Idempotency:** same persisted UUID/share is reused; changed immutable details conflict. Parent → attempt → binding locks. Pre-send expectations/state hash/send intent commit before R2 transport. Unknown acceptance keeps the original key/X-ID. Only the shared inbox worker and atomic finalizer settle.
+- **Side effects:** actual R2 session client through the durable coordinator; no communication from this route
+- **Success:** validated session links/share/return state, or local terminal outcome; 202 processing for pending/unknown
 - **Error disclosure:** fixed
-- **Authenticity:** holding the sale's link: its token is the credential for that one sale and for nothing else
-- **Replay:** the same idempotency key returns the same attempt and session; a new key while one is active is refused
-- **Rate:** requirePaymentTokenRateLimit (the session family: 20 a minute per visitor address, counted in this server process only; until TRUST_PROXY_HOPS is set every visitor shares one address — R1-T4 phase B)
+- **Authenticity:** public resource locator plus exact cryptographic command/binding; hashed browser state checked when present. Every money outcome is verified through actual R2 transport.
+- **Replay:** fenced atomic finalizer and unique financial event/outbox; uncertain send commands are never rotated or blindly resent
+- **Rate:** payment token family limiter; numeric callback only accepts a valid hashed state
+- **Finding:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
 
 ### POST `/api/pay/t/:token/hosted-fields-complete`
 
-- params: `token: raw`
-- body: `schema: tokenCompletionBaseSchema.extend({ paymentMethod: z.enum(["card", "apple_pay"]).optional().default("card"), }).strict()`
-- authChecks: `prepareTokenCompletion`, `resolvePaymentToken`
-- storageMethods: `getSplitPaymentsByTransaction`, `getTransaction`
-- sideEffects: `live update: sseBroker.broadcast`, `provider: queryWindcaveSession`, `push: sendPushToMerchant`
-- statuses: `200`, `400`, `404`, `409`, `429`, `500`, `503`
-- capabilityGates: `isWindcaveConfigured`
-- rateLimits: `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
-- idempotency: `claimFinalization`
-- helpers: `broadcastToStone`, `expectedForTokenAttempt`, `persistTokenOutcome`, `reconciliationCode`, `recordTokenReconciliation`, `recordedExpectedOutcome`, `requirePaymentTokenRateLimit`, `setPaymentTokenHeaders`, `tokenAttemptOutcome`
+- params: `id: checked`, `id: strictPositiveIntegerParam`, `token: raw`
+- body: `fields: sessionId`, `schema: completeSchema`
+- authChecks: `resolvePaymentToken`
+- storageMethods: `getTransaction`
+- sideEffects: `provider reconciliation: runtime.reconcile`, `provider: runtime.client.querySession`, `provider: submitGooglePayToken`
+- statuses: `200`, `202`, `400`, `404`, `429`
+- capabilityGates: `config.features.newRetailPayments`
+- rateLimits: `checkRateLimit`, `deps.checkRateLimit`, `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
+- idempotency: `claimWalletSubmission`
+- helpers: `checkRateLimit`, `find`, `outcome`, `processing`, `requirePaymentTokenRateLimit`, `server/payment-checkout-handlers.ts:complete`
 
 Reviewed policy:
 
-- **Who:** public-bearer. **Tenant (token):** the link's token (43 base64url characters) selects the one sale it was made for: only its hash is looked up (resolvePaymentToken); an unknown or malformed token is 404; the attempt must be this sale's, for this share and idempotency key, with this provider session (prepareTokenCompletion)
-- **Input:** token: matched against PAYMENT_TOKEN_PATTERN, then only its hash is looked up; body: idempotencyKey (a UUID), sessionId (1 to 512 characters), shareIndex (0 to 10), paymentMethod card or apple_pay; strict
-- **Capability gate:** isWindcaveConfigured() (503 while unconfigured: the outcome waits)
-- **Idempotency:** paymentAttempts.claimFinalization: one finaliser per attempt; a settled attempt returns its outcome
-- **Side effects:** queries the provider for the session's outcome; on settlement a live update and a push to the business
-- **Success:** { approved, outcome, receiptShare } (tokenAttemptOutcome)
+- **Who:** public-bearer. **Tenant (token):** the original resource locator is retained; the request is then held to the exact tenant, aggregate, UUID key, immutable share and provider-session binding
+- **Input:** token/id locates the original public resource (numeric id parsed strictly). Strict body: UUID idempotencyKey, integer shareIndex (retail 0..10; invoice 0..12). Sessions accept exact optional amount/merchantId/stoneId, or validated invoice payerEmail. Completion requires exact sessionId; optional supported paymentMethod or Google Pay payload. No client-supplied provider URLs.
+- **Capability gate:** reconciliation in server/payment-checkout-handlers.ts and server/invoice-checkout-handlers.ts is independent of initiation flags; provider absence returns truthful processing
+- **Idempotency:** same persisted UUID/share is reused; changed immutable details conflict. Parent → attempt → binding locks. Pre-send expectations/state hash/send intent commit before R2 transport. Unknown acceptance keeps the original key/X-ID. Only the shared inbox worker and atomic finalizer settle.
+- **Side effects:** enqueue receipt and optionally query through the shared R2 worker. Google Pay submission uses a durable once-only session command and validated provider query links; its return boolean never chooses money. Settlement appends a keyed outbox; no route-local push/SSE/email.
+- **Success:** validated session links/share/return state, or local terminal outcome; 202 processing for pending/unknown
 - **Error disclosure:** fixed
-- **Authenticity:** holding the sale's link: its token is the credential for that one sale and for nothing else, together with the attempt's idempotency key and provider session id
-- **Replay:** returns the settled outcome; the outcome always comes from the provider, never from the request
-- **Rate:** requirePaymentTokenRateLimit (the completion family: 40 a minute per visitor address, counted in this server process only; until TRUST_PROXY_HOPS is set every visitor shares one address — R1-T4 phase B)
+- **Authenticity:** public resource locator plus exact cryptographic command/binding; hashed browser state checked when present. Every money outcome is verified through actual R2 transport.
+- **Replay:** fenced atomic finalizer and unique financial event/outbox; uncertain send commands are never rotated or blindly resent
+- **Rate:** payment token family limiter; numeric callback only accepts a valid hashed state
+- **Finding:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
 
 ### POST `/api/pay/t/:token/googlepay-complete`
 
-- params: `token: raw`
-- body: `schema: tokenCompletionBaseSchema.extend({ googlePayToken: z.record(z.unknown()).optional(), }).strict()`
-- authChecks: `prepareTokenCompletion`, `resolvePaymentToken`
-- storageMethods: `getSplitPaymentsByTransaction`, `getTransaction`
-- sideEffects: `live update: sseBroker.broadcast`, `provider: queryWindcaveSession`, `provider: submitGooglePayToken`, `push: sendPushToMerchant`
-- statuses: `200`, `400`, `404`, `409`, `410`, `429`, `500`, `503`
-- capabilityGates: `isWindcaveConfigured`
-- rateLimits: `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
-- idempotency: `claimFinalization`
-- helpers: `broadcastToStone`, `expectedForTokenAttempt`, `persistTokenOutcome`, `reconciliationCode`, `recordTokenReconciliation`, `recordedExpectedOutcome`, `requirePaymentTokenRateLimit`, `setPaymentTokenHeaders`, `tokenAttemptOutcome`
+- params: `id: checked`, `id: strictPositiveIntegerParam`, `token: raw`
+- body: `fields: sessionId`, `schema: completeSchema`
+- authChecks: `resolvePaymentToken`
+- storageMethods: `getTransaction`
+- sideEffects: `provider reconciliation: runtime.reconcile`, `provider: runtime.client.querySession`, `provider: submitGooglePayToken`
+- statuses: `200`, `202`, `400`, `404`, `429`
+- capabilityGates: `config.features.newRetailPayments`
+- rateLimits: `checkRateLimit`, `deps.checkRateLimit`, `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
+- idempotency: `claimWalletSubmission`
+- helpers: `checkRateLimit`, `find`, `outcome`, `processing`, `requirePaymentTokenRateLimit`, `server/payment-checkout-handlers.ts:complete`
 
 Reviewed policy:
 
-- **Who:** public-bearer. **Tenant (token):** the link's token (43 base64url characters) selects the one sale it was made for: only its hash is looked up (resolvePaymentToken); an unknown or malformed token is 404; the attempt must be this sale's, for this share and idempotency key, with this provider session (prepareTokenCompletion)
-- **Input:** token: matched against PAYMENT_TOKEN_PATTERN, then only its hash is looked up; body: idempotencyKey (a UUID), sessionId (1 to 512 characters), shareIndex (0 to 10), and googlePayToken, an object passed to the provider as it is; strict
-- **Capability gate:** isWindcaveConfigured() (503 while unconfigured: the outcome waits)
-- **Idempotency:** paymentAttempts.claimFinalization: only the first finaliser submits the wallet token; a replay only queries the session, so it cannot charge twice
-- **Side effects:** the first finaliser submits the Google Pay token to the provider's submit URL cached for this attempt (assertWindcaveUrl checks it is the provider's); every finaliser then queries the session, and only the verified outcome settles (R2-T5: never the submit's reply); on settlement a live update and a push to the business
-- **Success:** { approved, outcome, receiptShare } (tokenAttemptOutcome)
+- **Who:** public-bearer. **Tenant (token):** the original resource locator is retained; the request is then held to the exact tenant, aggregate, UUID key, immutable share and provider-session binding
+- **Input:** token/id locates the original public resource (numeric id parsed strictly). Strict body: UUID idempotencyKey, integer shareIndex (retail 0..10; invoice 0..12). Sessions accept exact optional amount/merchantId/stoneId, or validated invoice payerEmail. Completion requires exact sessionId; optional supported paymentMethod or Google Pay payload. No client-supplied provider URLs.
+- **Capability gate:** reconciliation in server/payment-checkout-handlers.ts and server/invoice-checkout-handlers.ts is independent of initiation flags; provider absence returns truthful processing
+- **Idempotency:** same persisted UUID/share is reused; changed immutable details conflict. Parent → attempt → binding locks. Pre-send expectations/state hash/send intent commit before R2 transport. Unknown acceptance keeps the original key/X-ID. Only the shared inbox worker and atomic finalizer settle.
+- **Side effects:** enqueue receipt and optionally query through the shared R2 worker. Google Pay submission uses a durable once-only session command and validated provider query links; its return boolean never chooses money. Settlement appends a keyed outbox; no route-local push/SSE/email.
+- **Success:** validated session links/share/return state, or local terminal outcome; 202 processing for pending/unknown
 - **Error disclosure:** fixed
-- **Authenticity:** holding the sale's link: its token is the credential for that one sale and for nothing else, together with the attempt's idempotency key and provider session id
-- **Replay:** never resubmits the wallet token; returns the settled outcome
-- **Rate:** requirePaymentTokenRateLimit (the completion family: 40 a minute per visitor address, counted in this server process only; until TRUST_PROXY_HOPS is set every visitor shares one address — R1-T4 phase B)
+- **Authenticity:** public resource locator plus exact cryptographic command/binding; hashed browser state checked when present. Every money outcome is verified through actual R2 transport.
+- **Replay:** fenced atomic finalizer and unique financial event/outbox; uncertain send commands are never rotated or blindly resent
+- **Rate:** payment token family limiter; numeric callback only accepts a valid hashed state
+- **Finding:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
 
 ### GET `/api/pay/return/:state`
 
-- params: `state: raw`
-- query: `result: raw`, `source: raw`
-- authChecks: `paymentAttempts.resolveReturnState`
+- params: `id: checked`, `state: raw`
+- query: `result: checked`, `source: raw`
+- authChecks: `attempts.resolveReturnState`
 - storageMethods: `getSplitPaymentsByTransaction`, `getTransaction`
-- sideEffects: `live update: sseBroker.broadcast`, `provider: queryWindcaveSession`, `push: sendPushToMerchant`
-- statuses: `200`, `303`, `404`, `410`, `429`, `500`
-- capabilityGates: `isWindcaveConfigured`
-- rateLimits: `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
-- idempotency: `claimFinalization`
-- helpers: `broadcastToStone`, `expectedForTokenAttempt`, `persistTokenOutcome`, `reconcileTokenReturnState`, `reconciliationCode`, `recordTokenReconciliation`, `recordedExpectedOutcome`, `requirePaymentTokenRateLimit`, `setPaymentTokenHeaders`, `tokenAttemptOutcome`
+- sideEffects: `provider reconciliation: runtime.reconcile`
+- statuses: `200`, `202`, `303`, `404`, `410`, `429`
+- rateLimits: `checkRateLimit`, `deps.checkRateLimit`, `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
+- helpers: `checkRateLimit`, `outcome`, `processing`, `requirePaymentTokenRateLimit`, `server/payment-checkout-handlers.ts:returnState`
 
 Reviewed policy:
 
-- **Who:** public-bearer. **Tenant (token):** the return state (HMAC-derived from one payment attempt) selects that attempt (paymentAttempts.resolveReturnState); an unknown state is 404
-- **Input:** state: an opaque return state, resolved by its hash; source 'hpp' or any result marks a provider return; result decides nothing (R2-T5: the verified provider outcome alone settles)
-- **Capability gate:** isWindcaveConfigured() (unconfigured, the attempt stays pending)
-- **Idempotency:** the provider's browser return reconciles through paymentAttempts.claimFinalization, once per attempt; a plain read is read-only
-- **Side effects:** on the provider's browser return: queries the provider and settles the attempt (live update and push to the business)
-- **Success:** a browser return is always 303 to /pay/return/<state>; a plain read returns only { outcome, receiptShare }
+- **Who:** public-bearer. **Tenant (token):** hashed state with absolute expiry addresses one attempt. Numbered and invoice callbacks additionally compare its persisted aggregate/merchant identity to the supplied resource. Legacy callbacks without a usable state return reconciliation-required.
+- **Input:** state: opaque 43-character bearer, checked by attempts.resolveReturnState or repository.resolveInvoiceReturnState; source/result are hints only. Numeric transactionId is a strict positive integer; invoice token is resolved through getCheckoutInvoiceByToken. No raw query/body logging.
+- **Capability gate:** reconciliation in server/payment-checkout-handlers.ts and server/invoice-checkout-handlers.ts is independent of initiation flags; provider absence returns truthful processing
+- **Idempotency:** same persisted UUID/share is reused; changed immutable details conflict. Parent → attempt → binding locks. Pre-send expectations/state hash/send intent commit before R2 transport. Unknown acceptance keeps the original key/X-ID. Only the shared inbox worker and atomic finalizer settle.
+- **Side effects:** enqueue receipt and optionally query through the shared R2 worker. Google Pay submission uses a durable once-only session command and validated provider query links; its return boolean never chooses money. Settlement appends a keyed outbox; no route-local push/SSE/email.
+- **Success:** narrow local outcome/receipt share or safe redirect; pending remains processing
 - **Error disclosure:** fixed
-- **Authenticity:** holding the attempt's return state, the credential for that one attempt
-- **Replay:** harmless: settlement is claimed once, and reads are read-only
-- **Rate:** requirePaymentTokenRateLimit (the resolve family: 120 a minute per visitor address, counted in this server process only; until TRUST_PROXY_HOPS is set every visitor shares one address — R1-T4 phase B)
+- **Authenticity:** public resource locator plus exact cryptographic command/binding; hashed browser state checked when present. Every money outcome is verified through actual R2 transport.
+- **Replay:** fenced atomic finalizer and unique financial event/outbox; uncertain send commands are never rotated or blindly resent
+- **Rate:** payment token family limiter; numeric callback only accepts a valid hashed state
+- **Finding:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
 
 ### ALL `/api/pay/notification/:state`
 
-- params: `state: raw`
-- query: `result: raw`
-- body: `fields: result`
-- authChecks: `paymentAttempts.resolveReturnState`
-- storageMethods: `getSplitPaymentsByTransaction`, `getTransaction`
-- sideEffects: `live update: sseBroker.broadcast`, `provider: queryWindcaveSession`, `push: sendPushToMerchant`
-- statuses: `200`, `429`
-- capabilityGates: `isWindcaveConfigured`
-- rateLimits: `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
-- idempotency: `claimFinalization`
-- helpers: `broadcastToStone`, `expectedForTokenAttempt`, `persistTokenOutcome`, `reconcileTokenReturnState`, `reconciliationCode`, `recordTokenReconciliation`, `recordedExpectedOutcome`, `requirePaymentTokenRateLimit`, `setPaymentTokenHeaders`
+- statuses: `200`, `400`, `405`, `413`, `415`, `503`
+- helpers: `server/durable-payment-notification.ts:errorHandler`, `server/durable-payment-notification.ts:receive`, `server/durable-payment-notification.ts:validate`
 
 Reviewed policy:
 
-- **Who:** provider. **Tenant (token):** the return state (HMAC-derived, one per payment attempt) selects one attempt through paymentAttempts.resolveReturnState; an unknown state does nothing
-- **Input:** state: an opaque return state, only resolved by its hash; result (query or body): read, and decides nothing (R2-T5: the verified provider outcome alone settles)
-- **Capability gate:** isWindcaveConfigured(): with no provider configured the attempt stays pending
-- **Idempotency:** paymentAttempts.claimFinalization claims the attempt before the provider is queried; a terminal or conflicting attempt is left alone, so repeated or concurrent notifications settle it once
-- **Side effects:** queries the provider for the attempt's session and verifies the outcome against the attempt's expected values (R2-T5); on settlement, a live update and a push to the business (persistTokenOutcome, broadcastToStone)
-- **Success:** 200 "OK" at once, before any work; nothing else is returned
+- **Who:** provider. **Tenant (provider-session):** session identity is a reconciliation hint; only the worker resolves an exact independently persisted attempt/binding
+- **Input:** GET query sessionid or sessionId: one scalar id, identical aliases only; URL <=8192 bytes and <=20 fields. POST: bounded 8 KB JSON/form, <=20 form parameters, no compressed bodies. Other methods 405. Approval/money fields are ignored. The state path is not financial authority.
+- **Idempotency:** committed inbox uniqueness (provider, kind=fprn, session); arrival count increments. Database absence/failure returns 503 with Retry-After, never 200.
+- **Success:** 200 "OK" only after the durable receipt commits
 - **Error disclosure:** fixed
-- **Authenticity:** none needed: the call only prompts a re-read, and the outcome comes from querying the provider, never from the request
-- **Replay:** harmless: a settled attempt is terminal and the claim is atomic
-- **Rate:** requirePaymentTokenRateLimit (the completion family, per visitor address)
+- **Authenticity:** notification fields authorize no money; actual R2 query/verifier and fenced aggregate finalizer are the only settlement path
+- **Replay:** one receipt row; terminal settlement/event/outbox replays are idempotent
+- **Rate:** none at this route; size/shape bounds and infrastructure limits remain. R6 owns distributed abuse controls.
+- **Finding:** Historical sessions without exact pre-send expectations remain held for operational reconciliation. Real keyed delivery remains an R3 exit gate.
 
 ### GET `/api/merchants/:id/active-transaction`
 
@@ -1310,14 +1305,13 @@ Reviewed policy:
 - middleware: `authenticateToken`
 - body: `schema: retailTransactionCreateRequestSchema`
 - authChecks: `checkMerchantOwnership`, `compares stone.merchantId !== validation.data.merchantId`
-- storageMethods: `createTransactionForMerchant`, `getOrCreateSubscription`, `getTaptStoneForMerchant`
-- sideEffects: `live update: sseBroker.broadcast`, `push: sendPushToMerchant`
-- statuses: `200`, `400`, `401`, `402`, `403`, `500`, `503`
+- storageMethods: `createTransactionForMerchant`, `getCreationCommandForMerchant`, `getOrCreateSubscription`, `getTaptStoneForMerchant`
+- statuses: `200`, `400`, `401`, `402`, `403`, `409`, `500`, `503`
 - dtos: `ownerTransactionDto`
 - errorTextInResponse: `validation.error.errors`
 - capabilityGates: `config.features.newRetailPayments`
 - entitlementGates: `BILLING_CARD_REQUIRED`, `billingCardIsReady`, `requireBillingCard`
-- helpers: `broadcastToStone`, `requireBillingCard`
+- helpers: `commandActor`, `requireBillingCard`
 
 Reviewed policy:
 
@@ -1326,7 +1320,7 @@ Reviewed policy:
 - **Capability gate:** a sale without a board has its own link, which needs per-payment links on (config.features.newRetailPayments: 503 otherwise)
 - **Entitlement gate:** paid access (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise)
 - **Idempotency:** none: each call makes another pending sale, with a new private link (only its hash kept; a token clash is 503) or its board's shared address
-- **Side effects:** a live update to the business, and to the board's page for a board sale (sseBroker, via broadcastToStone); a push notification to the business (sendPushToMerchant)
+- **Side effects:** Concrete scoped mutation, immutable command/audit and keyed outbox in server/payment-creation-command.ts; no route-local financial publication.
 - **Success:** ownerTransactionDto with the sale's page and QR addresses; the private link's token appears only in this answer
 - **Error disclosure:** input-issues
 - **Finding:** The platform admin passes checkMerchantOwnership for any business, so it can create sales, record cash sales, take Tap to Pay and cancel sales for any business; no admin screen does: kept by the owner's decision (2026-09-29).
@@ -1337,21 +1331,20 @@ Reviewed policy:
 - body: `schema: cashSaleRequestSchema`
 - authChecks: `checkMerchantOwnership`, `compares stone.merchantId !== merchantId`
 - storageMethods: `getCashSaleByKeyForMerchant`, `getOrCreateSubscription`, `getTaptStoneForMerchant`, `recordCashSaleForMerchant`
-- sideEffects: `live update: sseBroker.broadcast`, `push: sendPushToMerchant`
 - statuses: `200`, `400`, `401`, `402`, `403`, `409`, `500`, `503`
 - dtos: `ownerTransactionDto`
 - errorTextInResponse: `validation.error.errors`
 - entitlementGates: `BILLING_CARD_REQUIRED`, `billingCardIsReady`, `requireBillingCard`
-- helpers: `broadcastToStone`, `conflict`, `requireBillingCard`
+- helpers: `requireBillingCard`
 
 Reviewed policy:
 
 - **Who:** merchant (owner, member, platform admin). **Tenant (path-merchant):** the business named in the body (merchantId), checked with checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business; getCashSaleByKeyForMerchant and recordCashSaleForMerchant scope the UUID to that business; getTaptStoneForMerchant scopes the read and recordCashSaleForMerchant locks and rechecks an active owned board through insert (400 on unavailable/raced board)
 - **Input:** body: cashSaleRequestSchema, strict: the business, item name and price by the rules creating a sale uses, and an optional board (400 with the issues). Idempotency-Key header must be a UUID (400 IDEMPOTENCY_KEY_REQUIRED otherwise)
 - **Entitlement gate:** paid access for new records (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise); an authenticated matching committed retry returns its audited record with no new action
-- **Idempotency:** merchant-scoped UUID, database unique key and exact request fingerprint; changed money/item/board conflicts (409 IDEMPOTENCY_CONFLICT). Cash row, Cash_Recorded audit and manual-source outbox commit atomically. Same-key replay reuses the first record/event, with no usage increment or repeated communication, and says so (replayed: true); a conflict names the sale the key already recorded (its ownerTransactionDto, never the key or fingerprint), so the terminal can tell the merchant and release its key. Generic constructors cannot mint cash keys
-- **Side effects:** atomic manual audit/outbox, distinct from provider settlement; temporary first-commit SSE/push compatibility delivery only. Shared keyed receiver cutover remains required before R3 exit
-- **Success:** { transaction: ownerTransactionDto, replayed?: true }; a 409 conflict carries { code, message, transaction: ownerTransactionDto }
+- **Idempotency:** merchant-scoped UUID, database unique key and exact request fingerprint; changed money/item/board conflicts (409 IDEMPOTENCY_CONFLICT). Cash row, Cash_Recorded audit and manual-source outbox commit atomically. Same-key replay reuses the first record/event, with no usage increment or repeated communication. Generic constructors cannot mint cash keys
+- **Side effects:** Concrete scoped mutation, immutable command/audit and keyed outbox in server/storage.ts; no route-local financial publication.
+- **Success:** { transaction: ownerTransactionDto }
 - **Error disclosure:** input-issues
 - **Finding:** The platform admin passes checkMerchantOwnership for any business, so it can create sales, record cash sales, take Tap to Pay and cancel sales for any business; no admin screen does: kept by the owner's decision (2026-09-29).
 
@@ -1389,18 +1382,16 @@ Reviewed policy:
 - body: `schema: z.object({ totalSplits: z.number().int().min(2).max(10), }).strict()`
 - authChecks: `isTokenAddressedTransaction`
 - storageMethods: `createBillSplit`, `getTransaction`
-- sideEffects: `live update: sseBroker.broadcast`
 - statuses: `200`, `400`, `404`, `409`, `500`
 - dtos: `publicTransactionDto`
 - errorTextInResponse: `error.message`
-- helpers: `broadcastToStone`
 
 Reviewed policy:
 
 - **Who:** public. **Tenant (number):** the sale's sequential number selects it, for any business; only a sale with its own link (isTokenAddressedTransaction) is hidden (404)
 - **Input:** id: strictPositiveIntegerParam; body: { totalSplits: a whole number from 2 to 10 }, nothing else (strict, since 2026-09-26)
 - **Idempotency:** only a pending sale the business allowed to split (409 otherwise, since 2026-09-26); storage.createBillSplit sets it up atomically, returns an exact retry unchanged, and refuses a different split (BillSplitConflictError, 409)
-- **Side effects:** a live update to the business's screens (broadcastToStone)
+- **Side effects:** Concrete scoped mutation, immutable command/audit and keyed outbox in server/storage.ts; no route-local financial publication.
 - **Success:** publicTransactionDto of the split sale, with its board's page and QR addresses
 - **Error disclosure:** domain-errors
 - **Authenticity:** anyone with the sale's number: numbers are sequential, so every board, cash and tap-to-pay sale can be found by counting
@@ -1433,21 +1424,17 @@ Reviewed policy:
 - middleware: `authenticateToken`
 - params: `id: strictPositiveIntegerParam`
 - authChecks: `checkMerchantOwnership`, `compares req.user?.role === "admin"`
-- storageMethods: `cancelTransactionForMerchant`, `getRetailCancellationContextForMerchant`, `getTransaction`, `getTransactionForMerchant`
-- sideEffects: `live update: sseBroker.broadcast`, `provider: queryWindcaveSession`, `push: sendPushToMerchant`
+- storageMethods: `cancelTransactionForMerchant`, `getTransaction`, `getTransactionForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
 - dtos: `ownerTransactionDto`
-- capabilityGates: `isWindcaveConfigured`
-- idempotency: `claimFinalization`
-- helpers: `broadcastToStone`, `numberedSaleExpectedFrom`, `persistTokenOutcome`, `reconciliationCode`, `recordTokenReconciliation`, `recordedExpectedOutcome`
+- helpers: `commandActor`, `reconcileBeforeManualChange`
 
 Reviewed policy:
 
 - **Who:** merchant (owner, member, platform admin). **Tenant (resource):** getTransactionForMerchant scopes a merchant session's read; the validated platform admin alone may resolve the sale globally. cancelTransactionForMerchant locks and rechecks the sale's business and pending/processing state at the write; another business's is answered as a missing one (404), by checkMerchantOwnership: the business in the path is the session's; the platform admin is let through for any business
 - **Input:** id: strictPositiveIntegerParam (400 otherwise)
-- **Capability gate:** isWindcaveConfigured(): unconfigured, the cancel asks the provider nothing and leaves open attempts untouched
-- **Idempotency:** owner decision OI-1 (2026-10-13): an attempt to pay never refuses the cancel; money already taken does (a provider transaction, a paid or processing share, an approved attempt: 409 PAYMENT_CAPTURED, read through getRetailCancellationContextForMerchant before any provider call and rechecked under the parent row lock). Each open attempt (ready/finalizing with a session) is asked once, without retries and outside any lock, through queryWindcaveSession with its recorded expected values; a verified approval is claimed (claimFinalization) and settled through persistTokenOutcome and the cancel answers 409 PAYMENT_COMPLETED; a verified decline is finalized declined only after the cancel commits, so the sale stays cancelled; anything else cancels and leaves the attempt able to settle, and finalize records a later payment on the cancelled sale. A board sale's own pending session is asked the same way and only refuses; its payment is recorded by its notification/callback. Unsent claims are abandoned with the sale. A sale no longer pending/processing is 400 (so again is 400)
-- **Side effects:** provider: queryWindcaveSession (one exchange); a payment found settled sends the business a payment push (sendPushToMerchant, via persistTokenOutcome); a live update to the business, and to the board's page for a board sale (sseBroker, via broadcastToStone)
+- **Idempotency:** cancels a pending or processing sale under the parent row lock, then separately rechecks recorded attempts and split shares with a fresh statement snapshot. Live/expired or possibly accepted attempts, legacy sessions and captured/processing shares hold cancellation (409 PAYMENT_ACTIVE); any other aggregate state is 400 (so again is 400). Only a persisted cancellation broadcasts. Durable cancellation command/audit/outbox remains R3 work; legacy provider sends before attachment still require initiation convergence
+- **Side effects:** Concrete scoped mutation, immutable command/audit and keyed outbox in server/storage.ts; no route-local financial publication.
 - **Success:** ownerTransactionDto with the board's addresses for a board sale
 - **Error disclosure:** fixed
 - **Finding:** The platform admin passes checkMerchantOwnership for any business, so it can create sales, record cash sales, take Tap to Pay and cancel sales for any business; no admin screen does: kept by the owner's decision (2026-09-29).
@@ -1472,30 +1459,30 @@ Reviewed policy:
 
 ### POST `/api/transactions/:id/pay`
 
-- params: `id: strictPositiveIntegerParam`
-- body: `schema: paymentRequestSchema`
-- authChecks: `compares stone.merchantId !== transaction.merchantId`, `compares transaction.merchantId !== requestMerchantId`, `isTokenAddressedTransaction`
-- storageMethods: `getMerchant`, `getNextPendingSplit`, `getTaptStone`, `getTransaction`, `updateTransactionWindcaveSession`
-- sideEffects: `provider: createWindcaveSession`
-- statuses: `200`, `400`, `403`, `404`, `409`, `410`, `429`, `500`, `503`
-- errorTextInResponse: `validation.error.errors`
-- capabilityGates: `isWindcaveConfigured`
-- rateLimits: `checkRateLimit`
-- helpers: `checkRateLimit`
+- params: `id: checked`, `id: strictPositiveIntegerParam`, `token: raw`
+- body: `schema: sessionSchema`
+- authChecks: `compares input.merchantId!==sale.merchantId`, `resolvePaymentToken`
+- storageMethods: `getMerchant`, `getSplitPaymentsByTransaction`, `getTaptStoneForMerchant`, `getTransaction`
+- sideEffects: `provider through durable attempt coordinator: checkout.open`
+- statuses: `200`, `202`, `400`, `403`, `404`, `409`, `410`, `429`, `503`
+- capabilityGates: `config.features.newRetailPayments`
+- rateLimits: `checkRateLimit`, `deps.checkRateLimit`, `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
+- helpers: `checkRateLimit`, `find`, `requirePaymentTokenRateLimit`, `server/payment-checkout-handlers.ts:session`
 
 Reviewed policy:
 
-- **Who:** public. **Tenant (number):** the sale's sequential number selects it, for any business; only a sale with its own link (isTokenAddressedTransaction) is hidden (404)
-- **Input:** id: strictPositiveIntegerParam; body: paymentRequestSchema (merchantId, stoneId, paymentMethod, cardLast4, amount — all optional; a merchantId or stoneId given must match the sale); amount: never charged — what is owed (the next share, or the whole price) is; an amount given must equal it to the cent, or 400 before any provider session (owner decision 2026-09-26)
-- **Capability gate:** isWindcaveConfigured() (503 PAYMENT_PROVIDER_UNAVAILABLE while unconfigured)
-- **Idempotency:** a completed or processing sale is refused (409); otherwise every call creates a new provider session and binds it to the sale, replacing the last one
-- **Side effects:** creates a payment session with the provider (createWindcaveSession); a duplicate-request reply binds its session and settles nothing (503: the notification or callback settles it by a verified query, R2-T5)
-- **Success:** the provider session id and its hosted-page and submit URLs (kept server-side too, and never taken back from a client)
-- **Error disclosure:** input-issues
-- **Authenticity:** anyone with the sale's number: numbers are sequential, so every board, cash and tap-to-pay sale can be found by counting
-- **Replay:** each call opens another provider session for the same sale
-- **Rate:** checkRateLimit (100 a minute per normalized IPv4 address or IPv6 /64, counted in this server process only; until TRUST_PROXY_HOPS is set visitors behind a proxy share its address — R1-T4 phase B)
-- **Finding:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
+- **Who:** public. **Tenant (number):** the original resource locator is retained; the request is then held to the exact tenant, aggregate, UUID key, immutable share and provider-session binding
+- **Input:** token/id locates the original public resource (numeric id parsed strictly). Strict body: UUID idempotencyKey, integer shareIndex (retail 0..10; invoice 0..12). Sessions accept exact optional amount/merchantId/stoneId, or validated invoice payerEmail. Completion requires exact sessionId; optional supported paymentMethod or Google Pay payload. No client-supplied provider URLs.
+- **Capability gate:** newRetailPayments/invoicePayments and UAT/production mode gate new creation; off means no new provider request
+- **Idempotency:** same persisted UUID/share is reused; changed immutable details conflict. Parent → attempt → binding locks. Pre-send expectations/state hash/send intent commit before R2 transport. Unknown acceptance keeps the original key/X-ID. Only the shared inbox worker and atomic finalizer settle.
+- **Side effects:** actual R2 session client through the durable coordinator; no communication from this route
+- **Success:** validated session links/share/return state, or local terminal outcome; 202 processing for pending/unknown
+- **Error disclosure:** fixed
+- **Authenticity:** public resource locator plus exact cryptographic command/binding; hashed browser state checked when present. Every money outcome is verified through actual R2 transport.
+- **Replay:** fenced atomic finalizer and unique financial event/outbox; uncertain send commands are never rotated or blindly resent
+- **Rate:** payment token family limiter; numeric callback only accepts a valid hashed state
+- **Finding:** Numeric board-sale addressing remains publicly guessable; preserve the reviewed R1 scope and token-sale exclusion.
+- **Finding:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
 
 ### GET `/api/windcave/env`
 
@@ -1514,57 +1501,59 @@ Reviewed policy:
 
 ### POST `/api/transactions/:id/hosted-fields-complete`
 
-- params: `id: strictPositiveIntegerParam`
-- body: `fields: paymentMethod, sessionId`
-- authChecks: `isTokenAddressedTransaction`
-- storageMethods: `getNextPendingSplit`, `getTransaction`, `incrementTransactionCount`, `updateSplitPaymentStatus`, `updateTransactionPaymentMethod`, `updateTransactionSessionState`, `updateTransactionStatus`
-- sideEffects: `live update: sseBroker.broadcast`, `provider: queryWindcaveSession`, `push: sendPushToMerchant`
-- statuses: `200`, `400`, `403`, `404`, `500`, `503`
-- capabilityGates: `isWindcaveConfigured`
-- helpers: `broadcastToStone`, `expectedForNumberedSale`, `finaliseHostedPayment`, `numberedSaleExpectedFrom`
+- params: `id: checked`, `id: strictPositiveIntegerParam`, `token: raw`
+- body: `fields: sessionId`, `schema: completeSchema`
+- authChecks: `resolvePaymentToken`
+- storageMethods: `getTransaction`
+- sideEffects: `provider reconciliation: runtime.reconcile`, `provider: runtime.client.querySession`, `provider: submitGooglePayToken`
+- statuses: `200`, `202`, `400`, `404`, `429`
+- capabilityGates: `config.features.newRetailPayments`
+- rateLimits: `checkRateLimit`, `deps.checkRateLimit`, `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
+- idempotency: `claimWalletSubmission`
+- helpers: `checkRateLimit`, `find`, `outcome`, `processing`, `requirePaymentTokenRateLimit`, `server/payment-checkout-handlers.ts:complete`
 
 Reviewed policy:
 
-- **Who:** public. **Tenant (number):** the sale's sequential number selects it, for any business; only a sale with its own link (isTokenAddressedTransaction) is hidden (404); the session id sent must be the one bound to the sale (403 otherwise)
-- **Input:** id: strictPositiveIntegerParam; body read without a schema: sessionId (required, compared with the bound session) and paymentMethod (only apple_pay is kept, anything else is card)
-- **Capability gate:** isWindcaveConfigured() (503 while unconfigured)
-- **Idempotency:** none: every call queries the provider and settles again (gap 11, finding)
-- **Side effects:** queries the provider for the bound session; settles the sale or its next share, counts it on the business, and sends a live update and a push
-- **Success:** { approved, redirectPath } to the receipt or the declined page
+- **Who:** public. **Tenant (number):** the original resource locator is retained; the request is then held to the exact tenant, aggregate, UUID key, immutable share and provider-session binding
+- **Input:** token/id locates the original public resource (numeric id parsed strictly). Strict body: UUID idempotencyKey, integer shareIndex (retail 0..10; invoice 0..12). Sessions accept exact optional amount/merchantId/stoneId, or validated invoice payerEmail. Completion requires exact sessionId; optional supported paymentMethod or Google Pay payload. No client-supplied provider URLs.
+- **Capability gate:** reconciliation in server/payment-checkout-handlers.ts and server/invoice-checkout-handlers.ts is independent of initiation flags; provider absence returns truthful processing
+- **Idempotency:** same persisted UUID/share is reused; changed immutable details conflict. Parent → attempt → binding locks. Pre-send expectations/state hash/send intent commit before R2 transport. Unknown acceptance keeps the original key/X-ID. Only the shared inbox worker and atomic finalizer settle.
+- **Side effects:** enqueue receipt and optionally query through the shared R2 worker. Google Pay submission uses a durable once-only session command and validated provider query links; its return boolean never chooses money. Settlement appends a keyed outbox; no route-local push/SSE/email.
+- **Success:** validated session links/share/return state, or local terminal outcome; 202 processing for pending/unknown
 - **Error disclosure:** fixed
-- **Authenticity:** anyone with the sale's number: numbers are sequential, so every board, cash and tap-to-pay sale can be found by counting, with the provider session id bound to it
-- **Replay:** settles again (gap 11); after a share, the same session no longer completes the next one (R2-T5: its reference is the counted share's)
-- **Rate:** none — no limit
-- **Finding:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
-- **Finding:** Gap 11 (known, escalated 2026-09-13): the finaliser re-settles on every call with the bound session (an unsplit sale is counted and pushed again). After a share it resets the session to pending; until R2-T5 one approved session could then complete the next share too, and now cannot, since the next share's reference differs from the one that session carries (r2-t5-split-share-replay.test.ts). Closed by moving onto the payment_attempts engine (C3).
-- **Finding:** A split share is marked paid without comparing what the provider charged with the share. Until 2026-09-26 the pay route let the customer choose the amount, so every share of a $100 sale could be paid with $0.01 and the sale showed fully paid (shown in the harness); the owner chose exact shares only, and the pay route now opens every session for exactly what is owed. Since R2-T5 the provider's amount, currency and reference are compared with the share's before it counts (the verified query). What remains is one session settling twice (gap 11's replay; the read-then-write settlement, R3/C20).
+- **Authenticity:** public resource locator plus exact cryptographic command/binding; hashed browser state checked when present. Every money outcome is verified through actual R2 transport.
+- **Replay:** fenced atomic finalizer and unique financial event/outbox; uncertain send commands are never rotated or blindly resent
+- **Rate:** payment token family limiter; numeric callback only accepts a valid hashed state
+- **Finding:** Numeric board-sale addressing remains publicly guessable; preserve the reviewed R1 scope and token-sale exclusion.
+- **Finding:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
 
 ### POST `/api/transactions/:id/googlepay-complete`
 
-- params: `id: strictPositiveIntegerParam`
-- body: `fields: googlePayToken, sessionId`
-- authChecks: `isTokenAddressedTransaction`
-- storageMethods: `getNextPendingSplit`, `getTransaction`, `incrementTransactionCount`, `updateSplitPaymentStatus`, `updateTransactionPaymentMethod`, `updateTransactionSessionState`, `updateTransactionStatus`
-- sideEffects: `live update: sseBroker.broadcast`, `provider: queryWindcaveSession`, `provider: submitGooglePayToken`, `push: sendPushToMerchant`
-- statuses: `200`, `400`, `403`, `404`, `410`, `500`, `503`
-- capabilityGates: `isWindcaveConfigured`
-- helpers: `broadcastToStone`, `expectedForNumberedSale`, `finaliseHostedPayment`, `numberedSaleExpectedFrom`
+- params: `id: checked`, `id: strictPositiveIntegerParam`, `token: raw`
+- body: `fields: sessionId`, `schema: completeSchema`
+- authChecks: `resolvePaymentToken`
+- storageMethods: `getTransaction`
+- sideEffects: `provider reconciliation: runtime.reconcile`, `provider: runtime.client.querySession`, `provider: submitGooglePayToken`
+- statuses: `200`, `202`, `400`, `404`, `429`
+- capabilityGates: `config.features.newRetailPayments`
+- rateLimits: `checkRateLimit`, `deps.checkRateLimit`, `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
+- idempotency: `claimWalletSubmission`
+- helpers: `checkRateLimit`, `find`, `outcome`, `processing`, `requirePaymentTokenRateLimit`, `server/payment-checkout-handlers.ts:complete`
 
 Reviewed policy:
 
-- **Who:** public. **Tenant (number):** the sale's sequential number selects it, for any business; only a sale with its own link (isTokenAddressedTransaction) is hidden (404); the session id sent must be the one bound to the sale (403 otherwise)
-- **Input:** id: strictPositiveIntegerParam; body read without a schema: sessionId (required, compared with the bound session) and googlePayToken (an object passed to the provider)
-- **Capability gate:** isWindcaveConfigured() (503 while unconfigured)
-- **Idempotency:** none: the wallet token is submitted to the provider's submit URL cached for the sale when there is one (the cache is then cleared); the session is always queried, and a verified result is settled again on every call (gap 11)
-- **Side effects:** submits the Google Pay token to the provider's cached submit URL (assertWindcaveUrl checks it), then queries the session; only an outcome verified against the sale's expected values settles the sale or its next share (R2-T5; anything else is 503), counts it, and sends a live update and a push
-- **Success:** { approved, redirectPath } to the receipt or the declined page
+- **Who:** public. **Tenant (number):** the original resource locator is retained; the request is then held to the exact tenant, aggregate, UUID key, immutable share and provider-session binding
+- **Input:** token/id locates the original public resource (numeric id parsed strictly). Strict body: UUID idempotencyKey, integer shareIndex (retail 0..10; invoice 0..12). Sessions accept exact optional amount/merchantId/stoneId, or validated invoice payerEmail. Completion requires exact sessionId; optional supported paymentMethod or Google Pay payload. No client-supplied provider URLs.
+- **Capability gate:** reconciliation in server/payment-checkout-handlers.ts and server/invoice-checkout-handlers.ts is independent of initiation flags; provider absence returns truthful processing
+- **Idempotency:** same persisted UUID/share is reused; changed immutable details conflict. Parent → attempt → binding locks. Pre-send expectations/state hash/send intent commit before R2 transport. Unknown acceptance keeps the original key/X-ID. Only the shared inbox worker and atomic finalizer settle.
+- **Side effects:** enqueue receipt and optionally query through the shared R2 worker. Google Pay submission uses a durable once-only session command and validated provider query links; its return boolean never chooses money. Settlement appends a keyed outbox; no route-local push/SSE/email.
+- **Success:** validated session links/share/return state, or local terminal outcome; 202 processing for pending/unknown
 - **Error disclosure:** fixed
-- **Authenticity:** anyone with the sale's number: numbers are sequential, so every board, cash and tap-to-pay sale can be found by counting, with the provider session id bound to it
-- **Replay:** settles again (gap 11); after a share, the same session no longer completes the next one (R2-T5: its reference is the counted share's)
-- **Rate:** none — no limit
-- **Finding:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
-- **Finding:** Gap 11 (known, escalated 2026-09-13): the finaliser re-settles on every call with the bound session (an unsplit sale is counted and pushed again). After a share it resets the session to pending; until R2-T5 one approved session could then complete the next share too, and now cannot, since the next share's reference differs from the one that session carries (r2-t5-split-share-replay.test.ts). Closed by moving onto the payment_attempts engine (C3).
-- **Finding:** A split share is marked paid without comparing what the provider charged with the share. Until 2026-09-26 the pay route let the customer choose the amount, so every share of a $100 sale could be paid with $0.01 and the sale showed fully paid (shown in the harness); the owner chose exact shares only, and the pay route now opens every session for exactly what is owed. Since R2-T5 the provider's amount, currency and reference are compared with the share's before it counts (the verified query). What remains is one session settling twice (gap 11's replay; the read-then-write settlement, R3/C20).
+- **Authenticity:** public resource locator plus exact cryptographic command/binding; hashed browser state checked when present. Every money outcome is verified through actual R2 transport.
+- **Replay:** fenced atomic finalizer and unique financial event/outbox; uncertain send commands are never rotated or blindly resent
+- **Rate:** payment token family limiter; numeric callback only accepts a valid hashed state
+- **Finding:** Numeric board-sale addressing remains publicly guessable; preserve the reviewed R1 scope and token-sale exclusion.
+- **Finding:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
 
 ### GET `/api/transactions/:id`
 
@@ -1971,54 +1960,45 @@ Reviewed policy:
 
 ### ALL `/api/windcave/notification`
 
-- middleware: `express.urlencoded(…)`, `express.json(…)`
-- query: `sessionId: raw`, `sessionid: raw`
-- body: `fields: sessionId, sessionid`
-- storageMethods: `getNextPendingSplit`, `getTransaction`, `getTransactionByWindcaveSessionId`, `incrementTransactionCount`, `updateSplitPaymentStatus`, `updateTransactionSessionState`, `updateTransactionStatus`
-- sideEffects: `live update: sseBroker.broadcast`, `provider: queryWindcaveSession`, `push: sendPushToMerchant`
-- statuses: `200`
-- capabilityGates: `isWindcaveConfigured`
-- helpers: `broadcastToStone`, `expectedForNumberedSale`, `numberedSaleExpectedFrom`
+- statuses: `200`, `400`, `405`, `413`, `415`, `503`
+- helpers: `server/durable-payment-notification.ts:errorHandler`, `server/durable-payment-notification.ts:receive`, `server/durable-payment-notification.ts:validate`
 
 Reviewed policy:
 
-- **Who:** provider. **Tenant (provider-session):** the provider's session id selects the one sale created with it (storage.getTransactionByWindcaveSessionId); an unknown id does nothing
-- **Input:** sessionId / sessionid (query or body): an opaque provider session id, used only to find the sale and to query the provider; the rest of the body is ignored
-- **Capability gate:** isWindcaveConfigured(): unconfigured, the notification is ignored before any write
-- **Idempotency:** only a sale whose session is still pending is processed, but pending → processing is a read then a write, not a claim (finding)
-- **Side effects:** queries the provider; on an outcome verified against the sale's expected values (R2-T5) settles the sale or its next split share, counts the sale on the business, and sends the business a live update and a push
-- **Success:** 200 "OK" at once, before any work; nothing else is returned
+- **Who:** provider. **Tenant (provider-session):** session identity is a reconciliation hint; only the worker resolves an exact independently persisted attempt/binding
+- **Input:** GET query sessionid or sessionId: one scalar id, identical aliases only; URL <=8192 bytes and <=20 fields. POST: bounded 8 KB JSON/form, <=20 form parameters, no compressed bodies. Other methods 405. Approval/money fields are ignored. The state path is not financial authority.
+- **Idempotency:** committed inbox uniqueness (provider, kind=fprn, session); arrival count increments. Database absence/failure returns 503 with Retry-After, never 200.
+- **Success:** 200 "OK" only after the durable receipt commits
 - **Error disclosure:** fixed
-- **Authenticity:** none needed from the caller: the outcome comes from querying the provider with the stored session id
-- **Replay:** a settled session is skipped (no longer pending); two simultaneous duplicates can both pass the read
-- **Rate:** none — anyone can make the server query the provider about a pending session whose id they hold; the ids are unguessable provider session ids
-- **Finding:** pending → processing is a read then a write, not an atomic claim: two simultaneous notifications for one session can both query the provider and both settle it (a second count increment, a second push). Plan 22.7 / R3 (C20) owns the single atomic finaliser.
-- **Finding:** Until R2-T6 (2026-10-12) it logged the raw query (with the provider's session id), and the query and body when no session id was found; it now logs fixed text and the internal sale id only (r2-t6-provider-log-guard.test.ts).
+- **Authenticity:** notification fields authorize no money; actual R2 query/verifier and fenced aggregate finalizer are the only settlement path
+- **Replay:** one receipt row; terminal settlement/event/outbox replays are idempotent
+- **Rate:** none at this route; size/shape bounds and infrastructure limits remain. R6 owns distributed abuse controls.
+- **Finding:** Historical sessions without exact pre-send expectations remain held for operational reconciliation. Real keyed delivery remains an R3 exit gate.
 
 ### GET `/api/windcave/callback`
 
-- query: `result: raw`, `sessionId: raw`, `sessionid: raw`, `transactionId: raw`
-- authChecks: `isTokenAddressedTransaction`
-- storageMethods: `getNextPendingSplit`, `getTransaction`, `getTransactionByWindcaveSessionId`, `incrementTransactionCount`, `updateSplitPaymentStatus`, `updateTransactionSessionState`, `updateTransactionStatus`
-- sideEffects: `live update: sseBroker.broadcast`, `provider: queryWindcaveSession`, `push: sendPushToMerchant`
-- statuses: `302`, `400`
-- capabilityGates: `isWindcaveConfigured`
-- helpers: `broadcastToStone`, `expectedForNumberedSale`, `numberedSaleExpectedFrom`
+- params: `id: checked`
+- query: `state: raw`, `transactionId: strictPositiveIntegerParam`
+- authChecks: `attempts.resolveReturnState`
+- storageMethods: `getSplitPaymentsByTransaction`, `getTransaction`
+- sideEffects: `provider reconciliation: runtime.reconcile`
+- statuses: `303`, `400`, `404`, `409`, `410`, `429`
+- rateLimits: `checkRateLimit`, `deps.checkRateLimit`, `paymentTokenRateLimiter.allow`, `requirePaymentTokenRateLimit`
+- helpers: `checkRateLimit`, `outcome`, `requirePaymentTokenRateLimit`, `server/payment-checkout-handlers.ts:numericReturn`
 
 Reviewed policy:
 
-- **Who:** public. **Tenant (number):** the sale's number (transactionId), or else the provider session id, selects the sale; a sale with its own link is sent home as a missing one is (302, since 2026-09-27: its 404 told a caller counting through the numbers which were link sales); a cancel only chooses the page, and only with the bound session id
-- **Input:** transactionId: read into a variable, then strictPositiveIntegerQueryParam (a malformed one finds nothing, since 2026-09-26); sessionId / sessionid: compared with the bound session to choose the cancelled page; result: 'cancelled' only redirects (R2-T5: it settles nothing); any 'sim' key rejects the request (400)
-- **Capability gate:** isWindcaveConfigured(): unconfigured, nothing is settled and the customer sees pending
-- **Idempotency:** an already approved or declined sale only redirects; otherwise pending → processing is a read then a write, like the notification's (R3 / C20)
-- **Side effects:** queries the provider for the bound session and settles the sale or its next share only on an outcome verified against the sale's expected values (count, live update, push; R2-T5); a cancel changes nothing
-- **Success:** 302 to the receipt, or to the result page (declined, cancelled or pending), or home
+- **Who:** public-bearer. **Tenant (token):** hashed state with absolute expiry addresses one attempt. Numbered and invoice callbacks additionally compare its persisted aggregate/merchant identity to the supplied resource. Legacy callbacks without a usable state return reconciliation-required.
+- **Input:** state: opaque 43-character bearer, checked by attempts.resolveReturnState or repository.resolveInvoiceReturnState; source/result are hints only. Numeric transactionId is a strict positive integer; invoice token is resolved through getCheckoutInvoiceByToken. No raw query/body logging.
+- **Capability gate:** reconciliation in server/payment-checkout-handlers.ts and server/invoice-checkout-handlers.ts is independent of initiation flags; provider absence returns truthful processing
+- **Idempotency:** same persisted UUID/share is reused; changed immutable details conflict. Parent → attempt → binding locks. Pre-send expectations/state hash/send intent commit before R2 transport. Unknown acceptance keeps the original key/X-ID. Only the shared inbox worker and atomic finalizer settle.
+- **Side effects:** enqueue receipt and optionally query through the shared R2 worker. Google Pay submission uses a durable once-only session command and validated provider query links; its return boolean never chooses money. Settlement appends a keyed outbox; no route-local push/SSE/email.
+- **Success:** narrow local outcome/receipt share or safe redirect; pending remains processing
 - **Error disclosure:** fixed
-- **Authenticity:** anyone with the sale's number: numbers are sequential, so every board, cash and tap-to-pay sale can be found by counting; the outcome always comes from querying the provider and verifying it (R2-T5); a cancel settles nothing
-- **Replay:** a settled sale only redirects; simultaneous calls can both settle (R3 / C20)
-- **Rate:** none — anyone can prompt a provider query for a pending numbered sale
-- **Finding:** Addressed by a guessable sequential number and held to nobody: the gap-12 memo's 'adjacent surface'. Board sales still use numbers (boards are kept, owner 2026-09-25); plan §10.3 (numbered pay converges on the token attempt service or is retired, R3) closes it.
-- **Finding:** Settles by a read then a write, not a claim, racing the notification (plan 22.7 / R3, C20).
+- **Authenticity:** public resource locator plus exact cryptographic command/binding; hashed browser state checked when present. Every money outcome is verified through actual R2 transport.
+- **Replay:** fenced atomic finalizer and unique financial event/outbox; uncertain send commands are never rotated or blindly resent
+- **Rate:** payment token family limiter; numeric callback only accepts a valid hashed state
+- **Finding:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
 
 ### GET `/api/admin/analytics`
 
@@ -2576,9 +2556,8 @@ Reviewed policy:
 
 - middleware: `requireEcommerceApi`, `authenticateApiKey`
 - body: `schema: apiV1CreateTransactionSchema`
-- storageMethods: `createTransactionForMerchant`, `createWebhookDelivery`, `getApiKeyByKey`, `getOrCreateSubscription`, `logApiRequest`, `updateApiKeyLastUsed`
-- statuses: `200`, `400`, `401`, `402`, `403`, `404`, `500`, `503`
-- dtos: `publicTransactionDto`
+- storageMethods: `createTransactionForMerchant`, `getApiKeyByKey`, `getCreationCommandForMerchant`, `getOrCreateSubscription`, `logApiRequest`, `updateApiKeyLastUsed`
+- statuses: `200`, `400`, `401`, `402`, `403`, `404`, `409`, `500`, `503`
 - errorTextInResponse: `validation.error.errors`
 - capabilityGates: `config.features.ecommerceApi`, `config.features.newRetailPayments`, `requireEcommerceApi`
 - entitlementGates: `BILLING_CARD_REQUIRED`, `billingCardIsReady`, `requireBillingCard`
@@ -2590,15 +2569,15 @@ Reviewed policy:
 - **Input:** the key's create_transactions permission is checked first (403), then the body: apiV1CreateTransactionSchema (amount, currency, item_name, and webhook_url as a URL of at most 2048 characters)
 - **Capability gate:** requireEcommerceApi (FEATURE_ECOMMERCE_API, off by default: 404) and config.features.newRetailPayments (503 while per-payment links are off)
 - **Entitlement gate:** requireBillingCard: 402 BILLING_CARD_REQUIRED without a paid plan
-- **Idempotency:** none: every call creates another sale and another payment link (no idempotency key)
-- **Side effects:** creates a per-payment sale (createRetailTransaction, server/retail-transaction-service.ts), writes an API log row, and records a webhook delivery row that nothing sends
+- **Idempotency:** required Idempotency-Key UUID; merchant/key unique concrete creation receipt and canonical request fingerprint; replay returns the same aggregate and deterministic hashed retail credential
+- **Side effects:** Concrete scoped mutation, immutable command/audit and keyed outbox in server/retail-transaction-service.ts; no route-local financial publication.
 - **Success:** fields listed one by one: id, amount, currency, item_name, status, payment_url, qr_code_url (the payment link's raw token, given once), created_at; publicTransactionDto is only the stored webhook payload
 - **Error disclosure:** input-issues
 - **Authenticity:** a Bearer API key found with storage.getApiKeyByKey and active; create_transactions permission
-- **Replay:** a replayed request creates another sale
+- **Replay:** same UUID/fingerprint reuses the original bill; changed immutable details conflict
 - **Rate:** none — no per-key or per-address limit
-- **Finding:** webhook_url from the caller is stored as a webhook delivery row. Nothing delivers those rows today; any future delivery worker must restrict destinations (server-side request forgery).
-- **Finding:** No rate limit and no idempotency key on an API that creates payment links (behind FEATURE_ECOMMERCE_API, off by default; plan 15.5 decides the API's future).
+- **Finding:** Webhook requests are explicitly unavailable before creation; the later API phase must restrict destinations before enabling delivery.
+- **Finding:** Distributed rate limits remain with R6; FEATURE_ECOMMERCE_API remains off by default.
 
 ### GET `/api/v1/transactions/:id`
 
@@ -2643,18 +2622,17 @@ Reviewed policy:
 - middleware: `authenticateToken`
 - body: `fields: planId`
 - authChecks: `isAccountOwner`
-- storageMethods: `changeSubscriptionPlan`, `countSeatsInUse`, `getOrCreateSubscription`
-- sideEffects: `provider: chargeStoredCard`
+- storageMethods: `changeSubscriptionPlan`, `countSeatsInUse`, `getOrCreateSubscription`, `getSubscription`
 - statuses: `200`, `400`, `401`, `402`, `403`, `404`, `409`, `422`, `500`, `502`, `503`
 - dtos: `subscriptionDto`
-- helpers: `executeStoredCardCharge`
+- helpers: `commandActor`, `executeStoredCardCharge`
 
 Reviewed policy:
 
 - **Who:** merchant (owner). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** body read without a schema but for planId: planIdSchema, one of the plans (400 'Unknown plan' otherwise); nothing else is read
 - **Idempotency:** the current plan again changes nothing; an upgrade applies at once after charging the stored card (no card 402, declined 422, unconfirmed 502); a downgrade waits for the period's end, and one that would strand logins is 409; each runs under the subscription's billing claim (409 while another billing step holds it)
-- **Side effects:** an upgrade charges the stored card, with an idempotency key (executeStoredCardCharge, then chargeStoredCard)
+- **Side effects:** Concrete scoped mutation, immutable command/audit and keyed outbox in server/durable-subscription-billing.ts; no route-local financial publication.
 - **Success:** { subscription: subscriptionDto, applied: 'immediate' | 'period-end', message }
 - **Error disclosure:** fixed
 
@@ -2666,6 +2644,7 @@ Reviewed policy:
 - storageMethods: `cancelSubscription`, `countSeatsInUse`, `getOrCreateSubscription`
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
 - dtos: `subscriptionDto`
+- helpers: `commandActor`
 
 Reviewed policy:
 
@@ -2681,8 +2660,9 @@ Reviewed policy:
 - middleware: `authenticateToken`
 - authChecks: `isAccountOwner`
 - storageMethods: `countSeatsInUse`, `resumeSubscription`
-- statuses: `200`, `401`, `403`, `409`, `500`, `503`
+- statuses: `200`, `400`, `401`, `403`, `409`, `500`, `503`
 - dtos: `subscriptionDto`
+- helpers: `commandActor`
 
 Reviewed policy:
 
@@ -2862,98 +2842,104 @@ Reviewed policy:
 
 - middleware: `authenticateToken`
 - authChecks: `isAccountOwner`
-- storageMethods: `bindSubscriptionCardSession`, `getMerchant`, `getOrCreateSubscription`
-- sideEffects: `provider: createCardStorageSession`
-- statuses: `200`, `401`, `403`, `404`, `500`, `502`, `503`
-- capabilityGates: `isWindcaveConfigured`
+- storageMethods: `getMerchant`, `getOrCreateSubscription`
+- statuses: `200`, `202`, `400`, `401`, `403`, `404`, `409`, `503`
+- helpers: `commandActor`
 
 Reviewed policy:
 
 - **Who:** merchant (owner). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** nothing is read
-- **Capability gate:** the provider must be configured (isWindcaveConfigured: 503 otherwise)
+- **Capability gate:** Configured durable card provider and enabled initiation checked in server/durable-subscription-card.ts.
 - **Idempotency:** each call opens another hosted card page at the provider and binds its session to the subscription (bindSubscriptionCardSession), replacing any earlier one
-- **Side effects:** opens a hosted card-storage session at the provider (createCardStorageSession), with the business's contact email
+- **Side effects:** Concrete scoped mutation, immutable command/audit and keyed outbox in server/durable-subscription-card.ts; no route-local financial publication.
 - **Success:** { sessionId, redirectUrl }: the provider's page; the session id reads back only this one result
 - **Error disclosure:** fixed
 
 ### POST `/api/billing/card/confirm`
 
 - middleware: `authenticateToken`
-- body: `fields: sessionId`
+- body: `schema: z.object({sessionId:z.string().refine(value=>/^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$/.test(value))}).strict()`
 - authChecks: `isAccountOwner`
-- storageMethods: `completeSubscriptionCardSetup`, `countSeatsInUse`, `getSubscription`
-- sideEffects: `provider: chargeStoredCard`, `provider: queryStoredCardSession`
-- statuses: `200`, `202`, `400`, `401`, `403`, `404`, `409`, `422`, `500`, `502`, `503`
+- storageMethods: `countSeatsInUse`, `getSubscription`
+- statuses: `200`, `202`, `400`, `401`, `403`, `404`, `409`, `422`, `503`
 - dtos: `subscriptionDto`
-- helpers: `executeStoredCardCharge`
+- entitlementGates: `billingCardIsReady`
 
 Reviewed policy:
 
 - **Who:** merchant (owner). **Tenant (session):** the session's own business: nothing in the request names one; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3)); the card session must be the one bound to its subscription (subscriptionCardSessionState: 403 otherwise, the same for another business's)
 - **Input:** body read without a schema: sessionId, a trimmed string matching /^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$/ (400 otherwise)
+- **Entitlement gate:** billingCardIsReady checks readiness of the pending confirmation projection; it grants no browser-authorized charge or independent entitlement.
 - **Idempotency:** a session already settled answers from the stored result with no provider call; otherwise the provider is asked (202 while pending); an approved card is stored and, when the subscription needs paying, charged under the billing claim with an idempotency key (completeSubscriptionCardSetup: 409 busy, 422 declined, 502 unconfirmed)
-- **Side effects:** reads the card session back from the provider (queryStoredCardSession) and may charge the stored card (executeStoredCardCharge, then chargeStoredCard)
+- **Side effects:** Concrete scoped mutation, immutable command/audit and keyed outbox in server/durable-subscription-card.ts; no route-local financial publication.
 - **Success:** { success, ready, charged, card: { last4, brand, expiry }, subscription: subscriptionDto }; 202 { pending: true }
 - **Error disclosure:** fixed
 
 ### ALL `/api/billing/card/notification`
 
-- statuses: `200`
+- statuses: `200`, `400`, `405`, `413`, `415`, `503`
+- helpers: `server/durable-payment-notification.ts:errorHandler`, `server/durable-payment-notification.ts:receive`, `server/durable-payment-notification.ts:validate`
 
 Reviewed policy:
 
-- **Who:** provider. **Tenant (none):** reads nothing and writes nothing
-- **Input:** nothing is read
-- **Idempotency:** does nothing
-- **Success:** 200 "OK"
+- **Who:** provider. **Tenant (provider-session):** session identity is a reconciliation hint; only the worker resolves an exact independently persisted attempt/binding
+- **Input:** GET query sessionid or sessionId: one scalar id, identical aliases only; URL <=8192 bytes and <=20 fields. POST: bounded 8 KB JSON/form, <=20 form parameters, no compressed bodies. Other methods 405. Approval/money fields are ignored. The state path is not financial authority.
+- **Idempotency:** committed inbox uniqueness (provider, kind=fprn, session); arrival count increments. Database absence/failure returns 503 with Retry-After, never 200.
+- **Success:** 200 "OK" only after the durable receipt commits
 - **Error disclosure:** fixed
-- **Authenticity:** none needed: the call does nothing. A stored card is saved only when the signed-in owner's browser confirms it (POST /api/billing/card/confirm), which re-reads the session from the provider
-- **Replay:** harmless
-- **Rate:** none — there is nothing to limit
+- **Authenticity:** notification fields authorize no money; actual R2 query/verifier and fenced aggregate finalizer are the only settlement path
+- **Replay:** one receipt row; terminal settlement/event/outbox replays are idempotent
+- **Rate:** none at this route; size/shape bounds and infrastructure limits remain. R6 owns distributed abuse controls.
+- **Finding:** Historical sessions without exact pre-send expectations remain held for operational reconciliation. Real keyed delivery remains an R3 exit gate.
 
 ### GET `/api/billing/card/callback`
 
-- query: `result: raw`
-- body: `fields: result`
-- statuses: `302`
-- helpers: `billingCardCallback`, `safeBillingCardCallbackResult`
+- query: `state: raw`
+- authChecks: `subscriptionPayments.card.resolveReturnState`
+- statuses: `303`, `404`, `409`, `503`
+- helpers: `billingCardCallback`
 
 Reviewed policy:
 
-- **Who:** public. **Tenant (none):** reads nothing; sends the browser back to billing settings
-- **Input:** result (query or body): reduced by safeBillingCardCallbackResult to approved, declined, cancelled or unknown before it enters the redirect
-- **Idempotency:** does nothing
-- **Success:** 302 to /settings?section=billing&card=<one of the four results>
+- **Who:** public-bearer. **Tenant (token):** Expiring hashed return state identifies exactly one stored subscription card attempt; browser result and supplied merchant/session are not authority.
+- **Input:** state: one scalar query value resolved by subscriptionPayments.card.resolveReturnState in server/durable-subscription-card.ts. Result/body fields are hints only.
+- **Capability gate:** Configured subscription runtime; unavailable or legacy state returns reconciliation-required in server/subscription-payment-runtime.ts.
+- **Idempotency:** Same stored card intent and shared inbox; no independent browser finalizer.
+- **Side effects:** Scoped card confirmation through server/durable-subscription-card.ts; retained billing intent through server/durable-subscription-billing.ts.
+- **Success:** 303 to /settings?section=billing&card=pending; no credentials or unverified approved outcome.
 - **Error disclosure:** fixed
-- **Authenticity:** anyone: the redirect carries only one of four fixed words, and the settings page then asks the server, signed in, to confirm the card
-- **Replay:** harmless
-- **Rate:** none — there is nothing to limit
+- **Authenticity:** Valid stored hashed state with absolute expiry; zero-value and billing outcomes are queried and verified server-side.
+- **Replay:** Same stored command; terminal results reused without another purchase.
+- **Rate:** none — no new initiation occurs; distributed abuse controls remain with R6.
 
 ### POST `/api/billing/card/callback`
 
-- query: `result: raw`
-- body: `fields: result`
-- statuses: `302`
-- helpers: `billingCardCallback`, `safeBillingCardCallbackResult`
+- query: `state: raw`
+- authChecks: `subscriptionPayments.card.resolveReturnState`
+- statuses: `303`, `404`, `409`, `503`
+- helpers: `billingCardCallback`
 
 Reviewed policy:
 
-- **Who:** public. **Tenant (none):** reads nothing; sends the browser back to billing settings
-- **Input:** result (query or body): reduced by safeBillingCardCallbackResult to approved, declined, cancelled or unknown before it enters the redirect
-- **Idempotency:** does nothing
-- **Success:** 302 to /settings?section=billing&card=<one of the four results>
+- **Who:** public-bearer. **Tenant (token):** Expiring hashed return state identifies exactly one stored subscription card attempt; browser result and supplied merchant/session are not authority.
+- **Input:** state: one scalar query value resolved by subscriptionPayments.card.resolveReturnState in server/durable-subscription-card.ts. Result/body fields are hints only.
+- **Capability gate:** Configured subscription runtime; unavailable or legacy state returns reconciliation-required in server/subscription-payment-runtime.ts.
+- **Idempotency:** Same stored card intent and shared inbox; no independent browser finalizer.
+- **Side effects:** Scoped card confirmation through server/durable-subscription-card.ts; retained billing intent through server/durable-subscription-billing.ts.
+- **Success:** 303 to /settings?section=billing&card=pending; no credentials or unverified approved outcome.
 - **Error disclosure:** fixed
-- **Authenticity:** anyone: the redirect carries only one of four fixed words, and the settings page then asks the server, signed in, to confirm the card
-- **Replay:** harmless
-- **Rate:** none — there is nothing to limit
+- **Authenticity:** Valid stored hashed state with absolute expiry; zero-value and billing outcomes are queried and verified server-side.
+- **Replay:** Same stored command; terminal results reused without another purchase.
+- **Rate:** none — no new initiation occurs; distributed abuse controls remain with R6.
 
 ### DELETE `/api/billing/card`
 
 - middleware: `authenticateToken`
 - authChecks: `isAccountOwner`
 - storageMethods: `removeSubscriptionCard`
-- statuses: `200`, `401`, `403`, `409`, `500`, `503`
+- statuses: `200`, `400`, `401`, `403`, `409`, `500`, `503`
+- helpers: `commandActor`
 
 Reviewed policy:
 
@@ -3244,12 +3230,12 @@ Reviewed policy:
 
 - middleware: `authenticateToken`
 - body: `schema: createAdHocInvoiceSchema`
-- storageMethods: `cleanUploadedFileOwnedByMerchant`, `createOrReuseInvoiceRentRequestForMerchant`, `getInvoiceRentRequestForMerchant`, `getOrCreateSubscription`, `getTenantProfileForMerchant`
+- storageMethods: `cleanUploadedFileOwnedByMerchant`, `createOrReuseInvoiceRentRequestForMerchant`, `getCreationCommandForMerchant`, `getInvoiceRentRequestForMerchant`, `getOrCreateSubscription`, `getTenantProfileForMerchant`
 - sideEffects: `email: resendInvoiceEmailForMerchant`
-- statuses: `200`, `201`, `400`, `401`, `402`, `403`, `404`, `500`, `503`
+- statuses: `200`, `201`, `400`, `401`, `402`, `403`, `404`, `409`, `500`, `503`
 - errorTextInResponse: `err.errors`
 - entitlementGates: `BILLING_CARD_REQUIRED`, `billingCardIsReady`, `requireBillingCard`
-- helpers: `requireBillingCard`, `requireOwnedInvoiceDocument`
+- helpers: `commandActor`, `requireBillingCard`, `requireOwnedInvoiceDocument`
 
 Reviewed policy:
 
@@ -3287,22 +3273,19 @@ Reviewed policy:
 
 - middleware: `authenticateToken`
 - params: `id: strictUuidParam`
-- storageMethods: `getInvoiceRentRequestForMerchant`, `getOpenInvoiceSessionsForMerchant`, `voidInvoiceRentRequestForMerchant`
-- sideEffects: `provider: queryWindcaveSession`
+- storageMethods: `getInvoiceRentRequestForMerchant`, `voidInvoiceRentRequestForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
-- capabilityGates: `isWindcaveConfigured`
-- helpers: `invoiceCaptured`, `invoiceExpectation`, `invoicePaidJustNow`
+- helpers: `commandActor`, `reconcileBeforeManualChange`
 
 Reviewed policy:
 
 - **Who:** merchant (owner, member). **Tenant (resource):** the invoice read by id (getInvoiceRentRequestForMerchant) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403), including current parent ownership, rechecked under parent-then-child locks; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500)
-- **Capability gate:** isWindcaveConfigured(): unconfigured, the open windows are not asked and the change goes ahead on the stored state
-- **Idempotency:** voidInvoiceRentRequestForMerchant checks the current locked status and commits the scoped invoice update and history together; a paid or externally paid one is 409 'Cannot void a paid invoice' (400 until 2026-09-27, P2.2). OI-1 (2026-10-13): a card payment already taken (a provider transaction, a paid share or split session, an approved attempt) refuses with 409 PAYMENT_CAPTURED before any provider call, and again under the locks; each window that may still be paid (its unpaid split sessions, or the pinned session: getOpenInvoiceSessionsForMerchant) is asked once, in parallel and outside any lock, and a verified payment refuses with 409 PAYMENT_COMPLETED, left for its completion path to record; otherwise the change goes ahead, and a payment completing later is recorded (see findings). A voided one is voided again, with a new time, and logged again. Ownership refusal changes nothing; history failure rolls back the write
-- **Side effects:** provider: queryWindcaveSession, once per open window
+- **Idempotency:** voidInvoiceRentRequestForMerchant checks the current locked status and commits the scoped invoice update and history together; a paid or externally paid one is 409 'Cannot void a paid invoice' (400 until 2026-09-27, P2.2). Recorded live/expired attempts, legacy sessions and paid split shares refuse with 409 PAYMENT_ACTIVE. A voided one is voided again, with a new time, and logged again. Ownership refusal changes nothing; history failure rolls back the write. Legacy initiation before attachment still requires R3 convergence
 - **Success:** the invoice afterwards, a whole invoice row (the tenant and automation, amount, the checkout token, channel, rent or a charge with its type and description, the attached document's reference and name, status and its dates, the external payment reference, reminders sent, the provider's session and transaction ids, the split, the WhatsApp message id)
 - **Error disclosure:** fixed
-- **Finding:** Voiding while the tenant is paying (allowed since OI-1, 2026-10-13): a single payment completing afterwards is recorded by finalizeRentInvoice (a voided invoice becomes paid, Payment_Received_After_Void; one paid another way keeps its status, Payment_Received_After_External with a refund due); a split share's is logged for a refund (Split_Share_Unrecorded, with the invoice's state as its reason). Only the latest single-invoice session is pinned, so a payment through an earlier wallet session is still found by no lookup (pre-existing).
+- **Finding:** Voiding while the tenant is paying: the provider's completion then finds the invoice settled (finalizeRentInvoice), so a single payment's charge is recorded nowhere; a split share's is logged (Split_Share_Unrecorded). R3 (payment attempts).
+- **Finding:** A split invoice with shares already paid can be voided: those shares stay collected, with nothing but their events to show for them (R3/R4, refunds).
 - **Finding:** Every login of the business, a teammate included, has every property action and setting (tenants, rent and bills, voiding, marking paid outside TaptPay, automations, the reminder settings): kept by the owner's decision (2026-09-27).
 
 ### POST `/api/property/invoices/:id/mark-paid-external`
@@ -3310,23 +3293,19 @@ Reviewed policy:
 - middleware: `authenticateToken`
 - params: `id: strictUuidParam`
 - body: `schema: markInvoicePaidExternalSchema`
-- storageMethods: `getInvoiceRentRequestForMerchant`, `getOpenInvoiceSessionsForMerchant`, `markInvoiceRentRequestPaidExternalForMerchant`
-- sideEffects: `provider: queryWindcaveSession`
+- storageMethods: `getInvoiceRentRequestForMerchant`, `markInvoiceRentRequestPaidExternalForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
 - errorTextInResponse: `err.errors`
-- capabilityGates: `isWindcaveConfigured`
-- helpers: `invoiceCaptured`, `invoiceExpectation`, `invoicePaidJustNow`
+- helpers: `commandActor`, `reconcileBeforeManualChange`
 
 Reviewed policy:
 
 - **Who:** merchant (owner, member). **Tenant (resource):** the invoice read by id (getInvoiceRentRequestForMerchant) must be the session's business's: another business's is 404, the same as a missing one (since 2026-09-27; it was 403), including current parent ownership, rechecked under parent-then-child locks; not voided (409, since 2026-09-27); the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500); body: markInvoicePaidExternalSchema (an optional reference of at most 200 characters, null or empty for none: both screens send null when no reference is typed, which was refused until 2026-09-27, batch 6d; 400 with the issues)
-- **Capability gate:** isWindcaveConfigured(): unconfigured, the open windows are not asked and the change goes ahead on the stored state
-- **Idempotency:** markInvoiceRentRequestPaidExternalForMerchant checks the current locked status and commits the scoped external-payment record and history together; a paid or externally paid one is 409 'Invoice is already paid' (400 until 2026-09-27, P2.2), and a voided one stays voided. OI-1 (2026-10-13): a card payment already taken (a provider transaction, a paid share or split session, an approved attempt) refuses with 409 PAYMENT_CAPTURED before any provider call, and again under the locks; each window that may still be paid (its unpaid split sessions, or the pinned session: getOpenInvoiceSessionsForMerchant) is asked once, in parallel and outside any lock, and a verified payment refuses with 409 PAYMENT_COMPLETED, left for its completion path to record; otherwise the change goes ahead, and a payment completing later is recorded (see findings). Issued invoices remain payable after profile archival. Ownership refusal changes nothing; history failure rolls back the write
-- **Side effects:** provider: queryWindcaveSession, once per open window
+- **Idempotency:** markInvoiceRentRequestPaidExternalForMerchant checks the current locked status and commits the scoped external-payment record and history together; a paid or externally paid one is 409 'Invoice is already paid' (400 until 2026-09-27, P2.2), and a voided one stays voided. Recorded live/expired attempts, legacy sessions and paid split shares refuse with 409 PAYMENT_ACTIVE. Issued invoices remain payable after profile archival. Ownership refusal changes nothing; history failure rolls back the write. Legacy initiation before attachment still requires R3 convergence
 - **Success:** the invoice afterwards, a whole invoice row (the tenant and automation, amount, the checkout token, channel, rent or a charge with its type and description, the attached document's reference and name, status and its dates, the external payment reference, reminders sent, the provider's session and transaction ids, the split, the WhatsApp message id)
 - **Error disclosure:** input-issues
-- **Finding:** Marking an invoice paid outside TaptPay while the tenant is paying (allowed since OI-1, 2026-10-13): a single payment completing afterwards is recorded by finalizeRentInvoice (a voided invoice becomes paid, Payment_Received_After_Void; one paid another way keeps its status, Payment_Received_After_External with a refund due); a split share's is logged for a refund (Split_Share_Unrecorded, with the invoice's state as its reason). Only the latest single-invoice session is pinned, so a payment through an earlier wallet session is still found by no lookup (pre-existing).
+- **Finding:** Marking an invoice paid outside TaptPay while the tenant is paying: the provider's completion then finds the invoice settled (finalizeRentInvoice), so a single payment's charge is recorded nowhere; a split share's is logged (Split_Share_Unrecorded). R3 (payment attempts).
 - **Finding:** Every login of the business, a teammate included, has every property action and setting (tenants, rent and bills, voiding, marking paid outside TaptPay, automations, the reminder settings): kept by the owner's decision (2026-09-27).
 
 ### GET `/api/checkout/resolve/:token`
@@ -3372,179 +3351,157 @@ Reviewed policy:
 ### POST `/api/checkout/:token/split`
 
 - params: `token: raw`
-- body: `schema: z.object({ count: z.number().int().min(2).max(12) }).strict()`
-- authChecks: `getCheckoutInvoiceByToken`
-- storageMethods: `getInvoiceRentRequestByToken`, `getJobInvoiceByToken`, `invoiceHasSplitSessions`, `updateInvoiceRentRequest`, `updateJobInvoice`
-- statuses: `200`, `400`, `404`, `409`, `429`, `500`
-- rateLimits: `tokenRateLimit`
-- helpers: `splitInvoiceRef`, `tokenRateLimit`, `updateCheckoutInvoice`
+- body: `schema: z.object({count:z.number().int().min(2).max(12)}).strict()`
+- authChecks: `deps.getCheckoutInvoiceByToken`
+- statuses: `200`, `400`, `404`, `409`, `429`, `503`
+- rateLimits: `deps.checkRateLimit`
+- helpers: `server/invoice-checkout-handlers.ts:split`
 
 Reviewed policy:
 
-- **Who:** public-bearer. **Tenant (token):** the invoice's checkout token (20 random bytes, base64url) selects its one invoice, rent or trades (getCheckoutInvoiceByToken); an unknown token is 404
-- **Input:** token: read raw, then looked up; body: count, a whole number from 2 to 12, strict (400 otherwise; parseInt until 2026-09-26)
-- **Idempotency:** sets the invoice's share count; refused once any session has been opened for it or a share is paid (409, since 2026-09-26) and when the business has not allowed splitting (400)
-- **Success:** { splitCount, splitPaidCount: 0, shareCents }
+- **Who:** public-bearer. **Tenant (token):** the original resource locator is retained; the request is then held to the exact tenant, aggregate, UUID key, immutable share and provider-session binding
+- **Input:** token resolves one invoice; strict body {count: integer 2..12}; guarded aggregate CAS refuses recorded attempts, legacy sessions and paid shares.
+- **Idempotency:** same persisted UUID/share is reused; changed immutable details conflict. Parent → attempt → binding locks. Pre-send expectations/state hash/send intent commit before R2 transport. Unknown acceptance keeps the original key/X-ID. Only the shared inbox worker and atomic finalizer settle.
+- **Success:** splitCount, splitPaidCount and shareCents
 - **Error disclosure:** fixed
-- **Authenticity:** holding the invoice's checkout link: its token is the credential for that one invoice and for nothing else
-- **Replay:** the same count again changes nothing; another count is taken only until someone starts paying
-- **Rate:** tokenRateLimit (10 a minute per token, counted in this server process only; an unknown token gets a count of its own, so it limits one link's use, not guessing, which a 160-bit token makes futile)
-- **Finding:** What a split share costs is fixed when its session is opened, from the share count and the shares paid at that moment: sessions opened at once are all charged the equal share, so up to one cent per share of the remainder can go uncharged. Since 2026-09-26 the count locks once any session is opened (0030), so a share opened at 1/12 can no longer count as 1/2. The remainder is R3's (payment attempts).
+- **Authenticity:** public resource locator plus exact cryptographic command/binding; hashed browser state checked when present. Every money outcome is verified through actual R2 transport.
+- **Replay:** fenced atomic finalizer and unique financial event/outbox; uncertain send commands are never rotated or blindly resent
+- **Rate:** tokenRateLimit for session/completion; callback has no new initiation
+- **Finding:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
 
 ### POST `/api/checkout/:token/session`
 
 - params: `token: raw`
-- body: `fields: payerEmail`
-- authChecks: `getCheckoutInvoiceByToken`
-- storageMethods: `getClientProfile`, `getInvoiceRentRequestByToken`, `getJobInvoiceByToken`, `getMerchant`, `getTenantProfile`, `recordInvoiceSplitSession`, `updateInvoiceRentRequest`, `updateJobInvoice`
-- sideEffects: `provider: createWindcaveSession`
-- statuses: `200`, `404`, `409`, `429`, `500`, `502`, `503`
-- capabilityGates: `isWindcaveConfigured`
-- rateLimits: `tokenRateLimit`
-- helpers: `getCheckoutParty`, `splitInvoiceRef`, `tokenRateLimit`, `updateCheckoutInvoice`
+- body: `schema: openSchema`
+- authChecks: `deps.getCheckoutInvoiceByToken`
+- sideEffects: `provider through durable attempt coordinator: checkout.open`, `provider: runtime.client.createSession`, `provider: runtime.client.querySession`
+- statuses: `200`, `202`, `400`, `404`, `409`, `410`, `429`, `503`
+- capabilityGates: `config.features.invoicePayments`
+- rateLimits: `deps.checkRateLimit`
+- helpers: `linksFromBody`, `pending`, `result`, `server/invoice-checkout-handlers.ts:session`
 
 Reviewed policy:
 
-- **Who:** public-bearer. **Tenant (token):** the invoice's checkout token (20 random bytes, base64url) selects its one invoice, rent or trades (getCheckoutInvoiceByToken); an unknown token is 404
-- **Input:** token: read raw, then looked up; body read without a schema: payerEmail (checked as an email address; for a split invoice kept with that session only, never on a list)
-- **Capability gate:** isWindcaveConfigured() (503 PAYMENT_PROVIDER_UNAVAILABLE)
-- **Idempotency:** none: every call opens another provider session (finding)
-- **Side effects:** creates a payment session with the provider (createWindcaveSession) and, for a split invoice, records it with its amount and payer's email (recordInvoiceSplitSession, 0030); a duplicate-request reply settles nothing (503: the notification settles the recorded session by a verified query, R2-T5)
-- **Success:** the provider session id, the amount and the hosted-fields submit URLs (also cached here against the token, invoiceAjaxUrlCache)
+- **Who:** public-bearer. **Tenant (token):** the original resource locator is retained; the request is then held to the exact tenant, aggregate, UUID key, immutable share and provider-session binding
+- **Input:** token/id locates the original public resource (numeric id parsed strictly). Strict body: UUID idempotencyKey, integer shareIndex (retail 0..10; invoice 0..12). Sessions accept exact optional amount/merchantId/stoneId, or validated invoice payerEmail. Completion requires exact sessionId; optional supported paymentMethod or Google Pay payload. No client-supplied provider URLs.
+- **Capability gate:** newRetailPayments/invoicePayments and UAT/production mode gate new creation; off means no new provider request
+- **Idempotency:** same persisted UUID/share is reused; changed immutable details conflict. Parent → attempt → binding locks. Pre-send expectations/state hash/send intent commit before R2 transport. Unknown acceptance keeps the original key/X-ID. Only the shared inbox worker and atomic finalizer settle.
+- **Side effects:** actual R2 session client through the durable coordinator; no communication from this route
+- **Success:** validated session links/share/return state, or local terminal outcome; 202 processing for pending/unknown
 - **Error disclosure:** fixed
-- **Authenticity:** holding the invoice's checkout link: its token is the credential for that one invoice and for nothing else
-- **Replay:** each call opens another provider session for the same invoice
-- **Rate:** tokenRateLimit (10 a minute per token, counted in this server process only; an unknown token gets a count of its own, so it limits one link's use, not guessing, which a 160-bit token makes futile)
-- **Finding:** Every call opens another provider session and re-pins a single-payment invoice to it: a payment completed on an earlier session is then refused at completion (403) and missed by the notification, which finds invoices by their pinned session. The payer is charged and the invoice stays unpaid (R3: payment attempts).
-- **Finding:** What a split share costs is fixed when its session is opened, from the share count and the shares paid at that moment: sessions opened at once are all charged the equal share, so up to one cent per share of the remainder can go uncharged. Since 2026-09-26 the count locks once any session is opened (0030), so a share opened at 1/12 can no longer count as 1/2. The remainder is R3's (payment attempts).
+- **Authenticity:** public resource locator plus exact cryptographic command/binding; hashed browser state checked when present. Every money outcome is verified through actual R2 transport.
+- **Replay:** fenced atomic finalizer and unique financial event/outbox; uncertain send commands are never rotated or blindly resent
+- **Rate:** tokenRateLimit for session/completion; callback has no new initiation
+- **Finding:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
 
 ### POST `/api/checkout/:token/hosted-fields-complete`
 
 - params: `token: raw`
-- body: `fields: sessionId`
-- authChecks: `getCheckoutInvoiceByToken`
-- storageMethods: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`, `createJobEvent`, `getInvoiceRentRequest`, `getInvoiceRentRequestByToken`, `getInvoiceSplitSession`, `getJobInvoice`, `getJobInvoiceByToken`, `getMerchant`, `getPaidInvoiceSplitPayerEmails`, `getTenantProfile`, `logTransactionEvent`, `markInvoiceSplitSessionPaid`, `updateInvoiceRentRequest`, `updateJobInvoice`
-- sideEffects: `email/SMS: sendTradePaymentInvoice`, `email: sendGstInvoices`, `provider: queryWindcaveSession`
-- statuses: `200`, `400`, `403`, `404`, `500`, `503`
-- capabilityGates: `isWindcaveConfigured`
-- idempotency: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`
-- helpers: `closedReason`, `expectedForCheckoutInvoice`, `finalizeCheckoutInvoice`, `finalizeRentInvoice`, `finalizeTradeInvoice`, `invoiceExpectation`, `recordUncountedShare`, `sendRentGstInvoices`, `splitSessionOpenedFor`
+- body: `schema: completeSchema`
+- authChecks: `deps.getCheckoutInvoiceByToken`
+- sideEffects: `provider reconciliation: runtime.reconcile`, `provider: runtime.client.querySession`, `provider: submitGooglePayToken`
+- statuses: `200`, `202`, `400`, `404`, `429`
+- capabilityGates: `config.features.invoicePayments`
+- rateLimits: `deps.checkRateLimit`
+- idempotency: `claimWalletSubmission`
+- helpers: `linksFromBody`, `pending`, `result`, `server/invoice-checkout-handlers.ts:complete`
 
 Reviewed policy:
 
-- **Who:** public-bearer. **Tenant (token):** the invoice's checkout token (20 random bytes, base64url) selects its one invoice, rent or trades (getCheckoutInvoiceByToken); an unknown token is 404; a single payment must send the session pinned to it, a split share a session recorded for this invoice when it was opened (getInvoiceSplitSession; 403 otherwise, since 2026-09-26)
-- **Input:** token: read raw, then looked up; body read without a schema: sessionId (required; sent to the provider as one encoded path segment)
-- **Capability gate:** isWindcaveConfigured() (503 PAYMENT_PROVIDER_UNAVAILABLE: the outcome waits)
-- **Idempotency:** finalizeCheckoutInvoice: a settled invoice is left alone; a split share counts once per recorded session (atomicClaimSplitShare / atomicClaimJobSplitShare, then markInvoiceSplitSessionPaid), and an approved session that finds every share paid is recorded for a refund; a single payment settles by a read then a write
-- **Side effects:** queries the provider for the session (queryWindcaveSession); only an outcome verified against the invoice's expected values settles (R2-T5; anything else is 503, never a decline); once paid, the GST invoice email (rent, sendGstInvoices) or the payment invoice (trades, sendTradePaymentInvoice)
-- **Success:** { approved, status, splitCount, splitPaidCount }
+- **Who:** public-bearer. **Tenant (token):** the original resource locator is retained; the request is then held to the exact tenant, aggregate, UUID key, immutable share and provider-session binding
+- **Input:** token/id locates the original public resource (numeric id parsed strictly). Strict body: UUID idempotencyKey, integer shareIndex (retail 0..10; invoice 0..12). Sessions accept exact optional amount/merchantId/stoneId, or validated invoice payerEmail. Completion requires exact sessionId; optional supported paymentMethod or Google Pay payload. No client-supplied provider URLs.
+- **Capability gate:** reconciliation in server/payment-checkout-handlers.ts and server/invoice-checkout-handlers.ts is independent of initiation flags; provider absence returns truthful processing
+- **Idempotency:** same persisted UUID/share is reused; changed immutable details conflict. Parent → attempt → binding locks. Pre-send expectations/state hash/send intent commit before R2 transport. Unknown acceptance keeps the original key/X-ID. Only the shared inbox worker and atomic finalizer settle.
+- **Side effects:** enqueue receipt and optionally query through the shared R2 worker. Google Pay submission uses a durable once-only session command and validated provider query links; its return boolean never chooses money. Settlement appends a keyed outbox; no route-local push/SSE/email.
+- **Success:** validated session links/share/return state, or local terminal outcome; 202 processing for pending/unknown
 - **Error disclosure:** fixed
-- **Authenticity:** holding the invoice's checkout link: its token is the credential for that one invoice and for nothing else, with the invoice's pinned session for a single payment or a session recorded for it for a split share
-- **Replay:** a settled invoice is left alone and a split session counts once; two calls at once for a single payment can both settle it (R3 / C20)
-- **Rate:** none — every call asks the provider about the session sent, with the platform's credentials
+- **Authenticity:** public resource locator plus exact cryptographic command/binding; hashed browser state checked when present. Every money outcome is verified through actual R2 transport.
+- **Replay:** fenced atomic finalizer and unique financial event/outbox; uncertain send commands are never rotated or blindly resent
+- **Rate:** tokenRateLimit for session/completion; callback has no new initiation
+- **Finding:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
 
 ### POST `/api/checkout/:token/googlepay-complete`
 
 - params: `token: raw`
-- body: `fields: googlePayToken, sessionId`
-- authChecks: `getCheckoutInvoiceByToken`
-- storageMethods: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`, `createJobEvent`, `getInvoiceRentRequest`, `getInvoiceRentRequestByToken`, `getInvoiceSplitSession`, `getJobInvoice`, `getJobInvoiceByToken`, `getMerchant`, `getPaidInvoiceSplitPayerEmails`, `getTenantProfile`, `logTransactionEvent`, `markInvoiceSplitSessionPaid`, `updateInvoiceRentRequest`, `updateJobInvoice`
-- sideEffects: `email/SMS: sendTradePaymentInvoice`, `email: sendGstInvoices`, `provider: queryWindcaveSession`, `provider: submitGooglePayToken`
-- statuses: `200`, `400`, `403`, `404`, `409`, `500`, `503`
-- capabilityGates: `isWindcaveConfigured`
-- idempotency: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`
-- helpers: `closedReason`, `expectedForCheckoutInvoice`, `finalizeCheckoutInvoice`, `finalizeRentInvoice`, `finalizeTradeInvoice`, `invoiceExpectation`, `recordUncountedShare`, `sendRentGstInvoices`, `splitSessionOpenedFor`
+- body: `schema: completeSchema`
+- authChecks: `deps.getCheckoutInvoiceByToken`
+- sideEffects: `provider reconciliation: runtime.reconcile`, `provider: runtime.client.querySession`, `provider: submitGooglePayToken`
+- statuses: `200`, `202`, `400`, `404`, `429`
+- capabilityGates: `config.features.invoicePayments`
+- rateLimits: `deps.checkRateLimit`
+- idempotency: `claimWalletSubmission`
+- helpers: `linksFromBody`, `pending`, `result`, `server/invoice-checkout-handlers.ts:complete`
 
 Reviewed policy:
 
-- **Who:** public-bearer. **Tenant (token):** the invoice's checkout token (20 random bytes, base64url) selects its one invoice, rent or trades (getCheckoutInvoiceByToken); an unknown token is 404; a single payment must send the session pinned to it, a split share a session recorded for this invoice when it was opened (getInvoiceSplitSession; 403 otherwise, since 2026-09-26)
-- **Input:** token: read raw, then looked up; body read without a schema: sessionId (required), googlePayToken (any object, passed to the provider as it came)
-- **Capability gate:** isWindcaveConfigured() (503 PAYMENT_PROVIDER_UNAVAILABLE: the outcome waits)
-- **Idempotency:** finalizeCheckoutInvoice: a settled invoice is left alone; a split share counts once per session; a single payment settles by a read then a write
-- **Side effects:** submits the Google Pay token to the cached submit URL (submitGooglePayToken, checked by assertWindcaveUrl), then queries the provider (queryWindcaveSession); only an outcome verified against the invoice's expected values settles (R2-T5; anything else is 503); once paid, the GST invoice email (rent) or the payment invoice (trades)
-- **Success:** { approved, status, splitCount, splitPaidCount }
+- **Who:** public-bearer. **Tenant (token):** the original resource locator is retained; the request is then held to the exact tenant, aggregate, UUID key, immutable share and provider-session binding
+- **Input:** token/id locates the original public resource (numeric id parsed strictly). Strict body: UUID idempotencyKey, integer shareIndex (retail 0..10; invoice 0..12). Sessions accept exact optional amount/merchantId/stoneId, or validated invoice payerEmail. Completion requires exact sessionId; optional supported paymentMethod or Google Pay payload. No client-supplied provider URLs.
+- **Capability gate:** reconciliation in server/payment-checkout-handlers.ts and server/invoice-checkout-handlers.ts is independent of initiation flags; provider absence returns truthful processing
+- **Idempotency:** same persisted UUID/share is reused; changed immutable details conflict. Parent → attempt → binding locks. Pre-send expectations/state hash/send intent commit before R2 transport. Unknown acceptance keeps the original key/X-ID. Only the shared inbox worker and atomic finalizer settle.
+- **Side effects:** enqueue receipt and optionally query through the shared R2 worker. Google Pay submission uses a durable once-only session command and validated provider query links; its return boolean never chooses money. Settlement appends a keyed outbox; no route-local push/SSE/email.
+- **Success:** validated session links/share/return state, or local terminal outcome; 202 processing for pending/unknown
 - **Error disclosure:** fixed
-- **Authenticity:** holding the invoice's checkout link: its token is the credential for that one invoice and for nothing else, with the invoice's pinned session for a single payment or a session recorded for it for a split share
-- **Replay:** a settled invoice is left alone and a split session counts once; two calls at once for a single payment can both settle it (R3 / C20)
-- **Rate:** none — every call reaches the provider, with the platform's credentials
-- **Finding:** The submit URLs are cached per link, not per session: when two payers of one split invoice open sessions, the first one's Google Pay payment goes to the second one's session, and both sessions are then counted as shares.
+- **Authenticity:** public resource locator plus exact cryptographic command/binding; hashed browser state checked when present. Every money outcome is verified through actual R2 transport.
+- **Replay:** fenced atomic finalizer and unique financial event/outbox; uncertain send commands are never rotated or blindly resent
+- **Rate:** tokenRateLimit for session/completion; callback has no new initiation
+- **Finding:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
 
 ### GET `/api/checkout/callback`
 
-- query: `result: raw`, `token: raw`
-- authChecks: `getCheckoutInvoiceByToken`
-- storageMethods: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`, `createJobEvent`, `getInvoiceRentRequest`, `getInvoiceRentRequestByToken`, `getInvoiceSplitSession`, `getJobInvoice`, `getJobInvoiceByToken`, `getMerchant`, `getPaidInvoiceSplitPayerEmails`, `getTenantProfile`, `logTransactionEvent`, `markInvoiceSplitSessionPaid`, `updateInvoiceRentRequest`, `updateJobInvoice`
-- sideEffects: `email/SMS: sendTradePaymentInvoice`, `email: sendGstInvoices`, `provider: queryWindcaveSession`
-- statuses: `302`
-- capabilityGates: `isWindcaveConfigured`
-- idempotency: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`
-- helpers: `closedReason`, `expectedForCheckoutInvoice`, `finalizeCheckoutInvoice`, `finalizeRentInvoice`, `finalizeTradeInvoice`, `invoiceExpectation`, `recordUncountedShare`, `sendRentGstInvoices`
+- query: `state: raw`, `token: raw`
+- authChecks: `compares found.attempt.merchantId!==invoice.merchantId`, `deps.getCheckoutInvoiceByToken`
+- sideEffects: `provider reconciliation: runtime.reconcile`
+- statuses: `303`, `404`, `409`, `410`, `429`, `503`
+- rateLimits: `deps.checkRateLimit`
+- helpers: `server/invoice-checkout-handlers.ts:callback`
 
 Reviewed policy:
 
-- **Who:** public-bearer. **Tenant (token):** the invoice's checkout token (20 random bytes, base64url), in the query, selects its one invoice, rent or trades (getCheckoutInvoiceByToken); an unknown one is sent home (302), this being a browser's return (the shared rule's 404 does not apply here; corrected 2026-09-27 by R1-T3's matrix)
-- **Input:** query read raw: token (looked up; unknown goes to /) and result (only "cancelled" is acted on: no query)
-- **Capability gate:** isWindcaveConfigured() (while unconfigured it only redirects)
-- **Idempotency:** a settled invoice only redirects; otherwise the invoice's pinned session is queried and settled (a split invoice pins none, so nothing is)
-- **Side effects:** queries the provider for the pinned session (queryWindcaveSession) and settles only a verified outcome (R2-T5); once paid, the GST invoice email (rent) or the payment invoice (trades)
-- **Success:** a 302 to the invoice's checkout page (/r/<token>), or to / for an unknown token
+- **Who:** public-bearer. **Tenant (token):** hashed state with absolute expiry addresses one attempt. Numbered and invoice callbacks additionally compare its persisted aggregate/merchant identity to the supplied resource. Legacy callbacks without a usable state return reconciliation-required.
+- **Input:** state: opaque 43-character bearer, checked by attempts.resolveReturnState or repository.resolveInvoiceReturnState; source/result are hints only. Numeric transactionId is a strict positive integer; invoice token is resolved through getCheckoutInvoiceByToken. No raw query/body logging.
+- **Capability gate:** reconciliation in server/payment-checkout-handlers.ts and server/invoice-checkout-handlers.ts is independent of initiation flags; provider absence returns truthful processing
+- **Idempotency:** same persisted UUID/share is reused; changed immutable details conflict. Parent → attempt → binding locks. Pre-send expectations/state hash/send intent commit before R2 transport. Unknown acceptance keeps the original key/X-ID. Only the shared inbox worker and atomic finalizer settle.
+- **Side effects:** enqueue receipt and optionally query through the shared R2 worker. Google Pay submission uses a durable once-only session command and validated provider query links; its return boolean never chooses money. Settlement appends a keyed outbox; no route-local push/SSE/email.
+- **Success:** narrow local outcome/receipt share or safe redirect; pending remains processing
 - **Error disclosure:** fixed
-- **Authenticity:** holding the invoice's checkout link: its token is the credential for that one invoice and for nothing else; the outcome always comes from querying the provider about the pinned session
-- **Replay:** a settled invoice only redirects; two calls at once can both settle it (R3 / C20)
-- **Rate:** none — each call with a real link to an unpaid single-payment invoice asks the provider
-- **Finding:** Settles by a read then a write, not a claim, racing the notification (R3 / C20).
+- **Authenticity:** public resource locator plus exact cryptographic command/binding; hashed browser state checked when present. Every money outcome is verified through actual R2 transport.
+- **Replay:** fenced atomic finalizer and unique financial event/outbox; uncertain send commands are never rotated or blindly resent
+- **Rate:** tokenRateLimit for session/completion; callback has no new initiation
+- **Finding:** Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval.
 
 ### ALL `/api/windcave/rent-notification`
 
-- middleware: `express.urlencoded(…)`, `express.json(…)`
-- query: `sessionId: raw`, `sessionid: raw`
-- body: `fields: sessionId, sessionid`
-- storageMethods: `atomicClaimSplitShare`, `getInvoiceRentRequest`, `getInvoiceRentRequestByWindcaveSessionId`, `getInvoiceSplitSession`, `getMerchant`, `getPaidInvoiceSplitPayerEmails`, `getTenantProfile`, `logTransactionEvent`, `markInvoiceSplitSessionPaid`, `updateInvoiceRentRequest`
-- sideEffects: `email: sendGstInvoices`, `provider: queryWindcaveSession`
-- statuses: `200`
-- capabilityGates: `isWindcaveConfigured`
-- idempotency: `atomicClaimSplitShare`
-- helpers: `closedReason`, `expectedForCheckoutInvoice`, `finalizeRentInvoice`, `invoiceExpectation`, `recordUncountedShare`, `sendRentGstInvoices`
+- statuses: `200`, `400`, `405`, `413`, `415`, `503`
+- helpers: `server/durable-payment-notification.ts:errorHandler`, `server/durable-payment-notification.ts:receive`, `server/durable-payment-notification.ts:validate`
 
 Reviewed policy:
 
-- **Who:** provider. **Tenant (provider-session):** the provider's session id selects the one rent invoice created with it (storage.getInvoiceRentRequestByWindcaveSessionId), or the split invoice it was recorded for (getInvoiceSplitSession, since 2026-09-26); an unknown id does nothing
-- **Input:** sessionId / sessionid (query or body): an opaque provider session id; nothing else is read
-- **Capability gate:** isWindcaveConfigured(): unconfigured, the notification is ignored
-- **Idempotency:** a settled invoice (paid, paid externally, voided) is skipped; a split share is claimed atomically per session (storage.atomicClaimSplitShare), but a single payment is marked paid by a read then a write (finding)
-- **Side effects:** queries the provider and settles only a verified outcome (R2-T5); when paid, emails the GST invoice (sendRentGstInvoices → sendGstInvoices)
-- **Success:** 200 "OK" at once, before any work; nothing else is returned
+- **Who:** provider. **Tenant (provider-session):** session identity is a reconciliation hint; only the worker resolves an exact independently persisted attempt/binding
+- **Input:** GET query sessionid or sessionId: one scalar id, identical aliases only; URL <=8192 bytes and <=20 fields. POST: bounded 8 KB JSON/form, <=20 form parameters, no compressed bodies. Other methods 405. Approval/money fields are ignored. The state path is not financial authority.
+- **Idempotency:** committed inbox uniqueness (provider, kind=fprn, session); arrival count increments. Database absence/failure returns 503 with Retry-After, never 200.
+- **Success:** 200 "OK" only after the durable receipt commits
 - **Error disclosure:** fixed
-- **Authenticity:** none needed from the caller: the outcome comes from querying the provider with the stored session id
-- **Replay:** a settled invoice is skipped; two simultaneous duplicates of a single payment can both pass the read
-- **Rate:** none — any caller can prompt a provider query for a pending session whose id they hold
-- **Finding:** finalizeRentInvoice marks a single (unsplit) payment paid after a plain read: this notification and the browser's return arriving together can both record it, logging Payment_Received twice and sending the GST invoice twice. Plan 22.7 / R3 (C20).
+- **Authenticity:** notification fields authorize no money; actual R2 query/verifier and fenced aggregate finalizer are the only settlement path
+- **Replay:** one receipt row; terminal settlement/event/outbox replays are idempotent
+- **Rate:** none at this route; size/shape bounds and infrastructure limits remain. R6 owns distributed abuse controls.
+- **Finding:** Historical sessions without exact pre-send expectations remain held for operational reconciliation. Real keyed delivery remains an R3 exit gate.
 
 ### ALL `/api/windcave/trades-notification`
 
-- middleware: `express.urlencoded(…)`, `express.json(…)`
-- query: `sessionId: raw`, `sessionid: raw`
-- body: `fields: sessionId, sessionid`
-- storageMethods: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`, `createJobEvent`, `getInvoiceRentRequest`, `getInvoiceSplitSession`, `getJobInvoice`, `getJobInvoiceByWindcaveSessionId`, `getMerchant`, `getPaidInvoiceSplitPayerEmails`, `getTenantProfile`, `logTransactionEvent`, `markInvoiceSplitSessionPaid`, `updateInvoiceRentRequest`, `updateJobInvoice`
-- sideEffects: `email/SMS: sendTradePaymentInvoice`, `email: sendGstInvoices`, `provider: queryWindcaveSession`
-- statuses: `200`
-- capabilityGates: `isWindcaveConfigured`
-- idempotency: `atomicClaimJobSplitShare`, `atomicClaimSplitShare`
-- helpers: `closedReason`, `expectedForCheckoutInvoice`, `finalizeCheckoutInvoice`, `finalizeRentInvoice`, `finalizeTradeInvoice`, `invoiceExpectation`, `recordUncountedShare`, `sendRentGstInvoices`
+- statuses: `200`, `400`, `405`, `413`, `415`, `503`
+- helpers: `server/durable-payment-notification.ts:errorHandler`, `server/durable-payment-notification.ts:receive`, `server/durable-payment-notification.ts:validate`
 
 Reviewed policy:
 
-- **Who:** provider. **Tenant (provider-session):** the provider's session id selects the one job invoice created with it (storage.getJobInvoiceByWindcaveSessionId), or the split invoice it was recorded for (getInvoiceSplitSession, since 2026-09-26); an unknown id does nothing
-- **Input:** sessionId / sessionid (query or body): an opaque provider session id; nothing else is read
-- **Capability gate:** isWindcaveConfigured(): unconfigured, the notification is ignored
-- **Idempotency:** a settled invoice is skipped; a split share is claimed atomically per session (storage.atomicClaimJobSplitShare), but a single payment is marked paid by a read then a write (finding)
-- **Side effects:** queries the provider and settles only a verified outcome (R2-T5); when paid, sends the payment invoice (sendTradePaymentInvoice: email or SMS). The facts also list the rent path's GST email, which finalizeCheckoutInvoice can call, but this route always passes a trades invoice
-- **Success:** 200 "OK" at once, before any work; nothing else is returned
+- **Who:** provider. **Tenant (provider-session):** session identity is a reconciliation hint; only the worker resolves an exact independently persisted attempt/binding
+- **Input:** GET query sessionid or sessionId: one scalar id, identical aliases only; URL <=8192 bytes and <=20 fields. POST: bounded 8 KB JSON/form, <=20 form parameters, no compressed bodies. Other methods 405. Approval/money fields are ignored. The state path is not financial authority.
+- **Idempotency:** committed inbox uniqueness (provider, kind=fprn, session); arrival count increments. Database absence/failure returns 503 with Retry-After, never 200.
+- **Success:** 200 "OK" only after the durable receipt commits
 - **Error disclosure:** fixed
-- **Authenticity:** none needed from the caller: the outcome comes from querying the provider with the stored session id
-- **Replay:** a settled invoice is skipped; two simultaneous duplicates of a single payment can both pass the read
-- **Rate:** none — any caller can prompt a provider query for a pending session whose id they hold
-- **Finding:** finalizeTradeInvoice marks a single payment paid after a plain read: a notification and the browser's return arriving together can both record it and send the payment invoice twice. Plan 22.7 / R3 (C20).
+- **Authenticity:** notification fields authorize no money; actual R2 query/verifier and fenced aggregate finalizer are the only settlement path
+- **Replay:** one receipt row; terminal settlement/event/outbox replays are idempotent
+- **Rate:** none at this route; size/shape bounds and infrastructure limits remain. R6 owns distributed abuse controls.
+- **Finding:** Historical sessions without exact pre-send expectations remain held for operational reconciliation. Real keyed delivery remains an R3 exit gate.
 
 ### POST `/api/webhooks/whatsapp`
 
@@ -3860,7 +3817,7 @@ Reviewed policy:
 
 - params: `token: raw`
 - authChecks: `storage.getQuoteByToken`
-- storageMethods: `createJobEvent`, `getClientProfile`, `getJobInvoicesByQuote`, `getMerchant`, `getQuoteByToken`, `updateQuote`
+- storageMethods: `getClientProfile`, `getJobInvoicesByQuote`, `getMerchant`, `getQuoteByToken`, `recordQuoteViewForMerchant`
 - statuses: `200`, `404`, `500`
 
 Reviewed policy:
@@ -3880,12 +3837,11 @@ Reviewed policy:
 - params: `token: raw`
 - body: `schema: acceptQuoteSchema`
 - authChecks: `storage.getQuoteByToken`
-- storageMethods: `createJobEvent`, `createJobInvoice`, `getOrCreateSubscription`, `getQuoteByToken`, `updateQuote`
-- sideEffects: `email/SMS: resendTradeInvoice`, `email: tellBusinessQuoteAcceptanceBlocked`
-- statuses: `200`, `400`, `402`, `404`, `409`, `410`, `500`
+- storageMethods: `getJobInvoiceForMerchant`, `getOrCreateSubscription`, `getQuoteByToken`, `respondToQuoteForMerchant`
+- sideEffects: `email/SMS: resendTradeInvoiceForMerchant`
+- statuses: `200`, `400`, `402`, `404`, `409`, `410`, `503`
 - errorTextInResponse: `parsed.error.errors`
 - entitlementGates: `billingCardIsReady`
-- helpers: `generateInvoiceToken`
 
 Reviewed policy:
 
@@ -3921,12 +3877,12 @@ Reviewed policy:
 
 - middleware: `authenticateToken`
 - body: `schema: createJobInvoiceSchema`
-- storageMethods: `cleanUploadedFileOwnedByMerchant`, `createJobInvoiceForMerchant`, `getClientProfileForMerchant`, `getJobInvoiceForMerchant`, `getOrCreateSubscription`, `getQuoteDeliveryForMerchant`
+- storageMethods: `cleanUploadedFileOwnedByMerchant`, `createJobInvoiceForMerchant`, `getClientProfileForMerchant`, `getCreationCommandForMerchant`, `getJobInvoiceForMerchant`, `getOrCreateSubscription`, `getQuoteDeliveryForMerchant`
 - sideEffects: `email/SMS: resendTradeInvoiceForMerchant`
-- statuses: `201`, `400`, `401`, `402`, `403`, `404`, `500`, `503`
+- statuses: `201`, `400`, `401`, `402`, `403`, `404`, `409`, `500`, `503`
 - errorTextInResponse: `parsed.error.errors`
 - entitlementGates: `BILLING_CARD_REQUIRED`, `billingCardIsReady`, `requireBillingCard`
-- helpers: `requireBillingCard`, `requireOwnedInvoiceDocument`
+- helpers: `commandActor`, `requireBillingCard`, `requireOwnedInvoiceDocument`
 
 Reviewed policy:
 
@@ -3950,7 +3906,7 @@ Reviewed policy:
 - statuses: `201`, `400`, `401`, `402`, `403`, `404`, `409`, `500`, `503`
 - errorTextInResponse: `body.error.errors`
 - entitlementGates: `BILLING_CARD_REQUIRED`, `billingCardIsReady`, `requireBillingCard`
-- helpers: `requireBillingCard`
+- helpers: `commandActor`, `requireBillingCard`
 
 Reviewed policy:
 
@@ -3968,23 +3924,20 @@ Reviewed policy:
 - middleware: `authenticateToken`
 - params: `id: strictUuidParam`
 - body: `schema: markJobPaidExternalSchema`
-- storageMethods: `getJobInvoiceForMerchant`, `getOpenInvoiceSessionsForMerchant`, `markJobInvoicePaidExternalForMerchant`
-- sideEffects: `email: sendTradePaymentInvoiceForMerchant`, `provider: queryWindcaveSession`
+- storageMethods: `getJobInvoiceForMerchant`, `markJobInvoicePaidExternalForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
 - errorTextInResponse: `parsed.error.errors`
-- capabilityGates: `isWindcaveConfigured`
-- helpers: `invoiceCaptured`, `invoiceExpectation`, `invoicePaidJustNow`
+- helpers: `commandActor`, `reconcileBeforeManualChange`
 
 Reviewed policy:
 
 - **Who:** merchant (owner, member). **Tenant (resource):** the invoice read by id (getJobInvoiceForMerchant) must be the session's business's: another business's is 404, the same as a missing one, and neither voided nor already paid (409 each, since 2026-09-27); markJobInvoicePaidExternalForMerchant rechecks the business, the client and that state at its write, under the client's and the invoice's row locks; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500); body: markJobPaidExternalSchema (an optional reference of at most 200 characters, null or empty for none: every screen sends null when no reference is typed, and the desktop always does, which was refused until 2026-09-27; 400 with the first issue)
-- **Capability gate:** isWindcaveConfigured(): unconfigured, the open windows are not asked and the change goes ahead on the stored state
-- **Idempotency:** markJobInvoicePaidExternalForMerchant marks the owned invoice paid outside TaptPay with the reference and the time, and saves its paid_external event in the same transaction; a voided or paid one is 409 (since 2026-09-27: each call marked it again and emailed the client another receipt). OI-1 (2026-10-13): a card payment already taken (a provider transaction, a paid share or split session, an approved attempt) refuses with 409 PAYMENT_CAPTURED before any provider call, and again under the locks; each window that may still be paid (its unpaid split sessions, or the pinned session: getOpenInvoiceSessionsForMerchant) is asked once, in parallel and outside any lock, and a verified payment refuses with 409 PAYMENT_COMPLETED, left for its completion path to record; otherwise the change goes ahead, and a payment completing later is recorded (see findings). A row moved or settled after the lookup is 404 or 409 with nothing written or sent
-- **Side effects:** provider: queryWindcaveSession, once per open window; emails the client a receipt for the invoice, with the business's GST number (sendTradePaymentInvoiceForMerchant: the invoice read in one statement with its owned client, and logged only while both are still the business's); nothing when the client has no email
+- **Idempotency:** markJobInvoicePaidExternalForMerchant marks the owned invoice paid outside TaptPay with the reference and the time, and saves its paid_external event in the same transaction; a voided or paid one is 409 (since 2026-09-27: each call marked it again and emailed the client another receipt). Recorded live/expired attempts, legacy sessions and paid split shares refuse with 409 PAYMENT_ACTIVE. A row moved or settled after the lookup is 404 or 409 with nothing written or sent. Legacy initiation before attachment still requires R3 convergence
+- **Side effects:** Concrete scoped mutation, immutable command/audit and keyed outbox in server/storage.ts; no route-local financial publication.
 - **Success:** the invoice afterwards, a whole invoice row (the client, quote and recurring invoice, kind, amount, the checkout token, channel, job details, status and its dates, when the job was completed, the external payment reference, reminders sent, when to send, an attached document's reference and name, the provider's session and transaction ids, the split, the WhatsApp message id)
 - **Error disclosure:** input-issues
-- **Finding:** Marking an invoice paid outside TaptPay while the client is paying (allowed since OI-1, 2026-10-13): a single payment completing afterwards is recorded by finalizeTradeInvoice (a voided invoice becomes paid, payment_received_after_void, or stays voided with the payment and a refund due when a schedule has replaced it; one paid another way keeps its status, payment_received_after_external with a refund due); a split share's is logged for a refund (split_share_unrecorded, with the invoice's state as its reason). Only the latest single-invoice session is pinned, so a payment through an earlier wallet session is still found by no lookup (pre-existing).
+- **Finding:** Marking an invoice paid outside TaptPay while the client is paying: the provider's completion then finds the invoice settled (finalizeTradeInvoice), so a single payment's charge is recorded nowhere; a split share's is logged (split_share_unrecorded). R3 (payment attempts).
 - **Finding:** Every login of the business, a teammate included, has every trades action and setting but GST (clients, quotes, invoices, cancelling one, marking one paid outside TaptPay, recurring invoices, the reminder switch), as every trades screen offers them; in property the owner kept the same (2026-09-27, batch 6c answer 2).
 
 ### POST `/api/trades/invoices/:id/complete`
@@ -4006,22 +3959,19 @@ Reviewed policy:
 
 - middleware: `authenticateToken`
 - params: `id: strictUuidParam`
-- storageMethods: `getJobInvoiceForMerchant`, `getOpenInvoiceSessionsForMerchant`, `voidJobInvoiceForMerchant`
-- sideEffects: `provider: queryWindcaveSession`
+- storageMethods: `getJobInvoiceForMerchant`, `voidJobInvoiceForMerchant`
 - statuses: `200`, `400`, `401`, `403`, `404`, `409`, `500`, `503`
-- capabilityGates: `isWindcaveConfigured`
-- helpers: `invoiceCaptured`, `invoiceExpectation`, `invoicePaidJustNow`
+- helpers: `commandActor`, `reconcileBeforeManualChange`
 
 Reviewed policy:
 
 - **Who:** merchant (owner, member). **Tenant (resource):** the invoice read by id (getJobInvoiceForMerchant) must be the session's business's: another business's is 404, the same as a missing one, and not paid (409 since 2026-09-27: the screens offer cancelling only an unpaid one); voidJobInvoiceForMerchant rechecks the business, the client and that state at its write, under the client's and the invoice's row locks; the platform admin, with no business, is refused (403 "Merchant access required", since 2026-09-27 (R1-T3))
 - **Input:** id: strictUuidParam (400 'Invalid id' otherwise; since 2026-09-27, when a malformed one reached PostgreSQL's uuid cast, a 500)
-- **Capability gate:** isWindcaveConfigured(): unconfigured, the open windows are not asked and the change goes ahead on the stored state
-- **Idempotency:** voidJobInvoiceForMerchant voids the owned invoice with the time and saves invoice_voided in the client's history in the same transaction (logged since 2026-09-27). OI-1 (2026-10-13): a card payment already taken (a provider transaction, a paid share or split session, an approved attempt) refuses with 409 PAYMENT_CAPTURED before any provider call, and again under the locks; each window that may still be paid (its unpaid split sessions, or the pinned session: getOpenInvoiceSessionsForMerchant) is asked once, in parallel and outside any lock, and a verified payment refuses with 409 PAYMENT_COMPLETED, left for its completion path to record; otherwise the change goes ahead, and a payment completing later is recorded (see findings). A voided one is voided again, with a new time, and logged again; a row moved or paid after the lookup is 404 or 409 with nothing written
-- **Side effects:** provider: queryWindcaveSession, once per open window
+- **Idempotency:** voidJobInvoiceForMerchant voids the owned invoice with the time and saves invoice_voided in the client's history in the same transaction (logged since 2026-09-27). Recorded live/expired attempts, legacy sessions and paid split shares refuse with 409 PAYMENT_ACTIVE. A voided one is voided again, with a new time, and logged again; a row moved or paid after the lookup is 404 or 409 with nothing written. Legacy initiation before attachment still requires R3 convergence
 - **Success:** the invoice afterwards, a whole invoice row (the client, quote and recurring invoice, kind, amount, the checkout token, channel, job details, status and its dates, when the job was completed, the external payment reference, reminders sent, when to send, an attached document's reference and name, the provider's session and transaction ids, the split, the WhatsApp message id)
 - **Error disclosure:** fixed
-- **Finding:** Voiding while the client is paying (allowed since OI-1, 2026-10-13): a single payment completing afterwards is recorded by finalizeTradeInvoice (a voided invoice becomes paid, payment_received_after_void, or stays voided with the payment and a refund due when a schedule has replaced it; one paid another way keeps its status, payment_received_after_external with a refund due); a split share's is logged for a refund (split_share_unrecorded, with the invoice's state as its reason). Only the latest single-invoice session is pinned, so a payment through an earlier wallet session is still found by no lookup (pre-existing).
+- **Finding:** Voiding while the client is paying: the provider's completion then finds the invoice settled (finalizeTradeInvoice), so a single payment's charge is recorded nowhere; a split share's is logged (split_share_unrecorded). R3 (payment attempts).
+- **Finding:** A split invoice with shares already paid can be voided: those shares stay collected, with nothing but their events to show for them (R3/R4, refunds).
 - **Finding:** Every login of the business, a teammate included, has every trades action and setting but GST (clients, quotes, invoices, cancelling one, marking one paid outside TaptPay, recurring invoices, the reminder switch), as every trades screen offers them; in property the owner kept the same (2026-09-27, batch 6c answer 2).
 
 ### GET `/api/trades/schedules`

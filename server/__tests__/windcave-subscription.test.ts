@@ -15,6 +15,7 @@ jest.mock("../config", () => {
 
 import {
   chargeStoredCard,
+  queryStoredCardCharge,
   createCardStorageSession,
   queryStoredCardSession,
 } from "../windcave";
@@ -35,7 +36,67 @@ function requestSequence(...responses: Response[]) {
   });
 }
 
+describe('R3 stored-card identity recovery port',()=>{
+  it('refuses conflicting identity aliases on a zero-value verification',async()=>{
+    const request=requestSequence(jsonResponse(200,{id:'card-session',state:'complete',transactions:[{
+      id:'validation-one',transactionId:'validation-two',authorised:true,
+      card:{id:'stored-card',cardNumber:'****4242',dateExpiryMonth:9,dateExpiryYear:2031}
+    }]}));
+    expect((await queryStoredCardSession('card-session',{request,expected:{reference:'SC_reference',providerAccount:'SyntheticUser'}})).success).toBe(false);
+  });
+  it.each([{amount:'1.00'},{currency:'USD'},{merchantReference:'foreign-reference'},{username:'foreign-account'},{type:'purchase'}])('refuses a mismatched zero-value card echo %p',async(echo)=>{
+    const request=requestSequence(jsonResponse(200,{id:'card-session',state:'complete',transactions:[{
+      id:'validation-one',authorised:true,...echo,
+      card:{id:'stored-card',cardNumber:'****4242',dateExpiryMonth:9,dateExpiryYear:2031}
+    }]}));
+    expect((await queryStoredCardSession('card-session',{request,expected:{reference:'SC_reference',providerAccount:'SyntheticUser'}})).success).toBe(false);
+  });
+  const args=['durable-synthetic-x-id','synthetic-card','8.99','synthetic-reference'] as const;
+  it('commits the pending transaction identity before the first poll',async()=>{
+    let release!:()=>void,started!:()=>void;
+    const entered=new Promise<void>(r=>{started=r;}),commit=new Promise<void>(r=>{release=r;});
+    const request=requestSequence(jsonResponse(202,{id:'pending-identity'}),jsonResponse(200,{id:'pending-identity',authorised:true}));
+    const onPendingTransaction=jest.fn(async()=>{started();await commit;});
+    const result=chargeStoredCard(...args,{request,wait:async()=>{},onPendingTransaction} as any);
+    await Promise.race([entered,new Promise((_,reject)=>setTimeout(()=>reject(new Error('pending identity was not persisted')),1000))]);
+    expect(request).toHaveBeenCalledTimes(1);release();
+    expect(await result).toMatchObject({success:true,windcaveTransactionId:'pending-identity'});
+    expect(onPendingTransaction).toHaveBeenCalledWith('pending-identity');
+  });
+  it('a failed identity commit keeps an unknown outcome and sends no poll',async()=>{
+    const request=requestSequence(jsonResponse(202,{id:'pending-identity'}));
+    const result=await chargeStoredCard(...args,{request,wait:async()=>{},onPendingTransaction:async()=>{throw new Error('private storage error');}} as any);
+    expect(result).toMatchObject({success:false,windcaveTransactionId:'pending-identity'});
+    expect(result.error).not.toContain('private');expect(request).toHaveBeenCalledTimes(1);
+  });
+  it('resumes from a saved identity with GET alone',async()=>{
+    const request=requestSequence(jsonResponse(200,{id:'pending-identity',authorised:true}));
+    const result=await queryStoredCardCharge(args[0],'pending-identity',args[2],args[3],{request,wait:async()=>{}});
+    expect(result).toMatchObject({success:true,windcaveTransactionId:'pending-identity'});
+    expect(request.mock.calls.map(([,init])=>init.method)).toEqual(['GET']);
+  });
+  it.each([undefined,'../private','transaction?query',''])('an approval without a valid identity %p stays unknown',async(id)=>{
+    const request=requestSequence(jsonResponse(200,{id,authorised:true}));
+    expect((await chargeStoredCard(...args,{request})).success).toBe(false);
+  });
+  it('a final identity cannot replace the previously persisted pending identity',async()=>{
+    const request=requestSequence(jsonResponse(202,{id:'pending-identity'}),jsonResponse(200,{id:'another-identity',authorised:true}));
+    expect((await chargeStoredCard(...args,{request,wait:async()=>{}})).success).toBe(false);
+  });
+  it('does not forward query strings or another transaction path from a provider self link',async()=>{
+    const request=requestSequence(jsonResponse(202,{id:'pending-identity',links:[{rel:'self',href:'https://uat.windcave.com/api/v1/transactions/another-identity?private=query'}]}),jsonResponse(200,{id:'pending-identity',authorised:true}));
+    await chargeStoredCard(...args,{request,wait:async()=>{}});
+    expect(request.mock.calls[1][0]).toBe(request.mock.calls[0][0]+'/pending-identity');
+  });
+});
+
 describe("Windcave subscription stored-card contract", () => {
+  it('retains an already-complete created session without reopening its hosted form',async()=>{
+    const request=requestSequence(jsonResponse(202,{id:'already-complete',state:'complete',links:[{rel:'hpp',href:'https://uat.windcave.com/pxmi3/already-complete'}]}));
+    const result=await createCardStorageSession('synthetic-x-id','SC_reference','owner@synthetic.test',
+      'https://app.example.test/api/billing/card/callback?state=synthetic','https://app.example.test/api/billing/card/notification',{request});
+    expect(result).toMatchObject({success:true,sessionId:'already-complete',complete:true});expect(result.hppUrl).toBeUndefined();
+  });
   beforeEach(() => {
     jest.spyOn(console, "log").mockImplementation(() => undefined);
   });

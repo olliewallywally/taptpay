@@ -185,6 +185,8 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
   );
   const [reqFlash, setReqFlash] = useState(false);
   const [billFlash, setBillFlash] = useState(false);
+  const [requestDelivered,setRequestDelivered]=useState(false);
+  const [billDelivered,setBillDelivered]=useState(false);
   /* The row action popover: which invoice, where it sits in `.pt-stack`, and
      whether the destructive branch has been asked for. */
   const [rowMenu, setRowMenu] = useState<{ id: string; top: number } | null>(null);
@@ -314,7 +316,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
       const now = new Date();
       const due = new Date(now);
       due.setDate(due.getDate() + 7);
-      const res = await fetch(apiPath("POST /api/property/invoices"), {
+      const res = await propFetch(apiPath("POST /api/property/invoices"), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...propHeaders() },
         body: JSON.stringify({
@@ -354,7 +356,8 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
       }
       return invoice;
     },
-    onSuccess: () => {
+    onSuccess: (invoice) => {
+      setRequestDelivered(invoice.delivered===true);
       queryClient.invalidateQueries({ queryKey: PROPERTY_KEYS.invoices as any });
       if (frequency !== "once") {
         queryClient.invalidateQueries({ queryKey: PROPERTY_KEYS.schedules as any });
@@ -380,7 +383,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
     mutationFn: async () => {
       const due = new Date();
       due.setDate(due.getDate() + dueDays);
-      const res = await fetch(apiPath("POST /api/property/invoices"), {
+      const res = await propFetch(apiPath("POST /api/property/invoices"), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...propHeaders() },
         body: JSON.stringify({
@@ -405,7 +408,8 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
       }
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (invoice) => {
+      setBillDelivered(invoice.delivered===true);
       queryClient.invalidateQueries({ queryKey: PROPERTY_KEYS.invoices as any });
       setBillFlash(true);
       setTimeout(() => setBillFlash(false), 1600);
@@ -796,11 +800,11 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
   });
 
   const reqLabel = reqFlash
-    ? "request sent ✓"
+    ? requestDelivered?"request sent ✓":"request created · delivery pending"
     : sendRequest.isPending
       ? "sending…"
       : "send rent request";
-  const billLabel = billFlash ? "bill sent ✓" : sendBill.isPending ? "sending…" : "send bill";
+  const billLabel = billFlash ? (billDelivered?"bill sent ✓":"bill created · delivery pending") : sendBill.isPending ? "sending…" : "send bill";
 
   /* Collapsed line: the chosen frequency, then enough of the automation state to
      tell whether anything is running without opening the panel. */

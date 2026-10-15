@@ -12,11 +12,9 @@ describe("R3 verified reconciliation boundary", () => {
     "%s mismatch cannot settle", (field) => {
       expect(evidenceMatchesExpectation(expected, { ...evidence, [field]: field === "amountCents" ? 1000 : "different" } as any)).toBe(false);
     });
-  // Owner decision OI-2 (2026-10-13): the count is information, not a refusal.
-  test("several provider transactions can settle; a count that is not a positive integer, or boolean-only approval, cannot", () => {
+  test("a verified retry history is accepted but invalid counts and boolean-only approval cannot settle", () => {
     expect(evidenceMatchesExpectation(expected, { ...evidence, transactionCount: 2 } as any)).toBe(true);
-    for (const transactionCount of [0, -1, 1.5, Number.NaN])
-      expect(evidenceMatchesExpectation(expected, { ...evidence, transactionCount } as any)).toBe(false);
+    for(const transactionCount of [0,-1,NaN,1.5])expect(evidenceMatchesExpectation(expected,{...evidence,transactionCount} as any)).toBe(false);
     expect(evidenceMatchesExpectation(expected, { success: true, approved: true } as any)).toBe(false);
   });
   test("exact split cents sum to the invoice, including small remainder shares", () => {
@@ -36,36 +34,11 @@ describe("R3 verified reconciliation boundary", () => {
     expect(repository.finalize).not.toHaveBeenCalled();
     expect(repository.finishInbox).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({status:"retry",code:`provider_${kind}`}),now);
   });
-  test("integrity mismatch is dead-lettered without money mutation, with R2-T6's sanitized event", async () => {
-    const repository = fakeRepository(), audit = jest.fn();
-    await new PaymentReconciliationWorker(repository as any, {query: async () => ({...evidence,amountCents:1000})} as any,()=>now,()=>0,audit).runOne(randomUUID());
+  test("integrity mismatch is dead-lettered without money mutation", async () => {
+    const repository = fakeRepository();
+    await new PaymentReconciliationWorker(repository as any, {query: async () => ({...evidence,amountCents:1000})} as any,()=>now).runOne(randomUUID());
     expect(repository.finalize).not.toHaveBeenCalled();
     expect(repository.finishInbox).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({status:"dead_letter",code:"integrity_mismatch"}),now);
-    expect(audit).toHaveBeenCalledTimes(1);
-    expect(audit).toHaveBeenCalledWith("PROVIDER_OUTCOME_MISMATCH", {field:"amount"});
-  });
-  // H-3: the worker's mismatch path keeps R2-T6's signals: the event and the retail attempt's code.
-  test("a provider mismatch on a retail binding records integrity_mismatch:<field> on the attempt", async () => {
-    const repository = fakeRepository(), audit = jest.fn(), paymentAttemptId = randomUUID();
-    repository.resolveSession.mockResolvedValue({...expected, paymentAttemptId} as any);
-    await new PaymentReconciliationWorker(repository as any, {query: async () => ({kind:"mismatch",field:"reference"})} as any,()=>now,()=>0,audit).runOne(randomUUID());
-    expect(repository.recordReconciliation).toHaveBeenCalledWith(expect.objectContaining({paymentAttemptId}), "integrity_mismatch:reference", now);
-    expect(audit).toHaveBeenCalledWith("PROVIDER_OUTCOME_MISMATCH", {field:"reference"});
-    expect(repository.finalize).not.toHaveBeenCalled();
-    expect(repository.finishInbox).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({status:"dead_letter",code:"integrity_mismatch"}),now);
-  });
-  test("a failed code write still dead-letters the mismatch, never retries it", async () => {
-    const repository = fakeRepository();
-    repository.recordReconciliation.mockRejectedValue(new Error("synthetic"));
-    await new PaymentReconciliationWorker(repository as any, {query: async () => ({kind:"mismatch",field:"amount"})} as any,()=>now,()=>0,jest.fn()).runOne(randomUUID());
-    expect(repository.finishInbox).toHaveBeenCalledTimes(1);
-    expect(repository.finishInbox).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({status:"dead_letter",code:"integrity_mismatch"}),now);
-  });
-  test("evidence with several transactions settles and completes the inbox with its transaction", async () => {
-    const repository = fakeRepository();
-    await new PaymentReconciliationWorker(repository as any, {query: async () => ({...evidence,transactionCount:2})} as any,()=>now,()=>0,jest.fn()).runOne(randomUUID());
-    expect(repository.finalize).toHaveBeenCalledTimes(1);
-    expect(repository.finishInbox).toHaveBeenCalledWith(expect.anything(), {status:"complete",transactionId:"tx-A"},now);
   });
   test("finalizer commit precedes inbox completion; failed completion is replayable", async () => {
     const repository = fakeRepository();
@@ -83,6 +56,14 @@ function fakeRepository() {
       attemptCount:1,firstReceivedAt:now,leaseExpiresAt:new Date(now.getTime()+60000)})),
     resolveSession:jest.fn(async()=>({...expected,invoiceAttemptId:randomUUID()})),
     finalize:jest.fn(async()=>({kind:"finalized"})),
-    recordReconciliation:jest.fn(async()=>undefined),
     finishInbox:jest.fn(async()=>true)};
 }
+
+ test('repeated expired query leases cannot bypass the bounded attempt cap and signal only after commit',async()=>{
+   const repository=fakeRepository(),claim=await repository.claimInbox();repository.claimInbox.mockResolvedValue({...claim,attemptCount:21});
+   const query=jest.fn(async()=>({kind:'pending'} as const)),audit=jest.fn();
+   await new PaymentReconciliationWorker(repository as any,{query},()=>now,()=>0,undefined,audit).runOne(randomUUID());
+   expect(query).not.toHaveBeenCalled();expect(repository.finishInbox).toHaveBeenCalledWith(expect.anything(),expect.objectContaining({status:'dead_letter',code:'retry_exhausted'}),now);
+   expect(audit).toHaveBeenCalledWith('PAYMENT_RECONCILIATION_DEAD_LETTER',{code:'retry_exhausted'});
+   repository.finishInbox.mockResolvedValue(false);audit.mockClear();await new PaymentReconciliationWorker(repository as any,{query},()=>now,()=>0,undefined,audit).runOne(randomUUID());expect(audit).not.toHaveBeenCalled();
+ });

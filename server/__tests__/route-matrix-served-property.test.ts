@@ -1,3 +1,4 @@
+import {randomUUID as requestCommandKey} from 'node:crypto';
 import "./support/test-env";
 
 import * as propertyCron from "../property-cron";
@@ -183,7 +184,7 @@ const RECIPES: Record<string, ServedRecipe> = {
     fake.invoices.clear();
     return {
       req: {
-        method: "post", path: "/api/property/invoices",
+        method: "post", path: "/api/property/invoices", headers: {"Idempotency-Key":requestCommandKey()},
         body: { tenantProfileId: TENANT, amountCents: 12_000, deliveryChannel: "email", dueAt: inDays(14).toISOString(), kind: "charge", chargeType: "cleaning", description: "End of tenancy clean" },
       },
       status: 201,

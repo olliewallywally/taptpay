@@ -4,7 +4,7 @@ import { WINDCAVE_REQUEST_TIMEOUT_MS, type RefundOutcome } from "./windcave-clie
 
 /**
  * R4-T3 (docs/decisions/2026-10-14-r4-t3-atomic-refund-claim.md): the refund-operation rules
- * MemStorage, DatabaseStorage and the route share. They mirror migration 0039's graph, the
+ * MemStorage, DatabaseStorage and the route share. They mirror migration 0048's graph, the
  * ADR's settle table and refund-ID rules (§5), and its reply-from-committed-state rule (C-1).
  */
 
@@ -18,7 +18,7 @@ export const REFUND_LEASE_MS = WINDCAVE_REQUEST_TIMEOUT_MS + 2 * REFUND_STATEMEN
 /** When a scheduled `unknown` operation is next due for R4-T4's worker. */
 export const REFUND_RECHECK_MS = 5 * 60_000;
 
-/** 0039's token shape for provider transaction IDs (captures and refunds). */
+/** 0048's token shape for provider transaction IDs (captures and refunds). */
 export const PROVIDER_TOKEN = /^[A-Za-z0-9_-]{1,64}$/;
 
 const MOVES: Readonly<Record<RefundOperationState, readonly RefundOperationState[]>> = {
@@ -28,7 +28,7 @@ const MOVES: Readonly<Record<RefundOperationState, readonly RefundOperationState
   succeeded: [], failed: [], cancelled: [],
 };
 
-/** The arrows 0039's trigger allows between operation states. */
+/** The arrows 0048's trigger allows between operation states. */
 export function canMoveRefundOperation(from: RefundOperationState, to: RefundOperationState): boolean {
   return MOVES[from].includes(to);
 }

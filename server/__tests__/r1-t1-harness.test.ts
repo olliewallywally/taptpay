@@ -58,7 +58,7 @@ describe("R1-T1 — the harness is production's app, and nothing else", () => {
     expect(small.headers["content-encoding"]).toBeUndefined();
   });
 
-  it.each(["/pay/t/abc", "/split/t/abc", "/checkout/t/abc", "/receipt/t/abc", "/pay/return/abc", "/accept-invite"])(
+  it.each(["/pay/t/abc", "/split/t/abc", "/checkout/t/abc", "/receipt/t/abc", "/pay/return/abc", "/accept-invite", "/r/invoice-token?paymentState=return-secret", "/payment/result/12?state=return-secret"])(
     "keeps the bearer page %s out of shared caches and referrers",
     async (path) => {
       const { app } = await createTestApp();
@@ -135,9 +135,9 @@ describe("R1-T1 — the harness is production's app, and nothing else", () => {
     await new Promise<void>((resolve) => setImmediate(resolve));
 
     expect(notification.path).toBe("/api/windcave/notification?sessionid=harness-session");
-    expect(response.status).toBe(200);
-    expect(response.text).toBe("OK");
-    // Payments are off in the harness: nothing is reconciled, not even locked.
+    // MemStorage cannot persist a durable receipt. Never falsely acknowledge it.
+    expect(response.status).toBe(503);
+    expect(response.headers['retry-after']).toBe('5');
     expect((await storage.getTransaction(transaction.id))?.windcaveSessionState).toBe("pending");
   });
 

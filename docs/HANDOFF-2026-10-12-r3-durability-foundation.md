@@ -1,5 +1,12 @@
 # R3 durability foundation handoff
 
+Historical checkpoint. The completed repository status and remaining external
+sign-off are in [`HANDOFF-2026-10-14-r3-repository-complete.md`](HANDOFF-2026-10-14-r3-repository-complete.md).
+
+Current status: see [October 13 R3 handoff](HANDOFF-2026-10-13-r3-current-status.md).
+The owner stopped the move to R5 and reaffirmed R3 first; Claude owns R4.
+The historical foundation evidence below retains its own scope.
+
 Latest follow-up: R2 `14942392` is now integrated on this working branch.
 The original R3 expansion is byte-identical 0036, followed by canonical retail
 alignment 0037. See [integration ADR](decisions/2026-10-12-r2-r3-schema-integration.md)

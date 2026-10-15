@@ -177,6 +177,7 @@ async function sendApnsNotification(
 
   await new Promise<void>((resolve, reject) => {
     const client = http2.connect(`https://${APNS_HOST}`);
+    client.setTimeout(10000,()=>{client.destroy();reject(new Error('APNS_TIMEOUT'));});
     client.on("error", (err) => {
       client.destroy();
       reject(err);
@@ -224,6 +225,20 @@ async function sendApnsNotification(
       reject(err);
     });
   });
+}
+
+/** Durable callers persist their send intent first. This single-target port
+ * never simulates success and never retries an unkeyed provider request. */
+export function canSendPaymentPush(payload:{native?:boolean}):boolean{
+  return payload.native?!!(config.push.apnsKey&&config.push.apnsKeyId&&config.push.apnsTeamId):!!(VAPID_PUBLIC_KEY&&VAPID_PRIVATE_KEY);
+}
+export async function sendPaymentPushTarget(subscription:{endpoint:string;p256dh:string;auth:string},payload:PushPayload):Promise<void>{
+  const native=subscription.endpoint.startsWith('apns://');
+  if(!canSendPaymentPush({native}))throw new Error('PUSH_CREDENTIALS_UNAVAILABLE');
+  if(native){const token=subscription.endpoint.slice(7);if(!/^[a-fA-F0-9]{64}$/.test(token))throw new Error('PUSH_ENDPOINT_REFUSED');
+    await sendApnsNotification(token,payload,subscription.endpoint);return;}
+  if(!isPushServiceEndpoint(subscription.endpoint))throw new Error('PUSH_ENDPOINT_REFUSED');
+  initPush();await webpush.sendNotification({endpoint:subscription.endpoint,keys:{p256dh:subscription.p256dh,auth:subscription.auth}},JSON.stringify(payload),{timeout:10000});
 }
 
 async function sendNativePushToMerchant(

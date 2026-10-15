@@ -21,8 +21,9 @@ function capture(rows: Partial<Record<"clients" | "quotes" | "invoices" | "files
   const answers: Record<string, any[][]> = { clients: [[client]], quotes: [[{ id: quoteId, merchantId: 11, clientProfileId: parentId, totalCents: 100_000 }]], invoices: [[]], files: [[{ id: 1 }]], ...rows };
   const seen: Record<string, number> = {};
   const nameOf = (table: any) => table === clientProfiles ? "clients" : table === quotes ? "quotes" : table === jobInvoices ? "invoices" : "files";
-  const next = (table: any) => { const name = nameOf(table); const list = answers[name]; const index = Math.min(seen[name] ?? 0, list.length - 1); seen[name] = (seen[name] ?? 0) + 1; return list[index]; };
+  const next = (table: any) => { if(table===jobEvents)return []; const name = nameOf(table); const list = answers[name]; const index = Math.min(seen[name] ?? 0, list.length - 1); seen[name] = (seen[name] ?? 0) + 1; return list[index]; };
   const db: any = {
+    execute: async()=>({rows:[]}),
     transaction: async (run: any) => { calls.push({ kind: "transaction" }); return run(db); },
     select: () => ({ from: (table: any) => {
       const call: any = { kind: "select", table, locked: false }; calls.push(call);
@@ -137,14 +138,14 @@ describe("the balance", () => {
     expect(query(selects[0].where).params).toEqual([invoiceId, 11]);
     expect(query(selects[1].where).params).toEqual([parentId, 11]);
     expect(query(selects[2].where).params).toEqual([invoiceId, 11, parentId]);
-    expect(query(selects[3].where).params).toEqual([quoteId, 11]);
+    expect(query(selects[3].where).params).toEqual([quoteId, 11,parentId]);
     expect(query(selects[4].where).params).toEqual([11, parentId, quoteId, "voided"]);
     const [balance] = inserts(calls, jobInvoices);
     expect(balance.values).toMatchObject({ merchantId: 11, clientProfileId: parentId, quoteId, kind: "balance", amountCents: 75_000, deliveryChannel: "sms", status: "pending_dispatch", splitEnabled: true });
     expect(balance.values.token).toMatch(/^[A-Za-z0-9_-]{27}$/);
     const due = balance.values.dueAt.getTime(); const expected = new Date(before); expected.setDate(expected.getDate() + 7);
     expect(Math.abs(due - expected.getTime())).toBeLessThan(5_000);
-    expect(inserts(calls, jobEvents)[0].values).toEqual({ merchantId: 11, clientProfileId: parentId, jobInvoiceId: madeId, eventType: "balance_sent" });
+    expect(inserts(calls, jobEvents)[0].values).toMatchObject({merchantId:11,clientProfileId:parentId,jobInvoiceId:madeId,eventType:"balance_sent",payload:expect.objectContaining({amountCents:75000})});
   });
   test.each([
     ["a missing or foreign deposit", { invoices: [[]] }, { kind: "not-found" }],

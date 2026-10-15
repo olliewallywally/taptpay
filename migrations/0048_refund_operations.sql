@@ -1,4 +1,5 @@
--- R4-T2 — refund operations on `refunds` (plan v2.2 §11.2-§11.4).
+-- R4-T2 — refund operations on `refunds` (plan v2.2 §11.2-§11.4). Numbered 0048: written as
+-- 0039, renumbered after Codex's R3 0039-0047, which R4 preserves unchanged.
 --
 -- See docs/decisions/2026-10-14-r4-t2-refund-operation-schema.md (ADR, revision 3) and its §21.1
 -- reviews: docs/evidence/remediation-v2-2/r4/R4-review-pass-{3,4,5,6}-2026-10-14.md.
@@ -51,7 +52,7 @@ BEGIN
   ) OR EXISTS (
     SELECT 1 FROM pg_proc WHERE proname = 'taptpay_refund_operation_guard'
   ) THEN
-    RAISE EXCEPTION '0039 aborted: a refund operation column or function already exists'
+    RAISE EXCEPTION '0048 aborted: a refund operation column or function already exists'
       USING HINT = 'This migration does not trust an existing shape. Compare it with this file and resolve by hand.';
   END IF;
 END

@@ -12,6 +12,7 @@ process.env.FEATURE_NEW_RETAIL_PAYMENTS = "true";
 process.env.ENV_VALIDATION_MODE = "enforce";
 
 import request from "supertest";
+import {randomUUID} from "node:crypto";
 import { sseBroker } from "../sse-broker";
 import {
   signedIn, type SignedIn,
@@ -144,10 +145,11 @@ describe("the business-wide no-board live feed is retired", () => {
       // existing sale until that route was removed on 2026-09-27, C10 batch 6b.)
       billingInOrder();
       const created = await request(app)
-        .post("/api/transactions")
+        .post("/api/transactions").set("Idempotency-Key",randomUUID())
         .set(signedIn(owner))
         .send({ merchantId, itemName: "Private link sale", price: "30.00" });
       expect(created.status).toBe(200);
+      await sseBroker.broadcast(merchantId,null,{type:"transaction_updated",eventId:randomUUID(),merchantOnly:true,transaction:created.body});
 
       await expect(merchantStream.nextEvent()).resolves.toMatchObject({
         type: "transaction_updated",
@@ -175,10 +177,11 @@ describe("the business-wide no-board live feed is retired", () => {
       // A new sale on the board is the update (see the test above).
       billingInOrder();
       const created = await request(app)
-        .post("/api/transactions")
+        .post("/api/transactions").set("Idempotency-Key",randomUUID())
         .set(signedIn(owner))
         .send({ merchantId, itemName: "Board sale", price: "8.00", selectedStoneId: board.id })
         .expect(200);
+      await sseBroker.broadcast(merchantId,board.id,{type:"transaction_updated",eventId:randomUUID(),transaction:created.body});
 
       await expect(boardStream.nextEvent()).resolves.toMatchObject({
         type: "transaction_updated",
@@ -333,7 +336,7 @@ describe("a sale without a payment board always gets its own link", () => {
   async function createSale(principal: SignedIn & { merchantId: number }, body: Record<string, unknown>) {
     const { app } = await createTestApp();
     return request(app)
-      .post("/api/transactions")
+      .post("/api/transactions").set("Idempotency-Key",randomUUID())
       .set(signedIn(principal))
       .send({ merchantId: principal.merchantId, itemName: "Flat white", price: "5.50", ...body });
   }

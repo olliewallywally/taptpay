@@ -3150,5 +3150,44 @@ waits on pass 5 before any migration is committed.
 Migration 0039 and its Drizzle, MemStorage, contract and test changes, approved in pass 6
 after passes 4 and 5 refused earlier revisions. The record is
 [R4-T2-2026-10-14](r4/R4-T2-2026-10-14.md). The R4-T3/T4 rules are in the ADR. 0039 is
-applied nowhere, and the flag stays off.
+applied nowhere, and the flag stays off. (Renumbered 0048 when R3 was integrated, §30.)
 
+## 29. October 14 — R3 repository completion (Codex, `3c98dfe9`)
+
+R3 active numeric/token/invoice callbacks and five FPRN registrations converge on
+shared verified durable attempts/finalizers. Amount-first invoice UX, concrete
+creation/manual/quote/balance/subscription commands, card/billing recovery and
+actual keyed receipt/delivery receivers are integrated. Final follow-up fixes
+cover cancellation/card races, paid-period/card supersession, cross-merchant
+billing keys, declined-money fields, cash replay/conflict, confirmed unsent expiry,
+finite worker caps and preserved quote notice content. Claude retains R4.
+
+Verification: complete 214 server-suite / 5020-test coverage using the full run
+plus explicit replacement of all failed and affected suites; 133 client suites /
+1504 tests; typecheck/build; 74/19/15/24/11 PostgreSQL durability/subscription/
+command/registered-HTTP/delivery checks. No skips. Both owned schemas match all
+49 migration files through 0047, immutable checksums and complete fingerprint;
+restored synthetic data retains 1000 invoices per vertical and 1000 quotes.
+
+See [final review and exact evidence](r3/R3-FINAL-REPOSITORY-REVIEW-2026-10-14.md)
+and [repository handoff](../../HANDOFF-2026-10-14-r3-repository-complete.md).
+The original full run was red and is preserved; the completed replacement run
+passes all 28 selected suites / 1591 tests. No full invocation is relabelled.
+Repository work is complete. Official R3 exit remains held for sanitized Windcave
+UAT and production-sized restored migration/preflight/timing sign-off. No shared
+migration, real outbound financial/delivery call, deployment or R5 work occurred.
+
+## 30. October 14 — R3 integrated under R4 (Claude)
+
+Codex's `3c98dfe9` is merged onto R4-T3 part 1 (`8b7c300e`). Where both sides changed the same
+payment behaviour, Codex's version was taken whole; every earlier fix on this branch was then
+checked against it by six read-only agents and a critic. R4-T1, R4-T2 and R4-T3 part 1 are
+re-applied; the refund schema is now 0048 (0039–0047 are Codex's, unchanged). Ten regressions
+were fixed, each with a test that failed first, among them B-1 again (a session request
+Windcave provably never took held the sale for good), links served for a cancelled sale or a
+voided invoice, wallet charges on closed sales, and the merchant's cancel-refusal message.
+Open items for Codex and the owner, T-3 first, are in §5 of
+[R3-INTEGRATION-2026-10-14](r4/R3-INTEGRATION-2026-10-14.md). PostgreSQL 16 on fresh
+databases: R3 88/15/11/24/19, R4-T2 28, R4-T3 14, S2a 25, R2-T4 12, R2-T7 7. Suites: server
+222/5,139, client 134/1,507. Applied to no
+shared database; nothing deployed; refunds stay off. R4-T3 part 2 (the route) is next.

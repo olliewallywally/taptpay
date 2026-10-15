@@ -9,7 +9,6 @@ import {
   currentTokenShareIndex,
   forgetPaymentReturnState,
   getOrCreatePaymentIdempotencyKey,
-  isPaymentAttemptExpired,
   paymentReturnDestination,
   paymentIdempotencyKey,
   paymentTokenForReturnState,
@@ -18,7 +17,6 @@ import {
   receiptQrEndpoint,
   redactCustomerPaymentAddress,
   rememberPaymentReturnState,
-  replaceExpiredPaymentIdempotencyKey,
   tokenEntryDestination,
   tokenCompletionRequest,
   tokenPaymentPath,
@@ -179,26 +177,5 @@ describe("discriminated customer payment addressing", () => {
     expect(redactCustomerPaymentAddress(`/trades/quote/${token}`)).toBe("/trades/quote/:token");
     expect(redactCustomerPaymentAddress("/trades/quotes")).toBe("/trades/quotes");
     expect(redactCustomerPaymentAddress("/transactions")).toBe("/transactions");
-  });
-});
-
-// The server attests an attempt ended unsent (409 PAYMENT_ATTEMPT_EXPIRED): only then is a key replaced.
-describe("an expired attempt's key", () => {
-  test("only the server's exact code counts", () => {
-    expect(isPaymentAttemptExpired(new Error('409: {"code":"PAYMENT_ATTEMPT_EXPIRED","message":"x"}'))).toBe(true);
-    for (const error of [new Error('503: {"message":"The previous payment outcome is still being reconciled"}'),
-      new Error('409: {"message":"Another payment attempt is already active"}'), new Error("409: not json"), "409: x", null])
-      expect(isPaymentAttemptExpired(error)).toBe(false);
-  });
-  test("is replaced once; a second refusal of the same key adopts that replacement; another key is kept", () => {
-    const storage = new MemoryStorage();
-    const source = { kind: "retail-token" as const, token };
-    storage.setItem(`taptpay:payment-attempt:v1:retail-token:${token}:0`, "11111111-1111-4111-8111-111111111111");
-    const randomUuid = jest.spyOn(global.crypto, "randomUUID").mockReturnValueOnce("22222222-2222-4222-8222-222222222222");
-    expect(replaceExpiredPaymentIdempotencyKey(source, 0, "11111111-1111-4111-8111-111111111111", storage)).toBe("22222222-2222-4222-8222-222222222222");
-    expect(replaceExpiredPaymentIdempotencyKey(source, 0, "11111111-1111-4111-8111-111111111111", storage)).toBe("22222222-2222-4222-8222-222222222222");
-    expect(randomUuid).toHaveBeenCalledTimes(1);
-    expect(paymentIdempotencyKey(source, 0, storage)).toBe("22222222-2222-4222-8222-222222222222");
-    randomUuid.mockRestore();
   });
 });

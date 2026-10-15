@@ -235,7 +235,7 @@ const RENT_INVOICE_ROW =
 const RENT_DELIVERY =
   "sends the tenant the payment link by the invoice's channel: WhatsApp or SMS when chosen, configured and the tenant has a phone, otherwise email (resendInvoiceEmailForMerchant, then deliverInvoice with captured owned contact, server/property-cron.ts); no DB locks over providers; an uncertain send or refused/failed post-send record is reconciliation-required 503";
 const paidElsewhereFinding = (action: string) =>
-  `${action} while the tenant is paying (allowed since OI-1, 2026-10-13): a single payment completing afterwards is recorded by finalizeRentInvoice (a voided invoice becomes paid, Payment_Received_After_Void; one paid another way keeps its status, Payment_Received_After_External with a refund due); a split share's is logged for a refund (Split_Share_Unrecorded, with the invoice's state as its reason). Only the latest single-invoice session is pinned, so a payment through an earlier wallet session is still found by no lookup (pre-existing).`;
+  `${action} while the tenant is paying: the provider's completion then finds the invoice settled (finalizeRentInvoice), so a single payment's charge is recorded nowhere; a split share's is logged (Split_Share_Unrecorded). R3 (payment attempts).`;
 
 // ── The trades routes (batch 6d) ──
 const TRADES_ADMIN = adminRefused(ADMIN_403);
@@ -257,7 +257,7 @@ const tradesDelivery = (what: string) =>
   `sends the client ${what} by its channel: WhatsApp or SMS when chosen, configured and the client has a phone, otherwise email (server/trades-delivery.ts)`;
 const INVOICE_DELIVERY_REASON = "deliveryReason (a fixed code: not_found, not_payable, missing_data, send_failed or no_deliverable)";
 const tradesPaidElsewhereFinding = (action: string) =>
-  `${action} while the client is paying (allowed since OI-1, 2026-10-13): a single payment completing afterwards is recorded by finalizeTradeInvoice (a voided invoice becomes paid, payment_received_after_void, or stays voided with the payment and a refund due when a schedule has replaced it; one paid another way keeps its status, payment_received_after_external with a refund due); a split share's is logged for a refund (split_share_unrecorded, with the invoice's state as its reason). Only the latest single-invoice session is pinned, so a payment through an earlier wallet session is still found by no lookup (pre-existing).`;
+  `${action} while the client is paying: the provider's completion then finds the invoice settled (finalizeTradeInvoice), so a single payment's charge is recorded nowhere; a split share's is logged (split_share_unrecorded). R3 (payment attempts).`;
 const archivedStillFinding = (what: string) =>
   `An archived client can still be ${what} here; no screen offers it (the pickers list only current clients). Only a recurring invoice is refused for one (owner decision 2026-09-27).`;
 
@@ -272,62 +272,58 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
   // ── Batch 1 (2026-09-26): provider callbacks, cron, the ecommerce API, billing callbacks ──
 
   "ALL /api/pay/notification/:state": {
-    branches: [
-      {
-        principal: "provider",
-        tenant: "token",
-        tenantRule:
-          "the return state (HMAC-derived, one per payment attempt) selects one attempt through paymentAttempts.resolveReturnState; an unknown state does nothing",
-      },
-    ],
-    input:
-      "state: an opaque return state, only resolved by its hash; result (query or body): read, and decides nothing (R2-T5: the verified provider outcome alone settles)",
-    capability: "isWindcaveConfigured(): with no provider configured the attempt stays pending",
-    entitlement: null,
-    idempotency:
-      "paymentAttempts.claimFinalization claims the attempt before the provider is queried; a terminal or conflicting attempt is left alone, so repeated or concurrent notifications settle it once",
-    sideEffects:
-      "queries the provider for the attempt's session and verifies the outcome against the attempt's expected values (R2-T5); on settlement, a live update and a push to the business (persistTokenOutcome, broadcastToStone)",
-    successDto: PROVIDER_ACK,
-    errorDisclosure: ["fixed"],
-    controls: {
-      authenticity:
-        "none needed: the call only prompts a re-read, and the outcome comes from querying the provider, never from the request",
-      replay: "harmless: a settled attempt is terminal and the claim is atomic",
-      rate: "requirePaymentTokenRateLimit (the completion family, per visitor address)",
-    },
+  "branches": [
+    {
+      "principal": "provider",
+      "tenant": "provider-session",
+      "tenantRule": "session identity is a reconciliation hint; only the worker resolves an exact independently persisted attempt/binding"
+    }
+  ],
+  "input": "GET query sessionid or sessionId: one scalar id, identical aliases only; URL <=8192 bytes and <=20 fields. POST: bounded 8 KB JSON/form, <=20 form parameters, no compressed bodies. Other methods 405. Approval/money fields are ignored. The state path is not financial authority.",
+  "capability": null,
+  "entitlement": null,
+  "idempotency": "committed inbox uniqueness (provider, kind=fprn, session); arrival count increments. Database absence/failure returns 503 with Retry-After, never 200.",
+  "sideEffects": null,
+  "successDto": "200 \"OK\" only after the durable receipt commits",
+  "errorDisclosure": [
+    "fixed"
+  ],
+  "controls": {
+    "authenticity": "notification fields authorize no money; actual R2 query/verifier and fenced aggregate finalizer are the only settlement path",
+    "replay": "one receipt row; terminal settlement/event/outbox replays are idempotent",
+    "rate": "none at this route; size/shape bounds and infrastructure limits remain. R6 owns distributed abuse controls."
   },
+  "findings": [
+    "Historical sessions without exact pre-send expectations remain held for operational reconciliation. Real keyed delivery remains an R3 exit gate."
+  ]
+},
 
   "ALL /api/windcave/notification": {
-    branches: [
-      {
-        principal: "provider",
-        tenant: "provider-session",
-        tenantRule:
-          "the provider's session id selects the one sale created with it (storage.getTransactionByWindcaveSessionId); an unknown id does nothing",
-      },
-    ],
-    input:
-      "sessionId / sessionid (query or body): an opaque provider session id, used only to find the sale and to query the provider; the rest of the body is ignored",
-    capability: "isWindcaveConfigured(): unconfigured, the notification is ignored before any write",
-    entitlement: null,
-    idempotency:
-      "only a sale whose session is still pending is processed, but pending → processing is a read then a write, not a claim (finding)",
-    sideEffects:
-      "queries the provider; on an outcome verified against the sale's expected values (R2-T5) settles the sale or its next split share, counts the sale on the business, and sends the business a live update and a push",
-    successDto: PROVIDER_ACK,
-    errorDisclosure: ["fixed"],
-    controls: {
-      authenticity:
-        "none needed from the caller: the outcome comes from querying the provider with the stored session id",
-      replay: "a settled session is skipped (no longer pending); two simultaneous duplicates can both pass the read",
-      rate: "none — anyone can make the server query the provider about a pending session whose id they hold; the ids are unguessable provider session ids",
-    },
-    findings: [
-      "pending → processing is a read then a write, not an atomic claim: two simultaneous notifications for one session can both query the provider and both settle it (a second count increment, a second push). Plan 22.7 / R3 (C20) owns the single atomic finaliser.",
-      "Until R2-T6 (2026-10-12) it logged the raw query (with the provider's session id), and the query and body when no session id was found; it now logs fixed text and the internal sale id only (r2-t6-provider-log-guard.test.ts).",
-    ],
+  "branches": [
+    {
+      "principal": "provider",
+      "tenant": "provider-session",
+      "tenantRule": "session identity is a reconciliation hint; only the worker resolves an exact independently persisted attempt/binding"
+    }
+  ],
+  "input": "GET query sessionid or sessionId: one scalar id, identical aliases only; URL <=8192 bytes and <=20 fields. POST: bounded 8 KB JSON/form, <=20 form parameters, no compressed bodies. Other methods 405. Approval/money fields are ignored. The state path is not financial authority.",
+  "capability": null,
+  "entitlement": null,
+  "idempotency": "committed inbox uniqueness (provider, kind=fprn, session); arrival count increments. Database absence/failure returns 503 with Retry-After, never 200.",
+  "sideEffects": null,
+  "successDto": "200 \"OK\" only after the durable receipt commits",
+  "errorDisclosure": [
+    "fixed"
+  ],
+  "controls": {
+    "authenticity": "notification fields authorize no money; actual R2 query/verifier and fenced aggregate finalizer are the only settlement path",
+    "replay": "one receipt row; terminal settlement/event/outbox replays are idempotent",
+    "rate": "none at this route; size/shape bounds and infrastructure limits remain. R6 owns distributed abuse controls."
   },
+  "findings": [
+    "Historical sessions without exact pre-send expectations remain held for operational reconciliation. Real keyed delivery remains an R3 exit gate."
+  ]
+},
 
   "POST /api/v1/transactions": {
     branches: [
@@ -342,20 +338,20 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     capability:
       "requireEcommerceApi (FEATURE_ECOMMERCE_API, off by default: 404) and config.features.newRetailPayments (503 while per-payment links are off)",
     entitlement: "requireBillingCard: 402 BILLING_CARD_REQUIRED without a paid plan",
-    idempotency: "none: every call creates another sale and another payment link (no idempotency key)",
+    idempotency: "required Idempotency-Key UUID; merchant/key unique concrete creation receipt and canonical request fingerprint; replay returns the same aggregate and deterministic hashed retail credential",
     sideEffects:
-      "creates a per-payment sale (createRetailTransaction, server/retail-transaction-service.ts), writes an API log row, and records a webhook delivery row that nothing sends",
+      "Concrete scoped mutation, immutable command/audit and keyed outbox in server/retail-transaction-service.ts; no route-local financial publication.",
     successDto:
       "fields listed one by one: id, amount, currency, item_name, status, payment_url, qr_code_url (the payment link's raw token, given once), created_at; publicTransactionDto is only the stored webhook payload",
     errorDisclosure: ["input-issues"],
     controls: {
       authenticity: "a Bearer API key found with storage.getApiKeyByKey and active; create_transactions permission",
-      replay: "a replayed request creates another sale",
+      replay: "same UUID/fingerprint reuses the original bill; changed immutable details conflict",
       rate: "none — no per-key or per-address limit",
     },
     findings: [
-      "webhook_url from the caller is stored as a webhook delivery row. Nothing delivers those rows today; any future delivery worker must restrict destinations (server-side request forgery).",
-      "No rate limit and no idempotency key on an API that creates payment links (behind FEATURE_ECOMMERCE_API, off by default; plan 15.5 decides the API's future).",
+      "Webhook requests are explicitly unavailable before creation; the later API phase must restrict destinations before enabling delivery.",
+      "Distributed rate limits remain with R6; FEATURE_ECOMMERCE_API remains off by default.",
     ],
   },
 
@@ -384,112 +380,108 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
   },
 
   "ALL /api/billing/card/notification": {
-    branches: [{ principal: "provider", tenant: "none", tenantRule: "reads nothing and writes nothing" }],
-    input: "nothing is read",
-    capability: null,
-    entitlement: null,
-    idempotency: "does nothing",
-    sideEffects: null,
-    successDto: '200 "OK"',
-    errorDisclosure: ["fixed"],
-    controls: {
-      authenticity:
-        "none needed: the call does nothing. A stored card is saved only when the signed-in owner's browser confirms it (POST /api/billing/card/confirm), which re-reads the session from the provider",
-      replay: "harmless",
-      rate: "none — there is nothing to limit",
-    },
+  "branches": [
+    {
+      "principal": "provider",
+      "tenant": "provider-session",
+      "tenantRule": "session identity is a reconciliation hint; only the worker resolves an exact independently persisted attempt/binding"
+    }
+  ],
+  "input": "GET query sessionid or sessionId: one scalar id, identical aliases only; URL <=8192 bytes and <=20 fields. POST: bounded 8 KB JSON/form, <=20 form parameters, no compressed bodies. Other methods 405. Approval/money fields are ignored. The state path is not financial authority.",
+  "capability": null,
+  "entitlement": null,
+  "idempotency": "committed inbox uniqueness (provider, kind=fprn, session); arrival count increments. Database absence/failure returns 503 with Retry-After, never 200.",
+  "sideEffects": null,
+  "successDto": "200 \"OK\" only after the durable receipt commits",
+  "errorDisclosure": [
+    "fixed"
+  ],
+  "controls": {
+    "authenticity": "notification fields authorize no money; actual R2 query/verifier and fenced aggregate finalizer are the only settlement path",
+    "replay": "one receipt row; terminal settlement/event/outbox replays are idempotent",
+    "rate": "none at this route; size/shape bounds and infrastructure limits remain. R6 owns distributed abuse controls."
   },
+  "findings": [
+    "Historical sessions without exact pre-send expectations remain held for operational reconciliation. Real keyed delivery remains an R3 exit gate."
+  ]
+},
+
 
   "GET /api/billing/card/callback": {
-    branches: [{ principal: "public", tenant: "none", tenantRule: "reads nothing; sends the browser back to billing settings" }],
-    input:
-      "result (query or body): reduced by safeBillingCardCallbackResult to approved, declined, cancelled or unknown before it enters the redirect",
-    capability: null,
-    entitlement: null,
-    idempotency: "does nothing",
-    sideEffects: null,
-    successDto: "302 to /settings?section=billing&card=<one of the four results>",
-    errorDisclosure: ["fixed"],
-    controls: {
-      authenticity:
-        "anyone: the redirect carries only one of four fixed words, and the settings page then asks the server, signed in, to confirm the card",
-      replay: "harmless",
-      rate: "none — there is nothing to limit",
-    },
+    branches:[{principal:'public-bearer',tenant:'token',tenantRule:'Expiring hashed return state identifies exactly one stored subscription card attempt; browser result and supplied merchant/session are not authority.'}],
+    input:'state: one scalar query value resolved by subscriptionPayments.card.resolveReturnState in server/durable-subscription-card.ts. Result/body fields are hints only.',
+    capability:'Configured subscription runtime; unavailable or legacy state returns reconciliation-required in server/subscription-payment-runtime.ts.',
+    entitlement:null,idempotency:'Same stored card intent and shared inbox; no independent browser finalizer.',
+    sideEffects:'Scoped card confirmation through server/durable-subscription-card.ts; retained billing intent through server/durable-subscription-billing.ts.',
+    successDto:'303 to /settings?section=billing&card=pending; no credentials or unverified approved outcome.',errorDisclosure:['fixed'],
+    controls:{authenticity:'Valid stored hashed state with absolute expiry; zero-value and billing outcomes are queried and verified server-side.',replay:'Same stored command; terminal results reused without another purchase.',rate:'none — no new initiation occurs; distributed abuse controls remain with R6.'},
   },
+
 
   "POST /api/billing/card/callback": {
-    branches: [{ principal: "public", tenant: "none", tenantRule: "reads nothing; sends the browser back to billing settings" }],
-    input:
-      "result (query or body): reduced by safeBillingCardCallbackResult to approved, declined, cancelled or unknown before it enters the redirect",
-    capability: null,
-    entitlement: null,
-    idempotency: "does nothing",
-    sideEffects: null,
-    successDto: "302 to /settings?section=billing&card=<one of the four results>",
-    errorDisclosure: ["fixed"],
-    controls: {
-      authenticity:
-        "anyone: the redirect carries only one of four fixed words, and the settings page then asks the server, signed in, to confirm the card",
-      replay: "harmless",
-      rate: "none — there is nothing to limit",
-    },
+    branches:[{principal:'public-bearer',tenant:'token',tenantRule:'Expiring hashed return state identifies exactly one stored subscription card attempt; browser result and supplied merchant/session are not authority.'}],
+    input:'state: one scalar query value resolved by subscriptionPayments.card.resolveReturnState in server/durable-subscription-card.ts. Result/body fields are hints only.',
+    capability:'Configured subscription runtime; unavailable or legacy state returns reconciliation-required in server/subscription-payment-runtime.ts.',
+    entitlement:null,idempotency:'Same stored card intent and shared inbox; no independent browser finalizer.',
+    sideEffects:'Scoped card confirmation through server/durable-subscription-card.ts; retained billing intent through server/durable-subscription-billing.ts.',
+    successDto:'303 to /settings?section=billing&card=pending; no credentials or unverified approved outcome.',errorDisclosure:['fixed'],
+    controls:{authenticity:'Valid stored hashed state with absolute expiry; zero-value and billing outcomes are queried and verified server-side.',replay:'Same stored command; terminal results reused without another purchase.',rate:'none — no new initiation occurs; distributed abuse controls remain with R6.'},
   },
+
 
   "ALL /api/windcave/rent-notification": {
-    branches: [
-      {
-        principal: "provider",
-        tenant: "provider-session",
-        tenantRule:
-          "the provider's session id selects the one rent invoice created with it (storage.getInvoiceRentRequestByWindcaveSessionId), or the split invoice it was recorded for (getInvoiceSplitSession, since 2026-09-26); an unknown id does nothing",
-      },
-    ],
-    input: "sessionId / sessionid (query or body): an opaque provider session id; nothing else is read",
-    capability: "isWindcaveConfigured(): unconfigured, the notification is ignored",
-    entitlement: null,
-    idempotency:
-      "a settled invoice (paid, paid externally, voided) is skipped; a split share is claimed atomically per session (storage.atomicClaimSplitShare), but a single payment is marked paid by a read then a write (finding)",
-    sideEffects: "queries the provider and settles only a verified outcome (R2-T5); when paid, emails the GST invoice (sendRentGstInvoices → sendGstInvoices)",
-    successDto: PROVIDER_ACK,
-    errorDisclosure: ["fixed"],
-    controls: {
-      authenticity: "none needed from the caller: the outcome comes from querying the provider with the stored session id",
-      replay: "a settled invoice is skipped; two simultaneous duplicates of a single payment can both pass the read",
-      rate: "none — any caller can prompt a provider query for a pending session whose id they hold",
-    },
-    findings: [
-      "finalizeRentInvoice marks a single (unsplit) payment paid after a plain read: this notification and the browser's return arriving together can both record it, logging Payment_Received twice and sending the GST invoice twice. Plan 22.7 / R3 (C20).",
-    ],
+  "branches": [
+    {
+      "principal": "provider",
+      "tenant": "provider-session",
+      "tenantRule": "session identity is a reconciliation hint; only the worker resolves an exact independently persisted attempt/binding"
+    }
+  ],
+  "input": "GET query sessionid or sessionId: one scalar id, identical aliases only; URL <=8192 bytes and <=20 fields. POST: bounded 8 KB JSON/form, <=20 form parameters, no compressed bodies. Other methods 405. Approval/money fields are ignored. The state path is not financial authority.",
+  "capability": null,
+  "entitlement": null,
+  "idempotency": "committed inbox uniqueness (provider, kind=fprn, session); arrival count increments. Database absence/failure returns 503 with Retry-After, never 200.",
+  "sideEffects": null,
+  "successDto": "200 \"OK\" only after the durable receipt commits",
+  "errorDisclosure": [
+    "fixed"
+  ],
+  "controls": {
+    "authenticity": "notification fields authorize no money; actual R2 query/verifier and fenced aggregate finalizer are the only settlement path",
+    "replay": "one receipt row; terminal settlement/event/outbox replays are idempotent",
+    "rate": "none at this route; size/shape bounds and infrastructure limits remain. R6 owns distributed abuse controls."
   },
+  "findings": [
+    "Historical sessions without exact pre-send expectations remain held for operational reconciliation. Real keyed delivery remains an R3 exit gate."
+  ]
+},
 
   "ALL /api/windcave/trades-notification": {
-    branches: [
-      {
-        principal: "provider",
-        tenant: "provider-session",
-        tenantRule:
-          "the provider's session id selects the one job invoice created with it (storage.getJobInvoiceByWindcaveSessionId), or the split invoice it was recorded for (getInvoiceSplitSession, since 2026-09-26); an unknown id does nothing",
-      },
-    ],
-    input: "sessionId / sessionid (query or body): an opaque provider session id; nothing else is read",
-    capability: "isWindcaveConfigured(): unconfigured, the notification is ignored",
-    entitlement: null,
-    idempotency:
-      "a settled invoice is skipped; a split share is claimed atomically per session (storage.atomicClaimJobSplitShare), but a single payment is marked paid by a read then a write (finding)",
-    sideEffects:
-      "queries the provider and settles only a verified outcome (R2-T5); when paid, sends the payment invoice (sendTradePaymentInvoice: email or SMS). The facts also list the rent path's GST email, which finalizeCheckoutInvoice can call, but this route always passes a trades invoice",
-    successDto: PROVIDER_ACK,
-    errorDisclosure: ["fixed"],
-    controls: {
-      authenticity: "none needed from the caller: the outcome comes from querying the provider with the stored session id",
-      replay: "a settled invoice is skipped; two simultaneous duplicates of a single payment can both pass the read",
-      rate: "none — any caller can prompt a provider query for a pending session whose id they hold",
-    },
-    findings: [
-      "finalizeTradeInvoice marks a single payment paid after a plain read: a notification and the browser's return arriving together can both record it and send the payment invoice twice. Plan 22.7 / R3 (C20).",
-    ],
+  "branches": [
+    {
+      "principal": "provider",
+      "tenant": "provider-session",
+      "tenantRule": "session identity is a reconciliation hint; only the worker resolves an exact independently persisted attempt/binding"
+    }
+  ],
+  "input": "GET query sessionid or sessionId: one scalar id, identical aliases only; URL <=8192 bytes and <=20 fields. POST: bounded 8 KB JSON/form, <=20 form parameters, no compressed bodies. Other methods 405. Approval/money fields are ignored. The state path is not financial authority.",
+  "capability": null,
+  "entitlement": null,
+  "idempotency": "committed inbox uniqueness (provider, kind=fprn, session); arrival count increments. Database absence/failure returns 503 with Retry-After, never 200.",
+  "sideEffects": null,
+  "successDto": "200 \"OK\" only after the durable receipt commits",
+  "errorDisclosure": [
+    "fixed"
+  ],
+  "controls": {
+    "authenticity": "notification fields authorize no money; actual R2 query/verifier and fenced aggregate finalizer are the only settlement path",
+    "replay": "one receipt row; terminal settlement/event/outbox replays are idempotent",
+    "rate": "none at this route; size/shape bounds and infrastructure limits remain. R6 owns distributed abuse controls."
   },
+  "findings": [
+    "Historical sessions without exact pre-send expectations remain held for operational reconciliation. Real keyed delivery remains an R3 exit gate."
+  ]
+},
 
   "POST /api/webhooks/whatsapp": {
     branches: [
@@ -590,7 +582,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     entitlement: null,
     idempotency:
       "only while the sale is pending and the business allowed splitting; storage.createBillSplit sets it up atomically and a sale already split is refused (BillSplitConflictError, 409)",
-    sideEffects: "a live update to the business's screens (broadcastToStone)",
+    sideEffects: "Concrete scoped mutation, immutable command/audit and keyed outbox in server/storage.ts; no route-local financial publication.",
     successDto: "tokenPaymentDto of the split sale; no split-payment id is returned",
     errorDisclosure: ["domain-errors"],
     controls: {
@@ -657,96 +649,112 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
   },
 
   "POST /api/pay/t/:token/session": {
-    branches: [{ principal: "public-bearer", tenant: "token", tenantRule: TOKEN_TENANT_RULE }],
-    input: `${TOKEN_INPUT}; body: tokenSessionRequestSchema, strict (idempotencyKey: a UUID; amount: optional, and must equal what is owed)`,
-    capability:
-      "isWindcaveConfigured() (503 PAYMENT_PROVIDER_UNAVAILABLE) and PAYMENT_RETURN_STATE_SECRET (503 PAYMENT_RETURN_STATE_UNAVAILABLE)",
-    entitlement: null,
-    idempotency:
-      "per sale share and idempotency key: paymentAttempts.claim keeps one active attempt; the same key resumes its attempt and session, another key while one is active is 409, and concurrent creation of one attempt's session is coalesced in this process. The same key after its own attempt ended unsent (abandoned with no session and no send intent) is 409 PAYMENT_ATTEMPT_EXPIRED, since that key can never claim again and the page replaces it once; an expired attempt that holds a session or send intent is reconciled first (503 while it cannot be). A sale cancelled while its session was attached is 410 with no links (OI-1)",
-    sideEffects:
-      "creates a payment session with the provider (createWindcaveSession); an expired attempt is first reconciled by querying the provider, which can settle it (live update and push to the business)",
-    successDto:
-      "the provider session id, its hosted-page and submit URLs, attemptState and shareIndex; or, for a settled attempt, its outcome",
-    errorDisclosure: ["fixed"],
-    controls: {
-      authenticity: TOKEN_AUTHENTICITY,
-      replay: "the same idempotency key returns the same attempt and session; a new key while one is active is refused",
-      rate: tokenRate("session", 20),
-    },
+  "branches": [
+    {
+      "principal": "public-bearer",
+      "tenant": "token",
+      "tenantRule": "the original resource locator is retained; the request is then held to the exact tenant, aggregate, UUID key, immutable share and provider-session binding"
+    }
+  ],
+  "input": "token/id locates the original public resource (numeric id parsed strictly). Strict body: UUID idempotencyKey, integer shareIndex (retail 0..10; invoice 0..12). Sessions accept exact optional amount/merchantId/stoneId, or validated invoice payerEmail. Completion requires exact sessionId; optional supported paymentMethod or Google Pay payload. No client-supplied provider URLs.",
+  "capability": "newRetailPayments/invoicePayments and UAT/production mode gate new creation; off means no new provider request",
+  "entitlement": null,
+  "idempotency": "same persisted UUID/share is reused; changed immutable details conflict. Parent → attempt → binding locks. Pre-send expectations/state hash/send intent commit before R2 transport. Unknown acceptance keeps the original key/X-ID. Only the shared inbox worker and atomic finalizer settle.",
+  "sideEffects": "actual R2 session client through the durable coordinator; no communication from this route",
+  "successDto": "validated session links/share/return state, or local terminal outcome; 202 processing for pending/unknown",
+  "errorDisclosure": [
+    "fixed"
+  ],
+  "controls": {
+    "authenticity": "public resource locator plus exact cryptographic command/binding; hashed browser state checked when present. Every money outcome is verified through actual R2 transport.",
+    "replay": "fenced atomic finalizer and unique financial event/outbox; uncertain send commands are never rotated or blindly resent",
+    "rate": "payment token family limiter; numeric callback only accepts a valid hashed state"
   },
+  "findings": [
+    "Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval."
+  ]
+},
 
   "POST /api/pay/t/:token/hosted-fields-complete": {
-    branches: [
-      {
-        principal: "public-bearer",
-        tenant: "token",
-        tenantRule: `${TOKEN_TENANT_RULE}; the attempt must be this sale's, for this share and idempotency key, with this provider session (prepareTokenCompletion)`,
-      },
-    ],
-    input: `${TOKEN_INPUT}; body: idempotencyKey (a UUID), sessionId (1 to 512 characters), shareIndex (0 to 10), paymentMethod card or apple_pay; strict`,
-    capability: "isWindcaveConfigured() (503 while unconfigured: the outcome waits)",
-    entitlement: null,
-    idempotency: "paymentAttempts.claimFinalization: one finaliser per attempt; a settled attempt returns its outcome",
-    sideEffects: "queries the provider for the session's outcome; on settlement a live update and a push to the business",
-    successDto: "{ approved, outcome, receiptShare } (tokenAttemptOutcome)",
-    errorDisclosure: ["fixed"],
-    controls: {
-      authenticity: `${TOKEN_AUTHENTICITY}, together with the attempt's idempotency key and provider session id`,
-      replay: "returns the settled outcome; the outcome always comes from the provider, never from the request",
-      rate: tokenRate("completion", 40),
-    },
+  "branches": [
+    {
+      "principal": "public-bearer",
+      "tenant": "token",
+      "tenantRule": "the original resource locator is retained; the request is then held to the exact tenant, aggregate, UUID key, immutable share and provider-session binding"
+    }
+  ],
+  "input": "token/id locates the original public resource (numeric id parsed strictly). Strict body: UUID idempotencyKey, integer shareIndex (retail 0..10; invoice 0..12). Sessions accept exact optional amount/merchantId/stoneId, or validated invoice payerEmail. Completion requires exact sessionId; optional supported paymentMethod or Google Pay payload. No client-supplied provider URLs.",
+  "capability": "reconciliation in server/payment-checkout-handlers.ts and server/invoice-checkout-handlers.ts is independent of initiation flags; provider absence returns truthful processing",
+  "entitlement": null,
+  "idempotency": "same persisted UUID/share is reused; changed immutable details conflict. Parent → attempt → binding locks. Pre-send expectations/state hash/send intent commit before R2 transport. Unknown acceptance keeps the original key/X-ID. Only the shared inbox worker and atomic finalizer settle.",
+  "sideEffects": "enqueue receipt and optionally query through the shared R2 worker. Google Pay submission uses a durable once-only session command and validated provider query links; its return boolean never chooses money. Settlement appends a keyed outbox; no route-local push/SSE/email.",
+  "successDto": "validated session links/share/return state, or local terminal outcome; 202 processing for pending/unknown",
+  "errorDisclosure": [
+    "fixed"
+  ],
+  "controls": {
+    "authenticity": "public resource locator plus exact cryptographic command/binding; hashed browser state checked when present. Every money outcome is verified through actual R2 transport.",
+    "replay": "fenced atomic finalizer and unique financial event/outbox; uncertain send commands are never rotated or blindly resent",
+    "rate": "payment token family limiter; numeric callback only accepts a valid hashed state"
   },
+  "findings": [
+    "Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval."
+  ]
+},
 
   "POST /api/pay/t/:token/googlepay-complete": {
-    branches: [
-      {
-        principal: "public-bearer",
-        tenant: "token",
-        tenantRule: `${TOKEN_TENANT_RULE}; the attempt must be this sale's, for this share and idempotency key, with this provider session (prepareTokenCompletion)`,
-      },
-    ],
-    input: `${TOKEN_INPUT}; body: idempotencyKey (a UUID), sessionId (1 to 512 characters), shareIndex (0 to 10), and googlePayToken, an object passed to the provider as it is; strict`,
-    capability: "isWindcaveConfigured() (503 while unconfigured: the outcome waits)",
-    entitlement: null,
-    idempotency:
-      "paymentAttempts.claimFinalization: only the first finaliser submits the wallet token; a replay only queries the session, so it cannot charge twice",
-    sideEffects:
-      "the first finaliser submits the Google Pay token to the provider's submit URL cached for this attempt (assertWindcaveUrl checks it is the provider's); every finaliser then queries the session, and only the verified outcome settles (R2-T5: never the submit's reply); on settlement a live update and a push to the business",
-    successDto: "{ approved, outcome, receiptShare } (tokenAttemptOutcome)",
-    errorDisclosure: ["fixed"],
-    controls: {
-      authenticity: `${TOKEN_AUTHENTICITY}, together with the attempt's idempotency key and provider session id`,
-      replay: "never resubmits the wallet token; returns the settled outcome",
-      rate: tokenRate("completion", 40),
-    },
+  "branches": [
+    {
+      "principal": "public-bearer",
+      "tenant": "token",
+      "tenantRule": "the original resource locator is retained; the request is then held to the exact tenant, aggregate, UUID key, immutable share and provider-session binding"
+    }
+  ],
+  "input": "token/id locates the original public resource (numeric id parsed strictly). Strict body: UUID idempotencyKey, integer shareIndex (retail 0..10; invoice 0..12). Sessions accept exact optional amount/merchantId/stoneId, or validated invoice payerEmail. Completion requires exact sessionId; optional supported paymentMethod or Google Pay payload. No client-supplied provider URLs.",
+  "capability": "reconciliation in server/payment-checkout-handlers.ts and server/invoice-checkout-handlers.ts is independent of initiation flags; provider absence returns truthful processing",
+  "entitlement": null,
+  "idempotency": "same persisted UUID/share is reused; changed immutable details conflict. Parent → attempt → binding locks. Pre-send expectations/state hash/send intent commit before R2 transport. Unknown acceptance keeps the original key/X-ID. Only the shared inbox worker and atomic finalizer settle.",
+  "sideEffects": "enqueue receipt and optionally query through the shared R2 worker. Google Pay submission uses a durable once-only session command and validated provider query links; its return boolean never chooses money. Settlement appends a keyed outbox; no route-local push/SSE/email.",
+  "successDto": "validated session links/share/return state, or local terminal outcome; 202 processing for pending/unknown",
+  "errorDisclosure": [
+    "fixed"
+  ],
+  "controls": {
+    "authenticity": "public resource locator plus exact cryptographic command/binding; hashed browser state checked when present. Every money outcome is verified through actual R2 transport.",
+    "replay": "fenced atomic finalizer and unique financial event/outbox; uncertain send commands are never rotated or blindly resent",
+    "rate": "payment token family limiter; numeric callback only accepts a valid hashed state"
   },
+  "findings": [
+    "Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval."
+  ]
+},
 
   "GET /api/pay/return/:state": {
-    branches: [
-      {
-        principal: "public-bearer",
-        tenant: "token",
-        tenantRule:
-          "the return state (HMAC-derived from one payment attempt) selects that attempt (paymentAttempts.resolveReturnState); an unknown state is 404",
-      },
-    ],
-    input:
-      "state: an opaque return state, resolved by its hash; source 'hpp' or any result marks a provider return; result decides nothing (R2-T5: the verified provider outcome alone settles)",
-    capability: "isWindcaveConfigured() (unconfigured, the attempt stays pending)",
-    entitlement: null,
-    idempotency:
-      "the provider's browser return reconciles through paymentAttempts.claimFinalization, once per attempt; a plain read is read-only",
-    sideEffects:
-      "on the provider's browser return: queries the provider and settles the attempt (live update and push to the business)",
-    successDto: "a browser return is always 303 to /pay/return/<state>; a plain read returns only { outcome, receiptShare }",
-    errorDisclosure: ["fixed"],
-    controls: {
-      authenticity: "holding the attempt's return state, the credential for that one attempt",
-      replay: "harmless: settlement is claimed once, and reads are read-only",
-      rate: tokenRate("resolve", 120),
-    },
+  "branches": [
+    {
+      "principal": "public-bearer",
+      "tenant": "token",
+      "tenantRule": "hashed state with absolute expiry addresses one attempt. Numbered and invoice callbacks additionally compare its persisted aggregate/merchant identity to the supplied resource. Legacy callbacks without a usable state return reconciliation-required."
+    }
+  ],
+  "input": "state: opaque 43-character bearer, checked by attempts.resolveReturnState or repository.resolveInvoiceReturnState; source/result are hints only. Numeric transactionId is a strict positive integer; invoice token is resolved through getCheckoutInvoiceByToken. No raw query/body logging.",
+  "capability": "reconciliation in server/payment-checkout-handlers.ts and server/invoice-checkout-handlers.ts is independent of initiation flags; provider absence returns truthful processing",
+  "entitlement": null,
+  "idempotency": "same persisted UUID/share is reused; changed immutable details conflict. Parent → attempt → binding locks. Pre-send expectations/state hash/send intent commit before R2 transport. Unknown acceptance keeps the original key/X-ID. Only the shared inbox worker and atomic finalizer settle.",
+  "sideEffects": "enqueue receipt and optionally query through the shared R2 worker. Google Pay submission uses a durable once-only session command and validated provider query links; its return boolean never chooses money. Settlement appends a keyed outbox; no route-local push/SSE/email.",
+  "successDto": "narrow local outcome/receipt share or safe redirect; pending remains processing",
+  "errorDisclosure": [
+    "fixed"
+  ],
+  "controls": {
+    "authenticity": "public resource locator plus exact cryptographic command/binding; hashed browser state checked when present. Every money outcome is verified through actual R2 transport.",
+    "replay": "fenced atomic finalizer and unique financial event/outbox; uncertain send commands are never rotated or blindly resent",
+    "rate": "payment token family limiter; numeric callback only accepts a valid hashed state"
   },
+  "findings": [
+    "Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval."
+  ]
+},
 
   // ── Batch 2b (2026-09-26): numbered (board) sales, their receipts, the Windcave browser return ──
 
@@ -757,7 +765,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     entitlement: null,
     idempotency:
       "only a pending sale the business allowed to split (409 otherwise, since 2026-09-26); storage.createBillSplit sets it up atomically, returns an exact retry unchanged, and refuses a different split (BillSplitConflictError, 409)",
-    sideEffects: "a live update to the business's screens (broadcastToStone)",
+    sideEffects: "Concrete scoped mutation, immutable command/audit and keyed outbox in server/storage.ts; no route-local financial publication.",
     successDto: "publicTransactionDto of the split sale, with its board's page and QR addresses",
     errorDisclosure: ["domain-errors"],
     controls: {
@@ -788,75 +796,88 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
   },
 
   "POST /api/transactions/:id/pay": {
-    branches: [{ principal: "public", tenant: "number", tenantRule: NUMBER_TENANT_RULE }],
-    input:
-      "id: strictPositiveIntegerParam; body: paymentRequestSchema (merchantId, stoneId, paymentMethod, cardLast4, amount — all optional; a merchantId or stoneId given must match the sale); amount: never charged — what is owed (the next share, or the whole price) is; an amount given must equal it to the cent, or 400 before any provider session (owner decision 2026-09-26)",
-    capability: "isWindcaveConfigured() (503 PAYMENT_PROVIDER_UNAVAILABLE while unconfigured)",
-    entitlement: null,
-    idempotency:
-      "a completed or processing sale is refused (409); otherwise every call creates a new provider session and binds it to the sale, replacing the last one",
-    sideEffects:
-      "creates a payment session with the provider (createWindcaveSession); a duplicate-request reply binds its session and settles nothing (503: the notification or callback settles it by a verified query, R2-T5)",
-    successDto: "the provider session id and its hosted-page and submit URLs (kept server-side too, and never taken back from a client)",
-    errorDisclosure: ["input-issues"],
-    controls: {
-      authenticity: NUMBER_AUTHENTICITY,
-      replay: "each call opens another provider session for the same sale",
-      rate: CHECK_RATE_LIMIT,
-    },
-    findings: [NUMBERED_SALE_FINDING],
+  "branches": [
+    {
+      "principal": "public",
+      "tenant": "number",
+      "tenantRule": "the original resource locator is retained; the request is then held to the exact tenant, aggregate, UUID key, immutable share and provider-session binding"
+    }
+  ],
+  "input": "token/id locates the original public resource (numeric id parsed strictly). Strict body: UUID idempotencyKey, integer shareIndex (retail 0..10; invoice 0..12). Sessions accept exact optional amount/merchantId/stoneId, or validated invoice payerEmail. Completion requires exact sessionId; optional supported paymentMethod or Google Pay payload. No client-supplied provider URLs.",
+  "capability": "newRetailPayments/invoicePayments and UAT/production mode gate new creation; off means no new provider request",
+  "entitlement": null,
+  "idempotency": "same persisted UUID/share is reused; changed immutable details conflict. Parent → attempt → binding locks. Pre-send expectations/state hash/send intent commit before R2 transport. Unknown acceptance keeps the original key/X-ID. Only the shared inbox worker and atomic finalizer settle.",
+  "sideEffects": "actual R2 session client through the durable coordinator; no communication from this route",
+  "successDto": "validated session links/share/return state, or local terminal outcome; 202 processing for pending/unknown",
+  "errorDisclosure": [
+    "fixed"
+  ],
+  "controls": {
+    "authenticity": "public resource locator plus exact cryptographic command/binding; hashed browser state checked when present. Every money outcome is verified through actual R2 transport.",
+    "replay": "fenced atomic finalizer and unique financial event/outbox; uncertain send commands are never rotated or blindly resent",
+    "rate": "payment token family limiter; numeric callback only accepts a valid hashed state"
   },
+  "findings": [
+    "Numeric board-sale addressing remains publicly guessable; preserve the reviewed R1 scope and token-sale exclusion.",
+    "Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval."
+  ]
+},
 
   "POST /api/transactions/:id/hosted-fields-complete": {
-    branches: [
-      {
-        principal: "public",
-        tenant: "number",
-        tenantRule: `${NUMBER_TENANT_RULE}; the session id sent must be the one bound to the sale (403 otherwise)`,
-      },
-    ],
-    input:
-      "id: strictPositiveIntegerParam; body read without a schema: sessionId (required, compared with the bound session) and paymentMethod (only apple_pay is kept, anything else is card)",
-    capability: "isWindcaveConfigured() (503 while unconfigured)",
-    entitlement: null,
-    idempotency: "none: every call queries the provider and settles again (gap 11, finding)",
-    sideEffects:
-      "queries the provider for the bound session; settles the sale or its next share, counts it on the business, and sends a live update and a push",
-    successDto: "{ approved, redirectPath } to the receipt or the declined page",
-    errorDisclosure: ["fixed"],
-    controls: {
-      authenticity: `${NUMBER_AUTHENTICITY}, with the provider session id bound to it`,
-      replay: "settles again (gap 11); after a share, the same session no longer completes the next one (R2-T5: its reference is the counted share's)",
-      rate: "none — no limit",
-    },
-    findings: [NUMBERED_SALE_FINDING, GAP11_REPLAY_FINDING, SPLIT_SHARE_FINDING],
+  "branches": [
+    {
+      "principal": "public",
+      "tenant": "number",
+      "tenantRule": "the original resource locator is retained; the request is then held to the exact tenant, aggregate, UUID key, immutable share and provider-session binding"
+    }
+  ],
+  "input": "token/id locates the original public resource (numeric id parsed strictly). Strict body: UUID idempotencyKey, integer shareIndex (retail 0..10; invoice 0..12). Sessions accept exact optional amount/merchantId/stoneId, or validated invoice payerEmail. Completion requires exact sessionId; optional supported paymentMethod or Google Pay payload. No client-supplied provider URLs.",
+  "capability": "reconciliation in server/payment-checkout-handlers.ts and server/invoice-checkout-handlers.ts is independent of initiation flags; provider absence returns truthful processing",
+  "entitlement": null,
+  "idempotency": "same persisted UUID/share is reused; changed immutable details conflict. Parent → attempt → binding locks. Pre-send expectations/state hash/send intent commit before R2 transport. Unknown acceptance keeps the original key/X-ID. Only the shared inbox worker and atomic finalizer settle.",
+  "sideEffects": "enqueue receipt and optionally query through the shared R2 worker. Google Pay submission uses a durable once-only session command and validated provider query links; its return boolean never chooses money. Settlement appends a keyed outbox; no route-local push/SSE/email.",
+  "successDto": "validated session links/share/return state, or local terminal outcome; 202 processing for pending/unknown",
+  "errorDisclosure": [
+    "fixed"
+  ],
+  "controls": {
+    "authenticity": "public resource locator plus exact cryptographic command/binding; hashed browser state checked when present. Every money outcome is verified through actual R2 transport.",
+    "replay": "fenced atomic finalizer and unique financial event/outbox; uncertain send commands are never rotated or blindly resent",
+    "rate": "payment token family limiter; numeric callback only accepts a valid hashed state"
   },
+  "findings": [
+    "Numeric board-sale addressing remains publicly guessable; preserve the reviewed R1 scope and token-sale exclusion.",
+    "Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval."
+  ]
+},
 
   "POST /api/transactions/:id/googlepay-complete": {
-    branches: [
-      {
-        principal: "public",
-        tenant: "number",
-        tenantRule: `${NUMBER_TENANT_RULE}; the session id sent must be the one bound to the sale (403 otherwise)`,
-      },
-    ],
-    input:
-      "id: strictPositiveIntegerParam; body read without a schema: sessionId (required, compared with the bound session) and googlePayToken (an object passed to the provider)",
-    capability: "isWindcaveConfigured() (503 while unconfigured)",
-    entitlement: null,
-    idempotency:
-      "none: the wallet token is submitted to the provider's submit URL cached for the sale when there is one (the cache is then cleared); the session is always queried, and a verified result is settled again on every call (gap 11)",
-    sideEffects:
-      "submits the Google Pay token to the provider's cached submit URL (assertWindcaveUrl checks it), then queries the session; only an outcome verified against the sale's expected values settles the sale or its next share (R2-T5; anything else is 503), counts it, and sends a live update and a push",
-    successDto: "{ approved, redirectPath } to the receipt or the declined page",
-    errorDisclosure: ["fixed"],
-    controls: {
-      authenticity: `${NUMBER_AUTHENTICITY}, with the provider session id bound to it`,
-      replay: "settles again (gap 11); after a share, the same session no longer completes the next one (R2-T5: its reference is the counted share's)",
-      rate: "none — no limit",
-    },
-    findings: [NUMBERED_SALE_FINDING, GAP11_REPLAY_FINDING, SPLIT_SHARE_FINDING],
+  "branches": [
+    {
+      "principal": "public",
+      "tenant": "number",
+      "tenantRule": "the original resource locator is retained; the request is then held to the exact tenant, aggregate, UUID key, immutable share and provider-session binding"
+    }
+  ],
+  "input": "token/id locates the original public resource (numeric id parsed strictly). Strict body: UUID idempotencyKey, integer shareIndex (retail 0..10; invoice 0..12). Sessions accept exact optional amount/merchantId/stoneId, or validated invoice payerEmail. Completion requires exact sessionId; optional supported paymentMethod or Google Pay payload. No client-supplied provider URLs.",
+  "capability": "reconciliation in server/payment-checkout-handlers.ts and server/invoice-checkout-handlers.ts is independent of initiation flags; provider absence returns truthful processing",
+  "entitlement": null,
+  "idempotency": "same persisted UUID/share is reused; changed immutable details conflict. Parent → attempt → binding locks. Pre-send expectations/state hash/send intent commit before R2 transport. Unknown acceptance keeps the original key/X-ID. Only the shared inbox worker and atomic finalizer settle.",
+  "sideEffects": "enqueue receipt and optionally query through the shared R2 worker. Google Pay submission uses a durable once-only session command and validated provider query links; its return boolean never chooses money. Settlement appends a keyed outbox; no route-local push/SSE/email.",
+  "successDto": "validated session links/share/return state, or local terminal outcome; 202 processing for pending/unknown",
+  "errorDisclosure": [
+    "fixed"
+  ],
+  "controls": {
+    "authenticity": "public resource locator plus exact cryptographic command/binding; hashed browser state checked when present. Every money outcome is verified through actual R2 transport.",
+    "replay": "fenced atomic finalizer and unique financial event/outbox; uncertain send commands are never rotated or blindly resent",
+    "rate": "payment token family limiter; numeric callback only accepts a valid hashed state"
   },
+  "findings": [
+    "Numeric board-sale addressing remains publicly guessable; preserve the reviewed R1 scope and token-sale exclusion.",
+    "Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval."
+  ]
+},
 
   "GET /api/transactions/:id": {
     branches: [{ principal: "public", tenant: "number", tenantRule: NUMBER_TENANT_RULE }],
@@ -902,35 +923,31 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
   },
 
   "GET /api/windcave/callback": {
-    branches: [
-      {
-        principal: "public",
-        tenant: "number",
-        tenantRule:
-          "the sale's number (transactionId), or else the provider session id, selects the sale; a sale with its own link is sent home as a missing one is (302, since 2026-09-27: its 404 told a caller counting through the numbers which were link sales); a cancel only chooses the page, and only with the bound session id",
-      },
-    ],
-    input:
-      "transactionId: read into a variable, then strictPositiveIntegerQueryParam (a malformed one finds nothing, since 2026-09-26); sessionId / sessionid: compared with the bound session to choose the cancelled page; result: 'cancelled' only redirects (R2-T5: it settles nothing); any 'sim' key rejects the request (400)",
-    capability: "isWindcaveConfigured(): unconfigured, nothing is settled and the customer sees pending",
-    entitlement: null,
-    idempotency:
-      "an already approved or declined sale only redirects; otherwise pending → processing is a read then a write, like the notification's (R3 / C20)",
-    sideEffects:
-      "queries the provider for the bound session and settles the sale or its next share only on an outcome verified against the sale's expected values (count, live update, push; R2-T5); a cancel changes nothing",
-    successDto: "302 to the receipt, or to the result page (declined, cancelled or pending), or home",
-    errorDisclosure: ["fixed"],
-    controls: {
-      authenticity:
-        `${NUMBER_AUTHENTICITY}; the outcome always comes from querying the provider and verifying it (R2-T5); a cancel settles nothing`,
-      replay: "a settled sale only redirects; simultaneous calls can both settle (R3 / C20)",
-      rate: "none — anyone can prompt a provider query for a pending numbered sale",
-    },
-    findings: [
-      NUMBERED_SALE_FINDING,
-      "Settles by a read then a write, not a claim, racing the notification (plan 22.7 / R3, C20).",
-    ],
+  "branches": [
+    {
+      "principal": "public-bearer",
+      "tenant": "token",
+      "tenantRule": "hashed state with absolute expiry addresses one attempt. Numbered and invoice callbacks additionally compare its persisted aggregate/merchant identity to the supplied resource. Legacy callbacks without a usable state return reconciliation-required."
+    }
+  ],
+  "input": "state: opaque 43-character bearer, checked by attempts.resolveReturnState or repository.resolveInvoiceReturnState; source/result are hints only. Numeric transactionId is a strict positive integer; invoice token is resolved through getCheckoutInvoiceByToken. No raw query/body logging.",
+  "capability": "reconciliation in server/payment-checkout-handlers.ts and server/invoice-checkout-handlers.ts is independent of initiation flags; provider absence returns truthful processing",
+  "entitlement": null,
+  "idempotency": "same persisted UUID/share is reused; changed immutable details conflict. Parent → attempt → binding locks. Pre-send expectations/state hash/send intent commit before R2 transport. Unknown acceptance keeps the original key/X-ID. Only the shared inbox worker and atomic finalizer settle.",
+  "sideEffects": "enqueue receipt and optionally query through the shared R2 worker. Google Pay submission uses a durable once-only session command and validated provider query links; its return boolean never chooses money. Settlement appends a keyed outbox; no route-local push/SSE/email.",
+  "successDto": "narrow local outcome/receipt share or safe redirect; pending remains processing",
+  "errorDisclosure": [
+    "fixed"
+  ],
+  "controls": {
+    "authenticity": "public resource locator plus exact cryptographic command/binding; hashed browser state checked when present. Every money outcome is verified through actual R2 transport.",
+    "replay": "fenced atomic finalizer and unique financial event/outbox; uncertain send commands are never rotated or blindly resent",
+    "rate": "payment token family limiter; numeric callback only accepts a valid hashed state"
   },
+  "findings": [
+    "Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval."
+  ]
+},
 
   // ── Batch 3a (2026-09-26): invoice checkout and quote links ──
   "GET /api/checkout/resolve/:token": {
@@ -970,117 +987,139 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
   },
 
   "POST /api/checkout/:token/split": {
-    branches: [{ principal: "public-bearer", tenant: "token", tenantRule: CHECKOUT_TENANT_RULE }],
-    input: "token: read raw, then looked up; body: count, a whole number from 2 to 12, strict (400 otherwise; parseInt until 2026-09-26)",
-    capability: null,
-    entitlement: null,
-    idempotency: "sets the invoice's share count; refused once any session has been opened for it or a share is paid (409, since 2026-09-26) and when the business has not allowed splitting (400)",
-    sideEffects: null,
-    successDto: "{ splitCount, splitPaidCount: 0, shareCents }",
-    errorDisclosure: ["fixed"],
-    controls: {
-      authenticity: CHECKOUT_AUTHENTICITY,
-      replay: "the same count again changes nothing; another count is taken only until someone starts paying",
-      rate: CHECKOUT_RATE,
-    },
-    findings: [SPLIT_INVOICE_SHARE_FINDING],
+  "branches": [
+    {
+      "principal": "public-bearer",
+      "tenant": "token",
+      "tenantRule": "the original resource locator is retained; the request is then held to the exact tenant, aggregate, UUID key, immutable share and provider-session binding"
+    }
+  ],
+  "input": "token resolves one invoice; strict body {count: integer 2..12}; guarded aggregate CAS refuses recorded attempts, legacy sessions and paid shares.",
+  "capability": null,
+  "entitlement": null,
+  "idempotency": "same persisted UUID/share is reused; changed immutable details conflict. Parent → attempt → binding locks. Pre-send expectations/state hash/send intent commit before R2 transport. Unknown acceptance keeps the original key/X-ID. Only the shared inbox worker and atomic finalizer settle.",
+  "sideEffects": null,
+  "successDto": "splitCount, splitPaidCount and shareCents",
+  "errorDisclosure": [
+    "fixed"
+  ],
+  "controls": {
+    "authenticity": "public resource locator plus exact cryptographic command/binding; hashed browser state checked when present. Every money outcome is verified through actual R2 transport.",
+    "replay": "fenced atomic finalizer and unique financial event/outbox; uncertain send commands are never rotated or blindly resent",
+    "rate": "tokenRateLimit for session/completion; callback has no new initiation"
   },
+  "findings": [
+    "Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval."
+  ]
+},
 
   "POST /api/checkout/:token/session": {
-    branches: [{ principal: "public-bearer", tenant: "token", tenantRule: CHECKOUT_TENANT_RULE }],
-    input: "token: read raw, then looked up; body read without a schema: payerEmail (checked as an email address; for a split invoice kept with that session only, never on a list)",
-    capability: "isWindcaveConfigured() (503 PAYMENT_PROVIDER_UNAVAILABLE)",
-    entitlement: null,
-    idempotency: "none: every call opens another provider session (finding)",
-    sideEffects:
-      "creates a payment session with the provider (createWindcaveSession) and, for a split invoice, records it with its amount and payer's email (recordInvoiceSplitSession, 0030); a duplicate-request reply settles nothing (503: the notification settles the recorded session by a verified query, R2-T5)",
-    successDto:
-      "the provider session id, the amount and the hosted-fields submit URLs (also cached here against the token, invoiceAjaxUrlCache)",
-    errorDisclosure: ["fixed"],
-    controls: {
-      authenticity: CHECKOUT_AUTHENTICITY,
-      replay: "each call opens another provider session for the same invoice",
-      rate: CHECKOUT_RATE,
-    },
-    findings: [RESESSION_FINDING, SPLIT_INVOICE_SHARE_FINDING],
+  "branches": [
+    {
+      "principal": "public-bearer",
+      "tenant": "token",
+      "tenantRule": "the original resource locator is retained; the request is then held to the exact tenant, aggregate, UUID key, immutable share and provider-session binding"
+    }
+  ],
+  "input": "token/id locates the original public resource (numeric id parsed strictly). Strict body: UUID idempotencyKey, integer shareIndex (retail 0..10; invoice 0..12). Sessions accept exact optional amount/merchantId/stoneId, or validated invoice payerEmail. Completion requires exact sessionId; optional supported paymentMethod or Google Pay payload. No client-supplied provider URLs.",
+  "capability": "newRetailPayments/invoicePayments and UAT/production mode gate new creation; off means no new provider request",
+  "entitlement": null,
+  "idempotency": "same persisted UUID/share is reused; changed immutable details conflict. Parent → attempt → binding locks. Pre-send expectations/state hash/send intent commit before R2 transport. Unknown acceptance keeps the original key/X-ID. Only the shared inbox worker and atomic finalizer settle.",
+  "sideEffects": "actual R2 session client through the durable coordinator; no communication from this route",
+  "successDto": "validated session links/share/return state, or local terminal outcome; 202 processing for pending/unknown",
+  "errorDisclosure": [
+    "fixed"
+  ],
+  "controls": {
+    "authenticity": "public resource locator plus exact cryptographic command/binding; hashed browser state checked when present. Every money outcome is verified through actual R2 transport.",
+    "replay": "fenced atomic finalizer and unique financial event/outbox; uncertain send commands are never rotated or blindly resent",
+    "rate": "tokenRateLimit for session/completion; callback has no new initiation"
   },
+  "findings": [
+    "Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval."
+  ]
+},
 
   "POST /api/checkout/:token/hosted-fields-complete": {
-    branches: [
-      {
-        principal: "public-bearer",
-        tenant: "token",
-        tenantRule: `${CHECKOUT_TENANT_RULE}; a single payment must send the session pinned to it, a split share a session recorded for this invoice when it was opened (getInvoiceSplitSession; 403 otherwise, since 2026-09-26)`,
-      },
-    ],
-    input: "token: read raw, then looked up; body read without a schema: sessionId (required; sent to the provider as one encoded path segment)",
-    capability: "isWindcaveConfigured() (503 PAYMENT_PROVIDER_UNAVAILABLE: the outcome waits)",
-    entitlement: null,
-    idempotency:
-      "finalizeCheckoutInvoice: a settled invoice is left alone; a split share counts once per recorded session (atomicClaimSplitShare / atomicClaimJobSplitShare, then markInvoiceSplitSessionPaid), and an approved session that finds every share paid is recorded for a refund; a single payment settles by a read then a write",
-    sideEffects:
-      "queries the provider for the session (queryWindcaveSession); only an outcome verified against the invoice's expected values settles (R2-T5; anything else is 503, never a decline); once paid, the GST invoice email (rent, sendGstInvoices) or the payment invoice (trades, sendTradePaymentInvoice)",
-    successDto: "{ approved, status, splitCount, splitPaidCount }",
-    errorDisclosure: ["fixed"],
-    controls: {
-      authenticity: `${CHECKOUT_AUTHENTICITY}, with the invoice's pinned session for a single payment or a session recorded for it for a split share`,
-      replay: "a settled invoice is left alone and a split session counts once; two calls at once for a single payment can both settle it (R3 / C20)",
-      rate: "none — every call asks the provider about the session sent, with the platform's credentials",
-    },
+  "branches": [
+    {
+      "principal": "public-bearer",
+      "tenant": "token",
+      "tenantRule": "the original resource locator is retained; the request is then held to the exact tenant, aggregate, UUID key, immutable share and provider-session binding"
+    }
+  ],
+  "input": "token/id locates the original public resource (numeric id parsed strictly). Strict body: UUID idempotencyKey, integer shareIndex (retail 0..10; invoice 0..12). Sessions accept exact optional amount/merchantId/stoneId, or validated invoice payerEmail. Completion requires exact sessionId; optional supported paymentMethod or Google Pay payload. No client-supplied provider URLs.",
+  "capability": "reconciliation in server/payment-checkout-handlers.ts and server/invoice-checkout-handlers.ts is independent of initiation flags; provider absence returns truthful processing",
+  "entitlement": null,
+  "idempotency": "same persisted UUID/share is reused; changed immutable details conflict. Parent → attempt → binding locks. Pre-send expectations/state hash/send intent commit before R2 transport. Unknown acceptance keeps the original key/X-ID. Only the shared inbox worker and atomic finalizer settle.",
+  "sideEffects": "enqueue receipt and optionally query through the shared R2 worker. Google Pay submission uses a durable once-only session command and validated provider query links; its return boolean never chooses money. Settlement appends a keyed outbox; no route-local push/SSE/email.",
+  "successDto": "validated session links/share/return state, or local terminal outcome; 202 processing for pending/unknown",
+  "errorDisclosure": [
+    "fixed"
+  ],
+  "controls": {
+    "authenticity": "public resource locator plus exact cryptographic command/binding; hashed browser state checked when present. Every money outcome is verified through actual R2 transport.",
+    "replay": "fenced atomic finalizer and unique financial event/outbox; uncertain send commands are never rotated or blindly resent",
+    "rate": "tokenRateLimit for session/completion; callback has no new initiation"
   },
+  "findings": [
+    "Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval."
+  ]
+},
 
   "POST /api/checkout/:token/googlepay-complete": {
-    branches: [
-      {
-        principal: "public-bearer",
-        tenant: "token",
-        tenantRule: `${CHECKOUT_TENANT_RULE}; a single payment must send the session pinned to it, a split share a session recorded for this invoice when it was opened (getInvoiceSplitSession; 403 otherwise, since 2026-09-26)`,
-      },
-    ],
-    input:
-      "token: read raw, then looked up; body read without a schema: sessionId (required), googlePayToken (any object, passed to the provider as it came)",
-    capability: "isWindcaveConfigured() (503 PAYMENT_PROVIDER_UNAVAILABLE: the outcome waits)",
-    entitlement: null,
-    idempotency:
-      "finalizeCheckoutInvoice: a settled invoice is left alone; a split share counts once per session; a single payment settles by a read then a write",
-    sideEffects:
-      "submits the Google Pay token to the cached submit URL (submitGooglePayToken, checked by assertWindcaveUrl), then queries the provider (queryWindcaveSession); only an outcome verified against the invoice's expected values settles (R2-T5; anything else is 503); once paid, the GST invoice email (rent) or the payment invoice (trades)",
-    successDto: "{ approved, status, splitCount, splitPaidCount }",
-    errorDisclosure: ["fixed"],
-    controls: {
-      authenticity: `${CHECKOUT_AUTHENTICITY}, with the invoice's pinned session for a single payment or a session recorded for it for a split share`,
-      replay: "a settled invoice is left alone and a split session counts once; two calls at once for a single payment can both settle it (R3 / C20)",
-      rate: "none — every call reaches the provider, with the platform's credentials",
-    },
-    findings: [
-      "The submit URLs are cached per link, not per session: when two payers of one split invoice open sessions, the first one's Google Pay payment goes to the second one's session, and both sessions are then counted as shares.",
-    ],
+  "branches": [
+    {
+      "principal": "public-bearer",
+      "tenant": "token",
+      "tenantRule": "the original resource locator is retained; the request is then held to the exact tenant, aggregate, UUID key, immutable share and provider-session binding"
+    }
+  ],
+  "input": "token/id locates the original public resource (numeric id parsed strictly). Strict body: UUID idempotencyKey, integer shareIndex (retail 0..10; invoice 0..12). Sessions accept exact optional amount/merchantId/stoneId, or validated invoice payerEmail. Completion requires exact sessionId; optional supported paymentMethod or Google Pay payload. No client-supplied provider URLs.",
+  "capability": "reconciliation in server/payment-checkout-handlers.ts and server/invoice-checkout-handlers.ts is independent of initiation flags; provider absence returns truthful processing",
+  "entitlement": null,
+  "idempotency": "same persisted UUID/share is reused; changed immutable details conflict. Parent → attempt → binding locks. Pre-send expectations/state hash/send intent commit before R2 transport. Unknown acceptance keeps the original key/X-ID. Only the shared inbox worker and atomic finalizer settle.",
+  "sideEffects": "enqueue receipt and optionally query through the shared R2 worker. Google Pay submission uses a durable once-only session command and validated provider query links; its return boolean never chooses money. Settlement appends a keyed outbox; no route-local push/SSE/email.",
+  "successDto": "validated session links/share/return state, or local terminal outcome; 202 processing for pending/unknown",
+  "errorDisclosure": [
+    "fixed"
+  ],
+  "controls": {
+    "authenticity": "public resource locator plus exact cryptographic command/binding; hashed browser state checked when present. Every money outcome is verified through actual R2 transport.",
+    "replay": "fenced atomic finalizer and unique financial event/outbox; uncertain send commands are never rotated or blindly resent",
+    "rate": "tokenRateLimit for session/completion; callback has no new initiation"
   },
+  "findings": [
+    "Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval."
+  ]
+},
 
   "GET /api/checkout/callback": {
-    branches: [
-      {
-        principal: "public-bearer",
-        tenant: "token",
-        tenantRule:
-          "the invoice's checkout token (20 random bytes, base64url), in the query, selects its one invoice, rent or trades (getCheckoutInvoiceByToken); an unknown one is sent home (302), this being a browser's return (the shared rule's 404 does not apply here; corrected 2026-09-27 by R1-T3's matrix)",
-      },
-    ],
-    input: "query read raw: token (looked up; unknown goes to /) and result (only \"cancelled\" is acted on: no query)",
-    capability: "isWindcaveConfigured() (while unconfigured it only redirects)",
-    entitlement: null,
-    idempotency: "a settled invoice only redirects; otherwise the invoice's pinned session is queried and settled (a split invoice pins none, so nothing is)",
-    sideEffects:
-      "queries the provider for the pinned session (queryWindcaveSession) and settles only a verified outcome (R2-T5); once paid, the GST invoice email (rent) or the payment invoice (trades)",
-    successDto: "a 302 to the invoice's checkout page (/r/<token>), or to / for an unknown token",
-    errorDisclosure: ["fixed"],
-    controls: {
-      authenticity: `${CHECKOUT_AUTHENTICITY}; the outcome always comes from querying the provider about the pinned session`,
-      replay: "a settled invoice only redirects; two calls at once can both settle it (R3 / C20)",
-      rate: "none — each call with a real link to an unpaid single-payment invoice asks the provider",
-    },
-    findings: ["Settles by a read then a write, not a claim, racing the notification (R3 / C20)."],
+  "branches": [
+    {
+      "principal": "public-bearer",
+      "tenant": "token",
+      "tenantRule": "hashed state with absolute expiry addresses one attempt. Numbered and invoice callbacks additionally compare its persisted aggregate/merchant identity to the supplied resource. Legacy callbacks without a usable state return reconciliation-required."
+    }
+  ],
+  "input": "state: opaque 43-character bearer, checked by attempts.resolveReturnState or repository.resolveInvoiceReturnState; source/result are hints only. Numeric transactionId is a strict positive integer; invoice token is resolved through getCheckoutInvoiceByToken. No raw query/body logging.",
+  "capability": "reconciliation in server/payment-checkout-handlers.ts and server/invoice-checkout-handlers.ts is independent of initiation flags; provider absence returns truthful processing",
+  "entitlement": null,
+  "idempotency": "same persisted UUID/share is reused; changed immutable details conflict. Parent → attempt → binding locks. Pre-send expectations/state hash/send intent commit before R2 transport. Unknown acceptance keeps the original key/X-ID. Only the shared inbox worker and atomic finalizer settle.",
+  "sideEffects": "enqueue receipt and optionally query through the shared R2 worker. Google Pay submission uses a durable once-only session command and validated provider query links; its return boolean never chooses money. Settlement appends a keyed outbox; no route-local push/SSE/email.",
+  "successDto": "narrow local outcome/receipt share or safe redirect; pending remains processing",
+  "errorDisclosure": [
+    "fixed"
+  ],
+  "controls": {
+    "authenticity": "public resource locator plus exact cryptographic command/binding; hashed browser state checked when present. Every money outcome is verified through actual R2 transport.",
+    "replay": "fenced atomic finalizer and unique financial event/outbox; uncertain send commands are never rotated or blindly resent",
+    "rate": "tokenRateLimit for session/completion; callback has no new initiation"
   },
+  "findings": [
+    "Historical incomplete identities and real keyed delivery remain explicit R3 exit gates; no deployment approval."
+  ]
+},
 
   "GET /api/trades/quotes/token/:token": {
     branches: [{ principal: "public-bearer", tenant: "token", tenantRule: QUOTE_TENANT_RULE }],
@@ -2400,7 +2439,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     entitlement: null,
     idempotency:
       "the current plan again changes nothing; an upgrade applies at once after charging the stored card (no card 402, declined 422, unconfirmed 502); a downgrade waits for the period's end, and one that would strand logins is 409; each runs under the subscription's billing claim (409 while another billing step holds it)",
-    sideEffects: "an upgrade charges the stored card, with an idempotency key (executeStoredCardCharge, then chargeStoredCard)",
+    sideEffects: "Concrete scoped mutation, immutable command/audit and keyed outbox in server/durable-subscription-billing.ts; no route-local financial publication.",
     successDto: "{ subscription: subscriptionDto, applied: 'immediate' | 'period-end', message }",
     errorDisclosure: ["fixed"],
   },
@@ -2456,11 +2495,11 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
   "POST /api/billing/card/session": {
     branches: [{ principal: "merchant", roles: ["owner"], tenant: "session", tenantRule: sessionBusiness(ADMIN_403) }],
     input: "nothing is read",
-    capability: "the provider must be configured (isWindcaveConfigured: 503 otherwise)",
+    capability: "Configured durable card provider and enabled initiation checked in server/durable-subscription-card.ts.",
     entitlement: null,
     idempotency:
       "each call opens another hosted card page at the provider and binds its session to the subscription (bindSubscriptionCardSession), replacing any earlier one",
-    sideEffects: "opens a hosted card-storage session at the provider (createCardStorageSession), with the business's contact email",
+    sideEffects: "Concrete scoped mutation, immutable command/audit and keyed outbox in server/durable-subscription-card.ts; no route-local financial publication.",
     successDto: "{ sessionId, redirectUrl }: the provider's page; the session id reads back only this one result",
     errorDisclosure: ["fixed"],
   },
@@ -2476,11 +2515,11 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     ],
     input: "body read without a schema: sessionId, a trimmed string matching /^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$/ (400 otherwise)",
     capability: null,
-    entitlement: null,
+    entitlement: "billingCardIsReady checks readiness of the pending confirmation projection; it grants no browser-authorized charge or independent entitlement.",
     idempotency:
       "a session already settled answers from the stored result with no provider call; otherwise the provider is asked (202 while pending); an approved card is stored and, when the subscription needs paying, charged under the billing claim with an idempotency key (completeSubscriptionCardSetup: 409 busy, 422 declined, 502 unconfirmed)",
     sideEffects:
-      "reads the card session back from the provider (queryStoredCardSession) and may charge the stored card (executeStoredCardCharge, then chargeStoredCard)",
+      "Concrete scoped mutation, immutable command/audit and keyed outbox in server/durable-subscription-card.ts; no route-local financial publication.",
     successDto: "{ success, ready, charged, card: { last4, brand, expiry }, subscription: subscriptionDto }; 202 { pending: true }",
     errorDisclosure: ["fixed"],
   },
@@ -2970,7 +3009,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     entitlement: "paid access (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise)",
     idempotency:
       "none: each call makes another pending sale, with a new private link (only its hash kept; a token clash is 503) or its board's shared address",
-    sideEffects: "a live update to the business, and to the board's page for a board sale (sseBroker, via broadcastToStone); a push notification to the business (sendPushToMerchant)",
+    sideEffects: "Concrete scoped mutation, immutable command/audit and keyed outbox in server/payment-creation-command.ts; no route-local financial publication.",
     successDto: "ownerTransactionDto with the sale's page and QR addresses; the private link's token appears only in this answer",
     errorDisclosure: ["input-issues"],
     findings: [ADMIN_MONEY],
@@ -2990,9 +3029,9 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       "body: cashSaleRequestSchema, strict: the business, item name and price by the rules creating a sale uses, and an optional board (400 with the issues). Idempotency-Key header must be a UUID (400 IDEMPOTENCY_KEY_REQUIRED otherwise)",
     capability: null,
     entitlement: "paid access for new records (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise); an authenticated matching committed retry returns its audited record with no new action",
-    idempotency: "merchant-scoped UUID, database unique key and exact request fingerprint; changed money/item/board conflicts (409 IDEMPOTENCY_CONFLICT). Cash row, Cash_Recorded audit and manual-source outbox commit atomically. Same-key replay reuses the first record/event, with no usage increment or repeated communication, and says so (replayed: true); a conflict names the sale the key already recorded (its ownerTransactionDto, never the key or fingerprint), so the terminal can tell the merchant and release its key. Generic constructors cannot mint cash keys",
-    sideEffects: "atomic manual audit/outbox, distinct from provider settlement; temporary first-commit SSE/push compatibility delivery only. Shared keyed receiver cutover remains required before R3 exit",
-    successDto: "{ transaction: ownerTransactionDto, replayed?: true }; a 409 conflict carries { code, message, transaction: ownerTransactionDto }",
+    idempotency: "merchant-scoped UUID, database unique key and exact request fingerprint; changed money/item/board conflicts (409 IDEMPOTENCY_CONFLICT). Cash row, Cash_Recorded audit and manual-source outbox commit atomically. Same-key replay reuses the first record/event, with no usage increment or repeated communication. Generic constructors cannot mint cash keys",
+    sideEffects: "Concrete scoped mutation, immutable command/audit and keyed outbox in server/storage.ts; no route-local financial publication.",
+    successDto: "{ transaction: ownerTransactionDto }",
     errorDisclosure: ["input-issues"],
     findings: [ADMIN_MONEY],
   },
@@ -3036,10 +3075,10 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       },
     ],
     input: "id: strictPositiveIntegerParam (400 otherwise)",
-    capability: "isWindcaveConfigured(): unconfigured, the cancel asks the provider nothing and leaves open attempts untouched",
+    capability: null,
     entitlement: null,
-    idempotency: "owner decision OI-1 (2026-10-13): an attempt to pay never refuses the cancel; money already taken does (a provider transaction, a paid or processing share, an approved attempt: 409 PAYMENT_CAPTURED, read through getRetailCancellationContextForMerchant before any provider call and rechecked under the parent row lock). Each open attempt (ready/finalizing with a session) is asked once, without retries and outside any lock, through queryWindcaveSession with its recorded expected values; a verified approval is claimed (claimFinalization) and settled through persistTokenOutcome and the cancel answers 409 PAYMENT_COMPLETED; a verified decline is finalized declined only after the cancel commits, so the sale stays cancelled; anything else cancels and leaves the attempt able to settle, and finalize records a later payment on the cancelled sale. A board sale's own pending session is asked the same way and only refuses; its payment is recorded by its notification/callback. Unsent claims are abandoned with the sale. A sale no longer pending/processing is 400 (so again is 400)",
-    sideEffects: "provider: queryWindcaveSession (one exchange); a payment found settled sends the business a payment push (sendPushToMerchant, via persistTokenOutcome); a live update to the business, and to the board's page for a board sale (sseBroker, via broadcastToStone)",
+    idempotency: "cancels a pending or processing sale under the parent row lock, then separately rechecks recorded attempts and split shares with a fresh statement snapshot. Live/expired or possibly accepted attempts, legacy sessions and captured/processing shares hold cancellation (409 PAYMENT_ACTIVE); any other aggregate state is 400 (so again is 400). Only a persisted cancellation broadcasts. Durable cancellation command/audit/outbox remains R3 work; legacy provider sends before attachment still require initiation convergence",
+    sideEffects: "Concrete scoped mutation, immutable command/audit and keyed outbox in server/storage.ts; no route-local financial publication.",
     successDto: "ownerTransactionDto with the board's addresses for a board sale",
     errorDisclosure: ["fixed"],
     findings: [ADMIN_MONEY],
@@ -3391,15 +3430,16 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       { principal: "merchant", roles: ["owner", "member"], tenant: "resource", tenantRule: `${propertyRecord("invoice", "getInvoiceRentRequestForMerchant")}, including current parent ownership, rechecked under parent-then-child locks; ${PROPERTY_ADMIN}` },
     ],
     input: propertyId("id"),
-    capability: "isWindcaveConfigured(): unconfigured, the open windows are not asked and the change goes ahead on the stored state",
+    capability: null,
     entitlement: null,
     idempotency:
-      "voidInvoiceRentRequestForMerchant checks the current locked status and commits the scoped invoice update and history together; a paid or externally paid one is 409 'Cannot void a paid invoice' (400 until 2026-09-27, P2.2). OI-1 (2026-10-13): a card payment already taken (a provider transaction, a paid share or split session, an approved attempt) refuses with 409 PAYMENT_CAPTURED before any provider call, and again under the locks; each window that may still be paid (its unpaid split sessions, or the pinned session: getOpenInvoiceSessionsForMerchant) is asked once, in parallel and outside any lock, and a verified payment refuses with 409 PAYMENT_COMPLETED, left for its completion path to record; otherwise the change goes ahead, and a payment completing later is recorded (see findings). A voided one is voided again, with a new time, and logged again. Ownership refusal changes nothing; history failure rolls back the write",
-    sideEffects: "provider: queryWindcaveSession, once per open window",
+      "voidInvoiceRentRequestForMerchant checks the current locked status and commits the scoped invoice update and history together; a paid or externally paid one is 409 'Cannot void a paid invoice' (400 until 2026-09-27, P2.2). Recorded live/expired attempts, legacy sessions and paid split shares refuse with 409 PAYMENT_ACTIVE. A voided one is voided again, with a new time, and logged again. Ownership refusal changes nothing; history failure rolls back the write. Legacy initiation before attachment still requires R3 convergence",
+    sideEffects: null,
     successDto: `the invoice afterwards, ${RENT_INVOICE_ROW}`,
     errorDisclosure: ["fixed"],
     findings: [
       paidElsewhereFinding("Voiding"),
+      "A split invoice with shares already paid can be voided: those shares stay collected, with nothing but their events to show for them (R3/R4, refunds).",
       PROPERTY_TEAM,
     ],
   },
@@ -3414,10 +3454,10 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       },
     ],
     input: `${propertyId("id")}; body: markInvoicePaidExternalSchema (an optional reference of at most 200 characters, null or empty for none: both screens send null when no reference is typed, which was refused until 2026-09-27, batch 6d; 400 with the issues)`,
-    capability: "isWindcaveConfigured(): unconfigured, the open windows are not asked and the change goes ahead on the stored state",
+    capability: null,
     entitlement: null,
-    idempotency: "markInvoiceRentRequestPaidExternalForMerchant checks the current locked status and commits the scoped external-payment record and history together; a paid or externally paid one is 409 'Invoice is already paid' (400 until 2026-09-27, P2.2), and a voided one stays voided. OI-1 (2026-10-13): a card payment already taken (a provider transaction, a paid share or split session, an approved attempt) refuses with 409 PAYMENT_CAPTURED before any provider call, and again under the locks; each window that may still be paid (its unpaid split sessions, or the pinned session: getOpenInvoiceSessionsForMerchant) is asked once, in parallel and outside any lock, and a verified payment refuses with 409 PAYMENT_COMPLETED, left for its completion path to record; otherwise the change goes ahead, and a payment completing later is recorded (see findings). Issued invoices remain payable after profile archival. Ownership refusal changes nothing; history failure rolls back the write",
-    sideEffects: "provider: queryWindcaveSession, once per open window",
+    idempotency: "markInvoiceRentRequestPaidExternalForMerchant checks the current locked status and commits the scoped external-payment record and history together; a paid or externally paid one is 409 'Invoice is already paid' (400 until 2026-09-27, P2.2), and a voided one stays voided. Recorded live/expired attempts, legacy sessions and paid split shares refuse with 409 PAYMENT_ACTIVE. Issued invoices remain payable after profile archival. Ownership refusal changes nothing; history failure rolls back the write. Legacy initiation before attachment still requires R3 convergence",
+    sideEffects: null,
     successDto: `the invoice afterwards, ${RENT_INVOICE_ROW}`,
     errorDisclosure: ["input-issues"],
     findings: [
@@ -3730,11 +3770,11 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       },
     ],
     input: `${tradesId("id")}; body: markJobPaidExternalSchema (an optional reference of at most 200 characters, null or empty for none: every screen sends null when no reference is typed, and the desktop always does, which was refused until 2026-09-27; 400 with the first issue)`,
-    capability: "isWindcaveConfigured(): unconfigured, the open windows are not asked and the change goes ahead on the stored state",
+    capability: null,
     entitlement: null,
     idempotency:
-      "markJobInvoicePaidExternalForMerchant marks the owned invoice paid outside TaptPay with the reference and the time, and saves its paid_external event in the same transaction; a voided or paid one is 409 (since 2026-09-27: each call marked it again and emailed the client another receipt). OI-1 (2026-10-13): a card payment already taken (a provider transaction, a paid share or split session, an approved attempt) refuses with 409 PAYMENT_CAPTURED before any provider call, and again under the locks; each window that may still be paid (its unpaid split sessions, or the pinned session: getOpenInvoiceSessionsForMerchant) is asked once, in parallel and outside any lock, and a verified payment refuses with 409 PAYMENT_COMPLETED, left for its completion path to record; otherwise the change goes ahead, and a payment completing later is recorded (see findings). A row moved or settled after the lookup is 404 or 409 with nothing written or sent",
-    sideEffects: "provider: queryWindcaveSession, once per open window; emails the client a receipt for the invoice, with the business's GST number (sendTradePaymentInvoiceForMerchant: the invoice read in one statement with its owned client, and logged only while both are still the business's); nothing when the client has no email",
+      "markJobInvoicePaidExternalForMerchant marks the owned invoice paid outside TaptPay with the reference and the time, and saves its paid_external event in the same transaction; a voided or paid one is 409 (since 2026-09-27: each call marked it again and emailed the client another receipt). Recorded live/expired attempts, legacy sessions and paid split shares refuse with 409 PAYMENT_ACTIVE. A row moved or settled after the lookup is 404 or 409 with nothing written or sent. Legacy initiation before attachment still requires R3 convergence",
+    sideEffects: "Concrete scoped mutation, immutable command/audit and keyed outbox in server/storage.ts; no route-local financial publication.",
     successDto: `the invoice afterwards, ${JOB_INVOICE_ROW}`,
     errorDisclosure: ["input-issues"],
     findings: [tradesPaidElsewhereFinding("Marking an invoice paid outside TaptPay"), TRADES_TEAM],
@@ -3764,15 +3804,16 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
       },
     ],
     input: tradesId("id"),
-    capability: "isWindcaveConfigured(): unconfigured, the open windows are not asked and the change goes ahead on the stored state",
+    capability: null,
     entitlement: null,
     idempotency:
-      "voidJobInvoiceForMerchant voids the owned invoice with the time and saves invoice_voided in the client's history in the same transaction (logged since 2026-09-27). OI-1 (2026-10-13): a card payment already taken (a provider transaction, a paid share or split session, an approved attempt) refuses with 409 PAYMENT_CAPTURED before any provider call, and again under the locks; each window that may still be paid (its unpaid split sessions, or the pinned session: getOpenInvoiceSessionsForMerchant) is asked once, in parallel and outside any lock, and a verified payment refuses with 409 PAYMENT_COMPLETED, left for its completion path to record; otherwise the change goes ahead, and a payment completing later is recorded (see findings). A voided one is voided again, with a new time, and logged again; a row moved or paid after the lookup is 404 or 409 with nothing written",
-    sideEffects: "provider: queryWindcaveSession, once per open window",
+      "voidJobInvoiceForMerchant voids the owned invoice with the time and saves invoice_voided in the client's history in the same transaction (logged since 2026-09-27). Recorded live/expired attempts, legacy sessions and paid split shares refuse with 409 PAYMENT_ACTIVE. A voided one is voided again, with a new time, and logged again; a row moved or paid after the lookup is 404 or 409 with nothing written. Legacy initiation before attachment still requires R3 convergence",
+    sideEffects: null,
     successDto: `the invoice afterwards, ${JOB_INVOICE_ROW}`,
     errorDisclosure: ["fixed"],
     findings: [
       tradesPaidElsewhereFinding("Voiding"),
+      "A split invoice with shares already paid can be voided: those shares stay collected, with nothing but their events to show for them (R3/R4, refunds).",
       TRADES_TEAM,
     ],
   },

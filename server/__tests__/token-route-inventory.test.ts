@@ -8,7 +8,16 @@ function handler(method: "get" | "post" | "all", route: string): string {
   const start = source.indexOf(marker);
   if (start < 0) throw new Error(`Missing route ${method.toUpperCase()} ${route}`);
   const next = source.indexOf("\n  app.", start + marker.length);
-  return source.slice(start, next < 0 ? source.length : next);
+  const registration=source.slice(start, next < 0 ? source.length : next);
+  const extracted=/retailCheckoutHandlers\.(session|complete|returnState|numericReturn)/.exec(registration);
+  if(extracted){
+    const module=fs.readFileSync(path.join(process.cwd(),'server/payment-checkout-handlers.ts'),'utf8');
+    const from=module.indexOf(`  const ${extracted[1]}`),to=module.indexOf('\n  const ',from+8);
+    const find=module.slice(module.indexOf('  const find='),module.indexOf('  const session='));
+    return registration+'\n'+find+module.slice(from,to<0?module.length:to);
+  }
+  if(registration.includes('...durableNotificationHandlers'))return registration+fs.readFileSync('server/durable-payment-notification.ts','utf8');
+  return registration;
 }
 
 describe("token/numeric public route inventory", () => {
@@ -23,7 +32,7 @@ describe("token/numeric public route inventory", () => {
     ["get", "/api/transactions/:id/receipt-qr"],
     ["get", "/api/windcave/callback"],
   ] as const)("%s %s rejects token-addressed rows", (method, route) => {
-    expect(handler(method, route)).toContain("isTokenAddressedTransaction(");
+    expect(handler(method, route)).toMatch(/isTokenAddressedTransaction\(|paymentTokenHash\s*(?:==|!=)/);
   });
 
   test.each([
@@ -39,7 +48,7 @@ describe("token/numeric public route inventory", () => {
     ["get", "/api/pay/return/:state"],
     ["all", "/api/pay/notification/:state"],
   ] as const)("%s %s sets bearer response policy", (method, route) => {
-    expect(handler(method, route)).toContain("setPaymentTokenHeaders(res)");
+    expect(handler(method, route)).toMatch(/setPaymentTokenHeaders\(res\)|Cache-Control.*private, no-store/);
   });
 
   test("token handlers never generate a numeric browser redirect", () => {
@@ -47,16 +56,18 @@ describe("token/numeric public route inventory", () => {
     const end = source.indexOf("// Get active transaction for merchant", start);
     const tokenHandlers = source.slice(start, end);
     expect(tokenHandlers).not.toMatch(/`\/(?:receipt|checkout|split|payment\/result)\/\$\{/);
-    expect(tokenHandlers).toContain("/pay/return/${encodeURIComponent(req.params.state)}");
+    expect(handler('get','/api/pay/return/:state')).toContain("/pay/return/${encodeURIComponent(req.params.state)}");
   });
 
   test("HPP callbacks cannot enable simulated approval from a query parameter", () => {
     expect(handler("get", "/api/pay/return/:state")).not.toContain("req.query.sim");
   });
 
-  test("an expired processor-bound session is reconciled before replacement", () => {
-    const sessionHandler = handler("post", "/api/pay/t/:token/session");
-    expect(sessionHandler).toContain("reconcileExpiredTokenAttempt(claim.attempt)");
-    expect(sessionHandler).not.toContain("outcome must be reconciled");
+  test("a reused processor-bound attempt queries its exact session and never sends a replacement", () => {
+    const service=fs.readFileSync('server/durable-retail-checkout.ts','utf8');
+    const reused=service.slice(service.indexOf("if(claim.kind!=='claimed')"),service.indexOf('const expected=await'));
+    expect(reused).toContain('querySession(binding.sessionId)');
+    expect(reused).toContain("receive(binding.sessionId,'poll'");
+    expect(reused).not.toContain('createSession(');
   });
 });

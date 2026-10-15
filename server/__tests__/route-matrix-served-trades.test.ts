@@ -1,3 +1,4 @@
+import {randomUUID as requestCommandKey} from 'node:crypto';
 import "./support/test-env";
 
 import * as delivery from "../trades-delivery";
@@ -194,7 +195,7 @@ const RECIPES: Record<string, ServedRecipe> = {
     seeded(ctx);
     return {
       req: {
-        method: "post", path: "/api/trades/invoices",
+        method: "post", path: "/api/trades/invoices", headers: {"Idempotency-Key":requestCommandKey()},
         body: { clientProfileId: CLIENT, amountCents: 30_000, deliveryChannel: "email", dueAt: inDays(14).toISOString(), kind: "deposit", quoteId: QUOTE },
       },
       status: 201,
@@ -227,8 +228,9 @@ const RECIPES: Record<string, ServedRecipe> = {
       status: 200,
       check: (res) => {
         expect(res.body).toMatchObject({ id: INVOICE, status: "paid_external", externalPaymentReference: "Cash on site" });
-        // The client is sent the paid invoice, by the service that takes the business (R1-T7 S4b1).
-        expect(delivery.sendTradePaymentInvoiceForMerchant).toHaveBeenCalledWith(INVOICE, ctx.merchantId);
+        // The concrete manual-payment event/outbox owns the receiver. The HTTP
+        // route cannot independently repeat its receipt on retry.
+        expect(delivery.sendTradePaymentInvoiceForMerchant).not.toHaveBeenCalled();
         expect(delivery.sendTradePaymentInvoice).not.toHaveBeenCalled();
         expect(eventTypes()).toEqual(["paid_external"]);
       },

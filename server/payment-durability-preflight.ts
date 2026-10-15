@@ -27,7 +27,7 @@ export async function readPaymentDurabilityPreflight(client:{query(sql:string,va
   const canonical=(await client.query("SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='payment_attempts' AND column_name='expected_amount_cents') AS yes")).rows[0].yes;
   const missingExpected=canonical ? (await client.query(`SELECT count(*)::int AS n FROM payment_attempts a
     WHERE a.state IN ('claiming','ready','finalizing') AND (a.expected_amount_cents IS NULL OR a.expected_currency IS NULL
-      OR a.expected_merchant_reference IS NULL OR a.provider_environment IS NULL)`)).rows[0].n :
+      OR a.expected_merchant_reference IS NULL OR a.provider_environment IS NULL${expanded ? ' OR a.expected_provider_account IS NULL OR a.request_fingerprint IS NULL' : ''})`)).rows[0].n :
     (await client.query("SELECT count(*)::int AS n FROM payment_attempts WHERE state IN ('claiming','ready','finalizing')")).rows[0].n;
   const sizes=(await client.query(`SELECT c.relname AS table,pg_total_relation_size(c.oid)::float8 AS bytes FROM pg_class c
     JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname=ANY($1) ORDER BY c.relname`,

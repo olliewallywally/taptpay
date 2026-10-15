@@ -1,6 +1,6 @@
 /**
  * R4-T3 on actual PostgreSQL (docs/decisions/2026-10-14-r4-t3-atomic-refund-claim.md): the refund
- * claim, send intent and settle in DatabaseStorage, against migration 0039's checks and trigger,
+ * claim, send intent and settle in DatabaseStorage, against migration 0048's checks and trigger,
  * from an empty database with a non-UTC session time zone. Concurrency uses two connections.
  * TEST_DATABASE_URL=... TAPTPAY_TEST_DATABASE=1 node --import tsx scripts/verify-r4-t3-refund-claim-postgres.ts
  */
@@ -86,7 +86,7 @@ try {
   };
   const saleRow = async (id: number) => (await pool.query(`SELECT status, total_refunded, refundable_amount FROM transactions WHERE id = $1`, [id])).rows[0];
 
-  await check("a claim writes one requested operation 0039 accepts, and one audit event", async () => {
+  await check("a claim writes one requested operation 0048 accepts, and one audit event", async () => {
     const id = await sale();
     const result = await claim(one, id);
     assert.equal(result.kind, "claimed"); if (result.kind !== "claimed") return;
@@ -181,7 +181,7 @@ try {
     assert.equal((await saleRow(second.id)).total_refunded, "0.00");
   });
 
-  await check("declined, pending, mismatch and a thrown call each write what 0039 accepts", async () => {
+  await check("declined, pending, mismatch and a thrown call each write what 0048 accepts", async () => {
     for (const [outcome, state, parked] of [
       [{ kind: "declined" }, "failed", false], [{ kind: "pending", refundTransactionId: `pend${token()}` }, "unknown", false],
       [{ kind: "mismatch", field: "amount" }, "unknown", true], [{ kind: "thrown" }, "unknown", false],

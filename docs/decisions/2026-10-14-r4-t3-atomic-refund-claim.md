@@ -1,9 +1,11 @@
 # ADR — atomic refund claim (R4-T3)
 
+**Renumbered (2026-10-14):** R4-T2's migration was written as `0039` and is now `0048_refund_operations.sql`. Codex's completed R3 uses 0039–0047, which R4 keeps unchanged ([R3 integration](../evidence/remediation-v2-2/r4/R3-INTEGRATION-2026-10-14.md)).
+
 Date: 2026-10-14 UTC. Proposed by: the R2/R4 session. Status: **proposed, revision 3**
 (repository only). Plan v2.2 §11.1, §11.3, and the parts of §11.4 the route itself needs.
 
-It builds on [R4-T2's schema](2026-10-14-r4-t2-refund-operation-schema.md) (migration 0039)
+It builds on [R4-T2's schema](2026-10-14-r4-t2-refund-operation-schema.md) (migration 0048)
 and follows R4-T2's binding rules:
 - the lock order;
 - send intent before any call;
@@ -120,7 +122,7 @@ currency and method.
 4. **Refundable,** otherwise `not-refundable` with a fixed code:
    - the status is `completed` or `partially_refunded`;
    - the sale is not split;
-   - its capture matches `^[A-Za-z0-9_-]{1,64}$` (0039's shape). Otherwise
+   - its capture matches `^[A-Za-z0-9_-]{1,64}$` (0048's shape). Otherwise
      `capture_invalid`.
 5. **Live already?** If another operation on this sale is `requested`, `submitted` or
    `unknown` → `in-progress` (409 `REFUND_IN_PROGRESS`).
@@ -275,7 +277,7 @@ Every settle also sets `updated_at = now()`.
 - **Locks:** the claim takes a `withMemLock` on (business, key) and then one on the sale,
   matching PostgreSQL's order. Submit and settle take the sale lock. This corrects revision
   1, which wrongly said "synchronous between awaits".
-- **Rules:** one pure module, `server/refund-operation-rules.ts`. It mirrors 0039's CHECKs
+- **Rules:** one pure module, `server/refund-operation-rules.ts`. It mirrors 0048's CHECKs
   **and** its trigger:
   - the graph and each state's shape;
   - insert-time ownership of the business, user and capture;
@@ -297,7 +299,7 @@ Every settle also sets `updated_at = now()`.
 
   A replayed key answers with **the earlier refund's** result, and the copy says so.
 - **SSE:** `ownerRefundDto` shows `completedAt` and `refundReason` as null for operation rows,
-  because 0039 keeps those legacy columns empty. R4-T5 adds operation fields to the DTO;
+  because 0048 keeps those legacy columns empty. R4-T5 adds operation fields to the DTO;
   until then this is documented.
 - **Logs:** the route logs the error class (SQLSTATE or code) only, never the error object.
   A CHECK violation's "Failing row" would carry the reason, X-ID and capture.
@@ -336,7 +338,7 @@ Every settle also sets `updated_at = now()`.
   `keyConsumed`**. The client keeps the key. `REFUND_IN_PROGRESS` with `keyConsumed: false`
   is only ever another key's live operation.
 - **C-3. The operation UUID is generated before the insert** (`randomUUID()` in the app), so
-  `operation_id` and `merchant_reference` are set in the same statement. 0039 requires the
+  `operation_id` and `merchant_reference` are set in the same statement. 0048 requires the
   reference at insert and never lets it change.
 - **C-4. An error never sends and never fails.**
   - Any error, or an unconfirmed commit, in `markRefundSubmittedForMerchant` means do not
@@ -427,7 +429,7 @@ Every settle also sets `updated_at = now()`.
   - settle after the lease expired (the owner still settles);
   - takeover;
   - a backward app clock has no effect (database time).
-- **Shapes:** every transition's columns accepted by 0039.
+- **Shapes:** every transition's columns accepted by 0048.
 - **Invariants:**
   - `total_refunded` equals legacy confirmed plus succeeded operations;
   - the legacy fence;

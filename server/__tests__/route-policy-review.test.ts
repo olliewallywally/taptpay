@@ -23,6 +23,9 @@ const TOKEN_CHECKS = [
   "prepareTokenCompletion",
   "getCheckoutInvoiceByToken",
   "paymentAttempts.resolveReturnState",
+  "attempts.resolveReturnState",
+  "subscriptionPayments.card.resolveReturnState",
+  "deps.getCheckoutInvoiceByToken",
   "validateResetToken",
   "resetPassword",
   "storage.getMerchantByToken",
@@ -398,8 +401,11 @@ describe("R1-T2 / R1-T3 — every route's reviewed policy holds against its hand
         controls: { ...review.controls!, rate: "fine" },
       }).join("\n");
       expect(problems).toContain('controls.rate must start with "none"');
-      expect(problems).toContain("reads sessionId raw");
-      expect(problems).toContain("review's capability is empty");
+      const session='POST /api/pay/t/:token/session';
+      const sessionReview=ROUTE_REVIEW[session];
+      const unexplained=problemsWith(session,{...sessionReview,input:'nothing',capability:null}).join('\n');
+      expect(unexplained).toContain('reads token raw');
+      expect(unexplained).toContain("review's capability is empty");
     });
   });
 });

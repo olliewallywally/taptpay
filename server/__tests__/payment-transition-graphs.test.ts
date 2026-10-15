@@ -1,5 +1,5 @@
 import {evaluateTransition,retailTransactionGraph,paymentAttemptGraph,propertyInvoiceGraph,tradesInvoiceGraph,refundGraph,
-  subscriptionBillingAttemptGraph} from '../payment-transition-graphs';
+  subscriptionBillingAttemptGraph,subscriptionCardAttemptGraph} from '../payment-transition-graphs';
 
 describe('domain transition authority and terminality',()=>{
   test('property dispatch and trades send retain their existing public statuses',()=>{
@@ -12,18 +12,12 @@ describe('domain transition authority and terminality',()=>{
     expect(evaluateTransition(tradesInvoiceGraph,'sent','approve','merchant')).toEqual({kind:'conflict'});
     expect(propertyInvoiceGraph.rules.manualPaid.effects).not.toContain('usage_once');
   });
-  test('provider cannot move a voided invoice or cancelled retail sale to paid',()=>{
-    expect(evaluateTransition(propertyInvoiceGraph,'voided','approve','processor')).toEqual({kind:'conflict'});
-    expect(evaluateTransition(retailTransactionGraph,'cancelled','approve','processor')).toEqual({kind:'conflict'});
-  });
-  // OI-1 (2026-10-13): only a verified processor outcome may complete a cancelled sale, never a merchant.
-  // A specification of the reviewed graph: storage does not consult it; the behaviour itself is
-  // tested in oi1-retail-cancel-after-attempt.test.ts and the R3 PostgreSQL verifier.
-  test('a payment completing after a cancel is recorded by the processor edge only',()=>{
-    expect(evaluateTransition(retailTransactionGraph,'cancelled','approveAfterCancel','processor')).toEqual({kind:'claimed'});
-    expect(evaluateTransition(retailTransactionGraph,'cancelled','approveAfterCancel','merchant')).toEqual({kind:'conflict'});
-    for(const state of ['ready','finalizing']) expect(evaluateTransition(paymentAttemptGraph,state,'abandonUnsentOnCancel','merchant')).toEqual({kind:'conflict'});
-    expect(evaluateTransition(paymentAttemptGraph,'claiming','abandonUnsentOnCancel','merchant')).toEqual({kind:'claimed'});
+  test('a verified retained attempt can settle after cancellation; an external record stays intact',()=>{
+    expect(evaluateTransition(propertyInvoiceGraph,'voided','approve','processor')).toEqual({kind:'claimed'});
+    expect(evaluateTransition(retailTransactionGraph,'cancelled','approve','processor')).toEqual({kind:'claimed'});
+    expect(evaluateTransition(propertyInvoiceGraph,'paid_external','approve','processor')).toEqual({kind:'conflict'});
+    expect(evaluateTransition(propertyInvoiceGraph,'paid_external','additionalCapture','processor')).toEqual({kind:'claimed'});
+    expect(evaluateTransition(propertyInvoiceGraph,'voided','approve','merchant')).toEqual({kind:'conflict'});
   });
   test('ready or finalizing attempt cannot be abandoned by lease expiry',()=>{
     for(const state of ['ready','finalizing']) expect(evaluateTransition(paymentAttemptGraph,state,'abandonUnsent','system')).toEqual({kind:'conflict'});
@@ -39,5 +33,11 @@ describe('domain transition authority and terminality',()=>{
     expect(evaluateTransition(subscriptionBillingAttemptGraph,'unknown','approve','processor')).toEqual({kind:'claimed'});
     expect(evaluateTransition(propertyInvoiceGraph,'invalid','approve','processor')).toEqual({kind:'conflict'});
     expect(evaluateTransition(propertyInvoiceGraph,'sent','__proto__','merchant')).toEqual({kind:'conflict'});
+  });
+  test('subscription graphs use their persisted states and keep card verification separate from paid periods',()=>{
+    expect(subscriptionCardAttemptGraph.states).toEqual(['claiming','ready','approved','declined','abandoned']);
+    expect(subscriptionBillingAttemptGraph.states).toEqual(['claiming','unknown','approved','declined','abandoned']);
+    expect(subscriptionCardAttemptGraph.rules.approve.effects).not.toContain('paid_period_once');
+    expect(evaluateTransition(subscriptionBillingAttemptGraph,'claiming','start','system')).toEqual({kind:'claimed'});
   });
 });

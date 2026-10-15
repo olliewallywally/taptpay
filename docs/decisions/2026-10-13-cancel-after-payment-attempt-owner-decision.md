@@ -32,6 +32,11 @@ twice. They do not refuse the merchant because of an attempt.
    - If it was declined, the cancel goes ahead and the attempt is left open, as in rule 3.
      *Amended 2026-10-14 after review.* The first version closed it, which would lose a
      second card paid in the same session. Whether Windcave allows that is a UAT question.
+     *Status after the R3 integration (2026-10-14):* Codex's converged R3 (`3c98dfe9`) still
+     closes it. Any reconcile records a verified decline as the session's one settlement, so
+     a later approval in that session dead-letters as `settlement_conflict`. This is open
+     item T-3 in `../evidence/remediation-v2-2/r4/R3-INTEGRATION-2026-10-14.md`, for Codex
+     and the owner, and depends on the Windcave UAT answer.
 3. **If Windcave can't say yet, the cancel still goes ahead** (the owner's decision). This
    covers the customer still being on the payment page, and Windcave not being reachable.
    The open attempt is left able to settle. If the customer then finishes paying, the

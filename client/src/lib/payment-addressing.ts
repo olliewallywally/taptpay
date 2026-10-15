@@ -257,39 +257,6 @@ export function clearPaymentIdempotencyKey(
   storage.removeItem(attemptStorageKey(source, shareIndex));
 }
 
-/** The server's answer when this tab's attempt ended before any session was served. */
-export const PAYMENT_ATTEMPT_EXPIRED = "PAYMENT_ATTEMPT_EXPIRED";
-
-/** True only for that exact server code; apiRequest throws "<status>: <body>". */
-export function isPaymentAttemptExpired(error: unknown): boolean {
-  const text = error instanceof Error ? error.message : "";
-  const match = /^409: (.*)$/s.exec(text);
-  if (!match) return false;
-  try {
-    return JSON.parse(match[1])?.code === PAYMENT_ATTEMPT_EXPIRED;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Replace a share's key only while it is still the one the server refused as expired, so two requests
- * refused for the same key (the Apple Pay and Google Pay pre-sessions on load) adopt one replacement.
- */
-export function replaceExpiredPaymentIdempotencyKey(
-  source: CheckoutSource,
-  shareIndex: number,
-  refusedKey: string,
-  storage: StorageLike = window.sessionStorage,
-): string {
-  const key = attemptStorageKey(source, shareIndex);
-  const current = storage.getItem(key);
-  if (current && current !== refusedKey) return current;
-  const created = createOperationUuid();
-  storage.setItem(key, created);
-  return created;
-}
-
 /**
  * Move a locally-created attempt key onto the share index authoritatively
  * assigned by the server. The resolver snapshot can be stale when another

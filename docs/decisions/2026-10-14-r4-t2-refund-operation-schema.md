@@ -1,5 +1,7 @@
 # ADR — refund operations on `refunds` (R4-T2)
 
+**Renumbered (2026-10-14):** this migration was written as `0039` and is now `0048_refund_operations.sql`. Codex's completed R3 uses 0039–0047, which R4 keeps unchanged ([R3 integration](../evidence/remediation-v2-2/r4/R3-INTEGRATION-2026-10-14.md)).
+
 Date: 2026-10-14 UTC. Proposed by: the R2/R4 session. Status: **proposed, revision 3**
 (repository only; not applied to any shared database). Plan v2.2 §11.2–§11.4.
 
@@ -30,7 +32,7 @@ fee columns and a free-text `initiated_by` (preflight RD-10). Refund initiation 
 
 ## Decision
 
-Forward migration `0039_refund_operations.sql`, additive. No legacy column is dropped,
+Forward migration `0048_refund_operations.sql`, additive. No legacy column is dropped,
 renamed or retyped. Nothing about a legacy row changes, except that it gets an operation ID.
 
 ### Columns

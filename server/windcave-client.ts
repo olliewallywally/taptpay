@@ -59,13 +59,22 @@ export type CreateSessionOutcome =
   | { kind: "created"; sessionId: string; links: SessionLinks; rejectedLinks: number }
   /** The X-ID was already used: confirm the session by querying it, never from this body. */
   | { kind: "duplicate"; body: unknown }
-  | { kind: "rejected"; status: number }
+  /** `afterRetry`: an earlier try with the same X-ID failed without a reply, so this 4xx does
+   * not prove that no session was created (R3 integration B-1). */
+  | { kind: "rejected"; status: number; afterRetry?: true }
   /** The provider may have accepted the session. */
   | { kind: "unknown"; reason: UnknownReason }
   | { kind: "malformed" }
   /** A callback or notification address is not on PUBLIC_ORIGIN; nothing was sent. */
   | { kind: "invalid_request" }
   | { kind: "disabled" };
+
+/** R3 integration B-1: the provider provably took no session request, so an attempt that
+ * recorded send intent for it may be released. Anything else may have created a session. */
+export function sessionRequestNotSent(outcome: CreateSessionOutcome): boolean {
+  return outcome.kind === "invalid_request" || outcome.kind === "disabled" ||
+    (outcome.kind === "rejected" && !outcome.afterRetry);
+}
 
 export type QuerySessionOutcome =
   | { kind: "reply"; body: unknown }
@@ -230,7 +239,7 @@ export function createWindcaveClient(deps: WindcaveClientDeps): WindcaveClient {
         }
         if (status >= 400) {
           record("CREATE_SESSION_REJECTED", { status });
-          return { kind: "rejected", status };
+          return attempt > 0 ? { kind: "rejected", status, afterRetry: true } : { kind: "rejected", status };
         }
         if (status !== 200 && status !== 202) {
           record("CREATE_SESSION_UNKNOWN", { reason: "unexpected_status", status });
@@ -254,7 +263,7 @@ export function createWindcaveClient(deps: WindcaveClientDeps): WindcaveClient {
         }
         const selected = selectSessionLinks(links, config.mode);
         record("CREATE_SESSION_CREATED", { links: links.length, rejectedLinks: selected.rejected });
-        return { kind: "created", sessionId, links: selected.links, rejectedLinks: selected.rejected };
+        return { kind: "created", sessionId, links:body?.state==='complete'?{}:selected.links, rejectedLinks: selected.rejected };
       }
     },
 

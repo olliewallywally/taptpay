@@ -5,6 +5,7 @@
 // turns a billing 402 into BillingCardRequiredError once the banner is raised.
 import { BillingCardRequiredError, notifyIfBillingCardRequired } from "./queryClient";
 import { businessCsrfHeader, sessionFetch } from "./session";
+import {creationFetch,isCreationRequest} from './creation-command';
 export function tradesHeaders(): HeadersInit {
   return businessCsrfHeader();
 }
@@ -12,7 +13,7 @@ export function tradesHeaders(): HeadersInit {
 let redirecting = false;
 
 export async function tradesFetch(url: string, init: RequestInit = {}): Promise<Response> {
-  const res = await sessionFetch(url, init);
+  const res = await (isCreationRequest(url,init.method)?creationFetch(url,init):sessionFetch(url,init));
   if (notifyIfBillingCardRequired(res)) throw new BillingCardRequiredError();
   if (res.status === 401) {
     if (!redirecting) {

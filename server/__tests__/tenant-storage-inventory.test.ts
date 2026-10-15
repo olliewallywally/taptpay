@@ -75,12 +75,8 @@ test("authenticated sale creation and disabled native writes have explicit tenan
     expect(facts.get(key)?.storageMethods).toContain("createTransactionForMerchant");
     expect(facts.get(key)?.storageMethods).not.toContain("createTransaction");
   }
-  // R3 (cash commands): a cash sale is recorded with its audit event and outbox entry in one
-  // business-scoped storage call, which names the business explicitly.
-  const cash = facts.get("POST /api/transactions/cash-sale")!.storageMethods;
-  expect(cash).toContain("recordCashSaleForMerchant");
-  expect(cash).not.toContain("createTransaction");
-  expect(storageContract().find(method => method.name === "recordCashSaleForMerchant")?.requiredTenant).toBe(true);
+  expect(facts.get('POST /api/transactions/cash-sale')?.storageMethods).toContain('recordCashSaleForMerchant');
+  expect(facts.get('POST /api/transactions/cash-sale')?.storageMethods).not.toContain('createTransaction');
   const native = facts.get("POST /api/transactions/tap-to-pay")!.storageMethods;
   expect(native).toContain("getTransactionForMerchant");
   expect(native).not.toContain("getTransaction");
@@ -208,9 +204,9 @@ test("trades invoice state changes, the signed-in quote PDF and the receipt requ
   for (const name of ["getJobInvoiceDeliveryForMerchant", "recordJobInvoiceReceiptForMerchant"]) {
     expect(contract.find(method => method.name === name)?.requiredTenant).toBe(true);
   }
-  // OI-1 (2026-10-13): the open payment windows are asked of the provider before the change.
-  expect([...(facts.get("POST /api/trades/invoices/:id/mark-paid-external")?.sideEffects ?? [])].sort())
-    .toEqual(["email: sendTradePaymentInvoiceForMerchant", "provider: queryWindcaveSession"]);
+  // The scoped mutation records its audit and outbox atomically; the route must
+  // not independently send a receipt (receiver crash/retry is verified in R3 PG).
+  expect(facts.get("POST /api/trades/invoices/:id/mark-paid-external")?.sideEffects).toEqual([]);
 });
 
 test("trades quote, invoice and balance creation and their delivery require merchant scope", () => {

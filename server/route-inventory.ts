@@ -440,6 +440,21 @@ export function isNotificationWebhookRegistration(method: string, routePath: str
  * analysis passes independently recommended for this class of route.
  */
 export const PUBLIC_PATH_ALLOWLIST: Record<string, string> = {
+  // R3 retained factories: exact same public routes, with actual handler facts
+  // followed across modules by route-facts.ts and reviewed in route-review.ts.
+  "POST /api/pay/t/:token/session":"bearer token and durable retail attempt in server/payment-checkout-handlers.ts",
+  "POST /api/pay/t/:token/hosted-fields-complete":"exact token/UUID/share/session binding and shared verifier/finalizer",
+  "POST /api/pay/t/:token/googlepay-complete":"same exact durable binding; once-only wallet command",
+  "GET /api/pay/return/:state":"hashed return state and narrow local outcome; shared reconciliation",
+  "POST /api/transactions/:id/pay":"retained numeric board sale; token-addressed sales excluded; durable retail attempt",
+  "POST /api/transactions/:id/hosted-fields-complete":"exact numeric-sale UUID/share/session binding",
+  "POST /api/transactions/:id/googlepay-complete":"exact numeric-sale binding and once-only wallet command",
+  "GET /api/windcave/callback":"hashed state must match the numeric sale; legacy incomplete identities stay held",
+  "POST /api/checkout/:token/split":"invoice bearer token with guarded split CAS",
+  "POST /api/checkout/:token/session":"invoice bearer token and concrete durable invoice/share attempt",
+  "POST /api/checkout/:token/hosted-fields-complete":"exact invoice-token UUID/share/session binding; shared worker",
+  "POST /api/checkout/:token/googlepay-complete":"same exact invoice binding; once-only wallet command",
+  "GET /api/checkout/callback":"invoice token and hashed state must identify the same persisted attempt",
   "GET /robots.txt": "static well-known text file, no middleware",
   "GET /.well-known/apple-developer-merchantid-domain-association":
     "Apple Pay domain-verification file Apple's own servers must fetch unauthenticated",

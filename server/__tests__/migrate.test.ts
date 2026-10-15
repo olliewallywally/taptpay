@@ -78,7 +78,15 @@ const REAL_MIGRATIONS = [
   "0036_durable_payment_reconciliation.sql",
   "0037_retail_payment_canonical_integration.sql",
   "0038_cash_command_identity.sql",
-  "0039_refund_operations.sql",
+  "0039_payment_wallet_submission.sql",
+  "0040_invoice_attempt_payer.sql",
+  "0041_invoice_share_reservations.sql",
+  "0042_payment_command_delivery.sql",
+  "0043_subscription_payment_attempts.sql",
+  "0044_subscription_identity_registry.sql",
+  "0045_provider_operation_keys.sql",
+  "0046_payment_delivery_targets.sql",
+  "0047_payment_creation_commands.sql",  "0048_refund_operations.sql",
 ];
 
 /** Migrations that own a `BEGIN;` / `COMMIT;` pair. */

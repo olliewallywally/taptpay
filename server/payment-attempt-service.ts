@@ -121,8 +121,7 @@ export interface FinalizePaymentAttemptRecordInput {
   outcome: PaymentAttemptOutcome;
   receiptShare: number | null;
   now: Date;
-  /** expectedProviderAccount: the account the binding resolved (H-1, Option A). */
-  reconciliation?: { claim: InboxClaim; evidence: VerifiedOutcome; expectedProviderAccount: string };
+  reconciliation?: { claim: InboxClaim; evidence: VerifiedOutcome };
 }
 
 export interface FinalizedPaymentAttemptEffects {
@@ -191,8 +190,7 @@ export class PaymentAttemptInputError extends Error {
       | "currency"
       | "merchantReference"
       | "providerEnvironment"
-      | "reconciliationCode"
-      | "reconciliation",
+      | "reconciliationCode",
     message: string,
   ) {
     super(message);
@@ -390,14 +388,8 @@ export class PaymentAttemptService {
     paymentMethod?: string | null;
     outcome: PaymentAttemptOutcome;
     receiptShare?: number | null;
-    reconciliation?: { claim: InboxClaim; evidence: VerifiedOutcome; expectedProviderAccount: string };
+    reconciliation?: { claim: InboxClaim; evidence: VerifiedOutcome };
   }): Promise<FinalizePaymentAttemptResult> {
-    if (input.reconciliation) {
-      const account = input.reconciliation.expectedProviderAccount;
-      if (typeof account !== "string" || account.length < 1 || account.length > 200) {
-        throw new PaymentAttemptInputError("reconciliation", "expectedProviderAccount must be 1-200 characters");
-      }
-    }
     assertUuid(input.attemptId, "attemptId");
     assertNonEmpty(input.processorSessionId, "processorSessionId");
     if (input.processorTransactionId !== undefined && input.processorTransactionId !== null) {

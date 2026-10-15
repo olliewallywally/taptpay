@@ -109,6 +109,7 @@ describe("desktop settings business-details save contract", () => {
     releaseSession("business");
     signInThisPage();
     sessionStorage.clear();
+    let operation=0;jest.spyOn(crypto,'randomUUID').mockImplementation(()=>`00000000-0000-4000-8000-${String(++operation).padStart(12,'0')}`);
     window.history.replaceState({}, "", "/settings");
     authRole = "owner";
     planId = "solo";
@@ -511,7 +512,7 @@ describe("desktop settings business-details save contract", () => {
 
     await user.click(screen.getByRole("button", { name: "Restart subscription" }));
     await waitFor(() => {
-      expect(apiRequestMock).toHaveBeenCalledWith("POST", "/api/billing/card/session", {});
+      expect(apiRequestMock).toHaveBeenCalledWith("POST", "/api/billing/card/session", {},{idempotencyKey:expect.stringMatching(/^[0-9a-f-]{36}$/)});
     });
   });
 

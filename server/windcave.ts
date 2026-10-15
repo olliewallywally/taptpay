@@ -278,10 +278,13 @@ interface CardOnFileRequestOptions {
   request?: WindcaveRequest;
   wait?: (ms: number) => Promise<void>;
   transactionPollLimit?: number;
+  /** R3: commit the accepted transaction identity before any polling request. */
+  onPendingTransaction?: (transactionId:string)=>Promise<void>;
 }
 
 export interface StoreCardSessionResult {
   success: boolean;
+  complete?:boolean;
   sessionId?: string;
   hppUrl?: string;
   error?: string;
@@ -302,6 +305,7 @@ export interface StoredCardSessionResult {
   approved?: boolean;
   card?: StoredCard;
   error?: string;
+  providerTransactionId?:string;
 }
 
 export interface ChargeStoredCardResult {
@@ -406,6 +410,9 @@ export async function createCardStorageSession(
   const text = await response.text();
   if (response.status === 202 || response.status === 200) {
     const data = parseWindcaveJson(text);
+    if(data?.state==='complete'&&typeof data.id==='string'&&/^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$/.test(data.id)){
+      return {success:true,sessionId:data.id,complete:true};
+    }
     // R2-T6: only the `hpp` relation, valid for this mode (R2-T2), goes to the browser;
     // no other REDIRECT link stands in for it.
     const links = Array.isArray(data?.links)
@@ -427,7 +434,7 @@ export async function createCardStorageSession(
 /** Reads back the card token once the shopper has finished the hosted form. */
 export async function queryStoredCardSession(
   sessionId: string,
-  options: Pick<CardOnFileRequestOptions, "request"> = {},
+  options: Pick<CardOnFileRequestOptions, "request"> & {expected?:{reference:string;providerAccount:string}} = {},
 ): Promise<StoredCardSessionResult> {
   logAudit("STORE_CARD_QUERY", { sessionId });
   // Provider ids are opaque path segments, never paths. Reject traversal-like
@@ -486,12 +493,31 @@ export async function queryStoredCardSession(
   }
   const tx = authorisedEntries[0] ?? transactions[0];
 
+  if(options.expected){
+    // R3 binds this zero-value verification to a pre-send subscription attempt.
+    // Preserve R2's owner-approved conditional-field contract; supplied echoes
+    // must match, and a durable terminal transaction identity is mandatory.
+    for(const entry of transactions){
+      const amount=entry.amount===undefined?undefined:parseCentsExact(entry.amount);
+      if((entry.id!==undefined && entry.transactionId!==undefined && storedCardTransactionId(entry.id)!==storedCardTransactionId(entry.transactionId)) ||
+        (amount!==undefined && (!amount.ok || amount.cents!==0)) ||
+        (entry.currency!==undefined && entry.currency!=='NZD') ||
+        (entry.merchantReference!==undefined && entry.merchantReference!==options.expected.reference) ||
+        (entry.username!==undefined && entry.username!==options.expected.providerAccount) ||
+        (entry.type!==undefined && entry.type!==CARD_ON_FILE_FIELDS.storeSessionType)){
+        writeSecurityAuditEvent('PROVIDER_OUTCOME_MISMATCH',{field:'card_expectation'});
+        return {success:false,error:'integrity_mismatch:card_expectation'};
+      }
+    }
+    if(!storedCardTransactionId(tx.id??tx.transactionId))return {success:false,error:'Stored-card verification has no durable transaction identity'};
+  }
+
   const approved = authorisedEntries.length === 1;
   const card = approved ? extractStoredCard(tx) : undefined;
   logAudit("STORE_CARD_QUERY_RESULT", { sessionId, approved, hasCard: !!card });
 
   if (!approved) {
-    return { success: true, complete: true, approved: false };
+    return { success: true, complete: true, approved: false,...(options.expected?{providerTransactionId:storedCardTransactionId(tx.id??tx.transactionId)}:{}) };
   }
   if (!card) {
     return {
@@ -499,7 +525,7 @@ export async function queryStoredCardSession(
       error: "Windcave stored-card session response did not include a stored card",
     };
   }
-  return { success: true, complete: true, approved: true, card };
+  return { success: true, complete: true, approved: true, card,...(options.expected?{providerTransactionId:storedCardTransactionId(tx.id??tx.transactionId)}:{}) };
 }
 
 /**
@@ -560,7 +586,13 @@ export async function chargeStoredCard(
       logAudit("CHARGE_STORED_CARD_PENDING_INVALID", { xId, bytes: text.length });
       return { success: false, error: "Windcave returned a pending transaction without an id" };
     }
-    return pollStoredCardCharge(xId, pollUrl, pending?.id ?? pending?.transactionId, { amount, merchantReference }, options);
+    const transactionId=storedCardTransactionId(pending?.id??pending?.transactionId)!;
+    try {await options.onPendingTransaction?.(transactionId);}
+    catch {
+      logAudit('CHARGE_STORED_CARD_IDENTITY_COMMIT_FAILED',{});
+      return {success:false,windcaveTransactionId:transactionId,error:'Stored-card transaction identity could not be persisted'};
+    }
+    return pollStoredCardCharge(xId, pollUrl, transactionId, { amount, merchantReference }, options);
   }
 
   if (response.status !== 200 && response.status !== 201) {
@@ -608,8 +640,12 @@ function finalStoredCardChargeResult(
   charged: StoredCardCharge,
   fallbackTransactionId?: string,
 ): ChargeStoredCardResult {
-  const rawTransactionId = data?.id ?? data?.transactionId ?? fallbackTransactionId;
-  const windcaveTransactionId = rawTransactionId ? String(rawTransactionId) : undefined;
+  const windcaveTransactionId = storedCardTransactionId(data?.id ?? data?.transactionId ?? fallbackTransactionId);
+  if(!windcaveTransactionId || (fallbackTransactionId!==undefined && windcaveTransactionId!==fallbackTransactionId) ||
+    (data?.id!==undefined && data?.transactionId!==undefined && storedCardTransactionId(data.id)!==storedCardTransactionId(data.transactionId))){
+    logAudit('CHARGE_STORED_CARD_INVALID_IDENTITY',{});
+    return {success:false,windcaveTransactionId:fallbackTransactionId,error:'Stored-card transaction identity could not be verified'};
+  }
 
   // `authorised` is Windcave's documented final outcome. A final response without it is an
   // incomplete/malformed provider response, not a card decline (which would burn
@@ -648,28 +684,24 @@ function finalStoredCardChargeResult(
  * platform credentials back to the configured Windcave origin/path; if a
  * malformed response supplies another host, reconstruct the URL from its id.
  */
+function storedCardTransactionId(value:unknown):string|undefined {
+  if(typeof value==='number' && (!Number.isSafeInteger(value) || value<=0))return undefined;
+  if(typeof value!=='string' && typeof value!=='number')return undefined;
+  const id=String(value);
+  return /^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$/.test(id)?id:undefined;
+}
 function transactionPollUrl(data: any): string | undefined {
-  const selfHref = Array.isArray(data?.links)
-    ? data.links.find((link: any) => link?.rel === "self" && (!link.method || link.method === "GET"))?.href
-    : undefined;
+  const id=storedCardTransactionId(data?.id??data?.transactionId);
+  if(data?.id!==undefined && data?.transactionId!==undefined && storedCardTransactionId(data.id)!==storedCardTransactionId(data.transactionId))return undefined;
+  return id?`${TRANSACTION_URL}/${id}`:undefined;
+}
 
-  if (typeof selfHref === "string") {
-    try {
-      const candidate = new URL(selfHref);
-      const configured = new URL(TRANSACTION_URL);
-      const transactionPath = `${configured.pathname.replace(/\/+$/, "")}/`;
-      if (candidate.origin === configured.origin && candidate.pathname.startsWith(transactionPath)) {
-        return candidate.toString();
-      }
-    } catch {
-      // Fall through to the provider transaction id below.
-    }
-  }
-
-  const transactionId = data?.id ?? data?.transactionId;
-  if (typeof transactionId !== "string" && typeof transactionId !== "number") return undefined;
-  const value = String(transactionId).trim();
-  return value ? `${TRANSACTION_URL}/${encodeURIComponent(value)}` : undefined;
+/** R3 recovery queries an accepted transaction without repeating its purchase. */
+export async function queryStoredCardCharge(xId:string,transactionId:string,amount:string,merchantReference:string,
+  options:CardOnFileRequestOptions={}):Promise<ChargeStoredCardResult> {
+  const url=transactionPollUrl({id:transactionId});
+  if(!url)return {success:false,error:'Stored-card transaction identity could not be verified'};
+  return pollStoredCardCharge(xId,url,transactionId,{amount,merchantReference},options);
 }
 
 async function pollStoredCardCharge(

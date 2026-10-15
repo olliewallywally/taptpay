@@ -1,99 +1,29 @@
-import "./support/test-env";
-import request from "supertest";
-import * as windcave from "../windcave";
-import { sseBroker } from "../sse-broker";
-import * as push from "../push";
-import { createOwnerPrincipal, createTestApp, resetTestStorage, storage } from "./support/http-harness";
-
-// R1-T7 continuation: the R1-T7 cross-tenant audit found that
-// POST /api/transactions/:id/hosted-fields-complete and
-// POST /api/transactions/:id/googlepay-complete only compare the
-// client-supplied sessionId against transaction.windcaveSessionId when that
-// field is already truthy — a transaction that has never had /pay called on
-// it (windcaveSessionId still null, its state from creation) skips the check
-// entirely, so ANY client-supplied sessionId is accepted and queried against
-// Windcave. A previously-approved session obtained elsewhere on the shared
-// platform Windcave account can then finalise an unrelated victim
-// transaction for free.
-describe("R1-T7 continuation — Windcave session binding on the legacy transaction payment routes", () => {
-  beforeEach(() => {
-    resetTestStorage();
-    jest.spyOn(windcave, "isWindcaveConfigured").mockReturnValue(true);
-    jest.spyOn(windcave, "queryWindcaveSession").mockResolvedValue({ success: true, approved: true, windcaveTransactionId: "wcx_foreign" });
-    jest.spyOn(sseBroker, "broadcast").mockImplementation(() => {});
-    jest.spyOn(push, "sendPushToMerchant").mockResolvedValue({ eligibleSubscriptions: 0, attempted: 0, delivered: 0, failed: 0 });
+import './support/durable-payments-env';
+import request from 'supertest';import {randomUUID} from 'node:crypto';
+import {PaymentAttemptService} from '../payment-attempt-service';
+import {syntheticRetailRuntime} from './support/retail-runtime';
+import {createOwnerPrincipal,createTestApp,resetTestStorage,storage} from './support/http-harness';
+beforeEach(()=>resetTestStorage());
+async function fixture(){
+  const owner=await createOwnerPrincipal(),sale=await storage.createTransaction({merchantId:owner.merchantId,itemName:'Session binding',price:'10.00',status:'pending',paymentMethod:'qr_code',splitEnabled:false} as any);
+  const port=syntheticRetailRuntime(storage,new PaymentAttemptService(storage)),{app}=await createTestApp({paymentRuntime:port.runtime});
+  return {sale,port,app,intent:{idempotencyKey:randomUUID(),shareIndex:0}};
+}
+describe.each(['hosted-fields-complete','googlepay-complete'])('R1 session binding through R3 (%s)',method=>{
+  test('a valid UUID cannot authorize a foreign session before an attempt is prepared',async()=>{
+    const f=await fixture();const response=await request(f.app).post(`/api/transactions/${f.sale.id}/${method}`).send({...f.intent,sessionId:'foreign-session'});
+    expect(response.status).toBe(404);expect(f.port.client.querySession).not.toHaveBeenCalled();expect((await storage.getTransaction(f.sale.id))?.status).toBe('pending');
   });
-
-  async function freshTransaction() {
-    const owner = await createOwnerPrincipal();
-    const transaction = await storage.createTransaction({
-      merchantId: owner.merchantId,
-      itemName: "Session-binding fixture",
-      price: "10.00",
-      status: "pending",
-      paymentMethod: "qr_code",
-      splitEnabled: false,
-    } as any);
-    return { owner, transaction };
-  }
-
-  test("hosted-fields-complete rejects a foreign session on a transaction that never bound one", async () => {
-    const { app } = await createTestApp();
-    const { transaction } = await freshTransaction();
-    expect(transaction.windcaveSessionId).toBeNull();
-
-    const response = await request(app)
-      .post(`/api/transactions/${transaction.id}/hosted-fields-complete`)
-      .send({ sessionId: "attacker-foreign-session" });
-
-    expect(response.status).toBe(403);
-    expect(windcave.queryWindcaveSession).not.toHaveBeenCalled();
-    const stored = await storage.getTransaction(transaction.id);
-    expect(stored?.status).toBe("pending");
+  test('a legacy row session without a concrete attempt cannot authorize completion',async()=>{
+    const f=await fixture();await storage.updateTransactionWindcaveSession(f.sale.id,'legacy-session','pending','legacy-x-id');
+    const response=await request(f.app).post(`/api/transactions/${f.sale.id}/${method}`).send({...f.intent,sessionId:'legacy-session'});
+    expect(response.status).toBe(404);expect(f.port.client.querySession).not.toHaveBeenCalled();expect((await storage.getTransaction(f.sale.id))?.status).toBe('pending');
   });
-
-  test("googlepay-complete rejects a foreign session on a transaction that never bound one", async () => {
-    const { app } = await createTestApp();
-    const { transaction } = await freshTransaction();
-    expect(transaction.windcaveSessionId).toBeNull();
-
-    const response = await request(app)
-      .post(`/api/transactions/${transaction.id}/googlepay-complete`)
-      .send({ sessionId: "attacker-foreign-session" });
-
-    expect(response.status).toBe(403);
-    expect(windcave.queryWindcaveSession).not.toHaveBeenCalled();
-    const stored = await storage.getTransaction(transaction.id);
-    expect(stored?.status).toBe("pending");
-  });
-
-  test("the legitimate flow is unaffected: a session bound by /pay is accepted by hosted-fields-complete", async () => {
-    const { app } = await createTestApp();
-    const { transaction } = await freshTransaction();
-    await storage.updateTransactionWindcaveSession(transaction.id, "legit-session", "pending", "legit-x-id");
-
-    const response = await request(app)
-      .post(`/api/transactions/${transaction.id}/hosted-fields-complete`)
-      .send({ sessionId: "legit-session" });
-
-    expect(response.status).toBe(200);
-    expect(response.body.approved).toBe(true);
-    const stored = await storage.getTransaction(transaction.id);
-    expect(stored?.status).toBe("completed");
-  });
-
-  test("the legitimate flow is unaffected: a session bound by /pay is accepted by googlepay-complete", async () => {
-    const { app } = await createTestApp();
-    const { transaction } = await freshTransaction();
-    await storage.updateTransactionWindcaveSession(transaction.id, "legit-session", "pending", "legit-x-id");
-
-    const response = await request(app)
-      .post(`/api/transactions/${transaction.id}/googlepay-complete`)
-      .send({ sessionId: "legit-session" });
-
-    expect(response.status).toBe(200);
-    expect(response.body.approved).toBe(true);
-    const stored = await storage.getTransaction(transaction.id);
-    expect(stored?.status).toBe("completed");
+  test('the actual prepared session settles once through the R2 verifier and original finalizer',async()=>{
+    const f=await fixture(),opened=await request(f.app).post(`/api/transactions/${f.sale.id}/pay`).send(f.intent);expect(opened.status).toBe(200);f.port.setObservation('approved');
+    const body={...f.intent,sessionId:opened.body.sessionId};
+    expect((await request(f.app).post(`/api/transactions/${f.sale.id}/${method}`).send(body)).body.approved).toBe(true);
+    expect((await request(f.app).post(`/api/transactions/${f.sale.id}/${method}`).send(body)).body.approved).toBe(true);
+    expect((await storage.getTransaction(f.sale.id))?.status).toBe('completed');expect(f.port.counts()).toEqual({creates:1,applications:1});
   });
 });

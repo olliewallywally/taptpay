@@ -5,6 +5,7 @@ import { config } from "./config";
 import { createRequestLogger } from "./request-log";
 import { BOARD_PRINT_PATH } from "./board-print";
 import { crossSiteGuard } from "./cross-site";
+import {isDurablePaymentNotificationPath} from './payment-notification-paths';
 
 /**
  * The HTTP pipeline every request passes through before the routes: security
@@ -76,6 +77,7 @@ export function createApp(options: { writeRequestLog: (line: string) => void }):
       req.path === "/accept-invite" ||
       /^\/(?:pay|split|checkout|receipt)\/t\//.test(req.path) ||
       /^\/pay\/return\//.test(req.path) ||
+      /^\/(?:r|payment\/result)\//.test(req.path) ||
       /^\/api\/pay\/(?:t|return)\//.test(req.path)
     ) {
       res.set({
@@ -91,14 +93,17 @@ export function createApp(options: { writeRequestLog: (line: string) => void }):
   // and for the board builder's Send to Print, which parses its own larger body only once the
   // sign-in is checked (server/board-print.ts; owner decision 2026-09-26).
   app.use((req, res, next) => {
-    if (req.path === '/api/windcave/notification' || req.path === BOARD_PRINT_PATH) {
+    if (isDurablePaymentNotificationPath(req.path) || req.path === BOARD_PRINT_PATH) {
       next();
     } else {
       express.json()(req, res, next);
     }
   });
 
-  app.use(express.urlencoded({ extended: false }));
+  app.use((req,res,next)=>{
+    if(isDurablePaymentNotificationPath(req.path))next();
+    else express.urlencoded({extended:false})(req,res,next);
+  });
 
   app.use(createRequestLogger(options.writeRequestLog));
 

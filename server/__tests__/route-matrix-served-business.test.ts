@@ -1,3 +1,4 @@
+import {randomUUID as requestCommandKey} from 'node:crypto';
 import {randomUUID} from "node:crypto";
 import "./support/test-env";
 
@@ -162,7 +163,7 @@ const RECIPES: Record<string, ServedRecipe> = {
   "POST /api/transactions": async (ctx) => {
     await paidMonth(ctx);
     return {
-      req: { method: "post", path: "/api/transactions", body: { merchantId: ctx.merchantId, itemName: "Flat white", price: "5.50" } },
+      req: { method: "post", path: "/api/transactions", headers: {"Idempotency-Key":requestCommandKey()}, body: { merchantId: ctx.merchantId, itemName: "Flat white", price: "5.50" } },
       status: 200,
       check: async (res) => {
         // A sale without a board has its own private link, given once, here.

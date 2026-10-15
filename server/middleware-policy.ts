@@ -60,7 +60,7 @@ export const MIDDLEWARE_POLICY: Record<RegistrationFile, readonly MiddlewarePoli
       runtimeName: "<anonymous>",
       purpose: "No caching and no referrer for bearer-addressed pages.",
       security:
-        "/accept-invite, /pay|split|checkout|receipt/t/…, /pay/return/… and /api/pay/t|return/… get " +
+        "/accept-invite, /pay|split|checkout|receipt/t/…, /pay/return/…, /r/…, /payment/result/… and /api/pay/t|return/… get " +
         "Cache-Control: private, no-store and Referrer-Policy: no-referrer, so a link's token never reaches " +
         "a shared cache or another site's referrer. Runs before the routes and the static/Vite serving.",
     },
@@ -69,19 +69,19 @@ export const MIDDLEWARE_POLICY: Record<RegistrationFile, readonly MiddlewarePoli
       mounts: "inline function",
       when: "always",
       runtimeName: "<anonymous>",
-      purpose: "JSON request bodies, except on /api/windcave/notification and /api/board-builder/submit.",
+      purpose: "JSON request bodies, except on the four durable payment notification patterns and /api/board-builder/submit.",
       security:
-        "express.json() with its default 100 KB limit. The Windcave notification route parses its own " +
-        "(urlencoded and JSON) and trusts none of it: it only re-queries the provider. The board builder's " +
+        "express.json() with its default 100 KB limit. The four payment notifications parse their own " +
+        "8 KB JSON/form bodies, persist hints before ACK and never choose a money outcome. The board builder's " +
         "Send to Print parses its own, up to 3 MB, only after authenticateToken (server/board-print.ts), so " +
         "no one signed out can make the server read a large body.",
     },
     {
       path: null,
-      mounts: "express.urlencoded(…)",
+      mounts: "inline function",
       when: "always",
-      runtimeName: "urlencodedParser",
-      purpose: "Form-encoded request bodies (extended: false, default 100 KB limit).",
+      runtimeName: "<anonymous>",
+      purpose: "Form-encoded request bodies except the four durable payment notification patterns (their own bounded parser).",
       security: "Flat key/value pairs only; no nested objects from a form body.",
     },
     {

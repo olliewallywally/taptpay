@@ -89,9 +89,12 @@ try {
   for (const status of ["pending", "processing", "completed", "cancelled", "failed", "refunded", "partially_refunded"]) {
     await check(`cancellation preserves the ${status} state rule and financial fields`, async () => {
       const row = await sale(a, status);
-      const allowed = status === "pending" || status === "processing";
+      // R3 (docs/evidence/remediation-v2-2/r3/R3-TRANSITION-TABLES-2026-10-14.md): cancel is allowed from
+      // pending, processing and failed; a repeat of a cancelled sale returns the same terminal result.
+      const allowed = status === "pending" || status === "processing" || status === "failed";
       const result = await two.cancelTransactionForMerchant(row.id, a);
-      assert.deepEqual(result, allowed ? { kind: "cancelled", transaction: { ...row, status: "cancelled" } } : { kind: "conflict", status });
+      if (status === "cancelled") assert.deepEqual(result, { kind: "cancelled", transaction: row, reused: true });
+      else assert.deepEqual(result, allowed ? { kind: "cancelled", transaction: { ...row, status: "cancelled" } } : { kind: "conflict", status });
       assert.deepEqual(await one.getTransaction(row.id), allowed ? { ...row, status: "cancelled" } : row);
     });
   }
@@ -253,8 +256,9 @@ try {
   await check("two simultaneous cancellations produce one success", async () => {
     const row = await sale(a);
     const results = await Promise.all([one.cancelTransactionForMerchant(row.id, a), two.cancelTransactionForMerchant(row.id, a)]);
-    assert.equal(results.filter(result => result.kind === "cancelled").length, 1);
-    assert.deepEqual(results.find(result => result.kind === "conflict"), { kind: "conflict", status: "cancelled" });
+    // One cancels; the other returns the same terminal result as a replay (R3 transition tables).
+    assert.equal(results.filter(result => result.kind === "cancelled" && !result.reused).length, 1);
+    assert.equal(results.filter(result => result.kind === "cancelled" && result.reused).length, 1);
     assert.deepEqual(await one.getTransaction(row.id), { ...row, status: "cancelled" });
   });
 } finally { await Promise.all([pool.end(), writerPool.end()]); }

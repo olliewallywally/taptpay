@@ -57,6 +57,22 @@ describe("PaymentAttemptService with MemStorage", () => {
     }
   }
 
+  test('a failed bill can claim a fresh attempt after its prior outcome is terminal',async()=>{
+    const transaction=await storage.createTransaction(transactionInput());
+    const first=await service.claim({transactionId:transaction.id,shareIndex:0,idempotencyKey:KEY_ONE});
+    if(first.kind!=='claimed')throw Error('fixture');
+    (storage as any).paymentAttempts.get(first.attempt.id).state='declined';
+    (storage as any).paymentAttempts.get(first.attempt.id).outcome='declined';
+    (storage as any).transactions.get(transaction.id).status='failed';
+    expect((await service.claim({transactionId:transaction.id,shareIndex:0,idempotencyKey:KEY_TWO})).kind).toBe('claimed');
+  });
+  test('splitting refuses a claimed full-amount provider target without changing the parent',async()=>{
+    const transaction=await storage.createTransaction(transactionInput({splitEnabled:true}));
+    const claim=await service.claim({transactionId:transaction.id,shareIndex:0,idempotencyKey:KEY_ONE});if(claim.kind!=='claimed')throw Error('fixture');
+    await expect(storage.createBillSplit(transaction.id,2)).rejects.toBeInstanceOf(BillSplitConflictError);
+    expect((await storage.getTransaction(transaction.id))?.isSplit).toBe(false);expect(await storage.getSplitPaymentsByTransaction(transaction.id)).toEqual([]);
+  });
+
   test("claims one live attempt, reuses the same key, and abandons an expired lease", async () => {
     const transaction = await storage.createTransaction(transactionInput());
 

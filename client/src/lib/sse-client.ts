@@ -15,6 +15,7 @@ export class SSEClient {
   private pageHide: (() => void) | null = null;
   private pageShow: ((event: PageTransitionEvent) => void) | null = null;
   private listeners = new Map<string, Listener[]>();
+  private seen=new Set<string>();
 
   private closeTransport() {
     if (this.pageHide) window.removeEventListener('pagehide', this.pageHide);
@@ -30,6 +31,14 @@ export class SSEClient {
   private dispatch(raw: string) {
     try {
       const message: SSEMessage = JSON.parse(raw);
+      if(typeof message.eventId==='string'&&/^[0-9a-f-]{36}$/i.test(message.eventId)){
+        try{const saved=JSON.parse(sessionStorage.getItem('taptpay/realtime-events/v1')||'[]');
+          if(Array.isArray(saved))for(const id of saved.slice(-500))if(typeof id==='string')this.seen.add(id);
+        }catch{/* Storage is optional; in-memory replay protection still applies. */}
+        if(this.seen.has(message.eventId))return;
+        this.seen.add(message.eventId);while(this.seen.size>500)this.seen.delete(this.seen.values().next().value!);
+        try{sessionStorage.setItem('taptpay/realtime-events/v1',JSON.stringify([...this.seen]));}catch{/* No credentials or receipt data are stored here. */}
+      }
       const callbacks = this.listeners.get(message.type) || [];
       callbacks.forEach((callback) => callback(message));
     } catch (error) {

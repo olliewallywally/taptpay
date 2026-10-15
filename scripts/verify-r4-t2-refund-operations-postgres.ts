@@ -1,5 +1,5 @@
 /**
- * R4-T2 on actual PostgreSQL: migration 0039 (refund operations on `refunds`) from an empty
+ * R4-T2 on actual PostgreSQL: migration 0048 (refund operations on `refunds`) from an empty
  * database, with a non-UTC session time zone throughout. It applies over legacy rows of any
  * shape (including R1's mismatched ones); legacy rows and every legacy writer are untouched;
  * and every rule of the ADR's operation shape and state graph accepts what it should and
@@ -26,7 +26,7 @@ const url = new URL(testDatabaseUrl);
 assert.ok(["127.0.0.1", "localhost", "[::1]"].includes(url.hostname));
 assert.match(decodeURIComponent(url.pathname.slice(1)), /^taptpay_s\d_verify_[a-z0-9_]+$/);
 
-const MIGRATION = "0039_refund_operations.sql";
+const MIGRATION = "0048_refund_operations.sql";
 const readFileSync = (file: string) => readFileSyncFs(`migrations/${file}`, "utf8");
 // Every rule must hold whatever the session time zone (the 0037 lesson).
 const pool = new pg.Pool({ connectionString: testDatabaseUrl, max: 4, options: "-c TimeZone=Pacific/Auckland" });
@@ -55,13 +55,13 @@ try {
 
   const client = await pool.connect();
   try {
-    // Every migration before 0039 through the runner, from a copy of the folder; 0023-0025
+    // Every migration before 0048 through the runner, from a copy of the folder; 0023-0025
     // take the (empty) upload-ownership inventory as in production.
     await runner.ensureMigrationLedger(client);
     const files = runner.listMigrationFiles();
     const position = files.indexOf(MIGRATION);
-    assert.ok(position >= 0, "0039 is present in the complete migration history");
-    assert.equal(position, files.length - 1, "0039 is the latest migration");
+    assert.ok(position >= 0, "0048 is present in the complete migration history");
+    assert.equal(position, files.length - 1, "0048 is the latest migration");
     const before = await mkdtemp(path.join(process.env.TMPDIR ?? os.tmpdir(), "r4t2-migrations-"));
     for (const file of files.slice(0, position)) await copyFile(`migrations/${file}`, path.join(before, file));
     for (const file of files) {
@@ -100,7 +100,7 @@ try {
     const legacy = (await legacyInsert(saleA, A)).rows[0].id as number;
     const mismatched = (await legacyInsert(saleA, B)).rows[0].id as number;
 
-    await check("0039 applies through the runner over legacy rows of any shape; they get an operation ID and stay legacy", async () => {
+    await check("0048 applies through the runner over legacy rows of any shape; they get an operation ID and stay legacy", async () => {
       await runner.applyMigration(client, MIGRATION, readFileSync(MIGRATION));
       const ledger = await client.query(`SELECT 1 FROM drizzle.applied_migrations WHERE filename = $1`, [MIGRATION]);
       assert.equal(ledger.rowCount, 1);
@@ -112,17 +112,17 @@ try {
         { operation_id: undefined, state: null, attempt_count: 0, status: "pending", refund_amount: "5.00" });
     });
 
-    await check("0039's baseline contract finds every effect it declares", async () => {
+    await check("0048's baseline contract finds every effect it declares", async () => {
       const { findMissingBaselineEffects } = await import("../server/migration-baseline-contract");
       assert.deepEqual(await findMissingBaselineEffects(client, [MIGRATION]), []);
     });
 
-    await check("re-running 0039's body refuses the existing shape", async () => {
+    await check("re-running 0048's body refuses the existing shape", async () => {
       const body = readFileSync(MIGRATION).replace(/^BEGIN;$/m, "").replace(/^COMMIT;$/m, "");
       await client.query("BEGIN");
       const error = await sqlError(() => client.query(body));
       await client.query("ROLLBACK");
-      assert.match(error.message, /0039 aborted: a refund operation column or function already exists/);
+      assert.match(error.message, /0048 aborted: a refund operation column or function already exists/);
     });
 
     await check("the legacy writers still work: create (scoped and not), complete with a provider ID, fail, and R1's ownership move", async () => {

@@ -54,6 +54,7 @@ export default function PropertyTerminal() {
   const [toastMsg, setToastMsg]           = useState<string | null>(null);
   const [banner, setBanner]               = useState<string | null>(null);
   const [successLabel, setSuccessLabel]   = useState('');
+  const [successDelivered,setSuccessDelivered]=useState(false);
   const [frequency, setFrequency]         = useState('once');
   const [splitMode, setSplitMode]         = useState(false);
   const [busyScheduleId, setBusyScheduleId] = useState<string | null>(null);
@@ -101,7 +102,7 @@ export default function PropertyTerminal() {
       const now = new Date();
       const due = new Date(now); due.setDate(due.getDate() + 7);
       // 1. Send the first request immediately
-      const r = await fetch(apiPath("POST /api/property/invoices"), {
+      const r = await propFetch(apiPath("POST /api/property/invoices"), {
         method: 'POST', headers: { 'Content-Type': 'application/json', ...propHeaders() },
         body: JSON.stringify({ tenantProfileId: tenantId, amountCents, deliveryChannel: channel, dueAt: due.toISOString(), splitEnabled: !!split }),
       });
@@ -125,7 +126,8 @@ export default function PropertyTerminal() {
       }
       return invoice;
     },
-    onSuccess: (_, vars: any) => {
+    onSuccess: (invoice, vars: any) => {
+      setSuccessDelivered(invoice.delivered===true);
       queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/property/invoices")] });
       if (vars?.freq && vars.freq !== 'once') queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/property/schedules")] });
       setSuccessLabel(selectedTenant?.email || selectedTenant?.phone || '');
@@ -146,7 +148,7 @@ export default function PropertyTerminal() {
   const billMutation = useMutation({
     mutationFn: async ({ tenantId, amountCents, channel, chargeType, description, dueDays, split, documentUrl, documentName }: any) => {
       const due = new Date(); due.setDate(due.getDate() + (dueDays || 0));
-      const r = await fetch(apiPath("POST /api/property/invoices"), {
+      const r = await propFetch(apiPath("POST /api/property/invoices"), {
         method: 'POST', headers: { 'Content-Type': 'application/json', ...propHeaders() },
         body: JSON.stringify({
           tenantProfileId: tenantId, amountCents, deliveryChannel: channel,
@@ -161,7 +163,8 @@ export default function PropertyTerminal() {
       }
       return r.json();
     },
-    onSuccess: () => {
+    onSuccess: (invoice) => {
+      setSuccessDelivered(invoice.delivered===true);
       queryClient.invalidateQueries({ queryKey: [apiPath("GET /api/property/invoices")] });
       setSuccessLabel(selectedTenant?.email || selectedTenant?.phone || '');
       setSuccessKind('bill');
@@ -550,6 +553,7 @@ export default function PropertyTerminal() {
     feedOpen={feedOpen}
     successLabel={successLabel}
     successKind={successKind}
+    successDelivered={successDelivered}
     banner={banner}
     toastMessage={toastMsg}
     rowAction={rowAction}

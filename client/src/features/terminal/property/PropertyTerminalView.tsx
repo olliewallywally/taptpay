@@ -1127,8 +1127,8 @@ function BatchAndAutoScreen({ go, tenants, invoices, onBatchSend, sending, sched
 }
 
 /* ═══ SCREEN: SentSuccess ═══ */
-function SentSuccess({ amount, label, go, kind = 'rent' }: any) {
-  const title = kind === 'bill' ? 'bill sent' : 'rent link sent';
+function SentSuccess({ amount, label, go, kind = 'rent',delivered=true }: any) {
+  const title = delivered?(kind === 'bill' ? 'bill sent' : 'rent link sent'):(kind==='bill'?'bill created':'rent request created');
   return (
     <div className="tp-screen tp-feature" style={{ background: NAVY }}>
       <div className="stagger tp-hero" style={{ background: OFFW, color: NAVY, display: 'flex', flexDirection: 'column' }}>
@@ -1141,7 +1141,8 @@ function SentSuccess({ amount, label, go, kind = 'rent' }: any) {
       </div>
       <div className="stagger tp-panel" style={{ background: NAVY }}>
         <div className="tp-panel-body" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%' }}>
-        <div style={{ color: BLUE, fontWeight: 900, fontSize: 42, letterSpacing: '-0.04em' }}>sent</div>
+        <div style={{ color: BLUE, fontWeight: 900, fontSize: 42, letterSpacing: '-0.04em' }}>{delivered?'sent':'created'}</div>
+        {!delivered&&<div role="status">Delivery is still being checked.</div>}
         <div className="tp-success-check tp-pulse" style={{ marginTop: 14 }}><Ic.Check sz={40} sw={3.2} /></div>
         {label && <div style={{ marginTop: 18, color: 'rgba(88,171,255,0.85)', fontWeight: 500, fontSize: 14 }}>{label}</div>}
         <div style={{ flex: 1 }} />
@@ -1245,6 +1246,7 @@ export type PropertyTerminalViewProps = {
   feedOpen: boolean;
   successLabel: string;
   successKind: 'rent' | 'bill';
+  successDelivered?:boolean;
   banner: string | null;
   toastMessage: string | null;
   rowAction: any;
@@ -1376,6 +1378,7 @@ export function PropertyTerminalView(props: PropertyTerminalViewProps) {
     if (id === 'success') return <SentSuccess
       amount={props.amount} label={props.successLabel} go={props.onNavigate}
       kind={props.successKind}
+      delivered={props.successDelivered}
     />;
     return null;
   };

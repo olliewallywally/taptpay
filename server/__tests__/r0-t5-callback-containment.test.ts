@@ -41,13 +41,17 @@ describe("R0-T5 callback containment", () => {
     expectNoEffects(spies);
   });
 
-  test.each(["get", "post", "put", "patch", "delete", "head", "options"] as const)("disabled-provider notification %s never performs even temporary writes", async method => {
+  test.each(["get", "post", "put", "patch", "delete", "head", "options"] as const)("notification %s refuses without durable storage or for an unsupported method", async method => {
     const { app } = await createTestApp();
     const { spies } = await fixture();
     for (let retry = 0; retry < 2; retry++) {
-      const responses = await Promise.all(Array.from({ length: 3 }, () => request(app)[method]("/api/windcave/notification").query({ sessionid: "synthetic-persisted-session" })));
-      expect(responses.map(response => response.status)).toEqual([200, 200, 200]);
-      // The notification acknowledges before its async work; allow that work to finish.
+      const responses = await Promise.all(Array.from({ length: 3 }, () => {
+        const call=request(app)[method]("/api/windcave/notification").query({ sessionid: "synthetic-persisted-session" });
+        return method==='post'?call.send({sessionId:'synthetic-persisted-session'}):call;
+      }));
+      const status=method==='get'||method==='post'?503:405;
+      expect(responses.map(response => response.status)).toEqual([status,status,status]);
+      // No durable storage means no successful ACK, even with initiation off.
       await new Promise<void>(resolve => setImmediate(resolve));
     }
     expectNoEffects(spies);
@@ -58,8 +62,8 @@ describe("R0-T5 callback containment", () => {
     const { transaction, spies } = await fixture(false);
     jest.spyOn(windcave, "isWindcaveConfigured").mockReturnValue(true);
     const response = await request(app).get("/api/windcave/callback").query({ transactionId: transaction.id, sessionid: "unpersisted-browser-session", result: "approved" });
-    expect(response.status).toBe(302);
-    expect(response.headers.location).toBe(`/payment/result/${transaction.id}?status=pending`);
+    expect(response.status).toBe(409);
+    expect(response.status).toBe(409);expect(response.headers.location).toBeUndefined();
     expectNoEffects(spies);
   });
 
@@ -83,17 +87,17 @@ describe("R0-T5 callback containment", () => {
     const { app } = await createTestApp();
     const { transaction, spies } = await fixture();
     const response = await request(app).get("/api/windcave/callback").query({ transactionId: transaction.id, sessionid: "synthetic-persisted-session", result: "cancelled" });
-    expect(response.headers.location).toBe(`/payment/result/${transaction.id}?status=pending`);
+    expect(response.status).toBe(409);expect(response.headers.location).toBeUndefined();
     expectNoEffects(spies);
   });
 
-  test("provider query failure never finalizes payment as declined", async () => {
+  test("a legacy failed-query reply cannot finalize without durable return identity", async () => {
     const { app } = await createTestApp();
     const { transaction, spies } = await fixture();
     jest.spyOn(windcave, "isWindcaveConfigured").mockReturnValue(true);
     jest.mocked(windcave.queryWindcaveSession).mockResolvedValue({ success: false, error: "Synthetic transport failure" });
     const response = await request(app).get("/api/windcave/callback").query({ transactionId: transaction.id });
-    expect(response.headers.location).toBe(`/payment/result/${transaction.id}?status=pending`);
+    expect(response.status).toBe(409);expect(response.headers.location).toBeUndefined();
     expect(spies[1]).not.toHaveBeenCalled();
     expect(spies[2]).not.toHaveBeenCalled();
     expect(spies[3]).not.toHaveBeenCalled();
@@ -102,7 +106,7 @@ describe("R0-T5 callback containment", () => {
     expect(push.sendPushToMerchant).not.toHaveBeenCalled();
   });
 
-  test("a provider client that throws leaves the session reconcilable, not stranded in processing", async () => {
+  test("a legacy throwing wrapper cannot change a session without durable return identity", async () => {
     const { app } = await createTestApp();
     const { transaction, spies } = await fixture();
     jest.spyOn(windcave, "isWindcaveConfigured").mockReturnValue(true);
@@ -110,7 +114,7 @@ describe("R0-T5 callback containment", () => {
 
     const response = await request(app).get("/api/windcave/callback").query({ transactionId: transaction.id });
 
-    expect(response.headers.location).toBe(`/payment/result/${transaction.id}?status=pending`);
+    expect(response.status).toBe(409);expect(response.headers.location).toBeUndefined();
     // 'processing' would be terminal: the notification handler refuses anything
     // that is not 'pending', so the session could never be resolved again.
     expect((await storage.getTransaction(transaction.id))?.windcaveSessionState).toBe("pending");
@@ -125,12 +129,12 @@ describe("R0-T5 callback containment", () => {
 
     const response = await request(app).get("/api/windcave/callback").query({ transactionId: transaction.id });
 
-    expect(response.headers.location).toBe(`/payment/result/${transaction.id}?status=pending`);
+    expect(response.status).toBe(409);expect(response.headers.location).toBeUndefined();
     expect((await storage.getTransaction(transaction.id))?.windcaveSessionState).toBe("pending");
     for (const spy of spies.slice(1)) expect(spy).not.toHaveBeenCalled();
   });
 
-  test("an outcome the provider already settled is still readable while the provider is disabled", async () => {
+  test("legacy cached approval without durable identity cannot become a paid receipt", async () => {
     const { app } = await createTestApp();
     const { transaction, spies } = await fixture();
     await storage.updateTransactionSessionState(transaction.id, "approved");
@@ -138,9 +142,9 @@ describe("R0-T5 callback containment", () => {
 
     const response = await request(app).get("/api/windcave/callback").query({ transactionId: transaction.id });
 
-    // Persisted provider truth, not a browser claim — a customer who genuinely
-    // paid must not be parked on "pending" because the gate is off.
-    expect(response.headers.location).toBe(`/receipt/${transaction.id}`);
+    // Legacy cached state alone is not an owned, verified attempt. Actual
+    // retained-attempt completion with flags off is covered by R3 fault tests.
+    expect(response.status).toBe(409);expect(response.headers.location).toBeUndefined();
     expectNoEffects(spies);
   });
 

@@ -86,10 +86,11 @@ describe("R1-T2 — an ALL registration, expanded to every method it can receive
       const response = await (request(app) as any)[method](withUnknownSession(routePath));
       await afterTheHandlerFinishes();
 
-      expect(response.status).toBe(200);
+      const expected=method==='get'?503:method==='post'?415:405;
+      expect(response.status).toBe(expected);
       // HEAD carries no body; every other method gets the handler's own "OK",
       // not the router's 404 page or an error.
-      if (method !== "head") expect(response.text).toBe("OK");
+      if (method !== "head") expect(response.text).toBe(expected===503?'Receipt unavailable':expected===415?'Unsupported media type':'Method not allowed');
       expect(storageSnapshot()).toBe(before);
       expect(globalThis.fetch).not.toHaveBeenCalled();
       expect(sseBroker.broadcast).not.toHaveBeenCalled();

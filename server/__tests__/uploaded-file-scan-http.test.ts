@@ -142,7 +142,7 @@ describe("R1-T7 S6a — a stored document with no clean scan is kept from every 
     seedProperty(fake, owner.merchantId);
     const name = await make(owner);
     const documentUrl = `/uploads/invoices/${name}`;
-    const invoice = await request(app).post("/api/property/invoices").set(signedIn(owner))
+    const invoice = await request(app).post("/api/property/invoices").set(signedIn(owner)).set("Idempotency-Key",crypto.randomUUID())
       .send({ tenantProfileId: TENANT, amountCents: 5000, deliveryChannel: "email", dueAt: new Date(Date.now() + 86_400_000).toISOString(), kind: "charge", chargeType: "utilities", description: "Power", documentUrl, documentName: "bill.pdf" });
     expect({ status: invoice.status, body: invoice.body }).toEqual({ status: 400, body: { message: "Invalid document attachment" } });
     const quote = await request(app).post("/api/trades/quotes").set(signedIn(owner))

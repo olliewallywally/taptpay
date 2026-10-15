@@ -1,10 +1,10 @@
 # R1-T7 tenant/storage execution inventory
 
-Generated from working-tree sources on base `b08d39e62b306416c9045b2c413acd544b6c2d98`; the phase evidence names the final commit.
+Generated from working-tree sources on base `8b7c300eb852990bc22c869323b7f30cecd697d1`; the phase evidence names the final commit.
 
 Registrations: **194**; registrations with session/admin authentication: **122**;
 registrations calling checkMerchantOwnership: **25**.
-IStorage: **265** declared methods;
+IStorage: **266** declared methods;
 PaymentAttemptRepository: **10** inherited methods.
 
 Classifications come from the reviewed per-route branches, including mixed public/signed-in routes.
@@ -20,11 +20,11 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 
 | Registration | Reviewed scope(s) | Storage calls in handler/helpers |
 |---|---|---|
-| ALL /api/billing/card/notification | provider (provider/none) | — |
-| ALL /api/pay/notification/:state | provider (provider/token) | `getSplitPaymentsByTransaction`, `getTransaction` |
-| ALL /api/windcave/notification | provider (provider/provider-session) | `getNextPendingSplit`, `getTransaction`, `getTransactionByWindcaveSessionId`, `incrementTransactionCount`, `updateSplitPaymentStatus`, `updateTransactionSessionState`, `updateTransactionStatus` |
-| ALL /api/windcave/rent-notification | provider (provider/provider-session) | `atomicClaimSplitShare`, `getInvoiceRentRequest`, `getInvoiceRentRequestByWindcaveSessionId`, `getInvoiceSplitSession`, `getMerchant`, `getPaidInvoiceSplitPayerEmails`, `getTenantProfile`, `logTransactionEvent`, `markInvoiceSplitSessionPaid`, `updateInvoiceRentRequest` |
-| ALL /api/windcave/trades-notification | provider (provider/provider-session) | `atomicClaimJobSplitShare`, `atomicClaimSplitShare`, `createJobEvent`, `getInvoiceRentRequest`, `getInvoiceSplitSession`, `getJobInvoice`, `getJobInvoiceByWindcaveSessionId`, `getMerchant`, `getPaidInvoiceSplitPayerEmails`, `getTenantProfile`, `logTransactionEvent`, `markInvoiceSplitSessionPaid`, `updateInvoiceRentRequest`, `updateJobInvoice` |
+| ALL /api/billing/card/notification | provider (provider/provider-session) | — |
+| ALL /api/pay/notification/:state | provider (provider/provider-session) | — |
+| ALL /api/windcave/notification | provider (provider/provider-session) | — |
+| ALL /api/windcave/rent-notification | provider (provider/provider-session) | — |
+| ALL /api/windcave/trades-notification | provider (provider/provider-session) | — |
 | DELETE /api/billing/card | tenant (merchant/session) | `removeSubscriptionCard` |
 | DELETE /api/merchants/:id/logo | tenant (merchant/path-merchant) | `deleteUploadedFile`, `getMerchant`, `updateMerchantLogoUrl` |
 | DELETE /api/merchants/:merchantId/stock-items/:itemId | tenant (merchant/path-merchant) | `deleteStockItemForMerchant`, `getStockItemForMerchant` |
@@ -54,8 +54,8 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | GET /api/auth/session | public (public/session) | `getMerchant`, `getOrCreateSubscription` |
 | GET /api/auth/validate-reset-token/:token | single-resource bearer (public-bearer/token) | — |
 | GET /api/billing/card | tenant (merchant/session) | `getMerchant`, `getOrCreateSubscription` |
-| GET /api/billing/card/callback | public (public/none) | — |
-| GET /api/checkout/callback | single-resource bearer (public-bearer/token) | `atomicClaimJobSplitShare`, `atomicClaimSplitShare`, `createJobEvent`, `getInvoiceRentRequest`, `getInvoiceRentRequestByToken`, `getInvoiceSplitSession`, `getJobInvoice`, `getJobInvoiceByToken`, `getMerchant`, `getPaidInvoiceSplitPayerEmails`, `getTenantProfile`, `logTransactionEvent`, `markInvoiceSplitSessionPaid`, `updateInvoiceRentRequest`, `updateJobInvoice` |
+| GET /api/billing/card/callback | single-resource bearer (public-bearer/token) | — |
+| GET /api/checkout/callback | single-resource bearer (public-bearer/token) | — |
 | GET /api/checkout/document/:token | single-resource bearer (public-bearer/token) | `consumeInvoiceDocumentReadLimit`, `getCleanUploadedFileForMerchant`, `getInvoiceRentRequestByToken`, `getJobInvoiceByToken` |
 | GET /api/checkout/resolve/:token | single-resource bearer (public-bearer/token) | `cleanUploadedFileOwnedByMerchant`, `getActiveSchedule`, `getClientProfile`, `getInvoiceRentRequestByToken`, `getJobInvoiceByToken`, `getMerchant`, `getQuote`, `getTenantProfile` |
 | GET /api/internal/cron/status | scheduler (cron/none) | — |
@@ -98,7 +98,7 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | GET /api/trades/invoices | tenant (merchant/session) | `getJobInvoicesByMerchant` |
 | GET /api/trades/quotes | tenant (merchant/session) | `getQuotesByMerchant` |
 | GET /api/trades/quotes/:id/pdf | tenant (merchant/resource) | `getMerchant`, `getQuoteDeliveryForMerchant` |
-| GET /api/trades/quotes/token/:token | single-resource bearer (public-bearer/token) | `createJobEvent`, `getClientProfile`, `getJobInvoicesByQuote`, `getMerchant`, `getQuoteByToken`, `updateQuote` |
+| GET /api/trades/quotes/token/:token | single-resource bearer (public-bearer/token) | `getClientProfile`, `getJobInvoicesByQuote`, `getMerchant`, `getQuoteByToken`, `recordQuoteViewForMerchant` |
 | GET /api/trades/quotes/token/:token/pdf | single-resource bearer (public-bearer/token) | `getClientProfile`, `getMerchant`, `getQuoteByToken` |
 | GET /api/trades/reminder-settings | tenant (merchant/session) | `getMerchant` |
 | GET /api/trades/schedules | tenant (merchant/session) | `getJobSchedulesByMerchant` |
@@ -107,7 +107,7 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | GET /api/transactions/:transactionId/refunds | tenant (merchant/resource) | `getRefundsForTransactionForMerchant`, `getTransactionForMerchant` |
 | GET /api/tutorial/state | tenant (merchant/session) | `getMerchant`, `getMerchantTutorialProgress` |
 | GET /api/v1/transactions/:id | API-key tenant (api-key/resource) | `getApiKeyByKey`, `getTransactionForMerchant`, `logApiRequest`, `updateApiKeyLastUsed` |
-| GET /api/windcave/callback | public (public/number) | `getNextPendingSplit`, `getTransaction`, `getTransactionByWindcaveSessionId`, `incrementTransactionCount`, `updateSplitPaymentStatus`, `updateTransactionSessionState`, `updateTransactionStatus` |
+| GET /api/windcave/callback | single-resource bearer (public-bearer/token) | `getSplitPaymentsByTransaction`, `getTransaction` |
 | GET /api/windcave/env | public (public/none) | — |
 | GET /nfc/:merchantId | public (public/none) | — |
 | GET /nfc/:merchantId/stone/:stoneId | public (public/none) | — |
@@ -134,14 +134,14 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | POST /api/auth/resend-confirmation | account entry/recovery (public/mailbox) | `getMerchantByEmail`, `takeAuthThrottleSlot` |
 | POST /api/auth/reset-password | single-resource bearer (public-bearer/token) | `deactivatePushSubscriptionsForLogin`, `forgetAuthThrottle`, `getUserById` |
 | POST /api/auth/sign-out-everywhere | account (merchant/session) | `advanceUserSessionVersion`, `deactivatePushSubscriptionsForLogin` |
-| POST /api/billing/card/callback | public (public/none) | — |
-| POST /api/billing/card/confirm | tenant (merchant/session) | `completeSubscriptionCardSetup`, `countSeatsInUse`, `getSubscription` |
-| POST /api/billing/card/session | tenant (merchant/session) | `bindSubscriptionCardSession`, `getMerchant`, `getOrCreateSubscription` |
+| POST /api/billing/card/callback | single-resource bearer (public-bearer/token) | — |
+| POST /api/billing/card/confirm | tenant (merchant/session) | `countSeatsInUse`, `getSubscription` |
+| POST /api/billing/card/session | tenant (merchant/session) | `getMerchant`, `getOrCreateSubscription` |
 | POST /api/board-builder/submit | tenant (merchant/session) | `getMerchant`, `getTaptStoneForMerchant`, `settleAuthThrottle`, `takeAuthThrottleSlot` |
-| POST /api/checkout/:token/googlepay-complete | single-resource bearer (public-bearer/token) | `atomicClaimJobSplitShare`, `atomicClaimSplitShare`, `createJobEvent`, `getInvoiceRentRequest`, `getInvoiceRentRequestByToken`, `getInvoiceSplitSession`, `getJobInvoice`, `getJobInvoiceByToken`, `getMerchant`, `getPaidInvoiceSplitPayerEmails`, `getTenantProfile`, `logTransactionEvent`, `markInvoiceSplitSessionPaid`, `updateInvoiceRentRequest`, `updateJobInvoice` |
-| POST /api/checkout/:token/hosted-fields-complete | single-resource bearer (public-bearer/token) | `atomicClaimJobSplitShare`, `atomicClaimSplitShare`, `createJobEvent`, `getInvoiceRentRequest`, `getInvoiceRentRequestByToken`, `getInvoiceSplitSession`, `getJobInvoice`, `getJobInvoiceByToken`, `getMerchant`, `getPaidInvoiceSplitPayerEmails`, `getTenantProfile`, `logTransactionEvent`, `markInvoiceSplitSessionPaid`, `updateInvoiceRentRequest`, `updateJobInvoice` |
-| POST /api/checkout/:token/session | single-resource bearer (public-bearer/token) | `getClientProfile`, `getInvoiceRentRequestByToken`, `getJobInvoiceByToken`, `getMerchant`, `getTenantProfile`, `recordInvoiceSplitSession`, `updateInvoiceRentRequest`, `updateJobInvoice` |
-| POST /api/checkout/:token/split | single-resource bearer (public-bearer/token) | `getInvoiceRentRequestByToken`, `getJobInvoiceByToken`, `invoiceHasSplitSessions`, `updateInvoiceRentRequest`, `updateJobInvoice` |
+| POST /api/checkout/:token/googlepay-complete | single-resource bearer (public-bearer/token) | — |
+| POST /api/checkout/:token/hosted-fields-complete | single-resource bearer (public-bearer/token) | — |
+| POST /api/checkout/:token/session | single-resource bearer (public-bearer/token) | — |
+| POST /api/checkout/:token/split | single-resource bearer (public-bearer/token) | — |
 | POST /api/info-pack-leads | public (public/none) | `createInfoPackLead` |
 | POST /api/internal/cron | scheduler (cron/system) | — |
 | POST /api/merchants/:id/logo | tenant (merchant/path-merchant) | `deleteUploadedFile`, `saveUploadedFile`, `updateMerchantLogoUrl` |
@@ -149,15 +149,15 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | POST /api/merchants/:id/tapt-stones | tenant (merchant/path-merchant) | `createNextTaptStone`, `getMerchant`, `updateTaptStoneUrlsForMerchant` |
 | POST /api/merchants/:merchantId/stock-items | tenant (merchant/path-merchant) | `createStockItemForMerchant` |
 | POST /api/merchants/signup | account entry/recovery (public/mailbox) | `createMerchantWithSignup`, `getMerchantByEmail`, `getUserByEmail`, `takeAuthThrottleSlot` |
-| POST /api/pay/t/:token/googlepay-complete | single-resource bearer (public-bearer/token) | `getSplitPaymentsByTransaction`, `getTransaction` |
-| POST /api/pay/t/:token/hosted-fields-complete | single-resource bearer (public-bearer/token) | `getSplitPaymentsByTransaction`, `getTransaction` |
+| POST /api/pay/t/:token/googlepay-complete | single-resource bearer (public-bearer/token) | `getTransaction` |
+| POST /api/pay/t/:token/hosted-fields-complete | single-resource bearer (public-bearer/token) | `getTransaction` |
 | POST /api/pay/t/:token/receipt-pdf | single-resource bearer (public-bearer/token) | `getMerchant`, `getSplitPaymentsByTransaction` |
-| POST /api/pay/t/:token/session | single-resource bearer (public-bearer/token) | `getMerchant`, `getNextPendingSplit`, `getSplitPaymentsByTransaction`, `getTransaction`, `updateTransactionStatus` |
+| POST /api/pay/t/:token/session | single-resource bearer (public-bearer/token) | `getMerchant`, `getSplitPaymentsByTransaction`, `getTaptStoneForMerchant`, `getTransaction` |
 | POST /api/pay/t/:token/split | single-resource bearer (public-bearer/token) | `createBillSplit`, `getMerchant` |
-| POST /api/property/invoices | tenant (merchant/resource) | `cleanUploadedFileOwnedByMerchant`, `createOrReuseInvoiceRentRequestForMerchant`, `getInvoiceRentRequestForMerchant`, `getOrCreateSubscription`, `getTenantProfileForMerchant` |
-| POST /api/property/invoices/:id/mark-paid-external | tenant (merchant/resource) | `getInvoiceRentRequestForMerchant`, `getOpenInvoiceSessionsForMerchant`, `markInvoiceRentRequestPaidExternalForMerchant` |
+| POST /api/property/invoices | tenant (merchant/resource) | `cleanUploadedFileOwnedByMerchant`, `createOrReuseInvoiceRentRequestForMerchant`, `getCreationCommandForMerchant`, `getInvoiceRentRequestForMerchant`, `getOrCreateSubscription`, `getTenantProfileForMerchant` |
+| POST /api/property/invoices/:id/mark-paid-external | tenant (merchant/resource) | `getInvoiceRentRequestForMerchant`, `markInvoiceRentRequestPaidExternalForMerchant` |
 | POST /api/property/invoices/:id/resend | tenant (merchant/resource) | `getInvoiceRentRequestForMerchant`, `getOrCreateSubscription` |
-| POST /api/property/invoices/:id/void | tenant (merchant/resource) | `getInvoiceRentRequestForMerchant`, `getOpenInvoiceSessionsForMerchant`, `voidInvoiceRentRequestForMerchant` |
+| POST /api/property/invoices/:id/void | tenant (merchant/resource) | `getInvoiceRentRequestForMerchant`, `voidInvoiceRentRequestForMerchant` |
 | POST /api/property/invoices/document | tenant (merchant/session) | `saveScannedUploadedFile` |
 | POST /api/property/tenants | tenant (merchant/session) | `createTenantProfileForMerchant` |
 | POST /api/property/tenants/:id/archive | tenant (merchant/resource) | `archiveTenantProfileForMerchant`, `getTenantProfileForMerchant` |
@@ -176,26 +176,26 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | POST /api/trades/clients/:id/archive | tenant (merchant/resource) | `archiveClientProfileForMerchant`, `getClientProfileForMerchant` |
 | POST /api/trades/clients/:id/promote | tenant (merchant/resource) | `getClientProfileForMerchant`, `promoteClientProfileForMerchant` |
 | POST /api/trades/clients/:id/unarchive | tenant (merchant/resource) | `getClientProfileForMerchant`, `unarchiveClientProfileForMerchant` |
-| POST /api/trades/invoices | tenant (merchant/resource) | `cleanUploadedFileOwnedByMerchant`, `createJobInvoiceForMerchant`, `getClientProfileForMerchant`, `getJobInvoiceForMerchant`, `getOrCreateSubscription`, `getQuoteDeliveryForMerchant` |
+| POST /api/trades/invoices | tenant (merchant/resource) | `cleanUploadedFileOwnedByMerchant`, `createJobInvoiceForMerchant`, `getClientProfileForMerchant`, `getCreationCommandForMerchant`, `getJobInvoiceForMerchant`, `getOrCreateSubscription`, `getQuoteDeliveryForMerchant` |
 | POST /api/trades/invoices/:id/complete | tenant (merchant/resource) | `completeJobInvoiceForMerchant`, `getJobInvoiceForMerchant` |
-| POST /api/trades/invoices/:id/mark-paid-external | tenant (merchant/resource) | `getJobInvoiceForMerchant`, `getOpenInvoiceSessionsForMerchant`, `markJobInvoicePaidExternalForMerchant` |
+| POST /api/trades/invoices/:id/mark-paid-external | tenant (merchant/resource) | `getJobInvoiceForMerchant`, `markJobInvoicePaidExternalForMerchant` |
 | POST /api/trades/invoices/:id/send-balance | tenant (merchant/resource) | `createJobBalanceInvoiceForMerchant`, `getJobInvoiceForMerchant`, `getOrCreateSubscription` |
-| POST /api/trades/invoices/:id/void | tenant (merchant/resource) | `getJobInvoiceForMerchant`, `getOpenInvoiceSessionsForMerchant`, `voidJobInvoiceForMerchant` |
+| POST /api/trades/invoices/:id/void | tenant (merchant/resource) | `getJobInvoiceForMerchant`, `voidJobInvoiceForMerchant` |
 | POST /api/trades/quotes | tenant (merchant/resource) | `cleanUploadedFileOwnedByMerchant`, `createQuoteForMerchant`, `getClientProfileForMerchant`, `getMerchant`, `getOrCreateSubscription`, `getQuoteDeliveryForMerchant`, `recordQuoteDeliveryForMerchant` |
-| POST /api/trades/quotes/token/:token/respond | single-resource bearer (public-bearer/token) | `createJobEvent`, `createJobInvoice`, `getOrCreateSubscription`, `getQuoteByToken`, `updateQuote` |
+| POST /api/trades/quotes/token/:token/respond | single-resource bearer (public-bearer/token) | `getJobInvoiceForMerchant`, `getOrCreateSubscription`, `getQuoteByToken`, `respondToQuoteForMerchant` |
 | POST /api/trades/schedules | tenant (merchant/resource) | `createJobScheduleForMerchant`, `getClientProfileForMerchant`, `getOrCreateSubscription` |
-| POST /api/transactions | tenant (merchant/path-merchant) | `createTransactionForMerchant`, `getOrCreateSubscription`, `getTaptStoneForMerchant` |
-| POST /api/transactions/:id/cancel | tenant (merchant/resource) | `cancelTransactionForMerchant`, `getRetailCancellationContextForMerchant`, `getTransaction`, `getTransactionForMerchant` |
-| POST /api/transactions/:id/googlepay-complete | public (public/number) | `getNextPendingSplit`, `getTransaction`, `incrementTransactionCount`, `updateSplitPaymentStatus`, `updateTransactionPaymentMethod`, `updateTransactionSessionState`, `updateTransactionStatus` |
-| POST /api/transactions/:id/hosted-fields-complete | public (public/number) | `getNextPendingSplit`, `getTransaction`, `incrementTransactionCount`, `updateSplitPaymentStatus`, `updateTransactionPaymentMethod`, `updateTransactionSessionState`, `updateTransactionStatus` |
-| POST /api/transactions/:id/pay | public (public/number) | `getMerchant`, `getNextPendingSplit`, `getTaptStone`, `getTransaction`, `updateTransactionWindcaveSession` |
+| POST /api/transactions | tenant (merchant/path-merchant) | `createTransactionForMerchant`, `getCreationCommandForMerchant`, `getOrCreateSubscription`, `getTaptStoneForMerchant` |
+| POST /api/transactions/:id/cancel | tenant (merchant/resource) | `cancelTransactionForMerchant`, `getTransaction`, `getTransactionForMerchant` |
+| POST /api/transactions/:id/googlepay-complete | public (public/number) | `getTransaction` |
+| POST /api/transactions/:id/hosted-fields-complete | public (public/number) | `getTransaction` |
+| POST /api/transactions/:id/pay | public (public/number) | `getMerchant`, `getSplitPaymentsByTransaction`, `getTaptStoneForMerchant`, `getTransaction` |
 | POST /api/transactions/:id/receipt-pdf | public (public/number) | `getMerchant`, `getSplitPaymentById`, `getSplitPaymentsByTransaction`, `getTransaction` |
 | POST /api/transactions/:id/split | public (public/number) | `createBillSplit`, `getTransaction` |
 | POST /api/transactions/:transactionId/refunds | tenant (merchant/resource) | `createRefundForMerchant`, `getTransactionForMerchant`, `releaseRefundAmountForMerchant`, `reserveRefundAmountForMerchant`, `updateRefundStatusForMerchant` |
 | POST /api/transactions/cash-sale | tenant (merchant/path-merchant) | `getCashSaleByKeyForMerchant`, `getOrCreateSubscription`, `getTaptStoneForMerchant`, `recordCashSaleForMerchant` |
 | POST /api/transactions/tap-to-pay | tenant (merchant/path-merchant) | `createTransactionForMerchant`, `getActiveTransactionByMerchant`, `getOrCreateSubscription`, `getTransactionForMerchant`, `updateTransactionPaymentMethodForMerchant`, `updateTransactionStatusForMerchant` |
 | POST /api/tutorial/restart | tenant (merchant/session) | `restartMerchantTutorial` |
-| POST /api/v1/transactions | API-key tenant (api-key/key) | `createTransactionForMerchant`, `createWebhookDelivery`, `getApiKeyByKey`, `getOrCreateSubscription`, `logApiRequest`, `updateApiKeyLastUsed` |
+| POST /api/v1/transactions | API-key tenant (api-key/key) | `createTransactionForMerchant`, `getApiKeyByKey`, `getCreationCommandForMerchant`, `getOrCreateSubscription`, `logApiRequest`, `updateApiKeyLastUsed` |
 | POST /api/webhooks/whatsapp | provider (provider/provider-session) | `createJobEvent`, `getInvoiceRentRequestByWhatsappMessageId`, `getJobInvoiceByWhatsappMessageId`, `logTransactionEvent`, `updateInvoiceRentRequest`, `updateJobInvoice` |
 | PUT /api/merchants/:id | tenant (merchant/path-merchant) | `updateMerchantSettings` |
 | PUT /api/merchants/:id/change-password | account (merchant/path-merchant) | `deactivatePushSubscriptionsForLogin`, `getUserById`, `settleAuthThrottle`, `takeAuthThrottleSlot`, `updateUserPassword` |
@@ -208,7 +208,7 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | PUT /api/property/schedules/:id | tenant (merchant/resource) | `getActiveScheduleForMerchant`, `updateActiveScheduleForMerchant` |
 | PUT /api/property/tenants/:id | tenant (merchant/resource) | `getTenantProfileForMerchant`, `updateTenantProfileForMerchant` |
 | PUT /api/push/preferences | tenant (merchant/session) | `updatePushNotificationPreferences` |
-| PUT /api/subscription/plan | tenant (merchant/session) | `changeSubscriptionPlan`, `countSeatsInUse`, `getOrCreateSubscription` |
+| PUT /api/subscription/plan | tenant (merchant/session) | `changeSubscriptionPlan`, `countSeatsInUse`, `getOrCreateSubscription`, `getSubscription` |
 | PUT /api/team/:userId/status | tenant (merchant/resource) | `deactivatePushSubscriptionsForLogin`, `setTeamMemberStatus` |
 | PUT /api/trades/clients/:id | tenant (merchant/resource) | `getClientProfileForMerchant`, `updateClientProfileForMerchant` |
 | PUT /api/trades/gst-settings | tenant (merchant/session) | `updateMerchantSettings` |
@@ -251,14 +251,13 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | IStorage | deleteMerchant | no | `deleteMerchant(id: number): Promise<boolean>` |
 | IStorage | getTransaction | no | `getTransaction(id: number): Promise<Transaction \| undefined>` |
 | IStorage | getTransactionForMerchant | yes | `getTransactionForMerchant(id: number, merchantId: number): Promise<Transaction \| undefined>` |
-| IStorage | cancelTransactionForMerchant | yes | `cancelTransactionForMerchant(id: number, merchantId: number, now?: Date): Promise<TransactionCancellationResult>` |
-| IStorage | getRetailCancellationContextForMerchant | yes | `getRetailCancellationContextForMerchant(id: number, merchantId: number): Promise<RetailCancellationContext \| undefined>` |
-| IStorage | getOpenInvoiceSessionsForMerchant | yes | `getOpenInvoiceSessionsForMerchant(vertical: "property" \| "trades", invoiceId: string, merchantId: number): Promise<Array<{ sessionId: string; amountCents: number }>>` |
+| IStorage | cancelTransactionForMerchant | yes | `cancelTransactionForMerchant(id: number, merchantId: number, actor?: PaymentCommandActor): Promise<TransactionCancellationResult>` |
 | IStorage | getTransactionByPaymentTokenHash | no | `getTransactionByPaymentTokenHash(paymentTokenHash: string): Promise<Transaction \| undefined>` |
 | IStorage | getActiveTransactionByMerchant | yes | `getActiveTransactionByMerchant(merchantId: number, scope: ActiveTransactionScope): Promise<Transaction \| undefined>` |
 | IStorage | getTransactionByNfcSession | no | `getTransactionByNfcSession(nfcSessionId: string): Promise<Transaction \| undefined>` |
 | IStorage | createTransaction | no | `createTransaction(transaction: TransactionStorageInput): Promise<Transaction>` |
-| IStorage | createTransactionForMerchant | yes | `createTransactionForMerchant(merchantId: number, transaction: TransactionStorageInput): Promise<Transaction>` |
+| IStorage | createTransactionForMerchant | yes | `createTransactionForMerchant(merchantId: number, transaction: TransactionStorageInput,command?:CreationCommandIntent): Promise<Transaction>` |
+| IStorage | getCreationCommandForMerchant | yes | `getCreationCommandForMerchant(merchantId:number,key:string):Promise<typeof paymentCreationCommands.$inferSelect\|undefined>` |
 | IStorage | getCashSaleByKeyForMerchant | yes | `getCashSaleByKeyForMerchant(merchantId:number,idempotencyKey:string):Promise<Transaction\|undefined>` |
 | IStorage | recordCashSaleForMerchant | yes | `recordCashSaleForMerchant(merchantId:number,input:CashCommandInput,options?:{allowCreate?:boolean}):Promise<CashCommandResult>` |
 | IStorage | updateTransactionStatusForMerchant | yes | `updateTransactionStatusForMerchant(id: number, merchantId: number, status: string, windcaveTransactionId?: string): Promise<Transaction \| undefined>` |
@@ -315,14 +314,14 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | IStorage | getOrCreateSubscription | yes | `getOrCreateSubscription(merchantId: number): Promise<any>` |
 | IStorage | getSubscription | yes | `getSubscription(merchantId: number): Promise<any \| undefined>` |
 | IStorage | incrementTransactionCount | yes | `incrementTransactionCount(merchantId: number): Promise<void>` |
-| IStorage | cancelSubscription | yes | `cancelSubscription(merchantId: number, reason: string): Promise<CancelSubscriptionResult>` |
-| IStorage | resumeSubscription | yes | `resumeSubscription(merchantId: number): Promise<any>` |
+| IStorage | cancelSubscription | yes | `cancelSubscription(merchantId: number, reason: string,intent?:SubscriptionCommandIntent): Promise<CancelSubscriptionResult>` |
+| IStorage | resumeSubscription | yes | `resumeSubscription(merchantId: number,intent?:SubscriptionCommandIntent): Promise<any>` |
 | IStorage | getBillingHistory | yes | `getBillingHistory(merchantId: number, limit?: number): Promise<any[]>` |
-| IStorage | changeSubscriptionPlan | yes | `changeSubscriptionPlan(merchantId: number, planId: PlanId, chargeUpgrade?: PlanUpgradeChargeExecutor): Promise<PlanChangeResult>` |
+| IStorage | changeSubscriptionPlan | yes | `changeSubscriptionPlan(merchantId: number, planId: PlanId, chargeUpgrade?: PlanUpgradeChargeExecutor,intent?:SubscriptionCommandIntent): Promise<PlanChangeResult>` |
 | IStorage | saveSubscriptionCard | yes | `saveSubscriptionCard(merchantId: number, card: SubscriptionCardInput): Promise<any>` |
 | IStorage | bindSubscriptionCardSession | yes | `bindSubscriptionCardSession(merchantId: number, sessionId: string): Promise<boolean>` |
 | IStorage | completeSubscriptionCardSetup | yes | `completeSubscriptionCardSetup( merchantId: number, sessionId: string, card: SubscriptionCardInput, charge: SubscriptionCardChargeExecutor, ): Promise<SubscriptionCardSetupResult>` |
-| IStorage | removeSubscriptionCard | yes | `removeSubscriptionCard(merchantId: number): Promise<any>` |
+| IStorage | removeSubscriptionCard | yes | `removeSubscriptionCard(merchantId: number,intent?:SubscriptionCommandIntent): Promise<any>` |
 | IStorage | claimSubscriptionsDueForBilling | no | `claimSubscriptionsDueForBilling( now: Date, limit?: number, excludeSubscriptionIds?: readonly number[], claimedAt?: Date, ): Promise<MerchantSubscription[]>` |
 | IStorage | finalizeSubscriptionBillingClaim | no | `finalizeSubscriptionBillingClaim( subscriptionId: number, claimToken: string, updates: Record<string, unknown>, history: Record<string, unknown>, ): Promise<boolean>` |
 | IStorage | releaseSubscriptionBillingClaim | no | `releaseSubscriptionBillingClaim(subscriptionId: number, claimToken: string): Promise<void>` |
@@ -388,9 +387,9 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | IStorage | updateActiveSchedule | no | `updateActiveSchedule(id: string, updates: any): Promise<any \| undefined>` |
 | IStorage | getDueActiveSchedules | no | `getDueActiveSchedules(now: Date): Promise<any[]>` |
 | IStorage | getInvoiceRentRequestForMerchant | yes | `getInvoiceRentRequestForMerchant(id: string, merchantId: number): Promise<any \| undefined>` |
-| IStorage | voidInvoiceRentRequestForMerchant | yes | `voidInvoiceRentRequestForMerchant(id: string, merchantId: number): Promise<PropertyInvoiceMutationResult>` |
-| IStorage | markInvoiceRentRequestPaidExternalForMerchant | yes | `markInvoiceRentRequestPaidExternalForMerchant(id: string, merchantId: number, externalPaymentReference?: string): Promise<PropertyInvoiceMutationResult>` |
-| IStorage | createOrReuseInvoiceRentRequestForMerchant | yes | `createOrReuseInvoiceRentRequestForMerchant(tenantProfileId: string, merchantId: number, data: PropertyInvoiceInput): Promise<PropertyInvoiceCreationResult>` |
+| IStorage | voidInvoiceRentRequestForMerchant | yes | `voidInvoiceRentRequestForMerchant(id: string, merchantId: number, actor?: PaymentCommandActor): Promise<PropertyInvoiceMutationResult>` |
+| IStorage | markInvoiceRentRequestPaidExternalForMerchant | yes | `markInvoiceRentRequestPaidExternalForMerchant(id: string, merchantId: number, externalPaymentReference?: string, actor?: PaymentCommandActor): Promise<PropertyInvoiceMutationResult>` |
+| IStorage | createOrReuseInvoiceRentRequestForMerchant | yes | `createOrReuseInvoiceRentRequestForMerchant(tenantProfileId: string, merchantId: number, data: PropertyInvoiceInput,intent?:CreationCommandIntent): Promise<PropertyInvoiceCreationResult>` |
 | IStorage | getInvoiceRentRequestDeliveryForMerchant | yes | `getInvoiceRentRequestDeliveryForMerchant(id: string, merchantId: number): Promise<PropertyInvoiceDeliverySnapshot \| undefined>` |
 | IStorage | recordInvoiceRentRequestDeliveryForMerchant | yes | `recordInvoiceRentRequestDeliveryForMerchant(id: string, merchantId: number, tenantProfileId: string, data: PropertyInvoiceDeliveryInput): Promise<PropertyInvoiceMutationResult>` |
 | IStorage | createInvoiceRentRequest | no | `createInvoiceRentRequest(data: any): Promise<any>` |
@@ -428,14 +427,16 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | IStorage | getQuotesByMerchant | yes | `getQuotesByMerchant(merchantId: number, opts?: { status?: string }): Promise<any[]>` |
 | IStorage | getQuoteDeliveryForMerchant | yes | `getQuoteDeliveryForMerchant(id: string, merchantId: number): Promise<TradesQuoteDeliverySnapshot \| undefined>` |
 | IStorage | updateQuote | no | `updateQuote(id: string, updates: any): Promise<any \| undefined>` |
+| IStorage | respondToQuoteForMerchant | yes | `respondToQuoteForMerchant(id:string,merchantId:number,accept:boolean,options:{allowAccept:boolean}):Promise<QuoteResponseResult>` |
+| IStorage | recordQuoteViewForMerchant | yes | `recordQuoteViewForMerchant(id:string,merchantId:number):Promise<typeof quotes.$inferSelect\|undefined>` |
 | IStorage | getJobInvoiceForMerchant | yes | `getJobInvoiceForMerchant(id: string, merchantId: number): Promise<any \| undefined>` |
 | IStorage | getJobInvoiceDeliveryForMerchant | yes | `getJobInvoiceDeliveryForMerchant(id: string, merchantId: number): Promise<TradesInvoiceDeliverySnapshot \| undefined>` |
-| IStorage | voidJobInvoiceForMerchant | yes | `voidJobInvoiceForMerchant(id: string, merchantId: number): Promise<JobInvoiceMutationResult>` |
-| IStorage | markJobInvoicePaidExternalForMerchant | yes | `markJobInvoicePaidExternalForMerchant(id: string, merchantId: number, externalPaymentReference?: string): Promise<JobInvoiceMutationResult>` |
+| IStorage | voidJobInvoiceForMerchant | yes | `voidJobInvoiceForMerchant(id: string, merchantId: number, actor?: PaymentCommandActor): Promise<JobInvoiceMutationResult>` |
+| IStorage | markJobInvoicePaidExternalForMerchant | yes | `markJobInvoicePaidExternalForMerchant(id: string, merchantId: number, externalPaymentReference?: string, actor?: PaymentCommandActor): Promise<JobInvoiceMutationResult>` |
 | IStorage | completeJobInvoiceForMerchant | yes | `completeJobInvoiceForMerchant(id: string, merchantId: number): Promise<JobInvoiceMutationResult>` |
 | IStorage | recordJobInvoiceReceiptForMerchant | yes | `recordJobInvoiceReceiptForMerchant(id: string, merchantId: number, clientProfileId: string, receipt: TradesReceiptRecord): Promise<boolean>` |
-| IStorage | createJobInvoiceForMerchant | yes | `createJobInvoiceForMerchant(merchantId: number, client: TradesClientRef, data: JobInvoiceInput): Promise<JobInvoiceCreationResult>` |
-| IStorage | createJobBalanceInvoiceForMerchant | yes | `createJobBalanceInvoiceForMerchant(depositInvoiceId: string, merchantId: number, splitEnabled: boolean): Promise<JobBalanceCreationResult>` |
+| IStorage | createJobInvoiceForMerchant | yes | `createJobInvoiceForMerchant(merchantId: number, client: TradesClientRef, data: JobInvoiceInput,intent?:CreationCommandIntent): Promise<JobInvoiceCreationResult>` |
+| IStorage | createJobBalanceInvoiceForMerchant | yes | `createJobBalanceInvoiceForMerchant(depositInvoiceId: string, merchantId: number, splitEnabled: boolean,actor?:PaymentCommandActor): Promise<JobBalanceCreationResult>` |
 | IStorage | recordJobInvoiceDeliveryForMerchant | yes | `recordJobInvoiceDeliveryForMerchant(id: string, merchantId: number, clientProfileId: string, record: TradesInvoiceDeliveryRecord): Promise<JobInvoiceMutationResult>` |
 | IStorage | createJobInvoice | no | `createJobInvoice(data: any): Promise<any>` |
 | IStorage | getJobInvoice | no | `getJobInvoice(id: string): Promise<any \| undefined>` |

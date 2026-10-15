@@ -1,5 +1,6 @@
 import {
   createWindcaveClient,
+  sessionRequestNotSent,
   type WindcaveClientConfig,
   type WindcaveTransport,
 } from "../windcave-client";
@@ -77,6 +78,13 @@ const created = {
 };
 
 describe("createSession", () => {
+  it('keeps a completed creation identity without exposing another payment widget',async()=>{
+    const {client}=harness([reply(202,{...created,state:'complete'})]);
+    expect(await client.createSession(createRequest)).toMatchObject({kind:'created',sessionId:SESSION_ID,links:{}});
+    const {client:again}=harness([reply(202,{...created,state:'complete'})]);
+    const result=await again.createSession(createRequest);if(result.kind!=='created')throw Error('fixture');
+    expect(result.links.hpp).toBeUndefined();expect(result.links.ajaxSubmitCard).toBeUndefined();
+  });
   it("posts the purchase to the configured endpoint with the caller's X-ID and Basic auth", async () => {
     const { client, calls } = harness([reply(202, created)]);
 
@@ -163,6 +171,22 @@ describe("createSession", () => {
     const result = await client.createSession(createRequest);
     expect(result).toEqual({ kind: "rejected", status: 400 });
     expect(JSON.stringify(audit)).not.toContain("SECRET-DETAIL");
+  });
+
+  it("marks a 4xx after a retried try, which does not prove no session was created (R3 integration B-1)", async () => {
+    const first = harness([reply(429)]);
+    const plain = await first.client.createSession(createRequest);
+    expect(plain).toEqual({ kind: "rejected", status: 429 });
+    expect(sessionRequestNotSent(plain)).toBe(true);
+    const later = harness([abortError(), reply(429)]);
+    const retried = await later.client.createSession(createRequest);
+    expect(retried).toEqual({ kind: "rejected", status: 429, afterRetry: true });
+    expect(sessionRequestNotSent(retried)).toBe(false);
+    for (const kind of ["unknown", "malformed", "duplicate", "created"] as const) {
+      expect(sessionRequestNotSent({ kind } as never)).toBe(false);
+    }
+    expect(sessionRequestNotSent({ kind: "invalid_request" })).toBe(true);
+    expect(sessionRequestNotSent({ kind: "disabled" })).toBe(true);
   });
 
   it("retries a 5xx with the same X-ID, waiting between attempts", async () => {

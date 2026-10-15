@@ -5,11 +5,11 @@ import { WINDCAVE_REQUEST_TIMEOUT_MS } from "../windcave-client";
 
 /**
  * R4-T3 (docs/decisions/2026-10-14-r4-t3-atomic-refund-claim.md): the rules both stores and the
- * route share. They mirror migration 0039's graph and the ADR's settle table and refund-ID rules.
+ * route share. They mirror migration 0048's graph and the ADR's settle table and refund-ID rules.
  */
 const CAPTURE = "cap0001";
 
-describe("the state graph mirrors 0039", () => {
+describe("the state graph mirrors 0048", () => {
   it.each([
     ["requested", "submitted", true], ["requested", "cancelled", true], ["requested", "succeeded", false], ["requested", "unknown", false],
     ["submitted", "succeeded", true], ["submitted", "failed", true], ["submitted", "unknown", true], ["submitted", "cancelled", false], ["submitted", "requested", false],
@@ -34,7 +34,7 @@ describe("the fingerprint", () => {
 });
 
 describe("provider refund IDs", () => {
-  it("accept 0039's token shape that is not the capture", () => {
+  it("accept 0048's token shape that is not the capture", () => {
     expect(validProviderRefundId("ref_0001-A", CAPTURE)).toBe("valid");
     expect(validProviderRefundId(undefined, CAPTURE)).toBe("absent");
     expect(validProviderRefundId("has space", CAPTURE)).toBe("malformed");
@@ -76,7 +76,7 @@ describe("the settle table and ID rules (ADR §5)", () => {
   it("an exception from the call is scheduled unknown, never failed (C-4)", () => {
     expect(plan({ kind: "thrown" })).toEqual({ state: "unknown", refundId: null, parked: false, errorCode: "provider_error" });
   });
-  it("every error code fits 0039's sanitized shape", () => {
+  it("every error code fits 0048's sanitized shape", () => {
     const outcomes: Array<Parameters<typeof refundSettlePlan>[0]> = [{ kind: "rejected", status: 418 }, { kind: "mismatch", field: "reference" },
       { kind: "unknown", reason: "network" }, { kind: "thrown" }, { kind: "pending", refundTransactionId: CAPTURE }];
     for (const outcome of outcomes) expect(plan(outcome).errorCode).toMatch(/^[a-z][a-z0-9_:]{0,63}$/);

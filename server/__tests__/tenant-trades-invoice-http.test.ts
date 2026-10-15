@@ -10,14 +10,14 @@ afterEach(() => jest.restoreAllMocks());
 test.each([
   ['void','voidJobInvoiceForMerchant'],
   ['mark-paid-external','markJobInvoicePaidExternalForMerchant'],
-] as const)('%s reports a card payment already taken without mutation or receipt (OI-1)',async(action,method)=>{
+] as const)('%s reports recorded provider activity without mutation or receipt',async(action,method)=>{
   const {app}=await createTestApp();const owner=await createOwnerPrincipal();
   const fake=fakeTrades();seedTrades(fake,owner.merchantId);
-  jest.spyOn(storage,method).mockResolvedValue({kind:'conflict',reason:'payment-captured'});
+  jest.spyOn(storage,method).mockResolvedValue({kind:'conflict',reason:'payment-active'});
   const before=JSON.stringify([...fake.invoices]),effects=observeRefusalEffects();
   try {
     const response=await request(app).post(`/api/trades/invoices/${INVOICE}/${action}`).set(signedIn(owner)).send({externalPaymentReference:null});
-    expect(response.status).toBe(409);expect(response.body).toEqual({message:'A card payment has already been taken on this invoice',code:'PAYMENT_CAPTURED'});
+    expect(response.status).toBe(409);expect(response.body).toEqual({message:'Payment is in progress or a share is already paid',code:'PAYMENT_ACTIVE'});
     expect(JSON.stringify([...fake.invoices])).toBe(before);expect(fake.events).toEqual([]);expect(fake.writes).toEqual([]);
     expect(delivery.sendTradePaymentInvoiceForMerchant).not.toHaveBeenCalled();effects.assertNone();
   } finally {effects.restore();}
@@ -50,13 +50,13 @@ test.each([
   } finally { effects.restore(); }
 });
 
-test("external payment sends its receipt through the merchant-scoped service only", async () => {
+test("external payment records owned audit for durable receipt delivery without a direct bypass send", async () => {
   const { app } = await createTestApp(); const owner = await createOwnerPrincipal();
   const fake = fakeTrades(); seedTrades(fake, owner.merchantId);
   const res = await request(app).post(`/api/trades/invoices/${INVOICE}/mark-paid-external`).set(signedIn(owner)).send({ externalPaymentReference: "Cash" });
   expect(res.status).toBe(200);
   expect(res.body).toMatchObject({ id: INVOICE, status: "paid_external", externalPaymentReference: "Cash" });
-  expect((delivery as any).sendTradePaymentInvoiceForMerchant).toHaveBeenCalledWith(INVOICE, owner.merchantId);
+  expect((delivery as any).sendTradePaymentInvoiceForMerchant).not.toHaveBeenCalled();
   expect(delivery.sendTradePaymentInvoice).not.toHaveBeenCalled();
   expect(fake.events.map(row => row.eventType)).toEqual(["paid_external"]);
   expect(fake.events[0]).toMatchObject({ merchantId: owner.merchantId, clientProfileId: CLIENT, jobInvoiceId: INVOICE });

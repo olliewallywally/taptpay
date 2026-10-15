@@ -1,0 +1,816 @@
+{
+  "scope": "Completed R3 repository verification; provider UAT and release approval remain external",
+  "date_utc": "2026-10-14",
+  "branch": "fix/qwen-aligned-20261010",
+  "base_sha": "27d235b8d5dc53e364875bf056e2ff76af786b3a",
+  "source_files": [
+    {
+      "path": ".github/workflows/verify.yml",
+      "sha256": "c0119378198f8434e2c1d174774b7a2da71088d09d3baf8b66c9b817e8fdef17"
+    },
+    {
+      "path": "client/public/sw.js",
+      "sha256": "862358a788d2ae6bdc4474943688e08eaf52cc9afaae9a20c253284d1748a3a4"
+    },
+    {
+      "path": "client/src/desktop/DesktopSettingsPage.test.tsx",
+      "sha256": "52a79e86dbff703c57e74671b560b8e0513a2e0683c6d5782a08eb9cf34bdde7"
+    },
+    {
+      "path": "client/src/desktop/DesktopSettingsPage.tsx",
+      "sha256": "83fe82cd01aa92fbadc86e9035f2e9d3915f970f0432063a1a804c8f00f9b18d"
+    },
+    {
+      "path": "client/src/desktop/pages/property-terminal.tsx",
+      "sha256": "e9ab5e00afc5a8d943308f35ee28d3429c084453445cbd56c933cf9a40a9c5ea"
+    },
+    {
+      "path": "client/src/desktop/pages/trades-terminal.tsx",
+      "sha256": "fba35b57d495b238cb95703357b1a65886cb5d0fcb8384dae9468aaff2ed0047"
+    },
+    {
+      "path": "client/src/features/checkout/CheckoutView.tsx",
+      "sha256": "a6ca4615cd7e556647b0937f60270a23227a2a25540e37a35d3b97b6163fd137"
+    },
+    {
+      "path": "client/src/features/terminal/property/PropertyTerminalView.tsx",
+      "sha256": "30b72048a658b22664e95603d8841836d5e53fda876aaf77a4f6ba0a63417e71"
+    },
+    {
+      "path": "client/src/hooks/use-billing-card-return.test.ts",
+      "sha256": "7bec1e90afa78164f0fcdd1e8c37672afa81d7ea0255eeeec7db7766f20d092a"
+    },
+    {
+      "path": "client/src/hooks/use-billing-card-return.ts",
+      "sha256": "e78bd1228b463c0666db3ac2ccda9c0aa0d833fdefc962c86fcf09f486cad4ff"
+    },
+    {
+      "path": "client/src/lib/__tests__/billing-card-command.test.ts",
+      "sha256": "cb97b1f53872c03cef64fb330838c7f9aac7eccede8aa88f00bd3a680f6dfac4"
+    },
+    {
+      "path": "client/src/lib/__tests__/checkout-command.test.ts",
+      "sha256": "370fc82bc02b94fe9b54d66fa3a7881e0f471274ecad48f65c155f6d44adab62"
+    },
+    {
+      "path": "client/src/lib/__tests__/creation-command.test.ts",
+      "sha256": "62ae94d7a403f6803c3416ff18b87e1f2292fb212ac4e8c3423b48bd53b44282"
+    },
+    {
+      "path": "client/src/lib/api-error.ts",
+      "sha256": "2c7d25ee64f1e7f6429e02685f271c827c663eb558c8f3b5beae4541b83fc9af"
+    },
+    {
+      "path": "client/src/lib/billing-card-command.ts",
+      "sha256": "5ebaf7b8a85188cd60088ff515fe2b3fea89f64e8f1110eaa0254bfbf8ea5031"
+    },
+    {
+      "path": "client/src/lib/billing-required.test.tsx",
+      "sha256": "44ce3b41547654a3b6272bd2b8adb98e0c7c6051f549447e95b7538a9d0c15ed"
+    },
+    {
+      "path": "client/src/lib/cash-command-key.ts",
+      "sha256": "7844f4888c2bdf7b2510538d5c58ee38ab19b013c9d09eafd8273267578444d5"
+    },
+    {
+      "path": "client/src/lib/checkout-command.ts",
+      "sha256": "e628125d6428cc5ab3c9cb42b92d68d0a4e69d19c17d2376f70e0e791614fc7a"
+    },
+    {
+      "path": "client/src/lib/creation-command.ts",
+      "sha256": "597293f19a95c84b1fd8ae671fa2b2b2ec33feb283d7b6b83bb2f0a6f87ea062"
+    },
+    {
+      "path": "client/src/lib/property-api.ts",
+      "sha256": "45ad3be98a51421f4e3379b5eed5401f05f4af50ca0422048e533d0da27c5574"
+    },
+    {
+      "path": "client/src/lib/queryClient.ts",
+      "sha256": "774f5ae9cc3b34878900b6201f1032073997bb95f0d5054dabe806864825078c"
+    },
+    {
+      "path": "client/src/lib/sse-client.test.ts",
+      "sha256": "1a9bef8f06eda46e3967286f0f359d4ea24755940564728da8b7c1da627b411a"
+    },
+    {
+      "path": "client/src/lib/sse-client.ts",
+      "sha256": "4ccdbaada0c7522ec9ea864d8d7d777a58f19e23ce5434e3a71df93555832fb0"
+    },
+    {
+      "path": "client/src/lib/trades-api.ts",
+      "sha256": "6a6019f4010b77147df8d6bebc4d7029f2b228b11b3f78e9dc25b0c1584a0540"
+    },
+    {
+      "path": "client/src/pages/__tests__/board-sale-leave-links.test.tsx",
+      "sha256": "544f5d6277da55ecd5ad19df95d4e8f3159452799002bbd161d2058d399c5981"
+    },
+    {
+      "path": "client/src/pages/__tests__/checkout-durability.test.tsx",
+      "sha256": "eb7d2bf566472e3e1a27dd591c6d3259cff7a07c2bf513e27a88582a5911aa0d"
+    },
+    {
+      "path": "client/src/pages/__tests__/invoice-split-wallet-session.test.tsx",
+      "sha256": "d889263d56044cbf56c28fc7e23fb51fd3b0dc753da7d99161e62c60370c50db"
+    },
+    {
+      "path": "client/src/pages/__tests__/payment-result-durability.test.tsx",
+      "sha256": "3db2ecf6880315e81e5d897a31ed9c484cdb492dafa5b1149b122df43445ecbd"
+    },
+    {
+      "path": "client/src/pages/checkout.tsx",
+      "sha256": "52c6998bbba8a3500a778b8bffb8909f9b8cd1b255fad3e8d1f1215204d92dce"
+    },
+    {
+      "path": "client/src/pages/merchant-terminal-mobile-v2.test.tsx",
+      "sha256": "6c57daa3e49bc92a00fc0c50b900e610d491efb6816525f72b821815f179c210"
+    },
+    {
+      "path": "client/src/pages/merchant-terminal-mobile-v2.tsx",
+      "sha256": "38076664facae5779c71f9ab05d71c73963f159601839a9ab00f984dcb51a378"
+    },
+    {
+      "path": "client/src/pages/payment-result.tsx",
+      "sha256": "da0962669bca196036dc716010908b09938fe83b2036f75c70753410420cb77c"
+    },
+    {
+      "path": "client/src/pages/property/property-terminal.tsx",
+      "sha256": "6c48194f6568edca056cb123233b1a10610af47d5a00fdc9df205b404656d33c"
+    },
+    {
+      "path": "client/src/pages/settings.tsx",
+      "sha256": "e051f32c7b4c06bbb459dd24942c64e66a0de9d372719816bee5c3088e75d438"
+    },
+    {
+      "path": "client/src/pages/trades/trades-terminal.tsx",
+      "sha256": "e9af118ea59820ab0fa3ab847814f40ba9a4d908a9023386e61a6ceffa9076db"
+    },
+    {
+      "path": "jest.setup.js",
+      "sha256": "722efc6c081069ebf2fb6beda6204c400b3b33dd5eb5d825f4e811db387f0389"
+    },
+    {
+      "path": "migrations/0039_payment_wallet_submission.sql",
+      "sha256": "d32a4f39e57871230bd2fa040f19aeac1c87c156085f50d67100693b61fad43e"
+    },
+    {
+      "path": "migrations/0040_invoice_attempt_payer.sql",
+      "sha256": "110624703a596dfa173d6f6132c166bda3020167643681f068c7c2a85104f860"
+    },
+    {
+      "path": "migrations/0041_invoice_share_reservations.sql",
+      "sha256": "cabaf1b929c02909daf42c6071c117d08f591d026f7bc654a8b816f8fc2878c4"
+    },
+    {
+      "path": "migrations/0042_payment_command_delivery.sql",
+      "sha256": "350b6e78ba09fa5b7eeabf1f520905aa20e9620dcb10b42233b1409301d1cb0a"
+    },
+    {
+      "path": "migrations/0043_subscription_payment_attempts.sql",
+      "sha256": "ef2eac0e9edfa60f4d10ecbe48145174e1b1cd50e07bdafafbef1f897064ee75"
+    },
+    {
+      "path": "migrations/0044_subscription_identity_registry.sql",
+      "sha256": "23c419429b7a097a5043a1c6f432fd276daf41bacc64fc6d756ac2fba3eeb7a8"
+    },
+    {
+      "path": "migrations/0045_provider_operation_keys.sql",
+      "sha256": "862fe30f6367950c7427a6b5a8160f67bbb555b0c60fc8bed66597657d643631"
+    },
+    {
+      "path": "migrations/0046_payment_delivery_targets.sql",
+      "sha256": "bfa8fea32de619af4ff4b26b00a61d8db873c26eb04da6fd7d0740ab3543127f"
+    },
+    {
+      "path": "migrations/0047_payment_creation_commands.sql",
+      "sha256": "0fa2d29e1e78a1e3f64b54f81ddbcbc392bb7318b183e4a45c3b6c8a052e6001"
+    },
+    {
+      "path": "scripts/verify-r3-commands-postgres.ts",
+      "sha256": "1328a9dc27782fe570285900c8a742c82356b801bd4f9c577ea141adb46fc7e4"
+    },
+    {
+      "path": "scripts/verify-r3-delivery-postgres.ts",
+      "sha256": "0eefb5e2f7a680b7a8a728781353ef849d30d1b0d5b2bd63eedb0e7a3fb25cb4"
+    },
+    {
+      "path": "scripts/verify-r3-durability-postgres.ts",
+      "sha256": "17d9f255bcb046cc374c33f629b7c50c516795f32bd20cb745224d67cf915308"
+    },
+    {
+      "path": "scripts/verify-r3-http-postgres.ts",
+      "sha256": "d6968f379ce384ad01c71932077de14b94185774ef81d9e23963b8f5d0c839fb"
+    },
+    {
+      "path": "scripts/verify-r3-subscriptions-postgres.ts",
+      "sha256": "2ca23490a7bea26cc1e243946cdd1ce4b2c9b5907c9238d70cf783ee14d49211"
+    },
+    {
+      "path": "server/__tests__/c10-batch-5-account.test.ts",
+      "sha256": "0999f2f77f4995f01685ed52d119b73fc821931f7e63da38e519c51f4b0231ce"
+    },
+    {
+      "path": "server/__tests__/c10-batch-6c-property.test.ts",
+      "sha256": "10a36226b23a4920151a98c73409bd95d388ef98df1ba1edf9a07ea33614f3c0"
+    },
+    {
+      "path": "server/__tests__/c10-batch-6d-trades.test.ts",
+      "sha256": "48355fb7e5eb0625e3def6159ece8b7a7eaf86e63a51c5f0254adfe73c6b40a7"
+    },
+    {
+      "path": "server/__tests__/cash-command-idempotency.test.ts",
+      "sha256": "2db567679979e88febe59bea4929b79e8e25f3a4d5206f0ae9f3aff76b061c89"
+    },
+    {
+      "path": "server/__tests__/checkout-completion-session-binding.test.ts",
+      "sha256": "558eb4a46f87d87042d193996df8278a9132bbc0aff816ecc622bdf10e1dee2b"
+    },
+    {
+      "path": "server/__tests__/cross-site-guard.test.ts",
+      "sha256": "5ac469a2b5f26c25751298227d7bcdcd233c9722742da6b6da364514c89e79d6"
+    },
+    {
+      "path": "server/__tests__/durable-notification-pipeline.test.ts",
+      "sha256": "c841e140916b8d64f7177391300c95010af3e4e50c932e6761339023cfca42f6"
+    },
+    {
+      "path": "server/__tests__/invoice-document-attach-ownership.test.ts",
+      "sha256": "86a31a6afdd43ec9cb72c1a1e73e78d978957a44fd7ea2776d56b9c8d8cd5f4e"
+    },
+    {
+      "path": "server/__tests__/invoice-split-sessions.test.ts",
+      "sha256": "7eec578dbdbf7c2fc3ff8ca59628f25316eec99abf1cad60036b0dc62bb0ee14"
+    },
+    {
+      "path": "server/__tests__/migrate.test.ts",
+      "sha256": "fc736ccec667d895927a8e5ec629dbb77bdc4d578b0abef8b61b9fba8a79daa7"
+    },
+    {
+      "path": "server/__tests__/no-board-address-retired.test.ts",
+      "sha256": "2243f0790b9216d7f2c4c06e3b56245fb40d9e040c397db965ad3a0f78ed0949"
+    },
+    {
+      "path": "server/__tests__/no-board-sale-flag-off.test.ts",
+      "sha256": "e822ace547ecc0e247036391e2faf467f4b65abb6bd50317efdf9388e3339732"
+    },
+    {
+      "path": "server/__tests__/numbered-pay-exact-share.test.ts",
+      "sha256": "2f92d084f477b379563eb13d8c4b3017dbb72f55a02eb5a4d8ba5d1fd0909419"
+    },
+    {
+      "path": "server/__tests__/payment-attempt-service.test.ts",
+      "sha256": "184d6530437ba737047f6c724d8c3da21e16a4d8823ccb006349df7284899a1a"
+    },
+    {
+      "path": "server/__tests__/payment-creation-command.test.ts",
+      "sha256": "7b57fa97249c7e7a1a39612bc383419f8901d2ef3866c986ad639a17b0b7a53d"
+    },
+    {
+      "path": "server/__tests__/payment-delivery-receivers.test.ts",
+      "sha256": "39b88905f91bcb0038a6b52f28c8dbeb86f81805ef8ace2c61651b9f5c91172b"
+    },
+    {
+      "path": "server/__tests__/payment-email-adapter.test.ts",
+      "sha256": "f1beec02f4420d5281c4d2a3f7050b0c3c0c8c8352e2cdba024ec3971ffccbd0"
+    },
+    {
+      "path": "server/__tests__/payment-outbox-cap.test.ts",
+      "sha256": "40739f3f9a89d415a3af8f2fe44228c535833297f65584b15b2d840af7aa5aeb"
+    },
+    {
+      "path": "server/__tests__/payment-realtime-delivery.test.ts",
+      "sha256": "1f24cbdcb220504edcfc46f057084db89c54f08323cbf61f847ec8a096e05ffb"
+    },
+    {
+      "path": "server/__tests__/payment-reconciliation.test.ts",
+      "sha256": "c4fd4edb3b60160a5428b8c390ccf0cd189090e7141571d89d0f6cc3da15519a"
+    },
+    {
+      "path": "server/__tests__/payment-service-worker-delivery.test.ts",
+      "sha256": "642ef065dde511b225db8abb6c288999a5f9bc4569620e63b4e352b1ba878c7b"
+    },
+    {
+      "path": "server/__tests__/payment-transition-graphs.test.ts",
+      "sha256": "c5f60259663dc08634b3450019efd3b1ed65ea4d99b7f2507cd9b4deb4f894bd"
+    },
+    {
+      "path": "server/__tests__/payment-worker-bootstrap.test.ts",
+      "sha256": "12059dee254067a55e02d69c5cd6e5609ee3d474978c150d285b251f5be3f331"
+    },
+    {
+      "path": "server/__tests__/quote-accept-billing-refusal.test.ts",
+      "sha256": "747e334b46cc80e6adf59a5e62825ec498a6cbff2747174c5f01316674c18a54"
+    },
+    {
+      "path": "server/__tests__/r0-t5-callback-containment.test.ts",
+      "sha256": "eea8771d2085f3467971437f663a3568d8bbbf507c1a7c80abc8bb514c4694b0"
+    },
+    {
+      "path": "server/__tests__/r1-t1-harness.test.ts",
+      "sha256": "858b424a065ae47802acd770bb697a82df231c5e9e1ab217dbbec35fac645f05"
+    },
+    {
+      "path": "server/__tests__/r1-t7-windcave-session-binding.test.ts",
+      "sha256": "bafb9242de4b961d41c71126f33cb2f698957b6705e27271f14fa501e1c318b6"
+    },
+    {
+      "path": "server/__tests__/r2-t5-completion-verification.test.ts",
+      "sha256": "310f2f388152a14da6d51a226c2824457241f27a41341f09f8a0829387b77a19"
+    },
+    {
+      "path": "server/__tests__/r2-t5-retail-verification.test.ts",
+      "sha256": "5a95cc98cf633dc690cad59cc0319d0ec325d6d62607c9ab0872e397f9c86d9a"
+    },
+    {
+      "path": "server/__tests__/r2-t5-split-share-replay.test.ts",
+      "sha256": "eaae78743d580c1e96d4c06ba85bc9981a60eb700480226a5fb7a6ec19dbb51b"
+    },
+    {
+      "path": "server/__tests__/r3-manual-change-guards.test.ts",
+      "sha256": "fedd88e486ced4a84a59595a8a913a080c775f831bf65edae23af0dab45daa90"
+    },
+    {
+      "path": "server/__tests__/retail-checkout-durable-http.test.ts",
+      "sha256": "a7d92086d4ead0b7d3d2b859292ac3b5c9a8735357c82d5b64b29b5993a5c800"
+    },
+    {
+      "path": "server/__tests__/route-matrix-own-gates.test.ts",
+      "sha256": "b65dfc875929932b2f001e7a5c97f05f967f2e38770171a757b8ece403ec766c"
+    },
+    {
+      "path": "server/__tests__/route-matrix-served-account.test.ts",
+      "sha256": "b81afd6e388006ad79d622388d5c05261baaa21c9f2cd1368f5e164049f288f9"
+    },
+    {
+      "path": "server/__tests__/route-matrix-served-business.test.ts",
+      "sha256": "6fc08532509dfb9b9b5b050006e7aee56cf50a0c2a526844d466c622f4eed42c"
+    },
+    {
+      "path": "server/__tests__/route-matrix-served-checkout.test.ts",
+      "sha256": "f45c862e30a681bf13e77a4d116f84de0e11ab7d2778c81aab9ad32a103342af"
+    },
+    {
+      "path": "server/__tests__/route-matrix-served-property.test.ts",
+      "sha256": "7d14f44d87af27db041272b54aca493c9819f7cd18f7dbd0fdaf640e603e4df5"
+    },
+    {
+      "path": "server/__tests__/route-matrix-served-provider.test.ts",
+      "sha256": "85375a9b43028d51710dce7ebd41c497d04657d9122248e24b151ab276dfecca"
+    },
+    {
+      "path": "server/__tests__/route-matrix-served-public.test.ts",
+      "sha256": "1912297f8b817293572fbf1723e4dc6ee66ba2df84bd15760ef79303a4d6ba9b"
+    },
+    {
+      "path": "server/__tests__/route-matrix-served-retail-pay.test.ts",
+      "sha256": "98badfa1f83b17a2e995867cde6086b8a329b29fb9ca7b890a5ecc6c4f99accd"
+    },
+    {
+      "path": "server/__tests__/route-matrix-served-trades.test.ts",
+      "sha256": "9e7fc0de46e9e93235fefbd47c539dd72c88f1923329fc5c68cb604204764623"
+    },
+    {
+      "path": "server/__tests__/route-policy-all-methods.test.ts",
+      "sha256": "9eaebceff505a1b56dc9aaf70594eb33cf57efb03e771f2ca0857d117854cdee"
+    },
+    {
+      "path": "server/__tests__/route-policy-review.test.ts",
+      "sha256": "59a5d16bbef6b9343d2b099a9825c653431b91f934c0932a9be3550b07999e0f"
+    },
+    {
+      "path": "server/__tests__/subscription-billing.test.ts",
+      "sha256": "c140e9d64da21a1c6461772756d7c2376effc2bf5ef44ddc356ae5655ec73303"
+    },
+    {
+      "path": "server/__tests__/subscription-cron.test.ts",
+      "sha256": "a50aa04efbb02d5b55f9ad8f0d1701dcc0aec15de363aa93a90839730c7a3c00"
+    },
+    {
+      "path": "server/__tests__/subscription-durable-http.test.ts",
+      "sha256": "bea554c034820684ece6855e911fb0e97835b5f5e04f3eff532d3db3f26af24e"
+    },
+    {
+      "path": "server/__tests__/subscription-route-security.test.ts",
+      "sha256": "790245935c1cd4db816550b49b713a721b8f6937d99b2a9a79e3c62a507da311"
+    },
+    {
+      "path": "server/__tests__/subscription-storage-safety.test.ts",
+      "sha256": "69c9cd9b79a636a0db17ed5d9f76a7ca07d80208451b71b6e328818bf5539a5b"
+    },
+    {
+      "path": "server/__tests__/support/durable-payments-env.ts",
+      "sha256": "40b071b8a80c99f2362281d2f1e51e481a76d003ee53095964967ee85cd17b8c"
+    },
+    {
+      "path": "server/__tests__/support/http-harness.ts",
+      "sha256": "f6b8b9c03c174ea9c4fda8c5c1e2d009d96f385c656199d3c8c5949f857fe943"
+    },
+    {
+      "path": "server/__tests__/support/invoice-http.ts",
+      "sha256": "ce399b0bfe51699ef56031c93e00fa87172d4e59eabbff0134392ca8870828e9"
+    },
+    {
+      "path": "server/__tests__/support/invoice-runtime.ts",
+      "sha256": "5d077889fa10dfac88cf508db8d9ae93b8ff6fd79bf86ecfe376189008ebaadb"
+    },
+    {
+      "path": "server/__tests__/support/retail-runtime.ts",
+      "sha256": "c0c7789739db56511d47c9e61de9a710a60b944a0205880d47542376fbb24d8d"
+    },
+    {
+      "path": "server/__tests__/tenant-property-invoice-send-http.test.ts",
+      "sha256": "963d8032c734c028b420322115f70e19b9227338149dbcbb746a930a82a1ce32"
+    },
+    {
+      "path": "server/__tests__/tenant-property-invoice-storage.test.ts",
+      "sha256": "157beb74ade0832cb09661565f730bf652f303936efa24f29b6e864aaa88467f"
+    },
+    {
+      "path": "server/__tests__/tenant-storage-inventory.test.ts",
+      "sha256": "bf3a8536cfc9ad4d0cc8b6a9453e7f4fe187e28d98d128dc0b435cdd39ca37e0"
+    },
+    {
+      "path": "server/__tests__/tenant-trades-create-http.test.ts",
+      "sha256": "1973607ccc048cb74b71c9808d1a7d9359290fd8aae65c6e8586f9867514ae8a"
+    },
+    {
+      "path": "server/__tests__/tenant-trades-create-storage.test.ts",
+      "sha256": "229ca50fe45bbe78367799b4e86c84cd45eda38410682c82db1c84b5f72c0d3a"
+    },
+    {
+      "path": "server/__tests__/tenant-trades-invoice-http.test.ts",
+      "sha256": "91b9d88c8cdc651b6d49b328c78a4344ec17c56de23787bfd6f69260cd5da66d"
+    },
+    {
+      "path": "server/__tests__/tenant-trades-invoice-storage.test.ts",
+      "sha256": "d5968bb8cd1122b808c919d29f180d8c4664355181e29991c298e982ca1c7450"
+    },
+    {
+      "path": "server/__tests__/tenant-transaction-refund-http.test.ts",
+      "sha256": "d1cedfc56f6573ef598040ae00d46c7dd478542e674d3519628b0838bbdbaa12"
+    },
+    {
+      "path": "server/__tests__/tenant-transaction-refund-storage.test.ts",
+      "sha256": "d83ad7e5647349b36b06886b169e4d56ff651a09abdb2627be7f1dcf1c9a6ba0"
+    },
+    {
+      "path": "server/__tests__/token-route-inventory.test.ts",
+      "sha256": "4689b078c4f55d002a34dc967c85f69ea95194aa97c44570e3b9db09ddffd488"
+    },
+    {
+      "path": "server/__tests__/uploaded-file-scan-http.test.ts",
+      "sha256": "f7b2bea4838c72806b95c1efc1df74cda29fd0c4ebdf28763d860dbd6d0370f3"
+    },
+    {
+      "path": "server/__tests__/windcave-callback-transaction-id.test.ts",
+      "sha256": "a8f139b1ffc767aec83ad5fc364f962c5b685ca67b5e15d1cb9b1d60c997e370"
+    },
+    {
+      "path": "server/__tests__/windcave-client.test.ts",
+      "sha256": "3a46115b10a47d93b3f66cb3c15d2e60cc549fd4b03885886f741b7a5d3dbd65"
+    },
+    {
+      "path": "server/__tests__/windcave-reconciliation-provider.test.ts",
+      "sha256": "66d0bb438f9dafc3e50652219a546a1f2616217c4ea1abb8e816d5bb2e3e0414"
+    },
+    {
+      "path": "server/__tests__/windcave-subscription.test.ts",
+      "sha256": "28655ceb5d09791e3c0a0c513a1fbb3766d2e7ad516413b6909880ec77147a3b"
+    },
+    {
+      "path": "server/app.ts",
+      "sha256": "9eefa34a3e2bcb91a5ed5d6453c08ebec809600c04b98ccd71acfe2c26157e16"
+    },
+    {
+      "path": "server/cash-command.ts",
+      "sha256": "6c5607073739015bea6a7b9c2ecc4cc30cb7d3c7d76bc92b11e210b2b2de6169"
+    },
+    {
+      "path": "server/durable-invoice-checkout.ts",
+      "sha256": "6d6bbb912e2b25d2ce58780816c027dddce265aaedfcb8d364bdc8525bf7087e"
+    },
+    {
+      "path": "server/durable-payment-contract.ts",
+      "sha256": "30b5ee20fd35a8c4ed66441f593717b78cb9ab608d085a66ca4dc09c9344f57a"
+    },
+    {
+      "path": "server/durable-payment-delivery.ts",
+      "sha256": "325f61fb88c6262263730441770777d7434fd412d3e1a8d23d9b0ff2a13a8f6d"
+    },
+    {
+      "path": "server/durable-payment-notification.ts",
+      "sha256": "a484a965765e007c121adff6e5e13211ad7ee6ad952f4271d687fbe7a5943745"
+    },
+    {
+      "path": "server/durable-payment-storage.ts",
+      "sha256": "74b4f3403333b99ae609058dd928416aa362941604fcfca19befaba1efab349c"
+    },
+    {
+      "path": "server/durable-retail-checkout.ts",
+      "sha256": "4f226f62f0f34af6d2f84ae6fb2ec8ed4be6ae72c0c03947f1f5e3ec5d00235c"
+    },
+    {
+      "path": "server/durable-subscription-billing.ts",
+      "sha256": "ccc16745532aa06d71ea8ad319480739cb26c32387b2b347c6981cc2125b5295"
+    },
+    {
+      "path": "server/durable-subscription-card.ts",
+      "sha256": "d543772f1966b037ef1c1f952089ac983faea23d0ae75ab9bf235a5979083c76"
+    },
+    {
+      "path": "server/index.ts",
+      "sha256": "20cbca3b2fdee0fdb21481a90eac40422d1915f5a16e1b214290681ec8e914a6"
+    },
+    {
+      "path": "server/invoice-checkout-handlers.ts",
+      "sha256": "da7cf0f7fabe23fc23c43f052ad787043c2367174e8e665f894897ed4e0f0a1f"
+    },
+    {
+      "path": "server/middleware-policy.ts",
+      "sha256": "8c63079a70406a6512a9b46d9ced7fadbd4a4c49b8a08bdd3770616176f86d5c"
+    },
+    {
+      "path": "server/migration-baseline-contract.ts",
+      "sha256": "478526dde848ff302c365817b3093569ffaa6c84ef82ef93b89d4d83e21b5382"
+    },
+    {
+      "path": "server/payment-checkout-handlers.ts",
+      "sha256": "9574dae3a87c2474e1ecb9d0865cf0812b284ef5a097d3e051db2ed8280cba24"
+    },
+    {
+      "path": "server/payment-command.ts",
+      "sha256": "61d7e1c97e430b7a8510b3af09247c64bbef7ba5e52542ba919b22130b754dff"
+    },
+    {
+      "path": "server/payment-creation-command.ts",
+      "sha256": "7df090e09f716c0be29f4d34193c406959703cd676adc6b1949f85e79df9ae93"
+    },
+    {
+      "path": "server/payment-delivery-runtime.ts",
+      "sha256": "7663c84758f8dbd4933243fd23b29238631e4169714ea37f3f535dc40c4c5f39"
+    },
+    {
+      "path": "server/payment-manual-reconciliation.ts",
+      "sha256": "f9aab785552df77e68a0fa7c40927836f6611f6999540a4031336d62936038ea"
+    },
+    {
+      "path": "server/payment-notification-paths.ts",
+      "sha256": "e3513b14bb50f003d373904e42a9e9ad73167ab5d1295ae39edc029f0615db47"
+    },
+    {
+      "path": "server/payment-outbox.ts",
+      "sha256": "c3d6126315feb1bd7260b64f241415ccbd788e63610db11a43d7195cdb228712"
+    },
+    {
+      "path": "server/payment-reconciliation.ts",
+      "sha256": "d97e7cf8ef538253baf5ec973591ae2d602f8dd1ebbb5df9622003818cbe1f57"
+    },
+    {
+      "path": "server/payment-runtime-default.ts",
+      "sha256": "2f7b9f3870adeb65edbc7f5e63fe9d2cda22df4245ca681cb24fbff4fc0033b5"
+    },
+    {
+      "path": "server/payment-runtime.ts",
+      "sha256": "e7d3f13d13d746bcbb7d770b0aec81b6ea960fa06b576727ad1df5d9e64d0ef3"
+    },
+    {
+      "path": "server/payment-transition-graphs.ts",
+      "sha256": "4dbf77897b5f164582a54f23f0d5ddcc1915f963d866aeb2971ebf062ff90bee"
+    },
+    {
+      "path": "server/push.ts",
+      "sha256": "77a961d194832338fed12839ebc6072454d4f2de2fc1618c19df30ba965f237a"
+    },
+    {
+      "path": "server/retail-reconciliation-adapter.ts",
+      "sha256": "6cc6e7a810526992adf98c4126c9fb544983ecdd84459a3aeffcc8c2dabb5974"
+    },
+    {
+      "path": "server/retail-transaction-service.ts",
+      "sha256": "b9e7bf1453541310ad071a830853bcb69cc3b25a02583dd663523856d8053eb3"
+    },
+    {
+      "path": "server/route-facts.ts",
+      "sha256": "be418049725f882a3022afba5d0de66215f0e4b8e1d1a7ef455f56792e5e5aee"
+    },
+    {
+      "path": "server/route-inventory.ts",
+      "sha256": "a7df60d4c1983050b05829f2d5e3e2cd928cf16d92b302d792cbbd3a4c6d3578"
+    },
+    {
+      "path": "server/route-matrix.ts",
+      "sha256": "88b8c3447bd456a8a81ad9327ea8a652fd38e34a600a6fab6634c78726ae7c6f"
+    },
+    {
+      "path": "server/route-policy.ts",
+      "sha256": "06636f686227337e194d59f37d3c3ff3a88fc605120b9a79eea9586f85422ef3"
+    },
+    {
+      "path": "server/route-review.ts",
+      "sha256": "ac90c266cecfb7b49b8f3339d08d24e70f04a794cd1b9e8478f14561122176a8"
+    },
+    {
+      "path": "server/routes.ts",
+      "sha256": "5bb682ae46f1b1891ba089c223d8efcfb8b12ac590686ccb132a11408e752d11"
+    },
+    {
+      "path": "server/sse-broker.ts",
+      "sha256": "a98f676099c1d84cdf850b1367c9c94f1accfd0164af881cc7327ac6c292890c"
+    },
+    {
+      "path": "server/storage.ts",
+      "sha256": "25f71ea0abef17819096c57f5e1cf9b6e82023a78e7d2f615bcc5fbc93b043ec"
+    },
+    {
+      "path": "server/subscription-billing.ts",
+      "sha256": "65f3e29a70ac3728e2c374e1a6bfa5122b64865472170d75506aac2cf0609f02"
+    },
+    {
+      "path": "server/subscription-command.ts",
+      "sha256": "53476e357b02243b392932d85e648b8169feb6853aca0cd36d097da17d166a0e"
+    },
+    {
+      "path": "server/subscription-cron.ts",
+      "sha256": "cbebdb088e8434d4383c763044f3ceff5b4dd5340840168f9970781b0d909567"
+    },
+    {
+      "path": "server/subscription-payment-runtime.ts",
+      "sha256": "3a20a121e56123c426b83d148222494413d8ec0f495fae0e2e98e54640142acb"
+    },
+    {
+      "path": "server/windcave-client.ts",
+      "sha256": "a747903e957242d96deb6cfa7626cca3e74c8abe4f05e61da3b39f68de250839"
+    },
+    {
+      "path": "server/windcave-reconciliation-provider.ts",
+      "sha256": "f0b54094745487afae21044540a4fe24d59e04d217d9e3b7b2e56ea41bfe2315"
+    },
+    {
+      "path": "server/windcave.ts",
+      "sha256": "f395250aa2d7e2d33ecfe6837509f22296ee390397eee25b248dabf65e86f751"
+    },
+    {
+      "path": "shared/schema.ts",
+      "sha256": "e533d28773d25ba685ba31609c4c9baba3eb2961159b0903427792cdd50296fc"
+    }
+  ],
+  "server": {
+    "method": "Complete run plus explicit replacement of all failed and affected suites; original run was red and is not relabelled green",
+    "covered_suites": 214,
+    "passed_tests": 5020,
+    "skips": 0,
+    "original_run": {
+      "suites_passed": 196,
+      "suites_failed": 18,
+      "tests_passed": 4875,
+      "tests_failed": 141,
+      "result_sha256": "803eafb7a8f1b25f961737170ff8044d0f6258c587c227ba136d49a96f4c622b"
+    },
+    "replacement_run": {
+      "suites_passed": 28,
+      "tests_passed": 1591,
+      "skips": 0,
+      "result_sha256": "be70f0d4902f60bf892afc2504901d90f2d505d2be0432c03bee46f1d32c0569"
+    },
+    "replaced_suites": [
+      "uploaded-file-scan-http.test.ts",
+      "invoice-document-attach-ownership.test.ts",
+      "tenant-trades-invoice-http.test.ts",
+      "tenant-transaction-refund-http.test.ts",
+      "route-policy-all-methods.test.ts",
+      "tenant-transaction-refund-storage.test.ts",
+      "route-matrix-served-public.test.ts",
+      "route-matrix.test.ts",
+      "no-board-address-retired.test.ts",
+      "c10-batch-5-account.test.ts",
+      "quote-accept-billing-refusal.test.ts",
+      "route-matrix-own-gates.test.ts",
+      "cross-site-guard.test.ts",
+      "route-policy-inventory.test.ts",
+      "api-route-contract.test.ts",
+      "tenant-property-invoice-send-http.test.ts",
+      "tenant-trades-create-storage.test.ts",
+      "route-policy-facts.test.ts",
+      "no-board-sale-flag-off.test.ts",
+      "route-policy-review.test.ts",
+      "durable-notification-pipeline.test.ts",
+      "payment-email-adapter.test.ts",
+      "tenant-trades-invoice-storage.test.ts",
+      "payment-realtime-delivery.test.ts",
+      "payment-delivery-receivers.test.ts",
+      "tenant-property-invoice-storage.test.ts",
+      "payment-service-worker-delivery.test.ts",
+      "payment-worker-bootstrap.test.ts"
+    ]
+  },
+  "client": {
+    "suites_passed": 133,
+    "tests_passed": 1504,
+    "skips": 0,
+    "result_sha256": "1054395309889051640eefb4eff2445a707c1098fd343b4e07d2dbae7916d595"
+  },
+  "postgres": {
+    "durability": {
+      "passed": 74,
+      "log_sha256": "9024c050e9ffdd5dca46ebefd5bb4082a41ba6eee4ff9f22db1ed07cf02b6947"
+    },
+    "subscriptions": {
+      "passed": 19,
+      "log_sha256": "b45b8999ffacffa96d6223490d8b3d9585f8fdb2f364bbc7be07a70a13052244"
+    },
+    "commands": {
+      "passed": 15,
+      "log_sha256": "82f183682096329c3aaa6f07c9ec4cc2f72731516d4a73d85e62615e8b094cc0"
+    },
+    "http": {
+      "passed": 24,
+      "log_sha256": "e67164aaf98f90e069ab5b29fec8efbda92d25a8f740223f489c92b9280683ed"
+    },
+    "delivery": {
+      "passed": 11,
+      "log_sha256": "00b610984c0169f74e04afd25f3a35eae257b5379abe9359eb70f88121370669"
+    }
+  },
+  "schema": [
+    {
+      "target": "r3_integrated_scratch",
+      "migrations": 49,
+      "digest": "sha256:800ae81466f3165b21366a31159c863e952f347d4188d12824cd4d35f0b564ef",
+      "counts": {
+        "tables": 53,
+        "sequences": 22,
+        "columns": 773,
+        "constraints": 341,
+        "primaryKeyConstraints": 53,
+        "uniqueConstraints": 45,
+        "checkConstraints": 146,
+        "foreignKeyConstraints": 97,
+        "foreignKeys": 97,
+        "indexes": 180,
+        "foreignKeyColumnDefaults": 0,
+        "views": 0,
+        "triggers": 30,
+        "routines": 7,
+        "policies": 0,
+        "extensions": 1,
+        "types": 0,
+        "defaultPrivileges": 0,
+        "grantsBeyondOwner": 1
+      },
+      "preservedRows": {
+        "rent_invoices": 968,
+        "job_invoices": 774,
+        "quotes": 197,
+        "unvalidated_constraints": 0
+      }
+    },
+    {
+      "target": "r3_integrated_restore",
+      "migrations": 49,
+      "digest": "sha256:800ae81466f3165b21366a31159c863e952f347d4188d12824cd4d35f0b564ef",
+      "counts": {
+        "tables": 53,
+        "sequences": 22,
+        "columns": 773,
+        "constraints": 341,
+        "primaryKeyConstraints": 53,
+        "uniqueConstraints": 45,
+        "checkConstraints": 146,
+        "foreignKeyConstraints": 97,
+        "foreignKeys": 97,
+        "indexes": 180,
+        "foreignKeyColumnDefaults": 0,
+        "views": 0,
+        "triggers": 30,
+        "routines": 7,
+        "policies": 0,
+        "extensions": 1,
+        "types": 0,
+        "defaultPrivileges": 0,
+        "grantsBeyondOwner": 1
+      },
+      "preservedRows": {
+        "rent_invoices": 1000,
+        "job_invoices": 1000,
+        "quotes": 1000,
+        "unvalidated_constraints": 0
+      }
+    }
+  ],
+  "other_checks": {
+    "typecheck": "passed",
+    "production_build": "passed",
+    "postgres_verifier_safety": "8 passed, no skips",
+    "schema_fingerprint_contract": "28 passed, no skips",
+    "baseline_structural_contract": "580 requirements on each owned schema; historical test-data predicates excluded",
+    "route_inventory": "194 registrations, no unclassified or suspected gaps",
+    "tenant_inventory": "273 storage methods"
+  },
+  "remote_review": {
+    "claude_sha": "021d3f05e60284c8aa56703f4657c2c9c07f3448",
+    "disposition": "Read-only review; selective equivalent R3 corrections, no wholesale merge or R4 implementation"
+  },
+  "external_gates": [
+    "Windcave UAT on this candidate: purchase, card setup, stored-card charge, timeout/retry, final-decline lifecycle and session/X-ID recovery",
+    "Production-sized restore, historical identity/status counts, UTC, migration lock/timing review and separate approved migration/deployment release"
+  ]
+}

@@ -44,8 +44,8 @@ test.each(["owner", "member", "admin"])("%s can cancel; merchants use no global 
   const effects = observeRefusalEffects();
   try {
     const retry = await request(app).post(`/api/transactions/${transaction.id}/cancel`).set(signedIn(caller));
-    expect(retry.status).toBe(400);
-    expect(retry.body).toEqual({ message: "Cannot cancel transaction with status: cancelled" });
+    expect(retry.status).toBe(200);
+    expect(retry.body).toEqual(res.body);
     expect(storageSnapshot()).toBe(before);
     effects.assertNone();
   } finally { effects.restore(); }
@@ -71,13 +71,9 @@ test.each(["ownership", "completed"])("cancellation refuses a concurrent %s chan
   try {
     const res = await request(app).post(`/api/transactions/${transaction.id}/cancel`).set(signedIn(owner));
     expect(afterChange).toBeDefined();
-    // OI-1 (docs/decisions/2026-10-13-cancel-after-payment-attempt-owner-decision.md): a sale paid
-    // while the cancel ran is reported as just paid.
-    if (change === "ownership") expect(res.status).toBe(404);
-    else {
-      expect(res.status).toBe(409);
-      expect(res.body).toEqual({ code: "PAYMENT_COMPLETED", message: "This sale has just been paid" });
-    }
+    // R3 integration: a sale found paid at cancel answers 409 PAYMENT_COMPLETED, so the terminal can say so.
+    expect(res.status).toBe(change === "ownership" ? 404 : 409);
+    if (change !== "ownership") expect(res.body.code).toBe("PAYMENT_COMPLETED");
     expect(storageSnapshot()).toBe(afterChange);
     effects.assertNone();
   } finally { effects.restore(); }
