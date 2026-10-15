@@ -79,10 +79,15 @@ describe("R1-T1 — the harness is production's app, and nothing else", () => {
     await request(app).get(`/api/not-a-route/${jwtShaped}`);
     await request(app).get("/not-an-api-page");
 
-    expect(requestLog).toEqual([
-      expect.stringMatching(/^GET \/api\/pay\/t\/:token 404 in \d+ms$/),
-      expect.stringMatching(/^GET \/api\/not-a-route\/\[REDACTED_JWT\] 404 in \d+ms$/),
+    const entries=requestLog.map(line=>JSON.parse(line));
+    expect(entries).toEqual([
+      expect.objectContaining({event:'http_request',method:'GET',route:'/api/pay/t/:token',status:404}),
+      expect.objectContaining({event:'http_request',method:'GET',route:'[unmatched]',status:404}),
     ]);
+    for(const entry of entries){
+      expect(entry.requestId).toMatch(/^[0-9a-f-]{36}$/);
+      expect(entry.durationMs).toBeGreaterThanOrEqual(0);
+    }
     expect(requestLog.join("\n")).not.toContain(rawToken);
     expect(requestLog.join("\n")).not.toContain(jwtShaped);
   });

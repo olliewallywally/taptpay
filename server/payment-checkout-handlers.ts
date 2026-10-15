@@ -1,3 +1,4 @@
+import {logOperation} from "./structured-log";
 import type {Request,Response,RequestHandler} from 'express';
 import {z} from 'zod';
 import type {IStorage} from './storage';
@@ -60,7 +61,7 @@ export function createRetailCheckoutHandlers(deps:{storage:IStorage;attempts:Pay
       if(result.kind==='processing'){res.status(202).json({...result,outcome:'pending',processing:true});return;}
       if(result.kind==='expired'){res.status(409).json({code:'PAYMENT_ATTEMPT_EXPIRED',message:'This payment window expired before it was sent. Try again.'});return;}
       res.status(result.kind==='not-found'?404:result.kind==='conflict'?409:503).json({message:result.kind==='conflict'?'Another payment attempt is active':'Payment initiation is unavailable'});
-    }catch {console.error('[RETAIL_SESSION_UNAVAILABLE]');res.status(503).json({message:'Payment session is still being confirmed'});}
+    }catch {logOperation("error","RETAIL_SESSION_UNAVAILABLE",{payload:['[RETAIL_SESSION_UNAVAILABLE]']});res.status(503).json({message:'Payment session is still being confirmed'});}
   };
   const complete=(token:boolean,wallet=false):RequestHandler=>async(req,res)=>{
     res.set({'Cache-Control':'private, no-store','Referrer-Policy':'no-referrer'});
@@ -90,7 +91,7 @@ export function createRetailCheckoutHandlers(deps:{storage:IStorage;attempts:Pay
       const current=await attempts.getAttempt(attempt.id);
       if(!current || !['approved','declined','cancelled'].includes(current.state)){processing(res);return;}
       res.json(outcome(current));
-    }catch {console.error('[RETAIL_COMPLETION_UNAVAILABLE]');processing(res);}
+    }catch {logOperation("error","RETAIL_COMPLETION_UNAVAILABLE",{payload:['[RETAIL_COMPLETION_UNAVAILABLE]']});processing(res);}
   };
   const returnState:RequestHandler=async(req,res)=>{
     res.set({'Cache-Control':'private, no-store','Referrer-Policy':'no-referrer'});
@@ -118,7 +119,7 @@ export function createRetailCheckoutHandlers(deps:{storage:IStorage;attempts:Pay
       const receiptSplitId=sale && sale.paymentTokenHash==null && final.approved && final.receiptShare
         ? (await storage.getSplitPaymentsByTransaction(sale.id)).find(split=>split.splitIndex===final.receiptShare)?.id : null;
       res.json({...final,...(sale && sale.paymentTokenHash==null?{transactionId:sale.id,receiptSplitId:receiptSplitId??null}:{})});
-    }catch {console.error('[PAYMENT_RETURN_UNAVAILABLE]');processing(res);}
+    }catch {logOperation("error","PAYMENT_RETURN_UNAVAILABLE",{payload:['[PAYMENT_RETURN_UNAVAILABLE]']});processing(res);}
   };
   const numericReturn:RequestHandler=async(req,res)=>{
     res.set({'Cache-Control':'private, no-store','Referrer-Policy':'no-referrer'});

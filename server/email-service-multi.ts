@@ -1,3 +1,4 @@
+import {logOperation} from "./structured-log";
 import { Resend } from 'resend';
 import nodemailer from 'nodemailer';
 import { config } from './config';
@@ -55,7 +56,7 @@ function createSmtpTransporter() {
 
 async function sendWithResend(params: EmailParams): Promise<boolean> {
   if (!resendClient) {
-    console.log('Resend not configured');
+    logOperation("info","RESEND_NOT_CONFIGURED",{payload:['Resend not configured']});
     return false;
   }
   try {
@@ -67,13 +68,13 @@ async function sendWithResend(params: EmailParams): Promise<boolean> {
       html: params.html,
     } as Parameters<typeof resendClient.emails.send>[0]);
     if (error) {
-      console.error('Resend email error:', error);
+      logOperation("error","RESEND_EMAIL_ERROR",{payload:['Resend email error:',error]});
       return false;
     }
-    console.log('✅ Email sent via Resend');
+    logOperation("info","EMAIL_SENT_VIA_RESEND",{payload:['✅ Email sent via Resend']});
     return true;
   } catch (error) {
-    console.error('Resend email exception:', error);
+    logOperation("error","RESEND_EMAIL_EXCEPTION",{payload:['Resend email exception:',error]});
     return false;
   }
 }
@@ -89,26 +90,26 @@ async function sendWithSmtp(params: EmailParams): Promise<boolean> {
       text: params.text,
       html: params.html,
     });
-    console.log(`✅ Email sent via ${EMAIL_CONFIG.provider}`);
+    logOperation("info","EMAIL_SENT_VIA",{payload:[`✅ Email sent via ${EMAIL_CONFIG.provider}`]});
     return true;
   } catch (error) {
-    console.error(`${EMAIL_CONFIG.provider} email error:`, error);
+    logOperation("error","EMAIL_ERROR",{payload:[`${EMAIL_CONFIG.provider} email error:`,error]});
     return false;
   }
 }
 
 function simulateEmail(params: EmailParams): boolean {
-  console.log('\n=== SIMULATED EMAIL ===');
-  console.log(`To: ${params.to}`);
-  console.log(`From: ${params.from}`);
-  console.log(`Subject: ${params.subject}`);
-  if (params.text) console.log(`Text: ${params.text.substring(0, 100)}...`);
-  console.log('=====================\n');
+  logOperation("info","SIMULATED_EMAIL",{payload:['\n=== SIMULATED EMAIL ===']});
+  logOperation("info","TO",{payload:[`To: ${params.to}`]});
+  logOperation("info","FROM",{payload:[`From: ${params.from}`]});
+  logOperation("info","SUBJECT",{payload:[`Subject: ${params.subject}`]});
+  if (params.text) logOperation("info","TEXT",{payload:[`Text: ${params.text.substring(0, 100)}...`]});
+  logOperation("info","RUNTIME_DIAGNOSTIC",{payload:['=====================\n']});
   return true;
 }
 
 export async function sendEmailMulti(params: EmailParams): Promise<boolean> {
-  console.log(`Sending email via ${EMAIL_CONFIG.provider}`);
+  logOperation("info","SENDING_EMAIL_VIA",{payload:[`Sending email via ${EMAIL_CONFIG.provider}`]});
 
   let success = false;
 
@@ -118,7 +119,7 @@ export async function sendEmailMulti(params: EmailParams): Promise<boolean> {
     success = await sendWithSmtp(params);
     // Resend as fallback
     if (!success && resendClient) {
-      console.log('SMTP failed, falling back to Resend...');
+      logOperation("info","SMTP_FAILED_FALLING_BACK_TO_RESEND",{payload:['SMTP failed, falling back to Resend...']});
       success = await sendWithResend(params);
     }
   }
@@ -128,10 +129,10 @@ export async function sendEmailMulti(params: EmailParams): Promise<boolean> {
     // explicitly opted into simulation. In production a genuine delivery failure
     // must surface as a failure, not be masked by a fake "sent" result.
     if (config.isProduction && EMAIL_CONFIG.provider !== 'simulation') {
-      console.error(`❌ Email delivery failed (provider="${EMAIL_CONFIG.provider}", resendConfigured=${!!resendClient}) — "${params.subject}" to ${params.to}`);
+      logOperation("error","EMAIL_DELIVERY_FAILED_PROVIDER_RESENDCONFIGURED_TO",{payload:[`❌ Email delivery failed (provider="${EMAIL_CONFIG.provider}", resendConfigured=${!!resendClient}) — "${params.subject}" to ${params.to}`]});
       return false;
     }
-    console.log('All providers failed, using simulation mode');
+    logOperation("info","ALL_PROVIDERS_FAILED_USING_SIMULATION_MODE",{payload:['All providers failed, using simulation mode']});
     success = simulateEmail(params);
   }
 
@@ -290,12 +291,12 @@ export async function sendBoardBuilderEmail(order: BoardPrintOrder): Promise<boo
         attachments: [{ filename: email.filename, content: email.attachment }],
       });
       if (!error) {
-        console.log('✅ Board builder email sent via Resend');
+        logOperation("info","BOARD_BUILDER_EMAIL_SENT_VIA_RESEND",{payload:['✅ Board builder email sent via Resend']});
         return true;
       }
-      console.error('Resend board builder error:', error);
+      logOperation("error","RESEND_BOARD_BUILDER_ERROR",{payload:['Resend board builder error:',error]});
     } catch (err) {
-      console.error('Resend board builder exception:', err);
+      logOperation("error","RESEND_BOARD_BUILDER_EXCEPTION",{payload:['Resend board builder exception:',err]});
     }
   }
 
@@ -310,14 +311,14 @@ export async function sendBoardBuilderEmail(order: BoardPrintOrder): Promise<boo
         html: email.html,
         attachments: [{ filename: email.filename, content: email.attachment, contentType: 'application/pdf' }],
       });
-      console.log('✅ Board builder email sent via SMTP');
+      logOperation("info","BOARD_BUILDER_EMAIL_SENT_VIA_SMTP",{payload:['✅ Board builder email sent via SMTP']});
       return true;
     } catch (err) {
-      console.error('SMTP board builder error:', err);
+      logOperation("error","SMTP_BOARD_BUILDER_ERROR",{payload:['SMTP board builder error:',err]});
     }
   }
 
-  console.log('[SIMULATED] Board builder email to', PRINT_TARGET, 'for', order.businessName);
+  logOperation("info","SIMULATED_BOARD_BUILDER_EMAIL_TO",{payload:['[SIMULATED] Board builder email to',PRINT_TARGET,'for',order.businessName]});
   return true;
 }
 

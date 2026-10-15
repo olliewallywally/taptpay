@@ -1,3 +1,5 @@
+import {randomUUID} from "node:crypto";
+import {runWithOperationContext} from "./operation-context";
 import type { ProviderExpectation, ProviderQueryResult, ReconciliationProvider, ReconciliationRepository,
   ReconciliationError, InboxClaim } from "./durable-payment-contract";
 import { isSessionId, isUuid } from "./durable-payment-contract";
@@ -21,6 +23,7 @@ export class PaymentReconciliationWorker {
     private readonly audit:(action:string,details:Record<string,unknown>)=>unknown=writeSecurityAuditEvent) {}
 
   async runOne(owner: string, sessionId?:string): Promise<boolean> {
+    return runWithOperationContext({jobId:randomUUID()},async()=>{
     if (!isUuid(owner)) throw new Error("invalid_worker_owner");
     if(sessionId!==undefined && !isSessionId(sessionId))throw new Error('invalid_worker_session');
     const claim = await this.repository.claimInbox(owner, this.clock(),sessionId);
@@ -65,6 +68,8 @@ export class PaymentReconciliationWorker {
       await this.retry(claim, "internal_error").catch(() => undefined);
     }
     return true;
+
+    });
   }
 
   private async deadLetter(claim:InboxClaim,code:ReconciliationError,transactionId?:string,cause?:ReconciliationError):Promise<boolean>{

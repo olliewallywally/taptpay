@@ -1,5 +1,10 @@
 # Claude repository handoff
 
+**R6 is in progress on `remediation/r6-operations-20261015`.** Read
+`docs/HANDOFF-2026-10-15-r6-inflight.md` for the verified first logging/inventory
+slice, pending D9 question and remaining cron/readiness work. It is
+not a phase-complete or deployment handoff. Preserve owner app PID4196.
+
 **R5 repository implementation completed on `remediation/r5-encryption-20261014`
 (October 14).** Read `docs/HANDOFF-2026-10-14-r5-repository-complete.md`, its frozen
 verification/source manifest and final review before further R5 or migration work.

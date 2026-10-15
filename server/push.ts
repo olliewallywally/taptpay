@@ -1,3 +1,4 @@
+import {logOperation} from "./structured-log";
 import webpush from "web-push";
 import http2 from "http2";
 import jwt from "jsonwebtoken";
@@ -22,7 +23,7 @@ let pushInitialized = false;
 function initPush() {
   if (pushInitialized) return;
   if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
-    console.warn("VAPID keys not configured - web push notifications disabled");
+    logOperation("warn","VAPID_KEYS_NOT_CONFIGURED_WEB_PUSH_NOTIFICATIONS_DISABLED",{payload:["VAPID keys not configured - web push notifications disabled"]});
     return;
   }
   webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
@@ -153,7 +154,7 @@ function getApnsJwt(): string | null {
     apnsJwtIssuedAt = nowSecs;
     return apnsJwtToken;
   } catch (err) {
-    console.error("APNs JWT signing failed:", err);
+    logOperation("error","APNS_JWT_SIGNING_FAILED",{payload:["APNs JWT signing failed:",err]});
     return null;
   }
 }
@@ -264,10 +265,10 @@ async function sendNativePushToMerchant(
 
   const failed = results.filter((r) => r.status === "rejected");
   if (failed.length > 0) {
-    console.log(`APNs: ${results.length - failed.length}/${results.length} delivered`);
+    logOperation("info","APNS_DELIVERED",{payload:[`APNs: ${results.length - failed.length}/${results.length} delivered`]});
     for (const f of failed) {
       if (f.status === "rejected") {
-        console.error("APNs delivery error:", (f as PromiseRejectedResult).reason?.message);
+        logOperation("error","APNS_DELIVERY_ERROR",{payload:["APNs delivery error:",(f as PromiseRejectedResult).reason?.message]});
       }
     }
   }
@@ -303,11 +304,11 @@ export async function sendPushToMerchant(
   // endpoints were checked is never contacted unless it is a push service's; it is turned off.
   const webSubs = browserSubs.filter((sub) => isPushServiceEndpoint(sub.endpoint));
   for (const refused of browserSubs.filter((sub) => !isPushServiceEndpoint(sub.endpoint))) {
-    console.error("[PUSH_ENDPOINT_REFUSED]", { subscriptionId: refused.id });
+    logOperation("error","PUSH_ENDPOINT_REFUSED",{payload:["[PUSH_ENDPOINT_REFUSED]",{ subscriptionId: refused.id }]});
     try {
       await storage.deactivatePushSubscription(refused.id);
     } catch (error) {
-      console.error("[PUSH_ENDPOINT_REFUSED_DEACTIVATE]", error);
+      logOperation("error","PUSH_ENDPOINT_REFUSED_DEACTIVATE",{payload:["[PUSH_ENDPOINT_REFUSED_DEACTIVATE]",error]});
     }
   }
 
@@ -336,9 +337,7 @@ export async function sendPushToMerchant(
     result.delivered += results.length - failed;
     result.failed += failed;
     if (failed > 0) {
-      console.log(
-        `Web push: ${results.length - failed}/${results.length} delivered for merchant ${merchantId}`,
-      );
+      logOperation("info","WEB_PUSH_DELIVERED_FOR_MERCHANT",{payload:[`Web push: ${results.length - failed}/${results.length} delivered for merchant ${merchantId}`]});
     }
   }
 

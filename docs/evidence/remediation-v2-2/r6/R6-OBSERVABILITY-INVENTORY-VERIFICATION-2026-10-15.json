@@ -1,0 +1,111 @@
+{
+  "date": "2026-10-15",
+  "branch": "remediation/r6-operations-20261015",
+  "base": "3534978f1443dad6429fdd902bbc833836048c88",
+  "scope": "R6 structured logging/context and read-only current entitlement inventory only",
+  "officialR6Exit": false,
+  "sourceManifest": "R6-OBSERVABILITY-INVENTORY-source-sha256-2026-10-15.txt",
+  "sourceFiles": 54,
+  "server": {
+    "mode": "complete-file union; failed suites replaced by complete later reruns, never added twice",
+    "expectedSuites": 224,
+    "coveredSuites": 224,
+    "passedTests": 5169,
+    "failedTests": 0,
+    "pendingTests": 0,
+    "missingSuites": 0,
+    "runs": [
+      {
+        "name": "logging-full-other",
+        "sha256": "9629f096621ab6489e01a8502aeb6b9bcd7d965c1adba660abc151d20d3fb9cb",
+        "success": false,
+        "suites": 221,
+        "passedTests": 5135,
+        "failedTests": 9,
+        "pendingTests": 0
+      },
+      {
+        "name": "final-focused",
+        "sha256": "e4f2d74c613fb246c354a010146b2d57f885be30d3a6c5fe9421e055e90fdde7",
+        "success": true,
+        "suites": 10,
+        "passedTests": 127,
+        "failedTests": 0,
+        "pendingTests": 0
+      },
+      {
+        "name": "auth-throttle-final",
+        "sha256": "f738922c5180b4733ddaec1ebd07271a94755a385c237bde7f7d3c57ce88b877",
+        "success": true,
+        "suites": 1,
+        "passedTests": 18,
+        "failedTests": 0,
+        "pendingTests": 0
+      },
+      {
+        "name": "replaced-suites-final",
+        "sha256": "17488522330b5adea1746a66cac6912a52d0f77b9b55c8d62a57098e3b1ba84c",
+        "success": true,
+        "suites": 5,
+        "passedTests": 81,
+        "failedTests": 0,
+        "pendingTests": 0
+      }
+    ]
+  },
+  "cli": {
+    "command": "npm run test:r6:cli",
+    "passed": 4,
+    "failed": 0,
+    "skipped": 0,
+    "logSha256": "f9a3407de3b40c3ce653861bb864e92c9c268cc39cf6f67d9edb07b9b86e5f9c"
+  },
+  "postgres": {
+    "command": "node --import tsx scripts/verify-r6-entitlement-postgres.ts",
+    "checks": 4,
+    "syntheticMerchants": 6,
+    "syntheticSubscriptions": 5,
+    "readOnlyWriteRefused": true,
+    "originalSourceUnchanged": true,
+    "inventoryMutations": 0,
+    "providerCalls": 0,
+    "logSha256": "6604cdf5185d614b05eb5986ce1bdbc2963c8a17d4162a701f54152f721e03e4"
+  },
+  "checks": [
+    {
+      "command": "npm run check",
+      "outcome": "passed",
+      "logSha256": "0fedab01a35ca9fca53fe6fd66268f14af56d83677404c554d736f962da99fb3"
+    },
+    {
+      "command": "npm run check:r6",
+      "outcome": "passed",
+      "logSha256": "68e094c1b46c8639af0f6b631a06958347fba5f7c39058b48f157e9147147a36"
+    },
+    {
+      "command": "npm run build",
+      "outcome": "passed",
+      "logSha256": "b74386e13420809f90b80487f05b4296ba85f647eba9aae75792bd722efcfc2a"
+    },
+    {
+      "command": "esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+      "outcome": "passed after final server-only context changes; existing successful client build reused",
+      "logSha256": "2364179c6658c5e6a96aa54bc9a5228a222665357072323e719c2d9da2873d3e"
+    }
+  ],
+  "failureHistory": [
+    "Initial broad run was interrupted after three authentication timeouts; those three cases and then the entire 18-test authentication file passed with unchanged assertions/timeouts.",
+    "Completed broad run had nine failures in five suites: old audit joins/console/HTTP format expectations and two now-stale analytics error disclosure records. All five complete suites passed after the functional correlation fix and updated structured format assertions.",
+    "An intermediate focused command named three nonexistent legacy test filenames. It had runtime loading errors and is not a passing verification. Corrected explicit paths passed.",
+    "Failing-first tests demonstrated missing request/job context, hostile error metadata/code leakage and omitted merchants without subscriptions. PostgreSQL probe qualification was corrected for the deliberately restricted search path."
+  ],
+  "notPerformed": [
+    "shared/live migration or inventory",
+    "D9 access/provenance changes or after-policy assessment",
+    "Windcave or message provider calls/UAT",
+    "durable cron/readiness/shutdown implementation",
+    "R4 merge, main merge or deployment",
+    "remote CI execution",
+    "new client/device regression run"
+  ]
+}

@@ -1,3 +1,6 @@
+import {logOperation} from "./structured-log";
+import {runWithOperationContext} from "./operation-context";
+import {safeErrorSummary} from "./log-redaction";
 import {SubscriptionCommandConflict} from './subscription-command';
 import {getPaymentRuntime} from './payment-runtime-default';
 import {createDurablePaymentNotificationHandlers} from './durable-payment-notification';
@@ -668,7 +671,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       });
 
       if (!tokenRes.ok) {
-        console.error('Google token exchange failed:', tokenRes.status);
+        logOperation("error","GOOGLE_TOKEN_EXCHANGE_FAILED",{payload:['Google token exchange failed:',tokenRes.status]});
         return res.redirect(googleSignInError('Google sign in failed'));
       }
 
@@ -758,10 +761,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       });
       res.cookie(googleCookies.handoff.name, handoff.code, googleCookies.handoff.options);
       await storage.settleAuthThrottle(addressBuckets, "void", new Date())
-        .catch((error) => console.error("[GOOGLE_ADDRESS_THROTTLE_RETURN]", error));
+        .catch((error) => logOperation("error","GOOGLE_ADDRESS_THROTTLE_RETURN",{payload:["[GOOGLE_ADDRESS_THROTTLE_RETURN]",error]}));
       return res.redirect('/login?google=complete');
     } catch (err) {
-      console.error('Google OAuth callback error:', err);
+      logOperation("error","GOOGLE_OAUTH_CALLBACK_ERROR",{payload:['Google OAuth callback error:',err]});
       return res.redirect(googleSignInError('Google sign in failed. Please try again.'));
     }
   });
@@ -786,7 +789,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const session = await startBusinessSession(req, res, issued);
       return res.json({ merchantId: issued.merchantId, newUser: redeemed.newUser, csrfToken: session.csrfToken });
     } catch (err) {
-      console.error('[GOOGLE_SESSION]', err);
+      logOperation("error","GOOGLE_SESSION",{payload:['[GOOGLE_SESSION]',err]});
       return res.status(500).json({ message: 'Google sign in failed. Please try again.' });
     }
   });
@@ -867,7 +870,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       } catch (error) {
         if (!(error instanceof AppleSignInError)) throw error;
         // The reason only: never the code, the token or anything in it.
-        console.error('[APPLE_SIGN_IN]', error.reason);
+        logOperation("error","APPLE_SIGN_IN",{payload:['[APPLE_SIGN_IN]',error.reason]});
         return back(appleSignInError(
           error.reason === 'grant-refused' ? 'Apple sign in was not completed. Please try again.'
             : error.reason === 'unreachable' ? 'Apple sign in is unavailable right now. Please try again.'
@@ -922,12 +925,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       });
       res.cookie(appleCookies.handoff.name, handoff.code, appleCookies.handoff.options);
       await storage.settleAuthThrottle(addressBuckets, "void", new Date())
-        .catch((error) => console.error("[APPLE_ADDRESS_THROTTLE_RETURN]", error));
+        .catch((error) => logOperation("error","APPLE_ADDRESS_THROTTLE_RETURN",{payload:["[APPLE_ADDRESS_THROTTLE_RETURN]",error]}));
       return back('/login?apple=complete');
     } catch (err) {
       // Two first sign-ins at once: the second finds the address or the identity taken. Either way
       // nothing half-made is left, and trying again signs in.
-      console.error('[APPLE_SIGN_IN]', err instanceof Error ? err.name : 'error');
+      logOperation("error","APPLE_SIGN_IN",{payload:['[APPLE_SIGN_IN]',err instanceof Error ? err.name : 'error']});
       return back(appleSignInError('Apple sign in failed. Please try again.'));
     }
   });
@@ -950,7 +953,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const session = await startBusinessSession(req, res, issued);
       return res.json({ merchantId: issued.merchantId, newUser: redeemed.newUser, csrfToken: session.csrfToken });
     } catch (err) {
-      console.error('[APPLE_SESSION]', err);
+      logOperation("error","APPLE_SESSION",{payload:['[APPLE_SESSION]',err]});
       return res.status(500).json({ message: 'Apple sign in failed. Please try again.' });
     }
   });
@@ -975,7 +978,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const identity = await storage.getAppleIdentityForLogin(login.userId);
       return res.json(appleConnectionDto(identity, appleOffered()));
     } catch (err) {
-      console.error('[APPLE_CONNECTION]', err);
+      logOperation("error","APPLE_CONNECTION",{payload:['[APPLE_CONNECTION]',err]});
       return res.status(500).json({ message: 'Could not read the Apple connection. Please try again.' });
     }
   });
@@ -1002,7 +1005,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       res.cookie(appleCookies.oauth.name, start.cookieValue, appleCookies.oauth.options);
       return res.json({ url: appleAuthorizeUrl(settings, `${getBaseUrl(req)}/api/auth/apple/callback`, start) });
     } catch (err) {
-      console.error('[APPLE_CONNECT_START]', err);
+      logOperation("error","APPLE_CONNECT_START",{payload:['[APPLE_CONNECT_START]',err]});
       return res.status(500).json({ message: 'Could not start connecting Apple. Please try again.' });
     }
   });
@@ -1022,7 +1025,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       logSecurityEvent('APPLE_DISCONNECTED', { userId: login.userId, removed });
       return res.json({ connected: false });
     } catch (err) {
-      console.error('[APPLE_DISCONNECT]', err);
+      logOperation("error","APPLE_DISCONNECT",{payload:['[APPLE_DISCONNECT]',err]});
       return res.status(500).json({ message: 'Could not disconnect Apple. Please try again.' });
     }
   });
@@ -1069,7 +1072,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       return false;
     }
     await storage.settleAuthThrottle([throttleBucket], "success", new Date())
-      .catch((error) => console.error("[PASSWORD_CHECK_THROTTLE_CLEAR]", error));
+      .catch((error) => logOperation("error","PASSWORD_CHECK_THROTTLE_CLEAR",{payload:["[PASSWORD_CHECK_THROTTLE_CLEAR]",error]}));
     return true;
   }
 
@@ -1118,7 +1121,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       } catch (error) {
         if (!(error instanceof AppleSignInError)) throw error;
         // The reason only: never the code, the token or anything in it.
-        console.error('[APPLE_CONNECT]', error.reason);
+        logOperation("error","APPLE_CONNECT",{payload:['[APPLE_CONNECT]',error.reason]});
         return done(error.reason === 'unreachable' ? "unavailable" : "failed");
       }
 
@@ -1138,11 +1141,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // By login id only: no Apple subject, token or email. The same identity again changed nothing.
       if (outcome === "connected") logSecurityEvent('APPLE_CONNECTED', { userId: start.userId });
       await storage.settleAuthThrottle(addressBuckets, "void", new Date())
-        .catch((error) => console.error("[APPLE_ADDRESS_THROTTLE_RETURN]", error));
+        .catch((error) => logOperation("error","APPLE_ADDRESS_THROTTLE_RETURN",{payload:["[APPLE_ADDRESS_THROTTLE_RETURN]",error]}));
       return done("connected");
     } catch (err) {
       // The name only: a storage error's text can carry the row it refused, Apple's subject included.
-      console.error('[APPLE_CONNECT]', err instanceof Error ? err.name : 'error');
+      logOperation("error","APPLE_CONNECT",{payload:['[APPLE_CONNECT]',err instanceof Error ? err.name : 'error']});
       return done("failed");
     }
   }
@@ -1164,13 +1167,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // must not answer "try again": the spent token could never retry it.
       // R1-T4 phase E: the version already refuses every session; this records why on each.
       await endLoginSessions(userId, 'sign_out_everywhere')
-        .catch((error) => console.error("[SIGN_OUT_EVERYWHERE_SESSIONS]", error));
+        .catch((error) => logOperation("error","SIGN_OUT_EVERYWHERE_SESSIONS",{payload:["[SIGN_OUT_EVERYWHERE_SESSIONS]",error]}));
       if (req.authSession) clearSessionCookie(res, req.authSession.realm);
       await storage.deactivatePushSubscriptionsForLogin(req.user!.merchantId, userId)
-        .catch((error) => console.error("[SIGN_OUT_EVERYWHERE_PUSH_STOP]", error));
+        .catch((error) => logOperation("error","SIGN_OUT_EVERYWHERE_PUSH_STOP",{payload:["[SIGN_OUT_EVERYWHERE_PUSH_STOP]",error]}));
       return res.status(204).end();
     } catch (err) {
-      console.error('[SIGN_OUT_EVERYWHERE]', err);
+      logOperation("error","SIGN_OUT_EVERYWHERE",{payload:['[SIGN_OUT_EVERYWHERE]',err]});
       return res.status(500).json({ message: 'Could not sign out everywhere. Please try again.' });
     }
   });
@@ -1189,7 +1192,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
       return res.status(204).end();
     } catch (err) {
-      console.error('[LOGOUT]', err);
+      logOperation("error","LOGOUT",{payload:['[LOGOUT]',err]});
       return res.status(500).json({ message: 'Could not sign out. Please try again.' });
     }
   });
@@ -1249,10 +1252,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
 
       await storage.settleAuthThrottle([bucket], "success", new Date())
-        .catch((error) => console.error("[LOGIN_THROTTLE_CLEAR]", error));
+        .catch((error) => logOperation("error","LOGIN_THROTTLE_CLEAR",{payload:["[LOGIN_THROTTLE_CLEAR]",error]}));
       // A success gives its address try back; it never clears the address's count.
       await storage.settleAuthThrottle(addressBuckets, "void", new Date())
-        .catch((error) => console.error("[LOGIN_ADDRESS_THROTTLE_RETURN]", error));
+        .catch((error) => logOperation("error","LOGIN_ADDRESS_THROTTLE_RETURN",{payload:["[LOGIN_ADDRESS_THROTTLE_RETURN]",error]}));
       markSignInDevice(res, merchantDeviceCookie, device, email);
       logSecurityEvent('LOGIN_SUCCESS', { email, ip: clientIp, userId: user.id });
 
@@ -1310,11 +1313,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // an email, and the reply must not show that it took longer.
       const worked = await replyNoSoonerThan(startedAt, ACCOUNT_EMAIL_REPLY_FLOOR_MS);
       if (worked > ACCOUNT_EMAIL_REPLY_FLOOR_MS) {
-        console.warn(`[FORGOT_PASSWORD_SLOW] took ${Math.round(worked)} ms, over the ${ACCOUNT_EMAIL_REPLY_FLOOR_MS} ms floor`);
+        logOperation("warn","FORGOT_PASSWORD_SLOW_TOOK_MS_OVER_THE_MS_FLOOR",{payload:[`[FORGOT_PASSWORD_SLOW] took ${Math.round(worked)} ms, over the ${ACCOUNT_EMAIL_REPLY_FLOOR_MS} ms floor`]});
       }
       res.json({ message: "If an account with that email exists, a password reset link has been sent." });
     } catch (error) {
-      console.error("Password reset request error:", error);
+      logOperation("error","PASSWORD_RESET_REQUEST_ERROR",{payload:["Password reset request error:",error]});
       res.status(500).json({ message: "Failed to process password reset request" });
     }
   });
@@ -1339,9 +1342,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // stop its devices' notifications too.
       sseBroker.disconnectUser(reset.merchantId, reset.userId);
       await endLoginSessions(reset.userId, 'password_reset')
-        .catch((error) => console.error("[RESET_SESSIONS]", error));
+        .catch((error) => logOperation("error","RESET_SESSIONS",{payload:["[RESET_SESSIONS]",error]}));
       await storage.deactivatePushSubscriptionsForLogin(reset.merchantId, reset.userId)
-        .catch((error) => console.error("[RESET_PUSH_STOP]", error));
+        .catch((error) => logOperation("error","RESET_PUSH_STOP",{payload:["[RESET_PUSH_STOP]",error]}));
       // R1-T4 phase C: the link proved the email is theirs. Forgive the login's
       // sign-in slow-downs — its unknown devices' and every known device's — and
       // count this browser as known from now on.
@@ -1350,13 +1353,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         await storage.forgetAuthThrottle(
           [signInAccountBucket("merchant", login.email).key],
           [signInDeviceKeyPrefix("merchant", login.email)],
-        ).catch((error) => console.error("[RESET_THROTTLE_FORGET]", error));
+        ).catch((error) => logOperation("error","RESET_THROTTLE_FORGET",{payload:["[RESET_THROTTLE_FORGET]",error]}));
         markSignInDevice(res, merchantDeviceCookie, readSignInDevice(req, merchantDeviceCookie), login.email);
       }
 
       res.json({ message: "Password has been successfully reset" });
     } catch (error) {
-      console.error("Password reset error:", error);
+      logOperation("error","PASSWORD_RESET_ERROR",{payload:["Password reset error:",error]});
       res.status(500).json({ message: "Failed to reset password" });
     }
   });
@@ -1371,7 +1374,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // Answer with a failure rather than `valid: false`: the token may be
       // perfectly good, and telling the user it expired would send them back to
       // request another one that fails the same way.
-      console.error("Validate reset token error:", error);
+      logOperation("error","VALIDATE_RESET_TOKEN_ERROR",{payload:["Validate reset token error:",error]});
       res.status(500).json({ message: "Failed to validate the reset link" });
     }
   });
@@ -1426,7 +1429,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const isAdminEmail = !!adminEmail && normalizeThrottleEmail(email) === normalizeThrottleEmail(adminEmail);
       if (isAdminEmail && !adminPasswordHash) {
         await storage.settleAuthThrottle([bucket, ...addressBuckets], "void", new Date()).catch(() => undefined);
-        console.error("CRITICAL: ADMIN_PASSWORD_HASH env var not set. Admin login disabled.");
+        logOperation("error","CRITICAL_ADMIN_PASSWORD_HASH_ENV_VAR_NOT_SET_ADMIN_LOGIN_DISABLE",{payload:["CRITICAL: ADMIN_PASSWORD_HASH env var not set. Admin login disabled."]});
         return res.status(500).json({ message: "Admin login unavailable - contact system administrator" });
       }
       let passwordValid: boolean;
@@ -1449,9 +1452,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
 
       await storage.settleAuthThrottle([bucket], "success", new Date())
-        .catch((error) => console.error("[ADMIN_LOGIN_THROTTLE_CLEAR]", error));
+        .catch((error) => logOperation("error","ADMIN_LOGIN_THROTTLE_CLEAR",{payload:["[ADMIN_LOGIN_THROTTLE_CLEAR]",error]}));
       await storage.settleAuthThrottle(addressBuckets, "void", new Date())
-        .catch((error) => console.error("[ADMIN_LOGIN_ADDRESS_THROTTLE_RETURN]", error));
+        .catch((error) => logOperation("error","ADMIN_LOGIN_ADDRESS_THROTTLE_RETURN",{payload:["[ADMIN_LOGIN_ADDRESS_THROTTLE_RETURN]",error]}));
       markSignInDevice(res, adminDeviceCookie, device, email);
       logSecurityEvent('ADMIN_LOGIN_SUCCESS', { email, ip: clientIp });
 
@@ -1524,7 +1527,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       res.set("Cache-Control", "no-store");
       res.json({ user: await signedInUserDto(req.user!) });
     } catch (error) {
-      console.error("Auth me error:", error);
+      logOperation("error","AUTH_ME_ERROR",{payload:["Auth me error:",error]});
       res.status(500).json({ message: "Failed to load the signed-in user" });
     }
   });
@@ -1541,7 +1544,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!signedIn) return res.json({ signedIn: false });
       return res.json({ signedIn: true, user: await signedInUserDto(signedIn.user), csrfToken: signedIn.csrfToken });
     } catch (error) {
-      console.error("[AUTH_SESSION]", error);
+      logOperation("error","AUTH_SESSION",{payload:["[AUTH_SESSION]",error]});
       return res.status(500).json({ message: "Failed to load the signed-in user" });
     }
   });
@@ -1577,7 +1580,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         progress,
       });
     } catch (error) {
-      console.error("Tutorial state error:", error);
+      logOperation("error","TUTORIAL_STATE_ERROR",{payload:["Tutorial state error:",error]});
       res.status(500).json({ message: "Failed to load tutorial progress" });
     }
   });
@@ -1614,7 +1617,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       );
       res.json({ pageKey: row.pageKey, status: row.status, lastStep: row.lastStep });
     } catch (error) {
-      console.error("Tutorial progress error:", error);
+      logOperation("error","TUTORIAL_PROGRESS_ERROR",{payload:["Tutorial progress error:",error]});
       res.status(500).json({ message: "Failed to save tutorial progress" });
     }
   });
@@ -1634,7 +1637,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         progress: {},
       });
     } catch (error) {
-      console.error("Tutorial restart error:", error);
+      logOperation("error","TUTORIAL_RESTART_ERROR",{payload:["Tutorial restart error:",error]});
       res.status(500).json({ message: "Failed to restart tutorials" });
     }
   });
@@ -1727,7 +1730,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       res.json({ message: "Onboarding details submitted successfully" });
     } catch (error: any) {
-      console.error("Onboarding submission error:", error);
+      logOperation("error","ONBOARDING_SUBMISSION_ERROR",{payload:["Onboarding submission error:",error]});
       res.status(500).json({ message: "Failed to submit onboarding details" });
     }
   });
@@ -1756,7 +1759,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
       return res.status(204).end();
     } catch (error) {
-      console.error("[ADMIN_LOGOUT]", error);
+      logOperation("error","ADMIN_LOGOUT",{payload:["[ADMIN_LOGOUT]",error]});
       return res.status(500).json({ message: "Could not sign out. Please try again." });
     }
   });
@@ -1812,7 +1815,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       res.send(qrBuffer);
     } catch (error) {
-      console.error("Stone QR code generation error:", error);
+      logOperation("error","STONE_QR_CODE_GENERATION_ERROR",{payload:["Stone QR code generation error:",error]});
       res.status(500).json({ message: "Failed to generate QR code for stone" });
     }
   });
@@ -1837,7 +1840,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchant) return res.status(404).json({ message: "Payment board not found" });
       res.json(publicBoardBrandDto(merchant));
     } catch (error) {
-      console.error("Board brand error:", error);
+      logOperation("error","BOARD_BRAND_ERROR",{payload:["Board brand error:",error]});
       res.status(500).json({ message: "Failed to load the board" });
     }
   });
@@ -1888,7 +1891,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
       return res.json(dto);
     } catch (error) {
-      console.error("Payment token resolve failed");
+      logOperation("error","PAYMENT_TOKEN_RESOLVE_FAILED",{payload:["Payment token resolve failed"]});
       return res.status(500).json({ message: "Failed to load payment link" });
     }
   });
@@ -1915,7 +1918,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       res.type("png");
       return res.send(qrBuffer);
     } catch (error) {
-      console.error("Payment token QR generation failed");
+      logOperation("error","PAYMENT_TOKEN_QR_GENERATION_FAILED",{payload:["Payment token QR generation failed"]});
       return res.status(500).json({ message: "Failed to generate payment QR" });
     }
   });
@@ -1963,7 +1966,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (error instanceof BillSplitConflictError) {
         return res.status(409).json({ message: error.message, code: error.code });
       }
-      console.error("Token payment split configuration failed");
+      logOperation("error","TOKEN_PAYMENT_SPLIT_CONFIGURATION_FAILED",{payload:["Token payment split configuration failed"]});
       return res.status(500).json({ message: "Failed to configure payment split" });
     }
   });
@@ -2023,7 +2026,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (result.kind !== "ready") return sendTokenReceiptError(res, result);
       return res.json(tokenReceiptDto(result.transaction, result.merchant, result.share));
     } catch (error) {
-      console.error("Token receipt resolve failed");
+      logOperation("error","TOKEN_RECEIPT_RESOLVE_FAILED",{payload:["Token receipt resolve failed"]});
       return res.status(500).json({ message: "Failed to load receipt" });
     }
   });
@@ -2053,7 +2056,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       );
       return res.send(pdf);
     } catch (error) {
-      console.error("Token receipt PDF generation failed");
+      logOperation("error","TOKEN_RECEIPT_PDF_GENERATION_FAILED",{payload:["Token receipt PDF generation failed"]});
       return res.status(500).json({ message: "Failed to generate receipt PDF" });
     }
   });
@@ -2078,7 +2081,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       res.type("png");
       return res.send(qr);
     } catch (error) {
-      console.error("Token receipt QR generation failed");
+      logOperation("error","TOKEN_RECEIPT_QR_GENERATION_FAILED",{payload:["Token receipt QR generation failed"]});
       return res.status(500).json({ message: "Failed to generate receipt QR" });
     }
   });
@@ -2165,7 +2168,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     // SECURITY: Rate limiting
     const clientIp = req.ip || 'unknown';
     if (!checkRateLimit(clientIp)) {
-      console.warn(`SECURITY: Rate limit exceeded for IP ${clientIp} on active-transaction endpoint`);
+      logOperation("warn","SECURITY_RATE_LIMIT_EXCEEDED_FOR_IP_ON_ACTIVE_TRANSACTION_ENDPOI",{payload:[`SECURITY: Rate limit exceeded for IP ${clientIp} on active-transaction endpoint`]});
       return res.status(429).json({ message: "Too many requests. Please try again later." });
     }
 
@@ -2174,7 +2177,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
     try {
       // AUDIT: Log access to payment page
-      console.log(`Active transaction requested: merchant ${merchantId}, stone ${stoneId}, IP ${clientIp}`);
+      logOperation("info","ACTIVE_TRANSACTION_REQUESTED_MERCHANT_STONE_IP",{payload:[`Active transaction requested: merchant ${merchantId}, stone ${stoneId}, IP ${clientIp}`]});
 
       // SECURITY: verify the board belongs to this merchant
       // Another business's board is answered as a missing one (R1-T3, P2.2's tenant-safe 404), as the
@@ -2332,7 +2335,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     } catch (error) {
       if (error instanceof TransactionCreationScopeError) return res.status(400).json({ message: "Selected payment board is unavailable" });
       if(error instanceof CashCommandInputError) return res.status(400).json({message:"Invalid cash sale"});
-      console.error("[CASH_COMMAND_FAILED]");
+      logOperation("error","CASH_COMMAND_FAILED",{payload:["[CASH_COMMAND_FAILED]"]});
       res.status(500).json({ message: "Failed to record cash sale" });
     }
   });
@@ -2474,7 +2477,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       res.json({ approved: paymentResult.approved ?? false, transactionId: transaction!.id });
     } catch (error) {
-      console.error("Tap to Pay error:", error);
+      logOperation("error","TAP_TO_PAY_ERROR",{payload:["Tap to Pay error:",error]});
       res.status(500).json({ message: "Tap to Pay processing failed" });
     }
   });
@@ -2519,7 +2522,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (error instanceof BillSplitConflictError) {
         return res.status(409).json({ message: error.message, code: error.code });
       }
-      console.error("Error creating bill split:", error);
+      logOperation("error","ERROR_CREATING_BILL_SPLIT",{payload:["Error creating bill split:",error]});
       res.status(500).json({ message: "Failed to create bill split" });
     }
   });
@@ -2541,7 +2544,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
       res.json(publicSplitPaymentDto(split));
     } catch (error) {
-      console.error("Error fetching split payment:", error);
+      logOperation("error","ERROR_FETCHING_SPLIT_PAYMENT",{payload:["Error fetching split payment:",error]});
       res.status(500).json({ message: "Failed to fetch split payment" });
     }
   });
@@ -2591,7 +2594,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // The committed cancellation event owns delivery and replay protection.
       res.json(ownerTransactionDto(transactionWithUrls));
     } catch (error) {
-      console.error("Error canceling transaction:", error);
+      logOperation("error","ERROR_CANCELING_TRANSACTION",{payload:["Error canceling transaction:",error]});
       res.status(500).json({ message: "Failed to cancel transaction" });
     }
   });
@@ -2664,7 +2667,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const merchant = transaction.merchantId == null ? undefined : await storage.getMerchant(transaction.merchantId);
       res.json({ ...publicTransactionDto(transaction), merchant: merchant ? publicBusinessDto(merchant) : null });
     } catch (error) {
-      console.error("Error fetching transaction:", error);
+      logOperation("error","ERROR_FETCHING_TRANSACTION",{payload:["Error fetching transaction:",error]});
       res.status(500).json({ message: "Failed to fetch transaction" });
     }
   });
@@ -2725,7 +2728,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       res.setHeader('Content-Disposition', `attachment; filename=receipt-${transaction.id}-${new Date().toISOString().split('T')[0]}.pdf`);
       res.send(pdf);
     } catch (error) {
-      console.error("Error generating PDF receipt:", error);
+      logOperation("error","ERROR_GENERATING_PDF_RECEIPT",{payload:["Error generating PDF receipt:",error]});
       res.status(500).json({ message: "Failed to generate PDF receipt" });
     }
   });
@@ -2767,7 +2770,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       res.send(qrBuffer);
     } catch (error) {
-      console.error("Receipt QR generation error:", error);
+      logOperation("error","RECEIPT_QR_GENERATION_ERROR",{payload:["Receipt QR generation error:",error]});
       res.status(500).json({ message: "Failed to generate receipt QR code" });
     }
   });
@@ -2818,7 +2821,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       res.setHeader('Content-Disposition', `attachment; filename=tapt_business_report${dateRange}.pdf`);
       res.send(pdf);
     } catch (error) {
-      console.error("Error generating PDF report:", error);
+      logOperation("error","ERROR_GENERATING_PDF_REPORT",{payload:["Error generating PDF report:",error]});
       res.status(500).json({ message: "Failed to generate PDF report" });
     }
   });
@@ -2870,7 +2873,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       });
 
     } catch (error) {
-      console.error("Admin verification error:", error);
+      logOperation("error","ADMIN_VERIFICATION_ERROR",{payload:["Admin verification error:",error]});
       res.status(500).json({ message: "Failed to verify merchant" });
     }
   });
@@ -2894,7 +2897,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       res.json({ message: "Merchant activated successfully", merchant: { id: updated.id, status: updated.status } });
     } catch (error) {
-      console.error("Admin activate merchant error:", error);
+      logOperation("error","ADMIN_ACTIVATE_MERCHANT_ERROR",{payload:["Admin activate merchant error:",error]});
       res.status(500).json({ message: "Failed to activate merchant" });
     }
   });
@@ -2906,7 +2909,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const txList = await storage.getTransactionsByMerchant(merchantId);
       res.json(txList.map(adminTransactionDto));
     } catch (error) {
-      console.error("Admin fetch transactions error:", error);
+      logOperation("error","ADMIN_FETCH_TRANSACTIONS_ERROR",{payload:["Admin fetch transactions error:",error]});
       res.status(500).json({ message: "Failed to fetch transactions" });
     }
   });
@@ -2922,7 +2925,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       await storage.updateMerchant(merchantId, { windcaveMerchantId: windcaveMerchantId || null });
       res.json({ message: "Windcave Merchant ID updated" });
     } catch (error) {
-      console.error("Windcave merchant ID update error:", error);
+      logOperation("error","WINDCAVE_MERCHANT_ID_UPDATE_ERROR",{payload:["Windcave merchant ID update error:",error]});
       res.status(500).json({ message: "Failed to update Windcave Merchant ID" });
     }
   });
@@ -2977,7 +2980,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       });
 
     } catch (error) {
-      console.error("Admin activation error:", error);
+      logOperation("error","ADMIN_ACTIVATION_ERROR",{payload:["Admin activation error:",error]});
       res.status(500).json({ message: "Failed to activate merchant" });
     }
   });
@@ -3070,7 +3073,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(400).json({ message: "Current password is incorrect" });
       }
       await storage.settleAuthThrottle([throttleBucket], "success", new Date())
-        .catch((error) => console.error("[PASSWORD_CHANGE_THROTTLE_CLEAR]", error));
+        .catch((error) => logOperation("error","PASSWORD_CHANGE_THROTTLE_CLEAR",{payload:["[PASSWORD_CHANGE_THROTTLE_CLEAR]",error]}));
 
       const newPasswordHash = await bcrypt.hash(newPassword, 12);
       // Also ends every session of this login (R1-T4 phase D, owner decision
@@ -3084,7 +3087,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // Every device of this login stops getting notifications; this one
       // re-registers under the new session (client/src/lib/push-device.ts).
       await storage.deactivatePushSubscriptionsForLogin(merchantId, userId)
-        .catch((error) => console.error("[PASSWORD_CHANGE_PUSH_STOP]", error));
+        .catch((error) => logOperation("error","PASSWORD_CHANGE_PUSH_STOP",{payload:["[PASSWORD_CHANGE_PUSH_STOP]",error]}));
       const login = sessionLoginForUserRow(updated);
       if (!login) {
         return res.status(500).json({ message: "Password changed. Please sign in again." });
@@ -3092,14 +3095,14 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // R1-T4 phase E: the change advanced the version, which ends every session of this login,
       // this one included (recorded on each); this device carries on under a new session.
       await endLoginSessions(userId, "password_change")
-        .catch((error) => console.error("[PASSWORD_CHANGE_SESSIONS]", error));
+        .catch((error) => logOperation("error","PASSWORD_CHANGE_SESSIONS",{payload:["[PASSWORD_CHANGE_SESSIONS]",error]}));
       const session = await startBusinessSession(req, res, login);
 
       res.set("Cache-Control", "no-store");
       res.json({ message: "Password updated successfully", csrfToken: session.csrfToken });
 
     } catch (error) {
-      console.error("Change password error:", error);
+      logOperation("error","CHANGE_PASSWORD_ERROR",{payload:["Change password error:",error]});
       res.status(500).json({ message: "Failed to change password" });
     }
   });
@@ -3129,7 +3132,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       res.json(ownerMerchantDto(updatedMerchant));
     } catch (error) {
-      console.error("Error updating theme:", error);
+      logOperation("error","ERROR_UPDATING_THEME",{payload:["Error updating theme:",error]});
       res.status(500).json({ message: "Failed to update theme" });
     }
   });
@@ -3160,7 +3163,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       res.json(ownerMerchantDto(updatedMerchant));
     } catch (error) {
-      console.error("Error updating daily goal:", error);
+      logOperation("error","ERROR_UPDATING_DAILY_GOAL",{payload:["Error updating daily goal:",error]});
       res.status(500).json({ message: "Failed to update daily goal" });
     }
   });
@@ -3216,7 +3219,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       res.json(ownerMerchantDto(updatedMerchant));
     } catch (error) {
-      console.error("Update merchant error:", error);
+      logOperation("error","UPDATE_MERCHANT_ERROR",{payload:["Update merchant error:",error]});
       res.status(500).json({ message: "Failed to update merchant" });
     }
   });
@@ -3289,7 +3292,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       res.json({ logoUrl, message: "Logo uploaded successfully" });
     } catch (error) {
-      console.error("Logo upload error:", error);
+      logOperation("error","LOGO_UPLOAD_ERROR",{payload:["Logo upload error:",error]});
       res.status(500).json({ message: "Failed to upload logo" });
     }
   });
@@ -3332,7 +3335,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       res.json({ message: "Logo deleted successfully" });
     } catch (error) {
-      console.error("Logo deletion error:", error);
+      logOperation("error","LOGO_DELETION_ERROR",{payload:["Logo deletion error:",error]});
       res.status(500).json({ message: "Failed to delete logo" });
     }
   });
@@ -3365,7 +3368,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const stones = await storage.getTaptStonesByMerchant(merchantId);
       res.json(stones);
     } catch (error) {
-      console.error("Error fetching tapt stones:", error);
+      logOperation("error","ERROR_FETCHING_TAPT_STONES",{payload:["Error fetching tapt stones:",error]});
       res.status(500).json({ message: "Failed to get tapt stones" });
     }
   });
@@ -3416,7 +3419,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (error instanceof TaptStoneConflictError) {
         return res.status(409).json({ message: error.message, code: error.code });
       }
-      console.error("Error creating tapt stone:", error);
+      logOperation("error","ERROR_CREATING_TAPT_STONE",{payload:["Error creating tapt stone:",error]});
       res.status(500).json({ message: "Failed to create tapt stone" });
     }
   });
@@ -3455,7 +3458,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       res.json(updatedStone);
     } catch (error) {
-      console.error("Error updating tapt stone:", error);
+      logOperation("error","ERROR_UPDATING_TAPT_STONE",{payload:["Error updating tapt stone:",error]});
       res.status(500).json({ message: "Failed to update tapt stone" });
     }
   });
@@ -3485,7 +3488,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       res.json({ message: "Tapt stone deleted successfully" });
     } catch (error) {
-      console.error("Error deleting tapt stone:", error);
+      logOperation("error","ERROR_DELETING_TAPT_STONE",{payload:["Error deleting tapt stone:",error]});
       res.status(500).json({ message: "Failed to delete tapt stone" });
     }
   });
@@ -3584,7 +3587,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         recentMerchants: recentMerchants.sort((a, b) => b.totalRevenue - a.totalRevenue),
       });
     } catch (error) {
-      console.error("Error fetching admin analytics:", error);
+      logOperation("error","ERROR_FETCHING_ADMIN_ANALYTICS",{payload:["Error fetching admin analytics:",error]});
       res.status(500).json({ message: "Failed to get admin analytics" });
     }
   });
@@ -3620,7 +3623,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       res.json(days.map(d => ({ day: d.label, revenue: parseFloat(d.revenue.toFixed(2)), transactions: d.transactions })));
     } catch (error) {
-      console.error("Error fetching revenue over time:", error);
+      logOperation("error","ERROR_FETCHING_REVENUE_OVER_TIME",{payload:["Error fetching revenue over time:",error]});
       res.status(500).json({ message: "Failed to get revenue data" });
     }
   });
@@ -3657,7 +3660,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       res.json(result.sort((a, b) => b.value - a.value));
     } catch (error) {
-      console.error("Error fetching payment method breakdown:", error);
+      logOperation("error","ERROR_FETCHING_PAYMENT_METHOD_BREAKDOWN",{payload:["Error fetching payment method breakdown:",error]});
       res.status(500).json({ message: "Failed to get payment methods" });
     }
   });
@@ -3722,8 +3725,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       res.json({ configured: true, daily, countries, newUsers, returningUsers: Math.max(0, totalUsers - newUsers) });
     } catch (error: any) {
-      console.error("GA4 detailed error:", error?.message);
-      res.status(500).json({ configured: true, error: error?.message });
+      logOperation("error","GA4_DETAILED_ERROR",{payload:["GA4 detailed error:",error?.message]});
+      res.status(500).json({ configured: true, error: 'Analytics request failed' });
     }
   });
 
@@ -3799,8 +3802,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       res.json({ configured: true, metrics, topPages, devices, activeUsers });
     } catch (error: any) {
-      console.error("GA4 API error:", error?.message);
-      res.status(500).json({ configured: true, error: error?.message || 'GA4 API error' });
+      logOperation("error","GA4_API_ERROR",{payload:["GA4 API error:",error?.message]});
+      res.status(500).json({ configured: true, error: 'Analytics request failed' });
     }
   });
 
@@ -3820,7 +3823,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const merchants = await storage.getAllMerchants();
       res.json(merchants.map(adminMerchantSummaryDto));
     } catch (error) {
-      console.error("Error fetching merchants:", error);
+      logOperation("error","ERROR_FETCHING_MERCHANTS",{payload:["Error fetching merchants:",error]});
       res.status(500).json({ message: "Failed to fetch merchants" });
     }
   });
@@ -3835,7 +3838,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
       res.json(adminMerchantDto(merchant));
     } catch (error) {
-      console.error("Error fetching merchant:", error);
+      logOperation("error","ERROR_FETCHING_MERCHANT",{payload:["Error fetching merchant:",error]});
       res.status(500).json({ message: "Failed to fetch merchant" });
     }
   });
@@ -3898,7 +3901,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       });
 
     } catch (error) {
-      console.error("Error resending verification email:", error);
+      logOperation("error","ERROR_RESENDING_VERIFICATION_EMAIL",{payload:["Error resending verification email:",error]});
       res.status(500).json({ message: "Failed to resend verification email" });
     }
   });
@@ -3922,7 +3925,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         willDeliver: status.availableProviders.length > 0,
       });
     } catch (error) {
-      console.error('Email status error:', error);
+      logOperation("error","EMAIL_STATUS_ERROR",{payload:['Email status error:',error]});
       res.status(500).json({ message: 'Failed to read email status' });
     }
   });
@@ -3976,7 +3979,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         });
       }
       await storage.settleAuthThrottle([bucket], "success", new Date())
-        .catch((error) => console.error("[CONFIRM_EMAIL_THROTTLE_CLEAR]", error));
+        .catch((error) => logOperation("error","CONFIRM_EMAIL_THROTTLE_CLEAR",{payload:["[CONFIRM_EMAIL_THROTTLE_CLEAR]",error]}));
 
       // New stepper signups arrive with the full KYC application already stored.
       // Legacy pending accounts may not have these fields, so only mark onboarding
@@ -4055,13 +4058,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           ].join("\n"),
         });
         if (!notificationSent) {
-          console.error(`[SIGNUP_NOTIFY] Failed to send verified application for merchant ${merchant.id} to oliver@taptpay.co.nz`);
+          logOperation("error","SIGNUP_NOTIFY_FAILED_TO_SEND_VERIFIED_APPLICATION_FOR_MERCHANT_T",{payload:[`[SIGNUP_NOTIFY] Failed to send verified application for merchant ${merchant.id} to oliver@taptpay.co.nz`]});
         }
       }
 
       res.json({ message: "Email verified", merchantId: merchant.id });
     } catch (error) {
-      console.error("Confirm email error:", error);
+      logOperation("error","CONFIRM_EMAIL_ERROR",{payload:["Confirm email error:",error]});
       res.status(500).json({ message: "Failed to confirm email" });
     }
   });
@@ -4091,11 +4094,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       const worked = await replyNoSoonerThan(startedAt, ACCOUNT_EMAIL_REPLY_FLOOR_MS);
       if (worked > ACCOUNT_EMAIL_REPLY_FLOOR_MS) {
-        console.warn(`[CONFIRMATION_RESEND_SLOW] took ${Math.round(worked)} ms, over the ${ACCOUNT_EMAIL_REPLY_FLOOR_MS} ms floor`);
+        logOperation("warn","CONFIRMATION_RESEND_SLOW_TOOK_MS_OVER_THE_MS_FLOOR",{payload:[`[CONFIRMATION_RESEND_SLOW] took ${Math.round(worked)} ms, over the ${ACCOUNT_EMAIL_REPLY_FLOOR_MS} ms floor`]});
       }
       res.json({ message: "If that address is waiting to be confirmed, we've sent the link again." });
     } catch (error) {
-      console.error("Resend confirmation error:", error);
+      logOperation("error","RESEND_CONFIRMATION_ERROR",{payload:["Resend confirmation error:",error]});
       res.status(500).json({ message: "Failed to resend email" });
     }
   });
@@ -4133,13 +4136,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         html: `<p><strong>Name:</strong> ${safeName}</p><p><strong>Email:</strong> <a href="mailto:${safeEmail}">${safeEmail}</a></p><p>They have just unlocked the TaptPay info pack on taptpay.co.nz/info.</p>`,
         text: `New info pack request\n\nName: ${name}\nEmail: ${email}\n\nThey have just unlocked the TaptPay info pack on taptpay.co.nz/info.`,
       }).then((ok) => {
-        if (!ok) console.error("Info pack lead notification failed: Resend returned false");
-        else console.log(`✅ Info pack lead notification sent for ${email}`);
-      }).catch((e) => console.error("Info pack lead notification error:", e));
+        if (!ok) logOperation("error","INFO_PACK_LEAD_NOTIFICATION_FAILED_RESEND_RETURNED_FALSE",{payload:["Info pack lead notification failed: Resend returned false"]});
+        else logOperation("info","INFO_PACK_LEAD_NOTIFICATION_SENT_FOR",{payload:[`✅ Info pack lead notification sent for ${email}`]});
+      }).catch((e) => logOperation("error","INFO_PACK_LEAD_NOTIFICATION_ERROR",{payload:["Info pack lead notification error:",e]}));
 
       return res.status(201).json({ id: lead.id });
     } catch (error) {
-      console.error("Error saving info pack lead:", error);
+      logOperation("error","ERROR_SAVING_INFO_PACK_LEAD",{payload:["Error saving info pack lead:",error]});
       return res.status(500).json({ message: "Failed to save lead" });
     }
   });
@@ -4150,7 +4153,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   async function replyToSignup(res: express.Response, startedAt: number) {
     const worked = await replyNoSoonerThan(startedAt, SIGN_UP_REPLY_FLOOR_MS);
     if (worked > SIGN_UP_REPLY_FLOOR_MS) {
-      console.warn(`[SIGNUP_SLOW] took ${Math.round(worked)} ms, over the ${SIGN_UP_REPLY_FLOOR_MS} ms floor`);
+      logOperation("warn","SIGNUP_SLOW_TOOK_MS_OVER_THE_MS_FLOOR",{payload:[`[SIGNUP_SLOW] took ${Math.round(worked)} ms, over the ${SIGN_UP_REPLY_FLOOR_MS} ms floor`]});
     }
     return res.json({ message: "Check your email to continue." });
   }
@@ -4244,14 +4247,14 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const { sendMerchantVerificationEmail } = await import('./email-service-multi');
       const emailSent = await sendMerchantVerificationEmail(normalizedEmail, verificationToken, name, baseUrl);
       if (!emailSent) {
-        console.warn('Failed to send verification email, but merchant account was created');
+        logOperation("warn","FAILED_TO_SEND_VERIFICATION_EMAIL_BUT_MERCHANT_ACCOUNT_WAS_CREAT",{payload:['Failed to send verification email, but merchant account was created']});
       }
-      console.log(`Signup application ${merchant.id} created; waiting for its email to be confirmed`);
+      logOperation("info","SIGNUP_APPLICATION_CREATED_WAITING_FOR_ITS_EMAIL_TO_BE_CONFIRMED",{payload:[`Signup application ${merchant.id} created; waiting for its email to be confirmed`]});
 
       return replyToSignup(res, startedAt);
 
     } catch (error) {
-      console.error("Public merchant signup error:", error);
+      logOperation("error","PUBLIC_MERCHANT_SIGNUP_ERROR",{payload:["Public merchant signup error:",error]});
       res.status(500).json({ message: "Failed to create merchant account" });
     }
   });
@@ -4343,7 +4346,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         unsubscribe();
       });
     } catch (error) {
-      console.error("SSE subscribe error:", error);
+      logOperation("error","SSE_SUBSCRIBE_ERROR",{payload:["SSE subscribe error:",error]});
       // Once the stream is open a JSON body would corrupt it; close the socket
       // instead so EventSource sees a drop and reconnects on its own schedule.
       if (res.headersSent) res.end();
@@ -4426,7 +4429,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (error instanceof PushSessionEndedError) {
         return res.status(401).json({ code: "SESSION_ENDED", message: "You were signed out. Please sign in again." });
       }
-      console.error("Push subscribe error:", error);
+      logOperation("error","PUSH_SUBSCRIBE_ERROR",{payload:["Push subscribe error:",error]});
       res.status(500).json({ message: "Failed to save push subscription" });
     }
   });
@@ -4453,7 +4456,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       res.json({ success: true });
     } catch (error) {
-      console.error("Push unsubscribe error:", error);
+      logOperation("error","PUSH_UNSUBSCRIBE_ERROR",{payload:["Push unsubscribe error:",error]});
       res.status(500).json({ message: "Failed to unsubscribe" });
     }
   });
@@ -4491,7 +4494,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (error instanceof PushSessionEndedError) {
         return res.status(401).json({ code: "SESSION_ENDED", message: "You were signed out. Please sign in again." });
       }
-      console.error("Native push subscribe error:", error);
+      logOperation("error","NATIVE_PUSH_SUBSCRIBE_ERROR",{payload:["Native push subscribe error:",error]});
       res.status(500).json({ message: "Failed to save device token" });
     }
   });
@@ -4523,7 +4526,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       res.json({ success: true });
     } catch (error) {
-      console.error("Native push unsubscribe error:", error);
+      logOperation("error","NATIVE_PUSH_UNSUBSCRIBE_ERROR",{payload:["Native push unsubscribe error:",error]});
       res.status(500).json({ message: "Failed to remove device token" });
     }
   });
@@ -4565,7 +4568,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const preferences = await storage.getPushNotificationPreferences(merchantId, userId);
       res.json({ preferences: pushNotificationPreferencesDto(preferences) });
     } catch (error) {
-      console.error("Push preferences get error:", error);
+      logOperation("error","PUSH_PREFERENCES_GET_ERROR",{payload:["Push preferences get error:",error]});
       res.status(500).json({ message: "Failed to fetch notification preferences" });
     }
   });
@@ -4591,7 +4594,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       );
       res.json({ preferences: pushNotificationPreferencesDto(preferences) });
     } catch (error) {
-      console.error("Push preferences update error:", error);
+      logOperation("error","PUSH_PREFERENCES_UPDATE_ERROR",{payload:["Push preferences update error:",error]});
       res.status(500).json({ message: "Failed to update notification preferences" });
     }
   });
@@ -4741,7 +4744,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       });
 
     } catch (error) {
-      console.error("Error creating refund:", error);
+      logOperation("error","ERROR_CREATING_REFUND",{payload:["Error creating refund:",error]});
       res.status(500).json({ message: "Failed to create refund" });
     }
   });
@@ -4773,7 +4776,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       res.json(refunds);
 
     } catch (error) {
-      console.error("Error fetching refunds:", error);
+      logOperation("error","ERROR_FETCHING_REFUNDS",{payload:["Error fetching refunds:",error]});
       res.status(500).json({ message: "Failed to fetch refunds" });
     }
   });
@@ -4794,7 +4797,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       res.json(refunds);
 
     } catch (error) {
-      console.error("Error fetching merchant refunds:", error);
+      logOperation("error","ERROR_FETCHING_MERCHANT_REFUNDS",{payload:["Error fetching merchant refunds:",error]});
       res.status(500).json({ message: "Failed to fetch refunds" });
     }
   });
@@ -4825,7 +4828,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const stockItems = await storage.getStockItemsByMerchant(merchantId);
       res.json(stockItems);
     } catch (error) {
-      console.error("Error fetching stock items:", error);
+      logOperation("error","ERROR_FETCHING_STOCK_ITEMS",{payload:["Error fetching stock items:",error]});
       res.status(500).json({ message: "Failed to fetch stock items" });
     }
   });
@@ -4847,7 +4850,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       res.status(201).json(stockItem);
     } catch (error) {
-      console.error("Error creating stock item:", error);
+      logOperation("error","ERROR_CREATING_STOCK_ITEM",{payload:["Error creating stock item:",error]});
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Validation error", errors: error.errors });
       }
@@ -4884,7 +4887,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       res.json(stockItem);
     } catch (error) {
-      console.error("Error updating stock item:", error);
+      logOperation("error","ERROR_UPDATING_STOCK_ITEM",{payload:["Error updating stock item:",error]});
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Validation error", errors: error.errors });
       }
@@ -4919,7 +4922,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       res.json({ message: "Stock item deleted successfully" });
     } catch (error) {
-      console.error("Error deleting stock item:", error);
+      logOperation("error","ERROR_DELETING_STOCK_ITEM",{payload:["Error deleting stock item:",error]});
       res.status(500).json({ message: "Failed to delete stock item" });
     }
   });
@@ -5037,7 +5040,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
     } catch (error) {
       if(error instanceof CreationCommandConflict||error instanceof CreationCredentialUnavailable)return res.status(409).json({code:error.code,error:'The original creation request needs recovery'});
-      console.error("API transaction creation error:", error);
+      logOperation("error","API_TRANSACTION_CREATION_ERROR",{payload:["API transaction creation error:",error]});
       const isCredentialCollision = error instanceof PaymentCredentialCollisionError;
       // Best-effort: the usual reason we are in here is that the database is
       // unreachable, which is also the reason this audit write would throw. A
@@ -5054,7 +5057,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           errorMessage: isCredentialCollision ? 'Payment credential allocation failed' : 'Internal server error'
         });
       } catch (logError) {
-        console.error("API request logging failed:", logError);
+        logOperation("error","API_REQUEST_LOGGING_FAILED",{payload:["API request logging failed:",logError]});
       }
       res.status(isCredentialCollision ? 503 : 500).json({
         error: isCredentialCollision
@@ -5113,7 +5116,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       });
 
     } catch (error) {
-      console.error("API transaction fetch error:", error);
+      logOperation("error","API_TRANSACTION_FETCH_ERROR",{payload:["API transaction fetch error:",error]});
       // Best-effort — see the note on the POST handler above.
       try {
         await storage.logApiRequest({
@@ -5126,7 +5129,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           errorMessage: error instanceof Error ? error.message : 'Unknown error'
         });
       } catch (logError) {
-        console.error("API request logging failed:", logError);
+        logOperation("error","API_REQUEST_LOGGING_FAILED",{payload:["API request logging failed:",logError]});
       }
       res.status(500).json({ error: 'Internal server error' });
     }
@@ -5168,7 +5171,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         plans: PLAN_LIST,
       });
     } catch (error) {
-      console.error("Get subscription error:", error);
+      logOperation("error","GET_SUBSCRIPTION_ERROR",{payload:["Get subscription error:",error]});
       res.status(500).json({ message: "Failed to get subscription" });
     }
   });
@@ -5234,7 +5237,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       });
     } catch (error) {
       if(error instanceof SubscriptionCommandConflict)return res.status(409).json({code:error.code,message:"The original billing request has different details. Keep the original request."});
-      console.error("Change plan error:", error);
+      logOperation("error","CHANGE_PLAN_ERROR",{payload:["Change plan error:",error]});
       res.status(500).json({ message: "Failed to change plan" });
     }
   });
@@ -5280,7 +5283,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       });
     } catch (error) {
       if(error instanceof SubscriptionCommandConflict)return res.status(409).json({code:error.code,message:"The original billing request has different details. Keep the original request."});
-      console.error("Cancel subscription error:", error);
+      logOperation("error","CANCEL_SUBSCRIPTION_ERROR",{payload:["Cancel subscription error:",error]});
       res.status(500).json({ message: "Failed to cancel subscription" });
     }
   });
@@ -5307,7 +5310,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       });
     } catch (error) {
       if(error instanceof SubscriptionCommandConflict)return res.status(409).json({code:error.code,message:"The original billing request has different details. Keep the original request."});
-      console.error("Resume subscription error:", error);
+      logOperation("error","RESUME_SUBSCRIPTION_ERROR",{payload:["Resume subscription error:",error]});
       res.status(500).json({ message: "Failed to resume subscription" });
     }
   });
@@ -5336,7 +5339,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         seatsInUse: await storage.countSeatsInUse(merchantId),
       });
     } catch (error) {
-      console.error("Get team error:", error);
+      logOperation("error","GET_TEAM_ERROR",{payload:["Get team error:",error]});
       res.status(500).json({ message: "Failed to load team" });
     }
   });
@@ -5385,19 +5388,19 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           inviteUrl: `${getBaseUrl(req)}/accept-invite?token=${rawToken}`,
         });
       } catch (error) {
-        console.error("Team invite email failed:", error);
+        logOperation("error","TEAM_INVITE_EMAIL_FAILED",{payload:["Team invite email failed:",error]});
       }
       if (!emailSent) {
         const rolledBack = await storage.revokeTeamInvite(merchantId, result.user.id, inviteTokenHash);
         if (!rolledBack) {
-          console.error("Team invite rollback failed:", { merchantId, userId: result.user.id });
+          logOperation("error","TEAM_INVITE_ROLLBACK_FAILED",{payload:["Team invite rollback failed:",{ merchantId, userId: result.user.id }]});
         }
         return res.status(502).json({ message: "The invite email could not be sent. No seat was used." });
       }
 
       res.status(201).json({ member: teamMemberDto(result.user) });
     } catch (error) {
-      console.error("Invite team member error:", error);
+      logOperation("error","INVITE_TEAM_MEMBER_ERROR",{payload:["Invite team member error:",error]});
       res.status(500).json({ message: "Failed to send invite" });
     }
   });
@@ -5454,7 +5457,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           inviteUrl: `${getBaseUrl(req)}/accept-invite?token=${rawToken}`,
         });
       } catch (error) {
-        console.error("Team invite resend failed:", error);
+        logOperation("error","TEAM_INVITE_RESEND_FAILED",{payload:["Team invite resend failed:",error]});
       }
 
       if (!emailSent) {
@@ -5479,7 +5482,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       res.json({ member: teamMemberDto(rotated) });
     } catch (error) {
-      console.error("Resend team invite error:", error);
+      logOperation("error","RESEND_TEAM_INVITE_ERROR",{payload:["Resend team invite error:",error]});
       res.status(500).json({ message: "Failed to resend invite" });
     }
   });
@@ -5499,7 +5502,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!revoked) return res.status(404).json({ message: "Invite not found" });
       res.json({ message: "Invite revoked" });
     } catch (error) {
-      console.error("Revoke team invite error:", error);
+      logOperation("error","REVOKE_TEAM_INVITE_ERROR",{payload:["Revoke team invite error:",error]});
       res.status(500).json({ message: "Failed to revoke invite" });
     }
   });
@@ -5541,16 +5544,16 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         sseBroker.disconnectUser(merchantId, userId);
         // R1-T4 phase E: the status check already refuses every session of this login; this records why.
         await endLoginSessions(userId, "login_disabled")
-          .catch((error) => console.error("[TEAM_DISABLE_SESSIONS]", error));
+          .catch((error) => logOperation("error","TEAM_DISABLE_SESSIONS",{payload:["[TEAM_DISABLE_SESSIONS]",error]}));
         // Owner decision 2026-09-22: a disabled login's devices stop getting
         // notifications too. The login is already disabled, so a fault here is
         // logged, never returned.
         await storage.deactivatePushSubscriptionsForLogin(merchantId, userId)
-          .catch((error) => console.error("[TEAM_DISABLE_PUSH_STOP]", error));
+          .catch((error) => logOperation("error","TEAM_DISABLE_PUSH_STOP",{payload:["[TEAM_DISABLE_PUSH_STOP]",error]}));
       }
       res.json({ member: teamMemberDto(result.user) });
     } catch (error) {
-      console.error("Update team member error:", error);
+      logOperation("error","UPDATE_TEAM_MEMBER_ERROR",{payload:["Update team member error:",error]});
       res.status(500).json({ message: "Failed to update login" });
     }
   });
@@ -5576,7 +5579,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       // R1-T4 phase E: record why this login's sessions end; removing the login removes them.
       await endLoginSessions(userId, "login_removed")
-        .catch((error) => console.error("[TEAM_REMOVE_SESSIONS]", error));
+        .catch((error) => logOperation("error","TEAM_REMOVE_SESSIONS",{payload:["[TEAM_REMOVE_SESSIONS]",error]}));
       const removed = await storage.removeTeamMember(merchantId, userId);
       if (!removed) {
         return res.status(404).json({ message: "Login not found, or it is the account owner" });
@@ -5587,10 +5590,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // business's unattributed ones from before 0029. The login is already removed, so a fault
       // here is logged, never returned.
       await storage.deactivatePushSubscriptionsForLogin(merchantId, userId)
-        .catch((error) => console.error("[TEAM_REMOVE_PUSH_STOP]", error));
+        .catch((error) => logOperation("error","TEAM_REMOVE_PUSH_STOP",{payload:["[TEAM_REMOVE_PUSH_STOP]",error]}));
       res.json({ message: "Login removed" });
     } catch (error) {
-      console.error("Remove team member error:", error);
+      logOperation("error","REMOVE_TEAM_MEMBER_ERROR",{payload:["Remove team member error:",error]});
       res.status(500).json({ message: "Failed to remove login" });
     }
   });
@@ -5626,7 +5629,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       logSecurityEvent("TEAM_INVITE_ACCEPTED", { userId: activated.id, merchantId: activated.merchantId });
       res.json({ message: "Your login is ready. Please sign in." });
     } catch (error) {
-      console.error("Accept invite error:", error);
+      logOperation("error","ACCEPT_INVITE_ERROR",{payload:["Accept invite error:",error]});
       res.status(500).json({ message: "Failed to accept invite" });
     }
   });
@@ -5648,7 +5651,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       res.json({ history: history.map(billingHistoryDto) });
     } catch (error) {
-      console.error("Get billing history error:", error);
+      logOperation("error","GET_BILLING_HISTORY_ERROR",{payload:["Get billing history error:",error]});
       res.status(500).json({ message: "Failed to get billing history" });
     }
   });
@@ -5685,7 +5688,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           : null,
       });
     } catch (error) {
-      console.error("Get billing card error:", error);
+      logOperation("error","GET_BILLING_CARD_ERROR",{payload:["Get billing card error:",error]});
       res.status(500).json({ message: "Failed to load the payment method" });
     }
   });
@@ -5704,7 +5707,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if(result.kind==='ready')return res.json({sessionId:result.sessionId,redirectUrl:result.redirectUrl});
       if(result.kind==='processing'||result.kind==='terminal')return res.status(202).json({pending:true,sessionId:'sessionId' in result?result.sessionId:undefined,message:'Your original card setup is still being confirmed. Retry with the same request.'});
       return res.status(result.kind==='conflict'?409:result.kind==='not-found'?404:503).json({message:'Card setup is unavailable or an earlier payment is being reconciled'});
-    }catch{console.error('[CARD_SETUP_UNAVAILABLE]');res.status(503).json({message:'Card setup could not be confirmed. Keep the original request.'});}
+    }catch{logOperation("error","CARD_SETUP_UNAVAILABLE",{payload:['[CARD_SETUP_UNAVAILABLE]']});res.status(503).json({message:'Card setup could not be confirmed. Keep the original request.'});}
   });
 
   app.post("/api/billing/card/confirm", authenticateToken, async(req:AuthenticatedRequest,res)=>{
@@ -5727,7 +5730,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const seatsInUse=await storage.countSeatsInUse(merchantId);
       res.json({success:true,ready:renewalPaymentMethodIsReady(subscription),charged:attempt.activation_state==='approved',
         card:{last4:subscription.cardLast4,brand:subscription.cardBrand,expiry:subscription.cardExpiry},subscription:subscriptionDto(subscription,seatsInUse)});
-    }catch{console.error('[CARD_CONFIRMATION_UNAVAILABLE]');res.status(503).json({message:'Card confirmation is still being checked'});}
+    }catch{logOperation("error","CARD_CONFIRMATION_UNAVAILABLE",{payload:['[CARD_CONFIRMATION_UNAVAILABLE]']});res.status(503).json({message:'Card confirmation is still being checked'});}
   });
 
   app.all("/api/billing/card/notification",...durableNotificationHandlers);
@@ -5760,7 +5763,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       res.json({ success: true });
     } catch (error) {
       if(error instanceof SubscriptionCommandConflict)return res.status(409).json({code:error.code,message:"The original billing request has different details. Keep the original request."});
-      console.error("Remove billing card error:", error);
+      logOperation("error","REMOVE_BILLING_CARD_ERROR",{payload:["Remove billing card error:",error]});
       if (error instanceof SubscriptionBillingBusyError) {
         return res.status(409).json({ message: "Billing is already in progress. Please try again shortly." });
       }
@@ -5819,7 +5822,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         }
         res.json({ message: "Board submitted successfully" });
       } catch (error) {
-        console.error("Board builder submit error:", error);
+        logOperation("error","BOARD_BUILDER_SUBMIT_ERROR",{payload:["Board builder submit error:",error]});
         res.status(500).json({ message: "Failed to process board submission" });
       }
     },
@@ -5864,7 +5867,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       res.status(404).json({ message: 'File not found' });
     } catch (err) {
-      console.error('[UPLOADS_SERVE]', err);
+      logOperation("error","UPLOADS_SERVE",{payload:['[UPLOADS_SERVE]',err]});
       res.status(500).json({ message: 'Failed to serve file' });
     }
   });
@@ -5921,7 +5924,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       return await storage.cleanUploadedFileOwnedByMerchant(ref.relPath, invoice.merchantId);
     } catch (err) {
-      console.error("[CHECKOUT_DOCUMENT_CHECK]", err);
+      logOperation("error","CHECKOUT_DOCUMENT_CHECK",{payload:["[CHECKOUT_DOCUMENT_CHECK]",err]});
       return false;
     }
   }
@@ -5971,7 +5974,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const includeArchived = req.query.includeArchived === "true";
       const tenants = await storage.getTenantProfilesByMerchant(merchantId, { search, includeArchived });
       res.json(tenants);
-    } catch (err) { console.error("[PROP_TENANTS_LIST]", err); res.status(500).json({ message: "Failed to fetch tenants" }); }
+    } catch (err) { logOperation("error","PROP_TENANTS_LIST",{payload:["[PROP_TENANTS_LIST]",err]}); res.status(500).json({ message: "Failed to fetch tenants" }); }
   });
 
   app.post("/api/property/tenants", authenticateToken, async (req: AuthenticatedRequest, res) => {
@@ -5984,7 +5987,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       res.status(201).json(tenant);
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: "Validation error", errors: err.errors });
-      console.error("[PROP_TENANT_CREATE]", err); res.status(500).json({ message: "Failed to create tenant" });
+      logOperation("error","PROP_TENANT_CREATE",{payload:["[PROP_TENANT_CREATE]",err]}); res.status(500).json({ message: "Failed to create tenant" });
     }
   });
 
@@ -6000,7 +6003,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const tenant = await storage.getTenantProfileForMerchant(id, merchantId);
       if (!tenant || tenant.merchantId !== merchantId) return res.status(404).json({ message: "Tenant not found" });
       res.json(tenant);
-    } catch (err) { console.error("[PROP_TENANT_GET]", err); res.status(500).json({ message: "Failed to fetch tenant" }); }
+    } catch (err) { logOperation("error","PROP_TENANT_GET",{payload:["[PROP_TENANT_GET]",err]}); res.status(500).json({ message: "Failed to fetch tenant" }); }
   });
 
   app.put("/api/property/tenants/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
@@ -6017,7 +6020,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       res.json(tenant);
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: "Validation error", errors: err.errors });
-      console.error("[PROP_TENANT_UPDATE]", err); res.status(500).json({ message: "Failed to update tenant" });
+      logOperation("error","PROP_TENANT_UPDATE",{payload:["[PROP_TENANT_UPDATE]",err]}); res.status(500).json({ message: "Failed to update tenant" });
     }
   });
 
@@ -6032,7 +6035,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const tenant = await storage.archiveTenantProfileForMerchant(id, merchantId);
       if (!tenant) return res.status(404).json({ message: "Tenant not found" });
       res.json(tenant);
-    } catch (err) { console.error("[PROP_TENANT_ARCHIVE]", err); res.status(500).json({ message: "Failed to archive tenant" }); }
+    } catch (err) { logOperation("error","PROP_TENANT_ARCHIVE",{payload:["[PROP_TENANT_ARCHIVE]",err]}); res.status(500).json({ message: "Failed to archive tenant" }); }
   });
 
   app.post("/api/property/tenants/:id/unarchive", authenticateToken, async (req: AuthenticatedRequest, res) => {
@@ -6046,7 +6049,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const tenant = await storage.unarchiveTenantProfileForMerchant(id, merchantId);
       if (!tenant) return res.status(404).json({ message: "Tenant not found" });
       res.json(tenant);
-    } catch (err) { console.error("[PROP_TENANT_UNARCHIVE]", err); res.status(500).json({ message: "Failed to restore tenant" }); }
+    } catch (err) { logOperation("error","PROP_TENANT_UNARCHIVE",{payload:["[PROP_TENANT_UNARCHIVE]",err]}); res.status(500).json({ message: "Failed to restore tenant" }); }
   });
 
   app.get("/api/property/tenants/:id/events", authenticateToken, async (req: AuthenticatedRequest, res) => {
@@ -6061,7 +6064,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (limit === null) return res.status(400).json({ message: "Invalid limit" });
       const events = await storage.getTransactionEventsByTenantForMerchant(id, merchantId, limit);
       res.json(events);
-    } catch (err) { console.error("[PROP_EVENTS]", err); res.status(500).json({ message: "Failed to fetch events" }); }
+    } catch (err) { logOperation("error","PROP_EVENTS",{payload:["[PROP_EVENTS]",err]}); res.status(500).json({ message: "Failed to fetch events" }); }
   });
 
   // ── Schedules ────────────────────────────────────────────────────────────
@@ -6071,7 +6074,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const merchantId = req.user?.merchantId;
       if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       res.json(await storage.getActiveSchedulesByMerchant(merchantId));
-    } catch (err) { console.error("[PROP_SCHEDULES_MERCHANT]", err); res.status(500).json({ message: "Failed to fetch schedules" }); }
+    } catch (err) { logOperation("error","PROP_SCHEDULES_MERCHANT",{payload:["[PROP_SCHEDULES_MERCHANT]",err]}); res.status(500).json({ message: "Failed to fetch schedules" }); }
   });
 
   // (Removed GET /api/property/tenants/:tenantId/schedules, owner decision 2026-09-27: no screen
@@ -6095,7 +6098,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       res.status(201).json(result.schedule);
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: "Validation error", errors: err.errors });
-      console.error("[PROP_SCHEDULE_CREATE]", err); res.status(500).json({ message: "Failed to create schedule" });
+      logOperation("error","PROP_SCHEDULE_CREATE",{payload:["[PROP_SCHEDULE_CREATE]",err]}); res.status(500).json({ message: "Failed to create schedule" });
     }
   });
 
@@ -6117,7 +6120,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       res.json(result.schedule);
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: "Validation error", errors: err.errors });
-      console.error("[PROP_SCHEDULE_UPDATE]", err); res.status(500).json({ message: "Failed to update schedule" });
+      logOperation("error","PROP_SCHEDULE_UPDATE",{payload:["[PROP_SCHEDULE_UPDATE]",err]}); res.status(500).json({ message: "Failed to update schedule" });
     }
   });
 
@@ -6132,7 +6135,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const result = await storage.terminateActiveScheduleForMerchant(id, merchantId);
       if (result.kind !== "ok") return res.status(404).json({ message: "Schedule not found" });
       res.json(result.schedule);
-    } catch (err) { console.error("[PROP_SCHEDULE_DELETE]", err); res.status(500).json({ message: "Failed to terminate schedule" }); }
+    } catch (err) { logOperation("error","PROP_SCHEDULE_DELETE",{payload:["[PROP_SCHEDULE_DELETE]",err]}); res.status(500).json({ message: "Failed to terminate schedule" }); }
   });
 
   // ── Invoices ─────────────────────────────────────────────────────────────
@@ -6161,7 +6164,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return { ...inv, ...cache.get(inv.tenantProfileId), owingCents, sharesLeft };
       }));
       res.json(enriched);
-    } catch (err) { console.error("[PROP_INVOICES_LIST]", err); res.status(500).json({ message: "Failed to fetch invoices" }); }
+    } catch (err) { logOperation("error","PROP_INVOICES_LIST",{payload:["[PROP_INVOICES_LIST]",err]}); res.status(500).json({ message: "Failed to fetch invoices" }); }
   });
 
   // Upload a supporting document (PDF/image) for a one-off charge. Returns the
@@ -6196,7 +6199,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         scan = await scanner.scan(req.file.buffer);
         if (scan?.verdict !== "clean" && scan?.verdict !== "infected") throw new ScannerUnavailableError("an answer that is not a verdict");
       } catch (error) {
-        console.error("[INVOICE_DOC_SCAN_UNAVAILABLE]", error instanceof ScannerUnavailableError ? error.message : "scanner fault");
+        logOperation("error","INVOICE_DOC_SCAN_UNAVAILABLE",{payload:["[INVOICE_DOC_SCAN_UNAVAILABLE]",error instanceof ScannerUnavailableError ? error.message : "scanner fault"]});
         return res.status(503).json({ message: "Document scanning is temporarily unavailable. Please try again.", code: "DOCUMENT_SCAN_UNAVAILABLE" });
       }
       if (scan.verdict !== "clean") {
@@ -6211,7 +6214,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const documentUrl = `/uploads/${INVOICE_DOCUMENT_FOLDER}/${filename}`;
       res.json({ documentUrl, documentName: req.file.originalname });
     } catch (err) {
-      console.error("[PROP_INVOICE_DOC_UPLOAD]", err);
+      logOperation("error","PROP_INVOICE_DOC_UPLOAD",{payload:["[PROP_INVOICE_DOC_UPLOAD]",err]});
       res.status(500).json({ message: "Failed to upload document" });
     }
   });
@@ -6249,14 +6252,14 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           await storage.recordInvoiceDocumentAdminRead(req.user!.id, name);
         } catch {
           // No document bytes leave the server without a committed audit record.
-          console.error("[INVOICE_DOC_AUDIT_UNAVAILABLE]");
+          logOperation("error","INVOICE_DOC_AUDIT_UNAVAILABLE",{payload:["[INVOICE_DOC_AUDIT_UNAVAILABLE]"]});
           return res.status(503).json({ message: "Document temporarily unavailable" });
         }
         logSecurityEvent("ADMIN_INVOICE_DOCUMENT_READ", { adminUserId: req.user!.id, document: name });
       }
       return sendPrivateDocument(res, file);
     } catch (err) {
-      console.error("[INVOICE_DOC_SERVE]", err);
+      logOperation("error","INVOICE_DOC_SERVE",{payload:["[INVOICE_DOC_SERVE]",err]});
       res.status(500).json({ message: "Failed to serve document" });
     }
   });
@@ -6289,7 +6292,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     } catch (err) {
       if(err instanceof CreationCommandConflict)return res.status(409).json({code:err.code,message:'The original creation details differ. Keep the original request.'});
       if (err instanceof z.ZodError) return res.status(400).json({ message: "Validation error", errors: err.errors });
-      console.error("[PROP_INVOICE_CREATE]", err); res.status(500).json({ message: "Failed to create invoice" });
+      logOperation("error","PROP_INVOICE_CREATE",{payload:["[PROP_INVOICE_CREATE]",err]}); res.status(500).json({ message: "Failed to create invoice" });
     }
   });
 
@@ -6309,7 +6312,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (delivery.reason === "not_payable") return res.status(409).json({ message: "Invoice is not payable" });
       if (!delivery.ok) return res.status(502).json({ message: "Could not resend", reason: delivery.reason });
       res.json(delivery.invoice);
-    } catch (err) { console.error("[PROP_INVOICE_RESEND]", err); res.status(500).json({ message: "Failed to resend invoice" }); }
+    } catch (err) { logOperation("error","PROP_INVOICE_RESEND",{payload:["[PROP_INVOICE_RESEND]",err]}); res.status(500).json({ message: "Failed to resend invoice" }); }
   });
 
   // (Removed GET /api/property/invoices/:id, owner decision 2026-09-27: no screen called it; the
@@ -6332,7 +6335,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       });
       if (result.kind === "conflict") return res.status(409).json({ message: "Cannot void a paid invoice" });
       res.json(result.invoice);
-    } catch (err) { console.error("[PROP_INVOICE_VOID]", err); res.status(500).json({ message: "Failed to void invoice" }); }
+    } catch (err) { logOperation("error","PROP_INVOICE_VOID",{payload:["[PROP_INVOICE_VOID]",err]}); res.status(500).json({ message: "Failed to void invoice" }); }
   });
 
   app.post("/api/property/invoices/:id/mark-paid-external", authenticateToken, async (req: AuthenticatedRequest, res) => {
@@ -6357,7 +6360,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       res.json(result.invoice);
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: "Validation error", errors: err.errors });
-      console.error("[PROP_INVOICE_MARK_PAID]", err); res.status(500).json({ message: "Failed to mark invoice paid" });
+      logOperation("error","PROP_INVOICE_MARK_PAID",{payload:["[PROP_INVOICE_MARK_PAID]",err]}); res.status(500).json({ message: "Failed to mark invoice paid" });
     }
   });
 
@@ -6434,7 +6437,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         splitCount: invoice.splitCount ?? null,
         splitPaidCount: invoice.splitPaidCount ?? 0,
       });
-    } catch (err) { console.error("[CHECKOUT_RESOLVE]", err); res.status(500).json({ message: "Failed to load payment details" }); }
+    } catch (err) { logOperation("error","CHECKOUT_RESOLVE",{payload:["[CHECKOUT_RESOLVE]",err]}); res.status(500).json({ message: "Failed to load payment details" }); }
   });
 
   // Gap 13, the tenant-facing half of Option C. The reader of an attached
@@ -6459,7 +6462,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       try {
         allowed = await storage.consumeInvoiceDocumentReadLimit(token);
       } catch {
-        console.error("[INVOICE_DOC_LIMIT_UNAVAILABLE]");
+        logOperation("error","INVOICE_DOC_LIMIT_UNAVAILABLE",{payload:["[INVOICE_DOC_LIMIT_UNAVAILABLE]"]});
         return res.status(503).json({ message: "Document temporarily unavailable" });
       }
       if (!allowed) return res.setHeader("Retry-After", "60").status(429).json({ message: "Too many requests" });
@@ -6469,7 +6472,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const file = ref ? await storage.getCleanUploadedFileForMerchant(ref.relPath, invoice.merchantId) : undefined;
       if (!file) return res.status(404).json({ message: "Document not found" });
       return sendPrivateDocument(res, file);
-    } catch (err) { console.error("[CHECKOUT_DOCUMENT]", err); res.status(500).json({ message: "Failed to load document" }); }
+    } catch (err) { logOperation("error","CHECKOUT_DOCUMENT",{payload:["[CHECKOUT_DOCUMENT]",err]}); res.status(500).json({ message: "Failed to load document" }); }
   });
 
   // Tenant chooses how many flatmates to split the rent between (sets splitCount).
@@ -6511,7 +6514,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // Only a caller presenting EVOLUTION_API_KEY is believed, and with no key
       // configured nobody is (it used to accept everyone then).
       if (!presentedSecretMatches(req.headers["apikey"], config.whatsapp.apiKey)) {
-        console.warn("[WA_WEBHOOK] rejected — missing or wrong apikey");
+        logOperation("warn","WA_WEBHOOK_REJECTED_MISSING_OR_WRONG_APIKEY",{payload:["[WA_WEBHOOK] rejected — missing or wrong apikey"]});
         return;
       }
       const { event, data } = req.body ?? {};
@@ -6536,7 +6539,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           await storage.logTransactionEvent({ merchantId: invoice.merchantId, tenantProfileId: invoice.tenantProfileId, invoiceId: invoice.id, eventType: "WhatsApp_Status", payload: { messageId: msgId, status } });
         }
       }
-    } catch (err) { console.error("[WA_WEBHOOK] Error:", err); }
+    } catch (err) { logOperation("error","WA_WEBHOOK_ERROR",{payload:["[WA_WEBHOOK] Error:",err]}); }
   });
 
   // ── Merchant sector + timezone ────────────────────────────────────────────
@@ -6562,7 +6565,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const merchant = await storage.getMerchant(merchantId);
       if (!merchant) return res.status(404).json({ message: "Merchant not found" });
       res.json(reminderSettingsOf(merchant));
-    } catch (err) { console.error("[PROP_REMINDER_GET]", err); res.status(500).json({ message: "Failed to fetch reminder settings" }); }
+    } catch (err) { logOperation("error","PROP_REMINDER_GET",{payload:["[PROP_REMINDER_GET]",err]}); res.status(500).json({ message: "Failed to fetch reminder settings" }); }
   });
 
   app.put("/api/property/reminder-settings", authenticateToken, async (req: AuthenticatedRequest, res) => {
@@ -6574,7 +6577,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       res.json(reminderSettingsOf(merchant));
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: "Validation error", errors: err.errors });
-      console.error("[PROP_REMINDER_PUT]", err); res.status(500).json({ message: "Failed to update reminder settings" });
+      logOperation("error","PROP_REMINDER_PUT",{payload:["[PROP_REMINDER_PUT]",err]}); res.status(500).json({ message: "Failed to update reminder settings" });
     }
   });
 
@@ -6608,7 +6611,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const merchant = await storage.getMerchant(merchantId);
       if (!merchant) return res.status(404).json({ message: "Merchant not found" });
       res.json({ tradeRemindersEnabled: merchant.tradeRemindersEnabled ?? true });
-    } catch (err) { console.error("[TRADES_REMINDER_GET]", err); res.status(500).json({ message: "Failed to fetch reminder settings" }); }
+    } catch (err) { logOperation("error","TRADES_REMINDER_GET",{payload:["[TRADES_REMINDER_GET]",err]}); res.status(500).json({ message: "Failed to fetch reminder settings" }); }
   });
 
   app.put("/api/trades/reminder-settings", authenticateToken, async (req: AuthenticatedRequest, res) => {
@@ -6620,7 +6623,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       res.json({ tradeRemindersEnabled: merchant?.tradeRemindersEnabled ?? true });
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: "Validation error", errors: err.errors });
-      console.error("[TRADES_REMINDER_PUT]", err); res.status(500).json({ message: "Failed to update reminder settings" });
+      logOperation("error","TRADES_REMINDER_PUT",{payload:["[TRADES_REMINDER_PUT]",err]}); res.status(500).json({ message: "Failed to update reminder settings" });
     }
   });
 
@@ -6635,7 +6638,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         tradeGstMode: merchant.tradeGstMode === "exclusive" ? "exclusive" : "inclusive",
       });
     } catch (err) {
-      console.error("[TRADES_GST_GET]", err);
+      logOperation("error","TRADES_GST_GET",{payload:["[TRADES_GST_GET]",err]});
       res.status(500).json({ message: "Failed to fetch GST settings" });
     }
   });
@@ -6655,7 +6658,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       });
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: "Validation error", errors: err.errors });
-      console.error("[TRADES_GST_PUT]", err);
+      logOperation("error","TRADES_GST_PUT",{payload:["[TRADES_GST_PUT]",err]});
       res.status(500).json({ message: "Failed to update GST settings" });
     }
   });
@@ -6666,7 +6669,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       const rows = await storage.getClientProfilesByMerchant(merchantId);
       res.json(rows);
-    } catch (err) { console.error("[TRADES_CLIENTS_GET]", err); res.status(500).json({ message: "Failed to fetch clients" }); }
+    } catch (err) { logOperation("error","TRADES_CLIENTS_GET",{payload:["[TRADES_CLIENTS_GET]",err]}); res.status(500).json({ message: "Failed to fetch clients" }); }
   });
   app.post("/api/trades/clients", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
@@ -6676,7 +6679,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
       const row = await storage.createClientProfileForMerchant(merchantId, parsed.data);
       res.status(201).json(row);
-    } catch (err) { console.error("[TRADES_CLIENTS_POST]", err); res.status(500).json({ message: "Failed to create client" }); }
+    } catch (err) { logOperation("error","TRADES_CLIENTS_POST",{payload:["[TRADES_CLIENTS_POST]",err]}); res.status(500).json({ message: "Failed to create client" }); }
   });
   // C10 batch 6d (2026-09-27): a trades id is parsed as a UUID (a malformed one reached PostgreSQL's
   // uuid cast: a 500). Another business's record is not found, like a missing one.
@@ -6689,7 +6692,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const row = await storage.getClientProfileForMerchant(id, merchantId);
       if (!row) return res.status(404).json({ message: "Not found" });
       res.json(row);
-    } catch (err) { console.error("[TRADES_CLIENTS_GET_ID]", err); res.status(500).json({ message: "Failed to fetch client" }); }
+    } catch (err) { logOperation("error","TRADES_CLIENTS_GET_ID",{payload:["[TRADES_CLIENTS_GET_ID]",err]}); res.status(500).json({ message: "Failed to fetch client" }); }
   });
   app.put("/api/trades/clients/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
@@ -6704,7 +6707,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const updated = await storage.updateClientProfileForMerchant(id, merchantId, parsed.data);
       if (!updated) return res.status(404).json({ message: "Not found" });
       res.json(updated);
-    } catch (err) { console.error("[TRADES_CLIENTS_PUT]", err); res.status(500).json({ message: "Failed to update client" }); }
+    } catch (err) { logOperation("error","TRADES_CLIENTS_PUT",{payload:["[TRADES_CLIENTS_PUT]",err]}); res.status(500).json({ message: "Failed to update client" }); }
   });
   app.post("/api/trades/clients/:id/archive", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
@@ -6717,7 +6720,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const client = await storage.archiveClientProfileForMerchant(id, merchantId);
       if (!client) return res.status(404).json({ message: "Not found" });
       res.json(client);
-    } catch (err) { console.error("[TRADES_CLIENTS_ARCHIVE]", err); res.status(500).json({ message: "Failed to archive client" }); }
+    } catch (err) { logOperation("error","TRADES_CLIENTS_ARCHIVE",{payload:["[TRADES_CLIENTS_ARCHIVE]",err]}); res.status(500).json({ message: "Failed to archive client" }); }
   });
   app.post("/api/trades/clients/:id/unarchive", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
@@ -6731,7 +6734,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const client = await storage.unarchiveClientProfileForMerchant(id, merchantId);
       if (!client) return res.status(404).json({ message: "Not found" });
       res.json(client);
-    } catch (err) { console.error("[TRADES_CLIENTS_UNARCHIVE]", err); res.status(500).json({ message: "Failed to restore client" }); }
+    } catch (err) { logOperation("error","TRADES_CLIENTS_UNARCHIVE",{payload:["[TRADES_CLIENTS_UNARCHIVE]",err]}); res.status(500).json({ message: "Failed to restore client" }); }
   });
   // Promote a quick-invoice 'prospect' profile into a real (visible) client.
   app.post("/api/trades/clients/:id/promote", authenticateToken, async (req: AuthenticatedRequest, res) => {
@@ -6747,7 +6750,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (result.kind === "not-found") return res.status(404).json({ message: "Not found" });
       if (result.kind === "conflict") return res.status(409).json({ message: "Client is already saved" });
       res.json(result.client);
-    } catch (err) { console.error("[TRADES_CLIENTS_PROMOTE]", err); res.status(500).json({ message: "Failed to save client" }); }
+    } catch (err) { logOperation("error","TRADES_CLIENTS_PROMOTE",{payload:["[TRADES_CLIENTS_PROMOTE]",err]}); res.status(500).json({ message: "Failed to save client" }); }
   });
   app.get("/api/trades/clients/:id/events", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
@@ -6758,7 +6761,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const existing = await storage.getClientProfileForMerchant(id, merchantId);
       if (!existing) return res.status(404).json({ message: "Not found" });
       res.json(await storage.getJobEventsByClientForMerchant(id, merchantId));
-    } catch (err) { console.error("[TRADES_CLIENTS_EVENTS]", err); res.status(500).json({ message: "Failed to fetch client events" }); }
+    } catch (err) { logOperation("error","TRADES_CLIENTS_EVENTS",{payload:["[TRADES_CLIENTS_EVENTS]",err]}); res.status(500).json({ message: "Failed to fetch client events" }); }
   });
 
   app.get("/api/trades/quotes", authenticateToken, async (req: AuthenticatedRequest, res) => {
@@ -6768,7 +6771,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // A status filter is taken only as text: a repeated one reached the query as a list.
       const status = typeof req.query.status === "string" ? req.query.status : undefined;
       res.json(await storage.getQuotesByMerchant(merchantId, { status }));
-    } catch (err) { console.error("[TRADES_QUOTES_GET]", err); res.status(500).json({ message: "Failed to fetch quotes" }); }
+    } catch (err) { logOperation("error","TRADES_QUOTES_GET",{payload:["[TRADES_QUOTES_GET]",err]}); res.status(500).json({ message: "Failed to fetch quotes" }); }
   });
   app.post("/api/trades/quotes", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
@@ -6846,7 +6849,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const fresh = await storage.getQuoteDeliveryForMerchant(result.quote.id, merchantId);
       if (!fresh) return res.status(404).json({ message: "Not found" });
       res.status(201).json({ ...fresh.quote, delivered: delivery.sent, deliveryReason: delivery.reason });
-    } catch (err) { console.error("[TRADES_QUOTES_POST]", err); res.status(500).json({ message: "Failed to create quote" }); }
+    } catch (err) { logOperation("error","TRADES_QUOTES_POST",{payload:["[TRADES_QUOTES_POST]",err]}); res.status(500).json({ message: "Failed to create quote" }); }
   });
   // (Removed GET /api/trades/quotes/:id, owner decision 2026-09-27: no screen called it; the screens
   // read the quote list, and open a quote's PDF.)
@@ -6877,7 +6880,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchant) return res.status(404).json({ message: "Quote details unavailable" });
       sendQuotePdf(snapshot.quote, snapshot.client, merchant, req, res);
     } catch (err) {
-      console.error("[TRADES_QUOTE_PDF]", err);
+      logOperation("error","TRADES_QUOTE_PDF",{payload:["[TRADES_QUOTE_PDF]",err]});
       res.status(500).json({ message: "Failed to generate quote PDF" });
     }
   });
@@ -6894,7 +6897,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!client || !merchant) return res.status(404).json({ message: "Quote details unavailable" });
       sendQuotePdf(quote, client, merchant, req, res);
     } catch (err) {
-      console.error("[TRADES_QUOTE_TOKEN_PDF]", err);
+      logOperation("error","TRADES_QUOTE_TOKEN_PDF",{payload:["[TRADES_QUOTE_TOKEN_PDF]",err]});
       res.status(500).json({ message: "Failed to generate quote PDF" });
     }
   });
@@ -6941,7 +6944,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         invoice,
         previouslyViewed,
       });
-    } catch (err) { console.error("[TRADES_QUOTES_TOKEN_GET]", err); res.status(500).json({ message: "Failed to fetch quote" }); }
+    } catch (err) { logOperation("error","TRADES_QUOTES_TOKEN_GET",{payload:["[TRADES_QUOTES_TOKEN_GET]",err]}); res.status(500).json({ message: "Failed to fetch quote" }); }
   });
   // Customer-facing accept/decline (called from the public quote page, no auth — looked up by token)
   app.post("/api/trades/quotes/token/:token/respond",async(req,res)=>{
@@ -6962,7 +6965,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       res.json({quote:{id:result.quote.id,status:result.quote.status,acceptedAt:result.quote.acceptedAt,declinedAt:result.quote.declinedAt},
         depositInvoice:invoice?{id:invoice.id,token:invoice.token,kind:invoice.kind,amountCents:invoice.amountCents,status:invoice.status}:null,
         paymentUrl:invoice?`${getBaseUrl(req)}/r/${invoice.token}`:null,delivered:!!invoice&&['sent','viewed','paid','paid_external'].includes(invoice.status)});
-    }catch{console.error('[QUOTE_RESPONSE_UNAVAILABLE]');res.status(503).json({message:'Quote response could not be confirmed. Retry the original choice.'});}
+    }catch{logOperation("error","QUOTE_RESPONSE_UNAVAILABLE",{payload:['[QUOTE_RESPONSE_UNAVAILABLE]']});res.status(503).json({message:'Quote response could not be confirmed. Retry the original choice.'});}
   });
 
   app.get("/api/trades/invoices", authenticateToken, async (req: AuthenticatedRequest, res) => {
@@ -6975,7 +6978,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (clientProfileId === null) return res.status(400).json({ message: "Invalid clientProfileId" });
       const status = typeof req.query.status === "string" ? req.query.status : undefined;
       res.json(await storage.getJobInvoicesByMerchant(merchantId, { status, clientProfileId }));
-    } catch (err) { console.error("[TRADES_INVOICES_GET]", err); res.status(500).json({ message: "Failed to fetch invoices" }); }
+    } catch (err) { logOperation("error","TRADES_INVOICES_GET",{payload:["[TRADES_INVOICES_GET]",err]}); res.status(500).json({ message: "Failed to fetch invoices" }); }
   });
   app.post("/api/trades/invoices", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
@@ -7041,7 +7044,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const fresh = await storage.getJobInvoiceForMerchant(row.id, merchantId);
       if (!fresh) return res.status(404).json({ message: "Not found" });
       res.status(201).json({ ...fresh, delivered: delivery.sent, deliveryReason: delivery.reason });
-    } catch (err) {if(err instanceof CreationCommandConflict)return res.status(409).json({code:err.code,message:'The original creation details differ. Keep the original request.'}); console.error("[TRADES_INVOICES_POST]", err); res.status(500).json({ message: "Failed to create invoice" }); }
+    } catch (err) {if(err instanceof CreationCommandConflict)return res.status(409).json({code:err.code,message:'The original creation details differ. Keep the original request.'}); logOperation("error","TRADES_INVOICES_POST",{payload:["[TRADES_INVOICES_POST]",err]}); res.status(500).json({ message: "Failed to create invoice" }); }
   });
   // (Removed POST /api/trades/invoices/:id/resend, owner decision 2026-09-27: no screen called it; the
   // cron sends an invoice that failed to go, and the reminders follow up.)
@@ -7079,7 +7082,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const fresh = await storage.getJobInvoiceForMerchant(result.invoice.id, merchantId);
       if (!fresh) return res.status(404).json({ message: "Not found" });
       res.status(201).json({ ...fresh, delivered: delivery.sent, deliveryReason: delivery.reason });
-    } catch (err) { console.error("[TRADES_INVOICES_SEND_BALANCE]", err); res.status(500).json({ message: "Failed to send balance invoice" }); }
+    } catch (err) { logOperation("error","TRADES_INVOICES_SEND_BALANCE",{payload:["[TRADES_INVOICES_SEND_BALANCE]",err]}); res.status(500).json({ message: "Failed to send balance invoice" }); }
   });
   app.post("/api/trades/invoices/:id/mark-paid-external", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
@@ -7106,7 +7109,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // Payer receipt is committed with the manual event and delivered by its
       // outbox key, so a lost response/retry cannot send a second receipt.
       res.json(result.invoice);
-    } catch (err) { console.error("[TRADES_INVOICES_MARK_PAID]", err); res.status(500).json({ message: "Failed to mark invoice paid" }); }
+    } catch (err) { logOperation("error","TRADES_INVOICES_MARK_PAID",{payload:["[TRADES_INVOICES_MARK_PAID]",err]}); res.status(500).json({ message: "Failed to mark invoice paid" }); }
   });
   app.post("/api/trades/invoices/:id/complete", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
@@ -7126,7 +7129,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (result.kind === "not-found") return res.status(404).json({ message: "Not found" });
       if (result.kind === "conflict") return res.status(409).json(result.reason === "deposit" ? DEPOSIT : UNPAID);
       res.json(result.invoice);
-    } catch (err) { console.error("[TRADES_INVOICES_COMPLETE]", err); res.status(500).json({ message: "Failed to complete invoice" }); }
+    } catch (err) { logOperation("error","TRADES_INVOICES_COMPLETE",{payload:["[TRADES_INVOICES_COMPLETE]",err]}); res.status(500).json({ message: "Failed to complete invoice" }); }
   });
   app.post("/api/trades/invoices/:id/void", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
@@ -7148,7 +7151,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       });
       if (result.kind === "conflict") return res.status(409).json({ message: "This invoice is paid" });
       res.json(result.invoice);
-    } catch (err) { console.error("[TRADES_INVOICES_VOID]", err); res.status(500).json({ message: "Failed to void invoice" }); }
+    } catch (err) { logOperation("error","TRADES_INVOICES_VOID",{payload:["[TRADES_INVOICES_VOID]",err]}); res.status(500).json({ message: "Failed to void invoice" }); }
   });
 
   app.get("/api/trades/schedules", authenticateToken, async (req: AuthenticatedRequest, res) => {
@@ -7156,7 +7159,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const merchantId = req.user?.merchantId;
       if (!merchantId) return res.status(403).json(MERCHANT_ACCESS_REQUIRED);
       res.json(await storage.getJobSchedulesByMerchant(merchantId));
-    } catch (err) { console.error("[TRADES_SCHEDULES_GET]", err); res.status(500).json({ message: "Failed to fetch schedules" }); }
+    } catch (err) { logOperation("error","TRADES_SCHEDULES_GET",{payload:["[TRADES_SCHEDULES_GET]",err]}); res.status(500).json({ message: "Failed to fetch schedules" }); }
   });
   app.post("/api/trades/schedules", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
@@ -7185,7 +7188,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (result.kind === "not-found") return res.status(404).json({ message: "Client not found" });
       if (result.kind === "conflict") return res.status(409).json({ message: "This client is archived" });
       res.status(201).json(result.schedule);
-    } catch (err) { console.error("[TRADES_SCHEDULES_POST]", err); res.status(500).json({ message: "Failed to create schedule" }); }
+    } catch (err) { logOperation("error","TRADES_SCHEDULES_POST",{payload:["[TRADES_SCHEDULES_POST]",err]}); res.status(500).json({ message: "Failed to create schedule" }); }
   });
   app.put("/api/trades/schedules/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
@@ -7209,7 +7212,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (result.kind === "not-found") return res.status(404).json({ message: "Not found" });
       if (result.kind === "conflict") return res.status(409).json(CANCELLED);
       res.json(result.schedule);
-    } catch (err) { console.error("[TRADES_SCHEDULES_PUT]", err); res.status(500).json({ message: "Failed to update schedule" }); }
+    } catch (err) { logOperation("error","TRADES_SCHEDULES_PUT",{payload:["[TRADES_SCHEDULES_PUT]",err]}); res.status(500).json({ message: "Failed to update schedule" }); }
   });
   app.delete("/api/trades/schedules/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
@@ -7223,7 +7226,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const result = await storage.terminateJobScheduleForMerchant(id, merchantId);
       if (result.kind !== "ok") return res.status(404).json({ message: "Not found" });
       res.json(result.schedule);
-    } catch (err) { console.error("[TRADES_SCHEDULES_DELETE]", err); res.status(500).json({ message: "Failed to delete schedule" }); }
+    } catch (err) { logOperation("error","TRADES_SCHEDULES_DELETE",{payload:["[TRADES_SCHEDULES_DELETE]",err]}); res.status(500).json({ message: "Failed to delete schedule" }); }
   });
 
   // ── Cron endpoint ─────────────────────────────────────────────────────────
@@ -7253,13 +7256,15 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const baseUrl = getBaseUrl(req);
       const failedPasses: string[] = [];
       const runPass = async <T>(name: string, task: () => Promise<T>): Promise<T | { error: string }> => {
+        return runWithOperationContext({jobId:crypto.randomUUID()},async()=>{
         try {
           return await task();
         } catch (error) {
           failedPasses.push(name);
-          console.error(`[CRON] ${name} failed:`, error);
+          logOperation('error','cron_pass_failed',{job:name,...safeErrorSummary(error)});
           return { error: "Pass failed" };
         }
+        });
       };
 
       // Subscription billing starts independently. A property/trades/push pass
@@ -7338,7 +7343,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         failedPasses,
         subscriptionBilling,
       };
-      console.log(`[CRON] ok=${ok} durationMs=${lastCronRun.durationMs} failedPasses=${failedPasses.join(",") || "none"} subscriptionBilling=${JSON.stringify(subscriptionBilling)}`);
+      logOperation('info','cron_cycle_finished',{ok,durationMs:lastCronRun.durationMs,failed:failedPasses.length});
       res.status(ok ? 200 : 207).json({
         ok,
         ranAt: now.toISOString(),
@@ -7366,7 +7371,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         failedPasses: ["cron"],
         subscriptionBilling: null,
       };
-      console.error("[CRON]", err);
+      logOperation("error","CRON",{payload:["[CRON]",err]});
       res.status(500).json({ message: "Cron run failed" });
     }
     finally {

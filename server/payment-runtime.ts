@@ -1,3 +1,5 @@
+import {logOperation} from "./structured-log";
+import {runWithOperationContext} from "./operation-context";
 import {randomUUID} from 'node:crypto';
 import type {DurablePaymentStorage} from './durable-payment-storage';
 import {PaymentReconciliationWorker} from './payment-reconciliation';
@@ -25,12 +27,12 @@ export type ConfiguredPaymentRuntime=PaymentRuntime & {
 export function startPaymentReconciliationLoop(service:PaymentRuntime,intervalMs=1000):()=>void {
   let busy=false,stopped=false;
   const owner=randomUUID();
-  const tick=async()=>{
+  const tick=async()=>runWithOperationContext({jobId:randomUUID()},async()=>{
     if(busy || stopped) return;busy=true;
     try {for(let i=0;i<10 && !stopped;i++)if(!await service.worker.runOne(owner))break;}
-    catch {console.error('[PAYMENT_RECONCILIATION_UNAVAILABLE]');}
+    catch {logOperation("error","PAYMENT_RECONCILIATION_UNAVAILABLE");}
     finally {busy=false;}
-  };
+  });
   const timer=setInterval(()=>void tick(),intervalMs);timer.unref();
   return ()=>{stopped=true;clearInterval(timer);};
 }

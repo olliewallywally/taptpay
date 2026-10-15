@@ -1,3 +1,4 @@
+import {logOperation} from "./structured-log";
 /**
  * whatsapp-service.ts — thin seam over a self-hosted Evolution API instance
  * (https://github.com/evolution-foundation/evolution-api) for sending rent
@@ -37,12 +38,12 @@ export function normalizeNzPhone(raw?: string | null): string | null {
  */
 export async function sendWhatsApp(opts: { toPhone: string; text: string; instance?: string }): Promise<{ ok: boolean; messageId?: string }> {
   if (!isWhatsAppConfigured()) {
-    console.log(`[WHATSAPP] not configured — skipping send to ${opts.toPhone}`);
+    logOperation("info","WHATSAPP_NOT_CONFIGURED_SKIPPING_SEND_TO",{payload:[`[WHATSAPP] not configured — skipping send to ${opts.toPhone}`]});
     return { ok: false };
   }
   const number = normalizeNzPhone(opts.toPhone);
   if (!number) {
-    console.warn(`[WHATSAPP] unparseable number: ${opts.toPhone}`);
+    logOperation("warn","WHATSAPP_UNPARSEABLE_NUMBER",{payload:[`[WHATSAPP] unparseable number: ${opts.toPhone}`]});
     return { ok: false };
   }
   const base = (config.whatsapp.apiUrl || "").replace(/\/+$/, "");
@@ -61,14 +62,14 @@ export async function sendWhatsApp(opts: { toPhone: string; text: string; instan
     clearTimeout(timer);
     if (!res.ok) {
       const body = await res.text().catch(() => "");
-      console.error(`[WHATSAPP] send failed ${res.status}: ${body.slice(0, 300)}`);
+      logOperation("error","WHATSAPP_SEND_FAILED",{payload:[`[WHATSAPP] send failed ${res.status}: ${body.slice(0, 300)}`]});
       return { ok: false };
     }
     const json = await res.json().catch(() => ({})) as any;
     const messageId: string | undefined = json?.key?.id;
     return { ok: true, messageId };
   } catch (err: any) {
-    console.error(`[WHATSAPP] send error: ${err?.message || err}`);
+    logOperation("error","WHATSAPP_SEND_ERROR",{payload:[`[WHATSAPP] send error: ${err?.message || err}`]});
     return { ok: false };
   }
 }

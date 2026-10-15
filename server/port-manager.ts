@@ -1,3 +1,4 @@
+import {logOperation} from "./structured-log";
 import { exec } from "child_process";
 import { promisify } from "util";
 import type { Server } from "http";
@@ -62,16 +63,16 @@ export async function cleanupPort(port: number, options: PortCleanupOptions = {}
     }
 
     if (!portCheck.pid) {
-      console.warn(`⚠️ Port ${port} is in use but couldn't identify the process`);
+      logOperation("warn","PORT_IS_IN_USE_BUT_COULDN_T_IDENTIFY_THE_PROCESS",{payload:[`⚠️ Port ${port} is in use but couldn't identify the process`]});
       return false;
     }
 
-    console.log(`🔄 Port ${port} is in use by PID ${portCheck.pid} (${portCheck.command || 'unknown'})`);
+    logOperation("info","PORT_IS_IN_USE_BY_PID",{payload:[`🔄 Port ${port} is in use by PID ${portCheck.pid} (${portCheck.command || 'unknown'})`]});
 
     // First try graceful termination
     try {
       await execAsync(`kill ${portCheck.pid}`);
-      console.log(`📤 Sent SIGTERM to process ${portCheck.pid}`);
+      logOperation("info","SENT_SIGTERM_TO_PROCESS",{payload:[`📤 Sent SIGTERM to process ${portCheck.pid}`]});
       
       // Wait for graceful shutdown
       await new Promise(resolve => setTimeout(resolve, Math.min(timeout, 3000)));
@@ -79,35 +80,35 @@ export async function cleanupPort(port: number, options: PortCleanupOptions = {}
       // Check if port is now free
       const recheckResult = await checkPortAvailability(port);
       if (recheckResult.available) {
-        console.log(`✅ Port ${port} freed successfully`);
+        logOperation("info","PORT_FREED_SUCCESSFULLY",{payload:[`✅ Port ${port} freed successfully`]});
         return true;
       }
     } catch (killError) {
-      console.warn(`⚠️ Could not gracefully terminate process ${portCheck.pid}: ${killError}`);
+      logOperation("warn","COULD_NOT_GRACEFULLY_TERMINATE_PROCESS",{payload:[`⚠️ Could not gracefully terminate process ${portCheck.pid}: ${killError}`]});
     }
 
     // If force is enabled and graceful termination failed, try force kill
     if (force) {
       try {
         await execAsync(`kill -9 ${portCheck.pid}`);
-        console.log(`💀 Force killed process ${portCheck.pid}`);
+        logOperation("info","FORCE_KILLED_PROCESS",{payload:[`💀 Force killed process ${portCheck.pid}`]});
         
         // Brief wait for cleanup
         await new Promise(resolve => setTimeout(resolve, 1000));
         
         const finalCheck = await checkPortAvailability(port);
         if (finalCheck.available) {
-          console.log(`✅ Port ${port} freed with force kill`);
+          logOperation("info","PORT_FREED_WITH_FORCE_KILL",{payload:[`✅ Port ${port} freed with force kill`]});
           return true;
         }
       } catch (forceKillError) {
-        console.error(`❌ Force kill failed for process ${portCheck.pid}: ${forceKillError}`);
+        logOperation("error","FORCE_KILL_FAILED_FOR_PROCESS",{payload:[`❌ Force kill failed for process ${portCheck.pid}: ${forceKillError}`]});
       }
     }
 
     return false;
   } catch (error) {
-    console.error(`❌ Error cleaning up port ${port}:`, error);
+    logOperation("error","ERROR_CLEANING_UP_PORT",{payload:[`❌ Error cleaning up port ${port}:`,error]});
     return false;
   }
 }
@@ -120,16 +121,16 @@ export function setupGracefulShutdown(server: Server, port: number): void {
 
   const gracefulShutdown = async (signal: string) => {
     if (isShuttingDown) {
-      console.log(`⚠️ ${signal} received again, forcing exit...`);
+      logOperation("info","RECEIVED_AGAIN_FORCING_EXIT",{payload:[`⚠️ ${signal} received again, forcing exit...`]});
       process.exit(1);
     }
 
     isShuttingDown = true;
-    console.log(`🛑 ${signal} received, starting graceful shutdown...`);
+    logOperation("info","RECEIVED_STARTING_GRACEFUL_SHUTDOWN",{payload:[`🛑 ${signal} received, starting graceful shutdown...`]});
 
     // Set a timeout for forced shutdown
     const forceShutdownTimeout = setTimeout(() => {
-      console.log(`⏰ Shutdown timeout reached, forcing exit...`);
+      logOperation("info","SHUTDOWN_TIMEOUT_REACHED_FORCING_EXIT",{payload:[`⏰ Shutdown timeout reached, forcing exit...`]});
       // Even when an HTTP connection never closes, give accepted audit events
       // a bounded chance to finish before exiting.
       void closeSecurityAuditLog(500).finally(() => process.exit(1));
@@ -140,22 +141,22 @@ export function setupGracefulShutdown(server: Server, port: number): void {
       await new Promise<void>((resolve, reject) => {
         server.close((err) => {
           if (err) {
-            console.error(`❌ Error closing server: ${err.message}`);
+            logOperation("error","ERROR_CLOSING_SERVER",{payload:[`❌ Error closing server: ${err.message}`]});
             reject(err);
           } else {
-            console.log(`✅ Server closed successfully`);
+            logOperation("info","SERVER_CLOSED_SUCCESSFULLY",{payload:[`✅ Server closed successfully`]});
             resolve();
           }
         });
       });
 
       const auditFlushed = await closeSecurityAuditLog();
-      console.log(`🧹 Cleanup completed for port ${port}`);
+      logOperation("info","CLEANUP_COMPLETED_FOR_PORT",{payload:[`🧹 Cleanup completed for port ${port}`]});
       
       clearTimeout(forceShutdownTimeout);
       process.exit(auditFlushed ? 0 : 1);
     } catch (error) {
-      console.error(`❌ Error during graceful shutdown:`, error);
+      logOperation("error","ERROR_DURING_GRACEFUL_SHUTDOWN",{payload:[`❌ Error during graceful shutdown:`,error]});
       await closeSecurityAuditLog();
       clearTimeout(forceShutdownTimeout);
       process.exit(1);
@@ -171,7 +172,7 @@ export function setupGracefulShutdown(server: Server, port: number): void {
   // turns one bad request into total downtime. In production the platform
   // (autoscale) replaces crashed instances, so exit fast on unknown state.
   process.on('uncaughtException', (error) => {
-    console.error('❌ Uncaught exception (server kept alive in dev):', error);
+    logOperation("error","UNCAUGHT_EXCEPTION_SERVER_KEPT_ALIVE_IN_DEV",{payload:['❌ Uncaught exception (server kept alive in dev):',error]});
     if (config.isProduction) {
       gracefulShutdown('UNCAUGHT_EXCEPTION');
     }
@@ -182,7 +183,7 @@ export function setupGracefulShutdown(server: Server, port: number): void {
   // server over it caused repeated "app is down / timing out" incidents
   // (previously this called gracefulShutdown → process.exit).
   process.on('unhandledRejection', (reason, promise) => {
-    console.error('❌ Unhandled rejection at:', promise, 'reason:', reason);
+    logOperation("error","UNHANDLED_REJECTION_AT",{payload:['❌ Unhandled rejection at:',promise,'reason:',reason]});
   });
 }
 
@@ -196,25 +197,25 @@ export async function startServerWithPortManagement(
 ): Promise<boolean> {
   try {
     // Check if port is available
-    console.log(`🔍 Checking port ${port} availability...`);
+    logOperation("info","CHECKING_PORT_AVAILABILITY",{payload:[`🔍 Checking port ${port} availability...`]});
     const portCheck = await checkPortAvailability(port);
     
     if (!portCheck.available) {
-      console.log(`⚠️ Port ${port} is in use`);
+      logOperation("info","PORT_IS_IN_USE",{payload:[`⚠️ Port ${port} is in use`]});
       
       if (portCheck.pid) {
-        console.log(`📋 Process details: PID ${portCheck.pid}, Command: ${portCheck.command || 'unknown'}`);
-        console.log(`🔄 Attempting to clean up process on port ${port}...`);
+        logOperation("info","PROCESS_DETAILS_PID_COMMAND",{payload:[`📋 Process details: PID ${portCheck.pid}, Command: ${portCheck.command || 'unknown'}`]});
+        logOperation("info","ATTEMPTING_TO_CLEAN_UP_PROCESS_ON_PORT",{payload:[`🔄 Attempting to clean up process on port ${port}...`]});
         const cleaned = await cleanupPort(port, { force: true, timeout: 3000 });
 
         if (!cleaned) {
-          console.error(`❌ Could not clean up port ${port}. Manual intervention required.`);
-          console.log(`💡 Try running: kill ${portCheck.pid} or kill -9 ${portCheck.pid}`);
+          logOperation("error","COULD_NOT_CLEAN_UP_PORT_MANUAL_INTERVENTION_REQUIRED",{payload:[`❌ Could not clean up port ${port}. Manual intervention required.`]});
+          logOperation("info","TRY_RUNNING_KILL_OR_KILL_9",{payload:[`💡 Try running: kill ${portCheck.pid} or kill -9 ${portCheck.pid}`]});
           return false;
         }
       } else {
-        console.error(`❌ Port ${port} is in use but couldn't identify the process`);
-        console.log(`💡 Try running: sudo netstat -tlnp | grep ${port} or sudo ss -tlnp | grep ${port}`);
+        logOperation("error","PORT_IS_IN_USE_BUT_COULDN_T_IDENTIFY_THE_PROCESS",{payload:[`❌ Port ${port} is in use but couldn't identify the process`]});
+        logOperation("info","TRY_RUNNING_SUDO_NETSTAT_TLNP_GREP_OR_SUDO_SS_TLNP_GREP",{payload:[`💡 Try running: sudo netstat -tlnp | grep ${port} or sudo ss -tlnp | grep ${port}`]});
         return false;
       }
     }
@@ -223,19 +224,19 @@ export async function startServerWithPortManagement(
     return new Promise<boolean>((resolve) => {
       const onError = (error: any) => {
         if (error.code === 'EADDRINUSE') {
-          console.error(`❌ Port ${port} is still in use after cleanup attempts`);
-          console.log(`💡 Suggestions:`);
-          console.log(`   1. Wait a few seconds and try again`);
-          console.log(`   2. Check for other processes: sudo netstat -tlnp | grep ${port}`);
-          console.log(`   3. Restart your development environment`);
+          logOperation("error","PORT_IS_STILL_IN_USE_AFTER_CLEANUP_ATTEMPTS",{payload:[`❌ Port ${port} is still in use after cleanup attempts`]});
+          logOperation("info","SUGGESTIONS",{payload:[`💡 Suggestions:`]});
+          logOperation("info","1_WAIT_A_FEW_SECONDS_AND_TRY_AGAIN",{payload:[`   1. Wait a few seconds and try again`]});
+          logOperation("info","2_CHECK_FOR_OTHER_PROCESSES_SUDO_NETSTAT_TLNP_GREP",{payload:[`   2. Check for other processes: sudo netstat -tlnp | grep ${port}`]});
+          logOperation("info","3_RESTART_YOUR_DEVELOPMENT_ENVIRONMENT",{payload:[`   3. Restart your development environment`]});
         } else {
-          console.error(`❌ Server startup error:`, error.message);
+          logOperation("error","SERVER_STARTUP_ERROR",{payload:[`❌ Server startup error:`,error.message]});
         }
         resolve(false);
       };
 
       const onListening = () => {
-        console.log(`✅ Server successfully started on ${host}:${port}`);
+        logOperation("info","SERVER_SUCCESSFULLY_STARTED_ON",{payload:[`✅ Server successfully started on ${host}:${port}`]});
         server.removeListener('error', onError);
         resolve(true);
       };
@@ -246,7 +247,7 @@ export async function startServerWithPortManagement(
       server.listen({ port, host, reusePort: true });
     });
   } catch (error) {
-    console.error(`❌ Error starting server with port management:`, error);
+    logOperation("error","ERROR_STARTING_SERVER_WITH_PORT_MANAGEMENT",{payload:[`❌ Error starting server with port management:`,error]});
     return false;
   }
 }

@@ -1,3 +1,4 @@
+import {logOperation} from "./structured-log";
 import bcrypt from 'bcrypt';
 import { config } from './config';
 import { isDemoAccountLoginBlocked } from './demo-safety';
@@ -267,7 +268,7 @@ async function readForAuth<T>(
   } catch (error) {
     // Never logged through logSecurityEvent: an outage makes this fire on every
     // request, and the audit log is an append-only file on the same box.
-    console.error(`[AUTH_STORAGE_UNAVAILABLE] failed to ${what}:`, error);
+    logOperation("error","AUTH_STORAGE_UNAVAILABLE");
     return STORAGE_UNAVAILABLE;
   }
 }
@@ -612,7 +613,7 @@ export async function requestPasswordReset(email: string, baseUrl?: string): Pro
 
     return await sendPasswordResetEmail(user.email, resetToken, baseUrl);
   } catch (error) {
-    console.error('Failed to process password reset request:', error);
+    logOperation("error","PASSWORD_RESET_REQUEST_FAILED");
     return false;
   }
 }

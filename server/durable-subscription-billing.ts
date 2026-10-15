@@ -1,3 +1,5 @@
+import {runWithOperationContext} from "./operation-context";
+import {logOperation} from "./structured-log";
 import {createHash,randomUUID} from 'node:crypto';
 import {planFor,type PlanId} from '@shared/plans';
 import {nextBillingPeriodStart,nextPeriodUpdates,failedPaymentUpdates,immediatePlanUpdates,MAX_PAYMENT_ATTEMPTS} from './subscription-billing';
@@ -164,7 +166,7 @@ export class DurableSubscriptionBilling {
       return await this.finalize(row,owner,reply);
     }catch(error){
       const code=(error as {code?:unknown})?.code;
-      if(typeof code==='string'&&['23514','23505','42P08','42804','42P18','23502','22007','42703','42P01'].includes(code))console.error('[BILLING_LOCAL_COMMIT_UNAVAILABLE]',code);
+      if(typeof code==='string'&&['23514','23505','42P08','42804','42P18','23502','22007','42703','42P01'].includes(code))logOperation('error','BILLING_LOCAL_COMMIT_UNAVAILABLE',{code});
       await this.transaction(async client=>{await client.query(`UPDATE subscription_billing_attempts SET state='unknown',lease_owner=NULL,lease_expires_at=NULL,
         next_attempt_at=$4::timestamptz+interval '1 minute',last_error_code='outcome_unconfirmed',updated_at=$4
         WHERE id=$1 AND lease_owner=$2 AND lease_generation=$3`,[id,owner,row.lease_generation,this.clock()]);}).catch(()=>undefined);
@@ -223,11 +225,14 @@ export class DurableSubscriptionBilling {
     });
   }
   async reconcileDue(limit=10):Promise<number>{
+    return runWithOperationContext({jobId:randomUUID()},async()=>{
     const rows=await this.transaction(async client=>(await client.query(`SELECT id FROM subscription_billing_attempts WHERE applied_at IS NULL AND state<>'abandoned'
       AND next_attempt_at<=$1 AND (lease_expires_at IS NULL OR lease_expires_at<=$1) AND reconciliation_count<20
       AND (send_started_at IS NULL OR provider_transaction_id IS NOT NULL)
       AND last_error_code IS DISTINCT FROM 'parent_resolution_required' ORDER BY next_attempt_at,id LIMIT $2`,[this.clock(),Math.max(1,Math.min(20,limit))])).rows);
     for(const row of rows)await this.run(row.id);return rows.length;
+
+    });
   }
   /** A policy failure has no provider send/outcome. Audit it separately from a
    * card decline, while preserving the same period/key/dunning atomicity. */

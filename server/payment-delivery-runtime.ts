@@ -1,3 +1,5 @@
+import {logOperation} from "./structured-log";
+import {runWithOperationContext} from "./operation-context";
 import {randomUUID,createHash} from 'node:crypto';
 import {Resend} from 'resend';
 import {config} from './config';
@@ -52,12 +54,12 @@ export function createPaymentDeliveryRuntime(){
 /** Explicit bootstrap; no loop or external I/O is started on import. */
 export function startPaymentDeliveryLoop(runtime:NonNullable<ReturnType<typeof createPaymentDeliveryRuntime>>,intervalMs=1000):()=>void{
   let busy=false,realtimeBusy=false,stopped=false;const owner=randomUUID(),seen=new Set<string>(),boot=new Date();
-  const tick=async()=>{if(busy||stopped)return;busy=true;
+  const tick=async()=>runWithOperationContext({jobId:randomUUID()},async()=>{if(busy||stopped)return;busy=true;
     try{for(let i=0;i<10&&!stopped;i++)if(!await runtime.worker.runOne(owner))break;}
-    catch{console.error('[PAYMENT_DELIVERY_UNAVAILABLE]');}finally{busy=false;}};
-  const realtimeTick=async()=>{if(realtimeBusy||stopped)return;realtimeBusy=true;
+    catch{logOperation("error","PAYMENT_DELIVERY_UNAVAILABLE");}finally{busy=false;}});
+  const realtimeTick=async()=>runWithOperationContext({jobId:randomUUID()},async()=>{if(realtimeBusy||stopped)return;realtimeBusy=true;
     try{await runtime.receiver.realtime(new Date(Math.max(boot.getTime()-10000,Date.now()-60000)),seen);}
-    catch{console.error('[PAYMENT_REALTIME_UNAVAILABLE]');}finally{realtimeBusy=false;}};
+    catch{logOperation("error","PAYMENT_REALTIME_UNAVAILABLE");}finally{realtimeBusy=false;}});
   const timer=setInterval(()=>void tick(),intervalMs),realtimeTimer=setInterval(()=>void realtimeTick(),intervalMs);
   timer.unref();realtimeTimer.unref();return()=>{stopped=true;clearInterval(timer);clearInterval(realtimeTimer);};
 }

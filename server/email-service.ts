@@ -1,10 +1,11 @@
+import {logOperation} from "./structured-log";
 import { Resend } from 'resend';
 import { config } from './config';
 
 const resend = config.email.resendApiKey ? new Resend(config.email.resendApiKey) : null;
 
 if (!resend) {
-  console.warn("RESEND_API_KEY not set. Email functionality will be simulated.");
+  logOperation("warn","RESEND_API_KEY_NOT_SET_EMAIL_FUNCTIONALITY_WILL_BE_SIMULATED",{payload:["RESEND_API_KEY not set. Email functionality will be simulated."]});
 }
 
 interface EmailAttachment {
@@ -27,18 +28,18 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
     // a missing RESEND_API_KEY and makes "email sent" lies propagate to callers,
     // logs, and the admin test endpoint. Report the real failure instead.
     if (config.isProduction) {
-      console.error(`❌ RESEND_API_KEY not set — cannot send email "${params.subject}" to ${params.to}`);
+      logOperation("error","RESEND_API_KEY_NOT_SET_CANNOT_SEND_EMAIL_TO",{payload:[`❌ RESEND_API_KEY not set — cannot send email "${params.subject}" to ${params.to}`]});
       return false;
     }
-    console.log('\n=== SIMULATED EMAIL (dev) ===');
-    console.log(`To: ${params.to}`);
-    console.log(`From: ${params.from}`);
-    console.log(`Subject: ${params.subject}`);
-    console.log(`Text: ${params.text || 'No text content'}`);
+    logOperation("info","SIMULATED_EMAIL_DEV",{payload:['\n=== SIMULATED EMAIL (dev) ===']});
+    logOperation("info","TO",{payload:[`To: ${params.to}`]});
+    logOperation("info","FROM",{payload:[`From: ${params.from}`]});
+    logOperation("info","SUBJECT",{payload:[`Subject: ${params.subject}`]});
+    logOperation("info","TEXT",{payload:[`Text: ${params.text || 'No text content'}`]});
     if (params.attachments?.length) {
-      console.log(`Attachments: ${params.attachments.map(a => a.filename).join(', ')}`);
+      logOperation("info","ATTACHMENTS",{payload:[`Attachments: ${params.attachments.map(a => a.filename).join(', ')}`]});
     }
-    console.log('=====================\n');
+    logOperation("info","RUNTIME_DIAGNOSTIC",{payload:['=====================\n']});
     return true;
   }
 
@@ -52,13 +53,13 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
       attachments: params.attachments,
     });
     if (error) {
-      console.error('Resend email error:', error);
+      logOperation("error","RESEND_EMAIL_ERROR",{payload:['Resend email error:',error]});
       return false;
     }
-    console.log(`✅ Email sent successfully to ${params.to}`);
+    logOperation("info","EMAIL_SENT_SUCCESSFULLY_TO",{payload:[`✅ Email sent successfully to ${params.to}`]});
     return true;
   } catch (error: any) {
-    console.error('Resend email error:', error?.message || error);
+    logOperation("error","RESEND_EMAIL_ERROR",{payload:['Resend email error:',error?.message || error]});
     return false;
   }
 }

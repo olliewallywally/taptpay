@@ -1,3 +1,5 @@
+import {randomUUID} from "node:crypto";
+import {runWithOperationContext} from "./operation-context";
 export interface OutboxClaim {
   id:string;eventId:string;channel:'merchant_payment_update'|'payer_receipt';owner:string;
   attemptCount:number;leaseExpiresAt:Date;
@@ -16,6 +18,7 @@ export class PaymentOutboxWorker {
   constructor(private readonly repository:PaymentOutboxRepository,private readonly receiver:IdempotentPaymentEventReceiver,
     private readonly clock=()=>new Date()) {}
   async runOne(owner:string):Promise<boolean> {
+    return runWithOperationContext({jobId:randomUUID()},async()=>{
     const claim=await this.repository.claimOutbox(owner,this.clock());
     if(!claim) return false;
     // Repeated lost delivery leases cannot evade the finite retry budget.
@@ -29,5 +32,7 @@ export class PaymentOutboxWorker {
         new Date(now.getTime()+Math.min(300000,1000*2**Math.min(claim.attemptCount-1,12)))).catch(()=>undefined);
     }
     return true;
+
+    });
   }
 }

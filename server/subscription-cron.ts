@@ -1,3 +1,4 @@
+import {logOperation} from "./structured-log";
 import {storage as defaultStorage,type IStorage} from './storage';
 import {getSubscriptionPaymentRuntime} from './subscription-payment-runtime';
 import type {DurableSubscriptionBilling} from './durable-subscription-billing';
@@ -12,10 +13,10 @@ type BillingEngine=Pick<DurableSubscriptionBilling,'canInitiate'|'charge'|'recor
 export async function runSubscriptionBillingPass(now=new Date(),options:{storage?:BillingStore;billing?:BillingEngine}={}):Promise<SubscriptionBillingPassResult>{
   const result:SubscriptionBillingPassResult={charged:0,failed:0,skipped:0,errors:0,expired:0};
   const storage=options.storage??defaultStorage,billing=options.billing??getSubscriptionPaymentRuntime()?.billing;
-  try{result.expired=await storage.expireCancelledSubscriptions(now);}catch{console.error('[SUBSCRIPTION_EXPIRY_UNAVAILABLE]');result.errors++;}
+  try{result.expired=await storage.expireCancelledSubscriptions(now);}catch{logOperation("error","SUBSCRIPTION_EXPIRY_UNAVAILABLE");result.errors++;}
   if(!billing||!billing.canInitiate())return result;
   let due:Awaited<ReturnType<BillingStore['claimSubscriptionsDueForBilling']>>;
-  try{due=await storage.claimSubscriptionsDueForBilling(now);}catch{console.error('[SUBSCRIPTION_CLAIM_UNAVAILABLE]');result.errors++;return result;}
+  try{due=await storage.claimSubscriptionsDueForBilling(now);}catch{logOperation("error","SUBSCRIPTION_CLAIM_UNAVAILABLE");result.errors++;return result;}
   for(const subscription of due){
     const token=subscription.billingClaimToken;if(!token){result.errors++;continue;}
     try{
@@ -27,7 +28,7 @@ export async function runSubscriptionBillingPass(now=new Date(),options:{storage
       const outcome=decision.action==='record_failure'?await billing.recordMissingPaymentMethod(intent):await billing.charge({...intent,cardId:subscription.windcaveCardId!});
       if(outcome.reused||!outcome.applied){if(outcome.kind==='processing')result.errors++;else result.skipped++;}
       else if(outcome.kind==='approved')result.charged++;else if(outcome.kind==='declined')result.failed++;else result.skipped++;
-    }catch{console.error('[SUBSCRIPTION_BILLING_UNCONFIRMED]');result.errors++;}
+    }catch{logOperation("error","SUBSCRIPTION_BILLING_UNCONFIRMED");result.errors++;}
     finally{await storage.releaseSubscriptionBillingClaim(subscription.id,token).catch(()=>{result.errors++;});}
   }
   return result;

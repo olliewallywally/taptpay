@@ -175,7 +175,12 @@ describe("a fault stopping notifications never undoes or misreports ending the s
     jest.spyOn(storage, "deactivatePushSubscriptionsForLogin").mockRejectedValueOnce(new Error("synthetic fault"));
     return logged;
   };
-  const loggedTags = (logged: jest.SpyInstance) => logged.mock.calls.map(([tag]) => tag);
+  const loggedEvents = (logged: jest.SpyInstance) => logged.mock.calls.map(([line]) => {
+    const entry=JSON.parse(line);
+    expect(entry.level).toBe('error');
+    expect(line).not.toContain('synthetic fault');
+    return entry.event;
+  });
 
   it("sign out everywhere still answers 204, and every session has ended", async () => {
     const { app } = await createTestApp();
@@ -184,7 +189,7 @@ describe("a fault stopping notifications never undoes or misreports ending the s
 
     expect((await request(app).post("/api/auth/sign-out-everywhere").set(signedIn(owner))).status).toBe(204);
     expect((await subscribeWeb(app, owner, "after")).status).toBe(401);
-    expect(loggedTags(logged)).toContain("[SIGN_OUT_EVERYWHERE_PUSH_STOP]");
+    expect(loggedEvents(logged)).toContain("SIGN_OUT_EVERYWHERE_PUSH_STOP");
   });
 
   it("disabling a teammate still succeeds, and the teammate is refused", async () => {
@@ -197,7 +202,7 @@ describe("a fault stopping notifications never undoes or misreports ending the s
       .send({ status: "disabled" });
     expect(disabled.status).toBe(200);
     expect((await subscribeWeb(app, member, "after")).status).toBe(401); // 401 since 2026-09-27 (R1-T3, P2.2, owner decision): a sign-in that is invalid, expired or disabled was 403.
-    expect(loggedTags(logged)).toContain("[TEAM_DISABLE_PUSH_STOP]");
+    expect(loggedEvents(logged)).toContain("TEAM_DISABLE_PUSH_STOP");
   });
 
   it("a password reset still succeeds", async () => {
@@ -212,7 +217,7 @@ describe("a fault stopping notifications never undoes or misreports ending the s
       .send({ token: raw, password: "NewHarness456", confirmPassword: "NewHarness456" });
     expect(reset.status).toBe(200);
     expect((await subscribeWeb(app, owner, "after")).status).toBe(401);
-    expect(loggedTags(logged)).toContain("[RESET_PUSH_STOP]");
+    expect(loggedEvents(logged)).toContain("RESET_PUSH_STOP");
   });
 
   it("a password change still succeeds and this device carries on under its new session", async () => {
@@ -225,6 +230,6 @@ describe("a fault stopping notifications never undoes or misreports ending the s
     expect(change.status).toBe(200);
     expect((await subscribeWeb(app, owner, "after")).status).toBe(401);
     expect((await subscribeWeb(app, businessSessionBegunBy(change), "after")).status).toBe(200);
-    expect(loggedTags(logged)).toContain("[PASSWORD_CHANGE_PUSH_STOP]");
+    expect(loggedEvents(logged)).toContain("PASSWORD_CHANGE_PUSH_STOP");
   });
 });

@@ -1,3 +1,4 @@
+import {logOperation} from "./structured-log";
 import type { ConfiguredPaymentRuntime } from './payment-runtime';
 
 export async function reconcileRetainedPaymentsBeforeManualCommand(
@@ -11,7 +12,7 @@ export async function reconcileRetainedPaymentsBeforeManualCommand(
       await Promise.allSettled(sessions.slice(offset, offset + 4).map(session => runtime.reconcile(session, 'poll')));
     }
   } catch {
-    console.error('[MANUAL_COMMAND_RECONCILIATION_UNAVAILABLE]');
+    logOperation("error","MANUAL_COMMAND_RECONCILIATION_UNAVAILABLE",{payload:['[MANUAL_COMMAND_RECONCILIATION_UNAVAILABLE]']});
   }
   // Owner decision: an unknown result permits the command. The storage mutation
   // still checks captured money under its aggregate lock. Never drop attempts.

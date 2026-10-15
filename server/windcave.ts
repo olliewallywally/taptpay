@@ -1,5 +1,6 @@
 // Windcave RESTful API Integration
 import crypto from "crypto";
+import {logOperation} from "./structured-log";
 import { redactSensitive } from "./request-log";
 import { config } from "./config";
 import { createWindcaveClient, type UnknownReason, type WindcaveClient } from "./windcave-client";
@@ -33,7 +34,7 @@ export function sanitizeWindcaveAuditDetails(details: Record<string, any>) {
 
 function logAudit(action: string, details: Record<string, any>) {
   const sanitized = sanitizeWindcaveAuditDetails(details);
-  console.log(`[WINDCAVE] [${new Date().toISOString()}] ${action}:`, JSON.stringify(sanitized));
+  logOperation("info",action,sanitized);
 }
 
 // R2-T6 (RF-6): what a failure may say outside this module. Provider reply text can echo

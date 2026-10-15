@@ -1,3 +1,4 @@
+import {logOperation} from "./structured-log";
 import crypto from "node:crypto";
 import type { CookieOptions, Request, Response } from "express";
 import type { AuthSession } from "@shared/schema";
@@ -263,6 +264,6 @@ export async function settleSession(
       await storage.touchAuthSession(session.id, now, new Date(idle));
     }
   } catch (error) {
-    console.error("[AUTH_SESSION_SETTLE]", error);
+    logOperation("error","AUTH_SESSION_SETTLE",{payload:["[AUTH_SESSION_SETTLE]",error]});
   }
 }

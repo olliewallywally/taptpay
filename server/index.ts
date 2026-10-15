@@ -1,17 +1,18 @@
+import {logOperation} from "./structured-log";
+import {safeErrorSummary} from "./log-redaction";
 import { config } from "./config";
 import fs from "fs";
 import path from "path";
 import { spawnSync } from "child_process";
 import { createApp } from "./app";
 import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
+import { setupVite, serveStatic } from "./vite";
 import { seedDatabase } from "./seed";
 import { isDatabaseConnected, getDb } from "./database";
 import { sql } from "drizzle-orm";
 import { 
   startServerWithPortManagement, 
-  setupGracefulShutdown, 
-  getPortConflictHelp 
+  setupGracefulShutdown
 } from "./port-manager";
 import { createGlobalErrorHandler } from "./http-error-handler";
 import {getPaymentRuntime} from './payment-runtime-default';
@@ -23,11 +24,11 @@ const isProduction = config.isProduction;
 
 // Security headers, compression, bearer-page caching, body parsing and the
 // request log: the same app the server tests build (server/app.ts).
-const app = createApp({ writeRequestLog: log });
+const app = createApp({ writeRequestLog: line => console.log(line) });
 
 (async () => {
   for (const diagnostic of config.diagnostics) {
-    console.warn(`[CONFIG] ${diagnostic.group}: ${diagnostic.message}`);
+    logOperation('warn',`config_${diagnostic.key}`);
   }
 
   // ── Database connectivity verification ───────────────────────────────────
@@ -38,22 +39,22 @@ const app = createApp({ writeRequestLog: log });
     try {
       const db = getDb();
       await db!.execute(sql`SELECT 1`);
-      console.log('✅ Database: connection verified (live query succeeded)');
+      logOperation("info","DATABASE_CONNECTION_VERIFIED_LIVE_QUERY_SUCCEEDED",{payload:['✅ Database: connection verified (live query succeeded)']});
     } catch (error) {
       if (isProduction) {
-        console.error('FATAL: Database is unreachable after connection was established:');
-        console.error(error);
-        console.error('Refusing to start — merchant data cannot be read or written.');
+        logOperation("error","FATAL_DATABASE_IS_UNREACHABLE_AFTER_CONNECTION_WAS_ESTABLISHED",{payload:['FATAL: Database is unreachable after connection was established:']});
+        logOperation("error","RUNTIME_DIAGNOSTIC",{payload:[error]});
+        logOperation("error","REFUSING_TO_START_MERCHANT_DATA_CANNOT_BE_READ_OR_WRITTEN",{payload:['Refusing to start — merchant data cannot be read or written.']});
         process.exit(1);
       } else {
-        console.warn('⚠️  Database live-query check failed (continuing in dev mode):', error);
+        logOperation("warn","DATABASE_LIVE_QUERY_CHECK_FAILED_CONTINUING_IN_DEV_MODE",{payload:['⚠️  Database live-query check failed (continuing in dev mode):',error]});
       }
     }
   }
 
   // Admin sign-in refuses everyone without ADMIN_PASSWORD_HASH: say so where it shows.
   if (config.admin.email && !config.admin.passwordHash) {
-    console.warn('⚠️  Admin sign-in is off: ADMIN_PASSWORD_HASH is not set. Run `npm run admin:password` in the Shell to make one.');
+    logOperation("warn","ADMIN_SIGN_IN_IS_OFF_ADMIN_PASSWORD_HASH_IS_NOT_SET_RUN_NPM_RUN_",{payload:['⚠️  Admin sign-in is off: ADMIN_PASSWORD_HASH is not set. Run `npm run admin:password` in the Shell to make one.']});
   }
 
   // ── Read-only migration gate ─────────────────────────────────────────────
@@ -61,14 +62,15 @@ const app = createApp({ writeRequestLog: log });
   // or out-of-order schema history. Development reports the same issues loudly.
   try {
     const { reportPendingMigrations } = await import("./migrate");
-    await reportPendingMigrations({ failOnIssues: isProduction });
+    await reportPendingMigrations({ failOnIssues: isProduction,
+      log:()=>logOperation('warn','migration_gate_diagnostic') });
   } catch (error) {
     if (isProduction) {
-      console.error("[FATAL] Database migration gate failed.");
-      console.error(error);
+      logOperation("error","FATAL_DATABASE_MIGRATION_GATE_FAILED",{payload:["[FATAL] Database migration gate failed."]});
+      logOperation("error","RUNTIME_DIAGNOSTIC",{payload:[error]});
       process.exit(1);
     }
-    log(`⚠️  Migration check unavailable (non-fatal in development): ${error}`);
+    logOperation('warn','migration_check_unavailable',safeErrorSummary(error));
   }
 
   // ── Schema push (drizzle-kit push) ───────────────────────────────────────
@@ -82,12 +84,12 @@ const app = createApp({ writeRequestLog: log });
   // to apply schema changes, run `npm run db:push` manually after reviewing
   // exactly what will be changed, or start with RUN_SCHEMA_PUSH=true.
   if (config.retiredRunMigrations) {
-    console.error('[FATAL] RUN_MIGRATIONS is retired; run `npm run db:migrate` as a deliberate deploy step.');
+    logOperation("error","FATAL_RUN_MIGRATIONS_IS_RETIRED_RUN_NPM_RUN_DB_MIGRATE_AS_A_DELI",{payload:['[FATAL] RUN_MIGRATIONS is retired; run `npm run db:migrate` as a deliberate deploy step.']});
     process.exit(1);
   }
   const runSchemaPush = config.runSchemaPush;
   if (isDatabaseConnected() && runSchemaPush) {
-    log('Running schema push to sync database...');
+    logOperation('info','schema_push_started');
     try {
       const drizzleConfigPath = path.resolve(process.cwd(), 'drizzle.config.ts');
       const configExists = fs.existsSync(drizzleConfigPath);
@@ -102,18 +104,17 @@ const app = createApp({ writeRequestLog: log });
           }
         );
         if (push.status === 0) {
-          log('✅ Schema: database schema is up to date');
+          logOperation('info','schema_push_succeeded');
         } else {
-          const output = (push.stdout || '') + (push.stderr || '');
           // Non-zero exit most likely means a destructive change was blocked.
           // The server continues safely — no data was modified.
-          log(`⚠️  Schema has destructive changes — run \`npm run db:push\` manually to review before applying. Data untouched. Details: ${output.slice(0, 200)}`);
+          logOperation('warn','schema_push_failed',{exitStatus:push.status});
         }
       } else {
-        log('⚠️  drizzle.config.ts not found at project root — skipping schema push');
+        logOperation('warn','schema_push_config_missing');
       }
     } catch (err) {
-      log(`⚠️  Schema push threw an error (non-fatal): ${err}`);
+      logOperation('warn','schema_push_failed',safeErrorSummary(err));
     }
   }
 
@@ -142,7 +143,7 @@ const app = createApp({ writeRequestLog: log });
     const { syncVerifiedMerchants } = await import("./auth");
     await syncVerifiedMerchants();
   } catch (error) {
-    log(`⚠️ Failed to sync verified merchants: ${error}`);
+    logOperation('warn','verified_merchant_sync_failed',safeErrorSummary(error));
   }
 
 
@@ -227,12 +228,11 @@ const app = createApp({ writeRequestLog: log });
   const serverStarted = await startServerWithPortManagement(server, port, host);
   
   if (!serverStarted) {
-    log("❌ Failed to start server due to port conflicts");
-    log(getPortConflictHelp(port));
+    logOperation('error','server_port_conflict',{port});
     process.exit(1);
   }
 
-  log(`✅ Server successfully running on ${host}:${port}`);
+  logOperation('info','server_listening',{port});
 
   // Keep Neon database endpoint alive — ping every 4 minutes to prevent auto-suspension
   if (config.databaseUrl) {
@@ -245,6 +245,6 @@ const app = createApp({ writeRequestLog: log });
         // Silently ignore — server continues regardless
       }
     }, 4 * 60 * 1000);
-    log("✅ Database keep-alive ping started (every 4 minutes)");
+    logOperation('info','database_keepalive_started',{intervalMs:240000});
   }
 })();

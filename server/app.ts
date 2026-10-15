@@ -21,6 +21,9 @@ import {isDurablePaymentNotificationPath} from './payment-notification-paths';
 export function createApp(options: { writeRequestLog: (line: string) => void }): Express {
   const app = express();
 
+  // Establish correlation/logging before parsers and security middleware can fail.
+  app.use(createRequestLogger(options.writeRequestLog));
+
   // ============================================
   // SECURITY HEADERS - Payment Processor Grade
   // ============================================
@@ -104,8 +107,6 @@ export function createApp(options: { writeRequestLog: (line: string) => void }):
     if(isDurablePaymentNotificationPath(req.path))next();
     else express.urlencoded({extended:false})(req,res,next);
   });
-
-  app.use(createRequestLogger(options.writeRequestLog));
 
   // R1-T4 phase E: a change sent from another website is refused before any route runs, and only
   // the site's own origin gets CORS headers (server/cross-site.ts). After the request log, so a

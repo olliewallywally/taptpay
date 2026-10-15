@@ -1,3 +1,4 @@
+import {logOperation} from "./structured-log";
 /**
  * sms-service.ts — thin seam over Twilio's REST API for sending rent links /
  * reminders over SMS. Mirrors the shape of whatsapp-service / email-service so
@@ -28,13 +29,13 @@ export function isSmsConfigured(): boolean {
  */
 export async function sendSms(opts: { toPhone: string; text: string }): Promise<{ ok: boolean; messageId?: string }> {
   if (!isSmsConfigured()) {
-    console.log(`[SMS] not configured — skipping send to ${opts.toPhone}`);
+    logOperation("info","SMS_NOT_CONFIGURED_SKIPPING_SEND_TO",{payload:[`[SMS] not configured — skipping send to ${opts.toPhone}`]});
     return { ok: false };
   }
   // Twilio expects E.164 ("+64…"); normalizeNzPhone returns bare digits, so prefix "+".
   const digits = normalizeNzPhone(opts.toPhone);
   if (!digits) {
-    console.warn(`[SMS] unparseable number: ${opts.toPhone}`);
+    logOperation("warn","SMS_UNPARSEABLE_NUMBER",{payload:[`[SMS] unparseable number: ${opts.toPhone}`]});
     return { ok: false };
   }
   const to = `+${digits}`;
@@ -66,14 +67,14 @@ export async function sendSms(opts: { toPhone: string; text: string }): Promise<
     clearTimeout(timer);
     if (!res.ok) {
       const body = await res.text().catch(() => "");
-      console.error(`[SMS] send failed ${res.status}: ${body.slice(0, 300)}`);
+      logOperation("error","SMS_SEND_FAILED",{payload:[`[SMS] send failed ${res.status}: ${body.slice(0, 300)}`]});
       return { ok: false };
     }
     const json = (await res.json().catch(() => ({}))) as any;
     const messageId: string | undefined = json?.sid;
     return { ok: true, messageId };
   } catch (err: any) {
-    console.error(`[SMS] send error: ${err?.message || err}`);
+    logOperation("error","SMS_SEND_ERROR",{payload:[`[SMS] send error: ${err?.message || err}`]});
     return { ok: false };
   }
 }

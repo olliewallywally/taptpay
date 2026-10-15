@@ -35,6 +35,16 @@ export const MIDDLEWARE_POLICY: Record<RegistrationFile, readonly MiddlewarePoli
   "server/app.ts": [
     {
       path: null,
+      mounts: "createRequestLogger(…)",
+      when: "always",
+      runtimeName: "<anonymous>",
+      purpose: "Request UUID context/header before parsers; one structured JSON line per /api response.",
+      security:
+        "Logs the route template (e.g. /api/pay/t/:token), never the path's values, the query or the body; " +
+        "unmatched paths are a fixed marker. Central bounded redaction drops secrets and upstream error text; malformed bodies still receive a request ID.",
+    },
+    {
+      path: null,
       mounts: "helmet(…)",
       when: "always",
       runtimeName: "helmetMiddleware",
@@ -84,16 +94,7 @@ export const MIDDLEWARE_POLICY: Record<RegistrationFile, readonly MiddlewarePoli
       purpose: "Form-encoded request bodies except the four durable payment notification patterns (their own bounded parser).",
       security: "Flat key/value pairs only; no nested objects from a form body.",
     },
-    {
-      path: null,
-      mounts: "createRequestLogger(…)",
-      when: "always",
-      runtimeName: "<anonymous>",
-      purpose: "One log line per /api request: method, route template, status, duration.",
-      security:
-        "Logs the route template (e.g. /api/pay/t/:token), never the path's values, the query or the body; " +
-        "server/request-log.ts redacts tokens, return states and session ids from any path it must print.",
-    },
+
     {
       path: null,
       mounts: "crossSiteGuard(…)",

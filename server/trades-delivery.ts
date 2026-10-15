@@ -1,3 +1,4 @@
+import {logOperation,logCorrelation} from "./structured-log";
 import { storage } from './storage';
 import { sendEmail } from './email-service';
 import { isWhatsAppConfigured, sendWhatsApp } from './whatsapp-service';
@@ -268,7 +269,7 @@ export async function runTradesDispatchPass(
           });
       }
     } catch (error) {
-      console.error(`[TRADES_DISPATCH] invoice=${invoice.id}`, error);
+      logOperation("error","TRADES_DISPATCH",{correlation:logCorrelation(invoice.id)});
       result.errors++;
     }
   }
@@ -291,7 +292,7 @@ export async function runTradesOverduePass(
       });
       result.markedOverdue++;
     } catch (error) {
-      console.error(`[TRADES_OVERDUE] invoice=${invoice.id}`, error);
+      logOperation("error","TRADES_OVERDUE",{correlation:logCorrelation(invoice.id)});
       result.errors++;
     }
   }
@@ -349,7 +350,7 @@ export async function runTradesReminderPass(
       });
       result.sent++;
     } catch (error) {
-      console.error(`[TRADES_REMINDER] invoice=${invoice.id}`, error);
+      logOperation("error","TRADES_REMINDER",{correlation:logCorrelation(invoice.id)});
       result.errors++;
     }
   }
@@ -419,6 +420,6 @@ export async function sendTradePaymentInvoiceForMerchant(invoiceId: string, merc
   const recorded = await storage.recordJobInvoiceReceiptForMerchant(invoiceId, merchantId, snapshot.invoice.clientProfileId, { sent, reference: receipt.reference });
   // The email went to the contact owned when it was read. A line refused afterwards is
   // never written through a global key; the id says which invoice to reconcile.
-  if (!recorded) console.error(`[TRADES_RECEIPT_UNRECORDED] invoice=${invoiceId}`);
+  if (!recorded) logOperation("error","TRADES_RECEIPT_UNRECORDED",{correlation:logCorrelation(invoiceId)});
   return sent ? 1 : 0;
 }

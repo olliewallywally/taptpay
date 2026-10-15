@@ -1,3 +1,4 @@
+import {logOperation} from "./structured-log";
 /**
  * Router-level async safety net.
  *
@@ -152,11 +153,7 @@ export function wrapAsyncHandler<T extends AnyFunction>(handler: T): T {
       try {
         (next as (err?: unknown) => void)(toForwardableError(reason));
       } catch (forwardingError) {
-        console.error(
-          "[ASYNC_ROUTE_GUARD] failed to forward a rejection to the error handler",
-          forwardingError,
-          reason,
-        );
+        logOperation("error","ASYNC_ROUTE_GUARD_FAILED_TO_FORWARD_A_REJECTION_TO_THE_ERROR_HAN",{payload:["[ASYNC_ROUTE_GUARD] failed to forward a rejection to the error handler",forwardingError,reason]});
       }
     });
 

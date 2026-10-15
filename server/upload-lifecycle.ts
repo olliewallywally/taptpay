@@ -1,3 +1,4 @@
+import {logOperation} from "./structured-log";
 /**
  * R1-T7 S6b: the two scheduled passes of the private upload lifecycle (owner decisions 2026-09-29,
  * docs/decisions/2026-09-29-finish-r1-owner-answers.md, answers 3 and 4).
@@ -56,7 +57,7 @@ export async function runUploadScanPass(): Promise<UploadScanReport> {
       // No verdict is neither clean nor infected. Stop: the scanner is most likely down, and the
       // next run starts again. Documents are taken in no fixed order, so one the scanner can never
       // judge does not hold the others back.
-      console.error("[UPLOAD_SCAN_PASS] the scanner gave no verdict; the pass stopped");
+      logOperation("error","UPLOAD_SCAN_PASS_THE_SCANNER_GAVE_NO_VERDICT_THE_PASS_STOPPED",{payload:["[UPLOAD_SCAN_PASS] the scanner gave no verdict; the pass stopped"]});
       report.noVerdict = 1;
       break;
     }

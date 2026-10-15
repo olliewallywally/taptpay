@@ -1,3 +1,4 @@
+import {runWithOperationContext} from "./operation-context";
 import {createHash,randomUUID} from 'node:crypto';
 import {openActiveSecret,sealActiveSecret} from './active-secret-vault';
 import {loadDataEncryption,type DataEncryption} from './data-encryption';
@@ -192,6 +193,7 @@ export class DurableSubscriptionCard {
   }
   /** Recovers a crash after card commit and before preparing its initial bill. */
   async recoverActivations(limit=10):Promise<number>{
+    return runWithOperationContext({jobId:randomUUID()},async()=>{
     const rows=await this.transaction(async client=>(await client.query(`SELECT a.id FROM subscription_card_attempts a JOIN merchant_subscriptions s ON s.id=a.subscription_id
       WHERE a.state='approved' AND a.applied_at IS NOT NULL
       AND (s.cancellation_requested_at IS NULL OR s.cancellation_requested_at<=a.created_at)
@@ -202,5 +204,7 @@ export class DurableSubscriptionCard {
       AND NOT EXISTS(SELECT 1 FROM subscription_card_attempts newer WHERE newer.subscription_id=a.subscription_id AND newer.state='approved' AND newer.created_at>a.created_at)
       AND NOT EXISTS(SELECT 1 FROM subscription_billing_attempts b WHERE b.card_attempt_id=a.id) ORDER BY a.created_at LIMIT $1`,[Math.max(1,Math.min(20,limit))])).rows);
     for(const row of rows)await this.activate(row.id);return rows.length;
+
+    });
   }
 }

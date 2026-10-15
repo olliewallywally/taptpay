@@ -1,3 +1,4 @@
+import {logOperation} from "./structured-log";
 import { sendPushToMerchant, type PushDeliveryResult } from "./push";
 import { storage, type IStorage } from "./storage";
 
@@ -143,7 +144,7 @@ export async function runDailyPayoutNotificationPass(
     } catch (error) {
       result.failed += 1;
       const message = error instanceof Error ? error.message : "unknown error";
-      console.error(`[DAILY_PUSH] merchant=${summary.merchantId} delivery failed: ${message}`);
+      logOperation("error","DAILY_PUSH_MERCHANT_DELIVERY_FAILED",{payload:[`[DAILY_PUSH] merchant=${summary.merchantId} delivery failed: ${message}`]});
     } finally {
       await dependencies.storage.completePushNotificationDelivery(
         summary.merchantId,

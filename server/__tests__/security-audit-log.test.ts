@@ -47,7 +47,7 @@ it('reports an actual failed disk append without leaking error or event details'
   const logger = createSecurityAuditLogger({ filePath: tempDir }); // append to directory -> EISDIR
   logger.log('LOGIN_FAILURE', { email: 'private@example.test', token: 'private-token' });
   expect(await logger.close()).toBe(false);
-  expect(error).toHaveBeenCalledWith('[SECURITY_LOG_ERROR] reason=write_failed count=1');
+  expect(error.mock.calls.map(([line])=>JSON.parse(String(line)))).toContainEqual(expect.objectContaining({event:'security_log_write_failed',count:1}));
   const diagnostics = JSON.stringify(error.mock.calls);
   expect(diagnostics).not.toMatch(/private|EISDIR/);
   expect(diagnostics).not.toContain(tempDir);
@@ -67,8 +67,10 @@ it.each([
   expect(lines).toHaveLength(1);
   release();
   expect(await logger.close()).toBe(false);
-  expect(lines).toHaveLength(2);
-  expect(lines.map((line) => JSON.parse(line).n)).toEqual([0, 1]);
+  const accepted='maxQueuedBytes' in limit?1:2;
+  expect(lines).toHaveLength(accepted);
+  expect(lines.map((line) => JSON.parse(line).n)).toEqual(Array.from({length:accepted},(_,n)=>n));
+  if('maxQueuedBytes' in limit)expect(lines.reduce((n,line)=>n+Buffer.byteLength(line),0)).toBeLessThanOrEqual(limit.maxQueuedBytes!);
 });
 
 it('bounds shutdown time when the disk never completes', async () => {
@@ -76,9 +78,9 @@ it('bounds shutdown time when the disk never completes', async () => {
   const logger = createSecurityAuditLogger({ filePath: 'unused', writeLine: () => new Promise(() => {}) });
   logger.log('EVENT', { token: 'private-token' });
   expect(await logger.close(10)).toBe(false);
-  expect(error).toHaveBeenCalledWith(expect.stringContaining('reason=shutdown_timeout pending=1'));
+  expect(error.mock.calls.map(([line])=>JSON.parse(String(line)))).toContainEqual(expect.objectContaining({event:'security_log_shutdown_timeout',pending:1}));
   logger.log('LATE_EVENT', {});
-  expect(error).toHaveBeenCalledWith('[SECURITY_LOG_ERROR] reason=logger_closed count=1');
+  expect(error.mock.calls.map(([line])=>JSON.parse(String(line)))).toContainEqual(expect.objectContaining({event:'security_log_logger_closed',count:1}));
 });
 
 it('handles circular and oversized event details with bounded output', async () => {
@@ -90,7 +92,8 @@ it('handles circular and oversized event details with bounded output', async () 
   logger.log('LARGE', Object.fromEntries(Array.from({ length: 32 }, (_, n) => [`field${n}`, 'x'.repeat(10000)])));
   expect(await logger.close()).toBe(true);
   expect(JSON.parse(lines[0]).self).toBe('[CIRCULAR]');
-  expect(JSON.parse(lines[1]).details).toBe('[OMITTED_TOO_LARGE]');
+  expect(JSON.parse(lines[1]).field0).toBe('[REDACTED]');
+  expect(lines[1]).not.toContain('x'.repeat(100));
   expect(lines.every((line) => Buffer.byteLength(line) <= 16 * 1024)).toBe(true);
 });
 
@@ -115,7 +118,7 @@ it.each([false, true])('drains audit events on real SIGTERM (failed disk: %s)', 
   expect(result.error).toBeUndefined();
   expect(result.signal).toBeNull();
   expect(result.status).toBe(failDisk ? 1 : 0);
-  if (failDisk) expect(result.stderr).toContain('reason=write_failed');
+  if (failDisk) expect(result.stderr).toContain('"event":"security_log_write_failed"');
   else {
     const rows = fs.readFileSync(path.join(tempDir, 'logs', 'security-audit.log'), 'utf8').trim().split('\n');
     expect(rows.map((line) => JSON.parse(line).n)).toEqual(Array.from({ length: 200 }, (_, n) => n));

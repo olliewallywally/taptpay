@@ -1,3 +1,4 @@
+import {logOperation} from "./structured-log";
 import { storage } from "./storage";
 import { sendQuoteAcceptanceBlockedEmail } from "./email-service";
 
@@ -52,7 +53,7 @@ export async function tellBusinessQuoteAcceptanceBlocked(
       });
     }
   } catch (error) {
-    console.error(`[QUOTE_ACCEPTANCE_NOTICE] could not tell the business about quote ${quote.id}:`, error);
+    logOperation("error","QUOTE_ACCEPTANCE_NOTICE_COULD_NOT_TELL_THE_BUSINESS_ABOUT_QUOTE",{payload:[`[QUOTE_ACCEPTANCE_NOTICE] could not tell the business about quote ${quote.id}:`,error]});
   }
   if (!sent) noticeSentAt.delete(quote.id);
 }

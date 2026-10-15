@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import {serializeStructuredEvent,logOperation} from './structured-log';
 
-const MAX_EVENT_BYTES = 16 * 1024;
 const MAX_QUEUED_BYTES = 1024 * 1024;
 const MAX_QUEUED_EVENTS = 1024;
 
@@ -35,7 +35,7 @@ export function createSecurityAuditLogger(options: AuditLoggerOptions) {
     // First failure and powers of two make persistent failures visible without
     // replacing a disk backlog with one console write per request.
     if (count === 1 || Number.isInteger(Math.log2(count))) {
-      console.error(`[SECURITY_LOG_ERROR] reason=${reason} count=${count}`);
+      logOperation('error',`security_log_${reason}`,{count});
     }
   };
 
@@ -97,7 +97,7 @@ export function createSecurityAuditLogger(options: AuditLoggerOptions) {
       closed = true;
       closePromise = new Promise<boolean>((resolve) => {
         const timer = setTimeout(() => {
-          console.error(`[SECURITY_LOG_ERROR] reason=shutdown_timeout pending=${queue.length + Number(running)} bytes=${queuedBytes}`);
+          logOperation('error','security_log_shutdown_timeout',{pending:queue.length+Number(running),bytes:queuedBytes});
           queue.length = 0;
           queuedBytes = activeBytes;
           finishClose = undefined;
@@ -107,7 +107,7 @@ export function createSecurityAuditLogger(options: AuditLoggerOptions) {
           clearTimeout(timer);
           finishClose = undefined;
           if (failed || dropped) {
-            console.error(`[SECURITY_LOG_ERROR] reason=incomplete_audit failed=${failed} dropped=${dropped}`);
+            logOperation('error','security_log_incomplete_audit',{failed,dropped});
           }
           resolve(failed === 0 && dropped === 0);
         };
@@ -119,39 +119,7 @@ export function createSecurityAuditLogger(options: AuditLoggerOptions) {
 }
 
 function serializeEvent(event: string, details: Record<string, unknown>): string {
-  let remainingFields = 128;
-  const seen = new WeakSet<object>();
-  const sanitize = (value: unknown, key: string, depth: number): unknown => {
-    if (/password|secret|token|authorization|cookie|api.?key/i.test(key)) return '[REDACTED]';
-    if (/email/i.test(key)) {
-      if (typeof value !== 'string') return '[REDACTED]';
-      const at = value.indexOf('@');
-      return at > 0
-        ? `${at > 2 ? value.slice(0, 2) : ''}***${value.slice(at, at + 255)}`
-        : '[REDACTED]';
-    }
-    if (typeof value === 'string') return value.slice(0, 1024);
-    if (typeof value === 'bigint') return value.toString();
-    if (value === null || typeof value !== 'object') return value;
-    if (seen.has(value)) return '[CIRCULAR]';
-    if (depth >= 4 || remainingFields <= 0) return '[TRUNCATED]';
-    seen.add(value);
-    const result: Record<string, unknown> | unknown[] = Array.isArray(value) ? [] : Object.create(null);
-    for (const key of Object.keys(value).slice(0, 32)) {
-      if (remainingFields-- <= 0) break;
-      (result as Record<string, unknown>)[key] = sanitize((value as Record<string, unknown>)[key], key, depth + 1);
-    }
-    return result;
-  };
-  const timestamp = new Date().toISOString();
-  const safeEvent = typeof event === 'string' ? event.slice(0, 128) : '[INVALID_EVENT]';
-  // Preserve the existing flat record shape, but details cannot replace the
-  // event name or timestamp. Redaction covers field names, not arbitrary prose.
-  const entry = { ...sanitize(details, '', 0) as object, timestamp, event: safeEvent };
-  const line = `${JSON.stringify(entry)}\n`;
-  return Buffer.byteLength(line) <= MAX_EVENT_BYTES ? line : `${JSON.stringify({
-    timestamp, event: safeEvent, details: '[OMITTED_TOO_LARGE]',
-  })}\n`;
+  return `${serializeStructuredEvent(event,details)}\n`;
 }
 
 const securityAuditLogger = createSecurityAuditLogger({

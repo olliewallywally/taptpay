@@ -1,3 +1,4 @@
+import {logOperation} from "./structured-log";
 import type {Request,Response,RequestHandler} from 'express';
 import {z} from 'zod';
 import type {ConfiguredPaymentRuntime} from './payment-runtime';
@@ -65,7 +66,7 @@ export function createInvoiceCheckoutHandlers(deps:{runtime?:ConfiguredPaymentRu
       if(claim.kind==='processing'){res.status(202).json({processing:true,outcome:'pending',shareIndex:claim.shareIndex,returnState:claim.rawReturnState});return;}
       if(claim.kind==='expired'){res.status(409).json({code:'PAYMENT_ATTEMPT_EXPIRED',message:'This payment window expired before it was sent. Try again.'});return;}
       res.status(claim.kind==='not-found'?404:claim.kind==='conflict'?409:503).json({message:claim.kind==='conflict'?'Another payment attempt is active':'Payment initiation is unavailable'});
-    }catch {console.error('[INVOICE_SESSION_UNAVAILABLE]');res.status(503).json({message:'Payment session is still being confirmed'});}
+    }catch {logOperation("error","INVOICE_SESSION_UNAVAILABLE",{payload:['[INVOICE_SESSION_UNAVAILABLE]']});res.status(503).json({message:'Payment session is still being confirmed'});}
   };
   const complete=(wallet=false):RequestHandler=>async(req,res)=>{
     res.set({'Cache-Control':'private, no-store','Referrer-Policy':'no-referrer'});
@@ -91,7 +92,7 @@ export function createInvoiceCheckoutHandlers(deps:{runtime?:ConfiguredPaymentRu
       if(!attempt || !['approved','declined','cancelled'].includes(attempt.state)){pending(res);return;}
       const fresh=await deps.getCheckoutInvoiceByToken(req.params.token);
       res.json({...result(attempt.state),receiptShare:attempt.shareIndex||null,splitCount:fresh?.splitCount??null,splitPaidCount:fresh?.splitPaidCount??0});
-    }catch {console.error('[INVOICE_COMPLETION_UNAVAILABLE]');pending(res);}
+    }catch {logOperation("error","INVOICE_COMPLETION_UNAVAILABLE",{payload:['[INVOICE_COMPLETION_UNAVAILABLE]']});pending(res);}
   };
   const callback:RequestHandler=async(req,res)=>{
     const token=typeof req.query.token==='string'?req.query.token:undefined,state=typeof req.query.state==='string'?req.query.state:undefined;

@@ -1,3 +1,4 @@
+import {logOperation,logCorrelation} from "./structured-log";
 import crypto from "crypto";
 import { storage } from "./storage";
 import { billingCardIsReady } from "./billing-card";
@@ -71,7 +72,7 @@ export async function runTradesGeneratePass(now: Date = new Date()): Promise<{ g
         nextRunDate: followingRun,
       });
     } catch (error) {
-      console.error(`[TRADES_CRON_GENERATE] schedule=${schedule.id}`, error);
+      logOperation("error","TRADES_CRON_GENERATE",{correlation:logCorrelation(schedule.id)});
       result.errors++;
     }
   }

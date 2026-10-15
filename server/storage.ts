@@ -1,3 +1,4 @@
+import {logOperation} from "./structured-log";
 import { hashBearerCredential } from "./payment-credential";
 import { DataEncryption, DataEncryptionError } from "./data-encryption";
 import { sealLegacyBankChanges, withoutLegacyBankFields } from "./legacy-bank-writes";
@@ -3237,7 +3238,7 @@ export class MemStorage implements IStorage {
     this.invoiceSplitSessionRows.clear();
     this.authSessionRows.clear();
     this.documentAccessAudit = [];
-    console.log("All merchants and transactions cleared from memory");
+    logOperation("info","ALL_MERCHANTS_AND_TRANSACTIONS_CLEARED_FROM_MEMORY",{payload:["All merchants and transactions cleared from memory"]});
   }
 
   async saveUploadedFile(relPath: string, mimeType: string, data: Buffer, merchantId: number): Promise<void> {
@@ -6742,7 +6743,7 @@ export class DatabaseStorage implements IStorage {
         return deleted.length > 0;
       });
     } catch (error) {
-      console.error('Error deleting merchant:', error);
+      logOperation("error","ERROR_DELETING_MERCHANT",{payload:['Error deleting merchant:',error]});
       return false;
     }
   }
@@ -6974,7 +6975,7 @@ export class DatabaseStorage implements IStorage {
       });
     } catch (error) {
       if (error instanceof PushSessionEndedError) throw error;
-      console.error("Database error in createPushSubscription:", error);
+      logOperation("error","DATABASE_ERROR_IN_CREATEPUSHSUBSCRIPTION",{payload:["Database error in createPushSubscription:",error]});
       return null;
     }
   }
@@ -6985,7 +6986,7 @@ export class DatabaseStorage implements IStorage {
         .from(pushSubscriptions)
         .where(and(eq(pushSubscriptions.merchantId, merchantId), eq(pushSubscriptions.isActive, true)));
     } catch (error) {
-      console.error("Database error in getPushSubscriptionsByMerchant:", error);
+      logOperation("error","DATABASE_ERROR_IN_GETPUSHSUBSCRIPTIONSBYMERCHANT",{payload:["Database error in getPushSubscriptionsByMerchant:",error]});
       return [];
     }
   }
@@ -7014,7 +7015,7 @@ export class DatabaseStorage implements IStorage {
         .limit(1);
       return normalizePushNotificationPreferences(row?.preferences);
     } catch (error) {
-      console.error("Database error in getPushNotificationPreferences:", error);
+      logOperation("error","DATABASE_ERROR_IN_GETPUSHNOTIFICATIONPREFERENCES",{payload:["Database error in getPushNotificationPreferences:",error]});
       return { ...DEFAULT_PUSH_NOTIFICATION_PREFERENCES };
     }
   }
@@ -7042,7 +7043,7 @@ export class DatabaseStorage implements IStorage {
         .set({ isActive: false })
         .where(eq(pushSubscriptions.id, id));
     } catch (error) {
-      console.error("Database error in deactivatePushSubscription:", error);
+      logOperation("error","DATABASE_ERROR_IN_DEACTIVATEPUSHSUBSCRIPTION",{payload:["Database error in deactivatePushSubscription:",error]});
     }
   }
 
@@ -7351,7 +7352,7 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return splitPayment;
     } catch (error) {
-      console.error("Database error in createSplitPayment:", error);
+      logOperation("error","DATABASE_ERROR_IN_CREATESPLITPAYMENT",{payload:["Database error in createSplitPayment:",error]});
       return undefined;
     }
   }
@@ -7364,7 +7365,7 @@ export class DatabaseStorage implements IStorage {
         .where(eq(splitPayments.transactionId, transactionId))
         .orderBy(splitPayments.splitIndex);
     } catch (error) {
-      console.error("Database error in getSplitPaymentsByTransaction:", error);
+      logOperation("error","DATABASE_ERROR_IN_GETSPLITPAYMENTSBYTRANSACTION",{payload:["Database error in getSplitPaymentsByTransaction:",error]});
       return [];
     }
   }
@@ -7378,7 +7379,7 @@ export class DatabaseStorage implements IStorage {
         .limit(1);
       return split;
     } catch (error) {
-      console.error("Database error in getSplitPaymentById:", error);
+      logOperation("error","DATABASE_ERROR_IN_GETSPLITPAYMENTBYID",{payload:["Database error in getSplitPaymentById:",error]});
       return undefined;
     }
   }
@@ -7427,7 +7428,7 @@ export class DatabaseStorage implements IStorage {
 
       return updatedSplit;
     } catch (error) {
-      console.error("Database error in updateSplitPaymentStatus:", error);
+      logOperation("error","DATABASE_ERROR_IN_UPDATESPLITPAYMENTSTATUS",{payload:["Database error in updateSplitPaymentStatus:",error]});
       return undefined;
     }
   }
@@ -7448,7 +7449,7 @@ export class DatabaseStorage implements IStorage {
       
       return split;
     } catch (error) {
-      console.error("Database error in getNextPendingSplit:", error);
+      logOperation("error","DATABASE_ERROR_IN_GETNEXTPENDINGSPLIT",{payload:["Database error in getNextPendingSplit:",error]});
       return undefined;
     }
   }
@@ -10157,19 +10158,19 @@ export class DatabaseStorage implements IStorage {
 // every restart would permanently lose all merchant and transaction data.
 const _isProduction = config.isProduction;
 if (_isProduction && !isDatabaseConnected()) {
-  console.error('');
-  console.error('╔══════════════════════════════════════════════════════════╗');
-  console.error('║  FATAL: No database connection in production             ║');
-  console.error('║                                                          ║');
-  console.error('║  DATABASE_URL is not set or the Neon client failed to    ║');
-  console.error('║  initialise. TaptPay cannot run in production without a  ║');
-  console.error('║  database — merchant and transaction data would be lost  ║');
-  console.error('║  on every restart.                                       ║');
-  console.error('║                                                          ║');
-  console.error('║  Fix: ensure DATABASE_URL is set in your deployment      ║');
-  console.error('║  secrets (Replit → Deployments → Secrets).              ║');
-  console.error('╚══════════════════════════════════════════════════════════╝');
-  console.error('');
+  logOperation("error","RUNTIME_DIAGNOSTIC",{payload:['']});
+  logOperation("error","RUNTIME_DIAGNOSTIC",{payload:['╔══════════════════════════════════════════════════════════╗']});
+  logOperation("error","FATAL_NO_DATABASE_CONNECTION_IN_PRODUCTION",{payload:['║  FATAL: No database connection in production             ║']});
+  logOperation("error","RUNTIME_DIAGNOSTIC",{payload:['║                                                          ║']});
+  logOperation("error","DATABASE_URL_IS_NOT_SET_OR_THE_NEON_CLIENT_FAILED_TO",{payload:['║  DATABASE_URL is not set or the Neon client failed to    ║']});
+  logOperation("error","INITIALISE_TAPTPAY_CANNOT_RUN_IN_PRODUCTION_WITHOUT_A",{payload:['║  initialise. TaptPay cannot run in production without a  ║']});
+  logOperation("error","DATABASE_MERCHANT_AND_TRANSACTION_DATA_WOULD_BE_LOST",{payload:['║  database — merchant and transaction data would be lost  ║']});
+  logOperation("error","ON_EVERY_RESTART",{payload:['║  on every restart.                                       ║']});
+  logOperation("error","RUNTIME_DIAGNOSTIC",{payload:['║                                                          ║']});
+  logOperation("error","FIX_ENSURE_DATABASE_URL_IS_SET_IN_YOUR_DEPLOYMENT",{payload:['║  Fix: ensure DATABASE_URL is set in your deployment      ║']});
+  logOperation("error","SECRETS_REPLIT_DEPLOYMENTS_SECRETS",{payload:['║  secrets (Replit → Deployments → Secrets).              ║']});
+  logOperation("error","RUNTIME_DIAGNOSTIC",{payload:['╚══════════════════════════════════════════════════════════╝']});
+  logOperation("error","RUNTIME_DIAGNOSTIC",{payload:['']});
   process.exit(1);
 }
 
@@ -10183,7 +10184,7 @@ if (isDatabaseConnected()) {
   const rawUrl = config.databaseUrl ?? '';
   // Extract just the host portion — never log credentials.
   const dbHost = rawUrl.replace(/^[^@]*@/, '').split('/')[0] || 'unknown host';
-  console.log(`✅ Storage: DatabaseStorage (Neon PostgreSQL @ ${dbHost})`);
+  logOperation("info","STORAGE_DATABASESTORAGE_NEON_POSTGRESQL",{payload:[`✅ Storage: DatabaseStorage (Neon PostgreSQL @ ${dbHost})`]});
 } else {
-  console.log('⚠️  Storage: MemStorage — data will NOT persist across restarts (dev mode)');
+  logOperation("info","STORAGE_MEMSTORAGE_DATA_WILL_NOT_PERSIST_ACROSS_RESTARTS_DEV_MOD",{payload:['⚠️  Storage: MemStorage — data will NOT persist across restarts (dev mode)']});
 }

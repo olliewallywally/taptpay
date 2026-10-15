@@ -76,7 +76,9 @@ describe("removing a teammate stops their devices' notifications, as disabling d
     expect(res.status).toBe(200);
     expect(await storage.getUserById(member.user.id)).toBeUndefined();
     expect(stop).toHaveBeenCalledWith(owner.merchantId, member.user.id);
-    expect(log).toHaveBeenCalledWith("[TEAM_REMOVE_PUSH_STOP]", expect.any(Error));
+    expect(log).toHaveBeenCalledWith(expect.any(String));
+    const event=log.mock.calls.map(([line])=>JSON.parse(line)).find(row=>row.event==='TEAM_REMOVE_PUSH_STOP');
+    expect(event).toMatchObject({level:'error',event:'TEAM_REMOVE_PUSH_STOP',payload:'[REDACTED]'});
     stop.mockRestore();
     log.mockRestore();
   });

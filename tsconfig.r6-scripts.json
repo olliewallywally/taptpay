@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": [
+      "node"
+    ],
+    "tsBuildInfoFile": "./node_modules/typescript/r6-scripts.tsbuildinfo"
+  },
+  "include": [
+    "scripts/r6-entitlement-inventory.ts",
+    "scripts/r6-entitlement-inventory.test.ts",
+    "scripts/verify-r6-entitlement-postgres.ts"
+  ]
+}

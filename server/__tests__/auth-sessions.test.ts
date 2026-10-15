@@ -2,6 +2,7 @@ import "./support/test-env";
 import { ADMIN_TEST_PASSWORD } from "./support/admin-sign-in-test-env";
 
 import crypto from "crypto";
+import { logCorrelation } from "../structured-log";
 import fs from "fs";
 import path from "path";
 import request from "supertest";
@@ -123,7 +124,7 @@ const me = (app: App, browser: Browser) => send(app, browser, "get", "/api/auth/
 function securityLogLinesAbout(sessionId: string): Array<Record<string, unknown>> {
   if (!fs.existsSync(SECURITY_LOG)) return [];
   return fs.readFileSync(SECURITY_LOG, "utf8").split("\n")
-    .filter((line) => line.includes(sessionId))
+    .filter((line) => line.includes(logCorrelation(sessionId)))
     .map((line) => JSON.parse(line));
 }
 
@@ -576,6 +577,8 @@ describe("the daily swap of the secret", () => {
       expect(await storage.getAuthSession(idOf(first))).toMatchObject({ revokedReason: "reuse_detected" });
       const logged = await waitForSecurityLogEvent(idOf(first), "SESSION_REUSE_DETECTED");
       expect(logged.map((line) => line.event)).toContain("SESSION_REUSE_DETECTED");
+      expect(logged).toContainEqual(expect.objectContaining({correlation:logCorrelation(idOf(first))}));
+      expect(JSON.stringify(logged)).not.toContain(idOf(first));
       expect(JSON.stringify(logged)).not.toContain(secretOf(first));
     } finally {
       clock.restore();
@@ -608,6 +611,8 @@ describe("every way a session ends", () => {
     expect(await storage.getAuthSession(idOf(phoneCookie))).toMatchObject({ revokedReason: "logout" });
     const logged = await waitForSecurityLogEvent(idOf(phoneCookie), "SESSION_REVOKED");
     expect(logged.map((line) => line.event)).toContain("SESSION_REVOKED");
+    expect(logged).toContainEqual(expect.objectContaining({correlation:logCorrelation(idOf(phoneCookie))}));
+    expect(JSON.stringify(logged)).not.toContain(idOf(phoneCookie));
     expect(JSON.stringify(logged)).not.toContain(secretOf(phoneCookie));
   });
 

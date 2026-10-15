@@ -1,3 +1,4 @@
+import {logOperation,logCorrelation} from "./structured-log";
 /**
  * property-cron.ts — automation engine for the property management vertical.
  *
@@ -283,7 +284,7 @@ export async function runGeneratePass(now: Date = new Date()): Promise<{ generat
       });
       result.generated++;
     } catch (err) {
-      console.error(`[CRON_GENERATE] schedule=${schedule.id}`, err);
+      logOperation("error","CRON_GENERATE",{correlation:logCorrelation(schedule.id)});
       result.errors++;
     }
   }
@@ -329,7 +330,7 @@ export async function runDispatchPass(baseUrl: string): Promise<{ dispatched: nu
         result.dispatched++;
       } else { result.failed++; }
     } catch (err) {
-      console.error(`[CRON_DISPATCH] invoice=${invoice.id}`, err);
+      logOperation("error","CRON_DISPATCH",{correlation:logCorrelation(invoice.id)});
       result.errors++;
     }
   }
@@ -352,7 +353,7 @@ export async function runOverduePass(now: Date = new Date()): Promise<{ markedOv
       });
       result.markedOverdue++;
     } catch (err) {
-      console.error(`[CRON_OVERDUE] invoice=${invoice.id}`, err);
+      logOperation("error","CRON_OVERDUE",{correlation:logCorrelation(invoice.id)});
       result.errors++;
     }
   }
@@ -410,7 +411,7 @@ export async function runReminderPass(baseUrl: string, now: Date = new Date()): 
         result.sent++;
       } else { result.errors++; }
     } catch (err) {
-      console.error(`[CRON_REMINDER] invoice=${invoice.id}`, err);
+      logOperation("error","CRON_REMINDER",{correlation:logCorrelation(invoice.id)});
       result.errors++;
     }
   }
