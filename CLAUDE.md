@@ -1,6 +1,19 @@
 # Claude repository handoff
 
-**R6 is in progress on `remediation/r6-operations-20261015`.** Read
+**R7 repository implementation and available regression are complete on
+`remediation/r7-capabilities-20261015`.** Source `62a80d9c` is pushed:
+locked D13, retired fake native/JS/wallet/attended paths,
+truthful no-effect refusal, narrowed native navigation and a coherent verified
+web snapshot. Read `docs/HANDOFF-2026-10-15-r7-capabilities.md` and
+`docs/operations/r7-native-capability-release.md` first. Final evidence records
+1506 client tests,270 server tests,2 artifact-guard tests and316 browser cells
+(including all88 tutorial cells) passed. Native Xcode/device/redirect evidence,
+owner visual acceptance and release sign-off remain open. This is not deployment,
+native enablement or official phase exit. Exact Apple and production HPP hosts
+remain allowed for existing cookie/sessionStorage-bound flows; no wildcard.
+Claude retains R4. Preserve owner PID4196 and all deferred release gates.
+
+**R6 repository work is pushed on `remediation/r6-operations-20261015`.** Read
 `docs/HANDOFF-2026-10-15-r6-entitlements.md` first for owner-approved D9,
 verified entitlement/provenance implementation, frozen0049b and remaining release
 inputs. D9 is no longer pending; live activation/UAT/operations evidence remains.

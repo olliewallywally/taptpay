@@ -1,0 +1,380 @@
+{
+  "generatedAtUTC": "2026-10-15T23:04:25.265Z",
+  "branch": "remediation/r7-capabilities-20261015",
+  "baseCommit": "82bc816ad70817ab18b9ce7369172386e6b8dbfc",
+  "runtimeImplementationCommit": "62a80d9cb41bb5b137e2d78b691db76bf62f9819",
+  "followup": "The containing evidence/test/documentation commit resolves from git history; runtime source is unchanged from the implementation commit.",
+  "repositoryChecksComplete": true,
+  "officialPhaseExit": false,
+  "deployed": false,
+  "realProviderCalls": 0,
+  "databaseChanges": 0,
+  "featureActivation": false,
+  "tests": {
+    "clientAll": {
+      "suites": 134,
+      "tests": 1506,
+      "failed": 0,
+      "skipped": 0
+    },
+    "serverFocused": {
+      "suites": 10,
+      "tests": 227,
+      "failed": 0,
+      "skipped": 0
+    },
+    "routeContract": {
+      "suites": 1,
+      "tests": 43,
+      "failed": 0,
+      "skipped": 0
+    },
+    "distinctServerSuites": 11,
+    "distinctServerTests": 270,
+    "artifactGuard": {
+      "tests": 2,
+      "failed": 0
+    }
+  },
+  "typechecks": {
+    "application": "pass",
+    "r5Scripts": "pass",
+    "r6Scripts": "pass"
+  },
+  "productionBuild": "pass",
+  "capacitorSyncIOS": "pass",
+  "artifacts": {
+    "webFiles": 198,
+    "nativeChecked": true,
+    "unsupportedPaymentMarkers": 0
+  },
+  "browser": {
+    "engine": "Chromium 151.0.7922.173 built on Debian GNU/Linux 13 (trixie)",
+    "os": "Linux",
+    "normal": [
+      {
+        "context": "phone",
+        "cells": 51,
+        "failed": 0,
+        "apiRouteCount": 45,
+        "geometrySourceSHA256": "32127e8fb18e9fb7fcd44dee9cfa747cff8129f7707e8b7ddba7bd57032b8abe"
+      },
+      {
+        "context": "tablet",
+        "cells": 51,
+        "failed": 0,
+        "apiRouteCount": 44,
+        "geometrySourceSHA256": "32127e8fb18e9fb7fcd44dee9cfa747cff8129f7707e8b7ddba7bd57032b8abe"
+      },
+      {
+        "context": "desktop",
+        "cells": 51,
+        "failed": 0,
+        "apiRouteCount": 44,
+        "geometrySourceSHA256": "32127e8fb18e9fb7fcd44dee9cfa747cff8129f7707e8b7ddba7bd57032b8abe"
+      },
+      {
+        "context": "desktop-short",
+        "cells": 51,
+        "failed": 0,
+        "apiRouteCount": 44,
+        "geometrySourceSHA256": "32127e8fb18e9fb7fcd44dee9cfa747cff8129f7707e8b7ddba7bd57032b8abe"
+      }
+    ],
+    "publicOutcomes": {
+      "cells": 24,
+      "failed": 0,
+      "cases": [
+        "pending plus forged approval query",
+        "approved to confirmed receipt",
+        "approved state for wrong transaction remains processing",
+        "declined",
+        "cancelled",
+        "unmatched return notice"
+      ]
+    },
+    "tutorials": [
+      {
+        "context": "phone",
+        "cells": 22,
+        "completedAndPersistedRounds": 44,
+        "measuredSteps": 226,
+        "failed": 0,
+        "geometrySourceSHA256": "2b6202edcb416adfec917d4ef78b27fb35ab0aa7c1e2c9ba20417d8021907b68"
+      },
+      {
+        "context": "tablet",
+        "cells": 22,
+        "completedAndPersistedRounds": 44,
+        "measuredSteps": 216,
+        "failed": 0,
+        "geometrySourceSHA256": "2b6202edcb416adfec917d4ef78b27fb35ab0aa7c1e2c9ba20417d8021907b68"
+      },
+      {
+        "context": "desktop",
+        "cells": 22,
+        "completedAndPersistedRounds": 44,
+        "measuredSteps": 216,
+        "failed": 0,
+        "geometrySourceSHA256": "2b6202edcb416adfec917d4ef78b27fb35ab0aa7c1e2c9ba20417d8021907b68"
+      },
+      {
+        "context": "desktop-short",
+        "cells": 22,
+        "completedAndPersistedRounds": 44,
+        "measuredSteps": 216,
+        "failed": 0,
+        "geometrySourceSHA256": "2b6202edcb416adfec917d4ef78b27fb35ab0aa7c1e2c9ba20417d8021907b68"
+      }
+    ],
+    "totalCells": 316,
+    "harnessProvenance": {
+      "normalAndTutorials": "Loaded the base harness before the optional public-state mode was added; default mode/threshold/error behavior is unchanged.",
+      "loadedBaseHarnessSHA256": "c22096443d6f789018a2840ea4c4fbfa49a45033d8f575c7ac9eea6ca5ab61e1",
+      "publicStateHarnessSHA256": "34b96950b8980c02d838f5ddc35d77f20d6ea8a70eeab199a653535ca9e048dc"
+    },
+    "limitations": "Isolated loopback HTTPS, real app/session/routes, synthetic MemStorage and injected property/trades list storage; outbound browser calls blocked. No Safari/VoiceOver, real iOS, provider, live DB, performance, golden acceptance or professional sign-off."
+  },
+  "generatedBuild": {
+    "rootFiles": 198,
+    "fullBuildFiles": 396,
+    "nativeFiles": 398,
+    "indexSHA256": "34210529db88f44378ba001d8fe9d7437c61598a4d332428739a086df192d56d",
+    "rootTreeSHA256": "5ffc752f81f57e8fb2702106ead89c4b51bb74dc0357bb6ed8001dd6c3c8fde6",
+    "nativeConfigSHA256": "91efb293421f073efa9f14b4da544d1e4f2335d3a58547e2ff0b4b4a69451f1f",
+    "nativeEmptyFiles": [
+      "cordova.js",
+      "cordova_plugins.js"
+    ],
+    "allowNavigation": [
+      "appleid.apple.com",
+      "sec.windcave.com"
+    ]
+  },
+  "frozenPathsUnchanged": [
+    "migrations",
+    "shared/schema.ts",
+    "package-lock.json",
+    "ios/App/App/Info.plist",
+    "ios/App/App.xcodeproj/project.pbxproj"
+  ],
+  "sourceFiles": {
+    ".github/workflows/verify.yml": {
+      "sha256": "3bb6c5280396e58b0bace8cd3a0b2e1d871f4355655e31e63e96aebf5ce6d5b0"
+    },
+    "capacitor.config.ts": {
+      "sha256": "7108378c1a8e7ee4f3b98d90f12fc7fa1300b57c68dc2dc68b3b630881e77a32"
+    },
+    "client/src/App.tsx": {
+      "sha256": "43d0388badd467098616d4126c2d7b629f892ccc82758902bd763a99ac171778"
+    },
+    "client/src/__tests__/admin-session.test.tsx": {
+      "sha256": "6c7fd1a3a3e8d747bb6b8b0b800723b4df1fe10a9b0827d6e9efe99fd472b440"
+    },
+    "client/src/__tests__/auth-outage-resilience.test.tsx": {
+      "sha256": "d398366cb965c35d44204a3417620ac8b10c4f72683efd1807cd6871ba80a776"
+    },
+    "client/src/__tests__/push-resync-on-open.test.tsx": {
+      "sha256": "f74271a653962b65e9443efb72dbf48b5d2af2a34b4a067f3436c66cd8375865"
+    },
+    "client/src/__tests__/r1-t3-route-guards.test.tsx": {
+      "sha256": "68072852020ba6e135aa1fc1bad68e2484886ed57cedafe06136e91ec8692836"
+    },
+    "client/src/__tests__/r7-capability-boundary.test.ts": {
+      "sha256": "b3c3779a78c2087f65d6e2090d3ea75a326447b360dee435dcdd98263fca4465"
+    },
+    "client/src/__tests__/retail-terminal-view-boundary.test.tsx": {
+      "sha256": "8f99db6346e482cd2ce8ffc8c3ffbf5d5ee386335ef9f6e17c238c306028817f"
+    },
+    "client/src/components/digital-wallet-buttons.tsx": {
+      "deleted": true,
+      "baseSHA256": "e0a282e8ecd7570625c2108ba03d869efe39df35cce8fb9936ac5479b9341327"
+    },
+    "client/src/components/native-payment-buttons.tsx": {
+      "deleted": true,
+      "baseSHA256": "0267da9129ad576fcf5cc15d97ed19498a3abfa60422319c1a1d926fab503c5d"
+    },
+    "client/src/features/terminal/retail/RetailTerminalView.tsx": {
+      "sha256": "7e38a6aaacec046260715a3a94ee5a3aa319247101c691316017a9c5deb539c0"
+    },
+    "client/src/lib/native.ts": {
+      "sha256": "f8df39817eaadbb8bca793b9d51420c3984e8a0d9a57d737fa6dced6f5e02e88"
+    },
+    "client/src/pages/merchant-terminal-mobile-v2.test.tsx": {
+      "sha256": "654393857143c6959e6ea76fac030ea050690d9d1acb8339170bc5e65a9f2db6"
+    },
+    "client/src/pages/merchant-terminal-mobile-v2.tsx": {
+      "sha256": "edfa0cf5353dba3682e4376f8c696de93c2c87c9174f2709e2443bc2b3b9d663"
+    },
+    "client/src/pages/merchant-terminal-mobile.tsx": {
+      "sha256": "6aeded8b3f4d3758eaa2d3c6c5b86e096bd4079555549338a0e2e433c820e767"
+    },
+    "client/src/pages/merchant-terminal.tsx": {
+      "sha256": "4b68da7b3c001b5a61bed42041144e502c94c61b6b5f8c7518c8f7e039a32dbc"
+    },
+    "client/src/plugins/TaptPayPlugin.ts": {
+      "deleted": true,
+      "baseSHA256": "67a49258e327b46156dce9e0171571aa2a79941ef791feec684109df8360333c"
+    },
+    "ios/App/App.xcodeproj/project.pbxproj": {
+      "sha256": "408f4978f1969e554c2b561748404e166662eab3bf97d9452fa3ac94ce247b2f"
+    },
+    "ios/App/App/AppDelegate.swift": {
+      "sha256": "5963d47ceba89e0d5694376ebf0bca630284db3de794bdf8666ea3093fe38a2f"
+    },
+    "ios/App/App/Info.plist": {
+      "sha256": "9c8a0b3a32636c54d1670fc31f101e64127b9403f50becc95683a7d88af92e49"
+    },
+    "ios/App/CapApp-SPM/Package.swift": {
+      "sha256": "50a601bfb7c45063f5950443ae0a26d61c1d200746ed62ab8eda24a07971666f"
+    },
+    "package-lock.json": {
+      "sha256": "d2b7e57ed8ff58e091ef51befc441fd0f5b4dcc09b38fd71c12f5ca35837702d"
+    },
+    "package.json": {
+      "sha256": "29230e7bdd3be4fbb49a4d3dd118b65e6d2b9fd86f5b92b8a49eec73b5f975e0"
+    },
+    "scripts/verify-r1-t10-device-matrix.ts": {
+      "sha256": "34b96950b8980c02d838f5ddc35d77f20d6ea8a70eeab199a653535ca9e048dc"
+    },
+    "scripts/verify-r7-artifacts.mjs": {
+      "sha256": "4a7fe40278e519214998dd7b9ac408497ad9fcf3f68b3b32d08e39cf09038002"
+    },
+    "scripts/verify-r7-artifacts.test.mjs": {
+      "sha256": "38719d5415f1acc824b61091dfec7b2daf57bbae4262379dc7d403be334d337e"
+    },
+    "server/__tests__/api-route-contract.test.ts": {
+      "sha256": "cb03d23e206be331e0af7b38d38461b7bd962d990fa853a91594c92bc9959da6"
+    },
+    "server/__tests__/r0-t5-capability-gates.test.ts": {
+      "sha256": "16ea3e2815ae13ab8bb28fb049aebe4bd32f3070a37ff7147641df949bc64701"
+    },
+    "server/__tests__/r2-t6-provider-log-guard.test.ts": {
+      "sha256": "108229ff9cbe249b52c58f1227d4941a3415f71a54e8488315dd9ea1d052e3dc"
+    },
+    "server/__tests__/r7-capability-lock.test.ts": {
+      "sha256": "c8dcd6d8770cccd6800d4292b5a9f9a978939df2b048ecec21317f70af76eb93"
+    },
+    "server/__tests__/route-matrix-served-business.test.ts": {
+      "sha256": "253bbfaf9c38b384c1b38c2ed20817f24ef8680c45a93876921f18eb7beff05d"
+    },
+    "server/__tests__/tap-to-pay-validation.test.ts": {
+      "sha256": "b195c017b5d2a67a82086c76b3490db74cb7e8a7a43227836ebbb777d4a9be6e"
+    },
+    "server/__tests__/tenant-storage-inventory.test.ts": {
+      "sha256": "4cabbbb732da63d90528d46db27028f12733822b9618943dfa96a71e1705c4e9"
+    },
+    "server/config.ts": {
+      "sha256": "c1202c394ce1972ec5993d782906951d0fb705c896d0e83d54927c244246bae0"
+    },
+    "server/route-policy.ts": {
+      "sha256": "399930a0dd4ed1c7c477dc298f222fd1cdbec9279f328222bdac8e3657ff50e0"
+    },
+    "server/route-review.ts": {
+      "sha256": "8cb397d6607739adb958fbd441c324a56ec1d0772a7b3d49e3e1546ad474027a"
+    },
+    "server/routes.ts": {
+      "sha256": "e2b54e3cf9e6cbf4d16502d63a0721b9da73137f302ee0dbc3062eed4107a1ac"
+    },
+    "server/windcave.ts": {
+      "sha256": "5b4bdfa0967f7bc58d6d1d4c2873e491cae82e01d8486b8c800e412c81810ae2"
+    },
+    "shared/payment-capabilities.ts": {
+      "sha256": "91af5413b10f22bfe3df56abdd8e9845fd0605501f87b8a527f6a58f63c88dc7"
+    },
+    "src/plugins/TapToPayPlugin.swift": {
+      "deleted": true,
+      "baseSHA256": "3cec7bd40e6e7814d51de4c7c866d6dda41c303726092b22f184bd27c50fc6e0"
+    }
+  },
+  "commands": [
+    "npm run test:client -- --json --outputFile=/tmp/taptpay-r7/client-all.json",
+    "npx jest --selectProjects server --runInBand --runTestsByPath server/__tests__/route-matrix-served-business.test.ts server/__tests__/route-matrix-served-public.test.ts server/__tests__/tenant-storage-inventory.test.ts server/__tests__/r0-t5-disabled-route-side-effects.test.ts server/__tests__/r2-t6-provider-log-guard.test.ts server/__tests__/route-policy-inventory.test.ts server/__tests__/tap-to-pay-validation.test.ts server/__tests__/route-policy-review.test.ts server/__tests__/r0-t5-capability-gates.test.ts server/__tests__/r7-capability-lock.test.ts --json --outputFile=/tmp/taptpay-r7/server-final.json",
+    "npx jest --selectProjects server --runInBand --runTestsByPath server/__tests__/api-route-contract.test.ts --json --outputFile=/tmp/taptpay-r7/route-contract-final.json",
+    "node --test scripts/verify-r7-artifacts.test.mjs",
+    "npm run check",
+    "npm run check:r5",
+    "npm run check:r6",
+    "npm run build",
+    "npm run verify:r7:artifacts",
+    "npx cap sync ios",
+    "node scripts/verify-r7-artifacts.mjs --native",
+    "PLAYWRIGHT_CHROMIUM_PATH=/usr/bin/chromium node --import tsx scripts/verify-r1-t10-device-matrix.ts /tmp/taptpay-r7/matrix-phone /tmp/taptpay-r7/candidate-final --context phone",
+    "PLAYWRIGHT_CHROMIUM_PATH=/usr/bin/chromium node --import tsx scripts/verify-r1-t10-device-matrix.ts /tmp/taptpay-r7/matrix-tablet /tmp/taptpay-r7/candidate-final --context tablet",
+    "PLAYWRIGHT_CHROMIUM_PATH=/usr/bin/chromium node --import tsx scripts/verify-r1-t10-device-matrix.ts /tmp/taptpay-r7/matrix-desktop /tmp/taptpay-r7/candidate-final --context desktop",
+    "PLAYWRIGHT_CHROMIUM_PATH=/usr/bin/chromium node --import tsx scripts/verify-r1-t10-device-matrix.ts /tmp/taptpay-r7/matrix-short /tmp/taptpay-r7/candidate-final --context desktop-short",
+    "PLAYWRIGHT_CHROMIUM_PATH=/usr/bin/chromium node --import tsx scripts/verify-r1-t10-device-matrix.ts /tmp/taptpay-r7/tutorial-phone /tmp/taptpay-r7/candidate-final --context phone --tutorials",
+    "PLAYWRIGHT_CHROMIUM_PATH=/usr/bin/chromium node --import tsx scripts/verify-r1-t10-device-matrix.ts /tmp/taptpay-r7/tutorial-tablet /tmp/taptpay-r7/candidate-final --context tablet --tutorials",
+    "PLAYWRIGHT_CHROMIUM_PATH=/usr/bin/chromium node --import tsx scripts/verify-r1-t10-device-matrix.ts /tmp/taptpay-r7/tutorial-desktop /tmp/taptpay-r7/candidate-final --context desktop --tutorials",
+    "PLAYWRIGHT_CHROMIUM_PATH=/usr/bin/chromium node --import tsx scripts/verify-r1-t10-device-matrix.ts /tmp/taptpay-r7/tutorial-short /tmp/taptpay-r7/candidate-final --context desktop-short --tutorials",
+    "PLAYWRIGHT_CHROMIUM_PATH=/usr/bin/chromium node --import tsx scripts/verify-r1-t10-device-matrix.ts /tmp/taptpay-r7/public-states /tmp/taptpay-r7/candidate-final --payment-states"
+  ],
+  "privateEvidenceSHA256": {
+    "client-all.json": "7d773b2993e7e09ac8c13a75ad700068972c945f812c76580d35e4b8609d8f32",
+    "client-all.log": "00d465fd28d7a16fdea664675bfeebd135b34d8274053a22e175b4a2ae9403c2",
+    "server-final.json": "1b880f0231800f48562fe10fa903c438f53b7ce0f935dc6d5f72bbd2910b951c",
+    "server-final.log": "03e864ab7aa129a39a83b0a22f084a0d003832d1e95f805846952242dc02dbaa",
+    "route-contract-final.json": "7f80129180248bdb23752df1a029097c51a715f58ec2908a5089bbe36e1e2e0a",
+    "route-contract-final.log": "e6414586397b4bffd7212ab6082f5aacf57b22fdf4c31fe3fe731d3cb38e8588",
+    "capability-red.json": "be5e5cd606fb8c70eb00d323e6392c22f86353f81ac9382aee3acbde1577b3b7",
+    "capability-red.log": "eb3fa546320b99346f3c07b69a417d21ec0f9fd7fe73aa24db33d13b8a5d5318",
+    "client-regression.json": "85a5f866ee7bc67827bf4b8e779fc1fcb5d339ea51d1d32aa00dcdda227599ec",
+    "client-regression.log": "d4345cc951a5b47c978eef93fe24fee7a9878cedb68eb8fe542d3b23def101e5",
+    "server-regression.json": "ebede4ff2a573c7d9ef08a5784458d0bc56ebb3ac960935eccb93e0206d61592",
+    "server-regression.log": "451a13d068f1b581fd3bfa47c3039fbbfce85c302b8bc58fb682d0f1d12de63d",
+    "app-shell-red.json": "82f5daf98bdbdcfa07fd4591451a7b793d27fb9b6d07cbb3b18d936bbbe3a2a4",
+    "app-shell-red.log": "1c0b8078db2660e2b0843d694c34a5a4db0246279e5817a077df04fadf4f8596",
+    "app-shell-final.json": "4fa3933b96bb15774ca05b6cda6794531cf0e24b23d2001a2601036d14fd1f68",
+    "app-shell-final.log": "48f95de399c9826919acf80fc3648a7337ed2f3138af921b1fe6f3dc3fb20e90",
+    "route-contract-red.json": "c459cc060512811d7bfad9e3ebbb50da7b69186e2567705860b6bfe084d1bfbd",
+    "route-contract-red.log": "74c283ef2c48bed86bafa72f3c150af9352d7adb30fef52342a21aa9e78b578c",
+    "route-contract-counts.json": "cd4b608b6648f3b8f476e00e9ea5617ea1494b645c54689fedb16f548532ac6f",
+    "route-contract-counts.log": "0ce5cdafd71cdacf0b16e9ce7a35d3dbe9cf0914553bdc0e16e30c8a9d7361b7",
+    "artifact-tests-final.log": "467556b859639c08db50704961890b00ffbe6cc0655c2d3708d1056006062ad7",
+    "artifacts-red.log": "f1ec03fca8a33277130544f7d644f3ee4171bd638d3cb8c5485438d0f4c03ac4",
+    "artifacts-native-red.log": "7cec13998be5a99bbbf39545c51f71e939e4ab6acd7a2c106542f2e022ac7069",
+    "artifacts-served-red.log": "e25fffd99320b1cf3c15475fb666e58ea3ec4a50552247cb124c229d960a097e",
+    "native-billing-red.json": "ff7e671c77800299de4211941dcb028798c2994ea2055405afa92a5d78303846",
+    "native-billing-red.log": "06971329d76c00a9d33f5135cf7d3522d1db1379859e6a90de676e795ae83956",
+    "native-contract-final.json": "9da031fb72101c355f0a1da259c190db2de47da67f05734ef2fcc4543db025b6",
+    "native-contract-final.log": "771df183bb84c752754b68e2a873f6506895b0130882dccb5e07d6a8d9a10b53",
+    "artifacts-native-final.log": "abf11c1002a4fe2a5099bb59c084badf5b1f17952559589c651101510ae0d8d4",
+    "artifacts-commit.log": "abf11c1002a4fe2a5099bb59c084badf5b1f17952559589c651101510ae0d8d4",
+    "build-commit.log": "ab142de56eef8ae8be3c5062a392a49e7d0f78b2ad8b45bf469032ab8b4b46da",
+    "typecheck-commit.log": "0fedab01a35ca9fca53fe6fd66268f14af56d83677404c554d736f962da99fb3",
+    "typecheck-r5.log": "74c9a58e31401b51f9ff8175574d1edecdda01c19af024e5609feb046c0c3b41",
+    "typecheck-r6.log": "68e094c1b46c8639af0f6b631a06958347fba5f7c39058b48f157e9147147a36",
+    "cap-sync.log": "f34d88552867e51d6e5ae86214c18ae3eb4ed6b8f49953a8dfacdedd8a983fcf",
+    "cap-sync-final.log": "7074af7645a27762b0d6cc42c50475d547c5fda7ddc9ec27573c2a3f1c56b5e6",
+    "public-states.log": "6a7ae1491789d556039e463d49f0b2c04359a0bdf033282e13460edbfed8221b",
+    "public-states/results.json": "7ef96e9e8812a61c5bb57c17182cb9d5251b90beb184dd223065475454038aa3",
+    "matrix-phone.log": "d21abf8780114e34aa47828e2e1642a5f77d82e8cc6b00384bf7bbd7d35b0b8d",
+    "matrix-phone/results.json": "20929488d1d5926e3592e502d9227035778a2423674251175f053ed966d0e5cb",
+    "tutorial-phone.log": "a755ece6ab531d6b1be5e907fb05e6c006e4f0e8ae1e7364d6edf8174e0ecbd2",
+    "tutorial-phone/tutorial-results.json": "1f6e78a4a76660bd058d833907e29f286989094024b1ed433dc29920e34a13e8",
+    "matrix-tablet.log": "5a8ee3d8d74d0d2028e0c887bbae203308048d0665bebc01474b14f20a5e0a57",
+    "matrix-tablet/results.json": "79153f3cd5af9ebb8b0ff3abab01835d39beb1cced80bee7be2d44b8e20aa954",
+    "tutorial-tablet.log": "ae52211dd139606fff53e01ee78569ce02e8e85fe3c17a01a70c4177d806cfaa",
+    "tutorial-tablet/tutorial-results.json": "1c09a85a6f4c0fc77db489c30991c84c460a922a34fd517bd9d1adc4d5713161",
+    "matrix-desktop.log": "34215734587160966458b0a488dd08eefa1f0b281fbc7ea75d5a800fd73dca03",
+    "matrix-desktop/results.json": "c5a623a3354addc0fe7aa71aba499047cc6e8536f7bdb6067a0dc864b90521d8",
+    "tutorial-desktop.log": "c35cd10458d468529b444e8e2ec6dd9a0118ca17532085ae7bb9dd1f1d14d3cf",
+    "tutorial-desktop/tutorial-results.json": "6132f5cf833c5eba0eafddcc23f52bf4431bfdc737651db91e439ecee8cbea01",
+    "matrix-short.log": "a24b5f61baa282e4dc222c46e9050d4c6b0ca10d3b7704df684af760d8ddd586",
+    "matrix-short/results.json": "28fc58da5fc9646edd536914ceb375f896218d080f99145e28d881979ad65235",
+    "tutorial-short.log": "0bdf67b273ff54c012388853c1a90dc1f671b8dd88b82d1bf1e6c2f7841494ef",
+    "tutorial-short/tutorial-results.json": "661982d2445686ef66289c8255bda6890fa723e085ea49c8837239c9593badef"
+  },
+  "externalGates": [
+    "Actual Xcode/native build, signing, entitlements and matched remote web candidate",
+    "Native Apple/other sign-in, HPP/3DS/wallet return navigation, push/share and external-link device checks",
+    "iPhone12 Safari/VoiceOver and separate iPad evidence",
+    "Owner visual/golden acceptance and independent review",
+    "Existing R3 UAT, Claude R4 integration, six deferred R5 release checks and R6 real-target/UAT/operations gates"
+  ],
+  "notices": [
+    "Source diff-check clean; eight generated notices are retained third-party license trailing whitespace",
+    "Existing browser-data/chunk-size/ts-jest deprecation warnings",
+    "Remote GitHub CI and external/professional review not claimed"
+  ]
+}
