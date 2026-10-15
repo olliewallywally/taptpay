@@ -84,6 +84,11 @@ and must follow the ADR's lock-order, send-intent and lease rules.
 `docs/evidence/remediation-v2-2/r4/R3-INTEGRATION-2026-10-14.md` and Codex's
 `docs/HANDOFF-2026-10-14-r3-repository-complete.md`. Its §5 lists the open items for Codex and
 the owner (T-3 first). The refund schema is now migration 0048.
+**2026-10-15:** those open items are fixed except T-3 (read
+`docs/evidence/remediation-v2-2/r4/R3-OPEN-ITEMS-2026-10-15.md`; migration 0049 is applied nowhere;
+the owner runs `docs/operations/runbook-2026-10-15-r3-cutover.md` before R3 first boots on a used
+database). T-3's ADR, `docs/decisions/2026-10-15-t3-decline-supersession.md`, was refused in review
+pass 1.
 
 This program's established discipline: failing-tests-first; independently re-verify a prior
 pass's own claims before trusting them, the way every session in this program has had to;

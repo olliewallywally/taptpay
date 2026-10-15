@@ -1,10 +1,10 @@
 # R1-T7 tenant/storage execution inventory
 
-Generated from working-tree sources on base `8b7c300eb852990bc22c869323b7f30cecd697d1`; the phase evidence names the final commit.
+Generated from working-tree sources on base `671430e64aaff28a0db76b20db03fff6f16c771d`; the phase evidence names the final commit.
 
 Registrations: **194**; registrations with session/admin authentication: **122**;
 registrations calling checkMerchantOwnership: **25**.
-IStorage: **266** declared methods;
+IStorage: **264** declared methods;
 PaymentAttemptRepository: **10** inherited methods.
 
 Classifications come from the reviewed per-route branches, including mixed public/signed-in routes.
@@ -271,7 +271,6 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | IStorage | createSplitPayment | no | `createSplitPayment(data: any): Promise<any>` |
 | IStorage | getSplitPaymentsByTransaction | no | `getSplitPaymentsByTransaction(transactionId: number): Promise<any[]>` |
 | IStorage | getSplitPaymentById | no | `getSplitPaymentById(id: number): Promise<any \| undefined>` |
-| IStorage | updateSplitPaymentStatus | no | `updateSplitPaymentStatus(id: number, status: string, windcaveTransactionId?: string): Promise<any>` |
 | IStorage | getNextPendingSplit | no | `getNextPendingSplit(transactionId: number): Promise<any \| undefined>` |
 | IStorage | getSubscriptionRevenue | no | `getSubscriptionRevenue(): Promise<SubscriptionRevenue>` |
 | IStorage | createRefund | no | `createRefund(data: InsertRefund): Promise<Refund>` |
@@ -368,7 +367,6 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | IStorage | createSplitPayment | no | `createSplitPayment(data: any): Promise<any>` |
 | IStorage | getSplitPaymentsByTransaction | no | `getSplitPaymentsByTransaction(transactionId: number): Promise<any[]>` |
 | IStorage | getSplitPaymentById | no | `getSplitPaymentById(id: number): Promise<any \| undefined>` |
-| IStorage | updateSplitPaymentStatus | no | `updateSplitPaymentStatus(id: number, status: string, windcaveTransactionId?: string): Promise<any>` |
 | IStorage | getNextPendingSplit | no | `getNextPendingSplit(transactionId: number): Promise<any \| undefined>` |
 | IStorage | createTenantProfileForMerchant | yes | `createTenantProfileForMerchant(merchantId: number, data: TenantProfileChanges): Promise<any>` |
 | IStorage | getTenantProfileForMerchant | yes | `getTenantProfileForMerchant(id: string, merchantId: number): Promise<any \| undefined>` |

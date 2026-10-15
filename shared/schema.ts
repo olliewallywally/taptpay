@@ -311,7 +311,8 @@ export const paymentAttempts = pgTable("payment_attempts", {
 }, (t) => ({
   r3TenantIdentity: unique("payment_attempts_id_transaction_uq").on(t.id, t.transactionId),
   accountFingerprintCheck: check("payment_attempts_account_fingerprint_check", sql`(${t.expectedProviderAccount} is null and ${t.requestFingerprint} is null) or (${t.expectedProviderAccount} is not null and length(${t.expectedProviderAccount}) between 1 and 200 and ${t.requestFingerprint} is not null and ${t.requestFingerprint} ~ '^[0-9a-f]{64}$' and ${t.expectedAmountCents} is not null)`),
-  sendStartedCheck: check("payment_attempts_send_started_check", sql`${t.sendStartedAt} is null or (${t.sendStartedAt} >= ${t.createdAt} and ${t.sendStartedAt} <= ${t.leaseExpiresAt})`),
+  // Migration 0049: compared in UTC, whatever the session time zone (created_at and lease_expires_at are UTC wall time).
+  sendStartedCheck: check("payment_attempts_send_started_utc_check", sql`${t.sendStartedAt} is null or (${t.sendStartedAt} >= ${t.createdAt} at time zone 'UTC' and ${t.sendStartedAt} <= ${t.leaseExpiresAt} at time zone 'UTC')`),
   reconciliationCodeCheck: check("payment_attempts_reconciliation_code_check", sql`${t.lastReconciliationCode} is null or ${t.lastReconciliationCode} ~ '^[a-z][a-z0-9_:]{0,63}$'`),
   transactionIdx: index("payment_attempts_transaction_idx").on(t.transactionId),
   transactionShareKeyUnique: uniqueIndex("payment_attempts_transaction_share_key_uq")

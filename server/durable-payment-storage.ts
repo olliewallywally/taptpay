@@ -374,6 +374,9 @@ export class DurablePaymentStorage implements ReconciliationRepository, PaymentO
   }
 
   async receive(sessionId: string, kind: "fprn"|"browser"|"poll", now = new Date()): Promise<string> {
+    const REOPENS=`((payment_notification_inbox.status='dead_letter' AND payment_notification_inbox.last_error_code IN
+        ('retry_exhausted','unbound_session','provider_pending','provider_unknown','provider_unavailable','internal_error'))
+      OR (payment_notification_inbox.status='complete' AND payment_notification_inbox.completed_at<EXCLUDED.first_received_at-interval '1 minute'))`;
     if (!isSessionId(sessionId) || !["fprn","browser","poll"].includes(kind)) throw new Error("invalid_notification");
     return this.transaction(async(client)=>{
       const row=(await client.query(`INSERT INTO payment_notification_inbox(provider,kind,session_id,first_received_at,last_received_at,next_attempt_at)
@@ -382,7 +385,14 @@ export class DurablePaymentStorage implements ReconciliationRepository, PaymentO
           last_received_at=GREATEST(payment_notification_inbox.last_received_at,EXCLUDED.last_received_at),
           -- Integration fix: a poll (a merchant command or the payer's page asking now) brings a
           -- backed-off receipt forward, so "ask Windcave first" really asks. Finished rows stay finished.
-          next_attempt_at=CASE WHEN EXCLUDED.kind='poll' AND payment_notification_inbox.status IN ('pending','retry')
+          -- D1 (R3 integration): a new arrival reopens a receipt that gave up for a transient reason, or one
+          -- finished over a minute ago (a later card in the same session). One held for review stays closed.
+          status=CASE WHEN ${REOPENS} THEN 'pending' ELSE payment_notification_inbox.status END,
+          attempt_count=CASE WHEN ${REOPENS} THEN 0 ELSE payment_notification_inbox.attempt_count END,
+          first_received_at=CASE WHEN ${REOPENS} THEN EXCLUDED.first_received_at ELSE payment_notification_inbox.first_received_at END,
+          completed_at=CASE WHEN ${REOPENS} THEN NULL ELSE payment_notification_inbox.completed_at END,
+          next_attempt_at=CASE WHEN ${REOPENS} THEN EXCLUDED.next_attempt_at
+            WHEN EXCLUDED.kind='poll' AND payment_notification_inbox.status IN ('pending','retry')
             THEN LEAST(payment_notification_inbox.next_attempt_at,EXCLUDED.next_attempt_at) ELSE payment_notification_inbox.next_attempt_at END
           RETURNING id`,[kind,sessionId,now])).rows[0];
       return row.id;

@@ -3191,3 +3191,19 @@ Open items for Codex and the owner, T-3 first, are in §5 of
 databases: R3 88/15/11/24/19, R4-T2 28, R4-T3 14, S2a 25, R2-T4 12, R2-T7 7. Suites: server
 222/5,139, client 134/1,507. Applied to no
 shared database; nothing deployed; refunds stay off. R4-T3 part 2 (the route) is next.
+
+## 31. October 15 — R3 integration open items (Claude)
+
+The owner asked for the integration's open items to be fixed before R4-T3 part 2, and decided
+R-3a: a payment Windcave confirms when a merchant's change asks first is recorded. Fixed, each
+with a failing test first:
+- the cutover gate and the retirement of legacy outbox rows (owner runbook);
+- D1 (reopening receipts) and D4 (dead-letter signals);
+- the notification rate limit and bounded lookups of unknown sessions;
+- migration 0049 (identity written once; send intent checked in UTC), applied nowhere;
+- R-1 (the legacy split writer removed);
+- the legacy refund route refuses split sales.
+
+T-3's ADR revision 1 was refused in review pass 1. Record:
+[R3-OPEN-ITEMS-2026-10-15](r4/R3-OPEN-ITEMS-2026-10-15.md). Server 224/5,146. PostgreSQL:
+R3 91/15/11/24/20, cutover 5, R4-T2 28, R4-T3 14, S2a 25, R2-T4 12, R2-T7 7. Nothing deployed.

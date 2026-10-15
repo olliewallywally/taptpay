@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 8b7c300eb852990bc22c869323b7f30cecd697d1 on 2026-10-14.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 671430e64aaff28a0db76b20db03fff6f16c771d on 2026-10-15.
  *
  * 194 registrations (81 GET, 81 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -693,7 +693,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     principal: "provider-webhook",
     markers: [],
     facts: {
-      statuses: [200,400,405,413,415,503],
+      statuses: [200,400,405,413,415,429,503],
       helpers: ["server/durable-payment-notification.ts:errorHandler","server/durable-payment-notification.ts:receive","server/durable-payment-notification.ts:validate"],
     },
   },
@@ -1198,7 +1198,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     principal: "provider-webhook",
     markers: [],
     facts: {
-      statuses: [200,400,405,413,415,503],
+      statuses: [200,400,405,413,415,429,503],
       helpers: ["server/durable-payment-notification.ts:errorHandler","server/durable-payment-notification.ts:receive","server/durable-payment-notification.ts:validate"],
     },
   },
@@ -1878,7 +1878,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     principal: "provider-webhook",
     markers: ["billingCardCallback"],
     facts: {
-      statuses: [200,400,405,413,415,503],
+      statuses: [200,400,405,413,415,429,503],
       helpers: ["server/durable-payment-notification.ts:errorHandler","server/durable-payment-notification.ts:receive","server/durable-payment-notification.ts:validate"],
     },
   },
@@ -2306,7 +2306,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     principal: "provider-webhook",
     markers: [],
     facts: {
-      statuses: [200,400,405,413,415,503],
+      statuses: [200,400,405,413,415,429,503],
       helpers: ["server/durable-payment-notification.ts:errorHandler","server/durable-payment-notification.ts:receive","server/durable-payment-notification.ts:validate"],
     },
   },
@@ -2316,7 +2316,7 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     principal: "provider-webhook",
     markers: [],
     facts: {
-      statuses: [200,400,405,413,415,503],
+      statuses: [200,400,405,413,415,429,503],
       helpers: ["server/durable-payment-notification.ts:errorHandler","server/durable-payment-notification.ts:receive","server/durable-payment-notification.ts:validate"],
     },
   },

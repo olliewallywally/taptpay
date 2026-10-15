@@ -829,6 +829,37 @@ try {
     assert.equal((await pool.query('SELECT last_reconciliation_code FROM payment_attempts WHERE transaction_id=$1',[sale.id])).rows[0].last_reconciliation_code,'integrity_mismatch:amount');
     assert.equal((await pool.query('SELECT last_error_code FROM payment_notification_inbox WHERE id=$1',[claim!.id])).rows[0].last_error_code,'integrity_mismatch');
   });
+  await check('integration D1: a new arrival reopens a receipt that gave up for a transient reason, never one held for review',async()=>{
+    const status=async(id:string)=>(await pool.query('SELECT status,attempt_count,completed_at FROM payment_notification_inbox WHERE id=$1',[id])).rows[0];
+    const exhausted=`s-${randomUUID()}`,held=`s-${randomUUID()}`,done=`s-${randomUUID()}`;
+    const a=await one.receive(exhausted,'fprn',now),b=await one.receive(held,'fprn',now),c=await one.receive(done,'fprn',now);
+    await pool.query("UPDATE payment_notification_inbox SET status='dead_letter',last_error_code='retry_exhausted',attempt_count=20 WHERE id=$1",[a]);
+    await pool.query("UPDATE payment_notification_inbox SET status='dead_letter',last_error_code='integrity_mismatch',attempt_count=1 WHERE id=$1",[b]);
+    await pool.query("UPDATE payment_notification_inbox SET status='complete',completed_at=$2 WHERE id=$1",[c,now]);
+    await one.receive(exhausted,'fprn',now);await one.receive(held,'fprn',now);await one.receive(done,'fprn',now);
+    assert.deepEqual({...await status(a),completed_at:null},{status:'pending',attempt_count:0,completed_at:null});
+    assert.equal((await status(b)).status,'dead_letter');
+    assert.equal((await status(c)).status,'complete','finished within the last minute');
+    await one.receive(done,'fprn',new Date(now.getTime()+60001));
+    assert.equal((await status(c)).status,'pending');assert.equal((await status(c)).completed_at,null);
+  });
+  await check('integration 0049: an attached R2-era attempt cannot be given an account or fingerprint afterwards',async()=>{
+    const sale=await original.createTransaction({merchantId:merchant,itemName:'0049 synthetic',price:'10.01',status:'pending',paymentMethod:'qr_code',splitEnabled:false});
+    const claim=await retail.claim({transactionId:sale.id,shareIndex:0,idempotencyKey:randomUUID()});assert.equal(claim.kind,'claimed');if(claim.kind!=='claimed')throw Error('fixture');
+    await retail.recordExpectedValues({attemptId:claim.attempt.id,amountCents:1001,currency:'NZD',merchantReference:`TAPT_${claim.attempt.id}`,providerEnvironment:'uat'});
+    assert.equal((await retail.attachSession({attemptId:claim.attempt.id,processorSessionId:`s-${randomUUID()}`,processorXId:claim.attempt.id.replace(/-/g,'').slice(0,16)})).kind,'attached');
+    await assert.rejects(pool.query("UPDATE payment_attempts SET expected_provider_account='synthetic-account',request_fingerprint=repeat('a',64) WHERE id=$1",[claim.attempt.id]),{code:'23514'});
+  });
+  await check('integration 0049: send intent is checked in UTC whatever the database session time zone',async()=>{
+    const zoned=new pg.Pool({connectionString:testDatabaseUrl,max:2,options:'-c TimeZone=Pacific/Auckland'});
+    try {
+      const store=new DurablePaymentStorage(zoned);
+      const sale=await original.createTransaction({merchantId:merchant,itemName:'0049 zone',price:'10.01',status:'pending',paymentMethod:'qr_code',splitEnabled:false});
+      const claim=await retail.claim({transactionId:sale.id,merchantId:merchant,shareIndex:0,idempotencyKey:randomUUID()});assert.equal(claim.kind,'claimed');if(claim.kind!=='claimed')throw Error('fixture');
+      assert.ok(await store.prepareRetailExpectation({paymentAttemptId:claim.attempt.id,merchantId:merchant,currency:'NZD',environment:'uat',providerAccount:'synthetic-account'},now));
+      await assert.rejects(zoned.query("UPDATE payment_attempts SET send_started_at=lease_expires_at AT TIME ZONE 'UTC'+interval '1 second' WHERE id=$1",[claim.attempt.id]),{code:'23514'});
+    } finally {await zoned.end();}
+  });
   await check('unbound provider reference cannot attach or settle when independently expected money differs',async()=>{
     const id=await invoice('property'),claim=await one.claimInvoice(claimInput('property',id),now);assert.equal(claim.kind,'claimed');if(claim.kind!=='claimed')throw new Error('fixture_claim');
     await one.markInvoiceSendStarted(claim.attempt.id,now,randomBytes(32).toString('base64url'));

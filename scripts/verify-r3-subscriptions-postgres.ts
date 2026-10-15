@@ -158,6 +158,18 @@ try {
     now=new Date(now.getTime()+31*86400000);await card.recoverActivations();assert.equal(sends,0);assert.equal((await card.confirm(input.merchantId,sessionId))?.activation_satisfied,true);
     assert.deepEqual(await counts(input.subscriptionId),{history:0,events:0,outbox:0});
   });
+  // R3 integration D4 (docs/evidence/remediation-v2-2/r4/R3-INTEGRATION-2026-10-14.md): a card receipt
+  // dead-letters with the same sanitized signal as the reconciliation worker, after commit.
+  await check('integration: a card receipt that dead-letters raises one sanitized signal',async()=>{
+    const input=await fixture(),sessionId=`card-${randomUUID()}`,signals:Array<[string,Record<string,unknown>]>=[];
+    const billing=new DurableSubscriptionBilling(pool,{purchase:async()=>({success:false}),query:async()=>({success:false})},context,clock,()=>false);
+    const card=new DurableSubscriptionCard(pool,new DurablePaymentStorage(pool),{create:async()=>({sessionId}),hostedPage:async()=>undefined,
+      query:async()=>({kind:'mismatch'})},billing,context,'synthetic-return-secret-000000000000000',clock,()=>true,(action,details)=>{signals.push([action,details]);});
+    await card.start({subscriptionId:input.subscriptionId,merchantId:input.merchantId,idempotencyKey:randomUUID(),email:'owner@synthetic.test',baseUrl:'https://synthetic.test'});
+    await card.confirm(input.merchantId,sessionId);
+    assert.deepEqual(signals,[['PAYMENT_RECONCILIATION_DEAD_LETTER',{code:'integrity_mismatch'}]]);
+    assert.equal((await pool.query("SELECT status FROM payment_notification_inbox WHERE session_id=$1 AND kind='poll'",[sessionId])).rows[0].status,'dead_letter');
+  });
   await check('card removal refuses a pending setup before a later verification can replace it',async()=>{
     const {DatabaseStorage,SubscriptionBillingBusyError}=await import('../server/storage'),schema=await import('../shared/schema'),store=new DatabaseStorage(drizzle(pool,{schema}) as any),input=await fixture();
     const billing=new DurableSubscriptionBilling(pool,{purchase:async()=>({success:false}),query:async()=>({success:false})},context,clock,()=>false);

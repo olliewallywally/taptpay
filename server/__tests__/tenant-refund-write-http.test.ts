@@ -77,3 +77,16 @@ test("owner's ordinary refund retains response and balance", async () => {
   expect(provider).toHaveBeenCalledTimes(1);
   expect(res.body).toMatchObject({ success: true, refund: { status: "completed" }, transaction: { id: row.id, totalRefunded: "2.00" } });
 });
+
+// R3 integration (docs/evidence/remediation-v2-2/r4/R3-INTEGRATION-2026-10-14.md): a split sale's
+// transaction ID names only the last paid share's capture, so the legacy route never refunds one.
+test("a split sale is refused before any reservation or provider call", async () => {
+  const { row, provider, send } = await fixture();
+  Object.assign((storage as any).transactions.get(row.id), { isSplit: true, totalSplits: 2, completedSplits: 2 });
+  const before = storageSnapshot();
+  const res = await send();
+  expect(res.status).toBe(409);
+  expect(res.body.code).toBe("REFUND_SPLIT_SALE");
+  expect(provider).not.toHaveBeenCalled();
+  expect(storageSnapshot()).toBe(before);
+});

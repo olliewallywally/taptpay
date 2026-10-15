@@ -6,6 +6,8 @@ import type {PaymentSqlPool,PaymentSqlClient,DurablePaymentStorage} from './dura
 import type {DurableSubscriptionBilling} from './durable-subscription-billing';
 import type {PaymentCommandActor} from './payment-command';
 import {renewalPlan} from './subscription-billing';
+import {writeSecurityAuditEvent} from './security-audit-log';
+import {UNBOUND_DISCOVERY_TRIES} from './payment-reconciliation';
 
 export type CardExpectation={attemptId:string;processorXId:string;reference:string;amountCents:0;currency:'NZD';providerType:'validate';environment:'uat'|'production';providerAccount:string;sessionId?:string};
 export type CardObservation={kind:'pending'}|{kind:'unknown'}|{kind:'mismatch'}|
@@ -31,7 +33,13 @@ export class DurableSubscriptionCard {
   constructor(private readonly pool:PaymentSqlPool,private readonly inbox:DurablePaymentStorage,
     private readonly provider:SubscriptionCardProvider,private readonly billing:DurableSubscriptionBilling,
     private readonly context:{environment:'uat'|'production';providerAccount:string},private readonly returnSecret:string,
-    private readonly clock=()=>new Date(),private readonly enabled=()=>false){}
+    private readonly clock=()=>new Date(),private readonly enabled=()=>false,
+    private readonly audit:(action:string,details:Record<string,unknown>)=>unknown=writeSecurityAuditEvent){}
+  /** D4: the reconciliation worker's sanitized signal, only after the dead-letter commits (R3 integration). */
+  private async deadLetter(claim:InboxClaim,code:'integrity_mismatch'|'retry_exhausted'|'settlement_conflict',cause?:string):Promise<void>{
+    if(await this.inbox.finishInbox(claim,{status:'dead_letter',code},this.clock()))
+      try{this.audit('PAYMENT_RECONCILIATION_DEAD_LETTER',{code,...(cause?{cause}:{})});}catch{/* the inbox row records it */}
+  }
   canStart():boolean{return this.enabled()&&!!this.returnSecret;}
   private async transaction<T>(work:(client:PaymentSqlClient)=>Promise<T>):Promise<T>{
     const client=await this.pool.connect();try{await client.query('BEGIN');await client.query("SET LOCAL lock_timeout='2s'");await client.query("SET LOCAL statement_timeout='5s'");
@@ -123,21 +131,22 @@ export class DurableSubscriptionCard {
   async processReceipt(claim:InboxClaim):Promise<boolean>{
     let row=await this.transaction(async client=>(await client.query('SELECT * FROM subscription_card_attempts WHERE session_id=$1',[claim.sessionId])).rows[0]);
     if(!row && (await this.transaction(async client=>(await client.query('SELECT 1 FROM payment_session_bindings WHERE session_id=$1',[claim.sessionId])).rows.length)))return false;
-    if(!row && this.provider.discoverReference){
+    if(!row && claim.attemptCount<=UNBOUND_DISCOVERY_TRIES && this.provider.discoverReference){
       const reference=await this.provider.discoverReference(claim.sessionId);
       if(reference?.startsWith('SC_'))row=await this.transaction(async client=>(await client.query("SELECT * FROM subscription_card_attempts WHERE reference=$1 AND session_id IS NULL AND send_started_at IS NOT NULL AND state='claiming'",[reference])).rows[0]);
     }
     if(!row)return false;
-    if(row.environment!==this.context.environment||row.provider_account!==this.context.providerAccount){await this.inbox.finishInbox(claim,{status:'dead_letter',code:'integrity_mismatch'},this.clock());return true;}
+    if(row.environment!==this.context.environment||row.provider_account!==this.context.providerAccount){await this.deadLetter(claim,'integrity_mismatch');return true;}
     if(row.applied_at){await this.inbox.finishInbox(claim,{status:'complete',transactionId:row.provider_transaction_id??undefined},this.clock());return true;}
     const observation=await this.provider.query({...this.expectation(row),sessionId:claim.sessionId});
     if(observation.kind==='pending'||observation.kind==='unknown'){
-      await this.inbox.finishInbox(claim,{status:claim.attemptCount>=20?'dead_letter':'retry',code:claim.attemptCount>=20?'retry_exhausted':'provider_pending',nextAttemptAt:new Date(this.clock().getTime()+Math.min(300000,1000*2**Math.min(claim.attemptCount,12)))},this.clock());return true;
+      if(claim.attemptCount>=20){await this.deadLetter(claim,'retry_exhausted','provider_pending');return true;}
+      await this.inbox.finishInbox(claim,{status:'retry',code:'provider_pending',nextAttemptAt:new Date(this.clock().getTime()+Math.min(300000,1000*2**Math.min(claim.attemptCount,12)))},this.clock());return true;
     }
     if(observation.kind==='mismatch'||!isSessionId(observation.transactionId)){
-      await this.inbox.finishInbox(claim,{status:'dead_letter',code:'integrity_mismatch'},this.clock());return true;
+      await this.deadLetter(claim,'integrity_mismatch');return true;
     }
-    if(!row.session_id&&!await this.attach(row.id,claim.sessionId)){await this.inbox.finishInbox(claim,{status:'dead_letter',code:'settlement_conflict'},this.clock());return true;}
+    if(!row.session_id&&!await this.attach(row.id,claim.sessionId)){await this.deadLetter(claim,'settlement_conflict');return true;}
     const recorded=await this.transaction(async client=>{
       const fence=(await client.query(`SELECT id FROM payment_notification_inbox WHERE id=$1 AND status='processing' AND lease_owner=$2 AND attempt_count=$3
         AND lease_expires_at=$4 AND lease_expires_at>GREATEST($5::timestamptz,clock_timestamp()) FOR UPDATE`,[claim.id,claim.owner,claim.attemptCount,claim.leaseExpiresAt,this.clock()])).rows[0];

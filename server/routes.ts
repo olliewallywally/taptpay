@@ -1,6 +1,6 @@
 import {SubscriptionCommandConflict} from './subscription-command';
 import {getPaymentRuntime} from './payment-runtime-default';
-import {createDurablePaymentNotificationHandlers} from './durable-payment-notification';
+import {createDurablePaymentNotificationHandlers,NotificationRateLimiter} from './durable-payment-notification';
 import {extractWindcaveNotificationSession} from './payment-notification-paths';
 import {createRetailCheckoutHandlers} from './payment-checkout-handlers';
 import {createInvoiceCheckoutHandlers} from './invoice-checkout-handlers';
@@ -444,10 +444,11 @@ export async function registerRoutes(app: Express,options:{storage?:IStorage;pay
   const invoiceCheckoutHandlers=createInvoiceCheckoutHandlers({runtime:paymentRuntime,getCheckoutInvoiceByToken,
     customerEmail:async invoice=>{const party=await getCheckoutParty(invoice);if(!party)throw new Error('invoice_party_unavailable');return party.email??'payer@taptpay.co.nz';},
     baseUrl:getBaseUrl,checkRateLimit:tokenRateLimit});
+  const notificationRateLimiter=new NotificationRateLimiter();
   const durableNotificationHandlers=createDurablePaymentNotificationHandlers({receive:async(sessionId,kind)=>{
     if(!paymentRuntime)throw new Error('durable_receipt_unavailable');
     return paymentRuntime.repository.receive(sessionId,kind);
-  }},extractWindcaveNotificationSession,{allowGet:true});
+  }},extractWindcaveNotificationSession,{allowGet:true,limiter:notificationRateLimiter});
 
   app.get("/robots.txt", (_req, res) => {
     res.type("text/plain").send(
@@ -4652,6 +4653,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // Check if transaction can be refunded (allow partially_refunded for further partial refunds)
       if (transaction.status !== "completed" && transaction.status !== "partially_refunded") {
         return res.status(400).json({ message: "Only completed transactions can be refunded" });
+      }
+      // R3 integration: a split sale's transaction ID names only the last paid share's capture. Per-share
+      // refunds wait for R4; until then a split sale is never refunded through this route.
+      if (transaction.isSplit) {
+        return res.status(409).json({ code: "REFUND_SPLIT_SALE", message: "A split bill cannot be refunded here yet" });
       }
       if (!isWindcaveConfigured() || !transaction.windcaveTransactionId) {
         return res.status(503).json({

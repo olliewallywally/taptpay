@@ -20,7 +20,7 @@ describe("R0-T5 callback containment", () => {
     if (withSession) await storage.updateTransactionWindcaveSession(transaction.id, "synthetic-persisted-session", "pending", "synthetic-x-id");
     // logTransactionEvent is a MemStorage no-op, so an event write would be
     // invisible to any state comparison; it needs an explicit spy.
-    const writes = ["updateTransactionSessionState", "updateTransactionStatus", "updateSplitPaymentStatus", "incrementTransactionCount", "logTransactionEvent"] as const;
+    const writes = ["updateTransactionSessionState", "updateTransactionStatus", "incrementTransactionCount", "logTransactionEvent"] as const;
     const spies = writes.map(name => jest.spyOn(storage, name));
     return { transaction, spies };
   }

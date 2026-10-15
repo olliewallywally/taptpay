@@ -9,6 +9,8 @@ const EVIDENCE_FIELDS:ReadonlyArray<[keyof ProviderExpectation,MismatchField]>=[
   ['reference','reference'],['environment','environment'],['providerAccount','account'],
 ];
 
+export const UNBOUND_DISCOVERY_TRIES=3;
+
 /** H-3: the sanitized field a mismatch is reported under (R2-T6), never a value. */
 function mismatchField(expected:ProviderExpectation,result:ProviderQueryResult):MismatchField|'evidence' {
   if(result?.kind==='mismatch')return result.field??'evidence';
@@ -44,7 +46,9 @@ export class PaymentReconciliationWorker {
       if(claim.attemptCount>20){await this.deadLetter(claim,'retry_exhausted');return true;}
       if(this.separateDomain&&await this.separateDomain(claim))return true;
       let expected = await this.repository.resolveSession(claim.sessionId);
-      if(!expected && this.provider.discoverReference && this.repository.findUnboundSessionCandidate && this.repository.attachRecoveredSession){
+      // An unknown session is looked up only on its first tries, so a forged ID costs a bounded
+      // number of provider queries (R3 integration).
+      if(!expected && claim.attemptCount<=UNBOUND_DISCOVERY_TRIES && this.provider.discoverReference && this.repository.findUnboundSessionCandidate && this.repository.attachRecoveredSession){
         const reference=await this.provider.discoverReference(claim.sessionId);
         const candidate=reference?await this.repository.findUnboundSessionCandidate(claim.sessionId,reference):undefined;
         if(candidate){

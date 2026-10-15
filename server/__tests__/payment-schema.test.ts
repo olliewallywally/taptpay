@@ -61,7 +61,7 @@ describe("Phase 2 Drizzle schema", () => {
       "payment_attempts_return_state_expiry_check",
       "payment_attempts_return_state_hash_shape_check",
       "payment_attempts_return_state_pair_check",
-      "payment_attempts_send_started_check",
+      "payment_attempts_send_started_utc_check",
       "payment_attempts_share_index_check",
       "payment_attempts_state_check",
     ]);

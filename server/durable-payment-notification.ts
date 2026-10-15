@@ -1,17 +1,37 @@
 import express, { type ErrorRequestHandler, type RequestHandler } from "express";
 import { isSessionId } from "./durable-payment-contract";
 
+/** R3 integration: a fixed-window count per caller address, in process, in addition to any
+ * infrastructure limit. Windcave retries a notification it could not deliver. */
+export class NotificationRateLimiter {
+  private readonly counters=new Map<string,{count:number;resetAt:number}>();
+  constructor(readonly windowMs=60_000,private readonly limit=120){}
+  allow(key:string,now=Date.now()):boolean{
+    const current=this.counters.get(key);
+    if(!current || current.resetAt<=now){
+      this.counters.set(key,{count:1,resetAt:now+this.windowMs});
+      if(this.counters.size>=1000)for(const [name,counter] of this.counters)if(counter.resetAt<=now)this.counters.delete(name);
+      return true;
+    }
+    if(current.count>=this.limit)return false;
+    current.count++;return true;
+  }
+}
+
 /** Mount before global body parsers. R2 supplies extraction for the documented
  * provider format; this module does not guess aliases or trust outcome fields. */
 export function createDurablePaymentNotificationHandlers(
   repository: {receive(sessionId:string,kind:"fprn"):Promise<string>},
   extractSession: (body: unknown) => unknown,
-  options:{allowGet?:boolean}={},
+  options:{allowGet?:boolean;limiter?:NotificationRateLimiter}={},
 ) {
   const validate:RequestHandler=(req,res,next)=>{
     res.set({'Cache-Control':'private, no-store','Referrer-Policy':'no-referrer'});
     if(req.method!=='POST' && !(options.allowGet && req.method==='GET')) {res.setHeader('Allow',options.allowGet?'GET, POST':'POST');res.status(405).send('Method not allowed');return;}
     if(req.body!==undefined) {res.status(503).send('Notification parser unavailable');return;}
+    if(options.limiter && !options.limiter.allow(req.ip || 'unknown')) {
+      res.setHeader('Retry-After',String(Math.ceil(options.limiter.windowMs/1000)));res.status(429).send('Too many notifications');return;
+    }
     if(req.method==='GET') {
       if(req.originalUrl.length>8192 || Object.keys(req.query).length>20) {res.status(413).send('Invalid notification');return;}
       if(req.headers['transfer-encoding'] || Number(req.headers['content-length']??0)>0) {res.status(400).send('Invalid notification');return;}

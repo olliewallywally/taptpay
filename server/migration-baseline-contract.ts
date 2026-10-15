@@ -672,6 +672,9 @@ export const BASELINE_EFFECT_REQUIREMENTS: readonly Requirement[] = [
   r("0048_refund_operations.sql", "index", "refunds", "refunds_reconciliation_due_idx"),
   r("0048_refund_operations.sql", "function", "", "taptpay_refund_operation_guard"),
   r("0048_refund_operations.sql", "trigger", "refunds", "refund_operation_guard"),
+  r("0049_retail_identity_hardening.sql", "function", "", "taptpay_r3_retail_identity_written_once"),
+  r("0049_retail_identity_hardening.sql", "trigger", "payment_attempts", "retail_identity_written_once"),
+  r("0049_retail_identity_hardening.sql", "constraint", "payment_attempts", "payment_attempts_send_started_utc_check"),
 ];
 
 export const FIND_MISSING_BASELINE_EFFECTS_SQL = `

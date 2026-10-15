@@ -970,7 +970,6 @@ export interface IStorage extends PaymentAttemptRepository {
   createSplitPayment(data: any): Promise<any>;
   getSplitPaymentsByTransaction(transactionId: number): Promise<any[]>;
   getSplitPaymentById(id: number): Promise<any | undefined>;
-  updateSplitPaymentStatus(id: number, status: string, windcaveTransactionId?: string): Promise<any>;
   getNextPendingSplit(transactionId: number): Promise<any | undefined>;
   
   // Platform revenue is subscription MRR — TaptPay takes no cut of merchant
@@ -1183,7 +1182,6 @@ export interface IStorage extends PaymentAttemptRepository {
   createSplitPayment(data: any): Promise<any>;
   getSplitPaymentsByTransaction(transactionId: number): Promise<any[]>;
   getSplitPaymentById(id: number): Promise<any | undefined>;
-  updateSplitPaymentStatus(id: number, status: string, windcaveTransactionId?: string): Promise<any>;
   getNextPendingSplit(transactionId: number): Promise<any | undefined>;
 
   // ── Property management vertical ──────────────────────────────────────────
@@ -3031,44 +3029,6 @@ export class MemStorage implements IStorage {
 
   async getSplitPaymentById(id: number): Promise<any | undefined> {
     return this.splitPayments.get(id);
-  }
-
-  async updateSplitPaymentStatus(id: number, status: string, windcaveTransactionId?: string): Promise<any> {
-    const splitPayment = this.splitPayments.get(id);
-    if (!splitPayment) return undefined;
-    const now = new Date();
-
-    const updatedSplit = {
-      ...splitPayment,
-      status,
-      windcaveTransactionId: windcaveTransactionId || splitPayment.windcaveTransactionId,
-      paidAt: status === "completed" ? splitPayment.paidAt ?? now : splitPayment.paidAt,
-    };
-    
-    this.splitPayments.set(id, updatedSplit);
-
-    // If this split is completed, update the main transaction
-    if (status === "completed") {
-      const transaction = this.transactions.get(splitPayment.transactionId);
-      if (transaction) {
-        const allSplits = await this.getSplitPaymentsByTransaction(splitPayment.transactionId);
-        const completedSplits = allSplits.filter(s => s.status === "completed").length;
-        
-        const updatedTransaction = {
-          ...transaction,
-          completedSplits: completedSplits,
-          status: completedSplits >= (transaction.totalSplits ?? 1) ? "completed" : "pending",
-          completedAt:
-            completedSplits >= (transaction.totalSplits ?? 1)
-              ? transaction.completedAt ?? now
-              : transaction.completedAt,
-        };
-        
-        this.transactions.set(splitPayment.transactionId, updatedTransaction);
-      }
-    }
-
-    return updatedSplit;
   }
 
   async getNextPendingSplit(transactionId: number): Promise<any | undefined> {
@@ -7709,55 +7669,6 @@ export class DatabaseStorage implements IStorage {
       return split;
     } catch (error) {
       console.error("Database error in getSplitPaymentById:", error);
-      return undefined;
-    }
-  }
-
-  async updateSplitPaymentStatus(id: number, status: string, windcaveTransactionId?: string): Promise<any> {
-    try {
-      const now = new Date();
-      // Update the split payment
-      const [updatedSplit] = await this.db!
-        .update(splitPayments)
-        .set({
-          status,
-          windcaveTransactionId: windcaveTransactionId || undefined,
-          paidAt: status === "completed" ? now : undefined,
-        })
-        .where(eq(splitPayments.id, id))
-        .returning();
-
-      if (status === "completed" && updatedSplit) {
-        // Get all splits for this transaction to check if all are completed
-        const allSplits = await this.getSplitPaymentsByTransaction(updatedSplit.transactionId!);
-        const completedSplits = allSplits.filter(s => s.status === "completed").length;
-        
-        // Get the transaction to check total splits
-        const [transaction] = await this.db!
-          .select()
-          .from(transactions)
-          .where(eq(transactions.id, updatedSplit.transactionId!));
-        
-        if (transaction) {
-          const finalStatus = completedSplits >= (transaction.totalSplits ?? 1) ? "completed" : "pending";
-          
-          // Update the main transaction
-          await this.db!
-            .update(transactions)
-            .set({
-              completedSplits: completedSplits,
-              status: finalStatus,
-              ...(finalStatus === "completed"
-                ? { completedAt: sql`coalesce(${transactions.completedAt}, ${now})` }
-                : {}),
-            })
-            .where(eq(transactions.id, updatedSplit.transactionId!));
-        }
-      }
-
-      return updatedSplit;
-    } catch (error) {
-      console.error("Database error in updateSplitPaymentStatus:", error);
       return undefined;
     }
   }
