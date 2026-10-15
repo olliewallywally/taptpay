@@ -9,7 +9,6 @@
  * R1-T4 phase E: the session is the browser's HttpOnly cookie; the start-up check
  * (GET /api/auth/session) says who it signs in.
  */
-jest.mock("@/plugins/TaptPayPlugin", () => ({}));
 jest.mock("@/pages/landing-page", () => ({ LandingPage: () => null }));
 jest.mock("@/pages/login", () => ({ __esModule: true, default: () => null }));
 jest.mock("@/pages/app-login", () => ({ __esModule: true, default: () => null }));

@@ -1,6 +1,7 @@
 import type { ReactElement, ReactNode } from "react";
 
 import RetailTerminalViewCore from "./RetailTerminalViewCore.jsx";
+import { canTapToPay } from '@/lib/native';
 import "../terminal-keyframes.css";
 import "../terminal-tokens.css";
 import "./retail-terminal-view.css";
@@ -142,7 +143,7 @@ export interface RetailTerminalViewProps {
  * supplied by the owning controller through the capability props above.
  */
 export function RetailTerminalView(props: RetailTerminalViewProps): ReactElement {
-  return <RetailTerminalViewCore {...props} />;
+  return <RetailTerminalViewCore {...props} showPaywave={props.showPaywave === true && canTapToPay()} />;
 }
 
 export default RetailTerminalView;

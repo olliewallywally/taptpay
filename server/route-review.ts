@@ -1882,7 +1882,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     branches: [{ principal: "public", tenant: "none", tenantRule: "none: the platform's own settings" }],
     input: "nothing (the User-Agent is no longer read: R0-T5)",
     capability:
-      "reports config.features.tapToPay (Tap to Pay's switch) and nothing else; the wallets always report false, their routes being retired",
+      "server/routes.ts uses shared/payment-capabilities.ts: locked D13 reports contactless false independently of user agent, proxy or environment flag; retired wallets also report false",
     entitlement: null,
     idempotency: "read-only",
     sideEffects: null,
@@ -1890,7 +1890,7 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
     errorDisclosure: ["fixed"],
     controls: CONFIGURATION_CONTROLS,
     findings: [
-      "Only pages mounted nowhere ask for it (merchant-terminal.tsx, merchant-terminal-mobile.tsx; the stale bundles under client/public/app too). Retire it with them (dead code, R8).",
+      "Legacy terminals still query this endpoint; R7 keeps its response truthfully unavailable and removes their simulated payment paths.",
     ],
   },
 
@@ -3049,31 +3049,15 @@ export const ROUTE_REVIEW: Record<string, RouteReview> = {
   },
 
   "POST /api/transactions/tap-to-pay": {
-    branches: [
-      {
-        principal: "merchant",
-        roles: ["owner", "member"],
-        platformAdmin: true,
-        tenant: "path-merchant",
-        tenantRule: `the business named in the body (merchantId), checked with ${SIGNED_IN_BUSINESS_RULE}; getTransactionForMerchant scopes the named sale (404 otherwise); pending state is 409; create/status/method writes require explicit tenant scope and a refused outcome write returns reconciliation-required 503 without stale-row success. Native capability remains off`,
-      },
-    ],
-    input:
-      "strict tapToPayRequestSchema: positive safe-integer merchantId and optional transactionId; amount is a JSON number or decimal string from 0.01 to 99999999.99 with at most two decimals, canonicalized to a two-decimal string; optional nonblank string windcaveToken, required once the provider is configured. The stored charge amount is validated by the same money schema before any provider call",
-    capability: "Tap to Pay must be on (config.features.tapToPay: 503 TAP_TO_PAY_DISABLED otherwise), and the provider configured (isWindcaveConfigured: 503 otherwise)",
-    entitlement: "paid access (requireBillingCard: 402 BILLING_CARD_REQUIRED otherwise)",
-    idempotency:
-      "charges the named pending sale's stored price, or the business's newest pending sale, or, with none, a new sale for the amount sent; a sale no longer pending is 409. Nothing stops the same request finishing a different pending sale or making a new one when repeated",
-    sideEffects:
-      "opens an attended session at the provider and submits the phone's card token to it (createAttendedSession, submitTapToPayToken); a live update on approval (sseBroker, via broadcastToStone); a push notification either way (sendPushToMerchant)",
-    successDto: "{ approved, transactionId }",
-    errorDisclosure: ["provider-text"],
-    findings: [
-      "A provider failure answers with the provider's own error text (`Failed to create attended session: …`, `Payment processor error: …`, from sessionResult.error and paymentResult.error), to a signed-in login of the business (R2's provider boundary).",
-      "Strict input and stored-price validation are in place. It stays off (TAP_TO_PAY_DISABLED) until the iPhone hardware work (R7).",
-      "No idempotency: without a transactionId, a repeat finishes whatever is pending next, or charges a new sale for the amount sent (R3's payment attempts).",
-      ADMIN_MONEY,
-    ],
+    branches: [{ principal: "merchant", roles: ["owner", "member"], platformAdmin: true,
+      tenant: "path-merchant", tenantRule: `the business named in the validated body (merchantId), checked with ${SIGNED_IN_BUSINESS_RULE}. D13 refuses before any transaction/billing/provider access` }],
+    input: "strict tapToPayRequestSchema retains safe IDs, bounded decimal amounts and optional nonblank token validation; malformed input is 400",
+    capability: "server/routes.ts unconditionally returns 503 TAP_TO_PAY_DISABLED for valid owned requests. D13 is locked off; bare FEATURE_TAP_TO_PAY=true is rejected in server/config.ts",
+    entitlement: null,
+    idempotency: "retries/concurrency remain unavailable with zero effects",
+    sideEffects: null,
+    successDto: "none; only fixed unavailable/error responses",
+    errorDisclosure: ["fixed"], findings: [],
   },
 
   "POST /api/transactions/:id/cancel": {

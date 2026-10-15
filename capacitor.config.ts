@@ -7,15 +7,9 @@ const config: CapacitorConfig = {
   server: {
     url: "https://taptpay.co.nz/app-login",
     cleartext: false,
-    allowNavigation: [
-      "*.taptpay.co.nz",
-      "*.replit.app",
-      "*.repl.co",
-      "*.windcave.com",
-      "pay.google.com",
-      "apple.com",
-      "*.apple.com",
-    ],
+    // Keep the existing cookie-bound Apple sign-in in this WebView (see
+    // server/apple-sign-in.ts); every other external navigation stays outside it.
+    allowNavigation: ["appleid.apple.com"],
   },
   ios: {
     backgroundColor: "#0055FF",

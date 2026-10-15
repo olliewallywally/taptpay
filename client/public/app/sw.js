@@ -1,5 +1,5 @@
-const CACHE_NAME = 'taptpay-v3';
-const STATIC_CACHE = 'taptpay-static-v3';
+const CACHE_NAME = 'taptpay-v4';
+const STATIC_CACHE = 'taptpay-static-v4';
 
 const STATIC_ASSETS = [
   '/icons/icon-192x192.png',
@@ -25,6 +25,29 @@ self.addEventListener('activate', (event) => {
     }).then(() => self.clients.claim())
   );
 });
+
+// A financial event is claimed durably before display. An uncertain display
+// after a worker crash is not repeated; the app's stored payment remains the
+// authoritative result. Keep IDs longer than a push service's delivery TTL.
+function claimPaymentNotification(eventId) {
+  if(!eventId)return Promise.resolve(true);
+  if(typeof eventId!=='string'||!/^[0-9a-f-]{36}$/i.test(eventId)||typeof indexedDB==='undefined')return Promise.resolve(false);
+  return new Promise(resolve=>{
+    let open;try{open=indexedDB.open('taptpay-payment-notifications',1);}catch{resolve(false);return;}
+    open.onupgradeneeded=()=>{open.result.createObjectStore('events',{keyPath:'id'});};
+    open.onerror=()=>resolve(false);
+    open.onblocked=()=>resolve(false);
+    open.onsuccess=()=>{
+      const db=open.result;let tx,store;
+      try{tx=db.transaction('events','readwrite');store=tx.objectStore('events');}catch{db.close();resolve(false);return;}
+      store.add({id:eventId,createdAt:Date.now()});
+      tx.oncomplete=()=>{db.close();resolve(true);};
+      tx.onabort=()=>{db.close();resolve(false);};tx.onerror=()=>{};
+      const cutoff=Date.now()-35*86400000,cursor=store.openCursor();
+      cursor.onsuccess=()=>{const row=cursor.result;if(!row)return;if(row.value.createdAt<cutoff)row.delete();row.continue();};
+    };
+  });
+}
 
 self.addEventListener('push', (event) => {
   if (!event.data) return;
@@ -65,7 +88,7 @@ self.addEventListener('push', (event) => {
   };
 
   event.waitUntil(
-    self.registration.showNotification(payload.title || 'TaptPay', options)
+    claimPaymentNotification(payload.data?.eventId).then(claimed=>claimed?self.registration.showNotification(payload.title || 'TaptPay', options):undefined)
   );
 });
 
@@ -100,6 +123,25 @@ self.addEventListener('fetch', (event) => {
 
   if (request.method !== 'GET') return;
   if (url.pathname.startsWith('/api/')) return;
+
+  if (url.pathname.startsWith('/assets/')) {
+    // Vite build output is content-hashed (index-B1PJVunW.js), so a cached
+    // copy can never be stale — serve cache-first for instant repeat loads
+    // and only hit the network for files we've never seen.
+    event.respondWith(
+      caches.open(STATIC_CACHE).then((cache) =>
+        cache.match(request).then(
+          (hit) =>
+            hit ||
+            fetch(request).then((response) => {
+              if (response.ok) cache.put(request, response.clone());
+              return response;
+            })
+        )
+      )
+    );
+    return;
+  }
 
   if (url.pathname.match(/\.(js|css|woff2?|ttf|eot|svg|png|jpg|jpeg|gif|ico)$/)) {
     // Network-first with cache fallback: always try to get the freshest

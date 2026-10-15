@@ -1,3 +1,4 @@
+import { TAP_TO_PAY_UNAVAILABLE } from "@shared/payment-capabilities";
 import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -17,7 +18,7 @@ import { useDeviceStatusMonitoring, useSSEConnectionMonitoring } from "@/compone
 import { MerchantGate } from "@/components/merchant-gate";
 import { Send, Loader2, CheckCircle, Clock, XCircle, QrCode, Smartphone, Edit, Split, MoreHorizontal, Menu, X, Waves, ChevronDown, Copy, Check, CreditCard } from "lucide-react";
 import { Link } from "wouter";
-import { isNativeIOS, canTapToPay } from "@/lib/native";
+import { canTapToPay } from "@/lib/native";
 import { sessionFetch } from "@/lib/session";
 import { logOut } from "@/lib/log-out";
 
@@ -45,19 +46,15 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
   const [qrCollapsed, setQrCollapsed] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  
+
   // NFC-specific states
   const [nfcCapabilities, setNfcCapabilities] = useState<any>(null);
   const [nfcPaymentStatus, setNfcPaymentStatus] = useState<"idle" | "creating" | "ready" | "processing" | "completed" | "failed">("idle");
-  const [nfcSession, setNfcSession] = useState<any>(null);
-  const [showNfcOverlay, setShowNfcOverlay] = useState(false);
   const [showQrDropdown, setShowQrDropdown] = useState(false);
-  
+
   // Tap to Pay states
   const [tapToPayStatus, setTapToPayStatus] = useState<"idle" | "waiting" | "processing" | "completed" | "failed">("idle");
-  const [tapToPayApproved, setTapToPayApproved] = useState<boolean | null>(null);
-  const [showTapToPayOverlay, setShowTapToPayOverlay] = useState(false);
-  
+
   // Tapt Stone states
   const [selectedStoneId, setSelectedStoneId] = useState<number | null>(null);
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
@@ -125,15 +122,15 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  
+
   useEffect(() => {
     const checkScreenSize = () => {
       setIsMobile(window.innerWidth < 768);
     };
-    
+
     checkScreenSize();
     window.addEventListener('resize', checkScreenSize);
-    
+
     return () => window.removeEventListener('resize', checkScreenSize);
   }, []);
 
@@ -145,7 +142,7 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
           const response = await sessionFetch('/api/nfc/capabilities');
           const capabilities = await response.json();
           setNfcCapabilities(capabilities);
-          
+
           if (!capabilities.nfcSupported) {
             toast({
               title: "NFC Not Supported",
@@ -157,7 +154,7 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
           console.error('Failed to check NFC capabilities:', error);
         }
       };
-      
+
       checkNfcCapabilities();
     }
   }, [activeTab, nfcCapabilities, toast]);
@@ -351,191 +348,18 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
   };
 
   // NFC Payment Functions
-  const createNFCPayment = async () => {
-    const transaction = currentTransaction
-      ?? (activeTransaction?.status === 'pending' || activeTransaction?.status === 'processing'
-        ? activeTransaction : null);
-    if (!transaction) {
-      toast({
-        title: "No Transaction",
-        description: "Create a transaction first to enable NFC payment.",
-        variant: "destructive",
-      });
-      return;
-    }
+  const createNFCPayment = () => { toast({ title: "Tap to Pay unavailable", description: TAP_TO_PAY_UNAVAILABLE, variant: "destructive" }); };
 
-    setNfcPaymentStatus("creating");
-    
-    try {
-      const response = await apiRequest("POST", `/api/merchants/${merchantId}/nfc-pay`, {
-        amount: parseFloat(transaction.price),
-        itemName: transaction.itemName,
-        deviceId: navigator.userAgent,
-        nfcCapabilities: nfcCapabilities
-      });
 
-      const result = await response.json();
-      setNfcSession(result.nfcSession);
-      setNfcPaymentStatus("ready");
-      setShowNfcOverlay(true);
-      
-      toast({
-        title: "Payment Terminal Ready",
-        description: "Ask customer to tap their card or digital wallet.",
-      });
-    } catch (error) {
-      console.error('NFC payment creation failed:', error);
-      setNfcPaymentStatus("failed");
-      toast({
-        title: "Payment Failed",
-        description: "Could not create NFC payment session.",
-        variant: "destructive",
-      });
-    }
-  };
 
-  const simulateNFCTap = async () => {
-    if (!nfcSession) return;
-    
-    setNfcPaymentStatus("processing");
-    
-    try {
-      // Simulate processing delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      const response = await sessionFetch(`/api/nfc-sessions/${nfcSession.sessionId}/complete`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          paymentMethod: 'contactless_card',
-          cardLast4: '4532',
-          deviceId: navigator.userAgent
-        }),
-      });
 
-      if (!response.ok) {
-        throw new Error('Failed to complete NFC payment');
-      }
 
-      setNfcPaymentStatus("completed");
-      
-      toast({
-        title: "Payment Received!",
-        description: `Customer paid $${nfcSession.amount} successfully`,
-      });
 
-      // Auto-reset after showing success
-      setTimeout(() => {
-        resetNfcPayment();
-      }, 4000);
-
-    } catch (error) {
-      console.error('NFC payment failed:', error);
-      setNfcPaymentStatus("failed");
-      
-      toast({
-        title: "Payment Failed",
-        description: "Ask customer to try tapping again or use different payment method.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const resetNfcPayment = () => {
-    setNfcPaymentStatus("idle");
-    setNfcSession(null);
-    setShowNfcOverlay(false);
-  };
-
-  const closeNfcOverlay = () => {
-    setShowNfcOverlay(false);
-    resetNfcPayment();
-  };
 
   // Tap to Pay (Paywave) — iOS native bridge
-  const startTapToPayPayment = async () => {
-    const transaction = currentTransaction
-      ?? (activeTransaction?.status === 'pending' || activeTransaction?.status === 'processing'
-        ? activeTransaction : null);
-    if (!transaction) {
-      toast({ title: "No Transaction", description: "Create a transaction first.", variant: "destructive" });
-      return;
-    }
+  const startTapToPayPayment = () => { toast({ title: "Tap to Pay unavailable", description: TAP_TO_PAY_UNAVAILABLE, variant: "destructive" }); };
 
-    setTapToPayStatus("waiting");
-    setTapToPayApproved(null);
-    setShowTapToPayOverlay(true);
 
-    try {
-      let bridgeResult: { approved: boolean; token?: string; cancelled?: boolean; error?: string };
-
-      if (canTapToPay()) {
-        bridgeResult = await window.TaptPay!.startTapToPay({
-          amount: parseFloat(transaction.price),
-          currency: "NZD",
-          merchantName: merchant?.businessName || "TaptPay",
-        });
-      } else if (import.meta.env.DEV) {
-        // Dev-only simulation fallback — native bridge not available in browser preview
-        await new Promise(r => setTimeout(r, 2000));
-        bridgeResult = { approved: true, token: `SIM_TOKEN_${Date.now()}` };
-      } else {
-        // Production: bridge is required — Paywave should only be accessible in the iOS app
-        setTapToPayStatus("idle");
-        setShowTapToPayOverlay(false);
-        toast({ title: "Not available", description: "Tap to Pay requires the TaptPay iOS app.", variant: "destructive" });
-        return;
-      }
-
-      if (bridgeResult.cancelled) {
-        setTapToPayStatus("idle");
-        setShowTapToPayOverlay(false);
-        toast({ title: "Cancelled", description: "Tap to Pay was cancelled." });
-        return;
-      }
-
-      setTapToPayStatus("processing");
-      const response = await sessionFetch("/api/transactions/tap-to-pay", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          merchantId,
-          transactionId: transaction.id,
-          amount: parseFloat(transaction.price),
-          windcaveToken: bridgeResult.token,
-        }),
-      });
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.message || `Processor error (${response.status})`);
-      }
-
-      const data = await response.json();
-      setTapToPayApproved(data.approved);
-      setTapToPayStatus(data.approved ? "completed" : "failed");
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "active-transaction"] });
-
-      setTimeout(() => {
-        setShowTapToPayOverlay(false);
-        setTapToPayStatus("idle");
-        setTapToPayApproved(null);
-      }, 3500);
-    } catch (err: any) {
-      console.error("Tap to Pay error:", err);
-      setTapToPayStatus("failed");
-      setTapToPayApproved(false);
-      toast({ title: "Payment error", description: err?.message || "Tap to Pay failed", variant: "destructive" });
-    }
-  };
-
-  const closeTapToPayOverlay = () => {
-    setShowTapToPayOverlay(false);
-    setTapToPayStatus("idle");
-    setTapToPayApproved(null);
-  };
 
   // Gap 12: copy handler for the private per-payment share-link overlay.
   const copyShareLinkToClipboard = async (url: string) => {
@@ -567,7 +391,7 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
             <Clock className="absolute inset-2 w-8 h-8 text-[#00FF66]/70" />
           </div>
         )}
-        
+
         {status === "processing" && (
           <div className="relative w-12 h-10">
             {/* Animated ring only when processing */}
@@ -575,7 +399,7 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
             <div className="absolute inset-0 rounded-full border-3 border-transparent border-t-[#00FF66] animate-spin duration-700"></div>
           </div>
         )}
-        
+
         {status === "completed" && (
           <div className="relative w-12 h-10 flex items-center justify-center">
             {/* Success tick with smooth transition */}
@@ -583,7 +407,7 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
             <CheckCircle className="w-6 h-6 text-[#00FF66] animate-[scaleIn_0.5s_ease-in-out]" />
           </div>
         )}
-        
+
         {status === "failed" && (
           <div className="relative w-12 h-10 flex items-center justify-center">
             {/* Failed X with smooth transition */}
@@ -783,7 +607,7 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
             >
               QR
             </button>
-            <button
+            {canTapToPay() && (<button
               onClick={() => setActiveTab("NFC")}
               className={`px-6 py-2 rounded-md font-medium transition-all duration-200 ${
                 activeTab === "NFC"
@@ -792,8 +616,8 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
               }`}
             >
               NFC
-            </button>
-            {isNativeIOS() && (
+            </button>)}
+            {canTapToPay() && (
               <button
                 onClick={() => setActiveTab("TAP")}
                 className={`px-4 py-2 rounded-md font-medium transition-all duration-200 flex items-center gap-1 ${
@@ -847,7 +671,7 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
                 <Send size={24} />
                 <span className="text-xs mt-1 font-medium">Send</span>
               </button>
-              
+
               <button
                 onClick={() => handleActionClick("edit")}
                 className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 ${
@@ -862,7 +686,7 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
                 <Edit size={24} />
                 <span className="text-xs mt-1 font-medium">Edit</span>
               </button>
-              
+
               <button
                 onClick={() => handleActionClick("split")}
                 className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 ${
@@ -877,7 +701,7 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
                 <Split size={24} />
                 <span className="text-xs mt-1 font-medium">Split</span>
               </button>
-              
+
               <button
                 onClick={() => handleActionClick("more")}
                 className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 ${
@@ -944,7 +768,7 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
                           </FormItem>
                         )}
                       />
-                      
+
                       <FormField
                         control={form.control}
                         name="selectedStoneId"
@@ -970,7 +794,7 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
                           </FormItem>
                         )}
                       />
-                      
+
                       <Button
                         type="submit"
                         disabled={createTransactionMutation.isPending}
@@ -1014,7 +838,7 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
                   <h3 className="text-base font-semibold mb-2 text-white">
                     {activeTab === "NFC" ? "NFC Payment" : "Share Payment"}
                   </h3>
-                  
+
                   {activeTab === "NFC" ? (
                     // NFC Payment Options
                     <div className="space-y-2">
@@ -1058,7 +882,7 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
                     // QR Payment Link Sharing
                     <div className="space-y-4">
                       <p className="text-gray-300 mb-4">Copy the payment link to share with customers</p>
-                      
+
                       {/* Stone Selection */}
                       {taptStones && taptStones.length > 0 && (
                         <div className="space-y-3">
@@ -1093,7 +917,7 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
                           </div>
                         </div>
                       )}
-                      
+
                       {/* Fallback for no stones */}
                       {(!taptStones || taptStones.length === 0) && (
                         <Button
@@ -1210,19 +1034,19 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
                               const downloadUrl = `/api/merchants/${merchantId}/stone/${stone.id}/qr?size=800&download=true`;
                               const response = await fetch(downloadUrl);
                               if (!response.ok) throw new Error('Failed to fetch QR code');
-                              
+
                               const blob = await response.blob();
                               const url = window.URL.createObjectURL(blob);
-                              
+
                               const link = document.createElement('a');
                               link.href = url;
                               link.download = `tapt-payment-qr-stone-${stone.stoneNumber}.png`;
                               document.body.appendChild(link);
                               link.click();
-                              
+
                               document.body.removeChild(link);
                               window.URL.revokeObjectURL(url);
-                              
+
                               toast({
                                 title: "QR Code Downloaded",
                                 description: `Stone ${stone.stoneNumber} QR code saved to downloads`,
@@ -1286,7 +1110,7 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
             </div>
           </div>
         )}
-        
+
         {/* NFC Section */}
         {activeTab === "NFC" && (
           <div className="px-6 pb-32" style={{ minHeight: '400px' }}>
@@ -1375,7 +1199,7 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
         )}
 
         {/* Tap to Pay (Paywave) Section — iOS only */}
-        {activeTab === "TAP" && isNativeIOS() && (
+        {activeTab === "TAP" && canTapToPay() && (
           <div className="px-6 pb-32" style={{ minHeight: '400px' }}>
             <div
               className="rounded-2xl p-6 transition-all duration-300 mt-4"
@@ -1419,207 +1243,10 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
         )}
 
         {/* Tap to Pay Overlay */}
-        {showTapToPayOverlay && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center"
-            style={{ backgroundColor: '#0a0a0a' }}
-          >
-            <button
-              onClick={closeTapToPayOverlay}
-              className="absolute top-6 right-6 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors z-10"
-            >
-              <X className="h-4 w-4 text-white/70" />
-            </button>
 
-            <div
-              className="backdrop-blur-xl rounded-3xl p-12 max-w-sm w-full mx-8 text-center shadow-2xl"
-              style={{
-                background: 'linear-gradient(135deg, rgba(0, 255, 102, 0.12) 0%, rgba(0, 255, 102, 0.05) 100%)',
-                border: '1px solid rgba(0, 255, 102, 0.3)',
-                boxShadow: '0 25px 50px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(0, 255, 102, 0.2)',
-              }}
-            >
-              {tapToPayStatus === "waiting" && (
-                <div className="space-y-8">
-                  <div
-                    className="mx-auto w-24 h-24 rounded-full flex items-center justify-center"
-                    style={{ border: '2px solid rgba(0,255,102,0.4)', background: 'rgba(0,255,102,0.08)' }}
-                  >
-                    <Waves className="w-10 h-10 animate-pulse" style={{ color: '#00FF66' }} />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="text-2xl font-light text-white">Hold to Card</div>
-                    <div className="text-white/60 text-base">Hold the top of your iPhone near the customer's card or device</div>
-                  </div>
-                </div>
-              )}
-
-              {tapToPayStatus === "processing" && (
-                <div className="space-y-8">
-                  <div className="mx-auto w-16 h-16 rounded-full bg-white/10 border border-white/20 flex items-center justify-center">
-                    <Loader2 className="h-8 w-8 text-white/80 animate-spin" />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="text-2xl font-light text-white">Processing</div>
-                    <div className="text-white/60 text-base">Please wait...</div>
-                  </div>
-                </div>
-              )}
-
-              {tapToPayStatus === "completed" && (
-                <div className="space-y-8">
-                  <div
-                    className="mx-auto w-16 h-16 rounded-full flex items-center justify-center"
-                    style={{ background: 'rgba(0, 255, 102, 0.2)', border: '1px solid rgba(0, 255, 102, 0.4)' }}
-                  >
-                    <CheckCircle className="h-8 w-8" style={{ color: '#00FF66' }} />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="text-2xl font-light text-white">Payment Approved</div>
-                    <div className="text-white/60 text-base">Transaction complete</div>
-                  </div>
-                </div>
-              )}
-
-              {tapToPayStatus === "failed" && (
-                <div className="space-y-8">
-                  <div className="mx-auto w-16 h-16 rounded-full bg-red-500/20 border border-red-500/30 flex items-center justify-center">
-                    <XCircle className="h-8 w-8 text-red-400" />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="text-2xl font-light text-white">Payment Declined</div>
-                    <div className="text-white/60 text-base">Please try again or use another method</div>
-                  </div>
-                  <button
-                    onClick={closeTapToPayOverlay}
-                    className="w-full py-4 px-6 rounded-2xl text-white/90 text-sm font-light"
-                    style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)' }}
-                  >
-                    Try Again
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
 
         {/* NFC Payment Overlay for Mobile */}
-        {showNfcOverlay && (
-          <div 
-            className="fixed inset-0 z-50 min-h-screen flex items-center justify-center"
-            style={{ backgroundColor: '#1a1a1a' }}
-          >
-            {/* Small X button in top right */}
-            <button
-              onClick={closeNfcOverlay}
-              className="absolute top-6 right-6 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors z-10"
-            >
-              <X className="h-4 w-4 text-white/70" />
-            </button>
 
-            {/* Green liquid glass box */}
-            <div 
-              className="backdrop-blur-xl rounded-3xl p-12 max-w-sm w-full mx-8 text-center shadow-2xl relative"
-              style={{
-                background: 'linear-gradient(135deg, rgba(0, 255, 102, 0.15) 0%, rgba(0, 255, 102, 0.08) 100%)',
-                border: '1px solid rgba(0, 255, 102, 0.3)',
-                boxShadow: '0 25px 50px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(0, 255, 102, 0.2)'
-              }}
-            >
-              {nfcPaymentStatus === "ready" && (
-                <div className="space-y-8">
-                  <div className="space-y-2">
-                    <div className="text-6xl font-extralight text-white tracking-tight">
-                      ${nfcSession?.amount}
-                    </div>
-                    <div className="text-white/70 text-lg font-light">
-                      {nfcSession?.itemName}
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-6">
-                    <div 
-                      className="text-2xl font-light tracking-wide"
-                      style={{ color: '#00FF66' }}
-                    >
-                      TAP CARD HERE
-                    </div>
-                    <div className="text-white/60 text-base">
-                      Present your card or device
-                    </div>
-                    
-                    <button
-                      onClick={simulateNFCTap}
-                      className="w-full mt-8 py-4 px-6 rounded-2xl text-white/90 text-sm font-light transition-all duration-200"
-                      style={{
-                        background: 'rgba(0, 255, 102, 0.15)',
-                        border: '1px solid rgba(0, 255, 102, 0.3)'
-                      }}
-                    >
-                      Simulate Payment
-                    </button>
-                  </div>
-                </div>
-              )}
-              
-              {nfcPaymentStatus === "processing" && (
-                <div className="space-y-8">
-                  <div className="mx-auto w-16 h-16 rounded-full bg-white/10 border border-white/20 flex items-center justify-center">
-                    <Loader2 className="h-8 w-8 text-white/80 animate-spin" />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <div className="text-2xl font-light text-white">Processing Payment</div>
-                    <div className="text-white/60 text-base">Please wait...</div>
-                  </div>
-                </div>
-              )}
-
-              {nfcPaymentStatus === "completed" && (
-                <div className="space-y-8">
-                  <div 
-                    className="mx-auto w-16 h-16 rounded-full flex items-center justify-center"
-                    style={{
-                      background: 'rgba(0, 255, 102, 0.2)',
-                      border: '1px solid rgba(0, 255, 102, 0.4)'
-                    }}
-                  >
-                    <CheckCircle className="h-8 w-8" style={{ color: '#00FF66' }} />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <div className="text-2xl font-light text-white">Payment Successful</div>
-                    <div className="text-white/60 text-base">Transaction completed</div>
-                  </div>
-                </div>
-              )}
-
-              {nfcPaymentStatus === "failed" && (
-                <div className="space-y-8">
-                  <div className="mx-auto w-16 h-16 rounded-full bg-red-500/20 border border-red-500/30 flex items-center justify-center">
-                    <XCircle className="h-8 w-8 text-red-400" />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <div className="text-2xl font-light text-white">Payment Failed</div>
-                    <div className="text-white/60 text-base">Please try again</div>
-                  </div>
-                  
-                  <button
-                    onClick={resetNfcPayment}
-                    className="w-full mt-6 py-4 px-6 rounded-2xl text-white/90 text-sm font-light transition-all duration-200"
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.1)',
-                      border: '1px solid rgba(255, 255, 255, 0.2)'
-                    }}
-                  >
-                    Try Again
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
 
         {shareLinkOverlay}
 
@@ -1680,7 +1307,7 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
             >
               QR
             </button>
-            <button
+            {canTapToPay() && (<button
               onClick={() => setActiveTab("NFC")}
               className={`px-6 py-2 rounded-md font-medium transition-all duration-200 ${
                 activeTab === "NFC"
@@ -1689,7 +1316,7 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
               }`}
             >
               NFC
-            </button>
+            </button>)}
           </div>
         </div>
 
@@ -1708,7 +1335,7 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
                   style={{ backgroundColor: '#00FF66' }}
                 >
                   <div className="text-black text-lg font-medium">Create Transaction</div>
-                  
+
                   <FormField
                     control={form.control}
                     name="itemName"
@@ -1725,7 +1352,7 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
                       </FormItem>
                     )}
                   />
-                  
+
                   <FormField
                     control={form.control}
                     name="price"
@@ -1742,7 +1369,7 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
                       </FormItem>
                     )}
                   />
-                  
+
                   <Button 
                     type="submit" 
                     disabled={createTransactionMutation.isPending}
@@ -1783,7 +1410,7 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
                 <Send size={24} />
                 <span className="text-xs mt-1 font-medium">Send</span>
               </button>
-              
+
               <button
                 onClick={() => handleActionClick("edit")}
                 className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 ${
@@ -1798,7 +1425,7 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
                 <Edit size={24} />
                 <span className="text-xs mt-1 font-medium">Edit</span>
               </button>
-              
+
               <button
                 onClick={() => handleActionClick("split")}
                 className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 ${
@@ -1813,7 +1440,7 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
                 <Split size={24} />
                 <span className="text-xs mt-1 font-medium">Split</span>
               </button>
-              
+
               <button
                 onClick={() => handleActionClick("more")}
                 className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 ${
@@ -1880,7 +1507,7 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
                           </FormItem>
                         )}
                       />
-                      
+
                       <FormField
                         control={form.control}
                         name="selectedStoneId"
@@ -1906,7 +1533,7 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
                           </FormItem>
                         )}
                       />
-                      
+
                       <Button
                         type="submit"
                         disabled={createTransactionMutation.isPending}
@@ -1950,7 +1577,7 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
                   <h3 className="text-base font-semibold mb-2 text-white">
                     {activeTab === "NFC" ? "NFC Payment" : "Share Payment"}
                   </h3>
-                  
+
                   {activeTab === "NFC" ? (
                     // NFC Payment Options
                     <div className="space-y-2">
@@ -1994,7 +1621,7 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
                     // QR Payment Link Sharing
                     <div className="space-y-2">
                       <p className="text-gray-300 text-sm mb-4">Select a tapt stone and share its payment link</p>
-                      
+
                       {/* Stone Selection */}
                       <div className="text-left">
                         <label className="text-xs font-medium text-gray-300 block mb-2">Select Tapt Stone</label>
@@ -2088,210 +1715,10 @@ function MerchantTerminalMobilePage({ merchantId }: { merchantId: number }) {
 
 
         {/* NFC Payment Overlay */}
-        {showNfcOverlay && (
-          <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm">
-            <div className="min-h-screen flex items-center justify-center p-8">
-              <div className="bg-white/5 border border-white/10 rounded-3xl p-12 max-w-md w-full text-center backdrop-blur-xl shadow-2xl relative">
-                
-                {nfcPaymentStatus === "ready" && (
-                  <div className="space-y-12">
-                    <button
-                      onClick={closeNfcOverlay}
-                      className="absolute top-6 right-6 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
-                    >
-                      <X className="h-5 w-5 text-white/70" />
-                    </button>
-                    
-                    <div className="mx-auto w-20 h-20 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
-                      <Waves className="h-8 w-8 text-white/80" />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <div className="text-5xl font-extralight text-white tracking-tight">${nfcSession?.amount}</div>
-                      <div className="text-white/60 text-lg font-light">{nfcSession?.itemName}</div>
-                    </div>
-                    
-                    <div className="space-y-6">
-                      <div className="text-white/80 text-xl font-light">Tap to Pay</div>
-                      <div className="text-white/50 text-sm">Present card or device to terminal</div>
-                      
-                      <button
-                        onClick={simulateNFCTap}
-                        className="w-full mt-8 py-4 px-6 bg-white/10 hover:bg-white/15 border border-white/20 rounded-2xl text-white/90 text-sm font-light transition-all duration-200 hover:border-white/30"
-                      >
-                        Simulate Payment
-                      </button>
-                    </div>
-                  </div>
-                )}
-                
-                {nfcPaymentStatus === "processing" && (
-                  <div className="space-y-12">
-                    <div className="mx-auto w-20 h-20 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
-                      <Loader2 className="h-8 w-8 text-white/80 animate-spin" />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <div className="text-2xl font-light text-white">Processing Payment</div>
-                      <div className="text-white/60 text-sm">Please wait...</div>
-                    </div>
-                  </div>
-                )}
 
-                {nfcPaymentStatus === "completed" && (
-                  <div className="space-y-12">
-                    <div className="mx-auto w-20 h-20 rounded-full bg-green-500/20 border border-green-500/30 flex items-center justify-center">
-                      <CheckCircle className="h-8 w-8 text-green-400" />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <div className="text-2xl font-light text-white">Payment Successful</div>
-                      <div className="text-white/60 text-sm">Transaction completed</div>
-                    </div>
-                  </div>
-                )}
-
-                {nfcPaymentStatus === "failed" && (
-                  <div className="space-y-12">
-                    <div className="mx-auto w-20 h-20 rounded-full bg-red-500/20 border border-red-500/30 flex items-center justify-center">
-                      <XCircle className="h-8 w-8 text-red-400" />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <div className="text-2xl font-light text-white">Payment Failed</div>
-                      <div className="text-white/60 text-sm">Please try again</div>
-                    </div>
-                    
-                    <button
-                      onClick={resetNfcPayment}
-                      className="w-full py-4 px-6 bg-white/10 hover:bg-white/15 border border-white/20 rounded-2xl text-white/90 text-sm font-light transition-all duration-200 hover:border-white/30"
-                    >
-                      Try Again
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* NFC Payment Overlay for Desktop */}
-        {showNfcOverlay && (
-          <div 
-            className="fixed inset-0 z-50 min-h-screen flex items-center justify-center"
-            style={{ backgroundColor: '#1a1a1a' }}
-          >
-            {/* Small X button in top right */}
-            <button
-              onClick={closeNfcOverlay}
-              className="absolute top-6 right-6 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors z-10"
-            >
-              <X className="h-4 w-4 text-white/70" />
-            </button>
 
-            {/* Green liquid glass box */}
-            <div 
-              className="backdrop-blur-xl rounded-3xl p-16 max-w-lg w-full mx-8 text-center shadow-2xl relative"
-              style={{
-                background: 'linear-gradient(135deg, rgba(0, 255, 102, 0.15) 0%, rgba(0, 255, 102, 0.08) 100%)',
-                border: '1px solid rgba(0, 255, 102, 0.3)',
-                boxShadow: '0 25px 50px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(0, 255, 102, 0.2)'
-              }}
-            >
-              {nfcPaymentStatus === "ready" && (
-                <div className="space-y-10">
-                  <div className="space-y-2">
-                    <div className="text-7xl font-extralight text-white tracking-tight">
-                      ${nfcSession?.amount}
-                    </div>
-                    <div className="text-white/70 text-xl font-light">
-                      {nfcSession?.itemName}
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-8">
-                    <div 
-                      className="text-3xl font-light tracking-wide"
-                      style={{ color: '#00FF66' }}
-                    >
-                      TAP CARD HERE
-                    </div>
-                    <div className="text-white/60 text-lg">
-                      Present your card or device
-                    </div>
-                    
-                    <button
-                      onClick={simulateNFCTap}
-                      className="w-full mt-8 py-4 px-8 rounded-2xl text-white/90 text-base font-light transition-all duration-200"
-                      style={{
-                        background: 'rgba(0, 255, 102, 0.15)',
-                        border: '1px solid rgba(0, 255, 102, 0.3)'
-                      }}
-                    >
-                      Simulate Payment
-                    </button>
-                  </div>
-                </div>
-              )}
-              
-              {nfcPaymentStatus === "processing" && (
-                <div className="space-y-10">
-                  <div className="mx-auto w-20 h-20 rounded-full bg-white/10 border border-white/20 flex items-center justify-center">
-                    <Loader2 className="h-10 w-10 text-white/80 animate-spin" />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <div className="text-3xl font-light text-white">Processing Payment</div>
-                    <div className="text-white/60 text-lg">Please wait...</div>
-                  </div>
-                </div>
-              )}
-
-              {nfcPaymentStatus === "completed" && (
-                <div className="space-y-10">
-                  <div 
-                    className="mx-auto w-20 h-20 rounded-full flex items-center justify-center"
-                    style={{
-                      background: 'rgba(0, 255, 102, 0.2)',
-                      border: '1px solid rgba(0, 255, 102, 0.4)'
-                    }}
-                  >
-                    <CheckCircle className="h-10 w-10" style={{ color: '#00FF66' }} />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <div className="text-3xl font-light text-white">Payment Successful</div>
-                    <div className="text-white/60 text-lg">Transaction completed</div>
-                  </div>
-                </div>
-              )}
-
-              {nfcPaymentStatus === "failed" && (
-                <div className="space-y-10">
-                  <div className="mx-auto w-20 h-20 rounded-full bg-red-500/20 border border-red-500/30 flex items-center justify-center">
-                    <XCircle className="h-10 w-10 text-red-400" />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <div className="text-3xl font-light text-white">Payment Failed</div>
-                    <div className="text-white/60 text-lg">Please try again</div>
-                  </div>
-                  
-                  <button
-                    onClick={resetNfcPayment}
-                    className="w-full mt-8 py-4 px-8 rounded-2xl text-white/90 text-base font-light transition-all duration-200"
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.1)',
-                      border: '1px solid rgba(255, 255, 255, 0.2)'
-                    }}
-                  >
-                    Try Again
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
 
         {shareLinkOverlay}
       </div>

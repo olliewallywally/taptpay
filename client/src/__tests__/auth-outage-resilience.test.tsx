@@ -20,7 +20,6 @@
 // App.tsx statically imports the public pages. None of them are under test, and
 // one of them (the landing page) is being edited in parallel — stub them so this
 // file exercises the auth logic and nothing else.
-jest.mock("@/plugins/TaptPayPlugin", () => ({}));
 jest.mock("@/pages/landing-page", () => ({ LandingPage: () => null }));
 jest.mock("@/pages/login", () => ({ __esModule: true, default: () => null }));
 jest.mock("@/pages/app-login", () => ({ __esModule: true, default: () => null }));

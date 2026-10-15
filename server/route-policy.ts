@@ -1,6 +1,6 @@
 /**
  * R1-T2 — route policy inventory. GENERATED (bootstrap) by
- * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ b7fa2de91b508eb624d2257eafc2dee7c53b1439 on 2026-10-15.
+ * scripts/generate-route-policy.ts from server/app.ts, server/routes.ts, server/index.ts, server/vite.ts @ 82bc816ad70817ab18b9ce7369172386e6b8dbfc on 2026-10-15.
  *
  * 196 registrations (83 GET, 81 POST, 2 PATCH, 5 ALL, 17 PUT, 8 DELETE) on this SHA — evidence for THIS commit, not a timeless
  * constant; server/__tests__/route-policy-inventory.test.ts re-derives the
@@ -774,14 +774,8 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     facts: {
       middleware: ["authenticateToken"],
       body: ["schema: tapToPayRequestSchema"],
-      authChecks: ["checkMerchantOwnership","compares pendingTransaction.merchantId !== mid"],
-      storageMethods: ["createTransactionForMerchant","getActiveTransactionByMerchant","getOrCreateSubscription","getTransactionForMerchant","updateTransactionPaymentMethodForMerchant","updateTransactionStatusForMerchant"],
-      sideEffects: ["live update: sseBroker.broadcast","provider: createAttendedSession","provider: submitTapToPayToken","push: sendPushToMerchant"],
-      statuses: [200,400,401,402,403,404,409,500,502,503],
-      errorTextInResponse: ["paymentResult.error","sessionResult.error"],
-      capabilityGates: ["config.features.tapToPay","isWindcaveConfigured"],
-      entitlementGates: ["BILLING_CARD_REQUIRED","billingCardIsReady","requireBillingCard"],
-      helpers: ["broadcastToStone","requireBillingCard"],
+      authChecks: ["checkMerchantOwnership"],
+      statuses: [400,401,403,503],
     },
   },
   "POST /api/transactions/:id/split": {
@@ -834,7 +828,6 @@ export const ROUTE_POLICY: Record<string, RoutePolicyEntry> = {
     markers: [],
     facts: {
       statuses: [200],
-      capabilityGates: ["config.features.tapToPay"],
     },
   },
   "POST /api/transactions/:id/pay": {

@@ -1,0 +1,1 @@
+function n(r){if(!["ArrowLeft","ArrowRight","Home","End"].includes(r.key))return;const t=Array.from(r.currentTarget.querySelectorAll('[role="tab"]:not(:disabled)')),e=t.indexOf(r.target);if(e<0||!t.length)return;r.preventDefault();const o=r.key==="Home"?0:r.key==="End"?t.length-1:(e+(r.key==="ArrowRight"?1:-1)+t.length)%t.length;t[o].focus(),t[o].click()}export{n as t};

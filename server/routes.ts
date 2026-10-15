@@ -1,3 +1,4 @@
+import { TAP_TO_PAY_AVAILABLE, TAP_TO_PAY_UNAVAILABLE } from "@shared/payment-capabilities";
 import type {CronCoordinator} from "./durable-cron";
 import {getCronCoordinator} from "./cron-runtime";
 import {logOperation} from "./structured-log";
@@ -30,7 +31,7 @@ import {
 } from "./storage";
 import { TUTORIAL_PAGE_KEYS, isTutorialPageKey } from "@shared/tutorial";
 import { inviteTeamMemberSchema, acceptInviteSchema, retailTransactionCreateRequestSchema, cashSaleRequestSchema, updateMerchantDetailsSchema, updateThemeSchema, updateDailyGoalSchema, forgotPasswordSchema, resetPasswordSchema, changePasswordSchema, newPasswordSchema, createRefundSchema, insertRefundSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, merchantOnboardingSchema, pushNotificationPreferencesSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createClientProfileSchema, updateClientProfileSchema, createQuoteSchema, acceptQuoteSchema, createJobInvoiceSchema, markJobPaidExternalSchema, sendJobBalanceSchema, createJobScheduleSchema, updateJobScheduleSchema, updateTradeReminderSettingsSchema, updateTradeGstSettingsSchema } from "@shared/schema";
-import { isWindcaveConfigured, createWindcaveRefund, getWindcaveEnv, createAttendedSession, submitTapToPayToken } from "./windcave";
+import { isWindcaveConfigured, createWindcaveRefund, getWindcaveEnv } from "./windcave";
 import { authenticateUser, checkPasswordEvenly, passwordCheckBudget, authenticateToken, createUser, loginForUserId, sessionLoginForUserRow, isAccountOwner, requestPasswordReset, resetPassword, validateResetToken, type AuthenticatedRequest, logSecurityEvent, syncVerifiedMerchants, startBusinessSession, startAdminSession, endAuthSession, endLoginSessions, csrfTokenForRequest, clearSessionCookie, hasSessionCookie, readBusinessSession, respondAuthBackendUnavailable, isStreamSessionActive, liveBusinessSessionLogin } from "./auth";
 import {
   HANDOFF_CODE_TTL_MS, clearSignInCookie, googleVerifiedEmail, handoffCodeHash, newHandoffCode, readCookie,
@@ -39,7 +40,7 @@ import {
 import { type SignInRealm, type TooManyWhat, boardPrintBucket, confirmEmailBucket, confirmationResendBucket, appleCallbackAddressBucket, appleStateBucket, googleCallbackAddressBucket, googleStateBucket, normalizeThrottleEmail, passwordChangeBucket, passwordResetAddressBucket, passwordResetBucket, signInAccountBucket, signInAddressBucket, signInDeviceKeyPrefix, signupNoticeBucket, tooManyAttempts } from "./auth-throttle";
 import { BOARD_PRINT_JSON_LIMIT, boardPrintRequestSchema, decodeBoardPrintPdf } from "./board-print";
 import { clientAddressForLimits, limitAddress } from "./client-address";
-import { tapToPayAmountSchema, tapToPayRequestSchema } from "./tap-to-pay-request";
+import { tapToPayRequestSchema } from "./tap-to-pay-request";
 import { ACCOUNT_EMAIL_REPLY_FLOOR_MS, SIGN_UP_REPLY_FLOOR_MS, replyNoSoonerThan, replyStart } from "./even-reply";
 import { deviceKnowsEmail, markSignInDevice, readSignInDevice, signInBucketFor, signInDeviceCookie, type SignInDevice } from "./sign-in-device";
 import { generateReceiptPdf } from "./pdf-generator";
@@ -2329,149 +2330,14 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  // Tap to Pay (Windcave attended / Tap to Pay on iPhone)
-  // Required: {merchantId, amount, windcaveToken (when Windcave is configured)}
-  // Optional: {transactionId} — ID of the pending transaction to finalize; if omitted, uses the
-  //   merchant's current active pending transaction. Amount is always taken from the pending
-  //   transaction's stored price to guarantee ledger/processor consistency.
-  // "Paywave" is the NZ contactless payment brand used in the UI; the underlying protocol is
-  //   Windcave's attended Tap to Pay on iPhone (WCPaymentSDK + server-side session flow).
-  app.post("/api/transactions/tap-to-pay", authenticateToken, async (req: AuthenticatedRequest, res) => {
-    try {
-      const validation = tapToPayRequestSchema.safeParse(req.body);
-      if (!validation.success) {
-        return res.status(400).json({ message: "Invalid Tap to Pay request" });
-      }
-      const { merchantId: mid, transactionId, amount: requestedAmount, windcaveToken } = validation.data;
-      if (!checkMerchantOwnership(req, mid)) {
-        return res.status(403).json({ message: "Access denied" });
-      }
-      if (!config.features.tapToPay) {
-        return res.status(503).json({ code: "TAP_TO_PAY_DISABLED", message: "Tap to Pay is temporarily unavailable" });
-      }
-      if (!(await requireBillingCard(mid, res))) return;
-
-      // Resolve the pending transaction to finalize.
-      // Prefer the explicitly supplied transactionId, otherwise use the merchant's active pending one.
-      let pendingTransaction: Awaited<ReturnType<typeof storage.getTransaction>> | undefined;
-      if (transactionId) {
-        pendingTransaction = await storage.getTransactionForMerchant(transactionId, mid);
-        if (!pendingTransaction || pendingTransaction.merchantId !== mid) {
-          return res.status(404).json({ message: "Transaction not found" });
-        }
-        if (pendingTransaction.status !== "pending") {
-          return res.status(409).json({ message: "Transaction is no longer pending" });
-        }
-      } else {
-        // Deliberately unscoped (undefined = any board): this is the authenticated
-        // merchant finalising whatever they have pending, not a customer following
-        // a link, so board scoping would break a board-attached sale.
-        pendingTransaction = await storage.getActiveTransactionByMerchant(mid, { kind: "merchant-any" });
-      }
-
-      // The amount to charge Windcave is always the pending transaction's stored price.
-      // If no pending transaction, fall back to request body amount.
-      // This prevents any divergence between charged amount and recorded ledger amount.
-      const chargeValidation = tapToPayAmountSchema.safeParse(pendingTransaction ? pendingTransaction.price : requestedAmount);
-      if (!chargeValidation.success) {
-        return res.status(400).json({ message: "Invalid charge amount" });
-      }
-      const chargeAmount = chargeValidation.data;
-
-      const merchantRef = `TAPTP-${pendingTransaction?.id ?? Date.now()}`;
-      let paymentResult;
-
-      if (isWindcaveConfigured()) {
-        // Require a real NFC token when Windcave credentials are configured.
-        // Fail closed — never simulate a payment when credentials are present.
-        if (!windcaveToken) {
-          return res.status(400).json({ message: "windcaveToken is required when Windcave is configured" });
-        }
-
-        // Step 1: Create an attended session on Windcave using the pending transaction price
-        const sessionResult = await createAttendedSession(chargeAmount, merchantRef);
-        if (!sessionResult.success || !sessionResult.sessionId) {
-          return res.status(502).json({ message: `Failed to create attended session: ${sessionResult.error}` });
-        }
-
-        // Step 2: Submit the NFC token captured by the iOS SDK against the session
-        paymentResult = await submitTapToPayToken(sessionResult.sessionId, windcaveToken);
-
-        // A false `success` means a processor/network error — not a card decline.
-        // Return upstream error without persisting any transaction outcome.
-        if (!paymentResult.success) {
-          return res.status(502).json({ message: `Payment processor error: ${paymentResult.error}` });
-        }
-      } else {
-        return res.status(503).json({ code: "PAYMENT_PROVIDER_UNAVAILABLE", message: "Payment gateway unavailable" });
-      }
-
-      const finalStatus = paymentResult.approved ? "completed" : "failed";
-
-      let transaction;
-      if (pendingTransaction) {
-        // Finalize the existing pending transaction in place.
-        // The stored price is unchanged — it was the source of truth for chargeAmount.
-        transaction = await storage.updateTransactionStatusForMerchant(
-          pendingTransaction.id, mid,
-          finalStatus,
-          paymentResult.windcaveTransactionId ?? undefined
-        );
-        const withMethod = transaction && await storage.updateTransactionPaymentMethodForMerchant(pendingTransaction.id, mid, "tap_to_pay");
-        if (!withMethod) return res.status(503).json({ message: "Payment outcome needs reconciliation" });
-        transaction = withMethod;
-      } else {
-        // No pending transaction exists — create a fresh record using the exact charged amount.
-        // windcaveTransactionId is not part of the insert type (omitted from schema); set it
-        // via updateTransactionStatus after creation so the type contract is preserved.
-        transaction = await storage.createTransactionForMerchant(mid, {
-          merchantId: mid,
-          itemName: "Tap to Pay Sale",
-          price: chargeAmount,
-          status: finalStatus,
-          paymentMethod: "tap_to_pay",
-          splitEnabled: false,
-        });
-        if (paymentResult.windcaveTransactionId) {
-          const updated = await storage.updateTransactionStatusForMerchant(
-            transaction.id, mid,
-            finalStatus,
-            paymentResult.windcaveTransactionId
-          );
-          if (!updated) return res.status(503).json({ message: "Payment outcome needs reconciliation" });
-          transaction = updated;
-        }
-      }
-
-      if (paymentResult.approved) {
-        broadcastToStone(transaction!.merchantId!, transaction!.taptStoneId, {
-          type: "transaction_updated",
-          transaction: { ...transaction, paymentMethod: "tap_to_pay" },
-        });
-      }
-      sendPushToMerchant(transaction!.merchantId!, paymentResult.approved
-        ? {
-            type: "payment_received",
-            itemName: transaction!.itemName,
-            amount: transaction!.price,
-            transactionId: transaction!.id,
-          }
-        : {
-            type: "payment_failed",
-            reason: "failed",
-            itemName: transaction!.itemName,
-            amount: transaction!.price,
-            transactionId: transaction!.id,
-          }).catch(() => {});
-
-      res.json({ approved: paymentResult.approved ?? false, transactionId: transaction!.id });
-    } catch (error) {
-      logOperation("error","TAP_TO_PAY_ERROR",{payload:["Tap to Pay error:",error]});
-      res.status(500).json({ message: "Tap to Pay processing failed" });
-    }
+  // D13: retain validation/auth/ownership, but no unsupported provider or ledger path.
+  app.post("/api/transactions/tap-to-pay", authenticateToken, (req: AuthenticatedRequest, res) => {
+    const validation = tapToPayRequestSchema.safeParse(req.body);
+    if (!validation.success) return res.status(400).json({ message: "Invalid Tap to Pay request" });
+    if (!checkMerchantOwnership(req, validation.data.merchantId)) return res.status(403).json({ message: "Access denied" });
+    return res.status(503).json({ code: "TAP_TO_PAY_DISABLED", message: TAP_TO_PAY_UNAVAILABLE });
   });
 
-  // Create bill split
   app.post("/api/transactions/:id/split", async (req, res) => {
     try {
       const transactionId = strictPositiveIntegerParam(req.params.id);
@@ -2597,10 +2463,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // device could theoretically do. This previously derived every field from the
   // User-Agent alone, so a phone was told NFC, Apple Pay and contactless were
   // available while the routes behind them refuse — a fabricated capability.
-  // Tap to Pay follows its real feature gate; the wallet routes are tombstoned
-  // and have no gate to consult, so they report false until one exists.
+  // D13 stays false until a reviewed native/provider integration exists.
+  // Retired wallet routes cannot establish a capability either.
   app.get("/api/nfc/capabilities", (req, res) => {
-    const tapToPayEnabled = config.features.tapToPay;
+    const tapToPayEnabled = TAP_TO_PAY_AVAILABLE;
     res.json({
       nfcSupported: tapToPayEnabled,
       applePay: false,

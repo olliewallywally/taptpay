@@ -110,12 +110,9 @@ describe("the provider module never passes on provider text or IDs", () => {
     expectNoMarker(errorOf(await windcave.createWindcaveRefund(`tx-${BODY}`, "1.00", "REFUND_1")));
   });
 
-  it("createAttendedSession and submitTapToPayToken on a 4xx with text (Tap to Pay is off, R7)", async () => {
-    jest.spyOn(global, "fetch").mockImplementation(providerText(400) as any);
-    expectNoMarker(
-      errorOf(await windcave.createAttendedSession("1.00", "TAP_1", 0, XID)),
-      errorOf(await windcave.submitTapToPayToken(SESSION, TOKEN, 0, XID)),
-    );
+  it("retired attended transport cannot call a provider", () => {
+    expect((windcave as any).createAttendedSession).toBeUndefined();
+    expect((windcave as any).submitTapToPayToken).toBeUndefined();
   });
 
   it.each([

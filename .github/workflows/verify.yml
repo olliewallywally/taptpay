@@ -60,6 +60,10 @@ jobs:
         run: npm run test:server -- --runTestsByPath server/__tests__/durable-cron-contract.test.ts server/__tests__/durable-cron-runner.test.ts server/__tests__/cron-delivery-safety.test.ts server/__tests__/r6-cron-http.test.ts server/__tests__/r6-cron-no-secret.test.ts server/__tests__/r6-cron-job-context.test.ts
       - name: R6 readiness and bounded shutdown (synthetic HTTP and child processes)
         run: npm run test:server -- --runTestsByPath server/__tests__/r6-health.test.ts server/__tests__/r6-schema-readiness.test.ts server/__tests__/r6-readiness-bundle.test.ts server/__tests__/r6-worker-drain.test.ts server/__tests__/r6-shutdown.test.ts server/__tests__/r6-http-work.test.ts server/__tests__/async-route-guard.test.ts server/__tests__/security-audit-log.test.ts
+      - name: R7 locked native capability and side-effect-free refusal
+        run: npm run test:server -- --runTestsByPath server/__tests__/r7-capability-lock.test.ts server/__tests__/tap-to-pay-validation.test.ts server/__tests__/r0-t5-disabled-route-side-effects.test.ts
+      - name: R7 generated artifact guard (synthetic files only)
+        run: npm run test:r7:artifacts
       - name: operator backup safety (synthetic subprocesses only)
         run: npm run test:backup:safety
       - name: schema fingerprint determinism (no database opened)
@@ -68,6 +72,8 @@ jobs:
       # R5 reader checks above deliberately run without a database.
       - name: jest (client)
         run: npm run test:client
+      - name: R7 source build and checked-in web snapshot integrity
+        run: npm run build && npm run verify:r7:artifacts
 
   # R0-T6A's convergence proof, and the only migration gate that needs no
   # secrets — so it is green on forks and on every PR. The runner talks plain

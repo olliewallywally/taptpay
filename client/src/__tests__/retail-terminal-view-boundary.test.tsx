@@ -89,20 +89,9 @@ describe("RetailTerminalView safety boundary", () => {
     expect(screen.queryByRole("button", { name: "paywave" })).toBeNull();
   });
 
-  it("delegates paywave for an existing live transaction without recreating it locally", async () => {
-    const onCreateSale = jest.fn().mockResolvedValue(undefined);
-    render(<RetailTerminalView liveState={existingState} onCreateSale={onCreateSale} showPaywave />);
-
-    fireEvent.click(screen.getByRole("button", { name: "paywave" }));
-    fireEvent.click(screen.getByRole("button", { name: "send" }));
-
-    await waitFor(() => {
-      expect(onCreateSale).toHaveBeenCalledTimes(1);
-      expect(onCreateSale).toHaveBeenCalledWith(existingTransaction, {
-        paywave: true,
-        existing: true,
-      });
-    });
+  it("cannot advertise paywave by a caller prop while the native/provider capability is unimplemented", () => {
+    render(<RetailTerminalView liveState={existingState} onCreateSale={jest.fn()} showPaywave />);
+    expect(screen.queryByRole("button",{name:"paywave"})).not.toBeInTheDocument();
   });
 
   /* R1-T9: no double submit. A second tap on send while the first sale is still

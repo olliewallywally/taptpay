@@ -576,26 +576,17 @@ describe("a billing 402 on the phone retail terminal (R1-T9)", () => {
     expect(shareSales()).toEqual([]);
   });
 
-  it("Tap to Pay on a pending sale: the banner alone says why, with no \"Payment Declined\" (no card was declined)", async () => {
+  it("a spoofed iOS bridge cannot start payment or create a sale while D13 is off", async () => {
     const pendingSale = { id: 7, status: "pending", price: "5.00", itemName: "Coffee" };
     activeTransactionFixture = pendingSale;
-    tapToPayHandler = () => jsonResponse(BILLING_402, 402);
-    const startTapToPay = jest.fn(async () => ({ approved: true, token: "card-token" }));
+    const startTapToPay = jest.fn();
     (window as any).Capacitor = { isNativePlatform: () => true, getPlatform: () => "ios" };
     (window as any).TaptPay = { startTapToPay };
-    renderTerminal((queryClient) => {
-      queryClient.setQueryData(["/api/merchants", 1, "active-transaction"], pendingSale);
-    });
+    renderTerminal(queryClient => { queryClient.setQueryData(["/api/merchants", 1, "active-transaction"], pendingSale); });
     await screen.findByTestId("retail-terminal-view-stub");
-
     fireEvent.click(screen.getByText("tap to pay the pending sale"));
-    expect(screen.getByTestId("tap-to-pay-overlay")).toBeInTheDocument();
-
-    await waitFor(() => expect(tapToPayRequests).toBe(1));
-    await waitFor(() => expect(screen.queryByTestId("tap-to-pay-overlay")).not.toBeInTheDocument());
-    expect(startTapToPay).toHaveBeenCalledTimes(1);
-    expect(banners).toBe(1);
-    expect(screen.queryByText("Payment Declined")).not.toBeInTheDocument();
-    expect(mockToast).not.toHaveBeenCalled();
+    await waitFor(()=>expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({title:"Tap to Pay unavailable"})));
+    expect(screen.queryByTestId("tap-to-pay-overlay")).not.toBeInTheDocument();
+    expect(startTapToPay).not.toHaveBeenCalled();expect(tapToPayRequests).toBe(0);expect(banners).toBe(0);expect(mockCreateOutcomes).toEqual([]);
   });
 });

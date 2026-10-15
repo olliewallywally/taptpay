@@ -1,3 +1,4 @@
+import { TAP_TO_PAY_UNAVAILABLE } from "@shared/payment-capabilities";
 import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -20,7 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useDeviceStatusMonitoring, useSSEConnectionMonitoring } from "@/components/notification-system";
 import { MerchantGate } from "@/components/merchant-gate";
 import { Send, Loader2, CheckCircle, Clock, XCircle, Eye, Copy, Check, QrCode, Smartphone, Waves, CreditCard, X, Edit, MoreHorizontal, ChevronDown, Tag, Share, Link2, Mail, MessageCircle } from "lucide-react";
-import { isNativeIOS, canTapToPay } from "@/lib/native";
+import { canTapToPay } from "@/lib/native";
 import { Switch } from "@/components/ui/switch";
 import taptLogoPath from "@assets/IMG_6592_1755070818452.png";
 import { Link } from "wouter";
@@ -50,24 +51,21 @@ function MerchantTerminalPage({ merchantId }: { merchantId: number }) {
   const [activeAction, setActiveAction] = useState<string | null>(null);
   const [selectedStoneId, setSelectedStoneId] = useState<number | null>(null);
   const [qrCollapsed, setQrCollapsed] = useState(false);
-  
+
   // Stock item tagging state
   const [selectedStockItems, setSelectedStockItems] = useState<any[]>([]);
   const [stockSearchInput, setStockSearchInput] = useState("");
   const [filteredStockItems, setFilteredStockItems] = useState<any[]>([]);
-  
+
   // NFC-specific state
   const [nfcCapabilities, setNfcCapabilities] = useState<any>(null);
   const [nfcPaymentStatus, setNfcPaymentStatus] = useState<"idle" | "creating" | "ready" | "processing" | "completed" | "failed">("idle");
-  const [nfcSession, setNfcSession] = useState<any>(null);
-  const [showNfcOverlay, setShowNfcOverlay] = useState(false);
-  
+
   const [splitEnabled, setSplitEnabled] = useState(false);
   const [copiedPaymentLink, setCopiedPaymentLink] = useState(false);
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
   const prevTransactionStatusRef = useRef<string | null>(null);
   const successOverlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const tapToPayOverlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const copiedPaymentLinkTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Gap 12: this call site always creates a stoneless (board-less) sale (see
@@ -82,7 +80,6 @@ function MerchantTerminalPage({ merchantId }: { merchantId: number }) {
   useEffect(() => {
     return () => {
       if (successOverlayTimerRef.current) clearTimeout(successOverlayTimerRef.current);
-      if (tapToPayOverlayTimerRef.current) clearTimeout(tapToPayOverlayTimerRef.current);
       if (copiedPaymentLinkTimerRef.current) clearTimeout(copiedPaymentLinkTimerRef.current);
       if (copiedShareLinkTimerRef.current) clearTimeout(copiedShareLinkTimerRef.current);
     };
@@ -141,8 +138,7 @@ function MerchantTerminalPage({ merchantId }: { merchantId: number }) {
 
   // Tap to Pay (iOS only)
   const [tapToPayStatus, setTapToPayStatus] = useState<"idle" | "waiting" | "processing" | "completed" | "failed">("idle");
-  const [showTapToPayOverlay, setShowTapToPayOverlay] = useState(false);
-  
+
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -269,83 +265,9 @@ function MerchantTerminalPage({ merchantId }: { merchantId: number }) {
   };
 
   // Tap to Pay (iOS native bridge)
-  const startTapToPayPayment = async () => {
-    const transaction = currentTransaction
-      ?? (activeTransaction?.status === 'pending' || activeTransaction?.status === 'processing'
-        ? activeTransaction : null);
-    if (!transaction) {
-      toast({ title: "No Transaction", description: "Create a transaction first.", variant: "destructive" });
-      return;
-    }
+  const startTapToPayPayment = () => { toast({ title: "Tap to Pay unavailable", description: TAP_TO_PAY_UNAVAILABLE, variant: "destructive" }); };
 
-    setTapToPayStatus("waiting");
-    setShowTapToPayOverlay(true);
 
-    try {
-      let bridgeResult: { approved: boolean; token?: string; cancelled?: boolean; error?: string };
-
-      if (canTapToPay()) {
-        bridgeResult = await window.TaptPay!.startTapToPay({
-          amount: parseFloat(transaction.price),
-          currency: "NZD",
-          merchantName: merchant?.businessName || "TaptPay",
-        });
-      } else if (import.meta.env.DEV) {
-        // Dev-only simulation fallback — native bridge not available in browser preview
-        await new Promise(r => setTimeout(r, 2000));
-        bridgeResult = { approved: true, token: `SIM_TOKEN_${Date.now()}` };
-      } else {
-        // Production: bridge is required — Paywave should only be accessible in the iOS app
-        setTapToPayStatus("idle");
-        setShowTapToPayOverlay(false);
-        toast({ title: "Not available", description: "Tap to Pay requires the TaptPay iOS app.", variant: "destructive" });
-        return;
-      }
-
-      if (bridgeResult.cancelled) {
-        setTapToPayStatus("idle");
-        setShowTapToPayOverlay(false);
-        toast({ title: "Cancelled", description: "Tap to Pay was cancelled." });
-        return;
-      }
-
-      setTapToPayStatus("processing");
-      const response = await sessionFetch("/api/transactions/tap-to-pay", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          merchantId,
-          transactionId: transaction.id,
-          amount: parseFloat(transaction.price),
-          windcaveToken: bridgeResult.token,
-        }),
-      });
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.message || `Processor error (${response.status})`);
-      }
-
-      const data = await response.json();
-      setTapToPayStatus(data.approved ? "completed" : "failed");
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "active-transaction"] });
-
-      if (tapToPayOverlayTimerRef.current) clearTimeout(tapToPayOverlayTimerRef.current);
-      tapToPayOverlayTimerRef.current = setTimeout(() => {
-        setShowTapToPayOverlay(false);
-        setTapToPayStatus("idle");
-      }, 3500);
-    } catch (err: any) {
-      console.error("Tap to Pay error:", err);
-      setTapToPayStatus("failed");
-      toast({ title: "Payment error", description: err?.message || "Tap to Pay failed", variant: "destructive" });
-    }
-  };
-
-  const closeTapToPayOverlay = () => {
-    setShowTapToPayOverlay(false);
-    setTapToPayStatus("idle");
-  };
 
   // Filter stock items based on search input
   useEffect(() => {
@@ -371,11 +293,11 @@ function MerchantTerminalPage({ merchantId }: { merchantId: number }) {
       setSelectedStockItems(prev => [...prev, stockItem]);
       setStockSearchInput("");
       setFilteredStockItems([]);
-      
+
       // Update form values
       const newTotal = calculateTotalPrice();
       form.setValue("price", (parseFloat(newTotal) + parseFloat(stockItem.cost)).toFixed(2));
-      
+
       // Update item name with all selected items
       const allItemNames = [...selectedStockItems, stockItem].map(item => item.name).join(", ");
       form.setValue("itemName", allItemNames);
@@ -386,15 +308,15 @@ function MerchantTerminalPage({ merchantId }: { merchantId: number }) {
   const removeStockItem = (stockItemId: number) => {
     setSelectedStockItems(prev => {
       const newItems = prev.filter(item => item.id !== stockItemId);
-      
+
       // Update form values
       const newTotal = newItems.reduce((total, item) => total + parseFloat(item.cost), 0).toFixed(2);
       form.setValue("price", newTotal);
-      
+
       // Update item name
       const allItemNames = newItems.map(item => item.name).join(", ");
       form.setValue("itemName", allItemNames || "");
-      
+
       return newItems;
     });
   };
@@ -402,7 +324,7 @@ function MerchantTerminalPage({ merchantId }: { merchantId: number }) {
   // Helper function for efficient transaction change detection
   const hasTransactionChanged = (prev: any | null, current: any | null): boolean => {
     if (!prev || !current || prev.id !== current.id) return true;
-    
+
     // Check only the fields that are likely to change
     return (
       prev.status !== current.status ||
@@ -417,7 +339,7 @@ function MerchantTerminalPage({ merchantId }: { merchantId: number }) {
   // Set up SSE connection
   useEffect(() => {
     sseClient.connectMerchant(merchantId);
-    
+
     sseClient.subscribe("transaction_updated", (message) => {
       // Route through the query cache only — the [activeTransaction] effect
       // handles all state transitions including completion detection & cleanup.
@@ -451,7 +373,7 @@ function MerchantTerminalPage({ merchantId }: { merchantId: number }) {
         const response = await sessionFetch('/api/nfc/capabilities');
         const capabilities = await response.json();
         setNfcCapabilities(capabilities);
-        
+
         if (!capabilities.nfcSupported) {
           console.log("NFC not supported on this device");
         }
@@ -459,7 +381,7 @@ function MerchantTerminalPage({ merchantId }: { merchantId: number }) {
         console.error('Failed to check NFC capabilities:', error);
       }
     };
-    
+
     checkCapabilities();
   }, []);
 
@@ -498,7 +420,7 @@ function MerchantTerminalPage({ merchantId }: { merchantId: number }) {
     console.log("Action clicked:", action);
     console.log("Current activeAction:", activeAction);
     console.log("Tapt stones:", taptStones);
-    
+
     // Force send to work with error boundary
     if (action === "send") {
       try {
@@ -510,7 +432,7 @@ function MerchantTerminalPage({ merchantId }: { merchantId: number }) {
         return;
       }
     }
-    
+
     if (activeAction === action) {
       setActiveAction(null);
     } else {
@@ -519,51 +441,7 @@ function MerchantTerminalPage({ merchantId }: { merchantId: number }) {
   };
 
   // NFC Payment Functions
-  const createNFCPayment = async () => {
-    const itemName = form.getValues("itemName");
-    const price = form.getValues("price");
-    
-    if (!price || !itemName || !merchantId) {
-      toast({
-        title: "Missing Information",
-        description: "Please fill in all required fields.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setNfcPaymentStatus("creating");
-    
-    try {
-      const response = await apiRequest("POST", `/api/merchants/${merchantId}/nfc-pay`, {
-        amount: parseFloat(price),
-        itemName,
-        deviceId: navigator.userAgent,
-        nfcCapabilities: nfcCapabilities
-      });
-
-      const result = await response.json();
-      setNfcSession(result.nfcSession);
-      setNfcPaymentStatus("ready");
-      setShowNfcOverlay(true);
-      
-      toast({
-        title: "Payment Terminal Ready",
-        description: "Ask customer to tap their card or digital wallet.",
-      });
-    } catch (error) {
-      console.error('NFC payment creation failed:', error);
-      setNfcPaymentStatus("failed");
-      toast({
-        title: "Payment Failed",
-        description: "Could not create NFC payment session.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Real NFC hardware would trigger payment completion through SSE events
-  // No simulation function needed - payments process only through actual card taps
+  const createNFCPayment = () => { toast({ title: "Tap to Pay unavailable", description: TAP_TO_PAY_UNAVAILABLE, variant: "destructive" }); };
 
   // Share Payment Link Functions
   const copyPaymentLinkToClipboard = async (url: string) => {
@@ -716,7 +594,7 @@ function StonesSection({
                 <p className="text-gray-300 text-sm">No tapt stones available</p>
               </div>
             )}
-            
+
             <div className="text-center mt-6 pt-4 border-t border-gray-600">
               <button
                 onClick={async () => {
@@ -726,9 +604,9 @@ function StonesSection({
                       name: `Stone ${stoneNumber}`,
                       stoneNumber: stoneNumber
                     });
-                    
+
                     queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "tapt-stones"] });
-                    
+
                     toast({
                       title: "Stone Created",
                       description: `Stone ${stoneNumber} has been created successfully`,
@@ -780,7 +658,7 @@ function ActionsToolbar({
     { id: "send", icon: Send, label: "Share Link", testId: "button-share-link" },
     { id: "quick", icon: Tag, label: "Quick Amounts", testId: "button-quick-amounts" }
   ];
-  const actionButtons = isNativeIOS()
+  const actionButtons = canTapToPay()
     ? [...baseButtons, { id: "tap-to-pay", icon: Waves, label: "Paywave", testId: "button-tap-to-pay" }]
     : baseButtons;
 
@@ -806,7 +684,7 @@ function ActionsToolbar({
           </button>
         ))}
       </div>
-      
+
       {/* Action Panel */}
       <div 
         className="overflow-hidden transition-all duration-250 ease-in-out"
@@ -943,7 +821,7 @@ function ActionsToolbar({
             </div>
           )}
 
-          {activeAction === "tap-to-pay" && isNativeIOS() && (
+          {activeAction === "tap-to-pay" && canTapToPay() && (
             <div className="space-y-3" data-testid="tap-to-pay-panel">
               <div className="flex items-center gap-2">
                 <Waves size={16} style={{ color: '#00FF66' }} />
@@ -1060,7 +938,7 @@ function ItemForm({
               </FormItem>
             )}
           />
-          
+
           <FormField
             control={form.control}
             name="price"
@@ -1147,7 +1025,7 @@ function StockTagging({
           className="bg-gray-700 border-gray-600 text-white rounded-lg h-8 mb-2"
           data-testid="stock-search-input"
         />
-        
+
         {filteredStockItems.length > 0 && (
           <div className="absolute z-10 w-full bg-gray-700 border border-gray-600 rounded-lg mt-1 max-h-32 overflow-y-auto" data-testid="stock-suggestions">
             {filteredStockItems.map((item: any) => (
@@ -1446,7 +1324,7 @@ function PaymentStatus({ transaction, merchantId }: { transaction: any; merchant
         {/* Two-Pane Layout Container */}
         <div className="max-w-5xl mx-auto px-3 sm:px-6 pt-4 sm:pt-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-12">
-            
+
             {/* Left Pane: Amount & Actions */}
             <div className="space-y-4 sm:space-y-6 w-full max-w-2xl mx-auto lg:mx-0">
               {/* Amount Box */}
@@ -1518,89 +1396,7 @@ function PaymentStatus({ transaction, merchantId }: { transaction: any; merchant
               />
 
               {/* Tap to Pay Overlay (iOS only) */}
-              {showTapToPayOverlay && (
-                <div
-                  className="fixed inset-0 z-50 flex items-center justify-center"
-                  style={{ backgroundColor: '#0a0a0a' }}
-                >
-                  <button
-                    onClick={closeTapToPayOverlay}
-                    className="absolute top-6 right-6 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors z-10"
-                  >
-                    <X className="h-4 w-4 text-white/70" />
-                  </button>
 
-                  <div
-                    className="backdrop-blur-xl rounded-3xl p-12 max-w-sm w-full mx-8 text-center shadow-2xl"
-                    style={{
-                      background: 'linear-gradient(135deg, rgba(0, 255, 102, 0.12) 0%, rgba(0, 255, 102, 0.05) 100%)',
-                      border: '1px solid rgba(0, 255, 102, 0.3)',
-                      boxShadow: '0 25px 50px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(0, 255, 102, 0.2)',
-                    }}
-                  >
-                    {tapToPayStatus === "waiting" && (
-                      <div className="space-y-8">
-                        <div
-                          className="mx-auto w-24 h-24 rounded-full flex items-center justify-center"
-                          style={{ border: '2px solid rgba(0,255,102,0.4)', background: 'rgba(0,255,102,0.08)' }}
-                        >
-                          <Waves className="w-10 h-10 animate-pulse" style={{ color: '#00FF66' }} />
-                        </div>
-                        <div className="space-y-2">
-                          <div className="text-2xl font-light text-white">Hold to Card</div>
-                          <div className="text-white/60 text-base">Hold the top of your iPhone near the customer's card or device</div>
-                        </div>
-                      </div>
-                    )}
-
-                    {tapToPayStatus === "processing" && (
-                      <div className="space-y-8">
-                        <div className="mx-auto w-16 h-16 rounded-full bg-white/10 border border-white/20 flex items-center justify-center">
-                          <Loader2 className="h-8 w-8 text-white/80 animate-spin" />
-                        </div>
-                        <div className="space-y-2">
-                          <div className="text-2xl font-light text-white">Processing</div>
-                          <div className="text-white/60 text-base">Please wait...</div>
-                        </div>
-                      </div>
-                    )}
-
-                    {tapToPayStatus === "completed" && (
-                      <div className="space-y-8">
-                        <div
-                          className="mx-auto w-16 h-16 rounded-full flex items-center justify-center"
-                          style={{ background: 'rgba(0, 255, 102, 0.2)', border: '1px solid rgba(0, 255, 102, 0.4)' }}
-                        >
-                          <CheckCircle className="h-8 w-8" style={{ color: '#00FF66' }} />
-                        </div>
-                        <div className="space-y-2">
-                          <div className="text-2xl font-light text-white">Payment Approved</div>
-                          <div className="text-white/60 text-base">Transaction complete</div>
-                        </div>
-                      </div>
-                    )}
-
-                    {tapToPayStatus === "failed" && (
-                      <div className="space-y-8">
-                        <div className="mx-auto w-16 h-16 rounded-full bg-red-500/20 border border-red-500/30 flex items-center justify-center">
-                          <XCircle className="h-8 w-8 text-red-400" />
-                        </div>
-                        <div className="space-y-2">
-                          <div className="text-2xl font-light text-white">Payment Declined</div>
-                          <div className="text-white/60 text-base">Please try again or use another method</div>
-                        </div>
-                        <button
-                          onClick={closeTapToPayOverlay}
-                          className="w-full py-4 px-6 rounded-2xl text-white/90 text-sm font-light"
-                          style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)' }}
-                        >
-                          Try Again
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Right Pane: QR Code & Payment Status */}

@@ -43,6 +43,8 @@
 //     [--context phone|tablet|desktop|desktop-short] [--surface /path] [--self-test | --tutorials] [--measure <selector>]
 // --tutorials runs real progress, Settings restart, targets/fallbacks, resize,
 // document persistence and SPA departure/browser-Back checks on merchant pages.
+// --payment-states separately seeds synthetic attempts through MemStorage's
+// public APIs and verifies public result/receipt states on the real HTTP routes.
 // --accessibility adds a real WCAG A/AA axe audit to every normal matrix cell.
 // --tutorial-accessibility checks active dialogs, real keyboard navigation,
 // focus return on Escape/completion and axe on every merchant tutorial surface.
@@ -58,7 +60,7 @@ import express from "express";
 import bcrypt from "bcrypt";
 import https from "node:https";
 import http from "node:http";
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import net from "node:net";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -94,6 +96,8 @@ const ONLY_SURFACE = flag("--surface");
 const MEASURE = flag("--measure");
 const SELF_TEST = argv.includes("--self-test") ? (argv.splice(argv.indexOf("--self-test"), 1), true) : false;
 const TUTORIALS = argv.includes("--tutorials") ? (argv.splice(argv.indexOf("--tutorials"), 1), true) : false;
+// R7 public outcomes use real attempt storage/routes, never provider calls.
+const PAYMENT_STATES = argv.includes("--payment-states") ? (argv.splice(argv.indexOf("--payment-states"), 1), true) : false;
 const ACCESSIBILITY = argv.includes("--accessibility") ? (argv.splice(argv.indexOf("--accessibility"), 1), true) : false;
 const DIAGNOSTICS = argv.includes("--diagnostics") ? (argv.splice(argv.indexOf("--diagnostics"), 1), true) : false;
 const CANDIDATE_REVIEW = argv.includes("--candidate-review") ? (argv.splice(argv.indexOf("--candidate-review"), 1), true) : false;
@@ -124,6 +128,7 @@ if (KEYBOARD && !ACCESSIBILITY) throw new Error("--keyboard requires --accessibi
 if (DIALOGS && !ACCESSIBILITY) throw new Error("--dialogs requires --accessibility");
 if ((ZOOM || REDUCED_MOTION) && !ACCESSIBILITY && !TUTORIAL_ACCESSIBILITY) throw new Error("--zoom/--reduced-motion require --accessibility or --tutorial-accessibility");
 if (ZOOM && REDUCED_MOTION) throw new Error("zoom and reduced motion are separate matrix gates");
+if (PAYMENT_STATES && (MANUAL_PREVIEW || SELF_TEST || TUTORIALS || ACCESSIBILITY || TUTORIAL_ACCESSIBILITY || MEASURE || KEYBOARD || DIALOGS || ZOOM || REDUCED_MOTION)) throw new Error('--payment-states is a separate public-page gate');
 const accessibilityAuditor = ACCESSIBILITY ? (await import('./accessibility-audit.mjs')).auditAccessibility : null;
 mkdirSync(out, { recursive: true });
 
@@ -439,6 +444,44 @@ const OUTSIDE: Outside[] = [
   { path: "/admin/web-analytics", who: "admin", mark: { text: "Revenue & Platform" } },
   { path: "/admin/settings", who: "admin", mark: { text: "Settings page coming soon" } },
 ];
+
+const paymentStatePages: Outside[] = [];
+if (PAYMENT_STATES) {
+  const { PaymentAttemptService } = await import('../server/payment-attempt-service');
+  const attempts = new PaymentAttemptService(storage);
+  for (const state of ['pending', 'approved', 'declined', 'cancelled'] as const) {
+    const made = await sale(`Synthetic ${state} result`, '10.00', 'pending', { board: counter.id });
+    const rawReturnState = createPaymentCredential().rawToken;
+    const claim = await attempts.claim({ transactionId: made.id, shareIndex: 0, idempotencyKey: randomUUID() });
+    if (claim.kind !== 'claimed') throw new Error('payment-state fixture claim refused');
+    const expected = await attempts.recordExpectedValues({ attemptId: claim.attempt.id, amountCents: 1000,
+      currency: 'NZD', merchantReference: `matrix-${state}`, providerEnvironment: 'uat' });
+    if (expected.kind !== 'recorded') throw new Error('payment-state fixture expectation refused');
+    const sessionId = `matrix-${state}-${randomUUID()}`;
+    const attached = await attempts.attachSession({ attemptId: claim.attempt.id, processorSessionId: sessionId,
+      processorXId: randomUUID(), rawReturnState });
+    if (attached.kind !== 'attached') throw new Error('payment-state fixture attachment refused');
+    if (state !== 'pending') {
+      const claimed = await attempts.claimFinalization(claim.attempt.id, sessionId);
+      if (claimed.kind !== 'claimed') throw new Error('payment-state fixture finalization claim refused');
+      const finalized = await attempts.finalize({ attemptId: claim.attempt.id, processorSessionId: sessionId,
+        processorTransactionId: state === 'approved' ? `matrix-${randomUUID()}` : null,
+        paymentMethod: 'card', outcome: state });
+      if (finalized.kind !== 'finalized') throw new Error('payment-state fixture finalization refused');
+    }
+    const resultPath = `/payment/result/${made.id}`;
+    paymentStatePages.push({ path: `${resultPath}?state=${rawReturnState}&status=approved`,
+      name: `public-result-${state}`, who: 'nobody',
+      movesTo: state === 'approved' ? `/receipt/${made.id}` : resultPath,
+      mark: { text: state === 'approved' ? 'Payment Accepted!' : state === 'declined' ? 'Payment Declined'
+        : state === 'cancelled' ? 'Payment Cancelled' : 'Checking your payment' } });
+    if (state === 'approved') paymentStatePages.push({
+      path: `/payment/result/${boardOpen.id}?state=${rawReturnState}&status=approved`,
+      name: 'public-result-wrong-transaction', who: 'nobody', movesTo: `/payment/result/${boardOpen.id}`,
+      mark: { text: 'Checking your payment' } });
+  }
+  paymentStatePages.push(OUTSIDE.find(page => page.name === '/pay/return/:state')!);
+}
 
 if (MANUAL_PREVIEW) {
   previewRoutes.push(...SURFACES.map(s => ({ path: s.path, label: `${s.mode}: ${s.path}` })), ...OUTSIDE.map(s => ({ path: s.path, label: `${s.who}: ${s.name ?? s.path}` })));
@@ -918,8 +961,8 @@ async function visit(context: BrowserContext, size: Size, surface: Surface | Out
 let exitCode = 0;
 try {
   const sizes = SIZES.filter((size) => !ONLY_CONTEXT || size.name === ONLY_CONTEXT);
-  const surfaces = SURFACES.filter((surface) => !ONLY_SURFACE || surface.path === ONLY_SURFACE);
-  const pages = OUTSIDE.filter((page) => !ONLY_SURFACE || page.path === ONLY_SURFACE || page.name === ONLY_SURFACE);
+  const surfaces = PAYMENT_STATES ? [] : SURFACES.filter((surface) => !ONLY_SURFACE || surface.path === ONLY_SURFACE);
+  const pages = (PAYMENT_STATES ? paymentStatePages : OUTSIDE).filter((page) => !ONLY_SURFACE || page.path === ONLY_SURFACE || page.name === ONLY_SURFACE);
   if (!sizes.length || (!surfaces.length && !pages.length)) throw new Error("matrix filters selected zero cells");
   if (TUTORIALS || TUTORIAL_ACCESSIBILITY) {
     if (!surfaces.length) throw new Error("tutorial filters selected zero merchant surfaces");

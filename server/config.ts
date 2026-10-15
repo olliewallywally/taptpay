@@ -321,6 +321,9 @@ export function loadConfig(env: EnvironmentSource): Readonly<AppConfig> {
   if (rawBooleans.FEATURE_CRYPTO) {
     throw new ConfigValidationError("FEATURE_CRYPTO", "capability", "must remain false");
   }
+  if (rawBooleans.FEATURE_TAP_TO_PAY) {
+    throw new ConfigValidationError('FEATURE_TAP_TO_PAY', 'capability', 'must remain false until the native and provider integration is verified');
+  }
   if (rawBooleans.SEED_DEMO_DATA && appEnv !== "development" && appEnv !== "test") {
     throw new ConfigValidationError(
       "SEED_DEMO_DATA",

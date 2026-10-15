@@ -13,7 +13,6 @@
  * The route table is also read: every route of the listed families must be classified here, so a new
  * one cannot arrive unguarded without this test being told.
  */
-jest.mock("@/plugins/TaptPayPlugin", () => ({}));
 jest.mock("@/pages/landing-page", () => ({ LandingPage: () => null }));
 jest.mock("@/pages/login", () => ({ __esModule: true, default: () => null }));
 jest.mock("@/pages/app-login", () => ({ __esModule: true, default: () => null }));

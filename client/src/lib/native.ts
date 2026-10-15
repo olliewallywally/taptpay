@@ -1,24 +1,10 @@
-export interface TaptPayBridgeOptions {
-  amount: number;
-  currency: string;
-  merchantName: string;
-}
-
-export interface TaptPayBridgeResult {
-  approved: boolean;
-  token?: string;
-  cancelled?: boolean;
-  error?: string;
-}
+import { TAP_TO_PAY_AVAILABLE } from '@shared/payment-capabilities';
 
 declare global {
   interface Window {
     Capacitor?: {
       isNativePlatform: () => boolean;
       getPlatform: () => string;
-    };
-    TaptPay?: {
-      startTapToPay(opts: TaptPayBridgeOptions): Promise<TaptPayBridgeResult>;
     };
   }
 }
@@ -32,5 +18,5 @@ export function isNativeIOS(): boolean {
 }
 
 export function canTapToPay(): boolean {
-  return isNativeIOS() && typeof window.TaptPay?.startTapToPay === "function";
+  return TAP_TO_PAY_AVAILABLE;
 }

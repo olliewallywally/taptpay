@@ -1,6 +1,6 @@
 # R1-T7 tenant/storage execution inventory
 
-Generated from working-tree sources on base `b7fa2de91b508eb624d2257eafc2dee7c53b1439`; the phase evidence names the final commit.
+Generated from working-tree sources on base `82bc816ad70817ab18b9ce7369172386e6b8dbfc`; the phase evidence names the final commit.
 
 Registrations: **196**; registrations with session/admin authentication: **122**;
 registrations calling checkMerchantOwnership: **25**.
@@ -195,7 +195,7 @@ tests, two-tenant HTTP tests and a reviewed SQL predicate. This inventory does n
 | POST /api/transactions/:id/split | public (public/number) | `createBillSplit`, `getTransaction` |
 | POST /api/transactions/:transactionId/refunds | tenant (merchant/resource) | `createRefundForMerchant`, `getTransactionForMerchant`, `releaseRefundAmountForMerchant`, `reserveRefundAmountForMerchant`, `updateRefundStatusForMerchant` |
 | POST /api/transactions/cash-sale | tenant (merchant/path-merchant) | `getCashSaleByKeyForMerchant`, `getOrCreateSubscription`, `getTaptStoneForMerchant`, `recordCashSaleForMerchant` |
-| POST /api/transactions/tap-to-pay | tenant (merchant/path-merchant) | `createTransactionForMerchant`, `getActiveTransactionByMerchant`, `getOrCreateSubscription`, `getTransactionForMerchant`, `updateTransactionPaymentMethodForMerchant`, `updateTransactionStatusForMerchant` |
+| POST /api/transactions/tap-to-pay | tenant (merchant/path-merchant) | — |
 | POST /api/tutorial/restart | tenant (merchant/session) | `restartMerchantTutorial` |
 | POST /api/v1/transactions | API-key tenant (api-key/key) | `createTransactionForMerchant`, `getApiKeyByKey`, `getCreationCommandForMerchant`, `getOrCreateSubscription`, `logApiRequest`, `updateApiKeyLastUsed` |
 | POST /api/webhooks/whatsapp | provider (provider/provider-session) | `createJobEvent`, `getInvoiceRentRequestByWhatsappMessageId`, `getJobInvoiceByWhatsappMessageId`, `logTransactionEvent`, `updateInvoiceRentRequest`, `updateJobInvoice` |

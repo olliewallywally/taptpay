@@ -16,10 +16,8 @@ describe("R0-T5 disabled capability gates", () => {
     ["post", "/api/transactions/tap-to-pay"],
   ])("%s %s fails before billing or transaction writes", (method, route) => {
     const source = handler(method, route);
-    const gate = source.indexOf("config.features.tapToPay");
-    expect(gate).toBeGreaterThan(0);
-    expect(source.indexOf("requireBillingCard")).toBeGreaterThan(gate);
-    expect(source.indexOf("storage.createTransaction")).toBeGreaterThan(gate);
+    expect(source).toContain("TAP_TO_PAY_DISABLED");
+    expect(source).not.toMatch(/requireBillingCard|storage\.|createAttendedSession|submitTapToPayToken|broadcast/);
   });
 
   test("refund initiation fails before reservation and refund creation", () => {

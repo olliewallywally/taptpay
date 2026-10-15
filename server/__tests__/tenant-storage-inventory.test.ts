@@ -71,17 +71,15 @@ test("authenticated refunds use scoped writes and no retired global mutator", ()
 test("authenticated sale creation and disabled native writes have explicit tenant scope", () => {
   expect(storageContract().find(method => method.name === "associateTransactionWithStone")).toBeUndefined();
   const facts = currentRouteFacts();
-  for (const key of ["POST /api/transactions", "POST /api/v1/transactions", "POST /api/transactions/tap-to-pay"]) {
+  for (const key of ["POST /api/transactions", "POST /api/v1/transactions"]) {
     expect(facts.get(key)?.storageMethods).toContain("createTransactionForMerchant");
     expect(facts.get(key)?.storageMethods).not.toContain("createTransaction");
   }
   expect(facts.get('POST /api/transactions/cash-sale')?.storageMethods).toContain('recordCashSaleForMerchant');
   expect(facts.get('POST /api/transactions/cash-sale')?.storageMethods).not.toContain('createTransaction');
   const native = facts.get("POST /api/transactions/tap-to-pay")!.storageMethods;
-  expect(native).toContain("getTransactionForMerchant");
-  expect(native).not.toContain("getTransaction");
-  expect(native).toContain("updateTransactionStatusForMerchant");
-  expect(native).toContain("updateTransactionPaymentMethodForMerchant");
+  expect(native).toEqual([]);
+  expect(facts.get("POST /api/transactions/tap-to-pay")!.sideEffects).toEqual([]);
 });
 
 test("property profile operations and history have explicit merchant contracts", () => {

@@ -1,6 +1,6 @@
+import { TAP_TO_PAY_UNAVAILABLE } from "@shared/payment-capabilities";
 import {cashCommandConflict,cashCommandKey,completeCashCommand} from "@/lib/cash-command-key";
 import { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { QRCodeDisplay } from "@/components/qr-code-display";
@@ -15,8 +15,6 @@ import { sseClient } from "@/lib/sse-client";
 import { useToast } from "@/hooks/use-toast";
 import { useDeviceStatusMonitoring, useSSEConnectionMonitoring } from "@/components/notification-system";
 import { getCurrentMerchantId } from "@/lib/auth";
-import { Loader2, CheckCircle, XCircle, Waves, X } from "lucide-react";
-import { canTapToPay } from "@/lib/native";
 import RetailTerminalView, {
   type RetailCreateOptions,
   type RetailReceipt,
@@ -28,8 +26,6 @@ import RetailTerminalView, {
 } from "@/features/terminal/retail/RetailTerminalView";
 import { sessionFetch } from "@/lib/session";
 import { MERCHANTS_KEY, apiPath, apiTo, wholeNumber } from "@shared/api-path";
-
-const BRAND = "#00DFC8";
 
 /*
  * A board-less sale's own link, as the server gave it once when the sale was made (only its
@@ -115,9 +111,6 @@ export default function MerchantTerminalMobile() {
   // The cash sale last recorded here, for the success screen and its receipt link.
   const [liveReceipt, setLiveReceipt] = useState<RetailReceipt | null>(null);
 
-  const [tapToPayStatus, setTapToPayStatus] = useState<"idle" | "waiting" | "processing" | "completed" | "failed">("idle");
-  const [tapToPayApproved, setTapToPayApproved] = useState<boolean | null>(null);
-  const [showTapToPayOverlay, setShowTapToPayOverlay] = useState(false);
 
   const audioCtxRef = useRef<AudioContext | null>(null);
 
@@ -361,80 +354,6 @@ export default function MerchantTerminalMobile() {
     },
   });
 
-  const startTapToPayPayment = async (txOverride?: any) => {
-    const tx = txOverride ?? activeTransaction;
-    if (!tx) {
-      toast({ title: "No Transaction", description: "Create a transaction first.", variant: "destructive" });
-      return;
-    }
-    setTapToPayStatus("waiting");
-    setTapToPayApproved(null);
-    setShowTapToPayOverlay(true);
-    try {
-      let bridgeResult: { approved: boolean; token?: string; cancelled?: boolean; error?: string };
-      if (canTapToPay()) {
-        bridgeResult = await (window as any).TaptPay!.startTapToPay({
-          amount: parseFloat(tx.price),
-          currency: "NZD",
-          merchantName: merchant?.businessName || "TaptPay",
-        });
-      } else if (import.meta.env.DEV) {
-        await new Promise(r => setTimeout(r, 2000));
-        bridgeResult = { approved: true, token: `SIM_TOKEN_${Date.now()}` };
-      } else {
-        setTapToPayStatus("idle");
-        setShowTapToPayOverlay(false);
-        toast({ title: "Not available", description: "Tap to Pay requires the TaptPay iOS app.", variant: "destructive" });
-        return;
-      }
-      if (bridgeResult.cancelled) {
-        setTapToPayStatus("idle");
-        setShowTapToPayOverlay(false);
-        toast({ title: "Cancelled", description: "Tap to Pay was cancelled." });
-        return;
-      }
-      setTapToPayStatus("processing");
-      const r = await sessionFetch(apiPath("POST /api/transactions/tap-to-pay"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          merchantId,
-          transactionId: tx.id,
-          amount: parseFloat(tx.price),
-          windcaveToken: bridgeResult.token,
-        }),
-      });
-      if (notifyIfBillingCardRequired(r)) throw new BillingCardRequiredError();
-      if (!r.ok) {
-        const errData = await r.json().catch(() => ({}));
-        throw new Error(errData.message || `Processor error (${r.status})`);
-      }
-      const data = await r.json();
-      setTapToPayApproved(data.approved);
-      setTapToPayStatus(data.approved ? "completed" : "failed");
-      queryClient.invalidateQueries({ queryKey: [MERCHANTS_KEY, merchantId, "active-transaction"] });
-      setTimeout(() => { setShowTapToPayOverlay(false); setTapToPayStatus("idle"); setTapToPayApproved(null); }, 3500);
-    } catch (err: any) {
-      /* A billing 402: the server refused before charging, so no card was
-         declined. The billing banner says why (R1-T9); the overlay closes and the
-         sale stays pending to take again. */
-      if (isBillingCardRequired(err)) {
-        setTapToPayStatus("idle");
-        setShowTapToPayOverlay(false);
-        return;
-      }
-      setTapToPayStatus("failed");
-      setTapToPayApproved(false);
-      toast({ title: "Payment error", description: err?.message || "Tap to Pay failed", variant: "destructive" });
-    }
-  };
-
-  const closeTapToPayOverlay = () => {
-    setShowTapToPayOverlay(false);
-    setTapToPayStatus("idle");
-    setTapToPayApproved(null);
-  };
-
   if (!merchantId) {
     window.location.href = "/login";
     return <div>Redirecting...</div>;
@@ -545,6 +464,10 @@ export default function MerchantTerminalMobile() {
     draft: RetailSaleDraft,
     options: Partial<RetailCreateOptions> = {}
   ) => {
+    if (options.paywave) {
+      toast({ title: "Tap to Pay unavailable", description: TAP_TO_PAY_UNAVAILABLE, variant: "destructive" });
+      return;
+    }
     // The same client-known decision sent as linkMode above — never gate the
     // share overlay on response field presence (server/routes.ts populates
     // paymentUrl/qrCodeUrl unconditionally on every successful create).
@@ -574,9 +497,6 @@ export default function MerchantTerminalMobile() {
       };
       setSaleLinks((prev) => ({ ...prev, [String(newTx.id)]: link }));
     }
-    if (options.paywave) {
-      startTapToPayPayment(newTx);
-    }
   };
 
   const handleLiveCancel = () => {
@@ -586,10 +506,6 @@ export default function MerchantTerminalMobile() {
   };
 
   const handleCreateSale = async (draft: RetailSaleDraft, options: RetailCreateOptions) => {
-    if (options.existing && options.paywave) {
-      await startTapToPayPayment();
-      return;
-    }
     await handleLiveSend(draft, options);
   };
 
@@ -634,106 +550,6 @@ export default function MerchantTerminalMobile() {
         showPaywave={false}
         successNotification={successNotif}
       />
-
-      <AnimatePresence>
-        {showTapToPayOverlay && (
-          <motion.div
-            data-testid="tap-to-pay-overlay"
-            className="fixed inset-0 z-[999] flex items-center justify-center"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            style={{ backgroundColor: "#060D1F" }}
-          >
-            <button
-              onClick={closeTapToPayOverlay}
-              className="absolute top-6 right-6 w-8 h-8 rounded-full flex items-center justify-center"
-              style={{ background: "rgba(255,255,255,0.08)" }}
-            >
-              <X className="h-4 w-4 text-white/60" />
-            </button>
-            <motion.div
-              className="rounded-3xl p-10 max-w-sm w-full mx-6 text-center"
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              style={{
-                background: `linear-gradient(135deg, ${BRAND}14, ${BRAND}08)`,
-                border: `1px solid ${BRAND}40`,
-                boxShadow: `0 25px 50px rgba(0,0,0,0.6), 0 0 60px ${BRAND}18`,
-              }}
-            >
-              {tapToPayStatus === "waiting" && (
-                <div className="space-y-6">
-                  <div
-                    className="w-20 h-20 rounded-full flex items-center justify-center mx-auto"
-                    style={{ border: `2px solid ${BRAND}60`, background: `${BRAND}10` }}
-                  >
-                    <Waves className="w-10 h-10 animate-pulse" style={{ color: BRAND }} />
-                  </div>
-                  <div>
-                    <p className="text-white text-xl font-semibold">Hold to Card</p>
-                    <p className="text-white/50 text-sm mt-2">Hold the top of your iPhone near the customer's card</p>
-                  </div>
-                </div>
-              )}
-              {tapToPayStatus === "processing" && (
-                <div className="space-y-6">
-                  <div
-                    className="w-20 h-20 rounded-full flex items-center justify-center mx-auto"
-                    style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}
-                  >
-                    <Loader2 className="h-8 w-8 text-white/60 animate-spin" />
-                  </div>
-                  <div>
-                    <p className="text-white text-xl font-semibold">Processing</p>
-                    <p className="text-white/40 text-sm mt-2">Please wait...</p>
-                  </div>
-                </div>
-              )}
-              {tapToPayStatus === "completed" && (
-                <div className="space-y-6">
-                  <div
-                    className="w-20 h-20 rounded-full flex items-center justify-center mx-auto"
-                    style={{ background: `${BRAND}18`, border: `1px solid ${BRAND}40` }}
-                  >
-                    <CheckCircle className="h-8 w-8" style={{ color: BRAND }} />
-                  </div>
-                  <div>
-                    <p className="text-white text-xl font-semibold">Payment Approved</p>
-                    <p className="text-white/40 text-sm mt-2">Transaction complete</p>
-                  </div>
-                </div>
-              )}
-              {tapToPayStatus === "failed" && (
-                <div className="space-y-6">
-                  <div
-                    className="w-20 h-20 rounded-full flex items-center justify-center mx-auto bg-red-500/20"
-                    style={{ border: "1px solid rgba(239,68,68,0.3)" }}
-                  >
-                    <XCircle className="h-8 w-8 text-red-400" />
-                  </div>
-                  <div>
-                    <p className="text-white text-xl font-semibold">Payment Declined</p>
-                    <p className="text-white/40 text-sm mt-2">Please try again</p>
-                  </div>
-                  <button
-                    onClick={closeTapToPayOverlay}
-                    className="w-full py-3 rounded-2xl text-sm font-medium"
-                    style={{
-                      background: "rgba(255,255,255,0.08)",
-                      border: "1px solid rgba(255,255,255,0.12)",
-                      color: "rgba(255,255,255,0.7)",
-                    }}
-                  >
-                    Try Again
-                  </button>
-                </div>
-              )}
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
     </div>
   );
 }

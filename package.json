@@ -12,6 +12,8 @@
     "test:r5:cli": "node --import tsx --test scripts/r5-encryption-preflight.test.ts",
     "check:r6": "tsc -p tsconfig.r6-scripts.json",
     "test:r6:cli": "node --import tsx --test scripts/r6-entitlement-inventory.test.ts scripts/r6-cron-resolve.test.ts scripts/r6-entitlement-policy.test.ts",
+    "test:r7:artifacts": "node --test scripts/verify-r7-artifacts.test.mjs",
+    "verify:r7:artifacts": "node scripts/verify-r7-artifacts.mjs",
     "admin:password": "tsx scripts/set-admin-password.ts",
     "test": "jest",
     "test:client": "jest --selectProjects client",

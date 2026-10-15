@@ -5,7 +5,7 @@ import "./support/test-env";
 // The capabilities these routes check before serving anyone (a flag needs enforce mode, config.ts):
 // a sale without a board has its own link; Tap to Pay; refunds.
 process.env.FEATURE_NEW_RETAIL_PAYMENTS = "true";
-process.env.FEATURE_TAP_TO_PAY = "true";
+process.env.FEATURE_TAP_TO_PAY = "false";
 process.env.FEATURE_REFUND_INITIATION = "true";
 process.env.ENV_VALIDATION_MODE = "enforce";
 
@@ -185,24 +185,17 @@ const RECIPES: Record<string, ServedRecipe> = {
     };
   },
   "POST /api/transactions/tap-to-pay": async (ctx) => {
-    await paidMonth(ctx);
     const pending = await sale(ctx, "pending");
-    jest.spyOn(windcave, "isWindcaveConfigured").mockReturnValue(true);
-    jest.spyOn(windcave, "createAttendedSession").mockResolvedValue({ success: true, sessionId: "matrix-attended" } as any);
-    jest.spyOn(windcave, "submitTapToPayToken")
-      .mockResolvedValue({ success: true, approved: true, windcaveTransactionId: "matrix-tap" } as any);
     return {
-      req: {
-        method: "post", path: "/api/transactions/tap-to-pay",
-        body: { merchantId: ctx.merchantId, transactionId: pending, amount: "5.50", windcaveToken: "matrix-nfc-token" },
-      },
-      status: 200,
+      req: { method: "post", path: "/api/transactions/tap-to-pay", body: { merchantId: ctx.merchantId, transactionId: pending, amount: "5.50", windcaveToken: "matrix-nfc-token" } },
+      status: 503,
       check: async (res) => {
-        expect(res.body).toMatchObject({ approved: true, transactionId: pending });
-        expect(await storage.getTransaction(pending)).toMatchObject({ status: "completed", paymentMethod: "tap_to_pay" });
+        expect(res.body.code).toBe("TAP_TO_PAY_DISABLED");
+        expect(await storage.getTransaction(pending)).toMatchObject({status:"pending",paymentMethod:"qr_code"});
       },
     };
   },
+
   "POST /api/transactions/:id/cancel": async (ctx) => {
     const pending = await sale(ctx, "pending");
     return {
