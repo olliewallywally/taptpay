@@ -1,9 +1,9 @@
+import { subscriptionAccess } from './entitlement-policy';
+
 export const BILLING_CARD_REQUIRED = {
   code: "BILLING_CARD_REQUIRED",
   message: "Your subscription needs attention before you can send payments. Open Billing in Settings.",
 } as const;
-
-const DUNNING_ACCESS_DAYS = 8;
 
 export function isCardExpiryValid(expiry: unknown, now: Date = new Date()): boolean {
   const match = String(expiry || "").match(/^(0[1-9]|1[0-2])\/(\d{2})$/);
@@ -48,31 +48,15 @@ export function renewalPaymentMethodIsReady(
  *
  * This deliberately does not depend on a stored card. Removing a renewal card
  * cannot claw back a month that has already been paid for. Active access ends
- * at the paid period boundary; past-due access has a bounded dunning grace
- * window and therefore cannot stay live forever if the scheduler stops.
+ * at the paid period boundary; past-due paid access has a bounded dunning grace
+ * window. Under approved D9, verified unpaid grants remain valid for their own
+ * recorded periods independently of renewal failures.
  */
 export function subscriptionHasPaidAccess(
   subscription: any,
   now: Date = new Date(),
 ): boolean {
-  if (!subscription) return false;
-  if (subscription.status === "past_due") {
-    // Dunning grace extends an entitlement that was already paid for; an
-    // initial charge failure must never manufacture a free trial period.
-    if (
-      !subscription.lastBillingDate
-      || !subscription.currentPeriodEnd
-      || (subscription.failedPaymentCount ?? 0) >= 4
-    ) return false;
-    const graceEndsAt = new Date(subscription.currentPeriodEnd);
-    if (Number.isNaN(graceEndsAt.getTime())) return false;
-    graceEndsAt.setUTCDate(graceEndsAt.getUTCDate() + DUNNING_ACCESS_DAYS);
-    return now < graceEndsAt;
-  }
-  if (subscription.status !== "active") return false;
-  if (!subscription.lastBillingDate || !subscription.currentPeriodEnd) return false;
-  const periodEnd = new Date(subscription.currentPeriodEnd);
-  return !Number.isNaN(periodEnd.getTime()) && now < periodEnd;
+  return subscriptionAccess(subscription, now);
 }
 
 /**

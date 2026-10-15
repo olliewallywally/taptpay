@@ -53,7 +53,7 @@ jobs:
       - name: R6 operator scripts typecheck
         run: npm run check:r6
       - name: R6 logging and read-only entitlement inventory (synthetic, no database)
-        run: npm run test:server -- --runTestsByPath server/__tests__/r6-structured-logging.test.ts server/__tests__/r6-entitlement-inventory.test.ts
+        run: npm run test:server -- --runTestsByPath server/__tests__/r6-structured-logging.test.ts server/__tests__/r6-entitlement-inventory.test.ts server/__tests__/r6-entitlement-policy.test.ts
       - name: R6 operator CLI safety (synthetic, no database)
         run: npm run test:r6:cli
       - name: R6 durable cron and delivery fencing (synthetic, no database)

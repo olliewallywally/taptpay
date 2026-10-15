@@ -2306,3 +2306,42 @@ export const cronJobs = pgTable(
     ),
   }),
 );
+
+
+// D9 service-period history is separate from mutable billing state. No API
+// insert schema is exposed; reviewed tooling/confirmed billing own these rows.
+export const subscriptionEntitlementControl = pgTable("subscription_entitlement_control", {
+  id: integer("id").primaryKey().default(1),
+  stage: text("stage").notNull().default("legacy"),
+  activatedAt: timestamp("activated_at", {withTimezone:true}),
+  reviewDigest: text("review_digest"),
+}, t=>({
+  singleton:check("entitlement_control_singleton",sql`${t.id}=1`),
+  stage:check("entitlement_control_stage",sql`${t.stage} IN ('legacy','enforced')`),
+  review:check("entitlement_control_review",sql`(${t.stage}='legacy' AND ${t.activatedAt} IS NULL AND ${t.reviewDigest} IS NULL) OR (${t.stage}='enforced' AND ${t.activatedAt} IS NOT NULL AND isfinite(${t.activatedAt}) AND ${t.reviewDigest} ~ '^[0-9a-f]{64}$' AND ${t.reviewDigest} IS NOT NULL)`),
+}));
+export const subscriptionEntitlements = pgTable("subscription_entitlements", {
+  id:uuid("id").primaryKey().defaultRandom(),
+  subscriptionId:integer("subscription_id").notNull(),
+  merchantId:integer("merchant_id").notNull(),
+  source:text("source").notNull(),
+  sourceKey:text("source_key").notNull().unique(),
+  periodStart:timestamp("period_start",{withTimezone:true}).notNull(),
+  periodEnd:timestamp("period_end",{withTimezone:true}).notNull(),
+  billingAttemptId:uuid("billing_attempt_id").unique().references(()=>subscriptionBillingAttempts.id),
+  billingHistoryId:integer("billing_history_id").unique().references(()=>subscriptionBillingHistory.id),
+  reviewDigest:text("review_digest"),
+  createdAt:timestamp("created_at",{withTimezone:true}).notNull().default(sql`clock_timestamp()`),
+},t=>({
+  tenant:foreignKey({name:"entitlement_tenant_fk",columns:[t.subscriptionId,t.merchantId],foreignColumns:[merchantSubscriptions.id,merchantSubscriptions.merchantId]}),
+  source:check("entitlement_source_check",sql`${t.source} IN ('paid','migration_grant','complimentary','trial')`),
+  key:check("entitlement_key_check",sql`${t.sourceKey} ~ '^[a-z0-9:_-]{1,96}$'`),
+  period:check("entitlement_period_check",sql`isfinite(${t.periodStart}) AND isfinite(${t.periodEnd}) AND ${t.periodEnd}>${t.periodStart} AND isfinite(${t.createdAt})`),
+  evidence:check("entitlement_evidence_check",sql`(${t.source}='paid' AND ${t.billingAttemptId} IS NOT NULL AND ${t.billingHistoryId} IS NULL AND ${t.reviewDigest} IS NULL) OR (${t.billingAttemptId} IS NULL AND ${t.reviewDigest} IS NOT NULL AND ${t.reviewDigest} ~ '^[0-9a-f]{64}$' AND ((${t.source}='paid' AND ${t.billingHistoryId} IS NOT NULL) OR (${t.source}<>'paid' AND ${t.billingHistoryId} IS NULL)))`),
+  periodIndex:index("subscription_entitlement_period_idx").on(t.subscriptionId,t.periodEnd,t.periodStart),
+}));
+export const subscriptionEntitlementRevocations=pgTable("subscription_entitlement_revocations",{
+  entitlementId:uuid("entitlement_id").primaryKey().references(()=>subscriptionEntitlements.id),
+  reviewDigest:text("review_digest").notNull(),
+  createdAt:timestamp("created_at",{withTimezone:true}).notNull().default(sql`clock_timestamp()`),
+},t=>({review:check("entitlement_revocation_review",sql`${t.reviewDigest} ~ '^[0-9a-f]{64}$' AND isfinite(${t.createdAt})`)}));

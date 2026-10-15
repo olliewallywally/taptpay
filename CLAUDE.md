@@ -1,12 +1,16 @@
 # Claude repository handoff
 
 **R6 is in progress on `remediation/r6-operations-20261015`.** Read
-`docs/HANDOFF-2026-10-15-r6-readiness.md` first for the health/readiness and bounded
+`docs/HANDOFF-2026-10-15-r6-entitlements.md` first for owner-approved D9,
+verified entitlement/provenance implementation, frozen0049b and remaining release
+inputs. D9 is no longer pending; live activation/UAT/operations evidence remains.
+Then read
+`docs/HANDOFF-2026-10-15-r6-readiness.md` for the health/readiness and bounded
 shutdown follow-up, then
 `docs/HANDOFF-2026-10-15-r6-cron-inflight.md` for the verified durable-cron
 repository step and frozen0049a. Then read
 `docs/HANDOFF-2026-10-15-r6-inflight.md` for the verified first logging/inventory
-slice, pending D9 question and remaining cron/readiness work. It is
+slice and historical pending decisions/work, now superseded by the newer handoffs. It is
 not a phase-complete or deployment handoff. Preserve owner app PID4196.
 
 **R5 repository implementation completed on `remediation/r5-encryption-20261014`
@@ -22,7 +26,8 @@ Owner deferred R5's remaining release closeout on October15 while R6 continues;
 track the open checks in `docs/operations/r5-deferred-closeout.md`. Deferred does
 not mean waived or deployed. Durable cron coordination/status is verified as a
 repository step. Health/readiness and bounded full-server shutdown follow-up is
-recorded in the newest handoff; official R6 exit remains gated on D9, real-target
+recorded in its handoff. D9 repository work is implemented in the newest handoff;
+official R6 exit remains gated on real-target
 entitlement evidence, actual UAT and external operations activation.
 
 Before committing, pushing, or changing the current uncommitted merchant work, read:

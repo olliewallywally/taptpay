@@ -99,6 +99,9 @@ async function verify() {
       phase = 'forward_migration';
       await ensureMigrationLedger(client);
       await applyMigration(client, migration, bytes.toString('utf8'));
+      const d9='0049b_subscription_entitlements.sql',d9Bytes=await readFile(new URL('../migrations/'+d9,import.meta.url));
+      assert.equal(createHash('sha256').update(d9Bytes).digest('hex'),'e8d4303ab2463f9e8aa9d2cfd95d0e8383e5e8cb61eaf9253cb1e6afbab157dc');
+      await applyMigration(client,d9,d9Bytes.toString('utf8'));
       // This clone has independently verified canonical effects, but the R5
       // source did not carry historical ledger rows. Baseline only this clone,
       // using the normal complete effect verifier, without replaying old SQL.

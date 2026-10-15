@@ -1,0 +1,189 @@
+{
+  "phase": "R6 D9 repository implementation; official R6 exit remains open",
+  "base": "aa0802b2064744c445e5f7aff3962abee84cd919",
+  "branch": "remediation/r6-operations-20261015",
+  "commitReference": "commit containing this receipt and the D9 handoff",
+  "approval": "docs/decisions/2026-10-15-r6-d9-entitlement-and-dunning.md",
+  "sourceManifest": "R6-D9-source-sha256-2026-10-15.txt",
+  "sourceFiles": 22,
+  "serverRegression": {
+    "suites": 23,
+    "tests": 526,
+    "failed": 0,
+    "pending": 0,
+    "completeFileUnion": true,
+    "fullServerSuiteRerun": false,
+    "results": [
+      {
+        "file": "policy-billing-final.json",
+        "sha256": "7801d06f4f18d71b6e9fd8995c3183241938e09e726e2ff2ca98f335de8fb283",
+        "suites": 10,
+        "tests": 149
+      },
+      {
+        "file": "migration-routes-final.json",
+        "sha256": "917c47146459587c831a7fbe0df2ad31a118e6855f234b6d348a2d46f641719b",
+        "suites": 13,
+        "tests": 377
+      }
+    ]
+  },
+  "nativeChecks": [
+    {
+      "file": "postgres-final-verified.log",
+      "sha256": "407a3986a212458f79cb8d7a786dd5d7592f13afa7397b2870a3fcf497fbc9ec",
+      "summary": {
+        "checks": 18,
+        "database": "r6_policy_0d41e3739c1f",
+        "restored": "r6_policy_0d41e3739c1f_restore",
+        "fingerprint": "sha256:3d6ff3e4471e623cfed35fc5971521e537142ece22eae6a546e3ebdf52969c40",
+        "realProviderCalls": 0,
+        "syntheticApprovedSends": 1
+      }
+    },
+    {
+      "file": "inventory-postgres-final.log",
+      "sha256": "5b196bf5668d984c764e2d5a70eaa73edbaa1012ddea3734e44b88eb88bece9f",
+      "summary": {
+        "checks": 4,
+        "syntheticMerchants": 6,
+        "syntheticSubscriptions": 5,
+        "mutationsDuringInventory": 0,
+        "liveProviderCalls": 0,
+        "proposedPolicyAssessed": true
+      }
+    },
+    {
+      "file": "readiness-postgres.log",
+      "sha256": "02ab9d618686675a426bd8607aae5fab6a97bd749149a128115c1360ff260e4b",
+      "summary": {
+        "checks": 8,
+        "providerCalls": 0,
+        "sharedDatabaseMutations": 0,
+        "ownedTarget": "r6_ready_400e9d6704e7",
+        "sourceUnchanged": true,
+        "fingerprint": "sha256:3d6ff3e4471e623cfed35fc5971521e537142ece22eae6a546e3ebdf52969c40"
+      }
+    }
+  ],
+  "cliTests": 15,
+  "fingerprintTests": 28,
+  "typechecks": [
+    "npm run check",
+    "npm run check:r6"
+  ],
+  "build": "npm run build passed; final server-only esbuild rerun against unchanged client",
+  "logs": [
+    {
+      "file": "typecheck-final.log",
+      "sha256": "0fedab01a35ca9fca53fe6fd66268f14af56d83677404c554d736f962da99fb3"
+    },
+    {
+      "file": "typecheck-r6-final.log",
+      "sha256": "68e094c1b46c8639af0f6b631a06958347fba5f7c39058b48f157e9147147a36"
+    },
+    {
+      "file": "cli-final.log",
+      "sha256": "788eb5959ed5c33d8f1f0f81da326d52967f4f8c3f2c4e4cd197d14c5c187491"
+    },
+    {
+      "file": "fingerprint-tests.log",
+      "sha256": "6f6b89a391169c6c9ec6e31c8526de304d4ea215aef3458acb5bb143b0cb149d"
+    },
+    {
+      "file": "build.log",
+      "sha256": "91972b05f05d0fefae07fc1f99f5c8162a1fb6a1c4fa019d71acb507fc3ff6a6"
+    },
+    {
+      "file": "server-build-final.log",
+      "sha256": "fea8a26de9f8b04bd3152b8e71d052741b797f30c74623a752e00fa75afcbe42"
+    }
+  ],
+  "failedEvidenceRetained": [
+    {
+      "file": "policy-red.log",
+      "sha256": "b932226c094d608cd55a49d00f5b4243672d0765374c10d1fc8852a85b9d49ec"
+    },
+    {
+      "file": "report-red.log",
+      "sha256": "b3b2c31cc730a996d3ccd95000bd7f4a727d69b1e430dce5fd3750d762028b36"
+    },
+    {
+      "file": "postgres-first.log",
+      "sha256": "5022b28d8feaf534a4ce2880badd463a30ea6b7ccfbad26d1ae3466575e17e89"
+    },
+    {
+      "file": "postgres-second.log",
+      "sha256": "47ef273facc4dca81ca2c49264922fc68bc09ed0e7ce5598569b74b389f57073"
+    },
+    {
+      "file": "postgres-third.log",
+      "sha256": "900c92d28163b4d16217fe0dd3387d548b83e5775f71cc7be04285c0ff1f287c"
+    },
+    {
+      "file": "postgres-fourth.log",
+      "sha256": "efc88f512c98bd904a263f0ba32dc603607e053dcb0eeab76744a2e6f9ce776b"
+    },
+    {
+      "file": "postgres-fifth.log",
+      "sha256": "f01b4a74a26733a17729f5517b6024967d3c46280d1da1e87d82f2860a5425d0"
+    },
+    {
+      "file": "postgres-final.log",
+      "sha256": "58ebc82d145ac6c36bf5eab5a678eeaed3648d010c45dfbc0fa2bbf2b78d5f5f"
+    },
+    {
+      "file": "cli-classify-red.log",
+      "sha256": "9c59ead30359fd0880d3405d3d2aedf0a4150c6a3a84825dffcca4da0de41ab6"
+    },
+    {
+      "file": "revocation-red.log",
+      "sha256": "12bb117dc0711e1ecfa03763a3581d87522f5b3c4a6882c958c2dbae18ddacba"
+    }
+  ],
+  "frozenExistingMigrations": [
+    {
+      "path": "migrations/0048a_data_encryption_workflows.sql",
+      "sha256": "8319ec9760ae5d91c1b7339e988e6772f3f6925aebe2065ebfbf71407ce837ce"
+    },
+    {
+      "path": "migrations/0048b_active_secret_vault.sql",
+      "sha256": "998e38c5606ea606fdc01712adcace451781668ad652e77e6a06c3dda99ddd37"
+    },
+    {
+      "path": "migrations/0048c_invoice_email_constraint_canonical.sql",
+      "sha256": "6898e300826d17195f2934c2ece780f0093636d40fdff7dc3b9fae34dbeec462"
+    },
+    {
+      "path": "migrations/0049a_durable_cron.sql",
+      "sha256": "8b3aefa3997197b75345f726a9a05f62dcb0e8c5472c262f9326d81647760dfc"
+    }
+  ],
+  "newMigration": {
+    "path": "migrations/0049b_subscription_entitlements.sql",
+    "sha256": "e8d4303ab2463f9e8aa9d2cfd95d0e8383e5e8cb61eaf9253cb1e6afbab157dc"
+  },
+  "canonicalSchema": "sha256:3d6ff3e4471e623cfed35fc5971521e537142ece22eae6a546e3ebdf52969c40",
+  "realProviderCalls": 0,
+  "liveSharedMutations": 0,
+  "deployed": false,
+  "realTargetActivated": false,
+  "subagentsUsed": false,
+  "remaining": [
+    "real-target provenance and restored before/after report",
+    "actual Windcave UAT and professional scope/release review",
+    "external scheduler, named alert recipient, deployment probes/termination settings",
+    "combined rolling restart and production-sized capacity rehearsal",
+    "Claude R4 canonical integration and six deferred R5 release checks"
+  ],
+  "notes": [
+    "policy tests initially failed loading the absent module (zero executed tests)",
+    "report and valid CLI command tests reproduced missing behavior before correction",
+    "native tests found correlated ORM SQL qualification, future fixture anchor, and CLI digit-flag errors",
+    "independent restore report clocks are validated separately while all aggregate counts must match",
+    "owned template observer was closed before cloning; exact owned verifier804775 interrupted; owner4196 untouched",
+    "native failing revocation test preceded parent-locked current-access protection",
+    "formatter-moved TypeScript suppression fixed without weakening compiler checks",
+    "no assertion, timeout or applied migration was weakened; no full historical replay, real UAT or remote CI claim"
+  ]
+}

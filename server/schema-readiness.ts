@@ -2,10 +2,10 @@ import { performance } from 'node:perf_hooks';
 import { verifyMigrationState, type MigrationClient } from './migrate';
 import { logOperation } from './structured-log';
 
-// Canonical strict public-schema digest through frozen migration0049a.
+// Canonical strict public-schema digest through frozen migration0049b.
 // Kept in sync with the reviewed artifact by tests; never learned from the target.
 export const READINESS_SCHEMA_DIGEST =
-  'sha256:7c427b93f2e0a4c8ca48271faabbe07d641ee8a211d519364d6d0ea8002d3888';
+  'sha256:3d6ff3e4471e623cfed35fc5971521e537142ece22eae6a546e3ebdf52969c40';
 export interface ReadinessSqlPool {
   connect(): Promise<MigrationClient & { release(destroy?: boolean): void }>;
 }

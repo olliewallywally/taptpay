@@ -5,7 +5,7 @@ scheduler activation. No scheduler or alert recipient was configured by this
 change. Owner approved uncertain-job holds on October15; see
 [decision](../decisions/2026-10-15-r6-uncertain-cron-jobs-held.md) and
 [design](r6-durable-cron-design.md). R5's [deferred closeout](r5-deferred-closeout.md),
-R4 integration, D9, real UAT and external operations activation remain release
+R4 integration, real-target D9 activation evidence, real UAT and external operations activation remain release
 gates. See [health/readiness and shutdown](r6-health-readiness-shutdown.md) for the
 repository follow-up and platform rollout checks.
 

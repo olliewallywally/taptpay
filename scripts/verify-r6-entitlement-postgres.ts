@@ -7,6 +7,8 @@ import {
   ENTITLEMENT_INVENTORY_PAGE,
 } from '../server/entitlement-inventory';
 import { runEntitlementInventory } from './r6-entitlement-inventory';
+import {applyMigration,ensureMigrationLedger} from '../server/migrate';
+import {readFile} from 'node:fs/promises';
 // @ts-expect-error Existing standalone safety helper.
 import { assertSafePostgresVerifierEnvironment } from './postgres-verifier-safety.mjs';
 let checks = 0;
@@ -51,6 +53,8 @@ async function verify() {
   await c.connect();
   const target = { host: url.hostname, port: Number(url.port), database };
   try {
+    await ensureMigrationLedger(c);
+    for(const name of ['0049a_durable_cron.sql','0049b_subscription_entitlements.sql']) await applyMigration(c,name,await readFile('migrations/'+name,'utf8'));
     const now = new Date(),
       start = new Date(now.getTime() - 30 * 86400000),
       end = new Date(now.getTime() + 30 * 86400000),
@@ -125,8 +129,7 @@ async function verify() {
         assert.equal(report.overdue, 2);
         assert.equal(report.provenance.unclassified, 5);
         assert.deepEqual(report.proposedGate, {
-          assessment: 'pending_D9',
-          blocked: null,
+          assessment: 'approved_D9',allowed:0,blocked:6,newlyAllowed:0,newlyBlocked:2,
         });
         assert.ok(!JSON.stringify(report).includes('synthetic'));
       }
@@ -229,7 +232,7 @@ async function verify() {
         syntheticSubscriptions: 5,
         mutationsDuringInventory: 0,
         liveProviderCalls: 0,
-        proposedPolicyAssessed: false,
+        proposedPolicyAssessed: true,
       })
     );
   } finally {

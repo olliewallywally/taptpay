@@ -6,17 +6,20 @@ function client(rows: any[], database = 'owned', withoutSubscription = 0) {
     query: jest.fn(async (q: string) => ({
       rows: q.includes('current_database()')
         ? [{ database, as_of: now }]
-        : q.includes('AS merchants')
-          ? [
-              {
-                merchants: String(rows.length + withoutSubscription),
-                subscriptions: String(rows.length),
-                without_subscription: String(withoutSubscription),
-              },
-            ]
-          : q.includes('FROM public.merchant_subscriptions')
-            ? rows
-            : [],
+        : q.includes('FROM public.subscription_entitlement_control') &&
+            !q.includes('FROM public.merchant_subscriptions')
+          ? [{ stage: 'legacy' }]
+          : q.includes('AS merchants')
+            ? [
+                {
+                  merchants: String(rows.length + withoutSubscription),
+                  subscriptions: String(rows.length),
+                  without_subscription: String(withoutSubscription),
+                },
+              ]
+            : q.includes('FROM public.merchant_subscriptions')
+              ? rows
+              : [],
     })),
   };
 }
@@ -29,6 +32,8 @@ const active = (id: number, extra: any = {}) => ({
   next_billing_date: new Date('2026-11-01Z'),
   failed_payment_count: 0,
   token_present: true,
+  entitlement: { stage: 'legacy', periods: [] },
+  sources: [],
   ...extra,
 });
 test('merchants with no subscription remain visible and blocked in the current-policy report', async () => {
@@ -42,7 +47,7 @@ test('merchants with no subscription remain visible and blocked in the current-p
   });
   expect(r.currentGate).toEqual({ allowed: 1, blocked: 2 });
 });
-test('missing billing dates are unclassified and current access matches the shared gate; after-policy stays pending', async () => {
+test('missing billing dates are unclassified and approved after-policy reports the lockout hazard', async () => {
   const c = client([
     active(1),
     active(2, { last_billing_date: null }),
@@ -60,11 +65,48 @@ test('missing billing dates are unclassified and current access matches the shar
   expect(report.activeWithoutBillingDate).toBe(1);
   expect(report.provenance.unclassified).toBe(4);
   expect(report.proposedGate).toEqual({
-    assessment: 'pending_D9',
-    blocked: null,
+    assessment: 'approved_D9',
+    allowed: 0,
+    blocked: 4,
+    newlyAllowed: 0,
+    newlyBlocked: 2,
   });
+  expect(report.safeToActivate).toBe(false);
   expect(report.overdue).toBe(1);
   expect(c.query.mock.calls.at(-1)?.[0]).toBe('ROLLBACK');
+});
+test('verified grants change before/after counts without inventing payment history', async () => {
+  const report = await inventoryEntitlements(
+    client([
+      active(1, {
+        last_billing_date: null,
+        sources: ['migration_grant'],
+        entitlement: {
+          stage: 'legacy',
+          periods: [
+            {
+              source: 'migration_grant',
+              start: '2026-10-01T00:00:00Z',
+              end: '2026-11-01T00:00:00Z',
+            },
+          ],
+        },
+      }),
+    ]),
+    target
+  );
+  expect(report.currentGate).toEqual({ allowed: 0, blocked: 1 });
+  expect(report.proposedGate).toMatchObject({
+    allowed: 1,
+    blocked: 0,
+    newlyAllowed: 1,
+    newlyBlocked: 0,
+  });
+  expect(report.provenance).toMatchObject({
+    unclassified: 0,
+    migration_grant: 1,
+  });
+  expect(report.safeToActivate).toBe(true);
 });
 test('counts contain no raw fields or inferred grant/paid approval when claims are malformed', async () => {
   const c = client([
@@ -91,5 +133,28 @@ test('target mismatch refuses every row projection and still rolls back', async 
       q.includes('FROM public.merchant_subscriptions')
     )
   ).toBe(false);
+  expect(c.query.mock.calls.at(-1)?.[0]).toBe('ROLLBACK');
+});
+test('source-period aggregates reject malformed counts without returning a partial report', async () => {
+  const c = client([]),
+    query = c.query;
+  c.query = jest.fn(async (q: string) =>
+    q.includes('AS current_count')
+      ? {
+          rows: [
+            {
+              source: 'paid',
+              current_count: 'private-invalid',
+              expired_count: '0',
+              future_count: '0',
+              revoked_count: '0',
+            },
+          ],
+        }
+      : query(q)
+  );
+  await expect(inventoryEntitlements(c, target)).rejects.toThrow(
+    'R6_ENTITLEMENT_INVALID_COUNTS'
+  );
   expect(c.query.mock.calls.at(-1)?.[0]).toBe('ROLLBACK');
 });

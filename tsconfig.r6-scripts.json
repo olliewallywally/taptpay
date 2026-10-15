@@ -1,9 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "types": [
-      "node"
-    ],
+    "types": ["node"],
     "tsBuildInfoFile": "./node_modules/typescript/r6-scripts.tsbuildinfo"
   },
   "include": [
@@ -13,6 +11,9 @@
     "scripts/r6-cron-resolve.test.ts",
     "scripts/verify-r6-entitlement-postgres.ts",
     "scripts/verify-r6-cron-postgres.ts",
-    "scripts/verify-r6-readiness-postgres.ts"
+    "scripts/verify-r6-readiness-postgres.ts",
+    "scripts/r6-entitlement-policy.ts",
+    "scripts/r6-entitlement-policy.test.ts",
+    "scripts/verify-r6-policy-postgres.ts"
   ]
 }

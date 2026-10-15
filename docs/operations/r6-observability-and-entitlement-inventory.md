@@ -1,8 +1,10 @@
 # R6 logging and read-only entitlement inventory
 
-This is the first R6 repository slice. Durable cron coordination, health/readiness,
-graceful shutdown, D9 policy changes and actual UAT remain separate work. No live
-target report or scheduler configuration is implied.
+Logging began in the first R6 slice. Durable cron/readiness/shutdown and the
+approved D9 repository work are now implemented separately. See the
+[entitlement rollout](r6-entitlement-rollout.md) for current classification,
+comparison and activation procedures. Actual UAT, real-target evidence and
+external operations activation remain open.
 
 ## Correlating a request or job
 
@@ -75,9 +77,12 @@ The JSON contains only counts and the database snapshot timestamp:
   usability, expiry validation or proof of a valid renewal card. Token values are
   never selected or decrypted. Due/overdue counts exclude requested cancellation
   and non-active/non-past-due states; they do not initiate billing.
-- Provenance remains `unclassified`; `activeWithoutBillingDate` is a review count,
-  not proof of a migration grant. `proposedGate.blocked` stays null with
-  `assessment: pending_D9`. An after-policy comparison is not yet available.
+- Unverified provenance remains `unclassified`; `activeWithoutBillingDate` is a
+  review count, not proof of a grant. D9 is approved: proposedGate now records
+  actual before/after transitions and assessed blocked/allowed counts. Effective
+  access still follows the database control, initially legacy. The report adds
+  source/period validity and activation refusal indicators; approval does not
+  classify an existing row or activate policy automatically.
 
 The local PostgreSQL verifier creates a new named clone of the explicitly guarded
 owned R5 scratch database. It seeds six synthetic merchants/five subscriptions,

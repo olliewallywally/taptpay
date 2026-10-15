@@ -2,14 +2,15 @@ import { DEFAULT_PLAN_ID, planFor, planForOrDefault, type PlanId } from "@shared
 import type { MerchantSubscription } from "@shared/schema";
 import { addOneMonth } from "./storage";
 import { renewalPaymentMethodIsReady } from "./billing-card";
+import { DUNNING_POLICY } from './entitlement-policy';
 
 /**
  * Dunning schedule, in days after the first failure, before a subscription is
  * suspended. Three attempts over a week, then stop: retrying forever costs
  * Windcave fees and annoys the cardholder's bank.
  */
-export const DUNNING_RETRY_DAYS = [1, 3, 7] as const;
-export const MAX_PAYMENT_ATTEMPTS = DUNNING_RETRY_DAYS.length + 1;
+export const DUNNING_RETRY_DAYS = DUNNING_POLICY.retryDays;
+export const MAX_PAYMENT_ATTEMPTS = DUNNING_POLICY.maxAttempts;
 
 export const SUBSCRIPTION_PAST_DUE = {
   code: "SUBSCRIPTION_PAST_DUE",

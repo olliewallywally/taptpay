@@ -1,4 +1,5 @@
 import {logOperation} from "./structured-log";
+import { subscriptionEntitlementProjection } from './entitlement-projection';
 import { hashBearerCredential } from "./payment-credential";
 import { DataEncryption, DataEncryptionError } from "./data-encryption";
 import { sealLegacyBankChanges, withoutLegacyBankFields } from "./legacy-bank-writes";
@@ -22,7 +23,7 @@ import { nextRunDateAfter } from "./property-schedule";
 import { nextJobRunDateAfter } from "./trades-schedule";
 import { INVOICE_DOCUMENT_FOLDER, parseInvoiceDocumentRef } from "./upload-policy";
 import type { ScanResult } from "./malware-scanner";
-import { eq, ne, desc, asc, and, inArray, notInArray, gt, gte, lte, lt, or, ilike, like, sql, isNull, isNotNull } from "drizzle-orm";
+import { eq, ne, desc, asc, and, inArray, notInArray, gt, gte, lte, lt, or, ilike, like, sql, isNull, isNotNull, getTableColumns } from "drizzle-orm";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { authHandoffCodes, authSessions, authThrottle, invoiceDocumentAccessAudit, invoiceDocumentReadLimits, invoiceSplitSessions, type AuthSession, type InvoiceSplitSession, type NewAuthSession } from "@shared/schema";
 import { SESSION_RECLAIM_AFTER_MS } from "./auth-sessions";
@@ -7626,9 +7627,9 @@ export class DatabaseStorage implements IStorage {
   async getOrCreateSubscription(merchantId: number): Promise<MerchantSubscription> {
     if (!this.db) throw new Error('Database not available');
     
-    // Try to get existing subscription
+    // Parent and entitlement/control share one database statement/snapshot.
     const existing = await this.db
-      .select()
+      .select({...getTableColumns(merchantSubscriptions), entitlement: subscriptionEntitlementProjection})
       .from(merchantSubscriptions)
       .where(eq(merchantSubscriptions.merchantId, merchantId))
       .limit(1);
@@ -7644,8 +7645,6 @@ export class DatabaseStorage implements IStorage {
       .values(newSubscriptionValues(merchantId))
       .onConflictDoNothing({ target: merchantSubscriptions.merchantId })
       .returning();
-    if (result[0]) return result[0];
-
     const winner = await this.getSubscription(merchantId);
     if (!winner) throw new Error('Failed to create merchant subscription');
     return winner;
@@ -7654,7 +7653,7 @@ export class DatabaseStorage implements IStorage {
   async getSubscription(merchantId: number): Promise<MerchantSubscription | undefined> {
     if (!this.db) throw new Error('Database not available');
     const result = await this.db
-      .select()
+      .select({...getTableColumns(merchantSubscriptions), entitlement: subscriptionEntitlementProjection})
       .from(merchantSubscriptions)
       .where(eq(merchantSubscriptions.merchantId, merchantId))
       .limit(1);

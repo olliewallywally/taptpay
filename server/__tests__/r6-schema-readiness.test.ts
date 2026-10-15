@@ -9,7 +9,7 @@ afterEach(() => jest.useRealTimers());
 it('uses the reviewed schema digest, never a target-learned baseline', () => {
   const recorded = JSON.parse(
     fs.readFileSync(
-      'docs/evidence/remediation-v2-2/r6/R6-through-0049a-fingerprint-2026-10-15.json',
+      'docs/evidence/remediation-v2-2/r6/R6-through-0049b-fingerprint-2026-10-15.json',
       'utf8'
     )
   );

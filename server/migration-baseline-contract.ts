@@ -657,6 +657,21 @@ export const BASELINE_EFFECT_REQUIREMENTS: readonly Requirement[] = [
   ...['cron_job_active_name_uq','cron_job_run_idx','cron_job_held_idx'].map(name=>r('0049a_durable_cron.sql','index','cron_jobs',name)),
   r('0049a_durable_cron.sql','function','','taptpay_cron_metrics_valid'),r('0049a_durable_cron.sql','function','','taptpay_cron_history_guard'),
   r('0049a_durable_cron.sql','trigger','cron_runs','cron_run_history_guard'),r('0049a_durable_cron.sql','trigger','cron_jobs','cron_job_history_guard'),
+  ...['subscription_entitlement_control','subscription_entitlements','subscription_entitlement_revocations'].map(table=>r('0049b_subscription_entitlements.sql','table',table)),
+  ...['id','stage','activated_at','review_digest'].map(column=>r('0049b_subscription_entitlements.sql','column','subscription_entitlement_control',column)),
+  ...['id','subscription_id','merchant_id','source','source_key','period_start','period_end','billing_attempt_id','billing_history_id','review_digest','created_at'].map(column=>r('0049b_subscription_entitlements.sql','column','subscription_entitlements',column)),
+  ...['entitlement_id','review_digest','created_at'].map(column=>r('0049b_subscription_entitlements.sql','column','subscription_entitlement_revocations',column)),
+  ...['entitlement_control_singleton','entitlement_control_stage','entitlement_control_review'].map(name=>r('0049b_subscription_entitlements.sql','constraint','subscription_entitlement_control',name)),
+  ...['entitlement_tenant_fk','entitlement_source_check','entitlement_key_check','entitlement_period_check','entitlement_evidence_check','subscription_entitlements_source_key_key','subscription_entitlements_billing_attempt_id_key','subscription_entitlements_billing_history_id_key','subscription_entitlements_billing_attempt_id_fkey','subscription_entitlements_billing_history_id_fkey'].map(name=>r('0049b_subscription_entitlements.sql','constraint','subscription_entitlements',name)),
+  r('0049b_subscription_entitlements.sql','constraint','subscription_entitlement_revocations','entitlement_revocation_review'),
+  r('0049b_subscription_entitlements.sql','constraint','subscription_entitlement_revocations','subscription_entitlement_revocations_entitlement_id_fkey'),
+  r('0049b_subscription_entitlements.sql','index','subscription_entitlements','subscription_entitlement_period_idx'),
+  ...['taptpay_entitlement_immutable','taptpay_entitlement_source_guard','taptpay_capture_paid_entitlement','taptpay_entitlement_control_guard'].map(name=>r('0049b_subscription_entitlements.sql','function','',name)),
+  r('0049b_subscription_entitlements.sql','trigger','subscription_entitlements','entitlement_history_immutable'),
+  r('0049b_subscription_entitlements.sql','trigger','subscription_entitlements','entitlement_source_guard'),
+  r('0049b_subscription_entitlements.sql','trigger','subscription_entitlement_revocations','entitlement_revocation_immutable'),
+  r('0049b_subscription_entitlements.sql','trigger','subscription_entitlement_control','entitlement_control_guard'),
+  r('0049b_subscription_entitlements.sql','trigger','subscription_billing_attempts','subscription_paid_entitlement_capture'),
 ];
 
 export const FIND_MISSING_BASELINE_EFFECTS_SQL = `
