@@ -38,7 +38,7 @@ test('exact snapshots pass; changed and stale/malicious files fail', async () =>
     await rm(root, { recursive: true, force: true });
   }
 });
-test('native config cannot restore external navigation even when assets match', async () => {
+test('native config cannot broaden navigation even when assets match', async () => {
   const root = await mkdtemp(join(tmpdir(), 'r7-native-')),
     build = join(root, 'build'),
     snapshot = join(root, 'snapshot'),
@@ -57,7 +57,7 @@ test('native config cannot restore external navigation even when assets match', 
       server: {
         url: 'https://taptpay.co.nz/app-login',
         cleartext: false,
-        allowNavigation: ['appleid.apple.com'],
+        allowNavigation: ['appleid.apple.com', 'sec.windcave.com'],
       },
     };
     await writeFile(nativeConfig, JSON.stringify(config));

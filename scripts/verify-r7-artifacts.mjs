@@ -68,7 +68,7 @@ export async function verifyArtifacts({
     const config = JSON.parse(await readFile(nativeConfig, 'utf8'));
     assert.equal(config.server.url, 'https://taptpay.co.nz/app-login');
     assert.equal(config.server.cleartext, false);
-    assert.deepEqual(config.server.allowNavigation, ['appleid.apple.com']);
+    assert.deepEqual(config.server.allowNavigation, ['appleid.apple.com', 'sec.windcave.com']);
   }
   return {
     webFiles: Object.keys(expected).length,

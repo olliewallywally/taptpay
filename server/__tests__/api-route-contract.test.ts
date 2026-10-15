@@ -39,15 +39,13 @@ function clientSources(dir = "client/src"): string[] {
 }
 
 /**
- * The files the app never loads. Nothing imports eleven of them; App declares three for lazy loading
+ * The files the app never loads. Nothing imports nine of them; App declares three for lazy loading
  * and never renders them. Every call to a route the server no longer has is in one of these, so they
  * are left as they are, held to the number of addresses each spells today, and must stay unloaded.
  * Deleting them is the owner's decision (docs/PLAN-2026-10-06-r1-t10-acceptance-matrix.md, question 4).
  * A file is taken off this list by deleting it or by moving it onto the builder, never added to it.
  */
 const NEVER_LOADED: Record<string, number> = {
-  "client/src/components/digital-wallet-buttons.tsx": 3,
-  "client/src/components/native-payment-buttons.tsx": 4,
   "client/src/pages/admin-api.tsx": 7,
   "client/src/pages/admin-dashboard.tsx": 6,
   "client/src/pages/admin-merchant-broken.tsx": 9,
@@ -57,8 +55,8 @@ const NEVER_LOADED: Record<string, number> = {
   "client/src/pages/create-merchant.tsx": 3,
   "client/src/pages/demo-terminal.tsx": 28,
   "client/src/pages/exports.tsx": 4,
-  "client/src/pages/merchant-terminal-mobile.tsx": 17,
-  "client/src/pages/merchant-terminal.tsx": 22,
+  "client/src/pages/merchant-terminal-mobile.tsx": 13,
+  "client/src/pages/merchant-terminal.tsx": 19,
   "client/src/pages/settings-simple.tsx": 3,
 };
 /**
@@ -574,8 +572,8 @@ describe("R1-T10 — where an API address may still be spelled", () => {
       expect([file, spelled(file).length]).toEqual([file, times]);
       expect([file, loaded.has(file)]).toEqual([file, false]);
     }
-    expect(Object.keys(NEVER_LOADED)).toHaveLength(14);
-    expect(Object.values(NEVER_LOADED).reduce((sum, times) => sum + times, 0)).toBe(118);
+    expect(Object.keys(NEVER_LOADED)).toHaveLength(12);
+    expect(Object.values(NEVER_LOADED).reduce((sum, times) => sum + times, 0)).toBe(104);
   });
 
   it("the reading of what the app loads reaches every file that names a route", () => {

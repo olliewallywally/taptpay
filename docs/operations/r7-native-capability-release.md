@@ -13,10 +13,12 @@ according to its existing gates. Enabling native Tap requires the separate
 workstream in the master plan14.2, including durable server verification and UAT.
 
 The Capacitor app still loads `https://taptpay.co.nz/app-login`, uses HTTPS and
-keeps its existing orientation declarations. The only additional in-WebView host
-is `appleid.apple.com`, needed by the existing same-browser Apple OAuth cookie
-binding. Replit, broad Apple/subdomain and payment-provider wildcards are removed.
-No new HPP/3DS host is guessed. Actual native sign-in, checkout redirects and
+keeps its existing orientation declarations. Additional in-WebView hosts are
+exactly `appleid.apple.com` for Apple OAuth cookie binding and `sec.windcave.com`
+for Settings' browser-held billing card setup session. The latter is the existing
+production HPP host validated by server/windcave-links.ts. Replit, broad Apple/
+subdomain and payment-provider wildcards are removed. No HPP/3DS host is guessed.
+Actual native sign-in, checkout redirects and
 return navigation require the checks below before a native release.
 
 ## Reproduce the repository checks
@@ -76,6 +78,12 @@ configuration, artifact/commit identifiers, signing and entitlement results; do
 not infer any of these from Linux sync. Check the existing push registration,
 permissions, file/share plugins and physical NFC link sharing. Tap controls must
 remain absent even on iOS with a Capacitor proxy present.
+
+Record the remotely served web build as well as the native binary. The canonical
+server.url still points to production; syncing local assets does not deploy R7
+there. Device testing needs an owner-reviewed matching web candidate/test origin,
+with its exact navigation configuration recorded. Do not treat an old remote
+web build inside a freshly built native shell as evidence for this candidate.
 
 Test Apple sign-in start/cancel/error/success and the returned cookie session;
 other existing sign-in methods; HPP/3DS/hosted wallet redirects and return states;

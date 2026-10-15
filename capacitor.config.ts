@@ -7,9 +7,9 @@ const config: CapacitorConfig = {
   server: {
     url: "https://taptpay.co.nz/app-login",
     cleartext: false,
-    // Keep the existing cookie-bound Apple sign-in in this WebView (see
-    // server/apple-sign-in.ts); every other external navigation stays outside it.
-    allowNavigation: ["appleid.apple.com"],
+    // Preserve Apple sign-in cookies and Settings' browser-held billing session.
+    // Production HPP host is validated in server/windcave-links.ts; no wildcards.
+    allowNavigation: ["appleid.apple.com", "sec.windcave.com"],
   },
   ios: {
     backgroundColor: "#0055FF",

@@ -61,7 +61,7 @@ jobs:
       - name: R6 readiness and bounded shutdown (synthetic HTTP and child processes)
         run: npm run test:server -- --runTestsByPath server/__tests__/r6-health.test.ts server/__tests__/r6-schema-readiness.test.ts server/__tests__/r6-readiness-bundle.test.ts server/__tests__/r6-worker-drain.test.ts server/__tests__/r6-shutdown.test.ts server/__tests__/r6-http-work.test.ts server/__tests__/async-route-guard.test.ts server/__tests__/security-audit-log.test.ts
       - name: R7 locked native capability and side-effect-free refusal
-        run: npm run test:server -- --runTestsByPath server/__tests__/r7-capability-lock.test.ts server/__tests__/tap-to-pay-validation.test.ts server/__tests__/r0-t5-disabled-route-side-effects.test.ts
+        run: npm run test:server -- --runTestsByPath server/__tests__/r7-capability-lock.test.ts server/__tests__/tap-to-pay-validation.test.ts server/__tests__/r0-t5-disabled-route-side-effects.test.ts server/__tests__/api-route-contract.test.ts
       - name: R7 generated artifact guard (synthetic files only)
         run: npm run test:r7:artifacts
       - name: operator backup safety (synthetic subprocesses only)

@@ -143,3 +143,22 @@ Approve adding a failing-first served-copy drift case and rejecting a symlink
 artifact root as well as symlink entries. Separately recorded reread checked
 native full-map coverage and CI's actual build/guard ordering. No production
 asset may bypass verification by being put under the excluded root app name.
+
+Broader regression reread after implementation push: the API-address debt guard
+still lists the two deleted wallets and pre-removal literal counts in the legacy
+terminals. It fails before reading the remaining files. Approve removing only
+deleted entries and reducing the two retained counts to the actually remaining
+addresses, with the exact total still asserted. This tightens the debt budget;
+do not add exceptions or relax loaded-file route checks. Separately recorded
+reread checks each removed literal against the retired transport paths. Mark the
+historical wallet compliance note superseded by the actual R7 capability status;
+no legal/brand certification or new wallet integration is asserted.
+
+Final native compatibility correction: the later ten-heading
+R7-BILLING-NAVIGATION-REVIEW-2026-10-15.md supersedes the earlier Apple-only
+navigation conclusion. Settings stores its card setup session in sessionStorage
+before HPP navigation, so retain exact sec.windcave.com as well as Apple. This
+is the production host already enforced by the server link validator, inside the
+old wildcard. Failing-first config/actual HPP-contract tests reproduce its absence.
+No UAT/bank wildcard, SDK or charging behavior is added. Separately recorded
+reread confirms the existing browser context and exact selected-mode host.

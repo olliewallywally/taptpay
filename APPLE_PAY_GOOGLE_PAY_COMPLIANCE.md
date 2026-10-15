@@ -1,5 +1,11 @@
 # Apple Pay & Google Pay Compliance Report
 
+Historical implementation notes, superseded by R7 on October15,2026. The two
+placeholder wallet components described here have been removed. These notes do
+not establish a working native wallet or compliance approval. Current supported
+hosted checkout and the locked-off native Tap capability are documented in
+[the R7 release runbook](docs/operations/r7-native-capability-release.md).
+
 ## Current Implementation Status
 
 ### ❌ Critical Issues Fixed
